@@ -4,9 +4,9 @@
  */
 
 export const BUILD_INFO = {
-  "version": "0.6.0",
-  "buildTime": "2025-07-31T22:24:25.621Z",
-  "gitCommit": "d2c245e",
+  "version": "0.4.0",
+  "buildTime": "2025-08-01T17:41:54.565Z",
+  "gitCommit": "552efdf",
   "runtime": "bun",
   "bunVersion": "1.2.19"
 };
