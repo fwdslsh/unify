@@ -1,8 +1,6 @@
 [install]
 # Prefer exact versions for stability
 save-exact = true
-
-# Use Bun's faster package resolution
 registry = "https://registry.npmjs.org/"
 
 [test]
@@ -15,4 +13,4 @@ bun = true
 
 # Define build-time constants for executables
 [build]
-define = { BUILD_VERSION = '"0.6.0"' }
+define = { BUILD_VERSION = '"0.4.0"' }

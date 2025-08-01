@@ -6,8 +6,7 @@ Thank you for your interest in contributing to unify! This guide will help you g
 
 ### Prerequisites
 
-- **Node.js** 14+ (18+ recommended)
-- **npm** or **yarn**
+- **Bun** 1.0+ (latest recommended)
 - **git**
 
 ### Development Setup
@@ -18,16 +17,16 @@ git clone https://github.com/fwdslsh/unify.git
 cd cli
 
 # 2. Install dependencies
-npm install
+bun install
 
 # 3. Link for global testing
-npm link
+bun link
 
 # 4. Run tests
-npm test
+bun test
 
 # 5. Build example project
-npm run build
+bun run build
 ```
 
 ### Verify Installation
@@ -59,7 +58,7 @@ unify serve --source src
 3. **Test your changes**
    ```bash
    # Run the test suite
-   npm test
+   bun test
    
    # Test with example projects
    cd example/
@@ -88,13 +87,13 @@ We use ESLint and Prettier for code formatting:
 
 ```bash
 # Check code style
-npm run lint
+bun run lint
 
 # Fix auto-fixable issues
-npm run lint:fix
+bun run lint:fix
 
 # Format code
-npm run format
+bun run format
 ```
 
 **Key conventions:**
@@ -110,16 +109,16 @@ npm run format
 
 ```bash
 # Run all tests
-npm test
+bun test
 
 # Run specific test file
-node --test test/unit/include-processor.test.js
+bun test test/unit/include-processor.test.js
 
 # Run tests with coverage
-npm run test:coverage
+bun run test:coverage
 
 # Run integration tests
-npm run test:integration
+bun run test:integration
 ```
 
 #### Test Categories
@@ -148,13 +147,13 @@ describe('myFunction', () => {
 
 ```bash
 # Benchmark build performance
-npm run benchmark
+bun run benchmark
 
 # Profile memory usage
-node --inspect bin/cli.js build --source example/src
+bun --inspect bin/cli.js build --source example/src
 
 # Test with large sites
-npm run test:large
+bun run test:large
 ```
 
 ## 📝 Documentation
@@ -177,13 +176,13 @@ npm run test:large
 
 ```bash
 # Generate API documentation
-npm run docs:api
+bun run docs:api
 
 # Serve documentation locally
-npm run docs:serve
+bun run docs:serve
 
 # Check for broken links
-npm run docs:check
+bun run docs:check
 ```
 
 ## 🐛 Reporting Issues
@@ -191,7 +190,7 @@ npm run docs:check
 ### Before Submitting
 
 1. **Search existing issues** to avoid duplicates
-2. **Test with latest version** (`npm update unify`)
+2. **Test with latest version** (`bun update`)
 3. **Try minimal reproduction** case
 4. **Check documentation** for solutions
 
@@ -199,7 +198,7 @@ npm run docs:check
 
 **Bug reports should include:**
 - unify version (`unify --version`)
-- Node.js version (`node --version`)
+- Bun version (`bun --version`)
 - Operating system
 - Steps to reproduce
 - Expected vs actual behavior
@@ -336,7 +335,7 @@ We follow the [Contributor Covenant](https://www.contributor-covenant.org/):
 ### External Dependencies
 
 We minimize dependencies but use:
-- **markdown-it**: Markdown processing
+- **markdown-it**: Markdown processing  
 - **gray-matter**: Frontmatter parsing
 
 ## 🚢 Deployment and Release
@@ -357,10 +356,10 @@ git checkout main
 git pull origin main
 
 # Run tests
-npm test
+bun test
 
 # Publish to npm
-npm publish
+bun publish
 
 # Create GitHub release
 gh release create v0.x.x --generate-notes

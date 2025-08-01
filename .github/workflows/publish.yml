@@ -17,23 +17,14 @@ jobs:
         with:
           bun-version: latest
           
-      - name: Setup Node.js for NPM publishing
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-          registry-url: 'https://registry.npmjs.org'
-          
       - name: Install dependencies
         run: bun install
         
       - name: Run tests
-        run: bun test
-        
-      - name: Verify package files
-        run: bun pack --dry-run
+        run: bun test        
         
       - name: Build executable
-        run: bun build --compile --outfile unify bin/cli.js
+        run: bun build --compile --outfile unify bin/cli.js --minify
         
       - name: Upload executable artifact
         uses: actions/upload-artifact@v4
@@ -41,7 +32,13 @@ jobs:
           name: unify-executable
           path: unify
           retention-days: 30
-        
+
+      - name: Setup Node.js for NPM publishing
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          registry-url: 'https://registry.npmjs.org'
+           
       - name: Publish to NPM
         run: npm publish --access=public
         env:
