@@ -114,7 +114,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.image }}
+            ${{ env.REGISTRY }}/fwdslsh/${{ matrix.image }}
             fwdslsh/${{ matrix.image }}
           tags: |
             type=ref,event=branch
@@ -148,20 +148,20 @@ jobs:
       - name: Test CLI image
         if: matrix.image == 'unify'
         run: |
-          docker run --rm ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.image }}:latest unify --version
+          docker run --rm ${{ env.REGISTRY }}/fwdslsh/${{ matrix.image }}:latest unify --version
 
       - name: Test NGINX image  
         if: matrix.image == 'unify-nginx'
         run: |
           # Test that unify command is available
-          docker run --rm ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.image }}:latest unify --version
+          docker run --rm ${{ env.REGISTRY }}/fwdslsh/${{ matrix.image }}:latest unify --version
           
           # Test basic functionality with a simple site
           mkdir -p test-site
           echo '<h1>Test Site</h1>' > test-site/index.html
           
           # Test build functionality
-          docker run --rm -v $(pwd)/test-site:/site ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.image }}:latest \
+          docker run --rm -v $(pwd)/test-site:/site ${{ env.REGISTRY }}/fwdslsh/${{ matrix.image }}:latest \
             unify build --source /site --output /tmp/out
           
           echo "✅ Docker image tests passed"
@@ -178,7 +178,7 @@ jobs:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.image }}:latest
+          image-ref: ${{ env.REGISTRY }}/fwdslsh/${{ matrix.image }}:latest
           format: 'sarif'
           output: 'trivy-results.sarif'
 
