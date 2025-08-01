@@ -40,7 +40,7 @@ jobs:
         run: ./unify-test --version
       
       - name: Copy executable to workspace
-        run: cp unify-test dist/unify-linux-x64
+        run: mkdir -p dist && cp unify-test dist/unify-linux-x64
 
       - name: Test Docker builds
         run: |
