@@ -65,7 +65,7 @@ jobs:
       matrix:
         include:
           - dockerfile: Dockerfile.cli
-            image: unify-cli
+            image: unify
             platforms: linux/amd64,linux/arm64
           - dockerfile: Dockerfile.nginx
             image: unify-nginx
@@ -115,7 +115,7 @@ jobs:
         with:
           images: |
             ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.image }}
-            itlackey/${{ matrix.image }}
+            fwdslsh/${{ matrix.image }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -131,7 +131,7 @@ jobs:
           file: docker/${{ matrix.dockerfile }}
           platforms: ${{ matrix.platforms }}
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: latest,${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -143,10 +143,10 @@ jobs:
     if: github.event_name != 'pull_request'
     strategy:
       matrix:
-        image: [unify-cli, unify-nginx]
+        image: [unify, unify-nginx]
     steps:
       - name: Test CLI image
-        if: matrix.image == 'unify-cli'
+        if: matrix.image == 'unify'
         run: |
           docker run --rm ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.image }}:latest unify --version
 
@@ -173,7 +173,7 @@ jobs:
     if: github.event_name != 'pull_request'
     strategy:
       matrix:
-        image: [unify-cli, unify-nginx]
+        image: [unify, unify-nginx]
     steps:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
