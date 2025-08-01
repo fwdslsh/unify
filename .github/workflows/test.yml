@@ -46,7 +46,7 @@ jobs:
         run: |
           # Build CLI Docker image and test it
           docker build -f docker/Dockerfile.cli -t unify-cli-test .
-          docker run --rm unify-cli-test unify --version
+          docker run --rm unify-cli-test --version
           
           # Build NGINX Docker image and test it
           docker build -f docker/Dockerfile.nginx -t unify-nginx-test .

@@ -12,7 +12,7 @@ RUN apt-get update \
 
 # Enable necessary Apache modules, disable unused
 RUN a2enmod include headers \
- && a2dismod autoindex status cgid negotiation userdir
+ && a2dismod -f autoindex status cgid negotiation userdir
 
 # Remove default config and add our own (immutable, not writable by the container)
 COPY docker/apache.conf /etc/apache2/sites-available/000-default.conf
