@@ -1,0 +1,56 @@
+name: Run Tests
+
+on:
+  push:
+    branches:
+      - main
+      - test
+
+jobs:
+  run-tests:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+          
+      - name: Install dependencies
+        run: bun install
+        
+      - name: Run tests
+        run: bun test
+        
+      - name: Verify package structure
+        run: |
+          # Verify main entry points exist
+          test -f bin/cli.js
+          test -f package.json
+          # Verify package can be installed
+          bun install --production --dry-run
+        
+      - name: Build test executable
+        run: bun build --compile --outfile unify-test bin/cli.js
+        
+      - name: Test executable
+        run: ./unify-test --version
+      
+      - name: Copy executable to workspace
+        run: cp unify-test dist/unify-linux-x64
+
+      - name: Test Docker builds
+        run: |
+          # Build CLI Docker image and test it
+          docker build -f docker/Dockerfile.cli -t unify-cli-test .
+          docker run --rm unify-cli-test unify --version
+          
+          # Build NGINX Docker image and test it
+          docker build -f docker/Dockerfile.nginx -t unify-nginx-test .
+          echo "test" > test.txt
+          mkdir -p test-site
+          echo "<h1>Test</h1>" > test-site/index.html
+          timeout 10 docker run --rm -v $(pwd)/test-site:/site unify-nginx-test || true             

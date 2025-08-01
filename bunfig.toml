@@ -1,0 +1,18 @@
+[install]
+# Prefer exact versions for stability
+save-exact = true
+
+# Use Bun's faster package resolution
+registry = "https://registry.npmjs.org/"
+
+[test]
+# Use Bun's test runner
+preload = ["./test/bun-setup.js"]
+
+[run]
+# Enable Bun's built-in bundler for imports
+bun = true
+
+# Define build-time constants for executables
+[build]
+define = { BUILD_VERSION = '"0.6.0"' }

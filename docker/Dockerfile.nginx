@@ -1,0 +1,36 @@
+# Streamlined Docker build using single file executable with NGINX
+# Using Debian-based nginx for glibc compatibility with Bun executables
+FROM nginx:1.25-bookworm
+
+# Install utilities for health checks
+RUN apt-get update && apt-get install -y \
+    curl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy the single file executable
+COPY dist/unify-linux-x64 /usr/local/bin/unify
+RUN chmod +x /usr/local/bin/unify
+
+# Copy custom NGINX configuration
+COPY docker/nginx.conf /etc/nginx/nginx.conf
+
+# Create necessary directories
+RUN mkdir -p /site /var/www/html
+
+# Copy startup script
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Expose HTTP port
+EXPOSE 80
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost/ || exit 1
+
+# Set working directory for site files
+WORKDIR /site
+
+# Start dompile with auto-rebuild and NGINX
+ENTRYPOINT ["/entrypoint.sh"]

@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Page</title>
+</head>
+<body>
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://unpkg.com/augmented-ui@2/augmented-ui.min.css">
+<link rel="stylesheet" href="/css/main.css">
+    <title>Download Unify CLI</title>
+</head>
+
+<body>
+    <!-- NAVBAR -->
+<style>
+  .navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--bg-alt);
+    border-bottom: 2px solid var(--border);
+    padding: 1rem 2rem;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .navbar a {
+    color: var(--text);
+    font-family: var(--font-display);
+    margin-left: 1rem;
+    font-size: 1.1rem;
+    transition: all 0.2s ease-in-out;
+  }
+
+  .navbar a:hover, .navbar .logo a:hover {
+    color: var(--accent-2);
+  }
+
+  .navbar .logo a {
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    text-transform: lowercase;
+    color: var(--accent);
+    margin-left: 0;
+    font-family: 'slashcore', 'Share Tech Mono';
+  }
+
+  /* Generic glow effect for elements that use text color */
+  .navbar a:hover {
+    text-shadow: 0 0 1px currentColor,
+      0 0 1px currentColor,
+      0 0 1px currentColor;
+    text-decoration: none;
+  }
+</style>
+<nav class="navbar">
+  <div class="logo text-accent">
+    <a href="/">/unify</a>
+  </div>
+  <div class="nav-links">
+    <a href="/download.html">Download</a>
+    <a href="/about.html">About</a>
+    <a href="https://github.com/fwdslsh/unify" target="_blank" aria-label="GitHub">
+      <svg height="1.2em" viewBox="0 0 16 16" fill="currentColor" style="vertical-align: middle;">
+      <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38
+      0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52
+      -.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2
+      -3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.65
+      7.65 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08
+      2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01
+      1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+      </svg>
+    </a></svg>
+  </div>
+</nav>
+    <main class="container">
+        <section class="hero" data-augmented-ui="tl-clip tr-clip bl-round br-scoop border">
+            <h1>Download Unify CLI</h1>
+            <p><em>Build static sites with peace, power, and simplicity.</em></p>
+        </section>
+
+
+        <section class="card" style="margin: 2rem 0;">
+            <h2>Get Started</h2>
+            <p>Unify is a modern, lightweight static site generator for frontend developers who want maintainable,
+                framework-free HTML sites. Install it globally or run instantly with <code>npx</code>.</p>
+            <div>
+                <h3>✨ Quick Install</h3>
+                <pre class="cli" data-augmented-ui="border bl-clip br-clip tr-round">
+                <code>
+# With npm (recommended)
+npm install -g @fwdslsh/unify
+
+# Or use npx for one-off runs
+npx @fwdslsh/unify --help
+</code>
+                </pre>
+                <h3>🚀 Bun-Native (fastest)</h3>
+                <pre class="cli" data-augmented-ui="border bl-clip br-clip tr-round"><code>
+# Install Bun (if not already)
+curl -fsSL https://bun.sh/install | bash
+
+# Install unify globally with Bun
+bun add -g @fwdslsh/unify
+                </code></pre>
+                <h3>🦕 Deno</h3>
+                <pre class="cli" data-augmented-ui="border bl-clip br-clip tr-round"><code>
+# Use npm compatibility mode
+deno run -A npm:@fwdslsh/unify@latest --help
+                </code></pre>
+            </div>
+        </section>
+
+        <section class="card" style="margin: 2rem 0;">
+            <h2>Usage</h2>
+            <p>Once installed, you can build and serve your site with a single command:</p>
+            <pre class="cli" data-augmented-ui="border bl-clip br-clip tr-round">
+                <code>
+unify build         # Build from src/ to dist/
+unify serve         # Start dev server with live reload
+unify watch         # Watch for changes and rebuild
+            </code></pre>
+            <small>For advanced options, see the <a href="docs/cli-reference.md">CLI Reference</a>.</small>
+        </section>
+
+        <section class="card" style="margin: 2rem 0;">
+            <h2>Supported Platforms</h2>
+            <ul>
+                <li><strong>Bun</strong> (fastest, native APIs)</li>
+                <li><strong>Linux/MacOS/Windows</strong> (compiled binary)</li>
+                <li><strong>Node.js</strong> 14+ (native ESM support)</li>
+            </ul>
+        </section>
+
+        <section class="card" style="margin: 2rem 0;">
+            <h2>Directory Structure</h2>
+            <pre>
+src/
+├── .layouts/          # Page layouts with slots
+│   ├── default.html
+│   └── ...
+├── .components/       # Reusable components
+│   ├── head.html
+│   ├── header.html
+│   └── footer.html
+├── pages/             # Content pages
+│   └── ...
+└── index.html
+            </pre>
+        </section>
+
+        <section class="card" style="margin: 2rem 0;">
+            <h2>Next Steps</h2>
+            <ul>
+                <li>Read the <a href="docs/getting-started.md">Getting Started Guide</a></li>
+                <li>See <a href="docs/include-syntax.md">Include Syntax</a> for reusable components</li>
+                <li>Explore <a href="docs/layouts-slots-templates.md">Layouts &amp; Slots</a> for advanced templating
+                </li>
+            </ul>
+        </section>
+
+    </main>
+
+    <!-- FOOTER -->
+<footer class="container">
+  <p>&copy; 2025 fwdslsh. No cookies, no tracking, no JavaScript.</p>
+</footer>
+</body>
+
+</html>
+</body>
+</html>

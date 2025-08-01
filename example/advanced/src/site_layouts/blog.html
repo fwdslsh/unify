@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>
+    <slot name="title">My Blog</slot>
+  </title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="/styles/site.css">
+  <style>
+    .blog-layout {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .blog-header {
+      text-align: center;
+      border-bottom: 2px solid #eee;
+      padding-bottom: 20px;
+      margin-bottom: 30px;
+    }
+
+    .blog-content {
+      line-height: 1.6;
+    }
+
+    .blog-footer {
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 1px solid #eee;
+      text-align: center;
+      color: #666;
+    }
+  </style>
+</head>
+
+<body class="blog-layout">
+  <template target="header">
+    <h1>My Blog</h1>
+  </template>
+  <main class="blog-content">
+    <slot></slot> <!-- Main blog content -->
+  </main>
+  <include src="/custom_components/footer.html" />
+</body>
+
+</html>

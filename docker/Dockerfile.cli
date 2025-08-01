@@ -1,0 +1,28 @@
+# Streamlined Docker container using single file executable
+# Using Ubuntu instead of Alpine for glibc compatibility with Bun executables
+FROM ubuntu:22.04
+
+# Install only essential dependencies
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    tzdata \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN groupadd -g 1001 appgroup && \
+    useradd -u 1001 -g appgroup -m appuser
+
+# Copy the single file executable
+COPY dist/unify-linux-x64 /usr/local/bin/unify
+RUN chmod +x /usr/local/bin/unify
+
+# Create working directory
+WORKDIR /workspace
+RUN chown appuser:appgroup /workspace
+
+# Switch to non-root user
+USER appuser
+
+# Set default entrypoint and command
+ENTRYPOINT ["unify"]
+CMD ["--help"]

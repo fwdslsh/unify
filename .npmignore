@@ -1,0 +1,54 @@
+# Development and testing files
+test/
+docs/
+examples/
+docker/
+Dockerfile
+.dockerignore
+.github/
+.claude/
+CLAUDE.md
+.notes/
+
+*.test.js
+*.spec.js
+
+# Build and development tools
+.github/
+.vscode/
+.idea/
+
+# Documentation drafts
+Implementation Plan*
+roadmap.md
+
+# Development dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment and configuration
+.env*
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Coverage and test results
+coverage/
+.nyc_output/
+test-results/
+
+# Editor files
+*.swp
+*.swo
+*~

@@ -1,0 +1,35 @@
+FROM ubuntu:22.04
+
+# Add non-root user early so we can set ownership
+RUN useradd -r -u 1001 -g www-data -d /var/www htmluser
+
+# Install Apache, tini, and security module
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+    apache2 apache2-utils ca-certificates tini \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/*
+
+# Enable necessary Apache modules, disable unused
+RUN a2enmod include headers \
+ && a2dismod autoindex status cgid negotiation userdir
+
+# Remove default config and add our own (immutable, not writable by the container)
+COPY docker/apache.conf /etc/apache2/sites-available/000-default.conf
+
+# Prepare the web root with correct ownership/permissions
+RUN mkdir -p /var/www/html \
+ && chown -R htmluser:www-data /var/www/html \
+ && chmod -R 555 /var/www/html
+
+VOLUME ["/var/www/html"]
+WORKDIR /var/www/html
+
+# Expose port 8080
+EXPOSE 8080
+
+# Drop root privileges and start Apache via tini
+USER htmluser
+
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["/usr/sbin/apache2", "-D", "FOREGROUND"]

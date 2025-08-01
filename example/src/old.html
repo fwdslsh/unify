@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head><!--#include virtual="/includes/head.html" -->
+  <title>Home - Unify Demo</title>
+</head>
+
+<body>
+  <!--#include virtual="/includes/home-header.html" -->
+
+  <section>
+    <h2>Why Choose Unify?</h2>
+    <div class="features">
+      <div class="card" data-augmented-ui="tl-clip tr-scoop both">
+        <h3>🌱 Simple Includes</h3>
+        <p>Write <code>&lt;!--#include file="header.html"--&gt;</code> - no complex template engine needed. Pure HTML simplicity.</p>
+      </div>
+      <div class="card" data-augmented-ui="bl-clip tr-scoop both">
+        <h3>🔧 Modern CLI</h3>
+        <p>Works on any modern shell. Supports dry-run, verbose mode, build &amp; serve with live reload.</p>
+      </div>
+      <div class="card" data-augmented-ui="tl-round br-clip both">
+        <h3>🌿 Eco-Friendly</h3>
+        <p>Minimal dependencies, no runtime overhead. Build fast, sustainable websites with a tiny footprint.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="demo">
+    <h2>See It in Action</h2>
+    <pre class="cli" data-augmented-ui="border bl-clip br-clip tr-round">
+$ unify build
+Processing: index.html => dist/index.html
+Injecting includes into head...
+Build complete in 114 ms
+  </pre>
+  </section>
+
+  <section>
+    <h2>Solarpunk Philosophy</h2>
+    <p>Rooted in solarpunk philosophy—a future built on joyful, sustainable simplicity. Unify embodies DIY technology, eco-minded design, and digital minimalism. We believe in tools that empower without overwhelming, that build without breaking.</p>
+    <div class="card" data-augmented-ui="r-scoop b-clip both" style="background: linear-gradient(135deg, var(--surface-secondary), var(--surface-primary)); margin: var(--space-8) 0;">
+      <h3>🌟 Our Vision</h3>
+      <p><strong>Technology should feel like gardening—</strong> nurturing, sustainable, and in harmony with natural patterns. Every line of code should serve a purpose, every dependency should earn its place.</p>
+    </div>
+  </section>
+
+  <section id="get-started" style="text-align:center;">
+    <a class="btn" href="getting-started.html" data-augmented-ui="tl-round tr-round bl-clip br-clip">Get Started →</a>
+  </section>
+
+  <!--#include virtual="/includes/footer.html" -->
+</body>
+
+</html>
