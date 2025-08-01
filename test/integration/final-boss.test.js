@@ -1,7 +1,7 @@
 /**
  * Final Boss Integration Test
  * 
- * This is the ultimate comprehensive test that exercises the entire dompile system
+ * This is the ultimate comprehensive test that exercises the entire unify system
  * including all major features, edge cases, and real-world scenarios.
  * 
  * Features tested:
@@ -90,7 +90,7 @@ describe('Final Boss Integration Test', () => {
   <template target="description">Welcome to our comprehensive test site</template>
   
   <h1>Welcome to Final Boss Test Site</h1>
-  <p>This site tests all major DOMpile features.</p>
+  <p>This site tests all major Unify features.</p>
   
   <!--#include virtual="/.components/card.html" -->
   
@@ -108,7 +108,7 @@ describe('Final Boss Integration Test', () => {
   <template target="description">Learn about our test methodology</template>
   
   <h1>About This Test</h1>
-  <p>This is a comprehensive integration test for DOMpile.</p>
+  <p>This is a comprehensive integration test for Unify.</p>
   
   <!--#include virtual="/.components/card.html" -->
 </div>`,
@@ -344,7 +344,7 @@ describe('Final Boss Integration Test', () => {
 
       await createTestStructure(tempDir, edgeCaseStructure);
 
-      const buildResult = await runDompileBuild(tempDir, sourceDir, outputDir);
+      const buildResult = await runUnifyBuild(tempDir, sourceDir, outputDir);
       
       // Build should complete despite errors (graceful degradation)
       expect(buildResult.code).toBe(0);
@@ -374,7 +374,7 @@ describe('Final Boss Integration Test', () => {
 
       // Test custom source and output directories with short flags
       const customOutputDir = path.join(tempDir, 'build');
-      const buildResult = await runDompileBuild(
+      const buildResult = await runUnifyBuild(
         tempDir,
         path.join(tempDir, 'content'),
         customOutputDir,
@@ -413,7 +413,7 @@ describe('Final Boss Integration Test', () => {
 
       await createTestStructure(tempDir, largeStructure);
 
-      const buildResult = await runDompileBuild(tempDir, sourceDir, outputDir);
+      const buildResult = await runUnifyBuild(tempDir, sourceDir, outputDir);
       const buildTime = Date.now() - startTime;
 
       expect(buildResult.code).toBe(0);
@@ -453,7 +453,7 @@ describe('Final Boss Integration Test', () => {
 
       await createTestStructure(tempDir, deepStructure);
 
-      const buildResult = await runDompileBuild(tempDir, sourceDir, outputDir);
+      const buildResult = await runUnifyBuild(tempDir, sourceDir, outputDir);
       
       expect(buildResult.code).toBe(0);
 
@@ -468,9 +468,9 @@ describe('Final Boss Integration Test', () => {
 });
 
 /**
- * Helper function to run dompile build command
+ * Helper function to run unify build command
  */
-async function runDompileBuild(workingDir, sourceDir, outputDir, extraArgs = []) {
+async function runUnifyBuild(workingDir, sourceDir, outputDir, extraArgs = []) {
   const args = [
     'build',
     '--source', sourceDir,

@@ -119,8 +119,8 @@ unify has comprehensive test coverage:
 ## 🔗 Cross-Platform Support
 
 - **Node.js** 14+ (native ESM support)
-- **Bun**: `bun run @unify/cli serve` (faster execution)
-- **Deno**: `deno run --allow-read --allow-write --allow-net npm:@unify/cli`
+- **Bun**: `bun run @fwdslsh/unify serve` (faster execution)
+- **Deno**: `deno run --allow-read --allow-write --allow-net npm:@fwdslsh/unify`
 
 ## 🗺️ Roadmap
 
@@ -133,7 +133,7 @@ We welcome contributions! See our [Contributing Guide](CONTRIBUTING.md) for deta
 ### Development Setup
 
 ```bash
-git clone https://github.com/unify/cli
+git clone https://github.com/fwdslsh/unify
 cd cli
 npm install
 npm test

@@ -663,9 +663,9 @@ project/
 
 ### Package Managers
 
-- npm global installation: `npm install -g @unify/cli`
-- npx usage: `npx @unify/cli`
-- Package registry: `@unify/cli`
+- npm global installation: `npm install -g @fwdslsh/unify`
+- npx usage: `npx @fwdslsh/unify`
+- Package registry: `@fwdslsh/unify`
 
 ### Development Tools
 

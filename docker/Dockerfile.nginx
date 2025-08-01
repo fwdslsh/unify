@@ -32,5 +32,5 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 # Set working directory for site files
 WORKDIR /site
 
-# Start dompile with auto-rebuild and NGINX
+# Start unify with auto-rebuild and NGINX
 ENTRYPOINT ["/entrypoint.sh"]

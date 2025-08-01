@@ -1,11 +1,11 @@
 
 # Templating Quick Start Guide
 
-A simple introduction to dompile's templating features. Learn the basics of layouts, slots, templates, and includes in minutes.
+A simple introduction to unify's templating features. Learn the basics of layouts, slots, templates, and includes in minutes.
 
 ## Overview
 
-dompile has four simple templating features:
+unify has four simple templating features:
 
 - **Layouts** → Page structure with `<slot name="example">` placeholders
 - **Slots** → Content placeholders in layouts with optional default content

@@ -14,7 +14,7 @@ Thank you for your interest in contributing to unify! This guide will help you g
 
 ```bash
 # 1. Fork and clone the repository
-git clone https://github.com/dompile/cli.git
+git clone https://github.com/fwdslsh/unify.git
 cd cli
 
 # 2. Install dependencies
@@ -33,13 +33,13 @@ npm run build
 ### Verify Installation
 
 ```bash
-# Check dompile is working
-dompile --version
+# Check unify is working
+unify --version
 
 # Test with example project
 cd example/
-dompile build --source src --output test-dist
-dompile serve --source src
+unify build --source src --output test-dist
+unify serve --source src
 ```
 
 ## 🏗️ Development Workflow
@@ -63,11 +63,11 @@ dompile serve --source src
    
    # Test with example projects
    cd example/
-   dompile build --source src --output test-dist
+   unify build --source src --output test-dist
    
    # Test advanced features
    cd advanced/
-   dompile build --source src --output test-dist
+   unify build --source src --output test-dist
    ```
 
 4. **Commit and push**
@@ -191,14 +191,14 @@ npm run docs:check
 ### Before Submitting
 
 1. **Search existing issues** to avoid duplicates
-2. **Test with latest version** (`npm update dompile`)
+2. **Test with latest version** (`npm update unify`)
 3. **Try minimal reproduction** case
 4. **Check documentation** for solutions
 
 ### Issue Template
 
 **Bug reports should include:**
-- dompile version (`dompile --version`)
+- unify version (`unify --version`)
 - Node.js version (`node --version`)
 - Operating system
 - Steps to reproduce
@@ -368,4 +368,4 @@ gh release create v0.x.x --generate-notes
 
 ---
 
-**Thank you for contributing to dompile!** Every contribution, no matter how small, makes the project better for everyone. 🙏
+**Thank you for contributing to unify!** Every contribution, no matter how small, makes the project better for everyone. 🙏

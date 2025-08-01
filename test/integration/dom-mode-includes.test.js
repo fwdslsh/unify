@@ -144,12 +144,12 @@ describe('DOM Mode Include Processing', () => {
       `<body data-layout="/site_layouts/blog.html">
   <template target="title">Welcome to DOM Mode</template>
   <template target="header">
-    <h1>🧱 DOMpile DOM Mode</h1>
+    <h1>🧱 Unify DOM Mode</h1>
     <p>Modern templating with pure HTML</p>
   </template>
 
   <h2>Hello!</h2>
-  <p>This is a blog post rendered with the DOMpile DOM Mode layout engine. This content goes into the unnamed slot.</p>
+  <p>This is a blog post rendered with the Unify DOM Mode layout engine. This content goes into the unnamed slot.</p>
 
   <include src="/custom_components/alert.html"
            data-title="Note"
@@ -169,8 +169,8 @@ describe('DOM Mode Include Processing', () => {
   <include src="/custom_components/navigation.html" />
 
   <template target="footer">
-    <p>© 2025 - Built with DOMpile DOM Mode</p>
-    <p><a href="https://github.com/yourusername/dompile">View on GitHub</a></p>
+    <p>© 2025 - Built with Unify DOM Mode</p>
+    <p><a href="https://github.com/yourusername/unify">View on GitHub</a></p>
   </template>
 </body>`
     );

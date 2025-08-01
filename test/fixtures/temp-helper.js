@@ -12,7 +12,7 @@ import os from 'os';
  */
 export async function createTempDirectory() {
   const tempBase = os.tmpdir();
-  const tempName = `dompile-test-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  const tempName = `unify-test-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   const tempPath = path.join(tempBase, tempName);
   
   await fs.mkdir(tempPath, { recursive: true });
@@ -24,7 +24,7 @@ export async function createTempDirectory() {
  * @param {string} tempPath - Path to temporary directory
  */
 export async function cleanupTempDirectory(tempPath) {
-  if (tempPath && tempPath.includes('dompile-test-')) {
+  if (tempPath && tempPath.includes('unify-test-')) {
     await fs.rm(tempPath, { recursive: true, force: true });
   }
 }

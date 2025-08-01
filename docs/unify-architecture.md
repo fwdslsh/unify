@@ -1,10 +1,10 @@
 # Unify Architecture
 
-This document provides a detailed technical overview of the DOMpile static site generator implementation.
+This document provides a detailed technical overview of the Unify static site generator implementation.
 
 ## Overview
 
-DOMpile is a modern static site generator that processes HTML files with Apache SSI-style includes, markdown content, and provides live development features. It transforms templates with include statements into complete, standalone HTML files while offering incremental builds, asset tracking, and automatic sitemap generation.
+Unify is a modern static site generator that processes HTML files with Apache SSI-style includes, markdown content, and provides live development features. It transforms templates with include statements into complete, standalone HTML files while offering incremental builds, asset tracking, and automatic sitemap generation.
 
 ## Core Design Principles
 
@@ -249,7 +249,7 @@ test/
 
 ## Conclusion
 
-DOMpile's architecture delivers a powerful yet simple static site generator that scales from small projects to large sites. The modular design, incremental build system, and live development features provide an excellent developer experience while generating fast, SEO-optimized static websites.
+Unify's architecture delivers a powerful yet simple static site generator that scales from small projects to large sites. The modular design, incremental build system, and live development features provide an excellent developer experience while generating fast, SEO-optimized static websites.
 
 Key architectural strengths:
 - **Performance**: Incremental builds and smart asset tracking

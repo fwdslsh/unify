@@ -16,7 +16,7 @@ describe('Package.json Reading', () => {
 
   beforeEach(async () => {
     // Create an isolated temp directory far from project root to avoid finding project package.json
-    tempDir = path.join('/tmp', 'dompile-test-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9));
+    tempDir = path.join('/tmp', 'unify-test-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9));
     await fs.mkdir(tempDir, { recursive: true });
   });
 

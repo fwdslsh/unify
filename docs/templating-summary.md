@@ -1,6 +1,6 @@
 # Templating System Summary
 
-A concise overview of dompile's four templating features.
+A concise overview of unify's four templating features.
 
 ## Core Concepts
   

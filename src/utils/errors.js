@@ -318,6 +318,3 @@ export class ComponentError extends UnifyError {
     this.parentFile = parentFile;
   }
 }
-
-// Backwards compatibility alias
-export const DompileError = UnifyError;
