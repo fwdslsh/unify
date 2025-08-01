@@ -56,6 +56,7 @@ This document outlines the development roadmap for unify, showing completed feat
 - **Test coverage expansion** - add tests for all features and edge cases
 - **Performance optimizations** - profile and optimize build times
 - **Error message improvements** - better context and actionable suggestions
+- **Init command** - add `init` command to create an initial site
 
 ### Developer Experience
 
@@ -82,14 +83,6 @@ This document outlines the development roadmap for unify, showing completed feat
 - **IDE extensions** for better development experience
 - **Build analytics** with performance insights and optimization suggestions
 - **Deployment guides** with popular hosting platforms
-
-### Enterprise Features
-
-- **Multi-site management** for large organizations
-- **Theme system** with shared layouts and components across sites
-- **Content validation** with schema checking and lint rules
-- **Asset pipeline** with advanced preprocessing and optimization
-- **Headless CMS integration** for content management workflows
 
 ## 🎯 Version Goals
 
