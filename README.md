@@ -1,8 +1,10 @@
 # unify - an SSG for a more peaceful future
 
-![unify banner](example/src/imgs/green-banner-800.png)
+
+<img src="example/src/imgs/green-icon-64.png" alt="unify banner" style="float: left; margin-right: 16px;" />
 
 A modern, lightweight static site generator that brings the power of server-side includes, markdown processing, and live development to your workflow. Build maintainable static sites with component-based architecture—no more copying and pasting headers, footers, and navigation across multiple pages!
+
 
 ## ✨ Perfect for Frontend Developers
 
