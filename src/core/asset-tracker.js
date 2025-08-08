@@ -189,21 +189,39 @@ export class AssetTracker {
     // Extract new references from HTML
     const assets = this.extractAssetReferences(htmlContent, pagePath, sourceRoot);
     
-    // Also extract references from any CSS files referenced in the HTML
+    // Process CSS files recursively to handle @import chains
     const cssAssets = new Set();
+    const processedCssFiles = new Set(); // Prevent infinite loops in case of circular imports
+    
+    const processCssFile = async (cssPath) => {
+      if (processedCssFiles.has(cssPath)) {
+        return; // Already processed this CSS file
+      }
+      processedCssFiles.add(cssPath);
+      
+      try {
+        const fs = await import('fs/promises');
+        const cssContent = await fs.default.readFile(cssPath, 'utf-8');
+        const cssReferences = this.extractCssAssetReferences(cssContent, cssPath, sourceRoot);
+        
+        for (const cssRef of cssReferences) {
+          cssAssets.add(cssRef);
+          
+          // If this reference is another CSS file, process it recursively
+          if (cssRef.endsWith('.css')) {
+            await processCssFile(cssRef);
+          }
+        }
+      } catch (error) {
+        // CSS file might not exist or be readable, continue without error
+        logger.debug(`Could not read CSS file for asset extraction: ${cssPath}`);
+      }
+    };
+    
+    // Process all CSS files found in HTML
     for (const assetPath of assets) {
       if (assetPath.endsWith('.css')) {
-        try {
-          const fs = await import('fs/promises');
-          const cssContent = await fs.default.readFile(assetPath, 'utf-8');
-          const cssReferences = this.extractCssAssetReferences(cssContent, assetPath, sourceRoot);
-          for (const cssRef of cssReferences) {
-            cssAssets.add(cssRef);
-          }
-        } catch (error) {
-          // CSS file might not exist or be readable, continue without error
-          logger.debug(`Could not read CSS file for asset extraction: ${assetPath}`);
-        }
+        await processCssFile(assetPath);
       }
     }
     
