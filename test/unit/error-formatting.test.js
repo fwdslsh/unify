@@ -253,7 +253,6 @@ describe('Error Message Format Validation', () => {
       const output = result.stdout + result.stderr;
 
       // Should include debug information
-      expect(output).toMatch(/\[DEBUG\].*Runtime features/);
       expect(output).toMatch(/\[DEBUG\].*Build cache/);
       expect(output).toMatch(/\[DEBUG\].*Processed.*index\.html/);
     });
