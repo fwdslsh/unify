@@ -134,6 +134,7 @@ Options:
   --output, -o      Output directory (default: dist)
   --layouts, -l     Layouts directory (default: .layouts, relative to source)
   --components, -c  Components directory (default: .components, relative to source)
+  --assets, -a      Additional assets glob pattern to copy recursively
   --port, -p        Server port (default: 3000)
   --host            Server host (default: localhost)
   --pretty-urls     Generate pretty URLs (about.md → about/index.html)
@@ -152,6 +153,7 @@ Examples:
   unify serve                             # Serve with live reload on port 3000
   unify build --pretty-urls
   unify build --base-url https://mysite.com
+  unify build --assets "./assets/**/*.*"  # Copy additional assets
   unify serve --port 8080
 `);
 }

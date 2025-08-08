@@ -75,6 +75,7 @@ export function parseArgs(argv) {
     verbose: false,
     help: false,
     version: false,
+    assets: null,
   };
   
   for (let i = 0; i < argv.length; i++) {
@@ -165,6 +166,26 @@ export function parseArgs(argv) {
       continue;
     }
     
+    if ((arg === '--assets' || arg === '-a') && nextArg) {
+      args.assets = nextArg;
+      i++;
+      continue;
+    }
+    
+    // Handle --assets without value
+    if (arg === '--assets' || arg === '-a') {
+      throw new UnifyError(
+        'The --assets option requires a glob pattern value',
+        null,
+        null,
+        [
+          'Provide a glob pattern like: --assets "./assets/**/*.*"',
+          'Use quotes around patterns with special characters',
+          'Check the documentation for glob pattern examples'
+        ]
+      );
+    }
+    
     
     if ((arg === '--port' || arg === '-p') && nextArg) {
       args.port = parseInt(nextArg, 10);
@@ -230,7 +251,7 @@ export function parseArgs(argv) {
     if (arg.startsWith('-')) {
       const validOptions = [
         '--help', '-h', '--version', '-v', '--source', '-s', '--output', '-o',
-        '--layouts', '-l', '--components', '-c', '--port', '-p', '--host',
+        '--layouts', '-l', '--components', '-c', '--assets', '-a', '--port', '-p', '--host',
         '--pretty-urls', '--base-url', '--clean', '--no-sitemap', 
         '--perfection', '--minify', '--verbose'
       ];

@@ -474,6 +474,141 @@ describe('CLI Commands and Options', () => {
       expect(result1.code === 0 || result2.code === 0).toBeTruthy();
     });
   });
+
+  describe('Assets Glob Option', () => {
+    it('should copy additional assets with --assets glob pattern', async () => {
+      const structure = {
+        'src/index.html': '<h1>Assets Test</h1>',
+        'src/assets/image1.png': 'fake-png-content',
+        'src/assets/subdir/image2.jpg': 'fake-jpg-content',
+        'src/other/style.css': 'body { margin: 0; }',
+        'src/other/script.js': 'console.log("test");'
+      };
+
+      await createTestStructure(tempDir, structure);
+
+      const result = await runCLIInDir(tempDir, [
+        'build',
+        '--source', sourceDir,
+        '--output', outputDir,
+        '--assets', 'assets/**/*'
+      ]);
+
+      expect(result.code).toBe(0);
+      
+      // Check that index.html was built
+      const indexExists = await fileExists(path.join(outputDir, 'index.html'));
+      expect(indexExists).toBeTruthy();
+      
+      // Check that assets from glob pattern were copied
+      const image1Exists = await fileExists(path.join(outputDir, 'assets/image1.png'));
+      const image2Exists = await fileExists(path.join(outputDir, 'assets/subdir/image2.jpg'));
+      expect(image1Exists).toBeTruthy();
+      expect(image2Exists).toBeTruthy();
+      
+      // Check that non-matching assets were not copied
+      const styleExists = await fileExists(path.join(outputDir, 'other/style.css'));
+      const scriptExists = await fileExists(path.join(outputDir, 'other/script.js'));
+      expect(styleExists).toBeFalsy();
+      expect(scriptExists).toBeFalsy();
+    });
+
+    it('should work with short flag -a', async () => {
+      const structure = {
+        'src/index.html': '<h1>Short Flag Test</h1>',
+        'src/images/photo.png': 'fake-png'
+      };
+
+      await createTestStructure(tempDir, structure);
+
+      const result = await runCLIInDir(tempDir, [
+        'build',
+        '-s', sourceDir,
+        '-o', outputDir,
+        '-a', 'images/**/*'
+      ]);
+
+      expect(result.code).toBe(0);
+      
+      const photoExists = await fileExists(path.join(outputDir, 'images/photo.png'));
+      expect(photoExists).toBeTruthy();
+    });
+
+    it('should build successfully when no assets match the pattern', async () => {
+      const structure = {
+        'src/index.html': '<h1>No Match Test</h1>'
+      };
+
+      await createTestStructure(tempDir, structure);
+
+      const result = await runCLIInDir(tempDir, [
+        'build',
+        '--source', sourceDir,
+        '--output', outputDir,
+        '--assets', 'nonexistent/**/*'
+      ]);
+
+      expect(result.code).toBe(0);
+      
+      const indexExists = await fileExists(path.join(outputDir, 'index.html'));
+      expect(indexExists).toBeTruthy();
+    });
+
+    it('should build successfully when assets option is not provided', async () => {
+      const structure = {
+        'src/index.html': '<h1>No Assets Option Test</h1>'
+      };
+
+      await createTestStructure(tempDir, structure);
+
+      const result = await runCLIInDir(tempDir, [
+        'build',
+        '--source', sourceDir,
+        '--output', outputDir
+      ]);
+
+      expect(result.code).toBe(0);
+      
+      const indexExists = await fileExists(path.join(outputDir, 'index.html'));
+      expect(indexExists).toBeTruthy();
+    });
+
+    it('should show error when --assets is provided without value', async () => {
+      const structure = {
+        'src/index.html': '<h1>Error Test</h1>'
+      };
+
+      await createTestStructure(tempDir, structure);
+
+      const result = await runCLIInDir(tempDir, [
+        'build',
+        '--source', sourceDir,
+        '--output', outputDir,
+        '--assets'
+      ]);
+
+      expect(result.code).toBe(2); // CLI argument error
+      expect(result.stderr).toContain('The --assets option requires a glob pattern value');
+    });
+
+    it('should show error when -a is provided without value', async () => {
+      const structure = {
+        'src/index.html': '<h1>Error Test</h1>'
+      };
+
+      await createTestStructure(tempDir, structure);
+
+      const result = await runCLIInDir(tempDir, [
+        'build',
+        '--source', sourceDir,
+        '--output', outputDir,
+        '-a'
+      ]);
+
+      expect(result.code).toBe(2); // CLI argument error
+      expect(result.stderr).toContain('The --assets option requires a glob pattern value');
+    });
+  });
 });
 
 /**
