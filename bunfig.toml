@@ -13,4 +13,4 @@ bun = true
 
 # Define build-time constants for executables
 [build]
-define = { BUILD_VERSION = '"0.4.0"' }
+define = { BUILD_VERSION = '"0.4.1"' }
