@@ -5,7 +5,7 @@ import { build } from '../src/core/file-processor.js';
 import { watch } from '../src/core/file-watcher.js';
 import { DevServer } from '../src/server/dev-server.js';
 import { logger } from '../src/utils/logger.js';
-import { BUILD_INFO, getBuildInfo, getRuntimeFeatures } from '../src/utils/build-constants.js';
+import pkg from "../package.json";
 
 async function main() {
   try {
@@ -13,8 +13,7 @@ async function main() {
     
     // Handle version and help flags
     if (args.version) {
-      const info = getBuildInfo();
-      console.log(`unify v${info.version}`);
+      console.log(`unify v${pkg.version}`);
       process.exit(0);
     }
     
@@ -26,8 +25,6 @@ async function main() {
     // Set logging level based on verbose flag
     if (args.verbose) {
       logger.setLevel('DEBUG');
-      const features = getRuntimeFeatures();
-      logger.debug('Runtime features:', features);
     }
     
     // Default to build command if none specified
@@ -123,7 +120,7 @@ async function main() {
 
 function showHelp() {
   console.log(`
-unify v${BUILD_INFO.version}
+unify v${pkg.version}
 
 Usage: unify [command] [options]
 

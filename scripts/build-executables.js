@@ -91,52 +91,6 @@ async function buildWithBun(target) {
 
 
 /**
- * Create build constants file
- */
-async function createBuildConstants() {
-  const constantsPath = path.join(PROJECT_ROOT, 'src', 'utils', 'build-constants.js');
-  
-  // Read package.json for version info
-  const packageJsonPath = path.join(PROJECT_ROOT, 'package.json');
-  const packageJson = JSON.parse(await fs.readFile(packageJsonPath, 'utf-8'));
-  
-  const buildInfo = {
-    version: packageJson.version,
-    buildTime: new Date().toISOString(),
-    gitCommit: await getGitCommit(),
-    runtime: 'bun',
-    bunVersion: Bun.version
-  };
-  
-  const constantsContent = `/**
- * Build constants for Unify CLI
- * Auto-generated during build process
- */
-
-export const BUILD_INFO = ${JSON.stringify(buildInfo, null, 2)};
-
-export const RUNTIME_FEATURES = {
-  htmlRewriter: true,
-  fsWatch: true,
-  serve: true,
-  hash: true,
-  compile: true
-};
-
-export function getRuntimeFeatures() {
-  return RUNTIME_FEATURES;
-}
-
-export function getBuildInfo() {
-  return BUILD_INFO;
-}
-`;
-  
-  await fs.writeFile(constantsPath, constantsContent);
-  console.log('📝 Created build constants');
-}
-
-/**
  * Get current git commit hash
  */
 async function getGitCommit() {
@@ -189,9 +143,7 @@ async function main() {
   
   // Create dist directory
   await fs.mkdir(DIST_DIR, { recursive: true });
-  
-  // Create build constants
-  await createBuildConstants();
+
   
   const results = [];
   const errors = [];
@@ -260,4 +212,4 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   });
 }
 
-export { main as buildExecutables, createBuildConstants };
+export { main as buildExecutables };

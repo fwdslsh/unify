@@ -4,7 +4,7 @@
  */
 
 export const BUILD_INFO = {
-  "version": "0.4.0",
+  "version": "0.4.1",
   "buildTime": "2025-08-01T17:41:54.565Z",
   "gitCommit": "552efdf",
   "runtime": "bun",

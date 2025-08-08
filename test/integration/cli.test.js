@@ -6,6 +6,7 @@ import { describe, it, beforeEach, afterEach, expect } from 'bun:test';
 import fs from 'fs/promises';
 import path from 'path';
 import { runCLI } from '../test-utils.js';
+import pkg from "../../package.json" ;
 
 const testFixturesDir = path.join(import.meta.dir, '../fixtures/cli');
 
@@ -66,7 +67,7 @@ describe('CLI integration', () => {
   it('should show version with --version flag', async () => {
     const result = await runCLI(['--version']);
     expect(result.code).toBe(0);
-    expect(result.stdout.includes('0.6.0')).toBeTruthy();
+    expect(result.stdout.includes(pkg.version), "Version does not match: " + result.stdout).toBeTruthy();
   });
   
   it('should show help with --help flag', async () => {
