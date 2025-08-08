@@ -350,6 +350,77 @@ export async function build(options = {}) {
       }
     }
     
+    // Third pass: Copy additional assets from glob pattern (if specified)
+    if (config.assets) {
+      try {
+        const glob = new Bun.Glob(config.assets);
+        const additionalAssets = [];
+        
+        // Scan from source root
+        for await (const file of glob.scan(sourceRoot)) {
+          const fullPath = path.resolve(sourceRoot, file);
+          additionalAssets.push(fullPath);
+        }
+        
+        logger.info(`Found ${additionalAssets.length} additional assets matching pattern: ${config.assets}`);
+        
+        for (const filePath of additionalAssets) {
+          try {
+            const relativePath = path.relative(sourceRoot, filePath);
+            
+            // Skip if this asset was already copied in the referenced assets pass
+            if (!assetTracker.isAssetReferenced(filePath)) {
+              await copyAsset(filePath, sourceRoot, outputRoot);
+              results.copied++;
+              logger.debug(`Copied additional asset: ${relativePath}`);
+            } else {
+              logger.debug(`Skipped additional asset (already copied): ${relativePath}`);
+            }
+          } catch (error) {
+            const relativePath = path.relative(sourceRoot, filePath);
+            
+            // Use enhanced error formatting if available
+            if (error.formatForCLI) {
+              logger.error(error.formatForCLI());
+            } else {
+              logger.error(`Error copying additional asset ${relativePath}: ${error.message}`);
+            }
+            
+            results.errors.push({ 
+              file: filePath, 
+              relativePath,
+              error: error.message,
+              errorType: error.constructor.name,
+              suggestions: error.suggestions || []
+            });
+            
+            // If perfection mode is enabled, fail fast on any error
+            if (config.perfection) {
+              throw new BuildError(`Build failed in perfection mode due to error copying additional asset ${relativePath}: ${error.message}`, results.errors);
+            }
+          }
+        }
+      } catch (error) {
+        // Handle glob pattern errors
+        logger.error(`Error processing assets glob pattern "${config.assets}": ${error.message}`);
+        results.errors.push({ 
+          file: 'assets-glob', 
+          error: `Invalid glob pattern "${config.assets}": ${error.message}`,
+          errorType: error.constructor.name,
+          suggestions: [
+            'Check the glob pattern syntax (e.g., "./assets/**/*.*")',
+            'Ensure the pattern is relative to the source directory',
+            'Use forward slashes for paths even on Windows'
+          ]
+        });
+        
+        // If perfection mode is enabled, fail fast on any error
+        if (config.perfection) {
+          throw new BuildError(`Build failed in perfection mode due to assets glob error: ${error.message}`, results.errors);
+        }
+      }
+    }
+    
     // Generate sitemap.xml (if enabled)  
     if (config.sitemap !== false) {
       try {
