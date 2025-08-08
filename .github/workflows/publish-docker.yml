@@ -3,7 +3,7 @@ name: Build and Publish Docker Images
 on:
   push:
     branches: [main]
-    tags: ['v*']
+    tags: ["v*"]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -59,17 +59,17 @@ jobs:
       contents: read
       packages: write
     strategy:
-      matrix:
-        include:
-          - dockerfile: Dockerfile.cli
-            image: fwdslsh/unify
-            platforms: linux/amd64,linux/arm64
-          - dockerfile: Dockerfile.nginx
-            image: fwdslsh/unify-nginx
-            platforms: linux/amd64,linux/arm64
-          - dockerfile: Dockerfile.apache
-            image: fwdslsh/unify-apache
-            platforms: linux/amd64,linux/arm64
+        matrix:
+          include:
+            - dockerfile: Dockerfile.cli
+              image: unify
+              platforms: linux/amd64,linux/arm64
+            - dockerfile: Dockerfile.nginx
+              image: unify-nginx
+              platforms: linux/amd64,linux/arm64
+            - dockerfile: Dockerfile.apache
+              image: unify-apache
+              platforms: linux/amd64,linux/arm64
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -86,14 +86,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to Docker Hub
-        if: github.event_name != 'pull_request'
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-
       # - name: Log in to GitHub Container Registry
       #   if: github.event_name != 'pull_request'
       #   uses: docker/login-action@v3
@@ -101,7 +93,7 @@ jobs:
       #     registry: ghcr.io
       #     username: ${{ github.actor }}
       #     password: ${{ secrets.GITHUB_TOKEN }}
-          
+
       - name: Extract version from package.json
         id: package-version
         run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
@@ -110,7 +102,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: |            
+          images: |
             fwdslsh/${{ matrix.image }}
           tags: |
             type=ref,event=branch
@@ -119,6 +111,13 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
             type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Log in to Docker Hub
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -146,7 +145,7 @@ jobs:
         run: |
           docker run --rm ghcr.io/fwdslsh/${{ matrix.image }}:latest unify --version
 
-      - name: Test NGINX image  
+      - name: Test NGINX image
         if: matrix.image == 'unify-nginx'
         run: |
           # Test that unify command is available
@@ -155,11 +154,11 @@ jobs:
           # Test basic functionality with a simple site
           mkdir -p test-site
           echo '<h1>Test Site</h1>' > test-site/index.html
-          
+
           # Test build functionality
           docker run --rm -v $(pwd)/test-site:/site ghcr.io/fwdslsh/${{ matrix.image }}:latest \
             unify build --source /site --output /tmp/out
-          
+
           echo "✅ Docker image tests passed"
 
   security-scan:
@@ -175,11 +174,11 @@ jobs:
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: ghcr.io/fwdslsh/${{ matrix.image }}:latest
-          format: 'sarif'
-          output: 'trivy-results.sarif'
+          format: "sarif"
+          output: "trivy-results.sarif"
 
       - name: Upload Trivy scan results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v3
         if: always()
         with:
-          sarif_file: 'trivy-results.sarif'
+          sarif_file: "trivy-results.sarif"
