@@ -349,6 +349,19 @@ async function processDOMMode(pageContent, pagePath, sourceRoot, config = {}) {
   };
   
   try {
+    // Check if this is a complete HTML document (has <html> tag)
+    const isCompleteHtml = pageContent.includes('<html');
+    
+    // Check for explicit data-layout attribute
+    const layoutMatch = pageContent.match(/data-layout=["']([^"']+)["']/i);
+    const hasExplicitLayout = !!layoutMatch;
+    
+    // For complete HTML documents without explicit layout, don't apply any layout
+    if (isCompleteHtml && !hasExplicitLayout) {
+      logger.debug(`Skipping layout for complete HTML document: ${path.relative(sourceRoot, pagePath)}`);
+      return pageContent;
+    }
+    
     // Detect layout from HTML content using regex-based parsing
     let layoutPath;
     try {
