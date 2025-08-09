@@ -91,11 +91,24 @@ export function extractPageInfo(processedFiles, sourceRoot, outputRoot, prettyUr
       }
     } else {
       // HTML files
-      url = '/' + relativePath;
-      
-      // Convert index.html to root path
-      if (url.endsWith('/index.html')) {
-        url = url.replace('/index.html', '/');
+      if (prettyUrls) {
+        // Convert docs.html → /docs/ for pretty URLs
+        const nameWithoutExt = path.basename(relativePath, path.extname(relativePath));
+        const dir = path.dirname(relativePath);
+        
+        if (nameWithoutExt === 'index') {
+          url = dir === '.' ? '/' : `/${dir}/`;
+        } else {
+          url = dir === '.' ? `/${nameWithoutExt}/` : `/${dir}/${nameWithoutExt}/`;
+        }
+      } else {
+        // Use original path for HTML files when pretty URLs are disabled
+        url = '/' + relativePath;
+        
+        // Convert index.html to root path
+        if (url.endsWith('/index.html')) {
+          url = url.replace('/index.html', '/');
+        }
       }
     }
 
