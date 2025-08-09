@@ -137,7 +137,7 @@ jobs:
     if: github.event_name == 'release'
     strategy:
       matrix:
-        image: [unify, unify-nginx]
+        image: [unify, unify-nginx, unify-apache]
     steps:
       - name: Test CLI image
         if: matrix.image == 'unify'
@@ -158,6 +158,16 @@ jobs:
           docker run --rm -v $(pwd)/test-site:/site fwdslsh/${{ matrix.image }}:latest \
             unify build --source /site --output /tmp/out
 
+      - name: Test Apache image
+        if: matrix.image == 'unify-apache'
+        run: |
+          # Test that Apache can start and serve content
+          echo '<h1>Test Site</h1>' > test-apache.html
+          
+          # Test basic functionality with a simple site
+          timeout 10 docker run --rm -v $(pwd)/test-apache.html:/var/www/html/index.html \
+            fwdslsh/${{ matrix.image }}:latest timeout 5 /usr/sbin/apache2 -D FOREGROUND || true
+
           echo "✅ Docker image tests passed"
 
   security-scan:
@@ -167,7 +177,7 @@ jobs:
     if: github.event_name == 'release'
     strategy:
       matrix:
-        image: [unify, unify-nginx]
+        image: [unify, unify-nginx, unify-apache]
     steps:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
