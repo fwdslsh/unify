@@ -1,141 +1,44 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <title>About DOM Mode</title>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="/styles/site.css">
-  <style>
-  .alert { 
-    color: red; 
-    padding: 1rem; 
-    border: 1px solid red; 
-    border-radius: 4px;
-    background: #fff5f5;
-    margin: 16px 0;
-  }
-  .alert strong {
-    display: block;
-    margin-bottom: 8px;
-  }
-</style>
-<style>
-  .card {
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    padding: 20px;
-    margin: 16px 0;
-    background: white;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  }
-  .card h3 {
-    margin-top: 0;
-    color: #333;
-  }
-  .card-content {
-    color: #666;
-  }
-</style>
+<head>
+  <title>Page</title>
 </head>
-  <body>
-    <header>
-    <slot name="header">
-        <h1>Default Header</h1>
-    
-</header>
-    <main class="default-layout">
-      <div>
+<body>
+<div>
   <!--Uses default layout since it is an html fragment and not data-layout attribute is provided -->
+  <template target="title">About DOM Mode</template>
+  <template target="header">
+    <h1>About DOM Mode</h1>
+        <include src="/custom_components/navigation.html" />
+  </template>
 
   <h2>What is DOM Mode?</h2>
   <p>DOM Mode is a modern templating system for Unify that uses pure HTML with minimal custom elements.</p>
 
-<div class="alert">
-  <strong data-token="title">Title</strong>
-  <p data-token="message">Message</p>
-</div>
+  <include src="/custom_components/alert.html"
+           data-title="Note"
+           data-message="This is the same component used on the homepage." />
 
   <h3>Key Features</h3>
+  <include src="/custom_components/card.html"
+           data-title="� Modular"
+           data-content="Build sites from reusable components" />
 
-<div class="card">
-  <h3 data-token="title">Card Title</h3>
-  <div class="card-content">
-    <p data-token="content">Default card content goes here.</p>
-  </div>
-</div>
+  <include src="/custom_components/card.html"
+           data-title="📝 HTML-centric"
+           data-content="No templating language, just HTML" />
 
-<div class="card">
-  <h3 data-token="title">Card Title</h3>
-  <div class="card-content">
-    <p data-token="content">Default card content goes here.</p>
-  </div>
-</div>
-
-<div class="card">
-  <h3 data-token="title">Card Title</h3>
-  <div class="card-content">
-    <p data-token="content">Default card content goes here.</p>
-  </div>
-</div>
+  <include src="/custom_components/card.html"
+           data-title="⚡ Fast"
+           data-content="All processing at build time, pure HTML output" />
 
   <h3>How It Works</h3>
   <ol>
     <li>Pages specify layouts with <code>data-layout</code></li>
-    <li>Content goes into slots using <code>&lt;template data-slot="name"&gt;</code></li>
+    <li>Content goes into slots using <code>&lt;template target="name"&gt;</code></li>
     <li>Components are included with <code>&lt;include src="..." /&gt;</code></li>
-    <li>Token replacement happens with <code>data-token</code> attributes</li>
-  </ol>
-</div> <!-- unnamed slot receives default content -->
-    </main>
-    <footer>
-      <div>
-  <!--Uses default layout since it is an html fragment and not data-layout attribute is provided -->
 
-  <h2>What is DOM Mode?</h2>
-  <p>DOM Mode is a modern templating system for Unify that uses pure HTML with minimal custom elements.</p>
-
-<div class="alert">
-  <strong data-token="title">Title</strong>
-  <p data-token="message">Message</p>
-</div>
-
-  <h3>Key Features</h3>
-
-<div class="card">
-  <h3 data-token="title">Card Title</h3>
-  <div class="card-content">
-    <p data-token="content">Default card content goes here.</p>
-  </div>
-</div>
-
-<div class="card">
-  <h3 data-token="title">Card Title</h3>
-  <div class="card-content">
-    <p data-token="content">Default card content goes here.</p>
-  </div>
-</div>
-
-<div class="card">
-  <h3 data-token="title">Card Title</h3>
-  <div class="card-content">
-    <p data-token="content">Default card content goes here.</p>
-  </div>
-</div>
-
-  <h3>How It Works</h3>
-  <ol>
-    <li>Pages specify layouts with <code>data-layout</code></li>
-    <li>Content goes into slots using <code>&lt;template data-slot="name"&gt;</code></li>
-    <li>Components are included with <code>&lt;include src="..." /&gt;</code></li>
-    <li>Token replacement happens with <code>data-token</code> attributes</li>
   </ol>
 </div>
-    </footer>
-  <script>
-  console.log("Alert component loaded");
-</script>
-<script>
-  console.log("Card component loaded");
-</script>
 </body>
 </html>

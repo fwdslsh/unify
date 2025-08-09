@@ -90,12 +90,11 @@
 </head>
 
 <body class="blog-layout">
-  <template data-slot="header">
+  <template target="header">
     <h1>My Blog</h1>
   </template>
   <main class="blog-content">
-
-  <h2>Hello!</h2>
+    <h2>Hello!</h2>
   <p>This is a blog post rendered with the Unify DOM Mode layout engine. This content goes into the unnamed slot.</p>
 
 <div class="alert">
@@ -126,9 +125,7 @@
     <li><a href="/about.html">About</a></li>
     <li><a href="/contact.html">Contact</a></li>
   </ul>
-</nav>
-
- <!-- Main blog content -->
+</nav> <!-- Main blog content -->
   </main>
   <footer class="footer">
     <slot name="footer">

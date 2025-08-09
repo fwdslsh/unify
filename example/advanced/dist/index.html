@@ -1,216 +1,55 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <title>
-  &lt;  
-
-<div class="alert">
-  <strong data-token="title">Title</strong>
-  <p data-token="message">Message</p>
-</div>
-
-  <h3>Components Example</h3>
-  <p>Here are some reusable components:</p>
-
-<div class="card">
-  <h3 data-token="title">Card Title</h3>
-  <div class="card-content">
-    <p data-token="content">Default card content goes here.</p>
-  </div>
-</div>
-
-<div class="card">
-  <h3 data-token="title">Card Title</h3>
-  <div class="card-content">
-    <p data-token="content">Default card content goes here.</p>
-  </div>
-</div>
-
-<nav class="nav">
-  <ul>
-    <li><a href="/">Home</a></li>
-    <li><a href="/about.html">About</a></li>
-    <li><a href="/contact.html">Contact</a></li>
-  </ul>
-</nav>ot="title"&gt;Welcome to DOM Mode
-
-  <h2>Hello!</h2>
-  <p>This is a blog post rendered with the Unify DOM Mode layout engine. This content goes into the unnamed slot.</p>
-
-<div class="alert">
-  <strong data-token="title">Title</strong>
-  <p data-token="message">Message</p>
-</div>
-
-  <h3>Components Example</h3>
-  <p>Here are some reusable components:</p>
-
-<div class="card">
-  <h3 data-token="title">Card Title</h3>
-  <div class="card-content">
-    <p data-token="content">Default card content goes here.</p>
-  </div>
-</div>
-
-<div class="card">
-  <h3 data-token="title">Card Title</h3>
-  <div class="card-content">
-    <p data-token="content">Default card content goes here.</p>
-  </div>
-</div>
-
-<nav class="nav">
-  <ul>
-    <li><a href="/">Home</a></li>
-    <li><a href="/about.html">About</a></li>
-    <li><a href="/contact.html">Contact</a></li>
-  </ul>
-</nav>
-
-</title>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="/styles/site.css">
-  <style>
-  .alert { 
-    color: red; 
-    padding: 1rem; 
-    border: 1px solid red; 
-    border-radius: 4px;
-    background: #fff5f5;
-    margin: 16px 0;
-  }
-  .alert strong {
-    display: block;
-    margin-bottom: 8px;
-  }
-</style>
-<style>
-  .card {
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    padding: 20px;
-    margin: 16px 0;
-    background: white;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  }
-  .card h3 {
-    margin-top: 0;
-    color: #333;
-  }
-  .card-content {
-    color: #666;
-  }
-</style>
-<style>
-  .nav {
-    background: #f8f9fa;
-    padding: 16px;
-    border-radius: 8px;
-  }
-  .nav ul {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    gap: 20px;
-  }
-  .nav a {
-    text-decoration: none;
-    color: #0066cc;
-    font-weight: 500;
-  }
-  .nav a:hover {
-    text-decoration: underline;
-  }
-</style>
+<head>
+  <title>Page</title>
 </head>
-  <body>
-    <header>
-    <slot name="header">
-        <h1>Default Header</h1>
-    
-</header>
-    <main class="default-layout">
-      
-  &lt;  
-
-<div class="alert">
-  <strong data-token="title">Title</strong>
-  <p data-token="message">Message</p>
-</div>
+<body>
+<body>
+  <  <include src="/custom_components/alert.html"
+           data-title="Note"
+           data-message="This site uses 100% declarative HTML." />
 
   <h3>Components Example</h3>
   <p>Here are some reusable components:</p>
 
-<div class="card">
-  <h3 data-token="title">Card Title</h3>
-  <div class="card-content">
-    <p data-token="content">Default card content goes here.</p>
-  </div>
-</div>
+  <include src="/custom_components/card.html"
+           data-title="🎯 Features"
+           data-content="DOM Mode supports layouts and components." />
 
-<div class="card">
-  <h3 data-token="title">Card Title</h3>
-  <div class="card-content">
-    <p data-token="content">Default card content goes here.</p>
-  </div>
-</div>
+  <include src="/custom_components/card.html"
+           data-title="⚡ Performance"
+           data-content="All processing at build time, pure HTML output." />
 
-<nav class="nav">
-  <ul>
-    <li><a href="/">Home</a></li>
-    <li><a href="/about.html">About</a></li>
-    <li><a href="/contact.html">Contact</a></li>
-  </ul>
-</nav>ot="title"&gt;Welcome to DOM Mode
+  <include src="/custom_components/navigation.html" />ot="title">Welcome to DOM Mode</template>
+  <template target="header">
+    <h1>🧱 Unify DOM Mode</h1>
+    <p>Modern templating with pure HTML</p>
+  </template>
 
   <h2>Hello!</h2>
   <p>This is a blog post rendered with the Unify DOM Mode layout engine. This content goes into the unnamed slot.</p>
 
-<div class="alert">
-  <strong data-token="title">Title</strong>
-  <p data-token="message">Message</p>
-</div>
+  <include src="/custom_components/alert.html"
+           data-title="Note"
+           data-message="This site uses 100% declarative HTML." />
 
   <h3>Components Example</h3>
   <p>Here are some reusable components:</p>
 
-<div class="card">
-  <h3 data-token="title">Card Title</h3>
-  <div class="card-content">
-    <p data-token="content">Default card content goes here.</p>
-  </div>
-</div>
+  <include src="/custom_components/card.html"
+           data-title="🎯 Features"
+           data-content="DOM Mode supports layouts, components, and token replacement." />
 
-<div class="card">
-  <h3 data-token="title">Card Title</h3>
-  <div class="card-content">
-    <p data-token="content">Default card content goes here.</p>
-  </div>
-</div>
+  <include src="/custom_components/card.html"
+           data-title="⚡ Performance"
+           data-content="All processing happens at build time - zero runtime JavaScript needed." />
 
-<nav class="nav">
-  <ul>
-    <li><a href="/">Home</a></li>
-    <li><a href="/about.html">About</a></li>
-    <li><a href="/contact.html">Contact</a></li>
-  </ul>
-</nav>
+  <include src="/custom_components/navigation.html" />
 
- <!-- unnamed slot receives default content -->
-    </main>
-    <footer>
-      
+  <template target="footer">
     <p>© 2025 - Built with Unify DOM Mode</p>
     <p><a href="https://github.com/yourusername/unify">View on GitHub</a></p>
-  
-    </footer>
-  <script>
-  console.log("Alert component loaded");
-</script>
-<script>
-  console.log("Card component loaded");
-</script>
+  </template>
+</body>
 </body>
 </html>

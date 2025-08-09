@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title><slot name="title">Untitled</slot></title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/styles/site.css">
+  </head>
+  <body>
+    <include src="/custom_components/header.html" />
+    <main class="default-layout">
+      <slot></slot> <!-- unnamed slot receives default content -->
+    </main>
+    <footer>
+      <slot name="footer">&copy; 2025</slot>
+    </footer>
+  </body>
+</html>
