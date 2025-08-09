@@ -34,6 +34,11 @@ export class FileClassifier {
       }
     }
     
+    // PATCH: Always treat markdown files as pages unless in underscore-prefixed dir
+    if (extension === '.md') {
+      return true;
+    }
+    
     return true;
   }
   

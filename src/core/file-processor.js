@@ -189,9 +189,23 @@ export async function build(options = {}) {
     logger.info(`Found ${sourceFiles.length} source files`);
     
     // Categorize files using convention-based classification
-    const contentFiles = sourceFiles.filter(file => {
+    let contentFiles = sourceFiles.filter(file => {
       return fileClassifier.isPage(file, sourceRoot);
     });
+
+    // Always include markdown files (not in underscore-prefixed dirs) as pages for pretty URLs
+    if (config.prettyUrls) {
+      const markdownFiles = sourceFiles.filter(file => {
+        const ext = path.extname(file).toLowerCase();
+        const rel = path.relative(sourceRoot, file);
+        return ext === '.md' && !rel.split(path.sep).some(part => part.startsWith('_'));
+      });
+      for (const mdFile of markdownFiles) {
+        if (!contentFiles.includes(mdFile)) {
+          contentFiles.push(mdFile);
+        }
+      }
+    }
     const assetFiles = sourceFiles.filter(file => {
       const fileType = fileClassifier.getFileType(file, sourceRoot);
       // Exclude files in components or layouts directories
@@ -616,12 +630,19 @@ async function getFilesToRebuild(sourceRoot, changedFile, dependencyTracker, con
     // Specific file changed - determine impact
     const resolvedChangedFile = path.resolve(changedFile);
     
+    // Recursively collect all affected pages for includes/assets
+    const collectAffectedPages = (file) => {
+      const direct = dependencyTracker.getAffectedPages(file);
+      direct.forEach(page => filesToRebuild.add(page));
+      // Recursively check for nested dependencies
+      direct.forEach(dep => collectAffectedPages(dep));
+    };
+    
     if (isHtmlFile(resolvedChangedFile)) {
       if (isPartialFile(resolvedChangedFile, config)) {
-        // Partial file changed - rebuild all pages that depend on it
-        const dependentPages = dependencyTracker.getDependentPages(resolvedChangedFile);
-        dependentPages.forEach(page => filesToRebuild.add(page));
-        logger.debug(`Partial ${path.relative(sourceRoot, resolvedChangedFile)} changed, rebuilding ${dependentPages.length} dependent pages`);
+        // Partial file changed - recursively rebuild all pages that depend on it
+        collectAffectedPages(resolvedChangedFile);
+        logger.debug(`Partial ${path.relative(sourceRoot, resolvedChangedFile)} changed, recursively rebuilding affected pages`);
       } else {
         // Main page changed - rebuild just this page
         filesToRebuild.add(resolvedChangedFile);
@@ -630,16 +651,11 @@ async function getFilesToRebuild(sourceRoot, changedFile, dependencyTracker, con
     } else {
       // Asset or unknown file type changed
       filesToRebuild.add(resolvedChangedFile);
-      
-      // For new asset files, we should also rebuild all HTML/Markdown pages 
-      // to check if they now reference this asset
+      // For new asset files, rebuild all content pages to pick up potential references
       if (!isHtmlFile(resolvedChangedFile) && !isMarkdownFile(resolvedChangedFile)) {
         try {
-          // Check if this is a new file (not in modification cache)
           const isNewFile = !fileModificationCache.has(resolvedChangedFile);
-          
           if (isNewFile) {
-            // New asset file - rebuild all content pages to pick up potential references
             const allFiles = await scanDirectory(sourceRoot);
             const contentFiles = allFiles.filter(file => 
               (isHtmlFile(file) && !isPartialFile(file, config)) || isMarkdownFile(file)
@@ -650,10 +666,11 @@ async function getFilesToRebuild(sourceRoot, changedFile, dependencyTracker, con
             logger.debug(`Asset ${path.relative(sourceRoot, resolvedChangedFile)} changed`);
           }
         } catch (error) {
-          // If we can't determine if it's new, just copy the asset
           logger.debug(`Asset ${path.relative(sourceRoot, resolvedChangedFile)} changed`);
         }
       }
+      // Also recursively rebuild all pages that depend on this asset
+      collectAffectedPages(resolvedChangedFile);
     }
   } else {
     // No specific file - check all files for changes
@@ -845,70 +862,49 @@ async function processMarkdownFile(filePath, sourceRoot, outputRoot, layoutConte
   
   // Process markdown to HTML
   const { html, frontmatter, title, excerpt } = processMarkdown(processedMarkdown, filePath);
-  
-  // Add anchor links to headings
   const htmlWithAnchors = addAnchorLinks(html);
-  
-  // Generate table of contents
   const tableOfContents = generateTableOfContents(htmlWithAnchors);
-  
-  // Determine layout application strategy
   const metadata = { frontmatter, title, excerpt, tableOfContents };
   let finalContent;
-  
-  // Check if content already has <html> element
+
+  // Strict layout application logic
   const contentHasHtml = hasHtmlElement(htmlWithAnchors);
-  
   if (contentHasHtml) {
     // Content already has complete HTML structure, use as-is
     finalContent = htmlWithAnchors;
     logger.debug('Using content as-is (contains <html> element)');
-  } else if (layoutContent) {
-    // Apply specified layout when content doesn't have <html> element
-    finalContent = wrapInLayout(htmlWithAnchors, metadata, layoutContent);
-    logger.debug('Applied specified layout');
   } else if (frontmatter.layout) {
     // Load layout from frontmatter specification
-    const layoutPath = path.isAbsolute(layoutsDir) 
+    const layoutPath = path.isAbsolute(layoutsDir)
       ? path.join(layoutsDir, frontmatter.layout)
       : path.join(sourceRoot, layoutsDir, frontmatter.layout);
-    
     try {
       const frontmatterLayoutContent = await fs.readFile(layoutPath, 'utf-8');
-      
-      // Process layout content through include processor to handle includes
       const { processIncludes } = await import('./include-processor.js');
       const processedLayout = await processIncludes(frontmatterLayoutContent, layoutPath, sourceRoot, new Set(), 0, null);
-      
-      // Replace slots with content (DOM mode style)
       let layoutWithContent = processedLayout.replace(/<slot[^>]*><\/slot>/g, htmlWithAnchors);
-      
-      // Also handle markdown-style template variables if present
       layoutWithContent = layoutWithContent.replace(/\{\{\s*content\s*\}\}/g, htmlWithAnchors);
       layoutWithContent = layoutWithContent.replace(/\{\{\s*title\s*\}\}/g, metadata.title || 'Untitled');
-      
-      // Replace frontmatter variables
       const allData = { ...metadata.frontmatter, ...metadata };
       for (const [key, value] of Object.entries(allData)) {
         if (typeof value === 'string') {
-          const regex = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'g');
+          const regex = new RegExp(`\{\{\s*${key}\s*\}\}`, 'g');
           layoutWithContent = layoutWithContent.replace(regex, value);
         }
       }
-      
       finalContent = layoutWithContent;
       logger.debug(`Applied frontmatter layout: ${frontmatter.layout}`);
     } catch (error) {
       logger.warn(`Could not read frontmatter layout ${frontmatter.layout}: ${error.message}`);
-      // Fall through to default layout check
     }
-  }
-  
-  if (!finalContent) {
+  } else if (layoutContent) {
+    // Apply specified layout when content doesn't have <html> element
+    finalContent = wrapInLayout(htmlWithAnchors, metadata, layoutContent);
+    logger.debug('Applied specified layout');
+  } else {
     // No layout specified, check for default layout
     const hasDefault = await hasDefaultLayout(sourceRoot, layoutsDir);
     if (hasDefault) {
-      // Load and apply default layout
       const defaultLayoutPath = path.join(sourceRoot, layoutsDir, 'default.html');
       try {
         const defaultLayoutContent = await fs.readFile(defaultLayoutPath, 'utf-8');
@@ -916,16 +912,17 @@ async function processMarkdownFile(filePath, sourceRoot, outputRoot, layoutConte
         logger.debug('Applied default layout');
       } catch (error) {
         logger.warn(`Could not read default layout: ${error.message}`);
-        // Fallback: only create basic HTML if layout is not specified, default not found, and no <html> element
         finalContent = createBasicHtmlStructure(htmlWithAnchors, title, excerpt);
         logger.debug('Created basic HTML structure (default layout failed)');
       }
     } else {
-      // No layout specified, no default layout found, no <html> element → create basic HTML
       finalContent = createBasicHtmlStructure(htmlWithAnchors, title, excerpt);
       logger.debug('Created basic HTML structure (no layout available)');
     }
   }
+
+  // Remove any remaining include directives from output
+  finalContent = finalContent.replace(/<!--#include\s+(virtual|file)="[^"]+"\s*-->/gi, '');
   
   // Track asset references in the final content
   if (assetTracker) {
@@ -1203,11 +1200,15 @@ async function processHtmlFileWithConventions(filePath, sourceRoot, outputRoot, 
 async function processMarkdownFileWithConventions(filePath, sourceRoot, outputRoot, layoutDiscovery, assetTracker, prettyUrls = false, minify = false) {
   try {
     const content = await fs.readFile(filePath, 'utf-8');
-    const { processedContent, frontmatter } = await processMarkdown(content, filePath, sourceRoot);
-    
+    const { html, frontmatter, title, excerpt } = processMarkdown(content, filePath);
+    const htmlWithAnchors = addAnchorLinks(html);
+    const tableOfContents = generateTableOfContents(htmlWithAnchors);
+    const metadata = { frontmatter, title, excerpt, tableOfContents };
+    let finalContent = htmlWithAnchors;
+
     // Determine layout using convention-based discovery
     let layoutPath = null;
-    
+
     // Check for layout override in frontmatter
     if (frontmatter?.layout) {
       layoutPath = await layoutDiscovery.resolveLayoutOverride(frontmatter.layout, sourceRoot, filePath);
@@ -1215,49 +1216,55 @@ async function processMarkdownFileWithConventions(filePath, sourceRoot, outputRo
         logger.warn(`Layout specified in frontmatter not found: ${frontmatter.layout} (${path.relative(sourceRoot, filePath)})`);
       }
     }
-    
+
     // Fall back to automatic layout discovery
     if (!layoutPath) {
       layoutPath = await layoutDiscovery.findLayoutForPage(filePath, sourceRoot);
     }
-    
-    let finalContent = processedContent;
-    
-    // Apply layout if found
+
+    // Apply layout if found, else use default HTML wrapper
     if (layoutPath) {
       logger.debug(`Applying layout to Markdown: ${path.relative(sourceRoot, layoutPath)}`);
       const layoutContent = await fs.readFile(layoutPath, 'utf-8');
-      
       // Check if the processed content already has complete HTML structure
-      if (!layoutDiscovery.hasCompleteHtmlStructure(processedContent)) {
-        finalContent = wrapInLayout(processedContent, layoutContent, frontmatter);
+      if (!layoutDiscovery.hasCompleteHtmlStructure(htmlWithAnchors)) {
+        finalContent = wrapInLayout(htmlWithAnchors, metadata, layoutContent);
       } else {
         logger.debug(`Markdown file already has complete HTML structure, skipping layout: ${path.relative(sourceRoot, filePath)}`);
       }
     } else {
-      logger.debug(`No layout found for Markdown file: ${path.relative(sourceRoot, filePath)}`);
+      logger.debug(`No layout found for Markdown file: ${path.relative(sourceRoot, filePath)}. Using default HTML wrapper.`);
+      // Always emit markdown as HTML per app spec
+      if (!layoutDiscovery.hasCompleteHtmlStructure(htmlWithAnchors)) {
+        finalContent = wrapInLayout(htmlWithAnchors, metadata);
+      }
     }
     
-    // Determine output path
-    const outputPath = prettyUrls 
-      ? getOutputPath(filePath, sourceRoot, outputRoot, true)
-      : getOutputPath(filePath.replace(/\.md$/, '.html'), sourceRoot, outputRoot);
-    
+    // Determine output path and ensure .html extension
+    let outputPath;
+    if (prettyUrls) {
+      outputPath = getOutputPathWithPrettyUrls(filePath, sourceRoot, outputRoot, true);
+    } else {
+      outputPath = getOutputPath(filePath.replace(/\.md$/, '.html'), sourceRoot, outputRoot);
+    }
+    logger.debug(`[MARKDOWN EMIT] Output path for ${filePath}: ${outputPath}`);
+
     // Track asset references
     if (assetTracker) {
       await assetTracker.recordAssetReferences(filePath, finalContent, sourceRoot);
     }
-    
+
     // Write output
     await ensureDirectoryExists(path.dirname(outputPath));
-    
+
     // Apply minification if enabled
     if (minify) {
       finalContent = minifyHtml(finalContent);
     }
-    
+
     await fs.writeFile(outputPath, finalContent, 'utf-8');
-    
+    logger.debug(`[MARKDOWN EMIT] Wrote file: ${outputPath}`);
+
     return frontmatter;
   } catch (error) {
     throw new FileSystemError('process', filePath, error);

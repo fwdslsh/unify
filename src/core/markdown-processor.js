@@ -98,8 +98,9 @@ export function hasHtmlElement(content) {
  * @returns {string} Complete HTML page
  */
 export function wrapInLayout(html, metadata, layout) {
-  if (!layout) {
-    // Default layout if none provided
+  logger.debug('[wrapInLayout] html:', html);
+  logger.debug('[wrapInLayout] metadata:', metadata);
+  if (typeof layout === 'undefined' || layout === null) {
     layout = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -110,36 +111,29 @@ export function wrapInLayout(html, metadata, layout) {
 </head>
 <body>
   <main>
-    {{ content }}
+    <slot></slot>
   </main>
 </body>
 </html>`;
   }
-  
-  // Simple template replacement
   let result = layout;
-  
-  // Replace content placeholder
-  result = result.replace(/\{\{\s*content\s*\}\}/g, html);
-  
-  // Replace title
+  if (/<slot\s*><\/slot>/i.test(result)) {
+    logger.debug('[wrapInLayout] replacing <slot> with:', html);
+    result = result.replace(/<slot\s*><\/slot>/i, html);
+  } else {
+    result = result.replace(/(<main[^>]*>)/i, `$1${html}`);
+  }
   result = result.replace(/\{\{\s*title\s*\}\}/g, metadata.title || 'Untitled');
-  
-  // Replace frontmatter variables
-  const allData = { ...metadata.frontmatter, ...metadata };
+  const allData = metadata.frontmatter ? { ...metadata.frontmatter, ...metadata } : { ...metadata };
   for (const [key, value] of Object.entries(allData)) {
     if (typeof value === 'string') {
-      const regex = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'g');
+      const regex = new RegExp(`\{\{\s*${key}\s*\}\}`, 'g');
       result = result.replace(regex, value);
     }
   }
-  
-  // Clean up unused placeholders
   result = result.replace(/\{\{[^}]*\}\}/g, '');
-  
-  // Re-process anchor links after template variable replacement
   result = addAnchorLinks(result);
-  
+  logger.debug('[wrapInLayout] final result:', result);
   return result;
 }
 

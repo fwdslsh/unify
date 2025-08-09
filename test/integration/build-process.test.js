@@ -106,17 +106,13 @@ describe('build-process integration', () => {
   });
   
   afterEach(async () => {
-    // Clean up test fixtures
-    if (sourceDir) {
-      const testFixturesDir = path.dirname(sourceDir);
-      try {
-        await fs.rm(testFixturesDir, { recursive: true, force: true });
-      } catch (error) {
-        // Ignore cleanup errors
-      }
+    // Log output directory for debugging
+    if (outputDir) {
+      console.log(`[TEST OUTPUT DIR] ${outputDir}`);
     }
-    sourceDir = null;
-    outputDir = null;
+    // SKIP cleanup for debugging and validation
+    // sourceDir = null;
+    // outputDir = null;
   });
   
   it('should build complete site with components and head injection', async () => {
@@ -358,15 +354,8 @@ title: Partial HTML Page
     // Create markdown file without html element, but no default layout
     await fs.writeFile(
       path.join(sourceDir, 'no-layout.md'),
-      `---
-title: No Layout Test
----
-
-# Content Without Layout
-
-This should get basic HTML structure.`
+      `---\ntitle: No Layout Test\n---\n\n# Content Without Layout\n\nThis should get basic HTML structure.`
     );
-    
     await build({
       source: sourceDir,
       output: outputDir,
@@ -374,6 +363,19 @@ This should get basic HTML structure.`
       layouts: '.layouts',
       clean: true
     });
+    // PATCH: Assert output file exists and print its contents for debug
+    const noLayoutOutputPath = path.join(outputDir, 'no-layout.html');
+    let exists = false;
+    try {
+      await fs.access(noLayoutOutputPath);
+      exists = true;
+    } catch {}
+    console.log('[TEST DEBUG] no-layout.html exists:', exists);
+    if (exists) {
+      const content = await fs.readFile(noLayoutOutputPath, 'utf-8');
+      console.log('[TEST DEBUG] no-layout.html content:', content);
+    }
+    expect(exists).toBeTruthy();
     
     // Verify basic HTML structure is created
     const noLayoutContent = await fs.readFile(path.join(outputDir, 'no-layout.html'), 'utf-8');
