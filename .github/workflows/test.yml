@@ -40,17 +40,4 @@ jobs:
         run: ./unify-test --version
       
       - name: Copy executable to workspace
-        run: mkdir -p dist && cp unify-test dist/unify-linux-x64
-
-      - name: Test Docker builds
-        run: |
-          # Build CLI Docker image and test it
-          docker build -f docker/Dockerfile.cli -t unify-cli-test .
-          docker run --rm unify-cli-test --version
-          
-          # Build NGINX Docker image and test it
-          docker build -f docker/Dockerfile.nginx -t unify-nginx-test .
-          echo "test" > test.txt
-          mkdir -p test-site
-          echo "<h1>Test</h1>" > test-site/index.html
-          timeout 10 docker run --rm -v $(pwd)/test-site:/site unify-nginx-test || true             
+        run: mkdir -p dist && cp unify-test dist/unify-linux-x64             

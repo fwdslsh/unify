@@ -142,6 +142,13 @@ npm test
 npm run example
 ```
 
+### CI/CD Workflows
+
+Our GitHub Actions workflows are optimized for performance and cost efficiency. See [CI/CD Workflows Documentation](docs/cicd-workflows.md) for details on:
+- Fast test feedback loops
+- Docker build validation on PRs
+- Automated publishing on releases
+
 ---
 
 _Built with ❤️ for frontend developers who love simple, powerful tools._

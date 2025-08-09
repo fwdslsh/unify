@@ -10,6 +10,21 @@ unify provides three different Docker container options for different use cases.
 | **Nginx** | Production with build automation | Nginx | Auto-build and serve with better performance |
 | **CLI** | Development and CI/CD | None | Building sites in pipelines, development |
 
+## Automated Builds and Publishing
+
+Docker images are automatically built and published through our [CI/CD workflows](cicd-workflows.md):
+
+- **Pull Requests**: Docker images are built and tested (validation only)
+- **Releases**: Docker images are built, tested, and published to Docker Hub
+- **Image Tags**: Available on Docker Hub as `fwdslsh/unify`, `fwdslsh/unify-nginx`, `fwdslsh/unify-apache`
+
+For the latest images:
+```bash
+docker pull fwdslsh/unify:latest        # CLI container
+docker pull fwdslsh/unify-nginx:latest  # Nginx container  
+docker pull fwdslsh/unify-apache:latest # Apache container
+```
+
 ## Apache Container (`Dockerfile.apache`)
 
 ### When to Use Apache Container

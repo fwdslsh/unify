@@ -17,10 +17,20 @@ RUN a2enmod include headers \
 # Remove default config and add our own (immutable, not writable by the container)
 COPY docker/apache.conf /etc/apache2/sites-available/000-default.conf
 
-# Prepare the web root with correct ownership/permissions
-RUN mkdir -p /var/www/html \
+# Prepare the web root and Apache runtime directory with correct ownership/permissions
+RUN mkdir -p /var/www/html /var/run/apache2 /var/log/apache2 \
  && chown -R htmluser:www-data /var/www/html \
+ && chown -R htmluser:www-data /var/run/apache2 \
+ && chown -R htmluser:www-data /var/log/apache2 \
  && chmod -R 555 /var/www/html
+
+# Set Apache environment variables
+ENV APACHE_RUN_USER=htmluser \
+    APACHE_RUN_GROUP=www-data \
+    APACHE_PID_FILE=/var/run/apache2/apache2.pid \
+    APACHE_RUN_DIR=/var/run/apache2 \
+    APACHE_LOCK_DIR=/var/run/apache2 \
+    APACHE_LOG_DIR=/var/log/apache2
 
 VOLUME ["/var/www/html"]
 WORKDIR /var/www/html
