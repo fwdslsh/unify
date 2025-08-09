@@ -8,6 +8,59 @@ import { logger } from '../utils/logger.js';
  */
 export class LayoutDiscovery {
   /**
+   * Find layout file in a specific directory using naming convention
+   * @param {string} directory - Directory path to search in
+   * @param {string} sourceRoot - Source root for logging
+   * @returns {Promise<string|null>} Path to layout file or null
+   */
+  async findLayoutInDirectory(directory, sourceRoot) {
+    try {
+      const files = await fs.readdir(directory);
+      
+      // Look for files that match the pattern: _*.layout.htm(l) or _layout.htm(l)
+      for (const file of files) {
+        if (this.isLayoutFileName(file)) {
+          const layoutPath = path.join(directory, file);
+          try {
+            await fs.access(layoutPath);
+            return layoutPath;
+          } catch {
+            // File not accessible, continue
+          }
+        }
+      }
+    } catch {
+      // Directory not readable or doesn't exist
+    }
+    
+    return null;
+  }
+
+  /**
+   * Check if a filename matches the layout naming convention
+   * @param {string} fileName - Name of the file to check
+   * @returns {boolean} True if matches layout pattern
+   */
+  isLayoutFileName(fileName) {
+    // Must start with underscore
+    if (!fileName.startsWith('_')) {
+      return false;
+    }
+    
+    // Must end with layout.html or layout.htm
+    if (fileName.endsWith('layout.html') || fileName.endsWith('layout.htm')) {
+      return true;
+    }
+    
+    // Also support the basic _layout.html and _layout.htm patterns
+    if (fileName === '_layout.html' || fileName === '_layout.htm') {
+      return true;
+    }
+    
+    return false;
+  }
+
+  /**
    * Find the appropriate layout for a given page
    * @param {string} pagePath - Absolute path to the page file
    * @param {string} sourceRoot - Absolute path to source directory
@@ -20,25 +73,11 @@ export class LayoutDiscovery {
     let currentDir = path.dirname(pagePath);
     
     while (currentDir && currentDir !== path.dirname(sourceRoot)) {
-      // Check for _layout.html in current directory
-      const layoutPath = path.join(currentDir, '_layout.html');
-      
-      try {
-        await fs.access(layoutPath);
-        logger.debug(`Found layout: ${path.relative(sourceRoot, layoutPath)}`);
-        return layoutPath;
-      } catch {
-        // Layout not found in this directory, continue climbing
-      }
-      
-      // Also check for _layout.htm variant
-      const layoutPathHtm = path.join(currentDir, '_layout.htm');
-      try {
-        await fs.access(layoutPathHtm);
-        logger.debug(`Found layout: ${path.relative(sourceRoot, layoutPathHtm)}`);
-        return layoutPathHtm;
-      } catch {
-        // Layout not found in this directory, continue climbing
+      // Look for any layout file that matches the pattern: _*.layout.htm(l)
+      const layoutFile = await this.findLayoutInDirectory(currentDir, sourceRoot);
+      if (layoutFile) {
+        logger.debug(`Found layout: ${path.relative(sourceRoot, layoutFile)}`);
+        return layoutFile;
       }
       
       const parentDir = path.dirname(currentDir);
@@ -49,21 +88,21 @@ export class LayoutDiscovery {
       currentDir = parentDir;
     }
     
-    // No folder-scoped layout found, check for default layout in _includes
-    const defaultLayoutPath = path.join(sourceRoot, '_includes', 'default-layout.html');
+    // No folder-scoped layout found, check for fallback layout in _includes
+    const fallbackLayoutPath = path.join(sourceRoot, '_includes', '_layout.html');
     try {
-      await fs.access(defaultLayoutPath);
-      logger.debug(`Found default layout: ${path.relative(sourceRoot, defaultLayoutPath)}`);
-      return defaultLayoutPath;
+      await fs.access(fallbackLayoutPath);
+      logger.debug(`Found fallback layout: ${path.relative(sourceRoot, fallbackLayoutPath)}`);
+      return fallbackLayoutPath;
     } catch {
       // Check .htm variant
-      const defaultLayoutPathHtm = path.join(sourceRoot, '_includes', 'default-layout.htm');
+      const fallbackLayoutPathHtm = path.join(sourceRoot, '_includes', '_layout.htm');
       try {
-        await fs.access(defaultLayoutPathHtm);
-        logger.debug(`Found default layout: ${path.relative(sourceRoot, defaultLayoutPathHtm)}`);
-        return defaultLayoutPathHtm;
+        await fs.access(fallbackLayoutPathHtm);
+        logger.debug(`Found fallback layout: ${path.relative(sourceRoot, fallbackLayoutPathHtm)}`);
+        return fallbackLayoutPathHtm;
       } catch {
-        // No default layout found
+        // No fallback layout found
       }
     }
     
@@ -81,23 +120,12 @@ export class LayoutDiscovery {
     const layouts = [];
     let currentDir = path.dirname(pagePath);
     
-    // Collect all _layout.html files from page directory up to source root
+    // Collect all layout files from page directory up to source root
     while (currentDir && currentDir !== path.dirname(sourceRoot)) {
-      // Check for _layout.html in current directory
-      const layoutPath = path.join(currentDir, '_layout.html');
-      
-      try {
-        await fs.access(layoutPath);
-        layouts.push(layoutPath);
-      } catch {
-        // Check for _layout.htm variant
-        const layoutPathHtm = path.join(currentDir, '_layout.htm');
-        try {
-          await fs.access(layoutPathHtm);
-          layouts.push(layoutPathHtm);
-        } catch {
-          // No layout in this directory
-        }
+      // Look for any layout file that matches the pattern
+      const layoutFile = await this.findLayoutInDirectory(currentDir, sourceRoot);
+      if (layoutFile) {
+        layouts.push(layoutFile);
       }
       
       const parentDir = path.dirname(currentDir);
@@ -193,23 +221,23 @@ export class LayoutDiscovery {
     const layoutChain = await this.getLayoutChain(pagePath, sourceRoot);
     dependencies.push(...layoutChain);
     
-    // Also include default layout as a potential dependency
-    const defaultLayoutPath = path.join(sourceRoot, '_includes', 'default-layout.html');
-    const defaultLayoutPathHtm = path.join(sourceRoot, '_includes', 'default-layout.htm');
+    // Also include fallback layout as a potential dependency
+    const fallbackLayoutPath = path.join(sourceRoot, '_includes', '_layout.html');
+    const fallbackLayoutPathHtm = path.join(sourceRoot, '_includes', '_layout.htm');
     
     try {
-      await fs.access(defaultLayoutPath);
-      if (!dependencies.includes(defaultLayoutPath)) {
-        dependencies.push(defaultLayoutPath);
+      await fs.access(fallbackLayoutPath);
+      if (!dependencies.includes(fallbackLayoutPath)) {
+        dependencies.push(fallbackLayoutPath);
       }
     } catch {
       try {
-        await fs.access(defaultLayoutPathHtm);
-        if (!dependencies.includes(defaultLayoutPathHtm)) {
-          dependencies.push(defaultLayoutPathHtm);
+        await fs.access(fallbackLayoutPathHtm);
+        if (!dependencies.includes(fallbackLayoutPathHtm)) {
+          dependencies.push(fallbackLayoutPathHtm);
         }
       } catch {
-        // No default layout
+        // No fallback layout
       }
     }
     

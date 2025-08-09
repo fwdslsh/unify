@@ -254,7 +254,7 @@ project/
 ### HTML Files (`.html`, `.htm`)
 - Pages: `.htm(l)` files not starting with `_` are emitted as pages.
 - Partials: `.htm(l)` files starting with `_` are non-emitting partials.
-- Layouts: `_layout.html` provides folder-scoped layouts.
+- Layouts: Files starting with `_` and ending with `layout.html` or `layout.htm` provide folder-scoped layouts.
 
 ### Markdown Files (`.md`)
 - Processed with frontmatter extraction and Markdown→HTML conversion.
@@ -282,14 +282,27 @@ Resolution:
 - `file` = relative to current file.
 - `virtual` = from `src/` root.
 
-## Layout System
+### Layout System
 
-### Discovery
-1. Nearest `_layout.html` in page's folder.
+#### Discovery
+1. Nearest layout file that matches the naming pattern in page's folder.
 2. Climb to `src/` root.
 3. Apply layouts as nested wrappers.
-4. Optional: if `src/_includes/default-layout.html` exists and no `_layout.html` found, use it.
+4. Optional: if `src/_includes/_layout.html` exists and no folder layout found, use it.
 5. Else: render page content as-is.
+
+#### Layout Naming Convention
+Layout files must:
+- Start with underscore (`_`)
+- End with `layout.html` or `layout.htm`
+
+Valid layout filenames:
+- `_layout.html`, `_layout.htm` (standard)
+- `_custom.layout.html`, `_blog.layout.htm` (extended pattern)
+- `_documentation.layout.html`, `_admin-panel.layout.htm` (complex naming)
+
+#### Fallback Layout
+- `src/_includes/_layout.html` serves as the fallback layout when no folder-scoped layout is found
 
 ### Slots & Templates
 - `<slot>` elements in layouts; unnamed = default slot.

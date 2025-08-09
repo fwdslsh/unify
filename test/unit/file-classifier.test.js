@@ -174,17 +174,33 @@ describe('FileClassifier', () => {
       expect(classifier.isLayout(docsLayoutPath, sourceDir)).toBe(true);
     });
 
-    test('should identify default-layout.html in _includes as layout', async () => {
+    test('should identify fallback layout in _includes as layout', async () => {
       await createTestStructure(sourceDir, {
-        '_includes/default-layout.html': '<html><body><slot></slot></body></html>',
-        '_includes/default-layout.htm': '<html><body><slot></slot></body></html>'
+        '_includes/_layout.html': '<html><body><slot></slot></body></html>',
+        '_includes/_layout.htm': '<html><body><slot></slot></body></html>'
       });
 
-      const defaultLayoutPath = path.join(sourceDir, '_includes', 'default-layout.html');
-      const defaultLayoutHtmPath = path.join(sourceDir, '_includes', 'default-layout.htm');
+      const fallbackLayoutPath = path.join(sourceDir, '_includes', '_layout.html');
+      const fallbackLayoutHtmPath = path.join(sourceDir, '_includes', '_layout.htm');
 
-      expect(classifier.isLayout(defaultLayoutPath, sourceDir)).toBe(true);
-      expect(classifier.isLayout(defaultLayoutHtmPath, sourceDir)).toBe(true);
+      expect(classifier.isLayout(fallbackLayoutPath, sourceDir)).toBe(true);
+      expect(classifier.isLayout(fallbackLayoutHtmPath, sourceDir)).toBe(true);
+    });
+
+    test('should identify extended layout patterns as layouts', async () => {
+      await createTestStructure(sourceDir, {
+        '_custom.layout.html': '<html><body><h1>Custom</h1><slot></slot></body></html>',
+        '_blog-post.layout.htm': '<html><body><h1>Blog</h1><slot></slot></body></html>',
+        '_documentation.layout.html': '<html><body><nav>Docs</nav><slot></slot></body></html>'
+      });
+
+      const customLayoutPath = path.join(sourceDir, '_custom.layout.html');
+      const blogLayoutPath = path.join(sourceDir, '_blog-post.layout.htm');
+      const docsLayoutPath = path.join(sourceDir, '_documentation.layout.html');
+
+      expect(classifier.isLayout(customLayoutPath, sourceDir)).toBe(true);
+      expect(classifier.isLayout(blogLayoutPath, sourceDir)).toBe(true);
+      expect(classifier.isLayout(docsLayoutPath, sourceDir)).toBe(true);
     });
 
     test('should NOT identify other underscore files as layouts', async () => {
@@ -201,6 +217,28 @@ describe('FileClassifier', () => {
       expect(classifier.isLayout(headerPath, sourceDir)).toBe(false);
       expect(classifier.isLayout(partialPath, sourceDir)).toBe(false);
       expect(classifier.isLayout(navPath, sourceDir)).toBe(false);
+    });
+  });
+
+  describe('isLayoutFileName', () => {
+    test('should recognize standard layout filenames', () => {
+      expect(classifier.isLayoutFileName('_layout.html')).toBe(true);
+      expect(classifier.isLayoutFileName('_layout.htm')).toBe(true);
+    });
+
+    test('should recognize extended layout patterns', () => {
+      expect(classifier.isLayoutFileName('_custom.layout.html')).toBe(true);
+      expect(classifier.isLayoutFileName('_blog-post.layout.htm')).toBe(true);
+      expect(classifier.isLayoutFileName('_documentation.layout.html')).toBe(true);
+      expect(classifier.isLayoutFileName('_admin.layout.htm')).toBe(true);
+    });
+
+    test('should reject non-layout files', () => {
+      expect(classifier.isLayoutFileName('layout.html')).toBe(false);
+      expect(classifier.isLayoutFileName('_component.html')).toBe(false);
+      expect(classifier.isLayoutFileName('_custom.template.html')).toBe(false);
+      expect(classifier.isLayoutFileName('custom.layout.html')).toBe(false);
+      expect(classifier.isLayoutFileName('_partial.html')).toBe(false);
     });
   });
 

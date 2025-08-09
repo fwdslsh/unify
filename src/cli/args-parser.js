@@ -152,34 +152,6 @@ export function parseArgs(argv) {
       continue;
     }
     
-    if ((arg === '--layouts' || arg === '-l')) {
-      throw new UnifyError(
-        'The --layouts option has been removed in version 0.5.0',
-        null,
-        null,
-        [
-          'Use convention-based layouts instead: place _layout.html files in directories',
-          'Shared layouts go in src/_includes/ directory',
-          'See migration guide: docs/migration-to-0.5.0.md',
-          'Use --help to see current options'
-        ]
-      );
-    }
-    
-    if ((arg === '--components' || arg === '-c') && nextArg) {
-      throw new UnifyError(
-        'The --components option has been removed in version 0.5.0',
-        null,
-        null,
-        [
-          'Use convention-based components instead: place components in src/_includes/',
-          'Files starting with _ are non-emitting by convention',
-          'See migration guide: docs/migration-to-0.5.0.md',
-          'Use --help to see current options'
-        ]
-      );
-    }
-    
     if ((arg === '--assets' || arg === '-a') && nextArg) {
       args.assets = nextArg;
       i++;

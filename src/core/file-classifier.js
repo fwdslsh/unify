@@ -79,15 +79,39 @@ export class FileClassifier {
       return false;
     }
     
-    // Must be named _layout.html or be in _includes/default-layout.html
-    if (fileName === '_layout.html' || fileName === '_layout.htm') {
+    // Check if filename matches layout pattern
+    if (this.isLayoutFileName(fileName)) {
       return true;
     }
     
-    // Check for default-layout.html in _includes
+    // Check for fallback layout in _includes
     const relativePath = path.relative(sourceRoot, filePath);
-    if (relativePath === path.join('_includes', 'default-layout.html') ||
-        relativePath === path.join('_includes', 'default-layout.htm')) {
+    if (relativePath === path.join('_includes', '_layout.html') ||
+        relativePath === path.join('_includes', '_layout.htm')) {
+      return true;
+    }
+    
+    return false;
+  }
+
+  /**
+   * Check if a filename matches the layout naming convention
+   * @param {string} fileName - Name of the file to check
+   * @returns {boolean} True if matches layout pattern
+   */
+  isLayoutFileName(fileName) {
+    // Must start with underscore
+    if (!fileName.startsWith('_')) {
+      return false;
+    }
+    
+    // Must end with layout.html or layout.htm
+    if (fileName.endsWith('layout.html') || fileName.endsWith('layout.htm')) {
+      return true;
+    }
+    
+    // Also support the basic _layout.html and _layout.htm patterns
+    if (fileName === '_layout.html' || fileName === '_layout.htm') {
       return true;
     }
     
