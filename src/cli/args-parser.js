@@ -62,8 +62,6 @@ export function parseArgs(argv) {
     command: null,
     source: "src",
     output: "dist",
-    layouts: ".layouts",
-    components: ".components",
     port: 3000,
     host: "localhost",
     prettyUrls: false,
@@ -154,16 +152,32 @@ export function parseArgs(argv) {
       continue;
     }
     
-    if ((arg === '--layouts' || arg === '-l') && nextArg) {
-      args.layouts = nextArg;
-      i++;
-      continue;
+    if ((arg === '--layouts' || arg === '-l')) {
+      throw new UnifyError(
+        'The --layouts option has been removed in version 0.5.0',
+        null,
+        null,
+        [
+          'Use convention-based layouts instead: place _layout.html files in directories',
+          'Shared layouts go in src/_includes/ directory',
+          'See migration guide: docs/migration-to-0.5.0.md',
+          'Use --help to see current options'
+        ]
+      );
     }
     
     if ((arg === '--components' || arg === '-c') && nextArg) {
-      args.components = nextArg;
-      i++;
-      continue;
+      throw new UnifyError(
+        'The --components option has been removed in version 0.5.0',
+        null,
+        null,
+        [
+          'Use convention-based components instead: place components in src/_includes/',
+          'Files starting with _ are non-emitting by convention',
+          'See migration guide: docs/migration-to-0.5.0.md',
+          'Use --help to see current options'
+        ]
+      );
     }
     
     if ((arg === '--assets' || arg === '-a') && nextArg) {
@@ -251,7 +265,7 @@ export function parseArgs(argv) {
     if (arg.startsWith('-')) {
       const validOptions = [
         '--help', '-h', '--version', '-v', '--source', '-s', '--output', '-o',
-        '--layouts', '-l', '--components', '-c', '--assets', '-a', '--port', '-p', '--host',
+        '--assets', '-a', '--port', '-p', '--host',
         '--pretty-urls', '--base-url', '--clean', '--no-sitemap', 
         '--perfection', '--minify', '--verbose'
       ];

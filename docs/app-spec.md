@@ -1,4 +1,4 @@
-# Unify Static Site Generator - Complete Application Specification
+# Unify Static Site Generator - Complete Application Specification (Updated)
 
 ## Overview
 
@@ -15,7 +15,7 @@ Unify is a modern, lightweight static site generator designed for frontend devel
 
 ### Primary Purpose
 
-Transform source HTML/Markdown files with includes, and layouts into a complete static website ready for deployment.
+Transform source HTML/Markdown files with includes and layouts into a complete static website ready for deployment.
 
 ### Key Features
 
@@ -139,19 +139,16 @@ unify watch [options]
 - **Behavior:** Created if doesn't exist
 - **Used by:** All commands
 
-**`--layouts, -l <directory>`**
+**`--assets, -a <pattern>`**
 
-- **Purpose:** Specify layouts directory (relative to source or absolute path)
-- **Default:** `.layouts`
+- **Purpose:** Specify additional assets glob pattern to copy recursively
+- **Default:** `null` (no additional assets)
 - **Used by:** All commands
-- **Note:** Must be relative to source directory or absolute path with read access. Does not get copied to output directory.
+- **Format:** Glob pattern like `"./assets/**/*.*"` or `"./static/**/*"`
+- **Behavior:** Copies matching files to output directory preserving relative paths
+- **Note:** Use quotes around patterns with special characters
 
-**`--components, -c <directory>`**
-
-- **Purpose:** Specify components directory (relative to source or absolute path)
-- **Default:** `.components`
-- **Used by:** All commands
-- **Note:** Must be relative to source directory or absolute path with read access. Does not get copied to output directory.
+> **Removed:** `--layouts`, `--components` (replaced by conventions)
 
 #### Build Options
 
@@ -231,484 +228,101 @@ unify watch [options]
 
 ## File Processing Rules
 
-### File Types Handled
-
-#### HTML Files (`.html`)
-
-- **Processing:** Include resolution, layout application, asset tracking
-- **Output:** Processed HTML with includes resolved
-- **Components:** Files in `.components/` directory are treated as partials (not directly copied to output)
-- **Layout Support:** Automatic layout or based on `data-layout` property on the pages root element
-
-#### Markdown Files (`.md`)
-
-- **Processing:** YAML frontmatter extraction, Markdown to HTML conversion with table support and code highlighting,  include resolution, layout application, DOM templating if HTML is included in file
-- **Output:** HTML files with same name
-- **Layout Support:** Automatic layout or based on frontmatter `layout` property
-
-#### Static Assets
-
-- **Types:** CSS, JS, images, fonts, etc.
-- **Processing:** Asset tracking, referenced assets only, copied as-is without modification
-- **Output:** Copied to output directory maintaining relative paths
-
-### Include System
-
-#### Apache SSI-Style Comments
-
-**Virtual Includes:**
-
-```html
-<!--#include virtual="/path/from/source/root.html" -->
-```
-
-- Path relative to source directory root (cannot traverse past src root)
-- Leading `/` optional but recommended
-- Case-sensitive
-
-**File Includes:**
-
-```html
-<!--#include file="relative/path/from/current/file.html" -->
-```
-
-- Path relative to current file's directory
-- Supports `../` for parent directories
-- Case-sensitive
-- Not recommended
-
-#### DOM Elements (Advanced)
-
-**Include Element:**
-
-```html
-<include src="/components/header.html"></include>
-```
-
-- Path relative to source directory root (cannot traverse past src root)
-- Leading `/` optional but recommended
-- Case-insensitive
-
-**Slot Element:**
-
-```html
-<slot name="content">Default content here</slot>
-```
-
-- Added to layout files as content placeholders
-  - Each layout is required to have exactly one unnamed slot that works as the primary content placeholder
-- Slot can optionally provide default content
-- Slot can optionally provide a name attribute
-  - Pages can override the content by providing templates that target the slot
-
-**Template Element:**
-
-```html
-<template target="content">
-  <p>
-    Content to replace the default
-  </p>
-</template>
-```
-
-- Contained in pages to provide content to layout slots
-- No template element is needed on the page to provide content to the layout's default slot
-
-### Layout System
-
-#### Page Files
-
-- Located in the source directory (defaults: `src`)
-- Can be HTML or Markdown files
-- HTML files should contain one root content element
-  - This element can be any valid HTML element (ie: `<div>`, `<article>`, `<section>`, etc.)
-  - This element can provide a `data-layout` attribute to specify a layout
-  - This element _can_ be a template element with no target attribute to denote it replaces the layout's default slot
-- Markdown files can include frontmatter to specify a layout
-- Pages may contain any number of  `<include>`, `<script>`, `<style>`, or `<template>` tags in their root
-  - May contain only one `<template>` element without a `target` attribute per page
-
-#### Layout Files
-
-- Located in layouts directory (default: `.layouts/`)
-- Standard HTML with one or more slots
-- Main content slot should be unnamed and is replaced by the page contents
-- When specifying the path to a layout:
-  - If path starts with `/` it is resolved as relative to the source folder.
-  - If it does not start with `/` it is relative to the layouts folder.
-  - File extension is optional, assumed to be html.
-
-#### Layout Application
-
-- If a `default.html` file exists in the layouts directory, it is automatically applied to all pages, unless they already contain an `<html>` element in their content or the specify a different layout to use.
-- HTML pages can use a `data-layout="custom"` attribute
-- Markdown pages can specify `layout: custom` frontmatter property to specify a layout
-
-### Dependency Tracking
-
-- Bidirectional mapping: pages ↔ includes
-- Change impact analysis for incremental builds
-- Circular dependency detection (10-level depth limit)
-- Smart rebuilding of affected files only
-- Live reload with full page refresh for all file changes (CSS-only reloads not supported)
-
-### Component Asset Processing
-
-Currently, both SSI-style includes (`<!--#include -->`) and DOM-style includes (`<include>`) inline component content as-is without extracting or relocating `<style>` and `<script>` elements. Component styles and scripts remain embedded within the component content at the location where they are included.
-
-#### Current Behavior
-
-**Example Component** (`/.components/button.html`):
-
-```html
-<style>
-  .btn { background: blue; color: white; }
-</style>
-<button class="btn">Click Me</button>
-```
-
-**Page with SSI Include:**
-
-```html
-<div>
-  <!--#include virtual="/.components/button.html" -->
-</div>
-```
-
-**Final Output:**
-
-```html
-<div>
-  <style>
-    .btn { background: blue; color: white; }
-  </style>
-  <button class="btn">Click Me</button>
-</div>
-```
-
-**Note:** The style remains inline within the component content, not moved to the `<head>` section.
-
-#### Planned Enhancement
-
-Future versions may include automatic extraction and relocation of component assets:
-
-- **Style Elements:** When using an `<include />` element, extracted from components and moved to `<head>` section
-- **Script Elements:** When using an `<include />` element, extracted from components and moved to end of `<body>` section  
-- **Deduplication:** Identical style/script blocks deduplicated when same component included multiple times
-- **Component Isolation:** Components remain self-contained with their styling using CSS scoping
-
-### Live Reload System
-
-The development server provides live reload functionality that automatically refreshes the browser when source files change.
-
-#### Reload Triggers
-
-- **Page Files:** Changes to `.html` and `.md` files trigger full page reload
-- **Component Files:** Changes to files in the components directory trigger full page reload
-- **Layout Files:** Changes to files in the layouts directory trigger full page reload
-- **Asset Files:** Changes to CSS, JavaScript, and other static assets trigger full page reload
-- **Include Dependencies:** Changes to any file that is included by another file trigger full rebuild of dependent pages with updated content
-
-#### File Addition and Deletion Handling
-
-The watch system properly handles file lifecycle events:
-
-**File Additions:**
-
-- **New Content Files:** Newly created `.html` and `.md` files are detected and built into the output directory
-- **New Component Files:** Newly created component files trigger rebuilds of any pages that reference them (even if they had missing include errors before)
-- **New Asset Files:** Newly added CSS, JS, images, and other assets are detected, analyzed for references, and copied to output if referenced by any page
-- **Directory Creation:** Files added to newly created directories are properly detected and processed
-
-**File Deletions:**
-
-- **Content File Removal:** Deleted `.html` and `.md` files are removed from the output directory
-- **Component File Removal:** Deleted component files trigger rebuilds of dependent pages, which will show "Include not found" messages
-- **Asset File Removal:** Deleted assets are removed from the output directory
-- **Dependency Cleanup:** All tracking data for deleted files is properly cleaned up
-
-**Rapid Changes:** The system handles rapid sequences of file additions and deletions without losing events, using debounced processing to batch changes efficiently.
-
-#### Rebuild Guarantees
-
-When component or include files change during development:
-
-1. **Dependency Detection:** The build system tracks which pages depend on which includes
-2. **Complete Rebuild:** Dependent pages are fully rebuilt from source, ensuring all includes are re-processed
-3. **Content Synchronization:** The final HTML output reflects the latest version of all included content
-4. **Browser Notification:** After successful rebuild, all connected browsers receive reload notifications
-
-**Critical Requirement:** Component changes must result in complete page reconstruction, not just cache invalidation. The served HTML must contain the updated component content before the browser reload is triggered.
-
-#### Technical Implementation
-
-- **Server-Sent Events (SSE):** Live reload uses SSE for efficient real-time communication
-- **File Watching:** Native file system watching with recursive directory monitoring
-- **Incremental Builds:** Only changed files and their dependencies are rebuilt
-- **Broadcast System:** All connected browser instances receive reload notifications
-- **Endpoint:** Live reload endpoint available at `/__live-reload`
-
-#### Browser Integration
-
-- **Automatic Injection:** Live reload client script is automatically injected into served HTML pages
-- **Connection Management:** Robust reconnection handling for interrupted connections
-- **Visual Feedback:** Console logging of connection status and reload events
-
-## Error Handling and Exit Codes
-
-### Exit Codes
-
-- **0:** Success
-- **1:** Recoverable errors (missing includes, validation warnings)
-- **2:** Fatal errors (invalid arguments, file system errors)
-
-### Error Types
-
-#### Validation Errors
-
-- Invalid CLI arguments
-- Port out of range (1-65535)
-- Unknown commands or options
-- **Behavior:** Display error with suggestions, exit code 1
-
-#### File System Errors
-
-- Source directory doesn't exist
-- Permission denied
-- Path traversal attempts
-- **Behavior:** Display error with context, exit code 2
-
-#### Build Errors
-
-- Circular dependencies
-- Include file not found
-- Layout processing failures
-- **Behavior:** Default to continuing build of other files when one fails, unless `--perfection` flag is used
-- **Recovery:** Failed includes become error comments in output, build continues
-- **Build Process:** Builds occur in temporary location and are copied to output directory once completed
-
-#### Security Errors
-
-- Path traversal attempts (`../../../etc/passwd`)
-- Access outside source boundaries
-- **Behavior:** Immediate failure, exit code 2
-
-### Error Output Format
-
-- Should contain the error message and one or more suggestions.
-
-```
-Error: {error message}
-
-Suggestions:
-  * {suggestion 1}
-  ... 
-```
-
-### Debug Mode
-
-- Activated via `UNIFY_DEBUG` environment variable or `--verbose` CLI argument
-- Shows stack traces for all errors
-- Detailed file processing logs
-
-## Output and Logging
-
-### Standard Output
-
-#### Build Command
-
-```
-unify v{version}
-
-Building static site...
-- Processed 15 files
-- Generated sitemap.xml with 8 pages
-- Copied 12 assets
-Build completed successfully! (1.2s)
-```
-
-#### Serve Command
-
-```
-unify v{version}
-
-Building static site...
-- Build completed successfully!
-🚀 Development server started
-📁 Serving: /path/to/output
-🌐 Local: http://localhost:3000
-- Live reload: enabled
-```
-
-#### Watch Command
-
-```
-unify v{version}
-
-Starting file watcher...
-Building static site...
-- Processed 15 files
-- Generated sitemap.xml with 8 pages
-- Copied 12 assets
-Build completed successfully! (1.2s)
-- Initial build completed
-- Watching for changes...
-- Changed: src/index.html
-- Rebuilding...
-- Rebuild completed (0.3s)
-```
-
-### Logging Levels
-
-- **Debug:** Debug messages
-- **Info:** General status messages
-- **Success:** Successful operations
-- **Warning:** Non-fatal issues
-- **Error:** Fatal problems
-
-## Security Requirements
-
-### Path Validation
-
-- All file operations must be within source directory boundaries, except absolute paths for includes
-- Path traversal prevention for all user inputs
-- Validation function: `isPathWithinDirectory()` if it is not, it should validate the the user has read access to the specified directory.
-- Absolute paths that resolve outside of the source directory should produce a warning in the build output.
-
-### Input Sanitization
-
-- CLI arguments validated against expected patterns
-- File paths normalized before processing
-- No injection vulnerabilities in template processing
-
-### Output Security
-
-- Static HTML/CSS/JS output only
-- No client-side template execution
-- No server-side code generation
-
-### Development Server Security
-
-- Serves only files from output directory
-- MIME type validation
-- Request path validation
-- No directory traversal in URLs
-
-## Performance Requirements
-
-### Build Performance
-
-- Incremental builds for changed files only
-- Smart dependency tracking to minimize rebuilds
-- Asset copying only for referenced files
-- Streaming file operations (no full-site memory loading)
-
-### Development Server
-
-- File change debouncing (100ms)
-- Selective rebuild based on dependency analysis
-- Efficient live reload via Server-Sent Events
-- Memory-efficient file watching
-
-### Scalability
-
-- Handle projects with 1000+ pages
-- Handle page that are over 5MB
-- Efficient processing of large asset collections
-- Minimal memory footprint during builds
-
-## Compatibility Requirements
-
-### Bun Support
-
-- Minimum version: Bun 1.2.19
-- ESM modules only
-- Built-in test runner support
-- Compiled to executable for deployment
-
-### Cross-Platform
-
-- Windows, macOS, Linux support
-- Path handling respects OS conventions
-- Line ending normalization
-
-## Configuration
-
-### Default Behavior
-
-- No configuration files required
-- Convention over configuration
-- Sensible defaults for all options
-
-### Directory Structure Conventions
+## Directory Structure Conventions
 
 ```
 project/
-├── src/                    # Source files (--source)
-│   ├── .components/        # Reusable components (--components)
-│   ├── .layouts/           # Page layouts (--layouts)
-│   ├── index.html          # Page files
-│   ├── about.md            # Markdown content
-│   └── assets/             # Static assets
-└── dist/                   # Output directory (--output)
+├── src/                      # Source root
+│   ├── _includes/            # Shared partials/layouts (non-emitting; not copied)
+│   ├── section/
+│   │   ├── _layout.html      # Layout for this folder (wraps descendants)
+│   │   ├── _partial.html     # Non-emitting partial
+│   │   └── page.html         # Page
+│   ├── index.html            # Page
+│   └── about/
+│       ├── _layout.html      # About-specific layout
+│       ├── _cta.html         # Partial
+│       └── index.html        # Page
+└── dist/                     # Output
 ```
 
-### File Naming Conventions
+- Any file or folder starting with `_` is **non-emitting** by convention.
+- `src/_includes/` is a conventional home for shared partials/layouts. Its contents are not copied to `dist/` unless referenced as non-HTML assets.
 
-- Layouts: Located in `.layouts/` directory
-- Components: Located in `.components/` directory
-- Pages: All other `.html` and `.md` files located under `src`
+## File Processing Rules
 
-## Integration Points
+### HTML Files (`.html`, `.htm`)
+- Pages: `.htm(l)` files not starting with `_` are emitted as pages.
+- Partials: `.htm(l)` files starting with `_` are non-emitting partials.
+- Layouts: `_layout.html` provides folder-scoped layouts.
 
-### Package Managers
+### Markdown Files (`.md`)
+- Processed with frontmatter extraction and Markdown→HTML conversion.
+- Layout discovery or override applies.
 
-- npm global installation: `npm install -g @fwdslsh/unify`
-- npx usage: `npx @fwdslsh/unify`
-- Package registry: `@fwdslsh/unify`
+### Static Assets
+- Copied only if referenced.
+- Underscore-prefixed assets are non-emitting unless explicitly referenced.
 
-### Development Tools
+### Include System
 
-- VS Code extension support
-- Docker container support
-- CI/CD pipeline integration
-- Vite HTML preprocessor integration (experimental, may be moved to separate project)
+#### DOM Include
+```html
+<include src="/components/header.html"></include>
+```
+Resolution:
+1. Leading `/` → from `src/` root.
+2. Else → relative to including file.
 
-### Deployment
+#### Apache SSI (unchanged)
+```html
+<!--#include file="relative.html" -->
+<!--#include virtual="/absolute.html" -->
+```
+- `file` = relative to current file.
+- `virtual` = from `src/` root.
 
-- Static hosting (Netlify, Vercel, GitHub Pages)
-- CDN deployment
-- Traditional web servers
+## Layout System
+
+### Discovery
+1. Nearest `_layout.html` in page's folder.
+2. Climb to `src/` root.
+3. Apply layouts as nested wrappers.
+4. Optional: if `src/_includes/default-layout.html` exists and no `_layout.html` found, use it.
+5. Else: render page content as-is.
+
+### Slots & Templates
+- `<slot>` elements in layouts; unnamed = default slot.
+- Pages use `<template target="name">` for named slots.
+
+### Overrides
+- `data-layout` accepts relative paths or absolute-from-`src` paths.
+
+## Dependency Tracking
+- Tracks pages ↔ partials/layouts/includes.
+- Rebuild dependents on change.
+
+## Live Reload
+- Changes to `_layout.html`, underscore partials, or `src/_includes/` trigger dependent rebuilds and browser reload.
+
+## Error Handling
+- Missing override layout: recoverable error + fallback.
+- Warn if non-underscore `.htm(l)` file is only ever included.
+
+## Security Requirements
+- Path traversal prevention.
+- Absolute paths resolve from `src/` root.
+- Underscore folders/files are non-emitting by convention.
+
+## Performance Requirements
+(Unchanged)
+
+## Compatibility Requirements
+(Unchanged)
+
+## Configuration
+- No configuration required for layouts/components.
+- Convention over configuration.
 
 ## Success Criteria
-
-### Functional Requirements
-
-- - All three commands (build, serve, watch) work correctly
-- - Include system processes Apache SSI and DOM elements
-- - Markdown processing with frontmatter and layouts
-- - Live reload functionality in development server
-- - Sitemap generation for SEO
-- - Security validation prevents path traversal
-- - Error handling with helpful messages
-
-### Performance
-
-- - Incremental builds complete in <1 second for single file changes
-- - Initial builds complete in <5 seconds for typical sites (<100 pages)
-- - Memory usage remains <100MB for typical projects
-- - File watching responds to changes within 200ms
-- - Can support files over 5MB
-
-### Usability Requirements
-
-- - Zero configuration required for basic usage
-- - Clear error messages with actionable suggestions
-- - Intuitive CLI with helpful defaults
-- - Comprehensive help documentation
-
-### Reliability Requirements
-
-- - Graceful handling of missing includes
-- - Robust error recovery during builds
-- - Cross-platform compatibility
+(Unchanged, except layout/component management updated to match this spec)
