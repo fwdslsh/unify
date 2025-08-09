@@ -1,11 +1,10 @@
 name: Build and Publish Docker Images
 
 on:
-  push:
-    branches: [main]
-    tags: ["v*"]
   pull_request:
     branches: [main]
+  release:
+    types: [published]
   workflow_dispatch:
 
 jobs:
@@ -113,7 +112,7 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Log in to Docker Hub
-        if: github.event_name != 'pull_request'
+        if: github.event_name == 'release'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -125,7 +124,7 @@ jobs:
           context: .
           file: docker/${{ matrix.dockerfile }}
           platforms: ${{ matrix.platforms }}
-          push: ${{ github.event_name != 'pull_request' }}
+          push: ${{ github.event_name == 'release' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
@@ -135,7 +134,7 @@ jobs:
     name: Test Docker Images
     runs-on: ubuntu-latest
     needs: build-docker-images
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'release'
     strategy:
       matrix:
         image: [unify, unify-nginx]
@@ -143,20 +142,20 @@ jobs:
       - name: Test CLI image
         if: matrix.image == 'unify'
         run: |
-          docker run --rm ghcr.io/fwdslsh/${{ matrix.image }}:latest unify --version
+          docker run --rm fwdslsh/${{ matrix.image }}:latest unify --version
 
       - name: Test NGINX image
         if: matrix.image == 'unify-nginx'
         run: |
           # Test that unify command is available
-          docker run --rm ghcr.io/fwdslsh/${{ matrix.image }}:latest unify --version
+          docker run --rm fwdslsh/${{ matrix.image }}:latest unify --version
 
           # Test basic functionality with a simple site
           mkdir -p test-site
           echo '<h1>Test Site</h1>' > test-site/index.html
 
           # Test build functionality
-          docker run --rm -v $(pwd)/test-site:/site ghcr.io/fwdslsh/${{ matrix.image }}:latest \
+          docker run --rm -v $(pwd)/test-site:/site fwdslsh/${{ matrix.image }}:latest \
             unify build --source /site --output /tmp/out
 
           echo "✅ Docker image tests passed"
@@ -165,7 +164,7 @@ jobs:
     name: Security Scan
     runs-on: ubuntu-latest
     needs: build-docker-images
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'release'
     strategy:
       matrix:
         image: [unify, unify-nginx]
@@ -173,7 +172,7 @@ jobs:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ghcr.io/fwdslsh/${{ matrix.image }}:latest
+          image-ref: fwdslsh/${{ matrix.image }}:latest
           format: "sarif"
           output: "trivy-results.sarif"
 
