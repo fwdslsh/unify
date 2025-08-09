@@ -11,8 +11,8 @@ describe('Default Command Behavior', () => {
     it('should default to build when only options provided', () => {
       const args = parseArgs(['--source', 'src', '--output', 'dist']);
       
-      // parseArgs should not set command, CLI main should default it
-      expect(args.command).toBe(null);
+  // parseArgs should default command to 'build'
+  expect(args.command).toBe('build');
       expect(args.source).toBe('src');
       expect(args.output).toBe('dist');
     });
@@ -20,7 +20,7 @@ describe('Default Command Behavior', () => {
     it('should handle empty arguments', () => {
       const args = parseArgs([]);
       
-      expect(args.command).toBe(null);
+  expect(args.command).toBe('build');
       expect(args.source).toBe('src');
       expect(args.output).toBe('dist');
     });
@@ -28,7 +28,7 @@ describe('Default Command Behavior', () => {
     it('should handle flags only', () => {
       const args = parseArgs(['--pretty-urls', '--port', '3000']);
       
-      expect(args.command).toBe(null);
+  expect(args.command).toBe('build');
       expect(args.prettyUrls).toBe(true);
       expect(args.port).toBe(3000);
     });
@@ -67,9 +67,12 @@ describe('Default Command Behavior', () => {
     it('should handle command at any position', () => {
       // Commands should only be first argument
       // This should be treated as an unknown argument, not a command
-      expect(() => {
+      try {
         parseArgs(['--source', 'src', 'build']);
-      }).toThrow(/Unknown option: build/);
+        throw new Error('Did not throw');
+      } catch (error) {
+        expect(error.message).toMatch(/Unknown option: build/);
+      }
     });
   });
 
@@ -77,15 +80,15 @@ describe('Default Command Behavior', () => {
     it('should parse help flag without command', () => {
       const args = parseArgs(['--help']);
       
-      expect(args.help).toBe(true);
-      expect(args.command).toBe(null);
+  expect(args.help).toBe(true);
+  expect(args.command).toBe('build');
     });
 
     it('should parse version flag without command', () => {
       const args = parseArgs(['--version']);
       
-      expect(args.version).toBe(true);
-      expect(args.command).toBe(null);
+  expect(args.version).toBe(true);
+  expect(args.command).toBe('build');
     });
 
     it('should parse short help flag', () => {

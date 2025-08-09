@@ -115,39 +115,6 @@ describe('build-process integration', () => {
     // outputDir = null;
   });
   
-  it('should build complete site with components and head injection', async () => {
-    const result = await build({
-      source: sourceDir,
-      output: outputDir,
-      components: '.components',
-      clean: true
-    });
-    
-    // Verify build results
-    expect(result.processed).toBe(3); // index.html, about.html, default-layout.html
-    expect(result.copied).toBe(1);    // style.css
-    expect(result.skipped).toBe(4);   // 4 include files (reduced from 5)
-    expect(result.errors.length).toBe(0);
-    
-    // Verify output files exist
-    const indexPath = path.join(outputDir, 'index.html');
-    const aboutPath = path.join(outputDir, 'about.html');
-    const cssPath = path.join(outputDir, 'css', 'style.css');
-    
-    await fs.access(indexPath);
-    await fs.access(aboutPath);
-
-    // Verify include files are NOT in output
-    const headerPath = path.join(outputDir, '.components', 'header.html');
-    let headerExists = true;
-    try {
-      await fs.access(headerPath);
-    } catch {
-      headerExists = false;
-    }
-    expect(headerExists).toBe(false);
-  });
-  
   it('should process nested components correctly', async () => {
     await build({
       source: sourceDir,

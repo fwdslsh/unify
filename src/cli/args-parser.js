@@ -78,25 +78,22 @@ export function parseArgs(argv) {
     includes: null,
   };
 
-  // Accept flags/options before and after the command
+  // Only the first non-option argument is considered a command
   let commandFound = false;
   let i = 0;
+  const validCommands = ['build', 'watch', 'serve'];
   while (i < argv.length) {
     const arg = argv[i];
     const nextArg = argv[i + 1];
 
-    // Find command anywhere in argv
-    if (!commandFound && (arg === 'build' || arg === 'watch' || arg === 'serve')) {
-      args.command = arg;
-      commandFound = true;
-      i++;
-      continue;
-    }
-
-    // Check for unknown commands (first non-option argument that isn't a valid command)
+    // If not a flag/option, and command not yet found, treat as command or error
     if (!arg.startsWith('-') && !commandFound) {
-      const validCommands = ['build', 'watch', 'serve'];
-      if (!validCommands.includes(arg)) {
+      if (validCommands.includes(arg)) {
+        args.command = arg;
+        commandFound = true;
+        i++;
+        continue;
+      } else {
         const suggestion = findClosestCommand(arg, validCommands);
         const suggestions = [];
         if (suggestion) {
@@ -114,10 +111,18 @@ export function parseArgs(argv) {
           suggestions
         );
       }
-      args.command = arg;
-      commandFound = true;
-      i++;
-      continue;
+    }
+    // If not a flag/option, and command already found, treat as unknown option
+    if (!arg.startsWith('-') && commandFound) {
+      throw new UnifyError(
+        `Unknown option: ${arg}`,
+        null,
+        null,
+        [
+          'Use --help to see valid options',
+          'Check for typos in the argument'
+        ]
+      );
     }
 
     // Flags
