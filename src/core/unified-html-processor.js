@@ -70,7 +70,7 @@ export async function processHtmlUnified(
       dependencyTracker.analyzePage(filePath, htmlContent, sourceRoot);
     }
     
-    // Process includes with the main include processor
+    // Always process includes (SSI and DOM) first
     let processedContent = await processIncludesWithStringReplacement(
       htmlContent,
       filePath,
@@ -78,8 +78,16 @@ export async function processHtmlUnified(
       processingConfig,
       new Set() // Initialize call stack for circular dependency detection
     );
-    
-    // Handle layouts and slots if needed
+
+    // Apply HTML optimization only after all includes are processed
+    if (processingConfig.optimize !== false) {
+      logger.debug(`Optimizing HTML content, optimize=${processingConfig.optimize}`);
+      processedContent = await optimizeHtmlContent(processedContent);
+    } else {
+      logger.debug(`Skipping HTML optimization, optimize=${processingConfig.optimize}`);
+    }
+
+    // Handle layouts and slots if needed (after includes and optimization)
     if (shouldUseDOMMode(processedContent)) {
       processedContent = await processDOMMode(
         processedContent,
@@ -98,15 +106,7 @@ export async function processHtmlUnified(
         processingConfig
       );
     }
-    
-    // Apply HTML optimization if enabled
-    if (processingConfig.optimize !== false) {
-      logger.debug(`Optimizing HTML content, optimize=${processingConfig.optimize}`);
-      processedContent = await optimizeHtmlContent(processedContent);
-    } else {
-      logger.debug(`Skipping HTML optimization, optimize=${processingConfig.optimize}`);
-    }
-    
+
     return processedContent;
   } catch (error) {
     logger.error(
@@ -181,20 +181,33 @@ async function processIncludesWithStringReplacement(htmlContent, filePath, sourc
   const domIncludeRegex = /<include\s+src="([^"]+)"[^>]*><\/include>/g;
   while ((match = domIncludeRegex.exec(htmlContent)) !== null) {
     const [fullMatch, src] = match;
-    
     try {
-      const resolvedPath = resolveIncludePathInternal('file', src, filePath, sourceRoot);
+      let resolvedPath;
+      if (src.startsWith('/')) {
+        // Absolute path from source root
+        resolvedPath = path.resolve(sourceRoot, src.replace(/^\/+/, ''));
+      } else {
+        // Relative path from current file
+        resolvedPath = path.resolve(path.dirname(filePath), src);
+      }
+      // Security: ensure resolved path is within source root
+      if (!isPathWithinDirectory(resolvedPath, sourceRoot)) {
+        throw new PathTraversalError(src, sourceRoot);
+      }
       const includeContent = await fs.readFile(resolvedPath, 'utf-8');
-      
       // Recursively process nested includes
       const nestedProcessedContent = await processIncludesWithStringReplacement(includeContent, resolvedPath, sourceRoot, config, newCallStack);
-      
       processedContent = processedContent.replace(fullMatch, nestedProcessedContent);
       logger.debug(`Processed include element: ${src} -> ${resolvedPath}`);
     } catch (error) {
       // Convert file not found errors to IncludeNotFoundError with helpful suggestions
       if (error.code === 'ENOENT' && !error.formatForCLI) {
-        const resolvedPath = resolveIncludePathInternal('file', src, filePath, sourceRoot);
+        let resolvedPath;
+        if (src.startsWith('/')) {
+          resolvedPath = path.resolve(sourceRoot, src.replace(/^\/+/, ''));
+        } else {
+          resolvedPath = path.resolve(path.dirname(filePath), src);
+        }
         error = new IncludeNotFoundError(src, filePath, [resolvedPath]);
       }
       // In perfection mode, fail fast on any include error

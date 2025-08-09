@@ -1,47 +1,22 @@
-<body>
-  <  <include src="/custom_components/alert.html"
-           data-title="Note"
-           data-message="This site uses 100% declarative HTML." />
+<template slot="title">Welcome to Unify</template>
+<template slot="header">
+  <h1>🧱 Unify</h1>
+  <p>Convention-based static site generator</p>
+</template>
 
-  <h3>Components Example</h3>
-  <p>Here are some reusable components:</p>
+<h2>Hello!</h2>
+<p>This is a page rendered with the Unify layout engine. This content goes into the unnamed slot.</p>
 
-  <include src="/custom_components/card.html"
-           data-title="🎯 Features"
-           data-content="DOM Mode supports layouts and components." />
+<!--#include virtual="/_includes/alert.html" -->
 
-  <include src="/custom_components/card.html"
-           data-title="⚡ Performance"
-           data-content="All processing at build time, pure HTML output." />
+<h3>Components Example</h3>
+<p>Here are some reusable components:</p>
 
-  <include src="/custom_components/navigation.html" />ot="title">Welcome to DOM Mode</template>
-  <template target="header">
-    <h1>🧱 Unify DOM Mode</h1>
-    <p>Modern templating with pure HTML</p>
-  </template>
+<!--#include virtual="/_includes/card.html" -->
 
-  <h2>Hello!</h2>
-  <p>This is a blog post rendered with the Unify DOM Mode layout engine. This content goes into the unnamed slot.</p>
+<!--#include virtual="/_includes/navigation.html" -->
 
-  <include src="/custom_components/alert.html"
-           data-title="Note"
-           data-message="This site uses 100% declarative HTML." />
-
-  <h3>Components Example</h3>
-  <p>Here are some reusable components:</p>
-
-  <include src="/custom_components/card.html"
-           data-title="🎯 Features"
-           data-content="DOM Mode supports layouts, components, and token replacement." />
-
-  <include src="/custom_components/card.html"
-           data-title="⚡ Performance"
-           data-content="All processing happens at build time - zero runtime JavaScript needed." />
-
-  <include src="/custom_components/navigation.html" />
-
-  <template target="footer">
-    <p>© 2025 - Built with Unify DOM Mode</p>
-    <p><a href="https://github.com/yourusername/unify">View on GitHub</a></p>
-  </template>
-</body>
+<template slot="footer">
+  <p>© 2025 - Built with Unify</p>
+  <p><a href="https://github.com/fwdslsh/unify">View on GitHub</a></p>
+</template>

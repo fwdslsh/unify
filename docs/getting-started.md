@@ -24,13 +24,13 @@ npx @fwdslsh/unify --help
 mkdir my-site
 cd my-site
 
-# Create source directory
-mkdir -p src/.components src/.layouts
+# Create source directory with conventional structure
+mkdir -p src/_includes
 ```
 
 ### 2. Create a Layout
 
-Create `src/.layouts/default.html`:
+Create `src/_layout.html` (folder-scoped layout):
 
 ```html
 <!DOCTYPE html>
@@ -41,18 +41,38 @@ Create `src/.layouts/default.html`:
     <slot name="head"></slot>
   </head>
   <body>
-    <!--#include virtual="/.components/header.html" -->
+    <!--#include virtual="/_includes/header.html" -->
     <main>
       <slot></slot>
     </main>
-    <!--#include virtual="/.components/footer.html" -->
+    <!--#include virtual="/_includes/footer.html" -->
+  </body>
+</html>
+```
+
+Or create `src/_includes/_layout.html` (fallback layout):
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <slot name="head"></slot>
+  </head>
+  <body>
+    <!--#include virtual="/_includes/header.html" -->
+    <main>
+      <slot></slot>
+    </main>
+    <!--#include virtual="/_includes/footer.html" -->
   </body>
 </html>
 ```
 
 ### 3. Create Components
 
-Create `src/.components/header.html`:
+Create `src/_includes/header.html`:
 
 ```html
 <header>
@@ -66,7 +86,7 @@ Create `src/.components/header.html`:
 </header>
 ```
 
-Create `src/.components/footer.html`:
+Create `src/_includes/footer.html`:
 
 ```html
 <footer>
@@ -93,12 +113,11 @@ Create `src/about.md`:
 ```markdown
 ---
 title: "About Us"
-layout: default
 ---
 
 # About Us
 
-This page demonstrates markdown with frontmatter and layout integration.
+This page demonstrates markdown with automatic layout integration.
 
 ## Features
 
@@ -106,7 +125,7 @@ This page demonstrates markdown with frontmatter and layout integration.
 - Frontmatter metadata
 - Include processing within markdown
 
-<!--#include virtual="/.components/contact-form.html" -->
+<!--#include virtual="/_includes/contact-form.html" -->
 ```
 
 ### 5. Build and Serve
@@ -123,6 +142,31 @@ Visit `http://localhost:3000` to see your site!
 
 ## Core Concepts
 
+### Convention-Based Architecture
+
+unify uses conventions to organize your site:
+
+- **Pages**: Any `.html` or `.md` file not starting with `_`
+- **Partials**: Files starting with `_` (non-emitting)
+- **Layouts**: Files starting with `_` and ending with `layout.html` or `layout.htm`
+- **Shared Components**: Files in `_includes/` directory
+
+### Layout System
+
+#### Layout Naming Patterns
+
+Valid layout file names:
+- `_layout.html`, `_layout.htm` (standard)
+- `_custom.layout.html`, `_blog.layout.htm` (extended patterns)
+- `_documentation.layout.html`, `_admin-panel.layout.htm` (complex naming)
+
+#### Layout Discovery
+
+1. **Folder Layout**: Looks for layout files in the page's directory
+2. **Parent Directories**: Climbs up to find the nearest layout
+3. **Fallback Layout**: Uses `_includes/_layout.html` if it exists
+4. **No Layout**: Renders page content as-is
+
 ### Include System
 
 unify uses Apache SSI syntax for includes:
@@ -133,8 +177,7 @@ unify uses Apache SSI syntax for includes:
 ### File Organization
 
 - **Source directory** (`src/`): Your content and templates
-- **Components directory** (`.components/`): Reusable includes
-- **Layouts directory** (`.layouts/`): Page templates
+- **Includes directory** (`_includes/`): Shared partials and layouts
 - **Output directory** (`dist/`): Generated static site
 
 ### Development Workflow
@@ -156,14 +199,14 @@ unify uses Apache SSI syntax for includes:
 
 ```
 src/
-├── .layouts/
-│   ├── default.html
-│   └── blog-post.html
-├── .components/
-│   ├── header.html
-│   ├── footer.html
-│   └── blog-nav.html
-├── posts/
+├── _includes/
+│   ├── _layout.html          # Fallback layout
+│   ├── header.html           # Shared header
+│   ├── footer.html           # Shared footer
+│   └── blog-nav.html         # Blog navigation
+├── blog/
+│   ├── _blog.layout.html     # Blog-specific layout
+│   ├── _sidebar.html         # Blog sidebar partial
 │   ├── 2024-01-01-first-post.md
 │   └── 2024-01-02-second-post.md
 ├── index.html
@@ -174,10 +217,10 @@ src/
 
 ```
 src/
-├── .layouts/default.html
-├── .components/
-│   ├── nav.html
-│   └── footer.html
+├── _includes/
+│   ├── _layout.html          # Fallback layout
+│   ├── nav.html              # Main navigation
+│   └── footer.html           # Footer
 ├── pages/
 │   ├── about.md
 │   ├── services.html
@@ -188,15 +231,24 @@ src/
 └── index.html
 ```
 
-### Component-based
+### Section-Specific Layouts
 
 ```
 src/
-├── .components/
-│   ├── hero-section.html
-│   ├── feature-card.html
-│   ├── testimonial.html
-│   └── call-to-action.html
-├── pages/
+├── _includes/
+│   ├── _layout.html          # Global fallback
+│   ├── header.html
+│   └── footer.html
+├── docs/
+│   ├── _docs.layout.html     # Documentation layout
+│   ├── _toc.html             # Table of contents partial
+│   ├── guide.html
+│   └── api.html
+├── blog/
+│   ├── _blog.layout.html     # Blog layout
+│   ├── _sidebar.html         # Blog sidebar
+│   └── posts/
+│       ├── first-post.md
+│       └── second-post.md
 └── index.html
 ```

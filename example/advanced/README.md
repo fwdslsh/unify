@@ -1,47 +1,69 @@
 # Advanced Example
 
-This example demonstrates the `unify` modern templating system that uses pure HTML with minimal custom elements.
+This example demonstrates the `unify` convention-based static site generator that uses pure HTML with minimal configuration.
 
 ## 🎯 Design Principles
 
-- **HTML-centric**: No templating language, just HTML
-- **Single custom element**: Only `<include />` is introduced  
-- **No wrappers**: Pages and components are just HTML
+- **Convention-based**: Files and directories starting with `_` are non-emitting by convention
+- **Layout discovery**: Automatic layout wrapping using file naming patterns
+- **Pure HTML output**: No runtime JavaScript or dynamic templating
 - **Minimal configuration**: Layouts are inferred by convention
-- **Pure build-time**: No runtime JavaScript or dynamic templating
 
 ## 📁 Project Structure
 
 ```
-examples/dom-mode/
-├── pages/
-│   ├── index.html           # Homepage with blog layout
-│   └── about.html           # About page with default layout
-├── components/
-│   ├── alert.html           # Alert component with token replacement
-│   ├── card.html            # Card component  
-│   └── navigation.html      # Navigation component
-├── layouts/
-│   ├── default.html         # Default page layout
-│   └── blog.html            # Blog-specific layout
-├── styles/
-│   └── site.css             # Global styles
-└── dist/                    # Generated output
+example/advanced/
+├── src/
+│   ├── _includes/
+│   │   ├── _layout.html         # Fallback layout
+│   │   ├── header.html          # Shared header component
+│   │   ├── footer.html          # Shared footer component
+│   │   ├── navigation.html      # Navigation component
+│   │   ├── card.html            # Card component  
+│   │   └── alert.html           # Alert component
+│   ├── _blog.layout.html        # Blog-specific layout using naming pattern
+│   ├── index.html               # Homepage (uses _includes/_layout.html)
+│   ├── about.html               # About page (uses _includes/_layout.html)
+│   ├── blog.html                # Blog page (uses _blog.layout.html)
+│   └── styles/
+│       └── site.css             # Global styles
+└── dist/                        # Generated output
 ```
 
 ## 🧩 Key Features Demonstrated
 
-### 1. Layout System
+### 1. Convention-Based Layout System
 
-Pages specify layouts using `data-layout`:
+Pages are automatically wrapped with the nearest layout file using naming patterns:
 
 ```html
-<body data-layout="/layouts/blog.html">
-  <!-- Page content -->
+<!-- Layout file: _blog.layout.html -->
+<!DOCTYPE html>
+<html>
+<head>
+  <title><slot name="title">Default Title</slot></title>
+</head>
+<body>
+  <main><slot></slot></main> <!-- Main content goes here -->
 </body>
+</html>
 ```
 
-### 2. Slot System
+### 2. Layout Naming Patterns
+
+Valid layout filenames:
+- `_layout.html`, `_layout.htm` (standard)
+- `_blog.layout.html`, `_docs.layout.htm` (extended patterns)
+- `_documentation.layout.html` (complex naming)
+
+### 3. Layout Discovery Process
+
+1. **Folder Layout**: Searches current directory for layout files
+2. **Parent Directory Climb**: Walks up directory tree to find nearest layout
+3. **Fallback Layout**: Uses `_includes/_layout.html` if it exists
+4. **No Layout**: Renders content as-is
+
+### 4. Slot System
 
 Named slots in layouts:
 ```html
@@ -53,83 +75,81 @@ Named slots in layouts:
 Content for slots:
 ```html
 <!-- In page -->
-<template target="title">My Page Title</template>
+<template slot="title">My Page Title</template>
 <!-- Content outside templates goes to unnamed slot -->
 <h1>Main Content</h1>
 ```
 
-### 3. Component Inclusion
+### 5. Component Inclusion
 
-Include components with data binding:
+Include components using Apache SSI syntax:
 ```html
-<include src="/components/alert.html"
-         data-title="Warning"
-         data-message="This is important!" />
-```
-
-### 4. Token Replacement
-
-Components use `data-token` for replaceable content:
-```html
-<!-- In component -->
-<strong data-token="title">Default Title</strong>
-<p data-token="message">Default message</p>
+<!--#include virtual="/_includes/header.html" -->
+<!--#include virtual="/_includes/alert.html" -->
 ```
 
 ## 🔧 Building This Example
 
 ```bash
-# Build the DOM mode example
-unify build --source examples/dom-mode/pages --output examples/dom-mode/dist
+# Build the advanced example
+unify build --source example/advanced/src --output example/advanced/dist
 
 # The build process will:
-# 1. Detect DOM mode elements in pages
-# 2. Apply layouts with slot system
-# 3. Process component includes with token replacement
-# 4. Move component styles to <head> (deduplicated)
-# 5. Move component scripts to end of <body> (deduplicated)
+# 1. Discover layout files using naming patterns
+# 2. Automatically wrap pages with nearest layouts
+# 3. Process slot system for content insertion
+# 4. Resolve includes recursively
+# 5. Copy referenced assets to output
 ```
 
 ## ✨ Expected Output
 
 The `index.html` file will be processed into a complete HTML document:
 
-- Layout `layouts/blog.html` provides the structure
-- Named slots (`title`, `header`, `footer`) filled from `<template target="...">`
+- Layout `_includes/_layout.html` provides the base structure
+- Named slots (`title`) filled from `<template slot="...">`
 - Default content goes into the unnamed `<slot></slot>`
-- `<include>` elements replaced with component content
-- `data-token` attributes replaced with values from `data-*` attributes
+- Include directives replaced with component content
 - Component styles moved to `<head>` and deduplicated
-- Component scripts moved to end of `<body>` and deduplicated
 
-## 🆚 Comparison with Traditional SSI
+## 🆚 Comparison with Configuration-Based Approach
 
-| Feature | Traditional SSI | DOM Mode |
-|---------|----------------|----------|
-| **Includes** | `<!--#include virtual="/path" -->` | `<include src="/path" />` |
-| **Data Passing** | ❌ Not supported | ✅ `data-title="value"` |
-| **Layouts** | ❌ Manual | ✅ `data-layout` + slots |
-| **Components** | ❌ Static only | ✅ Token replacement |
-| **Scoped Styles** | ❌ Global only | ✅ Component styles moved to head |
+| Feature | Old Approach | Convention-Based |
+|---------|--------------|------------------|
+| **Layout Discovery** | `--layouts` flag + explicit paths | Automatic discovery using naming patterns |
+| **Component Organization** | `--components` flag | `_includes/` directory by convention |
+| **File Classification** | Configuration-driven | Underscore prefix convention |
+| **Layout Application** | Manual specification | Automatic wrapping based on discovery |
 
-## 🎨 Component Architecture
+## 🎨 Convention Details
 
-Components are self-contained HTML files that can include:
+### Non-Emitting Files
+Files and directories starting with `_` are non-emitting:
+- `_includes/` - Shared components and layouts
+- `_layout.html` - Layout files
+- `_sidebar.html` - Partial components
 
-- **Styles**: `<style>` tags moved to document head
-- **Scripts**: `<script>` tags moved to end of body  
-- **Markup**: HTML content with `data-token` placeholders
-- **Token replacement**: `data-token="field"` replaced with `data-field` values
+### Layout Naming Patterns
+Valid layout filenames:
+- `_layout.html`, `_layout.htm` (standard)
+- `_blog.layout.html` (extended pattern)
+- `_custom.layout.html` (descriptive naming)
+
+### Layout Discovery Order
+1. Current directory for layout files
+2. Parent directories (climbing up)
+3. Fallback to `_includes/_layout.html`
+4. No layout (render content as-is)
 
 ## 🚀 Benefits
 
-- **🧩 Modular**: Build sites from reusable components
-- **🎨 Flexible**: Mix layouts, components, and traditional includes
-- **⚡ Fast**: All processing at build time, pure HTML output
-- **🔧 Maintainable**: Component-based architecture scales well
-- **📱 Modern**: Web standards-inspired syntax
-- **🎯 Focused**: Only one new element to learn (`<include>`)
+- **🧩 Zero Configuration**: No flags needed for basic layout functionality
+- **🎨 Intuitive**: File organization matches mental model
+- **⚡ Fast**: Convention-based discovery is efficient
+- **🔧 Maintainable**: Clear separation of layouts, components, and content
+- **📱 Scalable**: Conventions work for small and large projects
+- **🎯 Focused**: Developers focus on content, not configuration
 
 ---
 
-*This example showcases the full power of Unify's DOM Mode - a modern approach to static site generation with pure HTML.*
+*This example showcases the power of Unify's convention-based architecture - a modern approach to static site generation with minimal configuration.*

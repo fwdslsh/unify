@@ -169,13 +169,13 @@ export class FileWatcher {
 
     // Map events to standard events for compatibility, now with proper file existence checking
     const mappedEvent = await this.mapEventType(eventType, filename, fullPath);
-    
+
     logger.debug(`File ${mappedEvent} (${eventType}): ${filename}`);
-    
+
     // Emit event for compatibility
     this.emit(mappedEvent, fullPath);
     this.emit('all', mappedEvent, fullPath);
-    
+
     // Handle different event types appropriately
     if (mappedEvent === 'unlink') {
       // File was deleted - clean up from tracking and output
@@ -183,13 +183,24 @@ export class FileWatcher {
       // Note: dependent pages are added to build queue in handleFileDeletion
     } else {
       // File was added or changed - add to build queue
-      this.buildQueue.add(fullPath);
+      // If dependencyTracker is available, rebuild all affected pages
+      if (this.dependencyTracker) {
+        const affectedPages = this.dependencyTracker.getAffectedPages(fullPath);
+        if (affectedPages.length > 0) {
+          affectedPages.forEach(page => this.buildQueue.add(page));
+          logger.debug(`Queued ${affectedPages.length} affected pages for rebuild due to change in ${filename}`);
+        } else {
+          this.buildQueue.add(fullPath);
+        }
+      } else {
+        this.buildQueue.add(fullPath);
+      }
     }
-    
+
     if (this.buildTimeout) {
       clearTimeout(this.buildTimeout);
     }
-    
+
     this.buildTimeout = setTimeout(async () => {
       await this.processBuildQueue(config);
     }, config.debounceMs);

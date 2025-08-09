@@ -132,8 +132,6 @@ Commands:
 Options:
   --source, -s      Source directory (default: src)
   --output, -o      Output directory (default: dist)
-  --layouts, -l     Layouts directory (default: .layouts, relative to source)
-  --components, -c  Components directory (default: .components, relative to source)
   --assets, -a      Additional assets glob pattern to copy recursively
   --port, -p        Server port (default: 3000)
   --host            Server host (default: localhost)

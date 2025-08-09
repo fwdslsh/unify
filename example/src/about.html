@@ -1,28 +1,21 @@
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
-  <!--#include virtual="/includes/head.html" -->
+<template slot="title">
   <title>About - Unify</title>
-</head>
+</template>
 
-<body>
-  <!--#include virtual="/includes/header.html" -->
+<section class="container">
+  <section class="hero" data-augmented-ui="tl-clip tr-clip bl-round br-scoop border">
+    <h1>About Unify</h1>
+    <p><em>Rebellion through simplicity.</em></p>
+  </section>
 
-  <main class="container">
-    <section class="hero" data-augmented-ui="tl-clip tr-clip bl-round br-scoop border">
-      <h1>About Unify</h1>
-      <p><em>Rebellion through simplicity.</em></p>
-    </section>
-
-    <section class="card" data-augmented-ui="r-scoop b-clip both" style="margin: 1.5rem 0;">
-      <h3>🌱 The fwdslsh Manifesto</h3>
-      <p><strong>Reclaim the DOM. Build pages with bits, not bundles.</strong></p>
-      <p>In a world of endless frameworks and build complexity, we choose simplicity. We choose intention over
-        automation,
-        clarity over cleverness. No frameworks, no bloat, no compromise.</p>
-      <p><em>"A more peaceful future through purposeful technology."</em></p>
-    </section>
+  <section class="card" data-augmented-ui="r-scoop b-clip both" style="margin: 1.5rem 0;">
+    <h3>🌱 The fwdslsh Manifesto</h3>
+    <p><strong>Reclaim the DOM. Build pages with bits, not bundles.</strong></p>
+    <p>In a world of endless frameworks and build complexity, we choose simplicity. We choose intention over
+      automation,
+      clarity over cleverness. No frameworks, no bloat, no compromise.</p>
+    <p><em>"A more peaceful future through purposeful technology."</em></p>
+  </section>
     <section class="card" style="margin: 2rem 0;">
       <h2>Our Purpose</h2>
       <p>Unify is a modern, lightweight static site generator designed for frontend developers who want to build
@@ -99,11 +92,6 @@ Build complete in 112 ms
         <label for="bio">Bio</label>
         <textarea id="bio" rows="4" placeholder="Tell us about your off-grid setup..."></textarea>
       </div>
-      <button type="submit">Join the Network</button>
-    </form>
-  </main>
-
-  <!--#include virtual="/includes/footer.html" -->
-</body>
-
-</html>
+    <button type="submit">Join the Network</button>
+  </form>
+</section>

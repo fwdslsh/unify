@@ -9,16 +9,22 @@ import { build } from '../../src/core/file-processor.js';
 import { createTempDirectory, cleanupTempDirectory } from '../fixtures/temp-helper.js';
 
 describe('CSS Asset Tracking Bug', () => {
+  const tempBase = '/tmp/unify-test-fixed';
   let tempDir, sourceDir, outputDir;
 
   beforeEach(async () => {
-    tempDir = await createTempDirectory();
+    tempDir = tempBase;
     sourceDir = path.join(tempDir, 'src');
     outputDir = path.join(tempDir, 'dist');
+    // Clean up before each test
+    await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+    await fs.mkdir(sourceDir, { recursive: true });
+    await fs.mkdir(outputDir, { recursive: true });
   });
 
   afterEach(async () => {
-    await cleanupTempDirectory(tempDir);
+    // Clean up after each test
+    await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
   });
 
   it('should copy font files referenced in CSS @font-face declarations', async () => {
@@ -58,6 +64,21 @@ body {
     await fs.writeFile(path.join(sourceDir, 'fonts', 'custom.woff2'), 'FAKE_WOFF2_DATA');
     await fs.writeFile(path.join(sourceDir, 'fonts', 'custom.woff'), 'FAKE_WOFF_DATA');
     await fs.writeFile(path.join(sourceDir, 'fonts', 'another.ttf'), 'FAKE_TTF_DATA');
+
+    // Debug: print sourceDir and file existence
+    console.log('sourceDir:', sourceDir);
+    const filesToCheck = [
+      path.join(sourceDir, 'index.html'),
+      path.join(sourceDir, 'css', 'fonts.css'),
+      path.join(sourceDir, 'fonts', 'custom.woff2'),
+      path.join(sourceDir, 'fonts', 'custom.woff'),
+      path.join(sourceDir, 'fonts', 'another.ttf')
+    ];
+    for (const file of filesToCheck) {
+      const exists = await fs.access(file).then(() => true).catch(() => false);
+      console.log('File exists:', file, exists);
+      if (!exists) throw new Error(`Missing file before build: ${file}`);
+    }
 
     // Build the site
     const result = await build({
