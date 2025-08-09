@@ -8,6 +8,8 @@ import path from 'path';
 // processIncludes is now handled by unified-html-processor
 import { DependencyTracker } from './dependency-tracker.js';
 import { AssetTracker } from './asset-tracker.js';
+import { FileClassifier } from './file-classifier.js';
+import { LayoutDiscovery } from './layout-discovery.js';
 import { 
   processMarkdown, 
   isMarkdownFile, 
@@ -96,22 +98,20 @@ const fileModificationCache = new Map();
 const DEFAULT_OPTIONS = {
   source: 'src',
   output: 'dist',
-  components: '.components',
-  layouts: '.layouts',
   clean: true,
   prettyUrls: false,
   baseUrl: 'https://example.com'
 };
 
 /**
- * Build the complete static site from source files with include processing and head injection.
- * Processes HTML files through the include engine, injects global head content, copies static assets,
+ * Build the complete static site from source files with convention-based architecture.
+ * Uses underscore-prefixed files and directories for non-emitting content like layouts and partials.
+ * Processes HTML files through the include engine, applies layouts automatically, copies static assets,
  * and generates dependency tracking information for development server use.
  * 
  * @param {Object} options - Build configuration options
  * @param {string} [options.source='src'] - Source directory path
  * @param {string} [options.output='dist'] - Output directory path
- * @param {string} [options.components='src/.components'] - Components directory path
  * @param {boolean} [options.clean=true] - Whether to clean output directory before build
  * @returns {Promise<Object>} Build results with statistics and dependency tracker
  * @returns {number} returns.processed - Number of HTML pages processed
@@ -123,7 +123,7 @@ const DEFAULT_OPTIONS = {
  * @throws {BuildError} When source directory doesn't exist or other critical errors
  * 
  * @example
- * // Basic build
+ * // Basic build with convention-based layouts
  * const result = await build({ source: 'src', output: 'dist' });
  * console.log(`Built ${result.processed} pages in ${result.duration}ms`);
  * 
@@ -153,16 +153,6 @@ export async function build(options = {}) {
     const sourceRoot = path.resolve(config.source);
     const outputRoot = path.resolve(config.output);
     
-    // Convert relative paths to absolute paths for proper partial file detection
-    // If paths are relative and don't start with '.', join them with source root
-    if (config.components && !path.isAbsolute(config.components) && !config.components.startsWith('.')) {
-      config.components = path.join(sourceRoot, config.components);
-    }
-    
-    if (config.layouts && !path.isAbsolute(config.layouts) && !config.layouts.startsWith('.')) {
-      config.layouts = path.join(sourceRoot, config.layouts);
-    }
-    
     // Validate source directory exists
     try {
       await fs.access(sourceRoot);
@@ -188,22 +178,23 @@ export async function build(options = {}) {
     // Ensure output directory exists
     await fs.mkdir(outputRoot, { recursive: true });
     
-    // Initialize dependency and asset trackers
+    // Initialize dependency and asset trackers  
     const dependencyTracker = new DependencyTracker();
     const assetTracker = new AssetTracker();
+    const fileClassifier = new FileClassifier();
+    const layoutDiscovery = new LayoutDiscovery();
     
     // Scan source directory
     const sourceFiles = await scanDirectory(sourceRoot);
     logger.info(`Found ${sourceFiles.length} source files`);
     
-    // Categorize files - exclude components and layouts from being processed as pages
+    // Categorize files using convention-based classification
     const contentFiles = sourceFiles.filter(file => {
-      const isPartial = isPartialFile(file, config);
-      return (isHtmlFile(file) && !isPartial) || (isMarkdownFile(file) && !isPartial);
+      return fileClassifier.isPage(file, sourceRoot);
     });
     const assetFiles = sourceFiles.filter(file => {
-      const isPartial = isPartialFile(file, config);
-      return !isHtmlFile(file) && !isMarkdownFile(file) && !isPartial;
+      const fileType = fileClassifier.getFileType(file, sourceRoot);
+      return fileType === 'asset' && fileClassifier.shouldEmit(file, sourceRoot);
     });
     
     const results = {
@@ -217,75 +208,51 @@ export async function build(options = {}) {
     const processedFiles = [];
     const frontmatterData = new Map();
     
-    // Load layout file for markdown (if it exists)
-    const layoutFile = await findLayoutFile(sourceRoot, config.layouts);
-    let layoutContent = null;
-    if (layoutFile) {
-      try {
-        layoutContent = await fs.readFile(layoutFile, 'utf-8');
-        logger.debug(`Using layout file: ${path.relative(sourceRoot, layoutFile)}`);
-      } catch (error) {
-        const msg = `Could not read layout file ${layoutFile}: ${error.message}`;
-        
-        // If perfection mode is enabled, fail fast on layout errors
-        if (config.perfection) {
-          throw new BuildError(`Build failed in perfection mode due to layout error: ${msg}`, results.errors);
-        }
-        
-        logger.warn(msg);
-        results.errors.push({
-          file: layoutFile,
-          relativePath: path.relative(sourceRoot, layoutFile),
-          error: error.message,
-          errorType: error.constructor.name,
-          suggestions: error.suggestions || [],
-        });
-      }
-    }
-    
     // Process content files (HTML and Markdown) first to discover asset dependencies
     for (const filePath of sourceFiles) {
       try {
         const relativePath = path.relative(sourceRoot, filePath);
+        const fileType = fileClassifier.getFileType(filePath, sourceRoot);
         
-        if (isHtmlFile(filePath)) {
-          if (isPartialFile(filePath, config)) {
-            // Skip partial files in output
-            logger.debug(`Skipping partial file: ${relativePath}`);
-            results.skipped++;
-          } else {
-            // Process HTML file
-            await processHtmlFile(
+        if (fileType === 'page') {
+          if (isHtmlFile(filePath)) {
+            // Process HTML file with new convention-based system
+            await processHtmlFileWithConventions(
               filePath, 
               sourceRoot, 
               outputRoot, 
               dependencyTracker,
               assetTracker,
+              fileClassifier,
+              layoutDiscovery,
               config,
               buildCache
             );
             processedFiles.push(filePath);
             results.processed++;
             logger.debug(`Processed HTML: ${relativePath}`);
+          } else if (isMarkdownFile(filePath)) {
+            // Process Markdown file with new convention-based layouts
+            const frontmatter = await processMarkdownFileWithConventions(
+              filePath,
+              sourceRoot,
+              outputRoot,
+              layoutDiscovery,
+              assetTracker,
+              config.prettyUrls,
+              config.minify
+            );
+            processedFiles.push(filePath);
+            if (frontmatter) {
+              frontmatterData.set(filePath, frontmatter);
+            }
+            results.processed++;
+            logger.debug(`Processed Markdown: ${relativePath}`);
           }
-        } else if (isMarkdownFile(filePath)) {
-          // Process Markdown file and capture frontmatter
-          const frontmatter = await processMarkdownFile(
-            filePath,
-            sourceRoot,
-            outputRoot,
-            layoutContent,
-            assetTracker,
-            config.prettyUrls,
-            config.layouts,
-            config.minify
-          );
-          processedFiles.push(filePath);
-          if (frontmatter) {
-            frontmatterData.set(filePath, frontmatter);
-          }
-          results.processed++;
-          logger.debug(`Processed Markdown: ${relativePath}`);
+        } else if (fileType === 'partial' || fileType === 'layout') {
+          // Skip partial and layout files in output
+          logger.debug(`Skipping ${fileType} file: ${relativePath}`);
+          results.skipped++;
         }
       } catch (error) {
         const relativePath = path.relative(sourceRoot, filePath);
@@ -1081,16 +1048,17 @@ async function scanDirectory(dirPath, files = []) {
     const fullPath = path.join(dirPath, entry.name);
     
     if (entry.isDirectory()) {
-      // Skip hidden directories except for .components and .layouts
-      // Also skip common build/dependency directories
-      if ((!entry.name.startsWith('.') || entry.name === '.components' || entry.name === '.layouts') &&
+      // Skip hidden directories and common build/dependency directories
+      // Now includes all underscore directories since they're part of the convention
+      if (!entry.name.startsWith('.') &&
           entry.name !== 'node_modules' && 
           entry.name !== 'dist' && 
           entry.name !== 'build') {
         await scanDirectory(fullPath, files);
       }
     } else if (entry.isFile()) {
-      // Skip hidden files
+      // Include all files (underscore files are now part of the convention)
+      // Still skip hidden files that start with '.'
       if (!entry.name.startsWith('.')) {
         files.push(fullPath);
       }
@@ -1128,6 +1096,162 @@ async function ensureDirectoryExists(dirPath) {
     await fs.mkdir(dirPath, { recursive: true });
   } catch (error) {
     throw new FileSystemError('mkdir', dirPath, error);
+  }
+}
+
+/**
+ * Process HTML file with convention-based layout discovery
+ * @param {string} filePath - Path to HTML file
+ * @param {string} sourceRoot - Source root directory
+ * @param {string} outputRoot - Output root directory
+ * @param {DependencyTracker} dependencyTracker - Dependency tracker instance
+ * @param {AssetTracker} assetTracker - Asset tracker instance
+ * @param {FileClassifier} fileClassifier - File classifier instance
+ * @param {LayoutDiscovery} layoutDiscovery - Layout discovery instance
+ * @param {Object} config - Build configuration
+ * @param {Object} buildCache - Build cache instance
+ */
+async function processHtmlFileWithConventions(filePath, sourceRoot, outputRoot, dependencyTracker, assetTracker, fileClassifier, layoutDiscovery, config = {}, buildCache = null) {
+  const outputPath = getOutputPath(filePath, sourceRoot, outputRoot);
+  
+  // Check cache if available
+  if (buildCache && await buildCache.isUpToDate(filePath, outputPath)) {
+    logger.debug(`Skipping unchanged file: ${path.relative(sourceRoot, filePath)}`);
+    return;
+  }
+  
+  // Read HTML content
+  let htmlContent;
+  try {
+    htmlContent = await fs.readFile(filePath, 'utf-8');
+  } catch (error) {
+    throw new FileSystemError('read', filePath, error);
+  }
+  
+  // Use unified HTML processor with convention-based configuration
+  logger.debug(`Processing HTML with conventions: ${path.relative(sourceRoot, filePath)}`);
+  
+  // Create unified config that works with convention-based system
+  const unifiedConfig = {
+    ...getUnifiedConfig(config),
+    layoutDiscovery,
+    fileClassifier,
+    sourceRoot
+  };
+  
+  let processedContent = await processHtmlUnified(
+    htmlContent, 
+    filePath, 
+    sourceRoot, 
+    dependencyTracker,
+    unifiedConfig
+  );
+  
+  // Track asset references in the final content
+  if (assetTracker) {
+    await assetTracker.recordAssetReferences(filePath, processedContent, sourceRoot);
+  }
+  
+  // Write to output
+  await ensureDirectoryExists(path.dirname(outputPath));
+  
+  // Apply minification if enabled
+  if (config.minify) {
+    processedContent = minifyHtml(processedContent);
+  }
+  
+  try {
+    await fs.writeFile(outputPath, processedContent, 'utf-8');
+    
+    // Update cache after successful write
+    if (buildCache) {
+      await buildCache.updateFileHash(filePath);
+      
+      // Update dependencies from dependency tracker
+      if (dependencyTracker) {
+        const dependencies = dependencyTracker.getPageDependencies(filePath);
+        if (dependencies && dependencies.length > 0) {
+          buildCache.setDependencies(filePath, dependencies);
+        }
+      }
+    }
+  } catch (error) {
+    throw new FileSystemError('write', outputPath, error);
+  }
+}
+
+/**
+ * Process Markdown file with convention-based layout discovery
+ * @param {string} filePath - Path to Markdown file
+ * @param {string} sourceRoot - Source root directory
+ * @param {string} outputRoot - Output root directory
+ * @param {LayoutDiscovery} layoutDiscovery - Layout discovery instance
+ * @param {AssetTracker} assetTracker - Asset tracker instance
+ * @param {boolean} prettyUrls - Whether to generate pretty URLs
+ * @param {boolean} minify - Whether to minify HTML output
+ * @returns {Promise<Object|null>} Frontmatter data or null
+ */
+async function processMarkdownFileWithConventions(filePath, sourceRoot, outputRoot, layoutDiscovery, assetTracker, prettyUrls = false, minify = false) {
+  try {
+    const content = await fs.readFile(filePath, 'utf-8');
+    const { processedContent, frontmatter } = await processMarkdown(content, filePath, sourceRoot);
+    
+    // Determine layout using convention-based discovery
+    let layoutPath = null;
+    
+    // Check for layout override in frontmatter
+    if (frontmatter?.layout) {
+      layoutPath = await layoutDiscovery.resolveLayoutOverride(frontmatter.layout, sourceRoot, filePath);
+      if (!layoutPath) {
+        logger.warn(`Layout specified in frontmatter not found: ${frontmatter.layout} (${path.relative(sourceRoot, filePath)})`);
+      }
+    }
+    
+    // Fall back to automatic layout discovery
+    if (!layoutPath) {
+      layoutPath = await layoutDiscovery.findLayoutForPage(filePath, sourceRoot);
+    }
+    
+    let finalContent = processedContent;
+    
+    // Apply layout if found
+    if (layoutPath) {
+      logger.debug(`Applying layout to Markdown: ${path.relative(sourceRoot, layoutPath)}`);
+      const layoutContent = await fs.readFile(layoutPath, 'utf-8');
+      
+      // Check if the processed content already has complete HTML structure
+      if (!layoutDiscovery.hasCompleteHtmlStructure(processedContent)) {
+        finalContent = wrapInLayout(processedContent, layoutContent, frontmatter);
+      } else {
+        logger.debug(`Markdown file already has complete HTML structure, skipping layout: ${path.relative(sourceRoot, filePath)}`);
+      }
+    } else {
+      logger.debug(`No layout found for Markdown file: ${path.relative(sourceRoot, filePath)}`);
+    }
+    
+    // Determine output path
+    const outputPath = prettyUrls 
+      ? getOutputPath(filePath, sourceRoot, outputRoot, true)
+      : getOutputPath(filePath.replace(/\.md$/, '.html'), sourceRoot, outputRoot);
+    
+    // Track asset references
+    if (assetTracker) {
+      await assetTracker.recordAssetReferences(filePath, finalContent, sourceRoot);
+    }
+    
+    // Write output
+    await ensureDirectoryExists(path.dirname(outputPath));
+    
+    // Apply minification if enabled
+    if (minify) {
+      finalContent = minifyHtml(finalContent);
+    }
+    
+    await fs.writeFile(outputPath, finalContent, 'utf-8');
+    
+    return frontmatter;
+  } catch (error) {
+    throw new FileSystemError('process', filePath, error);
   }
 }
 
