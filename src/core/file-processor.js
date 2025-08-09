@@ -194,6 +194,15 @@ export async function build(options = {}) {
     });
     const assetFiles = sourceFiles.filter(file => {
       const fileType = fileClassifier.getFileType(file, sourceRoot);
+      // Exclude files in components or layouts directories
+      const relativePath = path.relative(sourceRoot, file);
+      const pathParts = relativePath.split(path.sep);
+      if (config.components && pathParts.includes(path.basename(config.components))) {
+        return false;
+      }
+      if (config.layouts && pathParts.includes(path.basename(config.layouts))) {
+        return false;
+      }
       return fileType === 'asset' && fileClassifier.shouldEmit(file, sourceRoot);
     });
     
@@ -283,7 +292,13 @@ export async function build(options = {}) {
     for (const filePath of assetFiles) {
       try {
         const relativePath = path.relative(sourceRoot, filePath);
-        
+        const pathParts = relativePath.split(path.sep);
+        // Skip copying any file or directory starting with _
+        if (pathParts.some(part => part.startsWith('_'))) {
+          logger.debug(`Skipped underscore-prefixed asset: ${relativePath}`);
+          results.skipped++;
+          continue;
+        }
         if (assetTracker.isAssetReferenced(filePath)) {
           await copyAsset(filePath, sourceRoot, outputRoot);
           results.copied++;
@@ -294,25 +309,10 @@ export async function build(options = {}) {
         }
       } catch (error) {
         const relativePath = path.relative(sourceRoot, filePath);
-        
-        // Use enhanced error formatting if available
-        if (error.formatForCLI) {
-          logger.error(error.formatForCLI());
-        } else {
-          logger.error(`Error copying asset ${relativePath}: ${error.message}`);
-        }
-        
-        results.errors.push({ 
-          file: filePath, 
-          relativePath,
-          error: error.message,
-          errorType: error.constructor.name,
-          suggestions: error.suggestions || []
-        });
-        
+        // ...existing code...
         // If perfection mode is enabled, fail fast on any error
         if (config.perfection) {
-          throw new BuildError(`Build failed in perfection mode due to error copying asset ${relativePath}: ${error.message}`, results.errors);
+          throw new BuildError(`Build failed in perfection mode due to error in ${relativePath}: ${error.message}`, results.errors);
         }
       }
     }
@@ -485,26 +485,35 @@ export async function incrementalBuild(options = {}, dependencyTracker = null, a
     const assets = assetTracker || new AssetTracker();
     
     // Determine what files need rebuilding
-    const filesToRebuild = await getFilesToRebuild(sourceRoot, changedFile, tracker, config);
-    
+    let filesToRebuild = await getFilesToRebuild(sourceRoot, changedFile, tracker, config);
+
+    // If dependencyTracker is available and changedFile is set, rebuild all affected pages
+    if (changedFile && tracker) {
+      const affectedPages = tracker.getAffectedPages(path.resolve(changedFile));
+      affectedPages.forEach(page => filesToRebuild.push(page));
+      // Remove duplicates
+      filesToRebuild = Array.from(new Set(filesToRebuild));
+      logger.debug(`Incremental build: rebuilding ${filesToRebuild.length} files (including affected pages)`);
+    }
+
     const results = {
       processed: 0,
       copied: 0,
       skipped: 0,
       errors: []
     };
-    
+
     if (filesToRebuild.length === 0) {
       logger.info('No files need rebuilding');
       return { ...results, duration: Date.now() - startTime, dependencyTracker: tracker };
     }
-    
+
     logger.info(`Rebuilding ${filesToRebuild.length} file(s)...`);
-    
+
     for (const filePath of filesToRebuild) {
       try {
         const relativePath = path.relative(sourceRoot, filePath);
-        
+
         // Check if the file still exists (might be deleted)
         let fileExists = true;
         try {
@@ -512,14 +521,14 @@ export async function incrementalBuild(options = {}, dependencyTracker = null, a
         } catch (error) {
           fileExists = false;
         }
-        
+
         if (!fileExists) {
           // File was deleted - just remove it from modification cache
           fileModificationCache.delete(filePath);
           logger.debug(`Removed deleted file from cache: ${relativePath}`);
           continue;
         }
-        
+
         if (isHtmlFile(filePath)) {
           if (!isPartialFile(filePath, config)) {
             await processHtmlFile(filePath, sourceRoot, outputRoot, tracker, assets, config);
@@ -541,7 +550,7 @@ export async function incrementalBuild(options = {}, dependencyTracker = null, a
               logger.warn(`Could not read layout file ${layoutFile}: ${error.message}`);
             }
           }
-          
+
           await processMarkdownFile(filePath, sourceRoot, outputRoot, layoutContent, assets, config.prettyUrls, config.layouts, config.minify);
           results.processed++;
           logger.debug(`Rebuilt Markdown: ${relativePath}`);
@@ -556,26 +565,26 @@ export async function incrementalBuild(options = {}, dependencyTracker = null, a
             results.skipped++;
           }
         }
-        
+
         // Update modification cache for existing files
         const stats = await fs.stat(filePath);
         fileModificationCache.set(filePath, stats.mtime.getTime());
-        
+
       } catch (error) {
         logger.error(error.formatForCLI ? error.formatForCLI() : `Error processing ${filePath}: ${error.message}`);
         results.errors.push({ file: filePath, error: error.message });
       }
     }
-    
+
     const duration = Date.now() - startTime;
     logger.success(`Incremental build completed in ${duration}ms`);
     logger.info(`Rebuilt: ${results.processed} pages, ${results.copied} assets`);
-    
+
     if (results.errors.length > 0) {
       logger.error(`Incremental build failed with ${results.errors.length} errors`);
       throw new BuildError(`Incremental build failed with ${results.errors.length} errors`, results.errors);
     }
-    
+
     return {
       ...results,
       duration,
@@ -1112,7 +1121,7 @@ async function ensureDirectoryExists(dirPath) {
  * @param {Object} buildCache - Build cache instance
  */
 async function processHtmlFileWithConventions(filePath, sourceRoot, outputRoot, dependencyTracker, assetTracker, fileClassifier, layoutDiscovery, config = {}, buildCache = null) {
-  const outputPath = getOutputPath(filePath, sourceRoot, outputRoot);
+  const outputPath = getOutputPathWithPrettyUrls(filePath, sourceRoot, outputRoot, config.prettyUrls);
   
   // Check cache if available
   if (buildCache && await buildCache.isUpToDate(filePath, outputPath)) {

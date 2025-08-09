@@ -96,46 +96,47 @@ export class AssetTracker {
   extractCssAssetReferences(cssContent, cssPath, sourceRoot) {
     const references = new Set();
     
-    // Patterns to match asset references in CSS
-    const patterns = [
-      // url() references
-      /url\(\s*["']?([^"')]+)["']?\s*\)/gi,
-      // @font-face src
-      /@font-face[^}]*src:\s*url\(\s*["']?([^"')]+)["']?\s*\)/gi,
-      // @import
-      /@import\s+(?:url\()?\s*["']([^"']+)["']?\s*\)?/gi
-    ];
+    // Match all url() references (background, src, etc.)
+    const urlPattern = /url\(\s*["']?([^"')]+)["']?\s*\)/gi;
+    let match;
+    while ((match = urlPattern.exec(cssContent)) !== null) {
+      const assetPath = match[1];
+      if (!assetPath) continue;
+      if (assetPath.startsWith('http://') || assetPath.startsWith('https://') || assetPath.startsWith('//')) continue;
+      if (assetPath.startsWith('data:')) continue;
+      if (assetPath.startsWith('#')) continue;
+      const resolvedPath = this.resolveAssetPath(assetPath, cssPath, sourceRoot);
+      if (resolvedPath) references.add(resolvedPath);
+    }
 
-    for (const pattern of patterns) {
-      let match;
-      while ((match = pattern.exec(cssContent)) !== null) {
-        const assetPath = match[1];
-        
+    // Match all @font-face src URLs (multiple URLs per src)
+    const fontFacePattern = /@font-face[^}]*src\s*:\s*([^;}]*)/gi;
+    while ((match = fontFacePattern.exec(cssContent)) !== null) {
+      const srcValue = match[1];
+      // Find all url() inside src
+      const srcUrlPattern = /url\(\s*["']?([^"')]+)["']?\s*\)/gi;
+      let srcMatch;
+      while ((srcMatch = srcUrlPattern.exec(srcValue)) !== null) {
+        const assetPath = srcMatch[1];
         if (!assetPath) continue;
-        
-        // Skip external URLs
-        if (assetPath.startsWith('http://') || 
-            assetPath.startsWith('https://') || 
-            assetPath.startsWith('//')) {
-          continue;
-        }
-        
-        // Skip data URLs
-        if (assetPath.startsWith('data:')) {
-          continue;
-        }
-        
-        // Skip CSS fragments (anchors)
-        if (assetPath.startsWith('#')) {
-          continue;
-        }
-        
-        // Resolve relative paths
+        if (assetPath.startsWith('http://') || assetPath.startsWith('https://') || assetPath.startsWith('//')) continue;
+        if (assetPath.startsWith('data:')) continue;
+        if (assetPath.startsWith('#')) continue;
         const resolvedPath = this.resolveAssetPath(assetPath, cssPath, sourceRoot);
-        if (resolvedPath) {
-          references.add(resolvedPath);
-        }
+        if (resolvedPath) references.add(resolvedPath);
       }
+    }
+
+    // Match all @import statements
+    const importPattern = /@import\s+(?:url\()?\s*["']([^"']+)["']?\s*\)?/gi;
+    while ((match = importPattern.exec(cssContent)) !== null) {
+      const assetPath = match[1];
+      if (!assetPath) continue;
+      if (assetPath.startsWith('http://') || assetPath.startsWith('https://') || assetPath.startsWith('//')) continue;
+      if (assetPath.startsWith('data:')) continue;
+      if (assetPath.startsWith('#')) continue;
+      const resolvedPath = this.resolveAssetPath(assetPath, cssPath, sourceRoot);
+      if (resolvedPath) references.add(resolvedPath);
     }
 
     return Array.from(references);
