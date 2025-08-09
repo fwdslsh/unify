@@ -37,13 +37,15 @@
 </head>
 
 <body class="blog-layout">
-  <template target="header">
-    <h1>My Blog</h1>
-  </template>
+  <header class="blog-header">
+    <slot name="header">
+      <h1>My Blog</h1>
+    </slot>
+  </header>
   <main class="blog-content">
     <slot></slot> <!-- Main blog content -->
   </main>
-  <include src="/custom_components/footer.html" />
+  <!--#include virtual="/_includes/footer.html" -->
 </body>
 
 </html>

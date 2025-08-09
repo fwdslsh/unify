@@ -23,8 +23,8 @@ unify build --source content --output public
 # Build with pretty URLs and custom base URL
 unify build --pretty-urls --base-url https://mysite.com
 
-# Build with custom component and layout directories
-unify build --components partials --layouts templates
+# Build with additional assets
+unify build --assets "./static/**/*"
 ```
 
 ### `unify serve [options]`
@@ -76,15 +76,14 @@ Output directory for generated static files.
 - **Default:** `dist`
 - **Example:** `--output public`
 
-#### `--layouts, -l <directory>`
-Layouts directory (relative to source).
-- **Default:** `.layouts`
-- **Example:** `--layouts templates`
+#### `--assets, -a <pattern>`
+Specify additional assets glob pattern to copy recursively.
+- **Default:** `null` (no additional assets)
+- **Format:** Glob pattern like `"./assets/**/*.*"` or `"./static/**/*"`
+- **Behavior:** Copies matching files to output directory preserving relative paths
+- **Note:** Use quotes around patterns with special characters
 
-#### `--components, -c <directory>`
-Components directory (relative to source).
-- **Default:** `.components`
-- **Example:** `--components partials`
+> **Convention-Based Architecture:** unify now uses file naming conventions instead of directory flags. Files and directories starting with `_` are non-emitting by convention. Layouts are automatically discovered using naming patterns.
 
 ### Server Options
 

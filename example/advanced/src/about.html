@@ -1,36 +1,20 @@
 <div>
-  <!--Uses default layout since it is an html fragment and not data-layout attribute is provided -->
-  <template target="title">About DOM Mode</template>
-  <template target="header">
-    <h1>About DOM Mode</h1>
-        <include src="/custom_components/navigation.html" />
-  </template>
+  <!-- Uses fallback layout since no layout file is found in this directory -->
+  <template slot="title">About Unify</template>
 
-  <h2>What is DOM Mode?</h2>
-  <p>DOM Mode is a modern templating system for Unify that uses pure HTML with minimal custom elements.</p>
+  <h2>What is Unify?</h2>
+  <p>Unify is a convention-based static site generator that uses pure HTML with minimal custom elements.</p>
 
-  <include src="/custom_components/alert.html"
-           data-title="Note"
-           data-message="This is the same component used on the homepage." />
+  <!--#include virtual="/_includes/alert.html" -->
 
   <h3>Key Features</h3>
-  <include src="/custom_components/card.html"
-           data-title="� Modular"
-           data-content="Build sites from reusable components" />
-
-  <include src="/custom_components/card.html"
-           data-title="📝 HTML-centric"
-           data-content="No templating language, just HTML" />
-
-  <include src="/custom_components/card.html"
-           data-title="⚡ Fast"
-           data-content="All processing at build time, pure HTML output" />
+  <!--#include virtual="/_includes/card.html" -->
 
   <h3>How It Works</h3>
   <ol>
-    <li>Pages specify layouts with <code>data-layout</code></li>
-    <li>Content goes into slots using <code>&lt;template target="name"&gt;</code></li>
-    <li>Components are included with <code>&lt;include src="..." /&gt;</code></li>
-
+    <li>Pages are automatically wrapped with the nearest layout file</li>
+    <li>Content goes into slots using <code>&lt;template slot="name"&gt;</code></li>
+    <li>Components are included with <code>&lt;!--#include virtual="..." --&gt;</code></li>
+    <li>Layout files use naming pattern <code>_*.layout.html</code></li>
   </ol>
 </div>
