@@ -175,6 +175,25 @@ export class DevServer {
         return new Response(file, { headers });
       }
       
+      // Check if the path corresponds to a directory with an index.html file
+      // This handles cases like /blog -> /blog/index.html
+      if (!path.extname(pathname) && !looksLikeSystemPath(pathname)) {
+        const directoryIndexPath = path.join(outputDir, pathname, 'index.html');
+        const directoryIndexFile = Bun.file(directoryIndexPath);
+        
+        if (await directoryIndexFile.exists()) {
+          const headers = this.getFileHeaders(directoryIndexPath, cors);
+          
+          if (this.config.liveReload) {
+            const content = await directoryIndexFile.text();
+            const withLiveReload = this.injectLiveReloadScript(content);
+            return new Response(withLiveReload, { headers });
+          }
+          
+          return new Response(directoryIndexFile, { headers });
+        }
+      }
+      
       // Fallback to fallback file (usually index.html for SPAs)
       // Only use fallback for routes that look like pages (no file extension) and aren't system paths
       if (fallback && !path.extname(pathname) && !looksLikeSystemPath(pathname)) {
