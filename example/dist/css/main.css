@@ -1,0 +1,312 @@
+/* === DEVPUNK STYLE SHEET === */
+/* Font and Reset */
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Staatliches&display=swap');
+
+/** Custom Font */
+@font-face {
+  font-family: 'slashcore';
+  src: url('fonts/selincah.regular.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+:root {
+  /* Base CRT Theme */
+  --color-bg: #0a0a0a;
+  /* Deep black background with a slight glow */
+  --color-fg: #e0e0e0;
+  /* Muted soft white foreground text */
+
+  /* Accent Colors (Muted Phosphor Colors) */
+  --color-accent-yellow: #f2c84b;
+  /* CRT amber/yellow */
+  --color-accent-green: #8cf28a;
+  /* Phosphor green */
+  --color-accent-red: #d65f5f;
+  /* CRT warning red */
+
+  /* Additional UI Element Colors */
+  --color-border: #303030;
+  /* Muted border for panels */
+  --color-highlight: #404040;
+  /* For hover/selection */
+  --color-muted: #888888;
+
+
+  --bg: var(--color-bg, #0d0d0d);
+  --bg-alt: #1a1a1a;
+  --text: var(--color-fg, #d8f3dc);
+  --accent: var(--color-accent-yellow, #ffdd00);
+  --accent-2: var(--color-accent-green, #26c50a);
+  --grime: var(--color-muted, #494949);
+  --nature: var(--color-accent-green, #4caf50);
+  --border: var(--color-border, #2a2a2a);
+  --warning: var(--color-accent-red, #b61515);
+
+
+  /* For secondary text or metadata */
+  --font-body: 'Share Tech Mono', monospace;
+  --font-display: 'Staatliches', sans-serif;
+
+  --radius: 8px;
+  --gap: 1rem;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  padding: 1rem;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-display);
+  color: var(--accent);
+  margin-bottom: 0.5rem;
+}
+
+[data-augmented-ui] {
+  --aug-border-bg: var(--text);
+  --aug-border-all: 2px;
+  --aug-inlay-bg: var(--bg-alt);
+}
+
+pre[data-augmented-ui] {
+  padding: 2rem;
+}
+
+/* Generic glow effect for elements that use text color */
+.glow-on-hover:hover {
+  text-shadow: 0 0 4px currentColor,
+    0 0 8px currentColor,
+    0 0 12px currentColor;
+}
+
+/* Glow effect for buttons or any element with background-color */
+.glow-bg-on-hover:hover {
+  box-shadow: 0 0 4px var(--glow-color),
+    0 0 8px var(--glow-color),
+    0 0 12px var(--glow-color);
+}
+
+/* Optional: smooth transition */
+.glow-on-hover,
+.glow-bg-on-hover {
+  transition: all 0.2s ease-in-out;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+input,
+textarea,
+select,
+button {
+  font-family: inherit;
+  font-size: 1rem;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius);
+  padding: 0.6rem;
+  margin-bottom: var(--gap);
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--accent);
+  outline: none;
+  background-color: #111;
+}
+
+button {
+  background-color: var(--accent);
+  --glow-color: var(--accent-2);
+  color: var(--bg);
+  border: none;
+  cursor: pointer;
+  font-weight: bold;
+  text-transform: uppercase;
+  padding: 0.75rem 1.25rem;
+}
+
+button:hover {
+  background-color: var(--accent-2);
+  color: var(--bg);
+}
+
+
+.hero {
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 6rem 2rem;
+  background: linear-gradient(145deg, #111 30%, #1a1a1a 70%);
+}
+
+.hero h1 {
+  font-family: var(--font-display);
+  font-size: 3rem;
+  color: var(--accent);
+  margin-bottom: 1rem;
+}
+
+.hero p {
+  max-width: 600px;
+  color: var(--text);
+  opacity: 0.8;
+}
+
+.hero .cta {
+  margin-top: 2rem;
+}
+
+.hero[data-augmented-ui] {
+
+  padding: 2rem 1rem;
+
+  h1 {
+    margin-bottom: 0rem;
+  }
+}
+
+.card {
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-left: 5px solid var(--accent);
+  border-left-color: var(--accent);
+  border-top: 1px solid transparent;
+  border-image: linear-gradient(to right, var(--accent) 0%, transparent 5%, transparent 100%);
+  border-image-slice: 1;
+  border-radius: var(--radius);
+  border-bottom-left-radius: 0;
+  border-top-left-radius: 0;
+  padding: 1.5rem;
+  box-shadow: 0 0 10px #00000055;
+  transition: transform 0.2s, box-shadow 1s, border-left-color 0.5s,
+    border-image 0.5s;
+
+  ul {
+    list-style: square;
+    margin-left: 1.5rem;
+  }
+
+  small {
+    margin-left: 1rem;
+  }
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  border-left-color: var(--accent-2);
+  border-image: linear-gradient(to right, var(--accent-2) 0%, transparent 50%, transparent 100%);
+  border-image-slice: 1;
+  transition: transform 0.2s, box-shadow 1s, border-left-color 0.5s,
+    border-image 0.5s;
+}
+
+section.card:hover {
+  box-shadow: 0 0 6px 3px var(--accent-2), 0 0 0 0 var(--accent-2);
+  transform: none;
+}
+
+.card h3 {
+  font-family: var(--font-display);
+  margin-bottom: 0.5rem;
+}
+
+.card p {
+  opacity: 0.9;
+}
+
+pre[data-augmented-ui]:has(code) {
+  color: var(--accent-2);
+  padding-block: 0.5rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: var(--gap);
+}
+
+footer {
+  border-top: 1px solid var(--border);
+  margin-top: 2rem;
+  padding-top: 1rem;
+  font-size: 0.9rem;
+  color: #888;
+}
+
+/* === Responsive Layout === */
+.container {
+  max-width: 1200px;
+  margin: auto;
+  padding: 1rem;
+}
+
+.grid {
+  display: grid;
+  gap: var(--gap);
+}
+
+@media (min-width: 600px) {
+  .grid-cols-2 {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (min-width: 900px) {
+  .grid-cols-3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* === Utility Classes === */
+.bg-warning {
+  background: var(--warning);
+  color: black;
+}
+
+.text-accent {
+  color: var(--accent);
+}
+
+.text-alt {
+  color: var(--accent-2);
+}
+
+.hidden {
+  display: none;
+}
+
+.rounded {
+  border-radius: var(--radius);
+}
