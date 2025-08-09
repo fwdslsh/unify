@@ -31,6 +31,12 @@ unify build --components partials --layouts templates
 
 Start development server with live reload.
 
+The development server automatically serves `index.html` files for directory requests:
+- `/blog/` → serves `blog/index.html`
+- `/blog` → serves `blog/index.html` (without trailing slash)
+- `/docs/api` → serves `docs/api/index.html`
+- `/nonexistent` → falls back to root `index.html` (SPA behavior)
+
 **Examples:**
 ```bash
 # Start dev server on default port 3000
