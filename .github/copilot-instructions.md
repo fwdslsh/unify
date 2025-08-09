@@ -3,6 +3,8 @@
 ## Project Overview
 Unify CLI is a **Bun-native static site generator** that emphasizes Apache SSI-style includes and high-performance HTML processing. This project is built exclusively for the Bun runtime and leverages Bun's native APIs for optimal performance.
 
+**ALWAYS reference these instructions first and fallback to search or bash commands only when you encounter unexpected information that does not match the info here.**
+
 ## Vendor Documentation
 
 Ensure that all code adheres to the vendor documentation provided in the `.vendor/` directory. This includes following best practices and utilizing Bun's built-in features effectively.
@@ -183,6 +185,157 @@ expect(result.errors.length).toBe(0); // No build errors
 - Live reload: < 100ms response time for file changes
 - Security validation: Early request filtering
 - Static file serving: Leverage Bun.serve for optimal performance
+
+## Working Effectively
+
+### Bootstrap, Build, and Test the Repository
+
+**CRITICAL - Install Bun Runtime First:**
+```bash
+# Install Bun (required - DO NOT use npm/node)
+curl -fsSL https://bun.sh/install | bash
+source ~/.bashrc  # REQUIRED: Must source to update PATH
+bun --version     # Verify installation (should show 1.2.0+)
+```
+
+**Dependencies and Setup:**
+```bash
+cd /path/to/unify
+bun install      # Install dependencies (~6 seconds)
+```
+
+**Run Tests - NEVER CANCEL:**
+```bash
+# Run complete test suite - NEVER CANCEL, takes ~2 minutes
+# Use timeout 180+ seconds minimum
+bun test
+
+# Expected: ~349 pass, 4 fail (CSS asset tracking - known issue)
+# Time: ~2 minutes - NEVER CANCEL THIS COMMAND
+```
+
+**Build Commands:**
+```bash
+# Basic build (example project) - very fast (~18ms)
+bun run build
+
+# Advanced build scenario - also fast (~22ms)  
+bun run build:advanced
+
+# Build executable - fast (~65ms)
+bun build --compile --outfile unify-test bin/cli.js
+
+# Docker build CLI image - NEVER CANCEL, takes ~10 minutes
+# Use timeout 600+ seconds minimum
+docker build -f docker/Dockerfile.cli -t unify-cli-test .
+```
+
+**Development Server:**
+```bash
+# Start dev server with live reload (port 3000)
+bun run serve
+
+# Or directly with CLI
+bun run bin/cli.js serve --port 3000
+```
+
+### CLI Usage Validation
+```bash
+# Test CLI commands
+bun run bin/cli.js --version    # Should show: unify v0.4.3
+bun run bin/cli.js --help       # Show all commands and options
+bun run bin/cli.js build --source example/src --output /tmp/test-output
+```
+
+## Validation Requirements
+
+**ALWAYS manually validate any changes by running through complete scenarios:**
+
+### Basic Build Validation
+```bash
+# 1. Clean build from example
+bun run bin/cli.js build --source example/src --output /tmp/validate-output
+
+# 2. Check output structure
+ls -la /tmp/validate-output/  # Should show: *.html, css/, sitemap.xml
+
+# 3. Verify HTML content includes processing
+head -20 /tmp/validate-output/index.html  # Should contain navbar, layout applied
+
+# 4. Verify assets copied correctly
+ls -la /tmp/validate-output/css/  # Should contain main.css if referenced
+```
+
+### Dev Server Live Reload Validation
+```bash
+# 1. Start server in background
+bun run serve &
+
+# 2. Verify server responds
+curl http://localhost:3000/  # Should return HTML content
+
+# 3. Test live reload by changing a file in example/src/ 
+# and verify browser receives reload event
+
+# 4. Stop server
+pkill -f "bun run serve"
+```
+
+### Component and Include Processing Validation
+```bash
+# 1. Build advanced example with custom components
+bun run build:advanced
+
+# 2. Verify components processed and content includes applied
+grep "navigation" example/advanced/dist/index.html  # Should contain navigation references
+
+# 3. Verify build completed without errors
+# Advanced example uses custom component directories, components may be copied
+ls -la example/advanced/dist/  # Should show built pages and assets
+```
+
+## Critical Timing and Timeout Values
+
+**NEVER CANCEL these commands - use these timeout values:**
+
+- **bun test**: 180 seconds minimum (typically ~2 minutes)
+- **Docker builds**: 600 seconds minimum (typically ~10 minutes) 
+- **bun install**: 60 seconds (typically ~6 seconds)
+- **Basic builds**: 30 seconds (typically <100ms)
+- **Executable builds**: 60 seconds (typically ~65ms)
+
+## Common Tasks and Outputs
+
+### Repository Structure
+```bash
+# Key directories you'll work with frequently:
+ls /home/runner/work/unify/unify/
+# Output: bin/ src/ test/ example/ docs/ docker/ package.json README.md
+
+# Main entry point
+ls bin/
+# Output: cli.js
+
+# Source code organization  
+ls src/
+# Output: cli/ core/ server/ utils/
+
+# Test structure
+ls test/
+# Output: unit/ integration/ security/ performance/ fixtures/
+```
+
+### Package.json Scripts
+```json
+{
+  "scripts": {
+    "test": "bun test",
+    "build": "bun run bin/cli.js build --source example/src --output example/dist",
+    "serve": "bun run bin/cli.js serve --source example/src --port 3000",
+    "build:executable": "bun run scripts/build-executables.js"
+  }
+}
+```
 
 ## Common Patterns
 

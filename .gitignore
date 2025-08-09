@@ -44,6 +44,12 @@ dist/
 build/
 out/
 
+# Compiled executables
+unify-test
+unify-linux*
+unify-macos*
+unify-windows*
+
 # IDE/Editor files
 .vscode/
 .idea/
