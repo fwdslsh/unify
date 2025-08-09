@@ -741,18 +741,29 @@ export async function initializeModificationCache(sourceRoot) {
 function getOutputPathWithPrettyUrls(filePath, sourceRoot, outputRoot, prettyUrls = false) {
   const relativePath = path.relative(sourceRoot, filePath);
   
-  if (prettyUrls && isMarkdownFile(filePath)) {
-    // Convert about.md → about/index.html for pretty URLs
+  if (prettyUrls && (isMarkdownFile(filePath) || isHtmlFile(filePath))) {
     const nameWithoutExt = path.basename(relativePath, path.extname(relativePath));
     const dir = path.dirname(relativePath);
     
-    // Special case: if the file is already named index.md, don't create nested directory
+    // Special case: if the file is already named index.md or index.html, don't create nested directory
     if (nameWithoutExt === 'index') {
-      return path.join(outputRoot, dir, 'index.html');
+      if (isMarkdownFile(filePath)) {
+        return path.join(outputRoot, dir, 'index.html');
+      } else {
+        // For HTML files, keep as index.html in the same directory
+        return path.join(outputRoot, dir, 'index.html');
+      }
     }
     
-    // Create directory structure: about.md → about/index.html
-    return path.join(outputRoot, dir, nameWithoutExt, 'index.html');
+    // Create directory structure: 
+    // about.md → about/index.html
+    // docs.html → docs/index.html
+    if (isMarkdownFile(filePath)) {
+      return path.join(outputRoot, dir, nameWithoutExt, 'index.html');
+    } else {
+      // For HTML files, create directory with the basename and put index.html inside
+      return path.join(outputRoot, dir, nameWithoutExt, 'index.html');
+    }
   }
   
   // For HTML files or when pretty URLs is disabled, use standard conversion
@@ -973,7 +984,7 @@ async function processMarkdownFile(filePath, sourceRoot, outputRoot, layoutConte
  * @param {AssetTracker} assetTracker - Asset tracker instance
  */
 async function processHtmlFile(filePath, sourceRoot, outputRoot, dependencyTracker, assetTracker, config = {}, buildCache = null) {
-  const outputPath = getOutputPath(filePath, sourceRoot, outputRoot);
+  const outputPath = getOutputPathWithPrettyUrls(filePath, sourceRoot, outputRoot, config.prettyUrls);
   
   // Check cache if available
   if (buildCache && await buildCache.isUpToDate(filePath, outputPath)) {

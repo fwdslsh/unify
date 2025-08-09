@@ -9,24 +9,6 @@ import path from 'path';
 import { build } from '../../src/core/file-processor.js';
 import { createTempDirectory, cleanupTempDirectory, createTestStructure } from '../fixtures/temp-helper.js';
 
-// Helper function to get all files recursively
-async function getAllFiles(dir) {
-  const files = [];
-  async function walk(currentDir) {
-    const entries = await fs.readdir(currentDir, { withFileTypes: true });
-    for (const entry of entries) {
-      const fullPath = path.join(currentDir, entry.name);
-      if (entry.isDirectory()) {
-        await walk(fullPath);
-      } else {
-        files.push(fullPath);
-      }
-    }
-  }
-  await walk(dir);
-  return files;
-}
-
 describe('Pretty URLs with HTML files', () => {
   let tempDir, sourceDir, outputDir;
 
@@ -58,13 +40,6 @@ describe('Pretty URLs with HTML files', () => {
     });
 
     expect(result.processed).toBe(5);
-
-    // Debug: List all files in output directory
-    console.log('Files in output directory:');
-    const outputFiles = await getAllFiles(outputDir);
-    for (const file of outputFiles) {
-      console.log('  ', path.relative(outputDir, file));
-    }
 
     // Check that pretty URLs are generated correctly
     // src/index.html => dist/index.html (no change for index.html)
