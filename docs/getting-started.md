@@ -99,7 +99,7 @@ Create `src/_includes/footer.html`:
 Create `src/index.html`:
 
 ```html
-<template slot="head">
+<template target="head">
   <title>Welcome - My Site</title>
 </template>
 <div>
