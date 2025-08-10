@@ -341,6 +341,7 @@ body {
         clean: true
       });
 
+      console.log('Build result:', result);
       expect(result.errors.length).toBe(0); // Build should succeed
       
   // Should process 2 HTML pages

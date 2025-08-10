@@ -137,7 +137,7 @@ describe('Convention-Based Architecture Integration', () => {
     });
   });
 
-  describe.skip('Markdown Processing', () => {
+  describe('Markdown Processing', () => {
     test('should process markdown with convention-based layouts', async () => {
       await createTestStructure(sourceDir, {
         '_includes/default-layout.html': '<html><body><main><slot></slot></main></body></html>',
@@ -163,8 +163,10 @@ This uses a custom layout.`,
       expect(result.processed).toBe(3); // blog/post.md, docs/readme.md, custom-layout.html
 
       // Check that markdown files were converted to HTML
-      await expect(fs.access(path.join(outputDir, 'blog', 'post.html'))).resolves.not.toThrow();
-      await expect(fs.access(path.join(outputDir, 'docs', 'readme.html'))).resolves.not.toThrow();
+      const blogPostExists = await fs.access(path.join(outputDir, 'blog', 'post.html')).then(() => true).catch(() => false);
+      const readmeExists = await fs.access(path.join(outputDir, 'docs', 'readme.html')).then(() => true).catch(() => false);
+      expect(blogPostExists).toBe(true);
+      expect(readmeExists).toBe(true);
 
       // Check content exists
       const blogPostContent = await fs.readFile(path.join(outputDir, 'blog', 'post.html'), 'utf-8');

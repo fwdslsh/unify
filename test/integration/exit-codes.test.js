@@ -291,7 +291,7 @@ describe('Exit Code Validation', () => {
       // This will timeout, simulating interruption
       const result = await runCLIInDir(tempDir, [
         'serve',
-        '--output', outputDir, // Fixed: serve uses --output not --source
+        '--source', sourceDir, // Fixed: serve uses --source not --output
         '--port', '9002'
       ], 1000); // Very short timeout
 

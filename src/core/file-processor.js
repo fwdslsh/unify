@@ -265,6 +265,16 @@ export async function build(options = {}) {
     const processedFiles = [];
     const frontmatterData = new Map();
 
+    // First, classify ALL HTML/Markdown files for statistics (before filtering)
+    for (const filePath of sourceFiles.filter(file => isHtmlFile(file) || isMarkdownFile(file))) {
+      const fileType = fileClassifier.getFileType(filePath, sourceRoot);
+      if (fileType === "partial" || fileType === "layout") {
+        const relativePath = path.relative(sourceRoot, filePath);
+        logger.debug(`Classifying ${fileType} file: ${relativePath}`);
+        results.skipped++;
+      }
+    }
+
     // Process content files (HTML and Markdown) first to discover asset dependencies
     for (const filePath of contentFiles) {
       try {
@@ -316,9 +326,8 @@ export async function build(options = {}) {
             logger.debug(`Processed Markdown: ${relativePath} → ${outputPath}`);
           }
         } else if (fileType === "partial" || fileType === "layout") {
-          // Skip partial and layout files in output
+          // Skip partial and layout files in output (already counted above)
           logger.debug(`Skipping ${fileType} file: ${relativePath}`);
-          results.skipped++;
         }
       } catch (error) {
         const relativePath = path.relative(sourceRoot, filePath);
