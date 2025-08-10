@@ -212,10 +212,11 @@ export async function build(options = {}) {
     if (config.prettyUrls) {
       const markdownFiles = sourceFiles.filter((file) => {
         const ext = path.extname(file).toLowerCase();
+        const relativePath = path.relative(sourceRoot, file);
 
         return (
           ext === ".md" &&
-          !rel.split(path.sep).some((part) => part.startsWith("_"))
+          !relativePath.split(path.sep).some((part) => part.startsWith("_"))
         );
       });
       for (const mdFile of markdownFiles) {
@@ -1494,10 +1495,16 @@ async function processMarkdownFileWithConventions(
 ) {
   try {
     const content = await fs.readFile(filePath, "utf-8");
+    // Process includes in the final content before layout application
+    logger.debug(`Processing includes for markdown file: ${filePath}`);
+    // Don't process includes yet - do it after layout application
+    logger.debug(`Original markdown content length: ${content.length}`);
+    
     const { html, frontmatter, title, excerpt } = processMarkdown(
       content,
       filePath
     );
+    logger.debug(`Processed HTML content length: ${html.length}`);
     const htmlWithAnchors = addAnchorLinks(html);
     const tableOfContents = generateTableOfContents(htmlWithAnchors);
     const metadata = { frontmatter, title, excerpt, tableOfContents };
@@ -1571,6 +1578,10 @@ async function processMarkdownFileWithConventions(
       }
     }
 
+    // Process includes in the final content AFTER layout application
+    const { processIncludes } = await import("./include-processor.js");
+    finalContent = await processIncludes(finalContent, filePath, sourceRoot);
+
     // Determine output path and ensure .html extension
     let outputPath;
     if (prettyUrls) {
@@ -1622,11 +1633,12 @@ async function processMarkdownFileWithConventions(
  * Process includes recursively
  * @param {string} filePath - Path to the file containing includes
  * @param {string} content - File content
+ * @param {string} sourceRoot - Source root directory
  * @param {number} [depth=0] - Current recursion depth
  * @returns {Promise<string>} Processed content with includes replaced
  * @throws {CircularDependencyError} If circular dependency is detected
  */
-async function processIncludesRecursively(filePath, content, depth = 0) {
+async function processIncludesRecursively(filePath, content, sourceRoot, depth = 0) {
   if (depth > 10) {
     throw new CircularDependencyError(
       `Max include depth exceeded for file: ${filePath}`
@@ -1634,30 +1646,66 @@ async function processIncludesRecursively(filePath, content, depth = 0) {
   }
 
   const rewriter = new HTMLRewriter();
-  rewriter.on("include", {
+  // Add detailed debug logs for include processing
+  logger.debug(`Content before processing: ${content.substring(0, 200)}...`);
+  logger.debug(`Content contains <!--#include: ${content.includes('<!--#include')}`);
+  logger.debug(`Starting include processing for file: ${filePath}, depth: ${depth}`);
+
+  rewriter.on('include', {
     element(element) {
-      const src = element.getAttribute("src");
+      const src = element.getAttribute('src');
+      logger.debug(`Found <include> element with src: ${src}`);
       if (src) {
-        const includePath = path.resolve(sourceRoot, src);
-        const includeContent = fs.readFileSync(includePath, "utf-8");
-        const processedContent = processIncludesRecursively(
-          includePath,
-          includeContent,
-          depth + 1
-        );
-        element.replace(processedContent);
+        const includePath = src.startsWith('/')
+          ? path.resolve(sourceRoot, `.${src}`)
+          : path.resolve(path.dirname(filePath), src);
+        logger.debug(`Resolved include path: ${includePath}`);
+
+        try {
+          const includeContent = fs.readFileSync(includePath, 'utf-8');
+          logger.debug(`Read content from include path: ${includePath}`);
+          const processedContent = processIncludesRecursively(
+            includePath,
+            includeContent,
+            sourceRoot,
+            depth + 1
+          );
+          element.replace(processedContent);
+        } catch (error) {
+          logger.error(`Error processing include at path: ${includePath}`, error);
+        }
       }
     },
   });
 
-  // Debug log for recursive include processing
-  logger.debug(`Processing includes for file: ${filePath}, depth: ${depth}`);
+    rewriter.on('comment', {
+      text(comment) {
+        logger.debug(`Found comment: ${comment.text}`);
+        const match = comment.text.match(/#include (file|virtual)="([^"]+)"/);
+        logger.debug(`Found <!--#include--> comment with match: ${JSON.stringify(match)}`);
+        if (match) {
+          const [, type, includePath] = match;
+          const resolvedPath =
+            type === 'virtual'
+              ? path.resolve(sourceRoot, includePath)
+              : path.resolve(path.dirname(filePath), includePath);
+          logger.debug(`Resolved include path for comment: ${resolvedPath}`);
 
-  // Debug log for excluded directories
-  logger.debug(`Excluding directories: ${excludedDirs.join(", ")}`);
-
-  // Debug log for content files after filtering
-  logger.debug(`Content files after exclusion: ${contentFiles.length}`);
-
-  return rewriter.transform(content).toString();
+          try {
+            const includeContent = fs.readFileSync(resolvedPath, 'utf-8');
+            logger.debug(`Read content from include path: ${resolvedPath}`);
+            const processedContent = processIncludesRecursively(
+              resolvedPath,
+              includeContent,
+              sourceRoot,
+              depth + 1
+            );
+            comment.replace(processedContent);
+            logger.debug(`Replaced comment with processed content`);
+          } catch (error) {
+            logger.error(`Error processing include comment at path: ${resolvedPath}`, error);
+          }
+        }
+      },
+    });  return rewriter.transform(content).toString();
 }

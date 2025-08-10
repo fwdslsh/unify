@@ -189,8 +189,17 @@ export class LayoutDiscovery {
         logger.debug(`Resolved layout override: ${path.relative(sourceRoot, layoutPathHtm)}`);
         return layoutPathHtm;
       } catch {
-        logger.warn(`Layout override not found: ${layoutSpec}`);
-        return null;
+        // Try in .layouts directory as fallback
+        const layoutsPath = path.join(sourceRoot, '.layouts', layoutSpec);
+        const layoutsPathWithExt = layoutsPath.endsWith('.html') ? layoutsPath : layoutsPath + '.html';
+        try {
+          await fs.access(layoutsPathWithExt);
+          logger.debug(`Resolved layout override from .layouts: ${path.relative(sourceRoot, layoutsPathWithExt)}`);
+          return layoutsPathWithExt;
+        } catch {
+          logger.warn(`Layout override not found: ${layoutSpec}`);
+          return null;
+        }
       }
     }
   }
