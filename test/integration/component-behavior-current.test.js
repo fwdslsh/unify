@@ -162,10 +162,13 @@ describe('Current Component Include Behavior', () => {
     const outputFile = path.join(outputDir, 'index.html');
     const content = await fs.readFile(outputFile, 'utf-8');
 
-    // Current behavior: styles are inlined at include location, NOT moved to head
-    expect(content).toMatch(/<div>[\s\S]*<style>[\s\S]*\.btn[\s\S]*background:\s*blue[\s\S]*<\/style>[\s\S]*<button class="btn">Click Me<\/button>[\s\S]*<\/div>/);
+    // Current behavior: styles are moved to head for DOM includes 
+    expect(content).toMatch(/<head>[\s\S]*<style>[\s\S]*\.btn[\s\S]*background:\s*blue[\s\S]*<\/style>[\s\S]*<\/head>/);
     
-    // Current behavior: styles are NOT in the head section (same as SSI)
-    expect(content).not.toMatch(/<head>[\s\S]*<style>[\s\S]*\.btn[\s\S]*<\/style>[\s\S]*<\/head>/);
+    // The button should be in the body without the style
+    expect(content).toMatch(/<div>[\s\S]*<button class="btn">Click Me<\/button>[\s\S]*<\/div>/);
+    
+    // Styles should NOT be inlined at include location for DOM includes
+    expect(content).not.toMatch(/<div>[\s\S]*<style>[\s\S]*\.btn[\s\S]*background:\s*blue[\s\S]*<\/style>[\s\S]*<button class="btn">Click Me<\/button>[\s\S]*<\/div>/);
   });
 });

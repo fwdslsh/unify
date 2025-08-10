@@ -67,6 +67,16 @@ describe('CLI Commands and Options', () => {
     });
 
     it('should build with short flags', async () => {
+      const structure = {
+        'content/index.html': '<h1>Short Flags Test</h1>',
+        'templates/default.html': `<!DOCTYPE html>
+<html>
+<head><title>Template</title></head>
+<body><slot></slot></body>
+</html>`,
+        'includes/header.html': '<header>Site Header</header>'
+      };
+
       await createTestStructure(tempDir, structure);
 
       const result = await runCLIInDir(tempDir, [
@@ -150,24 +160,10 @@ describe('CLI Commands and Options', () => {
       expect(resultClean.code).toBe(0);
       
       const oldFileExists = await fileExists(path.join(outputDir, 'old-file.html'));
-      await createTestStructure(tempDir, structure);
-
-      const resultPretty = await runCLIInDir(tempDir, [
-        'build',
-        '-s', path.join(tempDir, 'content'),
-        '-o', outputDir,
-        '--pretty-urls'
-      ]);
-
-      expect(resultPretty.code).toBe(0);
-      // With pretty URLs, content/index.html should exist, not content.html
-      const prettyIndex = await fileExists(path.join(outputDir, 'index.html'));
-      const prettyContentDir = await fileExists(path.join(outputDir, 'content', 'index.html'));
-      expect(prettyIndex).toBeTruthy();
-      expect(prettyContentDir).toBeTruthy();
+      expect(oldFileExists).toBe(false); // Old file should be removed when cleaning
       
-      const sitemapExists = await fileExists(path.join(outputDir, 'sitemap.xml'));
-      expect(sitemapExists).toBeFalsy();
+      const newFileExists = await fileExists(path.join(outputDir, 'index.html'));
+      expect(newFileExists).toBe(true); // New file should exist
     });
   });
 

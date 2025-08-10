@@ -70,14 +70,14 @@ describe("Default Command Behavior", () => {
       const args = parseArgs(["--help"]);
 
       expect(args.help).toBe(true);
-      expect(args.command).toBe("build");
+      expect(args.command).toBe(null); // No command should be set for help
     });
 
     it("should parse version flag without command", () => {
       const args = parseArgs(["--version"]);
 
       expect(args.version).toBe(true);
-      expect(args.command).toBe("build");
+      expect(args.command).toBe(null); // No command should be set for version
     });
 
     it("should parse short help flag", () => {

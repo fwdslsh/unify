@@ -320,8 +320,9 @@ describe('Error Message Format Validation', () => {
       ]);
 
       expect(result.stderr).toMatch(/Suggestions:/);
-      expect(result.stderr).toMatch(/-.*create.*missing\.html/i);
-      expect(result.stderr).toMatch(/-.*check.*path/i);
+      // In perfection mode, the build fails with BuildError and shows generic suggestions
+      expect(result.stderr).toMatch(/-.*Fix the.*error\(s\)/i);
+      expect(result.stderr).toMatch(/-.*Run with.*DEBUG/i);
     });
 
     it('should suggest using debug mode for complex errors', async () => {

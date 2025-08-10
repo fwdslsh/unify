@@ -1201,7 +1201,51 @@ export function shouldUseUnifiedProcessing(htmlContent) {
  * @returns {Promise<string>} Optimized HTML content
  */
 export async function optimizeHtml(htmlContent) {
-  return await optimizeHtmlContent(htmlContent);
+  // Check if HTMLRewriter is available
+  if (!hasFeature('htmlRewriter')) {
+    logger.debug('HTMLRewriter not available, skipping HTML optimization');
+    return htmlContent;
+  }
+  
+  const rewriter = new HTMLRewriter();
+
+  // Remove unnecessary whitespace (basic optimization)
+  rewriter.on('*', {
+    text(text) {
+      if (text.lastInTextNode) {
+        // Collapse multiple whitespace into single space
+        const optimized = text.text.replace(/\s+/g, ' ');
+        if (optimized !== text.text) {
+          text.replace(optimized);
+        }
+      }
+    }
+  });
+
+  // Optimize attributes (remove empty ones)
+  rewriter.on('*', {
+    element(element) {
+      // Remove empty class attributes
+      const classAttr = element.getAttribute('class');
+      if (classAttr === '') {
+        element.removeAttribute('class');
+      }
+      
+      // Remove empty id attributes
+      const idAttr = element.getAttribute('id');
+      if (idAttr === '') {
+        element.removeAttribute('id');
+      }
+    }
+  });
+
+  try {
+    const optimized = await rewriter.transform(new Response(htmlContent)).text();
+    return optimized;
+  } catch (error) {
+    logger.warn(`HTML optimization failed: ${error.message}`);
+    return htmlContent; // Return original if optimization fails
+  }
 }
 
 /**
