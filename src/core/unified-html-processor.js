@@ -20,6 +20,37 @@ import { isPathWithinDirectory, resolveIncludePath, resolveResourcePath } from "
 import { hasFeature } from "../utils/runtime-detector.js";
 
 /**
+ * Determine if processing should fail fast based on configuration
+ * @param {Object} config - Configuration object
+ * @param {string} errorType - Type of error ('warning', 'error', 'fatal')
+ * @returns {boolean} True if processing should fail fast
+ */
+function shouldFailFast(config, errorType = 'error') {
+  // Legacy support for perfection mode (maps to fail-on error)
+  if (config.perfection) {
+    return true;
+  }
+  
+  // New fail-on logic
+  if (!config.failOn) {
+    // Default: don't fail fast, let the build system handle errors
+    return false;
+  }
+  
+  if (config.failOn === 'warning') {
+    // Fail on any warning or error
+    return true;
+  }
+  
+  if (config.failOn === 'error') {
+    // Fail on errors (but not warnings)
+    return errorType === 'error' || errorType === 'fatal';
+  }
+  
+  return false;
+}
+
+/**
  * Process HTML content with unified support for both SSI includes and DOM templating
  * Uses HTMLRewriter for high-performance processing
  * @param {string} htmlContent - Raw HTML content to process
@@ -194,9 +225,9 @@ async function processIncludesWithStringReplacement(htmlContent, filePath, sourc
         const resolvedPath = resolveIncludePathInternal(type, includePath, filePath, sourceRoot);
         error = new IncludeNotFoundError(includePath, filePath, [resolvedPath]);
       }
-      // In perfection mode, fail fast on any include error
-      if (config.perfection) {
-        // Always throw BuildError for any include error in perfection mode
+      // In fail-fast mode, fail fast on any include error
+      if (shouldFailFast(config, 'error')) {
+        // Always throw BuildError for any include error in fail-fast mode
         let msg;
         if (error instanceof CircularDependencyError) {
           msg = `Include circular dependency: ${includePath} in ${filePath}`;
@@ -286,7 +317,7 @@ async function processIncludesWithStringReplacement(htmlContent, filePath, sourc
         if (error.code === 'ENOENT' && !error.formatForCLI) {
           error = new IncludeNotFoundError(src, errorFilePath, [resolvedPath]);
         }
-        if (config.perfection) {
+        if (shouldFailFast(config, 'error')) {
           let msg;
           if (error instanceof CircularDependencyError) {
             msg = `Include circular dependency: ${src} in ${errorFilePath}`;
@@ -313,8 +344,8 @@ async function processIncludesWithStringReplacement(htmlContent, filePath, sourc
   };
   } catch (err) {
     logger.error('processIncludesWithStringReplacement failed:', err);
-    // In perfection mode, re-throw all build-stopping errors
-    if (config.perfection && (
+    // In fail-fast mode, re-throw all build-stopping errors
+    if (shouldFailFast(config, 'error') && (
       err instanceof BuildError || 
       err instanceof CircularDependencyError ||
       err instanceof PathTraversalError ||
@@ -418,9 +449,9 @@ async function processIncludeElement(element, src, filePath, sourceRoot, config,
     element.setInnerContent(processedContent, { html: true });
     logger.debug(`Processed include element: ${src} -> ${resolvedPath}`);
   } catch (error) {
-    // In perfection mode, fail fast on any include error
-    if (config.perfection) {
-      throw new Error(`Include not found in perfection mode: ${src} in ${filePath}`);
+    // In fail-fast mode, fail fast on any include error
+    if (shouldFailFast(config, 'error')) {
+      throw new Error(`Include not found in fail-fast mode: ${src} in ${filePath}`);
     }
     logger.warn(`Include element not found: ${src} in ${filePath}`);
     element.setInnerContent(`<!-- Include not found: ${src} -->`, { html: true });
@@ -626,7 +657,7 @@ async function processIncludesInHTML(htmlContent, layoutPath, sourceRoot, config
     new Set(),
     0,
     null, // No dependency tracker needed
-    config && config.perfection ? true : false
+    shouldFailFast(config)
   );
 
   // Then process <include> elements if any remain
@@ -704,11 +735,11 @@ async function processIncludesInHTML(htmlContent, layoutPath, sourceRoot, config
         if (error.code === 'ENOENT' && !error.formatForCLI) {
           error = new IncludeNotFoundError(src, layoutPath, [resolvedPath]);
         }
-        if (config.perfection) {
+        if (shouldFailFast(config, 'error')) {
           if (error instanceof CircularDependencyError || error instanceof PathTraversalError || error instanceof IncludeNotFoundError) {
             throw error;
           }
-          throw new Error('Include element not found in perfection mode: ' + src + ' in ' + layoutPath);
+          throw new Error('Include element not found in fail-fast mode: ' + src + ' in ' + layoutPath);
         }
         logger.warn('[UNIFY] Include element not found:', src, 'in', layoutPath);
         result = result.replace(fullMatch, '<!-- Include not found: ' + src + ' -->');
@@ -958,9 +989,9 @@ async function processDOMTemplating(htmlContent, filePath, sourceRoot, config, e
           extractedAssets  // Pass extracted assets
         );
       } catch (error) {
-        // In perfection mode, fail fast on layout errors
-        if (config.perfection) {
-          throw new Error(`Layout not found in perfection mode for ${path.relative(sourceRoot, filePath)}: ${error.message}`);
+        // In fail-fast mode, fail fast on layout detection errors
+        if (shouldFailFast(config, 'error')) {
+          throw new Error(`Layout not found in fail-fast mode for ${path.relative(sourceRoot, filePath)}: ${error.message}`);
         }
         // Graceful degradation: if specific layout is missing, log warning and return original content
         logger.warn(`Layout not found for ${path.relative(sourceRoot, filePath)}: ${error.message}`);

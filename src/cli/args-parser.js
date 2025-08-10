@@ -68,12 +68,12 @@ export function parseArgs(argv) {
     baseUrl: "https://example.com",
     clean: false,
     sitemap: true,
-    perfection: false,
+    failOn: null, // Can be 'warning', 'error', or null (default: null = only fail on fatal errors)
     minify: false,
     verbose: false,
     help: false,
     version: false,
-    assets: null,
+    copy: null,
     layouts: null,
     includes: null,
   };
@@ -163,19 +163,19 @@ export function parseArgs(argv) {
       i += 2;
       continue;
     }
-    if ((arg === '--assets' || arg === '-a') && nextArg && !nextArg.startsWith('-')) {
-      args.assets = nextArg;
+    if ((arg === '--copy' || arg === '-a') && nextArg && !nextArg.startsWith('-')) {
+      args.copy = nextArg;
       i += 2;
       continue;
     }
-    // Handle --assets without value
-    if (arg === '--assets' || arg === '-a') {
+    // Handle --copy without value
+    if (arg === '--copy' || arg === '-a') {
       const error = new UnifyError(
-        'The --assets option requires a glob pattern value',
+        'The --copy option requires a glob pattern value',
         null,
         null,
         [
-          'Provide a glob pattern like: --assets "./assets/**/*.*"',
+          'Provide a glob pattern like: --copy "./assets/**/*.*"',
           'Use quotes around patterns with special characters',
           'Check the documentation for glob pattern examples'
         ]
@@ -225,8 +225,47 @@ export function parseArgs(argv) {
       i++;
       continue;
     }
+    if (arg === '--fail-on' && nextArg && !nextArg.startsWith('-')) {
+      const validLevels = ['warning', 'error'];
+      if (validLevels.includes(nextArg)) {
+        args.failOn = nextArg;
+        i += 2;
+        continue;
+      } else {
+        const error = new UnifyError(
+          `Invalid --fail-on level: ${nextArg}`,
+          null,
+          null,
+          [
+            'Valid levels are: warning, error',
+            'Use --fail-on warning to fail on any warning or error',
+            'Use --fail-on error to fail only on errors (default behavior)',
+            'Omit --fail-on to only fail on fatal build errors'
+          ]
+        );
+        error.errorType = 'UsageError';
+        throw error;
+      }
+    }
+    if (arg === '--fail-on') {
+      const error = new UnifyError(
+        'The --fail-on option requires a level value',
+        null,
+        null,
+        [
+          'Valid levels are: warning, error',
+          'Use --fail-on warning to fail on any warning or error',
+          'Use --fail-on error to fail only on errors',
+          'Omit --fail-on to only fail on fatal build errors'
+        ]
+      );
+      error.errorType = 'UsageError';
+      throw error;
+    }
+    // Backward compatibility: --perfection maps to --fail-on error
     if (arg === '--perfection' || arg === '-f') {
-      args.perfection = true;
+      args.failOn = 'error';
+      logger.warn('--perfection is deprecated, use --fail-on error instead');
       i++;
       continue;
     }
@@ -245,9 +284,9 @@ export function parseArgs(argv) {
     if (arg.startsWith('-')) {
       const validOptions = [
         '--help', '-h', '--version', '-v', '--source', '-s', '--output', '-o',
-        '--assets', '-a', '--port', '-p', '--host', '--layouts', '-l', '--templates', '--includes', '-c',
+        '--copy', '-a', '--port', '-p', '--host', '--layouts', '-l', '--templates', '--includes', '-c',
         '--pretty-urls', '--base-url', '--clean', '--no-sitemap', 
-        '--perfection', '--minify', '--verbose', '-u', '-f', '-m', '-V'
+        '--fail-on', '--perfection', '--minify', '--verbose', '-u', '-f', '-m', '-V'
       ];
       const suggestion = findClosestCommand(arg, validOptions);
       const suggestions = [];

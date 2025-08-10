@@ -40,6 +40,38 @@ import { logger } from "../utils/logger.js";
 import { getBaseUrlFromPackage } from "../utils/package-reader.js";
 
 /**
+ * Determine if build should fail based on configuration and error type
+ * @param {Object} config - Build configuration
+ * @param {string} errorType - Type of error that occurred
+ * @param {Object} error - The actual error object
+ * @returns {boolean} True if build should fail
+ */
+function shouldFailBuild(config, errorType = 'error', error = null) {
+  // Legacy support for perfection mode (maps to fail-on error)
+  if (config.perfection) {
+    return true;
+  }
+  
+  // New fail-on logic
+  if (!config.failOn) {
+    // Default: only fail on fatal build errors, not individual page errors
+    return false;
+  }
+  
+  if (config.failOn === 'warning') {
+    // Fail on any warning or error
+    return true;
+  }
+  
+  if (config.failOn === 'error') {
+    // Fail on errors (but not warnings)
+    return errorType === 'error' || errorType === 'fatal';
+  }
+  
+  return false;
+}
+
+/**
  * Enhanced HTML minifier that removes unnecessary whitespace, comments, and optimizes attributes
  * @param {string} html - HTML content to minify
  * @returns {string} - Minified HTML content
@@ -315,7 +347,7 @@ export async function build(options = {}) {
               assetTracker,
               config.prettyUrls,
               config.minify,
-              config.perfection, // propagate perfection mode
+              shouldFailBuild(config), // propagate fail mode
               outputPath // enforce output path
             );
             processedFiles.push(filePath);
@@ -344,10 +376,10 @@ export async function build(options = {}) {
           errorType: error.constructor.name,
           suggestions: error.suggestions || [],
         });
-        // If perfection mode is enabled, fail fast on any error
-        if (config.perfection) {
+        // If fail-on mode is enabled, fail fast on any error
+        if (shouldFailBuild(config, 'error', error)) {
           throw new BuildError(
-            `Build failed in perfection mode due to error in ${relativePath}: ${error.message}`,
+            `Build failed due to error in ${relativePath}: ${error.message}`,
             results.errors
           );
         }
@@ -378,41 +410,91 @@ export async function build(options = {}) {
       } catch (error) {
         const relativePath = path.relative(sourceRoot, filePath);
         // ...existing code...
-        // If perfection mode is enabled, fail fast on any error
-        if (config.perfection) {
+        // If fail-on mode is enabled, fail fast on any error
+        if (shouldFailBuild(config, 'error', error)) {
           throw new BuildError(
-            `Build failed in perfection mode due to error in ${relativePath}: ${error.message}`,
+            `Build failed due to error in ${relativePath}: ${error.message}`,
             results.errors
           );
         }
       }
     }
 
-    // Third pass: Copy additional assets from glob pattern (if specified)
-    if (config.assets) {
+    // Third pass: Copy src/assets to dist/assets (automatic)
+    const assetsDir = path.join(sourceRoot, 'assets');
+    try {
+      const stats = await fs.stat(assetsDir);
+      if (stats.isDirectory()) {
+        const targetAssetsDir = path.join(outputRoot, 'assets');
+        logger.info(`Copying src/assets to dist/assets...`);
+        
+        const assetFiles = await scanDirectory(assetsDir);
+        for (const filePath of assetFiles) {
+          try {
+            const relativePath = path.relative(assetsDir, filePath);
+            const targetPath = path.join(targetAssetsDir, relativePath);
+            
+            // Skip if this asset was already copied in the referenced assets pass
+            if (!copiedAssetsSet.has(filePath)) {
+              await ensureDirectoryExists(path.dirname(targetPath));
+              await fs.copyFile(filePath, targetPath);
+              copiedAssetsSet.add(filePath);
+              results.copied++;
+              logger.debug(`Copied assets directory file: ${relativePath}`);
+            } else {
+              logger.debug(`Skipped assets directory file (already copied): ${relativePath}`);
+            }
+          } catch (error) {
+            const relativePath = path.relative(sourceRoot, filePath);
+            logger.error(`Error copying assets directory file ${relativePath}: ${error.message}`);
+            results.errors.push({
+              file: filePath,
+              relativePath,
+              error: error.message,
+              errorType: error.constructor.name,
+              suggestions: [`Check file permissions for ${relativePath}`],
+            });
+            // If fail-on mode is enabled, fail fast on any error
+            if (shouldFailBuild(config, 'error', error)) {
+              throw new BuildError(
+                `Build failed due to error copying assets directory file ${relativePath}: ${error.message}`,
+                results.errors
+              );
+            }
+          }
+        }
+      }
+    } catch (error) {
+      if (error.code !== 'ENOENT') {
+        logger.debug(`src/assets directory not found or not accessible, skipping automatic copying`);
+      }
+    }
+
+    // Fourth pass: Copy additional files from glob pattern (if specified)
+    if (config.copy) {
       try {
-        const glob = new Bun.Glob(config.assets);
-        const additionalAssets = [];
+        const glob = new Bun.Glob(config.copy);
+        const additionalFiles = [];
         // Scan from source root
         for await (const file of glob.scan(sourceRoot)) {
           const fullPath = path.resolve(sourceRoot, file);
-          additionalAssets.push(fullPath);
+          additionalFiles.push(fullPath);
         }
         logger.info(
-          `Found ${additionalAssets.length} additional assets matching pattern: ${config.assets}`
+          `Found ${additionalFiles.length} additional files matching pattern: ${config.copy}`
         );
-        for (const filePath of additionalAssets) {
+        for (const filePath of additionalFiles) {
           try {
             const relativePath = path.relative(sourceRoot, filePath);
-            // Skip if this asset was already copied in the referenced assets pass
+            // Skip if this file was already copied in previous passes
             if (!copiedAssetsSet.has(filePath)) {
               await copyAsset(filePath, sourceRoot, outputRoot);
               copiedAssetsSet.add(filePath);
               results.copied++;
-              logger.debug(`Copied additional asset: ${relativePath}`);
+              logger.debug(`Copied additional file: ${relativePath}`);
             } else {
               logger.debug(
-                `Skipped additional asset (already copied): ${relativePath}`
+                `Skipped additional file (already copied): ${relativePath}`
               );
             }
           } catch (error) {
@@ -422,7 +504,7 @@ export async function build(options = {}) {
               logger.error(error.formatForCLI());
             } else {
               logger.error(
-                `Error copying additional asset ${relativePath}: ${error.message}`
+                `Error copying additional file ${relativePath}: ${error.message}`
               );
             }
             results.errors.push({
@@ -432,10 +514,10 @@ export async function build(options = {}) {
               errorType: error.constructor.name,
               suggestions: error.suggestions || [],
             });
-            // If perfection mode is enabled, fail fast on any error
-            if (config.perfection) {
+            // If fail-on mode is enabled, fail fast on any error
+            if (shouldFailBuild(config, 'error', error)) {
               throw new BuildError(
-                `Build failed in perfection mode due to error copying additional asset ${relativePath}: ${error.message}`,
+                `Build failed due to error copying additional file ${relativePath}: ${error.message}`,
                 results.errors
               );
             }
@@ -444,11 +526,11 @@ export async function build(options = {}) {
       } catch (error) {
         // Handle glob pattern errors
         logger.error(
-          `Error processing assets glob pattern "${config.assets}": ${error.message}`
+          `Error processing copy glob pattern "${config.copy}": ${error.message}`
         );
         results.errors.push({
-          file: "assets-glob",
-          error: `Invalid glob pattern "${config.assets}": ${error.message}`,
+          file: "copy-glob",
+          error: `Invalid glob pattern "${config.copy}": ${error.message}`,
           errorType: error.constructor.name,
           suggestions: [
             'Check the glob pattern syntax (e.g., "./assets/**/*.*")',
@@ -456,10 +538,10 @@ export async function build(options = {}) {
             "Use forward slashes for paths even on Windows",
           ],
         });
-        // If perfection mode is enabled, fail fast on any error
-        if (config.perfection) {
+        // If fail-on mode is enabled, fail fast on any error
+        if (shouldFailBuild(config, 'error', error)) {
           throw new BuildError(
-            `Build failed in perfection mode due to assets glob error: ${error.message}`,
+            `Build failed due to copy glob error: ${error.message}`,
             results.errors
           );
         }
@@ -496,10 +578,10 @@ export async function build(options = {}) {
         }
         results.errors.push({ file: "sitemap.xml", error: error.message });
 
-        // If perfection mode is enabled, fail fast on any error
-        if (config.perfection) {
+        // If fail-on mode is enabled, fail fast on any error
+        if (shouldFailBuild(config, 'error', error)) {
           throw new BuildError(
-            `Build failed in perfection mode due to sitemap generation error: ${error.message}`,
+            `Build failed due to sitemap generation error: ${error.message}`,
             results.errors
           );
         }
@@ -659,10 +741,10 @@ export async function incrementalBuild(
             try {
               layoutContent = await fs.readFile(layoutFile, "utf-8");
             } catch (error) {
-              // If perfection mode is enabled, fail fast on layout errors
-              if (config.perfection) {
+              // If fail-on mode is enabled, fail fast on layout errors
+              if (shouldFailBuild(config, 'error', error)) {
                 throw new BuildError(
-                  `Build failed in perfection mode due to layout error: Could not read layout file ${layoutFile}: ${error.message}`,
+                  `Build failed due to layout error: Could not read layout file ${layoutFile}: ${error.message}`,
                   results.errors
                 );
               }
@@ -681,7 +763,7 @@ export async function incrementalBuild(
             config.prettyUrls,
             config.layouts,
             config.minify,
-            config.perfection
+            shouldFailBuild(config)
           );
           results.processed++;
           logger.debug(`Rebuilt Markdown: ${relativePath}`);
@@ -1026,7 +1108,8 @@ async function processMarkdownFile(
   assetTracker,
   prettyUrls = false,
   layoutsDir = ".layouts",
-  minify = false
+  minify = false,
+  failFast = false
 ) {
   // Read markdown content
   let markdownContent;
@@ -1035,9 +1118,6 @@ async function processMarkdownFile(
   } catch (error) {
     throw new FileSystemError("read", filePath, error);
   }
-
-  // Accept perfectionMode argument (default false)
-  const perfectionMode = arguments.length > 8 ? arguments[8] : false;
 
   // Process includes in markdown content first (before converting to HTML)
   const { processIncludes } = await import("./include-processor.js");
@@ -1048,7 +1128,7 @@ async function processMarkdownFile(
     new Set(),
     0,
     null,
-    perfectionMode
+    failFast
   );
 
   // Process markdown to HTML
@@ -1080,7 +1160,7 @@ async function processMarkdownFile(
         new Set(),
         0,
         null,
-        perfectionMode
+        failFast
       );
       let layoutWithContent = processedLayout.replace(
         /<slot[^>]*><\/slot>/g,
@@ -1104,9 +1184,9 @@ async function processMarkdownFile(
       finalContent = layoutWithContent;
       logger.debug(`Applied frontmatter layout: ${frontmatter.layout}`);
     } catch (error) {
-      if (perfectionMode) {
+      if (failFast) {
         throw new BuildError(
-          `Build failed in perfection mode due to missing layout: ${frontmatter.layout} (${error.message})`,
+          `Build failed due to missing layout: ${frontmatter.layout} (${error.message})`,
           [{ file: filePath, error: error.message }]
         );
       }
@@ -1137,9 +1217,9 @@ async function processMarkdownFile(
         );
         logger.debug("Applied default layout");
       } catch (error) {
-        if (perfectionMode) {
+        if (failFast) {
           throw new BuildError(
-            `Build failed in perfection mode due to missing default layout: ${error.message}`,
+            `Build failed due to missing default layout: ${error.message}`,
             [{ file: filePath, error: error.message }]
           );
         }
@@ -1549,7 +1629,7 @@ async function processMarkdownFileWithConventions(
   assetTracker,
   prettyUrls = false,
   minify = false,
-  perfectionMode = false
+  failFast = false
 ) {
   try {
     const content = await fs.readFile(filePath, "utf-8");
@@ -1579,9 +1659,9 @@ async function processMarkdownFileWithConventions(
         filePath
       );
       if (!layoutPath) {
-        if (perfectionMode) {
+        if (failFast) {
           throw new BuildError(
-            `Build failed in perfection mode due to missing layout: ${frontmatter.layout}`,
+            `Build failed due to missing layout: ${frontmatter.layout}`,
             [
               {
                 file: filePath,
@@ -1680,7 +1760,7 @@ async function processMarkdownFileWithConventions(
 
     return frontmatter;
   } catch (error) {
-    if (perfectionMode && error instanceof BuildError) {
+    if (failFast && error instanceof BuildError) {
       throw error;
     }
     throw new FileSystemError("process", filePath, error);

@@ -66,10 +66,7 @@ export function processMarkdown(markdownContent, filePath) {
     };
   } catch (error) {
     logger.error(error.formatForCLI ? error.formatForCLI() : `Error processing markdown file ${filePath}: ${error.message}`);
-    if (typeof perfectionMode !== 'undefined' && perfectionMode) {
-      const msg = `Markdown frontmatter error: ${filePath}: ${error.message}`;
-      throw new BuildError(msg, [{ file: filePath, error: msg }]);
-    }
+    // Always throw the error - error handling policy is controlled at the build level
     throw error;
   }
 }

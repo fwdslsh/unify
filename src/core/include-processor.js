@@ -47,7 +47,7 @@ export async function processIncludes(
   processedFiles = new Set(),
   depth = 0,
   dependencyTracker = null,
-  perfectionMode = false
+  failFast = false
   ) {
   // Prevent excessive recursion
   if (depth > MAX_INCLUDE_DEPTH) {
@@ -98,11 +98,11 @@ export async function processIncludes(
             searchPaths.push(path.resolve(sourceRoot, includePath.replace(/^\/+/,'')));
           }
           const notFoundErr = new IncludeNotFoundError(includePath, filePath, searchPaths);
-          if (perfectionMode) throw notFoundErr;
+          if (failFast) throw notFoundErr;
           throw notFoundErr;
         }
         const fsErr = new FileSystemError('read', resolvedPath, error);
-        if (perfectionMode) throw fsErr;
+        if (failFast) throw fsErr;
         throw fsErr;
       }
 
@@ -119,7 +119,7 @@ export async function processIncludes(
         newProcessedFiles,
         depth + 1,
         dependencyTracker,
-        perfectionMode
+        failFast
       );
 
       logger.debug(`Processed include content: ${processedInclude.substring(0, 100)}...`);
@@ -131,8 +131,8 @@ export async function processIncludes(
 
     } catch (error) {
       // Handle errors gracefully based on their type
-      if (perfectionMode) {
-        // In perfection mode, all errors are fatal
+      if (failFast) {
+        // In fail-fast mode, all errors are fatal
         if (error.formatForCLI) logger.error(error.formatForCLI());
         throw error;
       }

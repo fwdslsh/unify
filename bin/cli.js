@@ -119,14 +119,15 @@ Commands:
 Options:
   --source, -s      Source directory (default: src)
   --output, -o      Output directory (default: dist)
-  --assets, -a      Additional assets glob pattern to copy recursively
+  --copy, -a        Additional files glob pattern to copy recursively
   --port, -p        Server port (default: 3000)
   --host            Server host (default: localhost)
   --pretty-urls     Generate pretty URLs (about.md → about/index.html)
   --base-url        Base URL for sitemap.xml (default: https://example.com)
   --clean           Clean output directory before build
   --no-sitemap      Disable sitemap.xml generation
-  --perfection      Fail entire build if any single page fails to build
+  --fail-on         Fail build on specified level: warning, error
+  --perfection      (deprecated) Use --fail-on error instead
   --minify          Enable HTML minification for production builds
   --verbose         Enable debug level messages in console output
   --help, -h        Show this help message
@@ -138,8 +139,12 @@ Examples:
   unify serve                             # Serve with live reload on port 3000
   unify build --pretty-urls
   unify build --base-url https://mysite.com
-  unify build --assets "./assets/**/*.*"  # Copy additional assets
+  unify build --copy "./assets/**/*.*"    # Copy additional files
   unify serve --port 8080
+
+Notes:
+  • src/assets is automatically copied to dist/assets (if exists)
+  • Files/folders starting with _ are not copied to output
 `);
 }
 
