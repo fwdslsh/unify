@@ -1,32 +1,19 @@
-<body data-layout="/site_layouts/blog.html">
-  <template target="title">Welcome to DOM Mode</template>
-  <template target="header">
-    <h1>🧱 Unify DOM Mode</h1>
-    <p>Modern templating with pure HTML</p>
+<div data-layout="_blog.layout.html">
+  <template slot="title">Welcome to My Blog</template>
+  <template slot="header">
+    <h1>🧱 My Blog</h1>
+    <p>Convention-based blogging with Unify</p>
   </template>
 
   <h2>Hello!</h2>
-  <p>This is a blog post rendered with the Unify DOM Mode layout engine. This content goes into the unnamed slot.</p>
+  <p>This is a blog post rendered with the Unify blog layout. This content goes into the unnamed slot.</p>
 
-  <include src="/custom_components/alert.html"
-           data-title="Note"
-           data-message="This site uses 100% declarative HTML." />
+  <!--#include virtual="/_includes/alert.html" -->
 
   <h3>Components Example</h3>
   <p>Here are some reusable components:</p>
 
-  <include src="/custom_components/card.html"
-           data-title="🎯 Features"
-           data-content="DOM Mode supports layouts and components." />
+  <!--#include virtual="/_includes/card.html" -->
 
-  <include src="/custom_components/card.html"
-           data-title="⚡ Performance"
-           data-content="All processing happens at build time - zero runtime JavaScript needed." />
-
-  <include src="/custom_components/navigation.html" />
-
-  <template target="footer">
-    <p>© 2025 - Built with Unify DOM Mode</p>
-    <p><a href="https://github.com/yourusername/unify">View on GitHub</a></p>
-  </template>
-</body>
+  <!--#include virtual="/_includes/navigation.html" -->
+</div>

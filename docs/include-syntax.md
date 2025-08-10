@@ -10,7 +10,7 @@ Using HTML elements.
 
 ```html
 <!-- include element -->
-<include src="/.components/header.html" />
+<include src="/_includes/header.html" />
 ```
 
 **Limitations:**
@@ -31,11 +31,11 @@ Using Apache SSI comments.
 Virtual includes use paths relative to the **source root directory**:
 
 ```html
-<!-- In any file, this resolves to src/.components/header.html -->
-<!--#include virtual="/.components/header.html" -->
+<!-- In any file, this resolves to src/_includes/header.html -->
+<!--#include virtual="/_includes/header.html" -->
 
 <!-- Nested directory structure -->
-<!--#include virtual="/.layouts/blog/sidebar.html" -->
+<!--#include virtual="/blog/_sidebar.html" -->
 
 <!-- Cross-directory includes -->
 <!--#include virtual="/shared/navigation.html" -->
@@ -55,8 +55,8 @@ File includes use paths relative to the **current file's directory**:
 <!-- From src/pages/about.html, includes src/pages/sidebar.html -->
 <!--#include file="sidebar.html" -->
 
-<!-- From src/blog/post.html, includes src/.components/header.html -->
-<!--#include file="../.components/header.html" -->
+<!-- From src/blog/post.html, includes src/_includes/header.html -->
+<!--#include file="../_includes/header.html" -->
 
 <!-- Deeply nested relative path -->
 <!--#include file="../../shared/footer.html" -->
@@ -86,30 +86,30 @@ File includes use paths relative to the **current file's directory**:
 
 Includes can contain other includes, allowing complex composition:
 
-**File: `src/.components/page-layout.html`**
+**File: `src/_includes/page-layout.html`**
 
 ```html
 <!DOCTYPE html>
 <html>
   <head>
-    <!--#include virtual="/.components/head-meta.html" -->
+    <!--#include virtual="/_includes/head-meta.html" -->
   </head>
   <body>
-    <!--#include virtual="/.components/header.html" -->
+    <!--#include virtual="/_includes/header.html" -->
     <main>
       <!-- Content will be inserted here -->
     </main>
-    <!--#include virtual="/.components/footer.html" -->
+    <!--#include virtual="/_includes/footer.html" -->
   </body>
 </html>
 ```
 
-**File: `src/.components/header.html`**
+**File: `src/_includes/header.html`**
 
 ```html
 <header>
-  <!--#include virtual="/.components/navigation.html" -->
-  <!--#include virtual="/.components/user-menu.html" -->
+  <!--#include virtual="/_includes/navigation.html" -->
+  <!--#include virtual="/_includes/user-menu.html" -->
 </header>
 ```
 
@@ -182,17 +182,19 @@ Only certain file types can be included:
 
 ```
 src/
-├── .components/           # Reusable includes
+├── _includes/            # Shared partials and layouts (non-emitting)
 │   ├── header.html
 │   ├── footer.html
 │   ├── navigation.html
 │   └── forms/
 │       ├── contact.html
 │       └── newsletter.html
-├── .layouts/              # Page layouts
-│   ├── default.html
-│   ├── blog.html
-│   └── landing.html
+├── blog/
+│   ├── _blog.layout.html  # Blog layout
+│   ├── _sidebar.html      # Blog sidebar partial
+│   └── posts/
+│       ├── first-post.md
+│       └── second-post.md
 ├── pages/                 # Main content
 │   ├── about.html
 │   └── contact.html
@@ -231,9 +233,9 @@ src/
 Include file not found: header.html
   in: src/index.html:5
 Suggestions:
-  • Create the include file: src/.components/header.html
+  • Create the include file: src/_includes/header.html
   • Check the include path and spelling
-  • Use virtual path: <!--#include virtual="/.components/header.html" -->
+  • Use virtual path: <!--#include virtual="/_includes/header.html" -->
 ```
 
 **Circular dependency:**
@@ -286,7 +288,7 @@ Includes work within markdown files:
 
 This is markdown content.
 
-<!--#include virtual="/.components/code-example.html" -->
+<!--#include virtual="/_includes/code-example.html" -->
 
 More markdown content here.
 ```
@@ -298,8 +300,8 @@ Include files can reference assets that get tracked:
 ```html
 <!-- header.html -->
 <header>
-  <img src="/images/logo.png" alt="Logo" />
-  <link rel="stylesheet" href="/css/header.css" />
+  <img src="/assets/images/logo.png" alt="Logo" />
+  <link rel="stylesheet" href="/assets/css/header.css" />
 </header>
 ```
 
@@ -309,11 +311,11 @@ Include files can reference assets that get tracked:
 
 **From Jekyll includes:**
 
-```liquid
+```html
 <!-- Jekyll -->
 {% include header.html %}
 <!-- unify -->
-<include src="/.components/header.html"/>
+<include src="/_includes/header.html"/>
 ```
 
 **From Hugo partials:**
@@ -322,7 +324,7 @@ Include files can reference assets that get tracked:
 <!-- Hugo -->
 {{ partial "header.html" . }}
 <!-- unify -->
-<include src="/.components/header.html"/>
+<include src="/_includes/header.html"/>
 ```
 
 **From 11ty includes:**
@@ -331,7 +333,7 @@ Include files can reference assets that get tracked:
 <!-- 11ty -->
 {% include "header.njk" %}
 <!-- unify -->
-<include src="/.components/header.html"/>
+<include src="header.html"/>
 ```
 
 ### Legacy Apache SSI

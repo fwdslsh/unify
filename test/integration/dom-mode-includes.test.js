@@ -13,23 +13,18 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 describe('DOM Mode Include Processing', () => {
-  let testDir = null;
-  let sourceDir = null;
-  let outputDir = null;
-  let componentsDir = null;
-  let layoutsDir = null;
+  const tempBase = '/tmp/unify-dom-mode-test';
+  let testDir, sourceDir, outputDir, componentsDir, layoutsDir;
 
   beforeEach(async () => {
-    // Create unique test directories for each test
-    testDir = path.join(__dirname, '../test-temp/dom-mode-includes-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9));
+    testDir = tempBase;
     sourceDir = path.join(testDir, 'src');
     outputDir = path.join(testDir, 'dist');
-    componentsDir = path.join(sourceDir, 'custom_components');
-    layoutsDir = path.join(sourceDir, 'site_layouts');
+    componentsDir = path.join(sourceDir, 'custom_components'); // Changed from '_includes'
+    layoutsDir = path.join(sourceDir, '_includes');
 
     // Clean up and create test directories
-    await fs.rm(testDir, { recursive: true, force: true });
-    await fs.mkdir(testDir, { recursive: true });
+    await fs.rm(testDir, { recursive: true, force: true }).catch(() => {});
     await fs.mkdir(sourceDir, { recursive: true });
     await fs.mkdir(componentsDir, { recursive: true });
     await fs.mkdir(layoutsDir, { recursive: true });
@@ -95,7 +90,7 @@ describe('DOM Mode Include Processing', () => {
 
     // Create a blog layout
     await fs.writeFile(
-      path.join(layoutsDir, 'blog.html'),
+      path.join(layoutsDir, 'blog.layout.html'),
       `<!DOCTYPE html>
 <html>
 <head>
@@ -141,7 +136,7 @@ describe('DOM Mode Include Processing', () => {
     // Create the test page with DOM-style includes
     await fs.writeFile(
       path.join(sourceDir, 'blog.html'),
-      `<body data-layout="/site_layouts/blog.html">
+      `<body data-layout="/_includes/blog.layout.html">
   <template target="title">Welcome to DOM Mode</template>
   <template target="header">
     <h1>🧱 Unify DOM Mode</h1>
@@ -184,32 +179,25 @@ describe('DOM Mode Include Processing', () => {
   });
 
   afterEach(async () => {
-    if (testDir) {
-      try {
-        await fs.rm(testDir, { recursive: true, force: true });
-      } catch (error) {
-        // Ignore cleanup errors
-      }
-      testDir = null;
-      sourceDir = null;
-      outputDir = null;
-      componentsDir = null;
-      layoutsDir = null;
-    }
+  // Clean up after each test
+  await fs.rm(testDir, { recursive: true, force: true }).catch(() => {});
   });
 
   it('should process <include> elements and include component content', async () => {
     // Build the site
     await build({
       source: sourceDir,
-      output: outputDir,
-      components: componentsDir,
-      layouts: layoutsDir
+      output: outputDir
     });
 
     // Read the output file
     const outputFile = path.join(outputDir, 'blog.html');
     const outputContent = await fs.readFile(outputFile, 'utf-8');
+
+    // Debug: Log the actual output content
+    console.log('\n=== ACTUAL OUTPUT CONTENT ===');
+    console.log(outputContent);
+    console.log('=== END OUTPUT ===\n');
 
     // Check that include elements are processed and replaced with component content
     expect(outputContent.includes('<include')).toBeFalsy();
@@ -232,31 +220,17 @@ describe('DOM Mode Include Processing', () => {
   });
 
   it('should exclude component and layout directories from output', async () => {
+
     // Build the site
     await build({
       source: sourceDir,
-      output: outputDir,
-      components: componentsDir,
-      layouts: layoutsDir
+      output: outputDir
     });
 
-    // Check that component directory is not copied to output
-    const outputComponentsDir = path.join(outputDir, 'custom_components');
-    try {
-      await fs.access(outputComponentsDir);
-      throw new Error('Components directory should not be copied to output');
-    } catch (error) {
-      expect(error.code).toBe('ENOENT');
-    }
-
-    // Check that layouts directory is not copied to output
-    const outputLayoutsDir = path.join(outputDir, 'site_layouts');
-    try {
-      await fs.access(outputLayoutsDir);
-      throw new Error('Layouts directory should not be copied to output');
-    } catch (error) {
-      expect(error.code).toBe('ENOENT');
-    }
+  // Check that _includes directory is not copied to output
+  const outputIncludesDir = path.join(outputDir, '_includes');
+  const includesExists = await fs.access(outputIncludesDir).then(() => true).catch(() => false);
+  expect(includesExists).toBe(false);
 
     // Check that other assets (like styles) are copied
     const outputStylesDir = path.join(outputDir, 'styles');
@@ -278,7 +252,7 @@ describe('DOM Mode Include Processing', () => {
     // Update the blog page to include the nested component
     await fs.writeFile(
       path.join(sourceDir, 'blog.html'),
-      `<body data-layout="/site_layouts/blog.html">
+      `<body data-layout="/_includes/blog.layout.html">
   <template target="title">Nested Include Test</template>
   
   <h2>Testing Nested Includes</h2>
@@ -289,9 +263,7 @@ describe('DOM Mode Include Processing', () => {
     // Build the site
     await build({
       source: sourceDir,
-      output: outputDir,
-      components: componentsDir,
-      layouts: layoutsDir
+      output: outputDir
     });
 
     // Read the output file

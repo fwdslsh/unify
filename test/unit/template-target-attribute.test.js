@@ -94,23 +94,23 @@ describe('template target attribute', () => {
     );
     
     // Verify head slot replacement
-    expect(result.includes('<meta name="description" content="Custom page description">')).toBeTruthy();
-    expect(result.includes('<link rel="stylesheet" href="custom.css">')).toBeTruthy();
+    expect(result.content.includes('<meta name="description" content="Custom page description">')).toBeTruthy();
+    expect(result.content.includes('<link rel="stylesheet" href="custom.css">')).toBeTruthy();
     
     // Verify header slot replacement
-    expect(result.includes('<h1>Custom Header</h1>')).toBeTruthy();
-    expect(result.includes('<nav>Custom Navigation</nav>')).toBeTruthy();
+    expect(result.content.includes('<h1>Custom Header</h1>')).toBeTruthy();
+    expect(result.content.includes('<nav>Custom Navigation</nav>')).toBeTruthy();
     
     // Verify sidebar slot replacement
-    expect(result.includes('<li>Custom Sidebar Item 1</li>')).toBeTruthy();
-    expect(result.includes('<li>Custom Sidebar Item 2</li>')).toBeTruthy();
+    expect(result.content.includes('<li>Custom Sidebar Item 1</li>')).toBeTruthy();
+    expect(result.content.includes('<li>Custom Sidebar Item 2</li>')).toBeTruthy();
     
     // Verify main content in default slot
-    expect(result.includes('<h2>Main Content</h2>')).toBeTruthy();
-    expect(result.includes('<p>This is the main page content that goes in the default slot.</p>')).toBeTruthy();
+    expect(result.content.includes('<h2>Main Content</h2>')).toBeTruthy();
+    expect(result.content.includes('<p>This is the main page content that goes in the default slot.</p>')).toBeTruthy();
     
     // Verify template elements are removed from output
-    expect(result.includes('<template target=')).toBeFalsy();
+    expect(result.content.includes('<template target=')).toBeFalsy();
   });
   
   it('should handle template without target attribute as default slot content', async () => {
@@ -145,12 +145,12 @@ describe('template target attribute', () => {
     );
     
     // Verify template content replaces default slot
-    expect(result.includes('<article>')).toBeTruthy();
-    expect(result.includes('<h1>Article Title</h1>')).toBeTruthy();
-    expect(result.includes('<p>Article content for default slot</p>')).toBeTruthy();
+    expect(result.content.includes('<article>')).toBeTruthy();
+    expect(result.content.includes('<h1>Article Title</h1>')).toBeTruthy();
+    expect(result.content.includes('<p>Article content for default slot</p>')).toBeTruthy();
     
     // Verify template element is removed
-    expect(result.includes('<template>')).toBeFalsy();
+    expect(result.content.includes('<template>')).toBeFalsy();
   });
   
   it('should support multiple template elements with different targets', async () => {
@@ -200,15 +200,15 @@ describe('template target attribute', () => {
     
     
     // Verify all targeted content is placed correctly
-    expect(result.includes('<meta charset="UTF-8">')).toBeTruthy();
-    expect(result.includes('<title>Multi-Template Page</title>')).toBeTruthy();
-    expect(result.includes('<a href="/">Home</a>')).toBeTruthy();
-    expect(result.includes('<a href="/about">About</a>')).toBeTruthy();
-    expect(result.includes('<p>&copy; 2024 Test Site</p>')).toBeTruthy(); // Test for HTML entity, not decoded symbol
-    expect(result.includes('<h1>Main Content</h1>')).toBeTruthy();
+    expect(result.content.includes('<meta charset="UTF-8">')).toBeTruthy();
+    expect(result.content.includes('<title>Multi-Template Page</title>')).toBeTruthy();
+    expect(result.content.includes('<a href="/">Home</a>')).toBeTruthy();
+    expect(result.content.includes('<a href="/about">About</a>')).toBeTruthy();
+    expect(result.content.includes('<p>&copy; 2024 Test Site</p>')).toBeTruthy(); // Test for HTML entity, not decoded symbol
+    expect(result.content.includes('<h1>Main Content</h1>')).toBeTruthy();
     
     // Verify all template elements are removed
-    expect(result.includes('<template target=')).toBeFalsy();
+    expect(result.content.includes('<template target=')).toBeFalsy();
   });
   
 

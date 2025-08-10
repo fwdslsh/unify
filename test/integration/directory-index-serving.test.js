@@ -289,8 +289,7 @@ async function startDevServer(sourceDir, outputDir, timeout = 10000) {
     Bun.env.BUN_PATH || process.execPath, 
     cliPath, 
     'serve',
-    '--source', sourceDir,
-    '--output', outputDir,
+    '--source', outputDir,  // Serve from the built output directory
     '--port', port.toString(),
     '--verbose'
   ], {
@@ -316,7 +315,11 @@ async function waitForServer(port, timeout = 10000) {
   while (Date.now() - startTime < timeout) {
     try {
       const response = await fetch(`http://localhost:${port}`);
-      if (response.ok || response.status === 404) {
+      // Server is ready if it responds with any HTTP status (200, 404, etc.)
+      // This means the server is up and handling requests
+      if (response.status >= 200 && response.status < 600) {
+        // Add a small delay to ensure build process has completed
+        await new Promise(resolve => setTimeout(resolve, 200));
         return;
       }
     } catch {

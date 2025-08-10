@@ -62,8 +62,6 @@ export function parseArgs(argv) {
     command: null,
     source: "src",
     output: "dist",
-    layouts: ".layouts",
-    components: ".components",
     port: 3000,
     host: "localhost",
     prettyUrls: false,
@@ -76,49 +74,53 @@ export function parseArgs(argv) {
     help: false,
     version: false,
     assets: null,
+    layouts: null,
+    includes: null,
   };
-  
-  for (let i = 0; i < argv.length; i++) {
+
+  // Only the first non-option argument is considered a command
+  let commandFound = false;
+  let i = 0;
+  const validCommands = ['build', 'watch', 'serve'];
+  while (i < argv.length) {
     const arg = argv[i];
     const nextArg = argv[i + 1];
-    
-    // Commands (only at the beginning, before any options)
-    if (arg === 'build' || arg === 'watch' || arg === 'serve') {
-      if (i === 0) {
+
+    // Help/version flags should always be recognized
+    if (arg === '--help' || arg === '-h') {
+      args.help = true;
+      i++;
+      continue;
+    }
+    if (arg === '--version' || arg === '-v') {
+      args.version = true;
+      i++;
+      continue;
+    }
+
+    // If not a flag/option, and command not yet found, treat as command or error
+    if (!arg.startsWith('-') && !commandFound) {
+      if (validCommands.includes(arg)) {
         args.command = arg;
+        commandFound = true;
+        i++;
         continue;
       } else {
-        // Command found after options, treat as unknown option
-        throw new UnifyError(
-          `Unknown option: ${arg}`,
-          null,
-          null,
-          [
-            'Commands must be the first argument',
-            'Use --help to see valid options',
-            'Check for typos in the option name'
-          ]
-        );
-      }
-    }
-    
-    // Check for unknown commands (first non-option argument)
-    if (!arg.startsWith('-') && !args.command && i === 0) {
-      if (arg !== 'build' && arg !== 'watch' && arg !== 'serve') {
-        const validCommands = ['build', 'watch', 'serve'];
+        // If help/version is set, don't throw error
+        if (args.help || args.version) {
+          i++;
+          continue;
+        }
         const suggestion = findClosestCommand(arg, validCommands);
         const suggestions = [];
-        
         if (suggestion) {
           suggestions.push(`Did you mean "${suggestion}"?`);
         }
-        
         suggestions.push(
           'Use --help to see valid options',
           'Check for typos in the command name',
           'Check the documentation for supported commands'
         );
-        
         throw new UnifyError(
           `Unknown command: ${arg}`,
           null,
@@ -126,55 +128,49 @@ export function parseArgs(argv) {
           suggestions
         );
       }
-      args.command = arg;
-      continue;
     }
-    
-    // Flags
-    if (arg === '--help' || arg === '-h') {
-      args.help = true;
-      continue;
+    // If not a flag/option, and command already found, treat as unknown option
+    if (!arg.startsWith('-') && commandFound) {
+      throw new UnifyError(
+        `Unknown option: ${arg}`,
+        null,
+        null,
+        [
+          'Use --help to see valid options',
+          'Check for typos in the argument'
+        ]
+      );
     }
-    
-    if (arg === '--version' || arg === '-v') {
-      args.version = true;
-      continue;
-    }
-    
+
     // Options with values
-    if ((arg === '--source' || arg === '-s') && nextArg) {
+    if ((arg === '--source' || arg === '-s') && nextArg && !nextArg.startsWith('-')) {
       args.source = nextArg;
-      i++;
+      i += 2;
       continue;
     }
-    
-    if ((arg === '--output' || arg === '-o') && nextArg) {
+    if ((arg === '--output' || arg === '-o') && nextArg && !nextArg.startsWith('-')) {
       args.output = nextArg;
-      i++;
+      i += 2;
       continue;
     }
-    
-    if ((arg === '--layouts' || arg === '-l') && nextArg) {
+    if ((arg === '--layouts' || arg === '-l' || arg === '--templates') && nextArg && !nextArg.startsWith('-')) {
       args.layouts = nextArg;
-      i++;
+      i += 2;
       continue;
     }
-    
-    if ((arg === '--components' || arg === '-c') && nextArg) {
-      args.components = nextArg;
-      i++;
+    if ((arg === '--includes' || arg === '-c') && nextArg && !nextArg.startsWith('-')) {
+      args.includes = nextArg;
+      i += 2;
       continue;
     }
-    
-    if ((arg === '--assets' || arg === '-a') && nextArg) {
+    if ((arg === '--assets' || arg === '-a') && nextArg && !nextArg.startsWith('-')) {
       args.assets = nextArg;
-      i++;
+      i += 2;
       continue;
     }
-    
     // Handle --assets without value
     if (arg === '--assets' || arg === '-a') {
-      throw new UnifyError(
+      const error = new UnifyError(
         'The --assets option requires a glob pattern value',
         null,
         null,
@@ -184,10 +180,10 @@ export function parseArgs(argv) {
           'Check the documentation for glob pattern examples'
         ]
       );
+      error.errorType = 'UsageError';
+      throw error;
     }
-    
-    
-    if ((arg === '--port' || arg === '-p') && nextArg) {
+    if ((arg === '--port' || arg === '-p') && nextArg && !nextArg.startsWith('-')) {
       args.port = parseInt(nextArg, 10);
       if (isNaN(args.port) || args.port < 1 || args.port > 65535) {
         throw new UnifyError(
@@ -201,74 +197,68 @@ export function parseArgs(argv) {
           ]
         );
       }
-      i++;
+      i += 2;
       continue;
     }
-    
-    if (arg === '--host' && nextArg) {
+    if (arg === '--host' && nextArg && !nextArg.startsWith('-')) {
       args.host = nextArg;
-      i++;
+      i += 2;
       continue;
     }
-    
-    if (arg === '--pretty-urls') {
+    if (arg === '--pretty-urls' || arg === '-u') {
       args.prettyUrls = true;
-      continue;
-    }
-    
-    if (arg === '--base-url' && nextArg) {
-      args.baseUrl = nextArg;
       i++;
       continue;
     }
-    
+    if (arg === '--base-url' && nextArg && !nextArg.startsWith('-')) {
+      args.baseUrl = nextArg;
+      i += 2;
+      continue;
+    }
     if (arg === '--clean') {
       args.clean = true;
+      i++;
       continue;
     }
-    
     if (arg === '--no-sitemap') {
       args.sitemap = false;
+      i++;
       continue;
     }
-    
-    if (arg === '--perfection') {
+    if (arg === '--perfection' || arg === '-f') {
       args.perfection = true;
+      i++;
       continue;
     }
-    
-    if (arg === '--minify') {
+    if (arg === '--minify' || arg === '-m') {
       args.minify = true;
+      i++;
       continue;
     }
-    
-    if (arg === '--verbose') {
+    if (arg === '--verbose' || arg === '-V') {
       args.verbose = true;
+      i++;
       continue;
     }
-    
+
     // Unknown arguments
     if (arg.startsWith('-')) {
       const validOptions = [
         '--help', '-h', '--version', '-v', '--source', '-s', '--output', '-o',
-        '--layouts', '-l', '--components', '-c', '--assets', '-a', '--port', '-p', '--host',
+        '--assets', '-a', '--port', '-p', '--host', '--layouts', '-l', '--templates', '--includes', '-c',
         '--pretty-urls', '--base-url', '--clean', '--no-sitemap', 
-        '--perfection', '--minify', '--verbose'
+        '--perfection', '--minify', '--verbose', '-u', '-f', '-m', '-V'
       ];
       const suggestion = findClosestCommand(arg, validOptions);
       const suggestions = [];
-      
       if (suggestion) {
         suggestions.push(`Did you mean "${suggestion}"?`);
       }
-      
       suggestions.push(
         'Use --help to see valid options',
         'Check for typos in the option name',
         'Check the documentation for supported flags'
       );
-      
-      // Use UnifyError for consistent CLI exit code
       throw new UnifyError(
         `Unknown option: ${arg}`,
         null,
@@ -282,13 +272,16 @@ export function parseArgs(argv) {
         null,
         null,
         [
-          'Commands must be the first argument',
           'Use --help to see valid options',
           'Check for typos in the argument'
         ]
       );
     }
   }
-  
+
+  if (!args.command && !args.help && !args.version) {
+    // Default to build if no command found and not help/version
+    args.command = 'build';
+  }
   return args;
 }

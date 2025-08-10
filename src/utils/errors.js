@@ -75,7 +75,7 @@ export class IncludeNotFoundError extends UnifyError {
       `Ensure the path is relative to ${parentFile} (for file="...") or source root (for virtual="...")`
     ];
     
-    super(`Include file not found: ${includePath}`, parentFile, null, suggestions);
+  super(`Include not found: ${includePath}`, parentFile, null, suggestions);
     this.includePath = includePath;
     this.parentFile = parentFile;
     this.searchPaths = searchPaths;
@@ -290,7 +290,7 @@ export class LayoutError extends UnifyError {
     
     suggestions.push('Use {{ content }} placeholder in your layout for page content');
     
-    super(`Layout error: ${reason}`, layoutPath, null, suggestions);
+  super(`Layout not found: ${layoutPath} (${reason})`, layoutPath, null, suggestions);
     this.layoutPath = layoutPath;
     this.reason = reason;
     this.alternatives = alternatives;

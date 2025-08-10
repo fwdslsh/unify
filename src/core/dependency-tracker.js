@@ -93,14 +93,18 @@ export class DependencyTracker {
   }
 
   /**
-   * Get all pages that depend on a specific include file
+   * Optimized Get all pages that depend on a specific include file
    * @param {string} includePath - Path to the include file
    * @returns {string[]} Array of page paths that depend on the include
    */
-  getAffectedPages(includePath) {
+  getAffectedPages(includePath, cache = new Map()) {
+    if (cache.has(includePath)) {
+      return cache.get(includePath);
+    }
+
     const directlyAffected = this.pagesByInclude.get(includePath) || [];
     const allAffected = new Set(directlyAffected);
-    
+
     // Check for nested dependencies - if this include is included by other includes
     const includesUsingThis = [];
     for (const [page, includes] of this.includesInPage.entries()) {
@@ -108,16 +112,17 @@ export class DependencyTracker {
         includesUsingThis.push(page);
       }
     }
-    
+
     // Recursively find pages affected by nested includes
     for (const nestedInclude of includesUsingThis) {
-      const nestedAffected = this.getAffectedPages(nestedInclude);
+      const nestedAffected = this.getAffectedPages(nestedInclude, cache);
       nestedAffected.forEach(page => allAffected.add(page));
     }
-    
+
     const result = Array.from(allAffected);
+    cache.set(includePath, result);
     logger.debug(`Include ${includePath} affects ${result.length} pages: ${result.join(', ')}`);
-    
+
     return result;
   }
   

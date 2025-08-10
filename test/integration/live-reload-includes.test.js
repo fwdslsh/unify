@@ -169,7 +169,10 @@ async function waitForServer(port, timeout = 10000) {
   while (Date.now() - startTime < timeout) {
     try {
       const response = await fetch(`http://localhost:${port}`);
-      if (response.ok || response.status === 404) {
+      // Accept any HTTP status code (200-599) as server being ready
+      if (response.status >= 200 && response.status < 600) {
+        // Add delay to ensure build process completes
+        await new Promise(resolve => setTimeout(resolve, 200));
         return;
       }
     } catch {

@@ -39,22 +39,10 @@ describe('parseArgs', () => {
   });
   
   
-  it('should parse layouts option', () => {
-    const args = parseArgs(['build', '--layouts', 'templates']);
-    expect(args.layouts).toBe('templates');
-  });
-  
-  it('should parse components option', () => {
-    const args = parseArgs(['build', '--components', 'ui']);
-    expect(args.components).toBe('ui');
-  });
-  
   it('should use default values', () => {
     const args = parseArgs(['build']);
     expect(args.source).toBe('src');
     expect(args.output).toBe('dist');
-    expect(args.layouts).toBe('.layouts');
-    expect(args.components).toBe('.components');
     expect(args.port).toBe(3000);
   });
   

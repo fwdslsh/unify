@@ -11,28 +11,35 @@ async function main() {
   try {
     const args = parseArgs(process.argv.slice(2));
     
-    // Handle version and help flags
+    // Always show version/help output if requested, regardless of command
     if (args.version) {
       console.log(`unify v${pkg.version}`);
       process.exit(0);
     }
-    
     if (args.help) {
       showHelp();
       process.exit(0);
     }
-    
+
     // Set logging level based on verbose flag
     if (args.verbose) {
       logger.setLevel('DEBUG');
     }
-    
-    // Default to build command if none specified
-    if (!args.command) {
+
+    // Default to build command if none specified and not help/version
+    if (!args.command && !args.help && !args.version) {
       args.command = 'build';
       logger.info('No command specified, defaulting to build');
     }
-    
+
+    // Only allow valid commands
+    const validCommands = ['build', 'watch', 'serve'];
+    if (!validCommands.includes(args.command)) {
+      showHelp();
+      console.error(`\nUnknown command: ${args.command}`);
+      process.exit(2);
+    }
+
     // Execute commands
     switch (args.command) {
       case 'build':
@@ -40,17 +47,13 @@ async function main() {
         await build(args);
         logger.info('Build completed successfully!');
         break;
-        
       case 'watch':
         logger.info('Starting file watcher...');
         await watch(args);
         break;
-        
       case 'serve':
         logger.info('Starting development server with live reload...');
         const server = new DevServer();
-        
-        // Start server with proper config mapping
         await server.start({
           port: args.port,
           hostname: args.host,
@@ -60,58 +63,42 @@ async function main() {
           liveReload: true,
           verbose: args.verbose
         });
-        
-        // Start file watcher with live reload callback
         const watchConfig = {
           ...args,
           onReload: (eventType, filePath) => {
             server.broadcastReload();
           }
         };
-        
         await watch(watchConfig);
         break;
-        
-      default:
-        throw new (await import('../src/utils/errors.js')).UnifyError(
-          `Unknown command: ${args.command}`,
-          null,
-          null,
-          [
-            'Use --help to see valid commands',
-            'Check for typos in the command name',
-            'Refer to the documentation for supported commands'
-          ]
-        );
     }
   } catch (error) {
     // Enhanced error formatting
+    let errorOutput = '';
     if (error.formatForCLI) {
-      console.error('\n' + error.formatForCLI());
+      errorOutput = '\n' + error.formatForCLI();
     } else {
-      logger.error('Error:', error.message);
+      errorOutput = 'Error: ' + error.message;
     }
-
     // Show stack trace in debug mode or for unexpected errors
     if (Bun.env.DEBUG || (!error.suggestions && !error.formatForCLI)) {
-      console.error('\n🔍 Stack trace:');
-      console.error(error.stack);
+      errorOutput += '\n🔍 Stack trace:\n' + error.stack;
     }
-
-    // Exit with code 2 for usage/argument errors, 1 for build errors (Unix standard)
+    // Always flush error output to stderr before exiting
+    try {
+      process.stderr.write(errorOutput + '\n');
+    } catch {}
+    // Exit with code 2 for usage/argument errors (UnifyError with suggestions), 1 for build errors
     if (error) {
-      const { BuildError } = await import('../src/utils/errors.js');
-      
-      // Build errors always get exit code 1, regardless of suggestions
-      if (error instanceof BuildError) {
-        process.exit(1);
-      }
-      // Other errors with suggestions get exit code 2 (user/argument errors)
-      else if (error.suggestions && Array.isArray(error.suggestions)) {
+      const { BuildError, UnifyError } = await import('../src/utils/errors.js');
+      // Prioritize usage/argument errors for exit code 2
+      if (error.errorType === 'UsageError') {
         process.exit(2);
-      }
-      // Unexpected errors without suggestions get exit code 1
-      else {
+      } else if (error instanceof BuildError) {
+        process.exit(1);
+      } else if (error instanceof UnifyError && error.suggestions && Array.isArray(error.suggestions)) {
+        process.exit(2);
+      } else {
         process.exit(1);
       }
     }
@@ -132,8 +119,6 @@ Commands:
 Options:
   --source, -s      Source directory (default: src)
   --output, -o      Output directory (default: dist)
-  --layouts, -l     Layouts directory (default: .layouts, relative to source)
-  --components, -c  Components directory (default: .components, relative to source)
   --assets, -a      Additional assets glob pattern to copy recursively
   --port, -p        Server port (default: 3000)
   --host            Server host (default: localhost)

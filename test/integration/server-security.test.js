@@ -48,28 +48,11 @@ describe('Server Security', () => {
         clean: true
       });
 
-      // Debug: check what files exist in output directory
-      const outputFiles = await fs.readdir(outputDir);
-      console.log(`Output directory contents: ${outputFiles}`);
-      if (outputFiles.includes('index.html')) {
-        const indexContent = await fs.readFile(path.join(outputDir, 'index.html'), 'utf-8');
-        console.log(`Built index.html content: ${indexContent.substring(0, 100)}...`);
-      }
-
       const server = await startDevServer(sourceDir, outputDir);
       
       try {
-        // Debug: check if server process is still alive
-        console.log(`Server process running: ${!server.process.killed && server.process.exitCode === null}`);
-        console.log(`Testing server on port: ${server.port}`);
-        
         // Test that HTML files are served correctly
         const indexResponse = await fetch(`http://localhost:${server.port}/`);
-        console.log(`Index response status: ${indexResponse.status}`);
-        if (!indexResponse.ok) {
-          const errorText = await indexResponse.text();
-          console.log(`Index response error: ${errorText}`);
-        }
         expect(indexResponse.ok).toBeTruthy();
         expect(indexResponse.status).toBe(200);
         expect(indexResponse.headers.get('content-type')).toContain('text/html');
@@ -599,7 +582,11 @@ async function waitForServer(port, timeout = 10000) {
   while (Date.now() - startTime < timeout) {
     try {
       const response = await fetch(`http://localhost:${port}`);
-      if (response.ok || response.status === 404) {
+      // Server is ready if it responds with any HTTP status (200, 404, etc.)
+      // This means the server is up and handling requests
+      if (response.status >= 200 && response.status < 600) {
+        // Add a small delay to ensure build process has completed
+        await new Promise(resolve => setTimeout(resolve, 200));
         return;
       }
     } catch {

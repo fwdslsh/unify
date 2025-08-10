@@ -1,6 +1,6 @@
 {
   "name": "@fwdslsh/unify",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "description": "A lightweight, framework-free static site generator with Bun native APIs",
   "type": "module",
   "main": "src/index.js",
@@ -38,7 +38,7 @@
     "live-reload"
   ],
   "author": "Unify Contributors",
-  "license": "CC0-1.0",
+  "license": "CC-BY-4.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/fwdslsh/unify.git"

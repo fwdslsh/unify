@@ -115,7 +115,9 @@ describe("--perfection Flag", () => {
 
       // Verify the error is related to missing include
       expect(
-        result.stderr.includes("Include") || result.stderr.includes("missing")
+        result.stderr.includes("Include not found") ||
+        result.stderr.includes("Include") ||
+        result.stderr.includes("missing")
       ).toBeTruthy();
     });
 
@@ -193,7 +195,8 @@ describe("--perfection Flag", () => {
 
       expect(result.code).toBe(1);
       expect(
-        result.stderr.includes("Include") && result.stderr.includes("not found")
+        result.stderr.includes("Include not found") ||
+        (result.stderr.includes("Include") && result.stderr.includes("not found"))
       ).toBeTruthy();
     });
 

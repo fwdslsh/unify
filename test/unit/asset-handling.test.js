@@ -260,7 +260,7 @@ body {
   });
 
   describe('Layout and Component Exclusion', () => {
-    it('should NOT copy layout directories to output', async () => {
+    it('should NOT copy underscore-prefixed directories to output', async () => {
       // Create test files directly
       await fs.writeFile(path.join(sourceDir, 'index.html'), `<!DOCTYPE html>
 <html>
@@ -271,12 +271,12 @@ body {
 <body><h1>Test</h1></body>
 </html>`);
 
-      await fs.mkdir(path.join(sourceDir, 'layouts'), { recursive: true });
-      await fs.mkdir(path.join(sourceDir, 'components'), { recursive: true });
+      await fs.mkdir(path.join(sourceDir, '_includes'), { recursive: true });
+      await fs.mkdir(path.join(sourceDir, '_partials'), { recursive: true });
       await fs.mkdir(path.join(sourceDir, 'assets'), { recursive: true });
       
-      await fs.writeFile(path.join(sourceDir, 'layouts', 'default.html'), '<html><body>{{ content }}</body></html>');
-      await fs.writeFile(path.join(sourceDir, 'components', 'header.html'), '<header>Header</header>');
+      await fs.writeFile(path.join(sourceDir, '_includes', '_layout.html'), '<html><body>{{ content }}</body></html>');
+      await fs.writeFile(path.join(sourceDir, '_partials', '_header.html'), '<header>Header</header>');
       await fs.writeFile(path.join(sourceDir, 'assets', 'style.css'), 'body { margin: 0; }');
 
       const result = await build({
@@ -287,106 +287,19 @@ body {
 
       expect(result.errors.length).toBe(0); // Build should succeed
 
-      // Layout and component directories should NOT be copied
-      const layoutExists = await fs.access(path.join(outputDir, 'layouts'))
+      // Underscore-prefixed directories should NOT be copied
+      const includesExists = await fs.access(path.join(outputDir, '_includes'))
         .then(() => true).catch(() => false);
-      const componentExists = await fs.access(path.join(outputDir, 'components'))
+      const partialsExists = await fs.access(path.join(outputDir, '_partials'))
         .then(() => true).catch(() => false);
       
-      expect(layoutExists).toBeFalsy(); // Layout directory should NOT be copied
-      expect(componentExists).toBeFalsy(); // Component directory should NOT be copied
+      expect(includesExists).toBeFalsy(); // _includes directory should NOT be copied
+      expect(partialsExists).toBeFalsy(); // _partials directory should NOT be copied
 
       // Regular assets should be copied
       const assetExists = await fs.access(path.join(outputDir, 'assets'))
         .then(() => true).catch(() => false);
       expect(assetExists).toBeTruthy(); // Asset directory should be copied
-    });
-
-    it('should NOT copy component directories to output', async () => {
-      // Create test files directly
-      await fs.writeFile(path.join(sourceDir, 'index.html'), `<!DOCTYPE html>
-<html>
-<head>
-  <title>Test</title>
-  <link rel="stylesheet" href="/css/main.css">
-</head>
-<body><h1>Test</h1></body>
-</html>`);
-
-      await fs.mkdir(path.join(sourceDir, '.components'), { recursive: true });
-      await fs.mkdir(path.join(sourceDir, 'includes'), { recursive: true });
-      await fs.mkdir(path.join(sourceDir, 'css'), { recursive: true });
-      
-      await fs.writeFile(path.join(sourceDir, '.components', 'nav.html'), '<nav>Navigation</nav>');
-      await fs.writeFile(path.join(sourceDir, 'includes', 'footer.html'), '<footer>Footer</footer>');
-      await fs.writeFile(path.join(sourceDir, 'css', 'main.css'), 'body { padding: 0; }');
-
-      const result = await build({
-        source: sourceDir,
-        output: outputDir,
-        components: '.components',
-        clean: true
-      });
-
-      expect(result.errors.length).toBe(0); // Build should succeed
-
-      // Component directories should NOT be copied
-      const compExists = await fs.access(path.join(outputDir, '.components'))
-        .then(() => true).catch(() => false);
-      const includesExists = await fs.access(path.join(outputDir, 'includes'))
-        .then(() => true).catch(() => false);
-      
-      expect(compExists).toBeFalsy(); // Components directory should NOT be copied
-      expect(includesExists).toBeFalsy(); // Includes directory should NOT be copied
-
-      // Regular assets should be copied
-      const cssExists = await fs.access(path.join(outputDir, 'css'))
-        .then(() => true).catch(() => false);
-      expect(cssExists).toBeTruthy(); // CSS directory should be copied
-    });
-
-    it('should handle alternative layout/component directory names', async () => {
-      // Create test files directly
-      await fs.writeFile(path.join(sourceDir, 'index.html'), `<!DOCTYPE html>
-<html>
-<head><title>Test</title></head>
-<body>
-  <h1>Test</h1>
-  <script src="/public/app.js"></script>
-</body>
-</html>`);
-
-      await fs.mkdir(path.join(sourceDir, 'templates'), { recursive: true });
-      await fs.mkdir(path.join(sourceDir, 'partials'), { recursive: true });
-      await fs.mkdir(path.join(sourceDir, 'public'), { recursive: true });
-      
-      await fs.writeFile(path.join(sourceDir, 'templates', 'base.html'), '<html><body>{{ content }}</body></html>');
-      await fs.writeFile(path.join(sourceDir, 'partials', 'menu.html'), '<nav>Menu</nav>');
-      await fs.writeFile(path.join(sourceDir, 'public', 'app.js'), 'console.log("app");');
-
-      const result = await build({
-        source: sourceDir,
-        output: outputDir,
-        layouts: 'templates',
-        components: 'partials',
-        clean: true
-      });
-
-      expect(result.errors.length).toBe(0); // Build should succeed
-
-      // Custom layout/component directories should NOT be copied
-      const templatesExists = await fs.access(path.join(outputDir, 'templates'))
-        .then(() => true).catch(() => false);
-      const partialsExists = await fs.access(path.join(outputDir, 'partials'))
-        .then(() => true).catch(() => false);
-      
-      expect(templatesExists).toBeFalsy(); // Templates directory should NOT be copied
-      expect(partialsExists).toBeFalsy(); // Partials directory should NOT be copied
-
-      // Public assets should be copied
-      const publicExists = await fs.access(path.join(outputDir, 'public'))
-        .then(() => true).catch(() => false);
-      expect(publicExists).toBeTruthy(); // Public directory should be copied
     });
   });
 
@@ -411,16 +324,16 @@ body {
 <body><h1>About Page</h1></body>
 </html>`);
 
-      await fs.mkdir(path.join(sourceDir, 'css'), { recursive: true });
-      await fs.mkdir(path.join(sourceDir, 'images'), { recursive: true });
-      await fs.mkdir(path.join(sourceDir, 'components'), { recursive: true });
-      await fs.mkdir(path.join(sourceDir, 'layouts'), { recursive: true });
-      
-      await fs.writeFile(path.join(sourceDir, 'css', 'style.css'), 'body { margin: 0; }');
-      await fs.writeFile(path.join(sourceDir, 'images', 'logo.png'), 'FAKE_PNG_DATA');
-      await fs.writeFile(path.join(sourceDir, 'components', 'header.html'), '<header>Header</header>');
-      await fs.writeFile(path.join(sourceDir, 'components', 'footer.html'), '<footer>Footer</footer>');
-      await fs.writeFile(path.join(sourceDir, 'layouts', 'default.html'), '<html><body>{{ content }}</body></html>');
+  await fs.mkdir(path.join(sourceDir, 'css'), { recursive: true });
+  await fs.mkdir(path.join(sourceDir, 'images'), { recursive: true });
+  await fs.mkdir(path.join(sourceDir, '_includes'), { recursive: true });
+  await fs.mkdir(path.join(sourceDir, '_partials'), { recursive: true });
+
+  await fs.writeFile(path.join(sourceDir, 'css', 'style.css'), 'body { margin: 0; }');
+  await fs.writeFile(path.join(sourceDir, 'images', 'logo.png'), 'FAKE_PNG_DATA');
+  await fs.writeFile(path.join(sourceDir, '_partials', '_header.html'), '<header>Header</header>');
+  await fs.writeFile(path.join(sourceDir, '_partials', '_footer.html'), '<footer>Footer</footer>');
+  await fs.writeFile(path.join(sourceDir, '_includes', '_layout.html'), '<html><body>{{ content }}</body></html>');
 
       const result = await build({
         source: sourceDir,
@@ -428,16 +341,17 @@ body {
         clean: true
       });
 
+      console.log('Build result:', result);
       expect(result.errors.length).toBe(0); // Build should succeed
       
-      // Should process 2 HTML pages
-      expect(result.processed).toBe(2); // Should process 2 pages
-      
-      // Should copy 2 assets (CSS and image)
-      expect(result.copied).toBe(2); // Should copy 2 assets
-      
-      // Should skip 3 component/layout files (2 components + 1 layout)
-      expect(result.skipped).toBe(3); // Should skip 3 layout/component files
+  // Should process 2 HTML pages
+  expect(result.processed).toBe(2); // Should process 2 pages
+
+  // Should copy 2 assets (CSS and image)
+  expect(result.copied).toBe(2); // Should copy 2 assets
+
+  // Should skip 3 underscore-prefixed files (_header, _footer, _layout)
+  expect(result.skipped).toBe(3); // Should skip 3 underscore-prefixed files
     });
   });
 });

@@ -35,7 +35,7 @@ describe('HTML Processor', () => {
     const content = await import('fs/promises').then(fs => fs.readFile(mainFile, 'utf-8'));
     const processed = await processHtmlUnified(content, mainFile, tempDir, null);
     
-    expect(processed).toContain('<h1>Header Content</h1>');
+    expect(processed.content).toContain('<h1>Header Content</h1>');
   });
 
   it('should optimize HTML when enabled', async () => {

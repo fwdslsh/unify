@@ -194,8 +194,6 @@ describe('Complete CLI Options Coverage', () => {
         'serve',
         '--source', 'content',
         '--output', 'public',
-        '--layouts', 'templates',
-        '--components', 'partials',
         '--port', '3000',
         '--host', '0.0.0.0',
         '--base-url', 'https://example.com',
@@ -208,8 +206,6 @@ describe('Complete CLI Options Coverage', () => {
       expect(args.command).toBe('serve');
       expect(args.source).toBe('content');
       expect(args.output).toBe('public');
-      expect(args.layouts).toBe('templates');
-      expect(args.components).toBe('partials');
       expect(args.port).toBe(3000);
       expect(args.host).toBe('0.0.0.0');
       expect(args.baseUrl).toBe('https://example.com');
@@ -225,8 +221,6 @@ describe('Complete CLI Options Coverage', () => {
         'build',
         '--source', 'src',
         '--output', 'dist', 
-        '--layouts', '.layouts',
-        '--components', '.components',
         '--port', '3000',
         '--host', 'localhost',
         '--pretty-urls',
@@ -241,8 +235,6 @@ describe('Complete CLI Options Coverage', () => {
       // Verify all spec options are parsed
       expect(allOptionsArgs.source).toBe('src');
       expect(allOptionsArgs.output).toBe('dist');
-      expect(allOptionsArgs.layouts).toBe('.layouts');
-      expect(allOptionsArgs.components).toBe('.components');
       expect(allOptionsArgs.port).toBe(3000);
       expect(allOptionsArgs.host).toBe('localhost');
       expect(allOptionsArgs.prettyUrls).toBe(true);
@@ -260,8 +252,6 @@ describe('Complete CLI Options Coverage', () => {
         'serve',
         '-s', 'src',
         '-o', 'dist',
-        '-l', 'layouts',
-        '-c', 'components',
         '-p', '8080',
         '--host', '0.0.0.0', // No short flag for host
         '--verbose' // No short flag for verbose
@@ -269,8 +259,6 @@ describe('Complete CLI Options Coverage', () => {
 
       expect(args.source).toBe('src');
       expect(args.output).toBe('dist');
-      expect(args.layouts).toBe('layouts');
-      expect(args.components).toBe('components');
       expect(args.port).toBe(8080);
       expect(args.host).toBe('0.0.0.0');
       expect(args.verbose).toBe(true);

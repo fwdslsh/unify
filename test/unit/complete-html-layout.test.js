@@ -69,11 +69,11 @@ describe('Complete HTML Layout Bug', () => {
     );
 
     // The result should be the original complete HTML, NOT wrapped in layout
-    expect(result).toBe(completeHtml);
-    expect(result.includes('Site Header')).toBe(false);
-    expect(result.includes('Site Footer')).toBe(false);
-    expect(result.includes('Layout Title')).toBe(false);
-    expect(result.includes('My Complete Page')).toBe(true);
+    expect(result.content).toBe(completeHtml);
+    expect(result.content.includes('Site Header')).toBe(false);
+    expect(result.content.includes('Site Footer')).toBe(false);
+    expect(result.content.includes('Layout Title')).toBe(false);
+    expect(result.content.includes('My Complete Page')).toBe(true);
   });
 
   it('should apply layout to HTML fragments', async () => {
@@ -113,11 +113,11 @@ describe('Complete HTML Layout Bug', () => {
     );
 
     // The result should be wrapped in the layout
-    expect(result.includes('Site Header')).toBe(true);
-    expect(result.includes('Site Footer')).toBe(true);
-    expect(result.includes('Layout Title')).toBe(true);
-    expect(result.includes('This is a fragment')).toBe(true);
-    expect(result.includes('<!DOCTYPE html>')).toBe(true);
+    expect(result.content.includes('Site Header')).toBe(true);
+    expect(result.content.includes('Site Footer')).toBe(true);
+    expect(result.content.includes('Layout Title')).toBe(true);
+    expect(result.content.includes('This is a fragment')).toBe(true);
+    expect(result.content.includes('<!DOCTYPE html>')).toBe(true);
   });
 
   it('should apply explicit layout when data-layout attribute is present', async () => {
@@ -163,8 +163,8 @@ describe('Complete HTML Layout Bug', () => {
     );
 
     // The result should use the explicit layout
-    expect(result.includes('Custom Nav')).toBe(true);
-    expect(result.includes('Custom Layout')).toBe(true);
-    expect(result.includes('Content with explicit layout')).toBe(true);
+    expect(result.content.includes('Custom Nav')).toBe(true);
+    expect(result.content.includes('Custom Layout')).toBe(true);
+    expect(result.content.includes('Content with explicit layout')).toBe(true);
   });
 });
