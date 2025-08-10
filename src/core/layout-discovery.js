@@ -105,6 +105,26 @@ export class LayoutDiscovery {
         // No fallback layout found
       }
     }
+
+    // Check for default.html in .layouts directory (convention support)
+    const defaultLayoutPath = path.join(sourceRoot, '.layouts', 'default.html');
+    try {
+      await fs.access(defaultLayoutPath);
+      logger.debug(`Found default layout: ${path.relative(sourceRoot, defaultLayoutPath)}`);
+      return defaultLayoutPath;
+    } catch {
+      // No default layout found
+    }
+
+    // Also check legacy layouts directory
+    const legacyDefaultLayoutPath = path.join(sourceRoot, 'layouts', 'default.html');
+    try {
+      await fs.access(legacyDefaultLayoutPath);
+      logger.debug(`Found legacy default layout: ${path.relative(sourceRoot, legacyDefaultLayoutPath)}`);
+      return legacyDefaultLayoutPath;
+    } catch {
+      // No legacy default layout found
+    }
     
     logger.debug(`No layout found for page: ${path.relative(sourceRoot, pagePath)}`);
     return null;

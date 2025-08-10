@@ -136,7 +136,8 @@ export function isPartialFile(filePath, config = '.components') {
   // Also check for common standard directory names that should be treated as partials
   const commonPartialDirs = [
     'layouts', 'components', '.components', '.layouts',
-    'includes', 'partials', 'templates'
+    'includes', 'partials', 'templates',
+    'custom_components', 'site_layouts'  // Support custom naming conventions
   ];
   
   for (const dirName of commonPartialDirs) {

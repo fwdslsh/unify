@@ -62,11 +62,29 @@ export class FileClassifier {
       return true;
     }
     
-    // Files in _includes directory are partials
+    // Check if in any directory that should be treated as partials
     const relativePath = path.relative(sourceRoot, filePath);
     const pathParts = relativePath.split(path.sep);
     
-    return pathParts.some(part => part.startsWith('_'));
+    // Files in underscore-prefixed directories are partials
+    if (pathParts.some(part => part.startsWith('_'))) {
+      return true;
+    }
+    
+    // Also check for common standard directory names that should be treated as partials
+    const commonPartialDirs = [
+      'layouts', 'components', '.components', '.layouts',
+      'includes', 'partials', 'templates',
+      'custom_components', 'site_layouts'  // Support custom naming conventions
+    ];
+    
+    for (const dirName of commonPartialDirs) {
+      if (pathParts.includes(dirName)) {
+        return true;
+      }
+    }
+    
+    return false;
   }
   
   /**

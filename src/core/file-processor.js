@@ -198,7 +198,17 @@ export async function build(options = {}) {
 
     // Categorize files using convention-based classification
     let contentFiles = sourceFiles.filter((file) => {
-      return fileClassifier.isPage(file, sourceRoot);
+      // First check if it's a basic page type
+      if (!fileClassifier.isPage(file, sourceRoot)) {
+        return false;
+      }
+      
+      // Then check if it's a partial file (should not be processed as page)
+      if (isPartialFile(file, config)) {
+        return false;
+      }
+      
+      return true;
     });
 
     // Exclude directories like _includes and _layouts
@@ -256,7 +266,7 @@ export async function build(options = {}) {
     const frontmatterData = new Map();
 
     // Process content files (HTML and Markdown) first to discover asset dependencies
-    for (const filePath of sourceFiles) {
+    for (const filePath of contentFiles) {
       try {
         const outputPath = getOutputPathWithPrettyUrls(
           filePath,
@@ -667,13 +677,18 @@ export async function incrementalBuild(
           results.processed++;
           logger.debug(`Rebuilt Markdown: ${relativePath}`);
         } else {
-          // For assets, only copy if referenced (or during initial build)
-          if (assets.isAssetReferenced(filePath) || !assetTracker) {
+          // For assets, only copy if referenced (or during initial build) and NOT a partial file
+          const isPartial = isPartialFile(filePath, config);
+          if (!isPartial && (assets.isAssetReferenced(filePath) || !assetTracker)) {
             await copyAsset(filePath, sourceRoot, outputRoot);
             results.copied++;
             logger.debug(`Copied: ${relativePath}`);
           } else {
-            logger.debug(`Skipped unreferenced asset: ${relativePath}`);
+            if (isPartial) {
+              logger.debug(`Skipped partial file: ${relativePath}`);
+            } else {
+              logger.debug(`Skipped unreferenced asset: ${relativePath}`);
+            }
             results.skipped++;
           }
         }
