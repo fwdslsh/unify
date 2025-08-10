@@ -75,7 +75,7 @@ Named slots in layouts:
 Content for slots:
 ```html
 <!-- In page -->
-<template slot="title">My Page Title</template>
+<template target="title">My Page Title</template>
 <!-- Content outside templates goes to unnamed slot -->
 <h1>Main Content</h1>
 ```
@@ -107,7 +107,7 @@ unify build --source example/advanced/src --output example/advanced/dist
 The `index.html` file will be processed into a complete HTML document:
 
 - Layout `_includes/_layout.html` provides the base structure
-- Named slots (`title`) filled from `<template slot="...">`
+- Named slots (`title`) filled from `<template target="...">`
 - Default content goes into the unnamed `<slot></slot>`
 - Include directives replaced with component content
 - Component styles moved to `<head>` and deduplicated

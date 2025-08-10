@@ -69,7 +69,7 @@ This content will be placed in the default slot of the layout.
 
 **HTML page with automatic layout:**
 ```html
-<template slot="head">
+<template target="head">
   <title>About Us - My Site</title>
   <meta name="description" content="Learn more about our company">
 </template>
@@ -152,8 +152,8 @@ Example of the wrapping process:
 
 **Page: `src/blog/post.html`**
 ```html
-<template slot="title">My First Post</template>
-<template slot="meta">
+<template target="title">My First Post</template>
+<template target="meta">
   <meta name="author" content="John Doe">
 </template>
 <h1>Welcome to my blog</h1>
@@ -206,8 +206,8 @@ Use `<template>` elements for modern component-based templating:
 **Page using template: `src/index.html`**
 ```html
 <div data-layout="_custom.layout.html">
-  <template slot="title">Welcome to My Site</template>
-  <template slot="meta">
+  <template target="title">Welcome to My Site</template>
+  <template target="meta">
     <meta name="keywords" content="static site, generator">
   </template>
   
@@ -239,14 +239,14 @@ Use the `data-layout` attribute to specify layouts and fill slots:
 **Page with data-layout:**
 ```html
 <div data-layout="_blog.layout.html">
-  <template slot="sidebar">
+  <template target="sidebar">
     <h3>Recent Posts</h3>
     <ul>
       <li><a href="/post1">First Post</a></li>
       <li><a href="/post2">Second Post</a></li>
     </ul>
   </template>
-  <template slot="meta">
+  <template target="meta">
     <meta name="author" content="John Doe">
   </template>
   
@@ -259,14 +259,14 @@ Use the `data-layout` attribute to specify layouts and fill slots:
 **Alternative placement on html/body elements:**
 ```html
 <html data-layout="_blog.layout.html">
-  <template slot="title">My Page Title</template>
+  <template target="title">My Page Title</template>
   <!-- Page content -->
 </html>
 
 <!-- OR -->
 
 <body data-layout="_blog.layout.html">
-  <template slot="header">Custom Header</template>
+  <template target="header">Custom Header</template>
   <!-- Page content -->
 </body>
 ```
@@ -324,22 +324,22 @@ Define specific content areas with named slots:
 **Page filling named slots:**
 ```html
 <div data-layout="layouts/complex.html">
-  <template slot="head">
+  <template target="head">
     <title>Custom Page Title</title>
     <link rel="stylesheet" href="/custom.css">
   </template>
   
-  <template slot="header">
+  <template target="header">
     <h1>Custom Header</h1>
     <nav>...</nav>
   </template>
   
-  <template slot="sidebar">
+  <template target="sidebar">
     <h3>Page Navigation</h3>
     <ul>...</ul>
   </template>
   
-  <template slot="footer">
+  <template target="footer">
     <p>Custom footer for this page</p>
   </template>
   
@@ -361,7 +361,7 @@ The unnamed slot receives content not in named templates:
 
 <!-- Page -->
 <div data-layout="layout.html">
-  <template slot="title">Page Title</template>
+  <template target="title">Page Title</template>
   
   <!-- This content goes to the default slot -->
   <h1>Main Heading</h1>
@@ -422,10 +422,10 @@ Build reusable components with slots:
 ```html
 <div data-layout="_layout.html">
   <!--#include virtual="/_includes/card.html" -->
-  <template slot="header">
+  <template target="header">
     <h3>Product Card</h3>
   </template>
-  <template slot="footer">
+  <template target="footer">
     <button>Buy Now</button>
   </template>
   
@@ -470,15 +470,15 @@ Create specialized layouts for different content types:
 **Using blog layout:**
 ```html
 <!-- This page is in src/blog/ directory, so it automatically uses _blog.layout.html -->
-<template slot="head">
+<template target="head">
   <title>My Blog Post - My Site</title>
   <meta name="description" content="A great blog post">
 </template>
-<template slot="post-meta">
+<template target="post-meta">
   <h1>My Blog Post</h1>
   <p class="meta">Published on January 1, 2024</p>
 </template>
-<template slot="comments">
+<template target="comments">
   <!--#include virtual="/_includes/comments.html" -->
 </template>
 
@@ -658,7 +658,7 @@ unify build --source src --output debug-dist
 
 <!-- unify -->
 <div data-layout="layouts/base.html">
-  <template slot="title">Page Title</template>
+  <template target="title">Page Title</template>
   Content here (goes to default slot)
 </div>
 ```

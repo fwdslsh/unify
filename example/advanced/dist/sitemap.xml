@@ -13,19 +13,7 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://unify.github.io/website/download.html</loc>
-    <lastmod>2025-08-10</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://unify.github.io/website/getting-started.html</loc>
-    <lastmod>2025-08-10</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://unify.github.io/website/old.html</loc>
+    <loc>https://unify.github.io/website/blog.html</loc>
     <lastmod>2025-08-10</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
