@@ -57,7 +57,7 @@ describe('Exit Code Validation', () => {
         'build',
         '--source', sourceDir,
         '--output', outputDir
-        // No --perfection flag, so should continue
+        // No --fail-on flag, so should continue with defaults
       ]);
 
       // Should succeed despite missing includes (recoverable error)
@@ -142,7 +142,7 @@ describe('Exit Code Validation', () => {
       expect(result.code).toBe(2); // Exit code 2 for CLI argument errors
     });
 
-    it('should return 1 when --perfection flag encounters errors', async () => {
+    it('should return 1 when --fail-on error flag encounters errors', async () => {
       const structure = {
         'src/index.html': '<h1>Home</h1>',
         'src/broken.html': '<!--#include file="missing.html" --><p>Content</p>'
@@ -154,10 +154,10 @@ describe('Exit Code Validation', () => {
         'build',
         '--source', sourceDir,
         '--output', outputDir,
-        '--perfection'
+        '--fail-on', 'error'
       ]);
 
-      expect(result.code).toBe(1); // Exit code 1 for build errors in perfection mode
+      expect(result.code).toBe(1); // Exit code 1 for build errors in fail-on error mode
     });
 
     it('should return 1 for validation errors', async () => {

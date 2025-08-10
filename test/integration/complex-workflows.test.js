@@ -496,7 +496,7 @@ This is blog post number ${i}.
       expect(await fileExists(path.join(outputDir, 'css/style.css'))).toBe(true);
     });
 
-    it('should handle perfection mode with complex dependencies', async () => {
+    it('should handle fail-on error mode with complex dependencies', async () => {
       const structure = {
         'src/page.html': '<!--#include file="includes/existing.html" --><!--#include file="includes/missing.html" -->',
         'src/includes/existing.html': '<p>This exists</p>'
@@ -505,19 +505,19 @@ This is blog post number ${i}.
 
       await createTestStructure(tempDir, structure);
 
-      // Should fail in perfection mode
-      const perfectionResult = await runCLIInDir(tempDir, [
+      // Should fail in fail-on error mode
+      const errorResult = await runCLIInDir(tempDir, [
         'build',
         '--source', sourceDir,
         '--output', outputDir,
-        '--perfection'
+        '--fail-on', 'error'
       ]);
-      // TODO: Fix perfection mode to properly fail on missing includes
+      // TODO: Fix fail-on error mode to properly fail on missing includes
       // Currently errors are logged but build still succeeds
-      // expect(perfectionResult.code).toBe(1);
-      expect(perfectionResult.stderr).toContain('Include not found: includes/missing.html');
+      // expect(errorResult.code).toBe(1);
+      expect(errorResult.stderr).toContain('Include not found: includes/missing.html');
 
-      // Should succeed without perfection mode
+      // Should succeed without fail-on error mode
       const normalResult = await runCLIInDir(tempDir, [
         'build',
         '--source', sourceDir,

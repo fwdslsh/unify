@@ -58,7 +58,7 @@ export class FileWatcher {
       clean: true,
       debounceMs: 300, // Increased debounce time to prevent excessive rebuilds
       ...options,
-      perfection: false // Watch mode should not use perfection flag
+      failOn: null // Watch mode should not use fail-on flag
     };
 
     // Register the onReload callback if provided
