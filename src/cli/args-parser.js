@@ -75,12 +75,13 @@ export function parseArgs(argv) {
     version: false,
     copy: null,
     layouts: null,
+    template: null, // For init command - which starter template to use
   };
 
   // Only the first non-option argument is considered a command
   let commandFound = false;
   let i = 0;
-  const validCommands = ['build', 'watch', 'serve'];
+  const validCommands = ['build', 'watch', 'serve', 'init'];
   while (i < argv.length) {
     const arg = argv[i];
     const nextArg = argv[i + 1];
@@ -128,8 +129,15 @@ export function parseArgs(argv) {
         );
       }
     }
-    // If not a flag/option, and command already found, treat as unknown option
+    // If not a flag/option, and command already found
     if (!arg.startsWith('-') && commandFound) {
+      // For init command, the first non-flag argument is the template name
+      if (args.command === 'init' && !args.template) {
+        args.template = arg;
+        i++;
+        continue;
+      }
+      // Otherwise treat as unknown option
       throw new UnifyError(
         `Unknown option: ${arg}`,
         null,

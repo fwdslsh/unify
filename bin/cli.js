@@ -4,6 +4,7 @@ import { parseArgs } from '../src/cli/args-parser.js';
 import { build } from '../src/core/file-processor.js';
 import { watch } from '../src/core/file-watcher.js';
 import { DevServer } from '../src/server/dev-server.js';
+import { init } from '../src/cli/init.js';
 import { logger } from '../src/utils/logger.js';
 import pkg from "../package.json";
 
@@ -33,7 +34,7 @@ async function main() {
     }
 
     // Only allow valid commands
-    const validCommands = ['build', 'watch', 'serve'];
+    const validCommands = ['build', 'watch', 'serve', 'init'];
     if (!validCommands.includes(args.command)) {
       showHelp();
       console.error(`\nUnknown command: ${args.command}`);
@@ -70,6 +71,11 @@ async function main() {
           }
         };
         await watch(watchConfig);
+        break;
+      case 'init':
+        logger.info('Initializing new Unify project...');
+        await init(args);
+        logger.info('Project initialized successfully!');
         break;
     }
   } catch (error) {
@@ -115,6 +121,7 @@ Commands:
   build     Build static site from source files (default)
   watch     Watch files and rebuild on changes
   serve     Start development server with live reload
+  init      Initialize new project with starter template
 
 Options:
   --source, -s      Source directory (default: src)
@@ -140,6 +147,8 @@ Examples:
   unify build --base-url https://mysite.com
   unify build --copy "./assets/**/*.*"    # Copy additional files
   unify serve --port 8080
+  unify init                              # Initialize with default starter
+  unify init basic                        # Initialize with basic starter template
 
 Notes:
   • src/assets is automatically copied to dist/assets (if exists)
