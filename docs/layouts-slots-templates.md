@@ -117,7 +117,7 @@ src/
 
 Layouts are selected in order of precedence:
 
-1. **Data attribute**: `<div data-layout="custom.layout.html">` or on html/body elements
+1. **Data attribute**: `<div data-layout="_custom.layout.html">` or on html/body elements
 2. **Frontmatter**: `layout: custom` (for markdown files - searches for `_custom.layout.html`)
 3. **Folder layout**: Nearest layout file matching naming pattern in directory tree
 4. **Fallback layout**: `_includes/_layout.html` if it exists

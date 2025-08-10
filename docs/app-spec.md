@@ -189,7 +189,7 @@ unify watch [options]
 
 - **Purpose:** Enable HTML minification for production builds
 - **Default:** `false`
-- **Used by:**  All commands
+- **Used by:** All commands
 - **Behavior:** Removes whitespace and does basic optimization on HTML output
 
 #### Server Options
@@ -252,39 +252,49 @@ project/
 ## File Processing Rules
 
 ### HTML Files (`.html`, `.htm`)
+
 - Pages: `.htm(l)` files not starting with `_` are emitted as pages.
 - Partials: `.htm(l)` files starting with `_` are non-emitting partials.
 - Layouts: Files starting with `_` and ending with `layout.html` or `layout.htm` provide folder-scoped layouts.
 
 ### Markdown Files (`.md`)
+
 - Processed with frontmatter extraction and Markdown→HTML conversion.
 - Layout discovery or override applies.
 
 ### Static Assets
+
 - Copied only if referenced.
-- Underscore-prefixed assets are non-emitting unless explicitly referenced.
+- Automatically copies the `src/assets` folder, overwriting target.
+- Underscore-prefixed html assets are non-emitting, and are only rendered.
 
 ### Include System
 
 #### DOM Include
+
 ```html
-<include src="/components/header.html"></include>
+<include src="/_includes/header.html"></include>
 ```
+
 Resolution:
+
 1. Leading `/` → from `src/` root.
 2. Else → relative to including file.
 
-#### Apache SSI (unchanged)
+#### Apache SSI
+
 ```html
 <!--#include file="relative.html" -->
 <!--#include virtual="/absolute.html" -->
 ```
+
 - `file` = relative to current file.
 - `virtual` = from `src/` root.
 
 ### Layout System
 
 #### Discovery
+
 1. Nearest layout file that matches the naming pattern in page's folder.
 2. Climb to `src/` root.
 3. Apply layouts as nested wrappers.
@@ -292,50 +302,153 @@ Resolution:
 5. Else: render page content as-is.
 
 #### Layout Naming Convention
+
 Layout files must:
+
 - Start with underscore (`_`)
 - End with `layout.html` or `layout.htm`
 
 Valid layout filenames:
+
 - `_layout.html`, `_layout.htm` (standard)
 - `_custom.layout.html`, `_blog.layout.htm` (extended pattern)
 - `_documentation.layout.html`, `_admin-panel.layout.htm` (complex naming)
 
 #### Fallback Layout
+
 - `src/_includes/_layout.html` serves as the fallback layout when no folder-scoped layout is found
 
 ### Slots & Templates
-- `<slot>` elements in layouts; unnamed = default slot.
-- Pages use `<template target="name">` for named slots.
+
+Slot/template injection applies to both HTML and Markdown files.
+Pages may use `<template target="name">...</template>` to provide named slot content for layouts.
+Layouts may use `<slot name="name"></slot>` for named slots, and `<slot></slot>` for default slot.
+During build, all `<template target="...">` elements are extracted from the page and injected into corresponding `<slot name="...">` in the layout chain. The main page content is injected into the default slot.
+
+**Example:**
+
+```html
+<!-- Page content -->
+<template target="sidebar">Sidebar content</template>
+<template target="footer">Footer content</template>
+<main>Main content</main>
+```
+
+```html
+<!-- Layout content -->
+<body>
+  <slot name="sidebar"></slot>
+  <slot></slot>
+  <slot name="footer"></slot>
+</body>
+```
+
+**Rationale:**
+
+- This ensures component-based, reusable layouts for all page types, and matches developer expectations for slot/template behavior.
+- Override precedence is explicit and predictable.
 
 ### Overrides
+
+**Layout override precedence:**
+
+- For HTML files: `data-layout` attribute takes precedence over frontmatter and discovered layout chain.
+- For Markdown files: frontmatter `layout` key takes precedence over discovered layout chain.
+- If no override is found, the nearest layout is discovered by climbing the directory tree, then falling back to `_includes/_layout.html` if present.
 - `data-layout` accepts relative paths or absolute-from-`src` paths.
 
 ## Dependency Tracking
+
 - Tracks pages ↔ partials/layouts/includes.
 - Rebuild dependents on change.
 
 ## Live Reload
+
 - Changes to `_layout.html`, underscore partials, or `src/_includes/` trigger dependent rebuilds and browser reload.
 
 ## Error Handling
+
 - Missing override layout: recoverable error + fallback.
 - Warn if non-underscore `.htm(l)` file is only ever included.
 
 ## Security Requirements
+
 - Path traversal prevention.
 - Absolute paths resolve from `src/` root.
 - Underscore folders/files are non-emitting by convention.
 
 ## Performance Requirements
-(Unchanged)
+
+### Build Performance
+
+- Incremental builds for changed files only
+- Smart dependency tracking to minimize rebuilds
+- Asset copying only for referenced files
+- Streaming file operations (no full-site memory loading)
+
+### Development Server
+
+- File change debouncing (100ms)
+- Selective rebuild based on dependency analysis
+- Efficient live reload via Server-Sent Events
+- Memory-efficient file watching
+
+### Scalability
+
+- Handle projects with 1000+ pages
+- Handle page that are over 5MB
+- Efficient processing of large asset collections
 
 ## Compatibility Requirements
-(Unchanged)
+
+### Bun Support
+
+- Minimum version: Bun 1.2.19
+- ESM modules only
+- Built-in test runner support
+- Compiled to executable for deployment
+
+### Cross-Platform
+
+- Windows, macOS, Linux support
+- Path handling respects OS conventions
+- Line ending normalization
 
 ## Configuration
+
 - No configuration required for layouts/components.
 - Convention over configuration.
 
 ## Success Criteria
-(Unchanged, except layout/component management updated to match this spec)
+
+
+### Functional Requirements
+
+- All three commands (build, serve, watch) work correctly
+- Include system processes Apache SSI and DOM elements
+- Markdown processing with frontmatter and layouts
+- Live reload functionality in development server
+- Sitemap generation for SEO
+- Security validation prevents path traversal
+- Error handling with helpful messages
+
+### Performance
+
+- Incremental builds complete in <1 second for single file changes
+- Initial builds complete in <5 seconds for typical sites (<100 pages)
+- Memory usage remains <100MB for typical projects
+- File watching responds to changes within 200ms
+- Can support files over 5MB
+
+### Usability Requirements
+
+- Zero configuration required for basic usage
+- Clear error messages with actionable suggestions
+- Intuitive CLI with helpful defaults
+- Comprehensive help documentation
+
+### Reliability Requirements
+
+- Graceful handling of missing includes
+- Robust error recovery during builds
+- Cross-platform compatibility

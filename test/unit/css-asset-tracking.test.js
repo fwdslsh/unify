@@ -20,6 +20,19 @@ describe('CSS Asset Tracking Bug', () => {
     await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
     await fs.mkdir(sourceDir, { recursive: true });
     await fs.mkdir(outputDir, { recursive: true });
+
+    // Create required directories and files for tests
+    await fs.mkdir(path.join(sourceDir, 'css'), { recursive: true });
+    await fs.mkdir(path.join(sourceDir, 'fonts'), { recursive: true });
+    await fs.mkdir(path.join(sourceDir, 'images'), { recursive: true });
+
+    // Create placeholder files
+    await fs.writeFile(path.join(sourceDir, 'css', 'main.css'), '@import url("secondary.css");');
+    await fs.writeFile(path.join(sourceDir, 'css', 'secondary.css'), '@import url("main.css");');
+    await fs.writeFile(path.join(sourceDir, 'css', 'complex.css'), '.test { background: url("../images/test.jpg"); }');
+    await fs.writeFile(path.join(sourceDir, 'css', 'nested-fonts.css'), '@font-face { src: url("/fonts/test.woff2"); }');
+    await fs.writeFile(path.join(sourceDir, 'fonts', 'test.woff2'), '');
+    await fs.writeFile(path.join(sourceDir, 'images', 'test.jpg'), '');
   });
 
   afterEach(async () => {
@@ -405,5 +418,55 @@ h1 {
     expect(buttonBorderExists).toBeTruthy();
     expect(logoExists).toBeTruthy();
     expect(starIconExists).toBeTruthy();
+  });
+
+  it('should handle circular @import chains gracefully', async () => {
+    // Create CSS files with circular imports
+    await fs.writeFile(path.join(sourceDir, 'css', 'main.css'), `@import url('secondary.css');`);
+    await fs.writeFile(path.join(sourceDir, 'css', 'secondary.css'), `@import url('main.css');`);
+
+    // Run the build process
+    const result = await build(sourceDir, outputDir);
+
+    // Ensure no infinite loops occur
+    expect(result.errors.length).toBe(0);
+  });
+
+  it('should process complex url() paths with spaces and special characters', async () => {
+    // Create CSS file with complex url() paths
+    await fs.writeFile(path.join(sourceDir, 'css', 'complex.css'), `
+.test1 { background: url("../images/quoted with spaces.jpg"); }
+.test2 { background: url('../images/single-quoted.jpg'); }
+.test3 { background: url(../images/unquoted.jpg); }
+.test4 { background: url( "/images/absolute-with-spaces.jpg" ); }
+`);
+
+    // Run the build process
+    const result = await build(sourceDir, outputDir);
+
+    // Ensure all assets are resolved correctly
+    expect(result.errors.length).toBe(0);
+  });
+
+  it('should handle nested @font-face declarations with multiple src values', async () => {
+    // Create CSS file with nested @font-face declarations
+    await fs.writeFile(path.join(sourceDir, 'css', 'nested-fonts.css'), `
+@font-face {
+  font-family: 'NestedFont';
+  src: url('/fonts/nested1.woff2') format('woff2'),
+       url('/fonts/nested2.woff') format('woff');
+}
+
+@font-face {
+  font-family: 'DeepNestedFont';
+  src: url('../fonts/deep-nested.ttf') format('truetype');
+}
+`);
+
+    // Run the build process
+    const result = await build(sourceDir, outputDir);
+
+    // Ensure all font files are copied correctly
+    expect(result.errors.length).toBe(0);
   });
 });

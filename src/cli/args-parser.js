@@ -86,6 +86,18 @@ export function parseArgs(argv) {
     const arg = argv[i];
     const nextArg = argv[i + 1];
 
+    // Help/version flags should always be recognized
+    if (arg === '--help' || arg === '-h') {
+      args.help = true;
+      i++;
+      continue;
+    }
+    if (arg === '--version' || arg === '-v') {
+      args.version = true;
+      i++;
+      continue;
+    }
+
     // If not a flag/option, and command not yet found, treat as command or error
     if (!arg.startsWith('-') && !commandFound) {
       if (validCommands.includes(arg)) {
@@ -94,6 +106,11 @@ export function parseArgs(argv) {
         i++;
         continue;
       } else {
+        // If help/version is set, don't throw error
+        if (args.help || args.version) {
+          i++;
+          continue;
+        }
         const suggestion = findClosestCommand(arg, validCommands);
         const suggestions = [];
         if (suggestion) {
@@ -125,53 +142,35 @@ export function parseArgs(argv) {
       );
     }
 
-    // Flags
-    if (arg === '--help' || arg === '-h') {
-      args.help = true;
-      i++;
-      continue;
-    }
-
-    if (arg === '--version' || arg === '-v') {
-      args.version = true;
-      i++;
-      continue;
-    }
-
     // Options with values
     if ((arg === '--source' || arg === '-s') && nextArg && !nextArg.startsWith('-')) {
       args.source = nextArg;
       i += 2;
       continue;
     }
-
     if ((arg === '--output' || arg === '-o') && nextArg && !nextArg.startsWith('-')) {
       args.output = nextArg;
       i += 2;
       continue;
     }
-
     if ((arg === '--layouts' || arg === '-l' || arg === '--templates') && nextArg && !nextArg.startsWith('-')) {
       args.layouts = nextArg;
       i += 2;
       continue;
     }
-
     if ((arg === '--includes' || arg === '-c') && nextArg && !nextArg.startsWith('-')) {
       args.includes = nextArg;
       i += 2;
       continue;
     }
-
     if ((arg === '--assets' || arg === '-a') && nextArg && !nextArg.startsWith('-')) {
       args.assets = nextArg;
       i += 2;
       continue;
     }
-
     // Handle --assets without value
     if (arg === '--assets' || arg === '-a') {
-      throw new UnifyError(
+      const error = new UnifyError(
         'The --assets option requires a glob pattern value',
         null,
         null,
@@ -181,8 +180,9 @@ export function parseArgs(argv) {
           'Check the documentation for glob pattern examples'
         ]
       );
+      error.errorType = 'UsageError';
+      throw error;
     }
-
     if ((arg === '--port' || arg === '-p') && nextArg && !nextArg.startsWith('-')) {
       args.port = parseInt(nextArg, 10);
       if (isNaN(args.port) || args.port < 1 || args.port > 65535) {
@@ -200,49 +200,41 @@ export function parseArgs(argv) {
       i += 2;
       continue;
     }
-
     if (arg === '--host' && nextArg && !nextArg.startsWith('-')) {
       args.host = nextArg;
       i += 2;
       continue;
     }
-
     if (arg === '--pretty-urls' || arg === '-u') {
       args.prettyUrls = true;
       i++;
       continue;
     }
-
     if (arg === '--base-url' && nextArg && !nextArg.startsWith('-')) {
       args.baseUrl = nextArg;
       i += 2;
       continue;
     }
-
     if (arg === '--clean') {
       args.clean = true;
       i++;
       continue;
     }
-
     if (arg === '--no-sitemap') {
       args.sitemap = false;
       i++;
       continue;
     }
-
     if (arg === '--perfection' || arg === '-f') {
       args.perfection = true;
       i++;
       continue;
     }
-
     if (arg === '--minify' || arg === '-m') {
       args.minify = true;
       i++;
       continue;
     }
-
     if (arg === '--verbose' || arg === '-V') {
       args.verbose = true;
       i++;
@@ -287,8 +279,8 @@ export function parseArgs(argv) {
     }
   }
 
-  if (!args.command) {
-    // Default to build if no command found
+  if (!args.command && !args.help && !args.version) {
+    // Default to build if no command found and not help/version
     args.command = 'build';
   }
   return args;

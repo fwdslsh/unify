@@ -46,8 +46,9 @@ export async function processIncludes(
   sourceRoot, 
   processedFiles = new Set(),
   depth = 0,
-  dependencyTracker = null
-) {
+  dependencyTracker = null,
+  perfectionMode = false
+  ) {
   // Prevent excessive recursion
   if (depth > MAX_INCLUDE_DEPTH) {
     throw new MaxDepthExceededError(filePath, depth, MAX_INCLUDE_DEPTH);
@@ -81,7 +82,7 @@ export async function processIncludes(
     try {
       // Resolve include path
       const resolvedPath = resolveIncludePath(type, includePath, filePath, sourceRoot);
-      
+
       // Read include file
       let includeContent;
       try {
@@ -94,19 +95,22 @@ export async function processIncludes(
           if (type === 'file') {
             searchPaths.push(path.resolve(path.dirname(filePath), includePath));
           } else if (type === 'virtual') {
-            searchPaths.push(path.resolve(sourceRoot, includePath.replace(/^\/+/, '')));
+            searchPaths.push(path.resolve(sourceRoot, includePath.replace(/^\/+/,'')));
           }
-          
-          throw new IncludeNotFoundError(includePath, filePath, searchPaths);
+          const notFoundErr = new IncludeNotFoundError(includePath, filePath, searchPaths);
+          if (perfectionMode) throw notFoundErr;
+          throw notFoundErr;
         }
-        throw new FileSystemError('read', resolvedPath, error);
+        const fsErr = new FileSystemError('read', resolvedPath, error);
+        if (perfectionMode) throw fsErr;
+        throw fsErr;
       }
-      
+
       // Track dependencies for this include file if tracker is provided
       if (dependencyTracker) {
         dependencyTracker.analyzePage(resolvedPath, includeContent, sourceRoot);
       }
-      
+
       // Recursively process nested includes
       const processedInclude = await processIncludes(
         includeContent,
@@ -114,23 +118,30 @@ export async function processIncludes(
         sourceRoot,
         newProcessedFiles,
         depth + 1,
-        dependencyTracker
+        dependencyTracker,
+        perfectionMode
       );
-      
+
+      logger.debug(`Processed include content: ${processedInclude.substring(0, 100)}...`);
+      logger.debug(`Current recursion depth: ${depth}`);
+
       // Replace the directive with processed content
+      logger.debug(`Replacing directive: ${fullMatch} with processed content from ${resolvedPath}`);
       processedContent = processedContent.replace(fullMatch, processedInclude);
-      
+
     } catch (error) {
       // Handle errors gracefully based on their type
+      if (perfectionMode) {
+        // In perfection mode, all errors are fatal
+        if (error.formatForCLI) logger.error(error.formatForCLI());
+        throw error;
+      }
       if (error.isRecoverable && error.isRecoverable()) {
         // Log warning and continue processing with error comment
         logger.warn(`Include warning: ${error.message.split(' in ')[0]} in ${filePath}`);
-        
         // Replace the directive with a warning comment
         const warningComment = error.toWarningComment();
         processedContent = processedContent.replace(fullMatch, warningComment);
-        
-        // Continue processing other includes
         continue;
       } else {
         // Fatal error - log and re-throw to stop processing
@@ -140,8 +151,6 @@ export async function processIncludes(
           logger.error(`Failed to process include: ${includePath} in ${filePath}`);
           logger.error(error.message);
         }
-        
-        // Re-throw fatal errors to fail the build
         throw error;
       }
     }

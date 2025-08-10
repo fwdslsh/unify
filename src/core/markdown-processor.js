@@ -58,83 +58,77 @@ export function processMarkdown(markdownContent, filePath) {
     }
     
     logger.debug(`Processed markdown: ${filePath}, title: ${title || 'untitled'}`);
-    
     return {
       html,
       frontmatter,
-      title: title || '',
-      excerpt: excerpt || ''
+      title,
+      excerpt
     };
-    
   } catch (error) {
     logger.error(error.formatForCLI ? error.formatForCLI() : `Error processing markdown file ${filePath}: ${error.message}`);
+    if (typeof perfectionMode !== 'undefined' && perfectionMode) {
+      const msg = `Markdown frontmatter error: ${filePath}: ${error.message}`;
+      throw new BuildError(msg, [{ file: filePath, error: msg }]);
+    }
     throw error;
   }
 }
 
 /**
- * Check if a file is a markdown file
- * @param {string} filePath - File path to check
- * @returns {boolean} True if file is markdown
- */
-export function isMarkdownFile(filePath) {
-  return /\.md$/i.test(filePath);
-}
-
-/**
- * Check if content contains an HTML element
- * @param {string} content - Content to check
- * @returns {boolean} True if content contains an <html> element
- */
-export function hasHtmlElement(content) {
-  return /<html[^>]*>/i.test(content);
-}
-
-/**
- * Wrap markdown HTML in a layout template
- * @param {string} html - Generated HTML content
- * @param {Object} metadata - Frontmatter and extracted metadata
- * @param {string} layout - Layout template (HTML with placeholders)
  * @returns {string} Complete HTML page
  */
 export function wrapInLayout(html, metadata, layout) {
   logger.debug('[wrapInLayout] html:', html);
   logger.debug('[wrapInLayout] metadata:', metadata);
-  if (typeof layout === 'undefined' || layout === null) {
-    layout = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{ title }}</title>
-  {{#if description}}<meta name="description" content="{{ description }}">{{/if}}
-</head>
-<body>
-  <main>
-    <slot></slot>
-  </main>
-</body>
-</html>`;
-  }
-  let result = layout;
-  if (/<slot\s*><\/slot>/i.test(result)) {
-    logger.debug('[wrapInLayout] replacing <slot> with:', html);
-    result = result.replace(/<slot\s*><\/slot>/i, html);
-  } else {
-    result = result.replace(/(<main[^>]*>)/i, `$1${html}`);
-  }
-  result = result.replace(/\{\{\s*title\s*\}\}/g, metadata.title || 'Untitled');
-  const allData = metadata.frontmatter ? { ...metadata.frontmatter, ...metadata } : { ...metadata };
-  for (const [key, value] of Object.entries(allData)) {
-    if (typeof value === 'string') {
-      const regex = new RegExp(`\{\{\s*${key}\s*\}\}`, 'g');
-      result = result.replace(regex, value);
+    // If content already has <html>, do not apply layout
+    if (hasHtmlElement(html)) {
+      return addAnchorLinks(html);
     }
-  }
-  result = result.replace(/\{\{[^}]*\}\}/g, '');
-  result = addAnchorLinks(result);
-  logger.debug('[wrapInLayout] final result:', result);
-  return result;
+    // Add anchor links to headings in content before layout injection
+    const htmlWithAnchors = addAnchorLinks(html);
+    // Use provided layout or default
+    if (typeof layout === 'undefined' || layout === null) {
+      layout = `<!DOCTYPE html>
+  <html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    {{#if description}}<meta name="description" content="{{ description }}">{{/if}}
+  </head>
+  <body>
+    <main>
+      <slot></slot>
+    </main>
+  </body>
+  </html>`;
+    }
+    let result = layout;
+    // Replace <slot> with content
+    if (/<slot\s*><\/slot>/i.test(result)) {
+      logger.debug('[wrapInLayout] replacing <slot> with:', htmlWithAnchors);
+      result = result.replace(/<slot\s*><\/slot>/i, htmlWithAnchors);
+    } else if (/\{\{\s*content\s*\}\}/i.test(result)) {
+      // Replace {{ content }} placeholder
+      result = result.replace(/\{\{\s*content\s*\}\}/gi, htmlWithAnchors);
+    } else {
+      result = result.replace(/(<main[^>]*>)/i, `$1${htmlWithAnchors}`);
+    }
+    // Replace {{ title }} and other placeholders
+    result = result.replace(/\{\{\s*title\s*\}\}/g, metadata.title || 'Untitled');
+    const allData = metadata.frontmatter ? { ...metadata.frontmatter, ...metadata } : { ...metadata };
+    for (const [key, value] of Object.entries(allData)) {
+      if (typeof value === 'string') {
+        const regex = new RegExp(`\{\{\s*${key}\s*\}\}`, 'g');
+        result = result.replace(regex, value);
+      }
+    }
+    // Remove any remaining {{ ... }} placeholders
+    result = result.replace(/\{\{[^}]*\}\}/g, '');
+    // Add anchor links to headings
+    result = addAnchorLinks(result);
+    logger.debug('[wrapInLayout] final result:', result);
+    return result;
 }
 
 /**
@@ -241,4 +235,25 @@ export function configureMarkdown(plugins = []) {
  */
 export function getMarkdownInstance() {
   return md;
+}
+
+/**
+ * Check if a file is a Markdown file based on its extension
+ * @param {string} filePath - Path to check
+ * @returns {boolean} True if the file has a .md extension
+ */
+export function isMarkdownFile(filePath) {
+  return filePath.toLowerCase().endsWith('.md');
+}
+
+/**
+ * Check if HTML content contains an <html> element
+ * @param {string} html - HTML content to check
+ * @returns {boolean} True if the content contains an <html> element
+ */
+export function hasHtmlElement(html) {
+  if (!html || typeof html !== 'string') {
+    return false;
+  }
+  return /<html[^>]*>/i.test(html);
 }

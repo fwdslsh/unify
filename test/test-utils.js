@@ -52,6 +52,20 @@ export async function runCLI(args, options = {}) {
       return { code: 124, stdout, stderr, timeout: true };
     }
     
+    if (options.debug) {
+      // Print captured output for inspection
+      // eslint-disable-next-line no-console
+      console.log('--- CLI DEBUG ---');
+      // eslint-disable-next-line no-console
+      console.log('Args:', args);
+      // eslint-disable-next-line no-console
+      console.log('Exit code:', code);
+      // eslint-disable-next-line no-console
+      console.log('STDOUT:', stdout);
+      // eslint-disable-next-line no-console
+      console.log('STDERR:', stderr);
+      console.log('-----------------');
+    }
     return { code, stdout, stderr };
   } catch (error) {
     if (timeoutHandle) {

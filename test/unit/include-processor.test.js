@@ -86,7 +86,7 @@ describe('include-processor', () => {
       
       // Should write a warning comment in place of the missing include
       const result = await processIncludes(html, filePath, testFixturesDir);
-      expect(result.includes('<!-- WARNING: Include file not found: missing.html -->')).toBeTruthy();
+      expect(result.includes('<!-- WARNING: Include not found: missing.html -->')).toBeTruthy();
     });
     
     it('should detect circular dependencies', async () => {

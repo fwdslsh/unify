@@ -152,4 +152,32 @@ describe('Pretty URLs with HTML files', () => {
     const advancedIndexExists = await fs.access(path.join(outputDir, 'docs', 'tutorials', 'advanced', 'index.html')).then(() => true).catch(() => false);
     expect(advancedIndexExists).toBe(true);
   });
+
+  test('should handle files with multiple extensions correctly', async () => {
+    // Create test structure with files having multiple extensions
+    await createTestStructure(sourceDir, {
+      'file.md.html': '<h1>Markdown HTML</h1>',
+      'nested/file.md.html': '<h1>Nested Markdown HTML</h1>'
+    });
+
+    // Build with pretty URLs enabled
+    const result = await build({
+      source: sourceDir,
+      output: outputDir,
+      prettyUrls: true
+    });
+
+    expect(result.processed).toBe(2);
+
+    // Check that files are processed correctly
+    const fileExists = await fs.access(path.join(outputDir, 'file', 'index.html')).then(() => true).catch(() => false);
+    expect(fileExists).toBe(true);
+    const fileContent = await fs.readFile(path.join(outputDir, 'file', 'index.html'), 'utf-8');
+    expect(fileContent).toContain('Markdown HTML');
+
+    const nestedFileExists = await fs.access(path.join(outputDir, 'nested', 'file', 'index.html')).then(() => true).catch(() => false);
+    expect(nestedFileExists).toBe(true);
+    const nestedFileContent = await fs.readFile(path.join(outputDir, 'nested', 'file', 'index.html'), 'utf-8');
+    expect(nestedFileContent).toContain('Nested Markdown HTML');
+  });
 });

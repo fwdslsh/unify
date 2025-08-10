@@ -106,7 +106,10 @@ export class AssetTracker {
       if (assetPath.startsWith('data:')) continue;
       if (assetPath.startsWith('#')) continue;
       const resolvedPath = this.resolveAssetPath(assetPath, cssPath, sourceRoot);
-      if (resolvedPath) references.add(resolvedPath);
+      if (resolvedPath) {
+        references.add(resolvedPath);
+        logger.debug(`Extracted URL reference: ${resolvedPath}`);
+      }
     }
 
     // Match all @font-face src URLs (multiple URLs per src)
@@ -123,7 +126,10 @@ export class AssetTracker {
         if (assetPath.startsWith('data:')) continue;
         if (assetPath.startsWith('#')) continue;
         const resolvedPath = this.resolveAssetPath(assetPath, cssPath, sourceRoot);
-        if (resolvedPath) references.add(resolvedPath);
+        if (resolvedPath) {
+          references.add(resolvedPath);
+          logger.debug(`Extracted font-face reference: ${resolvedPath}`);
+        }
       }
     }
 
@@ -136,7 +142,10 @@ export class AssetTracker {
       if (assetPath.startsWith('data:')) continue;
       if (assetPath.startsWith('#')) continue;
       const resolvedPath = this.resolveAssetPath(assetPath, cssPath, sourceRoot);
-      if (resolvedPath) references.add(resolvedPath);
+      if (resolvedPath) {
+        references.add(resolvedPath);
+        logger.debug(`Extracted import reference: ${resolvedPath}`);
+      }
     }
 
     return Array.from(references);
@@ -196,20 +205,23 @@ export class AssetTracker {
     
     const processCssFile = async (cssPath) => {
       if (processedCssFiles.has(cssPath)) {
+        logger.debug(`Skipping already processed CSS file: ${cssPath}`);
         return; // Already processed this CSS file
       }
+      logger.debug(`Processing CSS file: ${cssPath}`);
       processedCssFiles.add(cssPath);
-      
+
       try {
         const fs = await import('fs/promises');
         const cssContent = await fs.default.readFile(cssPath, 'utf-8');
         const cssReferences = this.extractCssAssetReferences(cssContent, cssPath, sourceRoot);
-        
+
         for (const cssRef of cssReferences) {
           cssAssets.add(cssRef);
-          
+
           // If this reference is another CSS file, process it recursively
           if (cssRef.endsWith('.css')) {
+            logger.debug(`Found nested CSS import: ${cssRef}`);
             await processCssFile(cssRef);
           }
         }

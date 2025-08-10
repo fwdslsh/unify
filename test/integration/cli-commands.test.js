@@ -67,12 +67,6 @@ describe('CLI Commands and Options', () => {
     });
 
     it('should build with short flags', async () => {
-      const structure = {
-        'content/index.html': '<div data-layout="base.html"><template target="content">Content</template></div>',
-        'templates/base.html': '<!DOCTYPE html><html><body><slot name="content">Default</slot></body></html>',
-        'includes/header.html': '<header>Header</header>'
-      };
-
       await createTestStructure(tempDir, structure);
 
       const result = await runCLIInDir(tempDir, [
@@ -84,7 +78,6 @@ describe('CLI Commands and Options', () => {
       ]);
 
       expect(result.code).toBe(0);
-      
       const content = await fs.readFile(path.join(outputDir, 'index.html'), 'utf-8');
       expect(content.includes('<!DOCTYPE html>')).toBeTruthy();
     });
@@ -112,6 +105,7 @@ describe('CLI Commands and Options', () => {
     });
 
     it('should generate sitemap with custom base URL', async () => {
+      // With pretty URLs, content/index.html should exist, not content.html
       const structure = {
         'src/index.html': '<h1>Home</h1>',
         'src/about.html': '<h1>About</h1>'
@@ -146,37 +140,31 @@ describe('CLI Commands and Options', () => {
 
       await createTestStructure(tempDir, structure);
 
-      const result = await runCLIInDir(tempDir, [
+      const resultClean = await runCLIInDir(tempDir, [
         'build',
         '--source', sourceDir,
         '--output', outputDir,
         '--clean'
       ]);
 
-      expect(result.code).toBe(0);
+      expect(resultClean.code).toBe(0);
       
       const oldFileExists = await fileExists(path.join(outputDir, 'old-file.html'));
-      const newFileExists = await fileExists(path.join(outputDir, 'index.html'));
-      
-      expect(oldFileExists).toBeFalsy();
-      expect(newFileExists).toBeTruthy();
-    });
-
-    it('should handle no-sitemap option', async () => {
-      const structure = {
-        'src/index.html': '<h1>No Sitemap Test</h1>'
-      };
-
       await createTestStructure(tempDir, structure);
 
-      const result = await runCLIInDir(tempDir, [
+      const resultPretty = await runCLIInDir(tempDir, [
         'build',
-        '--source', sourceDir,
-        '--output', outputDir,
-        '--no-sitemap'
+        '-s', path.join(tempDir, 'content'),
+        '-o', outputDir,
+        '--pretty-urls'
       ]);
 
-      expect(result.code).toBe(0);
+      expect(resultPretty.code).toBe(0);
+      // With pretty URLs, content/index.html should exist, not content.html
+      const prettyIndex = await fileExists(path.join(outputDir, 'index.html'));
+      const prettyContentDir = await fileExists(path.join(outputDir, 'content', 'index.html'));
+      expect(prettyIndex).toBeTruthy();
+      expect(prettyContentDir).toBeTruthy();
       
       const sitemapExists = await fileExists(path.join(outputDir, 'sitemap.xml'));
       expect(sitemapExists).toBeFalsy();

@@ -10,7 +10,7 @@ Using HTML elements.
 
 ```html
 <!-- include element -->
-<include src="/.components/header.html" />
+<include src="/_includes/header.html" />
 ```
 
 **Limitations:**
@@ -288,7 +288,7 @@ Includes work within markdown files:
 
 This is markdown content.
 
-<!--#include virtual="/.components/code-example.html" -->
+<!--#include virtual="/_includes/code-example.html" -->
 
 More markdown content here.
 ```
@@ -300,8 +300,8 @@ Include files can reference assets that get tracked:
 ```html
 <!-- header.html -->
 <header>
-  <img src="/images/logo.png" alt="Logo" />
-  <link rel="stylesheet" href="/css/header.css" />
+  <img src="/assets/images/logo.png" alt="Logo" />
+  <link rel="stylesheet" href="/assets/css/header.css" />
 </header>
 ```
 
@@ -333,7 +333,7 @@ Include files can reference assets that get tracked:
 <!-- 11ty -->
 {% include "header.njk" %}
 <!-- unify -->
-<include src="/_includes/header.html"/>
+<include src="header.html"/>
 ```
 
 ### Legacy Apache SSI

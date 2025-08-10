@@ -1,4 +1,26 @@
 /**
+ * Get output path for a source file, supporting pretty URLs
+ * @param {string} sourcePath - Source file path
+ * @param {string} sourceRoot - Source root directory
+ * @param {string} outputRoot - Output root directory
+ * @param {boolean} prettyUrls - Whether to use pretty URLs
+ * @returns {string} Output file path
+ */
+export function getOutputPathWithPrettyUrls(sourcePath, sourceRoot, outputRoot, prettyUrls = false) {
+  const relativePath = path.relative(sourceRoot, sourcePath);
+  const ext = path.extname(sourcePath).toLowerCase();
+  // Only apply pretty URLs to HTML/Markdown files not starting with '_'
+  const fileName = path.basename(sourcePath);
+  const isPage = !fileName.startsWith('_') && (ext === '.html' || ext === '.htm' || ext === '.md');
+  if (prettyUrls && isPage) {
+    // Remove extension and create subdirectory with index.html
+    const withoutExt = relativePath.replace(/\.[^.]+$/, '');
+    return path.resolve(outputRoot, withoutExt, 'index.html');
+  }
+  // Standard output: preserve relative path
+  return path.resolve(outputRoot, relativePath);
+}
+/**
  * Path resolution utilities for unify
  * Handles secure path resolution and validation
  */

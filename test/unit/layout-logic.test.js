@@ -68,11 +68,11 @@ describe('Layout Conditional Logic', () => {
       const markdownContent = '# Test Title\n\nContent here';
       const metadata = { title: 'Test Page', content: '<h1>Test Title</h1>\n<p>Content here</p>' };
       
-      const result = wrapInLayout(metadata.content, metadata, layoutContent);
-      
-      expect(result.includes('<!DOCTYPE html>')).toBeTruthy();
-      expect(result.includes('<title>Test Page</title>')).toBeTruthy();
-      expect(result.includes('<h1 id="test-title">Test Title</h1>')).toBeTruthy();
+  const result = wrapInLayout(metadata.content, metadata, layoutContent);
+  console.log('wrapInLayout result:', result);
+  expect(result.includes('<!DOCTYPE html>')).toBeTruthy();
+  expect(result.includes('<title>Test Page</title>')).toBeTruthy();
+  expect(result.includes('<h1 id="test-title">Test Title</h1>')).toBeTruthy();
     });
 
     it('should not apply layout when content already has HTML element', async () => {
