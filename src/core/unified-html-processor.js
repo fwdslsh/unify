@@ -26,11 +26,6 @@ import { hasFeature } from "../utils/runtime-detector.js";
  * @returns {boolean} True if processing should fail fast
  */
 function shouldFailFast(config, errorType = 'error') {
-  // Legacy support for perfection mode (maps to fail-on error)
-  if (config.perfection) {
-    return true;
-  }
-  
   // New fail-on logic
   if (!config.failOn) {
     // Default: don't fail fast, let the build system handle errors
@@ -582,9 +577,9 @@ async function processDOMMode(pageContent, pagePath, sourceRoot, config = {}, ex
     return processedHTML;
     
   } catch (error) {
-    // In perfection mode, fail fast on layout detection errors
-    if (domConfig.perfection) {
-      throw new Error(`Layout not found in perfection mode for ${path.relative(sourceRoot, pagePath)}: ${error.message}`);
+    // Use shouldFailFast to determine whether to throw or warn
+    if (shouldFailFast(domConfig, 'error')) {
+      throw new Error(`Layout not found for ${path.relative(sourceRoot, pagePath)}: ${error.message}`);
     }
     
     logger.warn(`Layout not found for ${path.relative(sourceRoot, pagePath)}: ${error.message}`);
@@ -993,7 +988,7 @@ async function processDOMTemplating(htmlContent, filePath, sourceRoot, config, e
           extractedAssets  // Pass extracted assets
         );
       } catch (error) {
-        // For default layouts, always gracefully degrade (even in perfection mode)
+        // For default layouts, always gracefully degrade
         // since they are implicit/automatic, not explicitly requested by the user
         logger.warn(`Default layout not found for ${path.relative(sourceRoot, filePath)}: ${error.message}`);
         return `<!DOCTYPE html>

@@ -256,13 +256,6 @@ export function parseArgs(argv) {
       error.errorType = 'UsageError';
       throw error;
     }
-    // Backward compatibility: --perfection maps to --fail-on error
-    if (arg === '--perfection' || arg === '-f') {
-      args.failOn = 'error';
-      logger.warn('--perfection is deprecated, use --fail-on error instead');
-      i++;
-      continue;
-    }
     if (arg === '--minify' || arg === '-m') {
       args.minify = true;
       i++;
@@ -280,7 +273,7 @@ export function parseArgs(argv) {
         '--help', '-h', '--version', '-v', '--source', '-s', '--output', '-o',
         '--copy', '--port', '-p', '--host', '--layouts', '-l', '--templates',
         '--pretty-urls', '--base-url', '--clean', '--no-sitemap', 
-        '--fail-on', '--perfection', '--minify', '--verbose', '-u', '-f', '-m', '-V'
+        '--fail-on', '--minify', '--verbose', '-u', '-m', '-V'
       ];
       const suggestion = findClosestCommand(arg, validOptions);
       const suggestions = [];

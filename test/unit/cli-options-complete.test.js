@@ -164,9 +164,9 @@ describe('Complete CLI Options Coverage', () => {
       expect(args.minify).toBe(true);
     });
 
-    it('should work with perfection flag', async () => {
+    it('should work with fail-on error flag', async () => {
       const structure = {
-        'src/index.html': '<h1>Verbose + Perfection</h1>',
+        'src/index.html': '<h1>Verbose + Fail on Error</h1>',
         'src/broken.html': '<!--#include file="missing.html" --><p>Content</p>'
       };
 
@@ -177,7 +177,7 @@ describe('Complete CLI Options Coverage', () => {
         '--source', sourceDir,
         '--output', outputDir,
         '--verbose',
-        '--perfection'
+        '--fail-on', 'error'
       ]);
 
       expect(result.code).toBe(1); // Should fail due to missing include
@@ -220,14 +220,14 @@ describe('Complete CLI Options Coverage', () => {
       const allOptionsArgs = parseArgs([
         'build',
         '--source', 'src',
-        '--output', 'dist', 
+        '--output', 'dist',
         '--port', '3000',
         '--host', 'localhost',
         '--pretty-urls',
         '--base-url', 'https://example.com',
         '--clean',
         '--no-sitemap',
-        '--perfection',
+        '--fail-on', 'error',
         '--minify',
         '--verbose'
       ]);
@@ -241,7 +241,7 @@ describe('Complete CLI Options Coverage', () => {
       expect(allOptionsArgs.baseUrl).toBe('https://example.com');
       expect(allOptionsArgs.clean).toBe(true);
       expect(allOptionsArgs.sitemap).toBe(false); // --no-sitemap
-      expect(allOptionsArgs.perfection).toBe(true);
+      expect(allOptionsArgs.failOn).toBe('error');
       expect(allOptionsArgs.minify).toBe(true);
       expect(allOptionsArgs.verbose).toBe(true);
     });

@@ -66,7 +66,7 @@ describe('Error Message Format Validation', () => {
       expect(result.stderr).toMatch(/\[WARN\].*Include not found.*missing\.html/);
     });
 
-    it('should format perfection mode errors according to spec', async () => {
+    it('should format fail-on error mode errors according to spec', async () => {
       const structure = {
         'src/broken.html': '<!--#include file="missing.html" --><p>Content</p>'
       };
@@ -77,7 +77,7 @@ describe('Error Message Format Validation', () => {
         'build',
         '--source', sourceDir,
         '--output', outputDir,
-        '--perfection'
+        '--fail-on', 'error'
       ]);
 
       expect(result.code).toBe(1);
@@ -125,7 +125,7 @@ describe('Error Message Format Validation', () => {
         'build',
         '--source', sourceDir,
         '--output', outputDir,
-        '--perfection'
+        '--fail-on', 'error'
       ]);
 
       expect(result.code).toBe(1);
@@ -147,7 +147,7 @@ describe('Error Message Format Validation', () => {
         'build',
         '--source', sourceDir,
         '--output', outputDir,
-        '--perfection'
+        '--fail-on', 'error'
       ]);
 
       expect(result.code).toBe(1);
@@ -166,7 +166,7 @@ describe('Error Message Format Validation', () => {
         'build',
         '--source', sourceDir,
         '--output', outputDir,
-        '--perfection'
+        '--fail-on', 'error'
       ]);
 
       expect(result.code).toBe(1);
@@ -270,7 +270,7 @@ describe('Error Message Format Validation', () => {
         'build',
         '--source', sourceDir,
         '--output', outputDir,
-        '--perfection'
+        '--fail-on', 'error'
       ]);
 
       expect(result.code).toBe(1);
@@ -295,7 +295,7 @@ describe('Error Message Format Validation', () => {
         'build',
         '--source', sourceDir,
         '--output', outputDir,
-        '--perfection'
+        '--fail-on', 'error'
       ]);
 
       expect(result.code).toBe(1);
@@ -316,11 +316,11 @@ describe('Error Message Format Validation', () => {
         'build',
         '--source', sourceDir,
         '--output', outputDir,
-        '--perfection'
+        '--fail-on', 'error'
       ]);
 
       expect(result.stderr).toMatch(/Suggestions:/);
-      // In perfection mode, the build fails with BuildError and shows generic suggestions
+      // In fail-on error mode, the build fails with BuildError and shows generic suggestions
       expect(result.stderr).toMatch(/-.*Fix the.*error\(s\)/i);
       expect(result.stderr).toMatch(/-.*Run with.*DEBUG/i);
     });
@@ -336,7 +336,7 @@ describe('Error Message Format Validation', () => {
         'build',
         '--source', sourceDir,
         '--output', outputDir,
-        '--perfection'
+        '--fail-on', 'error'
       ]);
 
       expect(result.stderr).toMatch(/Run with.*DEBUG.*for more detailed/);

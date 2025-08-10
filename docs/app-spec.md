@@ -139,16 +139,16 @@ unify watch [options]
 - **Behavior:** Created if doesn't exist
 - **Used by:** All commands
 
-**`--assets, -a <pattern>`**
+**`--copy <pattern>`**
 
-- **Purpose:** Specify additional assets glob pattern to copy recursively
-- **Default:** `null` (no additional assets)
+- **Purpose:** Specify additional files to copy using glob patterns
+- **Default:** `null` (no additional files copied beyond automatic asset detection)
 - **Used by:** All commands
-- **Format:** Glob pattern like `"./assets/**/*.*"` or `"./static/**/*"`
+- **Format:** Glob pattern like `"./docs/**/*.*"` or `"./config/*.json"`
 - **Behavior:** Copies matching files to output directory preserving relative paths
-- **Note:** Use quotes around patterns with special characters
+- **Note:** Use quotes around patterns with special characters. The `src/assets` directory is automatically copied if it exists.
 
-> **Removed:** `--layouts`, `--components` (replaced by conventions)
+> **Removed:** `--layouts`, `--components`, `--assets` (replaced by conventions and --copy)
 
 #### Build Options
 
@@ -172,12 +172,18 @@ unify watch [options]
 - **Default:** `false`
 - **Used by:** All commands
 
-**`--perfection`**
+**`--fail-on <level>`**
 
-- **Purpose:** Fail entire build if any single page fails to build
-- **Default:** `false`
+- **Purpose:** Fail entire build if errors of specified level or higher occur
+- **Default:** `null` (only fail on fatal build errors)
+- **Valid levels:** `warning`, `error`
 - **Used by:** `build` command, `watch` and `serve` ignore this option
-- **Behavior:** Exit with code 1 if any file processing fails
+- **Behavior:** Controls when the build process should exit with error code 1
+
+Examples:
+- `--fail-on warning`: Fail on any warning or error
+- `--fail-on error`: Fail only on errors (not warnings)
+- No flag: Only fail on fatal build errors (default behavior)
 
 **`--no-sitemap`**
 
@@ -264,9 +270,10 @@ project/
 
 ### Static Assets
 
-- Copied only if referenced.
-- Automatically copies the `src/assets` folder, overwriting target.
-- Underscore-prefixed html assets are non-emitting, and are only rendered.
+- **Asset Reference Tracking:** Only referenced assets are copied to output
+- **Automatic `src/assets` Copying:** The `src/assets` directory is automatically copied to `dist/assets` if it exists, preserving folder structure
+- **Additional File Copying:** Use `--copy` option to copy additional files with glob patterns
+- **Underscore Prefix Convention:** Files and folders starting with `_` are non-emitting and only used for processing (partials, layouts, etc.)
 
 ### Include System
 

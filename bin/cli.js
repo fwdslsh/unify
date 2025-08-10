@@ -127,7 +127,6 @@ Options:
   --clean           Clean output directory before build
   --no-sitemap      Disable sitemap.xml generation
   --fail-on         Fail build on specified level: warning, error
-  --perfection      (deprecated) Use --fail-on error instead
   --minify          Enable HTML minification for production builds
   --verbose         Enable debug level messages in console output
   --help, -h        Show this help message

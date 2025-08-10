@@ -255,15 +255,15 @@ This is a test blog post written in Markdown.
 
       await createTestStructure(tempDir, edgeCaseStructure);
 
-      // Run the build with perfection mode - should fail due to errors
+      // Run the build with fail-on error mode - should fail due to errors
       const result = await runCLI([
         'build',
         '--source', sourceDir,
         '--output', outputDir,
-        '--perfection'  // Required for circular dependencies to fail the build
+        '--fail-on', 'error'  // Required for circular dependencies to fail the build
       ], { cwd: tempDir });
 
-      // Build should fail due to errors in perfection mode
+      // Build should fail due to errors in fail-on error mode
       expect(result.code).toBe(1);
       // Should have either missing file or circular dependency error (or both)
       const hasExpectedError = 

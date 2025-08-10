@@ -47,11 +47,6 @@ import { getBaseUrlFromPackage } from "../utils/package-reader.js";
  * @returns {boolean} True if build should fail
  */
 function shouldFailBuild(config, errorType = 'error', error = null) {
-  // Legacy support for perfection mode (maps to fail-on error)
-  if (config.perfection) {
-    return true;
-  }
-  
   // New fail-on logic
   if (!config.failOn) {
     // Default: only fail on fatal build errors, not individual page errors
