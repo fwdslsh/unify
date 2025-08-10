@@ -1221,13 +1221,23 @@ async function processHtmlFile(
   );
 
   const unifiedConfig = getUnifiedConfig(config);
-  let processedContent = await processHtmlUnified(
+  let unifiedResult = await processHtmlUnified(
     htmlContent,
     filePath,
     sourceRoot,
     dependencyTracker,
     unifiedConfig
   );
+  
+  // Handle both old string format and new object format
+  let processedContent;
+  let extractedAssets = { styles: [], scripts: [] };
+  if (typeof unifiedResult === 'object' && unifiedResult.content !== undefined) {
+    processedContent = unifiedResult.content;
+    extractedAssets = unifiedResult.extractedAssets || { styles: [], scripts: [] };
+  } else {
+    processedContent = unifiedResult;
+  }
 
   // Track asset references in the final content
   if (assetTracker) {
@@ -1313,8 +1323,23 @@ async function scanDirectory(dirPath, files = []) {
   }
 
   const outputDirs = ["dist", "build", "output"];
-  // Add support for additional file types
-  const supportedExtensions = [".html", ".css", ".js", ".md"];
+  // Add support for all file types - we'll filter based on file classification later
+  const supportedExtensions = [
+    // HTML/Markdown content
+    ".html", ".htm", ".md",
+    // CSS/JavaScript
+    ".css", ".js", ".mjs", ".ts",
+    // Images
+    ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".ico", ".bmp", ".tiff",
+    // Fonts
+    ".woff", ".woff2", ".ttf", ".eot", ".otf",
+    // Audio/Video
+    ".mp4", ".webm", ".ogg", ".mp3", ".wav", ".m4a",
+    // Documents
+    ".pdf", ".txt", ".json", ".xml", ".zip", ".doc", ".docx",
+    // Other common assets
+    ".map" // source maps
+  ];
 
   for (const entry of entries) {
     const fullPath = path.join(dirPath, entry.name);
@@ -1427,13 +1452,22 @@ async function processHtmlFileWithConventions(
     sourceRoot,
   };
 
-  let processedContent = await processHtmlUnified(
+  let unifiedResult = await processHtmlUnified(
     htmlContent,
     filePath,
     sourceRoot,
     dependencyTracker,
     unifiedConfig
   );
+  
+  // Handle both old string format and new object format
+  let processedContent;
+  if (typeof unifiedResult === 'object' && unifiedResult.content !== undefined) {
+    processedContent = unifiedResult.content;
+    // extractedAssets are already handled within processHtmlUnified
+  } else {
+    processedContent = unifiedResult;
+  }
 
   // Track asset references in the final content
   if (assetTracker) {

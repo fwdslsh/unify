@@ -28,8 +28,8 @@ import { hasFeature } from "../utils/runtime-detector.js";
   if (nestedLayoutMatch) {
     const nestedLayoutPath = nestedLayoutMatch[1];
     // Recursively process the nested layout, but pass the current slot data as page content
-    const slotData = extractSlotDataFromHTML(pageContent);
-    const layoutWithSlots = applySlots(layoutContent, slotData);
+    const slotResult = extractSlotDataFromHTML(pageContent);
+    const layoutWithSlots = applySlots(layoutContent, slotResult.slots);
     
     // Now process the nested layout with the slot-applied content as the page content
     return await processLayoutAttribute(
@@ -71,13 +71,26 @@ export async function processHtmlUnified(
     }
     
     // Always process includes (SSI and DOM) first
-    let processedContent = await processIncludesWithStringReplacement(
+    let includeResult = await processIncludesWithStringReplacement(
       htmlContent,
       filePath,
       sourceRoot,
       processingConfig,
       new Set() // Initialize call stack for circular dependency detection
     );
+    
+    // Handle both old string format and new object format
+    let processedContent;
+    let extractedAssets = { styles: [], scripts: [] };
+    if (typeof includeResult === 'object' && includeResult.content !== undefined) {
+      processedContent = includeResult.content;
+      extractedAssets = includeResult;
+    } else {
+      processedContent = includeResult;
+    }
+    
+    // Extract and relocate component assets (styles to head, scripts to end of body)
+    processedContent = await extractAndRelocateComponentAssets(processedContent, extractedAssets);
 
     // Apply HTML optimization only after all includes are processed
     if (processingConfig.optimize !== false) {
@@ -93,7 +106,8 @@ export async function processHtmlUnified(
         processedContent,
         filePath,
         sourceRoot,
-        processingConfig
+        processingConfig,
+        extractedAssets
       );
     } else if (
       hasDOMTemplating(processedContent) ||
@@ -103,13 +117,17 @@ export async function processHtmlUnified(
         processedContent,
         filePath,
         sourceRoot,
-        processingConfig
+        processingConfig,
+        extractedAssets  // Pass extracted assets to DOM templating
       );
     }
 
   // Slot/template injection for HTML files (if layout contains <slot> or <template target="...">)
   // This is now handled in file-processor.js after layout chain is discovered and applied
-  return processedContent;
+  return {
+    content: processedContent,
+    extractedAssets: extractedAssets
+  };
   } catch (error) {
     logger.error(
       `Unified HTML processing failed for ${path.relative(
@@ -122,9 +140,11 @@ export async function processHtmlUnified(
 
 /**
  * Process includes using string replacement (more reliable for async operations)
+ * Returns an object with processed content and extracted assets
  */
 async function processIncludesWithStringReplacement(htmlContent, filePath, sourceRoot, config = {}, callStack = new Set()) {
   let processedContent = typeof htmlContent === 'string' ? htmlContent : '';
+  const extractedAssets = { styles: [], scripts: [] };
 
   // Defensive: always return a string, even if an error occurs
   try {
@@ -158,7 +178,11 @@ async function processIncludesWithStringReplacement(htmlContent, filePath, sourc
       const includeContent = await fs.readFile(resolvedPath, 'utf-8');
       
       // Recursively process nested includes
-      const nestedProcessedContent = await processIncludesWithStringReplacement(includeContent, resolvedPath, sourceRoot, config, newCallStack);
+      const nestedResult = await processIncludesWithStringReplacement(includeContent, resolvedPath, sourceRoot, config, newCallStack);
+      // SSI includes: Do NOT extract assets, keep Apache SSI behavior (inline everything)
+      const nestedProcessedContent = (typeof nestedResult === 'object' && nestedResult.content !== undefined) 
+        ? nestedResult.content 
+        : nestedResult;
       
       // Replace all occurrences of this include
       processedContent = (processedContent || '')
@@ -216,9 +240,38 @@ async function processIncludesWithStringReplacement(htmlContent, filePath, sourc
         if (!isPathWithinDirectory(resolvedPath, sourceRoot)) {
           throw new PathTraversalError(src, sourceRoot);
         }
-        let includeContent = await fs.readFile(resolvedPath, 'utf-8');
+        
+        // Check if this is a component (in components directory)
+        // Support multiple component directory patterns: .components, custom_components, _components
+        const isComponent = resolvedPath.includes(config.componentsDir) || 
+                            resolvedPath.includes('.components') ||
+                            resolvedPath.includes('custom_components') ||
+                            resolvedPath.includes('_components');
+        
+        let includeContent;
+        if (isComponent) {
+          // Use component processing with asset extraction
+          const componentContent = await fs.readFile(resolvedPath, 'utf-8');
+          const component = extractComponentAssets(componentContent);
+          // Collect extracted assets
+          extractedAssets.styles.push(...component.assets.styles);
+          extractedAssets.scripts.push(...component.assets.scripts);
+          includeContent = component.content;
+        } else {
+          includeContent = await fs.readFile(resolvedPath, 'utf-8');
+        }
+        
         // Recursively process nested includes
-        includeContent = await processIncludesWithStringReplacement(includeContent, resolvedPath, sourceRoot, config, newCallStack);
+        const nestedResult = await processIncludesWithStringReplacement(includeContent, resolvedPath, sourceRoot, config, newCallStack);
+        // If the nested result is an object (with assets), extract them
+        if (typeof nestedResult === 'object' && nestedResult.content !== undefined) {
+          includeContent = nestedResult.content;
+          extractedAssets.styles.push(...nestedResult.styles);
+          extractedAssets.scripts.push(...nestedResult.scripts);
+        } else {
+          includeContent = nestedResult;
+        }
+        
         processedContent = (processedContent || '')
           .replace(fullMatch, includeContent || '');
         logger.debug(`Processed include element: ${src} -> ${resolvedPath}`);
@@ -253,10 +306,31 @@ async function processIncludesWithStringReplacement(htmlContent, filePath, sourc
     }
   }
   
-    return processedContent;
+  return {
+    content: processedContent,
+    styles: extractedAssets.styles,
+    scripts: extractedAssets.scripts
+  };
   } catch (err) {
     logger.error('processIncludesWithStringReplacement failed:', err);
-    return '';
+    // In perfection mode, re-throw all build-stopping errors
+    if (config.perfection && (
+      err instanceof BuildError || 
+      err instanceof CircularDependencyError ||
+      err instanceof PathTraversalError ||
+      err instanceof IncludeNotFoundError ||
+      err.name === 'BuildError' ||
+      err.name === 'CircularDependencyError' ||
+      err.name === 'PathTraversalError' ||
+      err.name === 'IncludeNotFoundError'
+    )) {
+      throw err;
+    }
+    return {
+      content: '',
+      styles: [],
+      scripts: []
+    };
   }
 }
 
@@ -268,6 +342,40 @@ function escapeRegExp(string) {
 }
 
 /**
+ * Extract styles and scripts from component HTML content
+ */
+function extractComponentAssets(htmlContent) {
+  const assets = {
+    styles: [],
+    scripts: []
+  };
+
+  // Extract style tags
+  const styleRegex = /<style(?:\s[^>]*)?>[\s\S]*?<\/style>/gi;
+  let styleMatch;
+  while ((styleMatch = styleRegex.exec(htmlContent)) !== null) {
+    assets.styles.push(styleMatch[0]);
+  }
+
+  // Extract script tags
+  const scriptRegex = /<script(?:\s[^>]*)?>[\s\S]*?<\/script>/gi;
+  let scriptMatch;
+  while ((scriptMatch = scriptRegex.exec(htmlContent)) !== null) {
+    assets.scripts.push(scriptMatch[0]);
+  }
+
+  // Remove extracted assets from content
+  let cleanContent = htmlContent;
+  cleanContent = cleanContent.replace(styleRegex, '');
+  cleanContent = cleanContent.replace(scriptRegex, '');
+
+  return {
+    content: cleanContent,
+    assets
+  };
+}
+
+/**
  * Process SSI include directive
  */
 async function processIncludeDirective(comment, type, includePath, filePath, sourceRoot, config, callStack = new Set()) {
@@ -276,7 +384,12 @@ async function processIncludeDirective(comment, type, includePath, filePath, sou
     const includeContent = await fs.readFile(resolvedPath, 'utf-8');
     
     // Recursively process nested includes in the included content
-    const processedContent = await processIncludesWithStringReplacement(includeContent, resolvedPath, sourceRoot, config, callStack);
+    const includeResult = await processIncludesWithStringReplacement(includeContent, resolvedPath, sourceRoot, config, callStack);
+    
+    // Handle both old string format and new object format
+    const processedContent = (typeof includeResult === 'object' && includeResult.content !== undefined) 
+      ? includeResult.content 
+      : includeResult;
     
     comment.replace(processedContent, { html: true });
     logger.debug(`Processed include: ${includePath} -> ${resolvedPath}`);
@@ -295,7 +408,12 @@ async function processIncludeElement(element, src, filePath, sourceRoot, config,
     const includeContent = await fs.readFile(resolvedPath, 'utf-8');
     
     // Recursively process nested includes in the included content
-    const processedContent = await processIncludesWithStringReplacement(includeContent, resolvedPath, sourceRoot, config, callStack);
+    const includeResult = await processIncludesWithStringReplacement(includeContent, resolvedPath, sourceRoot, config, callStack);
+    
+    // Handle both old string format and new object format
+    const processedContent = (typeof includeResult === 'object' && includeResult.content !== undefined) 
+      ? includeResult.content 
+      : includeResult;
     
     element.setInnerContent(processedContent, { html: true });
     logger.debug(`Processed include element: ${src} -> ${resolvedPath}`);
@@ -387,7 +505,7 @@ function shouldUseDOMMode(content) {
  * @param {Object} config - DOM processor configuration
  * @returns {Promise<string>} Processed HTML content
  */
-async function processDOMMode(pageContent, pagePath, sourceRoot, config = {}) {
+async function processDOMMode(pageContent, pagePath, sourceRoot, config = {}, extractedAssets = null) {
   const domConfig = { 
     layoutsDir: '.layouts',
     componentsDir: '.components', 
@@ -411,39 +529,56 @@ async function processDOMMode(pageContent, pagePath, sourceRoot, config = {}) {
   // Detect layout from HTML content using regex-based parsing
   let layoutPath;
   try {
-
     layoutPath = await detectLayoutFromHTML(pageContent, sourceRoot, domConfig);
     logger.debug(`Using layout: ${layoutPath}`);
     let layoutContent = await fs.readFile(layoutPath, 'utf-8');
 
     // Extract slot content from page HTML using regex-based parsing
-    const slotData = extractSlotDataFromHTML(pageContent);
+    const slotResult = extractSlotDataFromHTML(pageContent);
 
     // Apply slots to layout using string replacement
-    let processedHTML = applySlots(layoutContent, slotData);
+    let processedHTML = applySlots(layoutContent, slotResult.slots);
+
+    // Inject extracted assets from component processing into the layout
+    if (extractedAssets && (extractedAssets.styles?.length > 0 || extractedAssets.scripts?.length > 0)) {
+      // Inject styles into head (before </head>)
+      if (extractedAssets.styles.length > 0) {
+        const headEndRegex = /<\/head>/i;
+        const dedupedStyles = [...new Set(extractedAssets.styles)]; // Remove duplicates
+        const stylesHTML = dedupedStyles.join('\n');
+        processedHTML = processedHTML.replace(headEndRegex, `${stylesHTML}\n</head>`);
+      }
+      
+      // Inject scripts into end of body (before </body>)
+      if (extractedAssets.scripts.length > 0) {
+        const bodyEndRegex = /<\/body>/i;
+        const dedupedScripts = [...new Set(extractedAssets.scripts)]; // Remove duplicates
+        const scriptsHTML = dedupedScripts.join('\n');
+        processedHTML = processedHTML.replace(bodyEndRegex, `${scriptsHTML}\n</body>`);
+      }
+    }
 
     // Check if the layout itself has a data-layout attribute (nested layouts)
     const nestedLayoutMatch = layoutContent.match(/data-layout=["']([^"']+)["']/i);
     if (nestedLayoutMatch) {
       const nestedLayoutPath = nestedLayoutMatch[1];
       // Recursively process the nested layout using DOM mode
-      return await processDOMMode(processedHTML, layoutPath, sourceRoot, domConfig);
+      return await processDOMMode(processedHTML, layoutPath, sourceRoot, domConfig, extractedAssets);
     }
 
-    // Process includes in the result
+    // Process any remaining includes in the result (shouldn't be many since includes were processed earlier)
     processedHTML = await processIncludesInHTML(processedHTML, layoutPath, sourceRoot, domConfig);
 
-      return processedHTML;
-    } catch (error) {
-      // In perfection mode, fail fast on layout detection errors
-      if (domConfig.perfection) {
-        throw new Error(`Layout not found in perfection mode for ${path.relative(sourceRoot, pagePath)}: ${error.message}`);
-      }
-      // Graceful degradation: if layout cannot be found, return content wrapped in basic HTML
-      return `<html><body>${pageContent}</body></html>`;
+    return processedHTML;
+    
+  } catch (error) {
+    // In perfection mode, fail fast on layout detection errors
+    if (domConfig.perfection) {
+      throw new Error(`Layout not found in perfection mode for ${path.relative(sourceRoot, pagePath)}: ${error.message}`);
     }
-      logger.warn(`Layout not found for ${path.relative(sourceRoot, pagePath)}: ${error.message}`);
-      return `<!DOCTYPE html>
+    
+    logger.warn(`Layout not found for ${path.relative(sourceRoot, pagePath)}: ${error.message}`);
+    return `<!DOCTYPE html>
 <html>
 <head>
   <title>Page</title>
@@ -452,40 +587,7 @@ async function processDOMMode(pageContent, pagePath, sourceRoot, config = {}) {
 ${pageContent}
 </body>
 </html>`;
-
-    }
-  // End of layout detection try/catch
-
-  // Defensive: always initialize processedContent before any include expansion logic
-  let processedContent = pageContent;
-  // (Actual include expansion logic should go here, but is currently not implemented in this placeholder)
-
-  // Extract slot content from page HTML using regex-based parsing
-  const slotData = extractSlotDataFromHTML(pageContent);
-
-  // Apply slots to layout using string replacement
-  let processedHTML = applySlots(layoutContent, slotData);
-
-  // Check if the layout itself has a data-layout attribute (nested layouts)
-
-
-  // Process includes in the result
-  processedHTML = await processIncludesInHTML(processedHTML, layoutPath, sourceRoot, domConfig);
-
-
-
-  // Check if the layout itself has a data-layout attribute (nested layouts)
-  const nestedLayoutMatch = layoutContent.match(/data-layout=["']([^"']+)["']/i);
-  if (nestedLayoutMatch) {
-    const nestedLayoutPath = nestedLayoutMatch[1];
-    // Recursively process the nested layout using DOM mode
-    return await processDOMMode(processedHTML, layoutPath, sourceRoot, domConfig);
   }
-
-  // Process includes in the result
-  processedHTML = await processIncludesInHTML(processedHTML, layoutPath, sourceRoot, domConfig);
-
-  return processedHTML;
 }
 
 /**
@@ -555,9 +657,42 @@ async function processIncludesInHTML(htmlContent, layoutPath, sourceRoot, config
         if (!isPathWithinDirectory(resolvedPath, sourceRoot)) {
           throw new PathTraversalError(src, sourceRoot);
         }
-        let includeContent = await fs.readFile(resolvedPath, 'utf-8');
-        includeContent = await processIncludesWithStringReplacement(includeContent, resolvedPath, sourceRoot, config, new Set());
-        result = result.replace(fullMatch, includeContent);
+        
+        // Check if this is a component (in components directory)
+        const isComponent = resolvedPath.includes(config.componentsDir) || resolvedPath.includes('.components');
+        console.log('[DEBUG] Processing DOM include:', { src, resolvedPath, isComponent, componentsDir: config.componentsDir });
+        console.log('[DEBUG] Component check:', { 
+          includesComponentsDir: resolvedPath.includes(config.componentsDir),
+          includesDotComponents: resolvedPath.includes('.components'),
+          resolvedPath,
+          componentsDir: config.componentsDir 
+        });
+        
+        if (isComponent) {
+          console.log('[DEBUG] Processing as component with asset extraction');
+          // Use component processing with asset extraction
+          const component = await loadAndProcessComponent(src, {}, sourceRoot, config);
+          console.log('[DEBUG] Component processed, styles:', component.styles.length, 'scripts:', component.scripts.length);
+          // Recursively process any nested includes in the component content
+          const componentResult = await processIncludesWithStringReplacement(component.content, resolvedPath, sourceRoot, config, new Set());
+          const componentContent = (typeof componentResult === 'object' && componentResult.content !== undefined) 
+            ? componentResult.content 
+            : componentResult;
+          result = result.replace(fullMatch, componentContent);
+          // Collect extracted assets
+          allStyles.push(...component.styles);
+          allScripts.push(...component.scripts);
+          console.log('[DEBUG] Total styles collected:', allStyles.length, 'scripts:', allScripts.length);
+        } else {
+          // Regular include processing for non-components
+          let includeContent = await fs.readFile(resolvedPath, 'utf-8');
+          const includeResult = await processIncludesWithStringReplacement(includeContent, resolvedPath, sourceRoot, config, new Set());
+          const processedIncludeContent = (typeof includeResult === 'object' && includeResult.content !== undefined) 
+            ? includeResult.content 
+            : includeResult;
+          result = result.replace(fullMatch, processedIncludeContent);
+        }
+        
         logger.debug('[UNIFY] Successfully processed DOM include:', src, '->', resolvedPath);
       } catch (error) {
         if (src.startsWith('/')) {
@@ -680,6 +815,8 @@ function hasDOMTemplating(content) {
  */
 function extractSlotDataFromHTML(htmlContent) {
   const slots = {};
+  const extractedStyles = [];
+  const extractedScripts = [];
   
   let match;
 
@@ -704,7 +841,18 @@ function extractSlotDataFromHTML(htmlContent) {
     // Remove all template elements
     defaultContent = defaultContent.replace(/<template[^>]*>[\s\S]*?<\/template>/gi, '');
     
-    // Remove script and style elements
+    // Extract and preserve script and style elements instead of removing them
+    const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
+    while ((match = styleRegex.exec(defaultContent)) !== null) {
+      extractedStyles.push(match[0]); // Keep the full <style>...</style> tag
+    }
+    
+    const scriptRegex = /<script[^>]*>([\s\S]*?)<\/script>/gi;
+    while ((match = scriptRegex.exec(defaultContent)) !== null) {
+      extractedScripts.push(match[0]); // Keep the full <script>...</script> tag
+    }
+    
+    // Now remove them from the content (but they're preserved above)
     defaultContent = defaultContent.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
     defaultContent = defaultContent.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
     
@@ -726,7 +874,11 @@ function extractSlotDataFromHTML(htmlContent) {
     }
   }
   
-  return slots;
+  return {
+    slots,
+    styles: extractedStyles,
+    scripts: extractedScripts
+  };
 }
 
 /**
@@ -790,7 +942,7 @@ function applySlots(layoutContent, slotData) {
  * @param {Object} config - Processing configuration
  * @returns {Promise<string>} Processed HTML with templates applied
  */
-async function processDOMTemplating(htmlContent, filePath, sourceRoot, config) {
+async function processDOMTemplating(htmlContent, filePath, sourceRoot, config, extractedAssets = { styles: [], scripts: [] }) {
   try {
     // Check for layout attribute using regex parsing
     const layoutMatch = htmlContent.match(/data-layout=["']([^"']+)["']/i);
@@ -802,7 +954,8 @@ async function processDOMTemplating(htmlContent, filePath, sourceRoot, config) {
           layoutAttr,
           filePath,
           sourceRoot,
-          config
+          config,
+          extractedAssets  // Pass extracted assets
         );
       } catch (error) {
         // In perfection mode, fail fast on layout errors
@@ -826,7 +979,8 @@ async function processDOMTemplating(htmlContent, filePath, sourceRoot, config) {
           config.defaultLayout,  // Just pass the filename, not the full path
           filePath,
           sourceRoot,
-          config
+          config,
+          extractedAssets  // Pass extracted assets
         );
       } catch (error) {
         // For default layouts, always gracefully degrade (even in perfection mode)
@@ -873,7 +1027,8 @@ async function processLayoutAttribute(
   layoutPath,
   filePath,
   sourceRoot,
-  config
+  config,
+  extractedAssets = { styles: [], scripts: [] }
 ) {
   // Resolve layout path
   let resolvedLayoutPath;
@@ -941,8 +1096,8 @@ async function processLayoutAttribute(
     const nestedLayoutPath = nestedLayoutMatch[1];
     console.log(`DEBUG: Found nested layout in ${layoutPath}: ${nestedLayoutPath}`);
     // Recursively process the nested layout, but pass the current slot data as page content
-    const slotData = extractSlotDataFromHTML(pageContent);
-    const layoutWithSlots = applySlots(layoutContent, slotData);
+    const slotResult = extractSlotDataFromHTML(pageContent);
+    const layoutWithSlots = applySlots(layoutContent, slotResult.slots);
     
     // Now process the nested layout with the slot-applied content as the page content
     return await processLayoutAttribute(
@@ -950,13 +1105,41 @@ async function processLayoutAttribute(
       nestedLayoutPath,
       resolvedLayoutPath, // Use current layout as the source file for nested layout resolution
       sourceRoot,
-      config
+      config,
+      extractedAssets  // Pass assets to nested layout
     );
   }
 
   // Extract slot data from page content using regex-based parsing and apply to layout
-  const slotData = extractSlotDataFromHTML(pageContent);
-  return applySlots(layoutContent, slotData);
+  const slotResult = extractSlotDataFromHTML(pageContent);
+  
+  // Combine extracted assets from component and page
+  const allExtractedAssets = {
+    styles: [...(extractedAssets?.styles || []), ...slotResult.styles],
+    scripts: [...(extractedAssets?.scripts || []), ...slotResult.scripts]
+  };
+  
+  // Inject extracted assets into layout before applying slots
+  let finalLayout = layoutContent;
+  if (allExtractedAssets.styles.length > 0 || allExtractedAssets.scripts.length > 0) {
+    // Inject styles into head (before </head>)
+    if (allExtractedAssets.styles.length > 0) {
+      const headEndRegex = /<\/head>/i;
+      const dedupedStyles = [...new Set(allExtractedAssets.styles)]; // Remove duplicates
+      const stylesHTML = dedupedStyles.join('\n');
+      finalLayout = finalLayout.replace(headEndRegex, `${stylesHTML}\n</head>`);
+    }
+    
+    // Inject scripts into end of body (before </body>)
+    if (allExtractedAssets.scripts.length > 0) {
+      const bodyEndRegex = /<\/body>/i;
+      const dedupedScripts = [...new Set(allExtractedAssets.scripts)]; // Remove duplicates
+      const scriptsHTML = dedupedScripts.join('\n');
+      finalLayout = finalLayout.replace(bodyEndRegex, `${scriptsHTML}\n</body>`);
+    }
+  }
+  
+  return applySlots(finalLayout, slotResult.slots);
 }
 
 /**
@@ -970,6 +1153,7 @@ function processStandaloneSlots(htmlContent) {
   return htmlContent
     .replace(/<slot[^>]*><\/slot>/gs, "")
     .replace(/<slot[^>]*\/>/g, "");
+}
 }
 
 /**
@@ -1073,4 +1257,73 @@ export async function extractHtmlMetadata(htmlContent) {
   rewriter.transform(response);
   
   return metadata;
+}
+
+/**
+ * Extract component assets (styles and scripts) and relocate them appropriately
+ * Styles go to head, scripts go to end of body
+ * @param {string} htmlContent - HTML content to process
+ * @param {Object} extractedAssets - Assets extracted during include processing
+ * @returns {string} HTML content with assets relocated
+ */
+async function extractAndRelocateComponentAssets(htmlContent, extractedAssets = { styles: [], scripts: [] }) {
+  // Check if this is a complete HTML document or just a fragment
+  const hasHtmlStructure = htmlContent.includes('<html') && htmlContent.includes('<head') && htmlContent.includes('<body');
+  
+  if (!hasHtmlStructure) {
+    // Fragment - just return as-is (layouts will handle asset relocation)
+    return htmlContent;
+  }
+
+  // Only extract content assets if we have extracted assets from DOM includes
+  // This preserves SSI behavior (inline assets) while supporting DOM include asset relocation
+  let contentStyles = [];
+  let contentScripts = [];
+  
+  if (extractedAssets.styles.length > 0 || extractedAssets.scripts.length > 0) {
+    // We have DOM include assets, so also extract content assets
+    const styleRegex = /<style[^>]*>[\s\S]*?<\/style>/gi;
+    const scriptRegex = /<script[^>]*>[\s\S]*?<\/script>/gi;
+    
+    contentStyles = [...htmlContent.matchAll(styleRegex)].map(match => match[0]);
+    contentScripts = [...htmlContent.matchAll(scriptRegex)].map(match => match[0]);
+  }
+  
+  // Combine content assets with extracted assets from includes
+  const allStyles = [...extractedAssets.styles, ...contentStyles];
+  const allScripts = [...extractedAssets.scripts, ...contentScripts];
+  
+  // If no styles or scripts to relocate, return as-is
+  if (allStyles.length === 0 && allScripts.length === 0) {
+    return htmlContent;
+  }
+  
+  // Remove styles and scripts from their current locations in content (only if we extracted them)
+  let processedContent = htmlContent;
+  if (contentStyles.length > 0) {
+    const styleRegex = /<style[^>]*>[\s\S]*?<\/style>/gi;
+    processedContent = processedContent.replace(styleRegex, '');
+  }
+  if (contentScripts.length > 0) {
+    const scriptRegex = /<script[^>]*>[\s\S]*?<\/script>/gi;
+    processedContent = processedContent.replace(scriptRegex, '');
+  }
+  
+  // Add styles to head (before </head>)
+  if (allStyles.length > 0) {
+    const headEndRegex = /<\/head>/i;
+    const dedupedStyles = [...new Set(allStyles)]; // Remove duplicates
+    const stylesHTML = dedupedStyles.join('\n');
+    processedContent = processedContent.replace(headEndRegex, `${stylesHTML}\n</head>`);
+  }
+  
+  // Add scripts to end of body (before </body>)
+  if (allScripts.length > 0) {
+    const bodyEndRegex = /<\/body>/i;
+    const dedupedScripts = [...new Set(allScripts)]; // Remove duplicates  
+    const scriptsHTML = dedupedScripts.join('\n');
+    processedContent = processedContent.replace(bodyEndRegex, `${scriptsHTML}\n</body>`);
+  }
+  
+  return processedContent;
 }

@@ -20,7 +20,7 @@ describe('DOM Mode Include Processing', () => {
     testDir = tempBase;
     sourceDir = path.join(testDir, 'src');
     outputDir = path.join(testDir, 'dist');
-    componentsDir = path.join(sourceDir, '_includes');
+    componentsDir = path.join(sourceDir, 'custom_components'); // Changed from '_includes'
     layoutsDir = path.join(sourceDir, '_includes');
 
     // Clean up and create test directories
@@ -193,6 +193,11 @@ describe('DOM Mode Include Processing', () => {
     // Read the output file
     const outputFile = path.join(outputDir, 'blog.html');
     const outputContent = await fs.readFile(outputFile, 'utf-8');
+
+    // Debug: Log the actual output content
+    console.log('\n=== ACTUAL OUTPUT CONTENT ===');
+    console.log(outputContent);
+    console.log('=== END OUTPUT ===\n');
 
     // Check that include elements are processed and replaced with component content
     expect(outputContent.includes('<include')).toBeFalsy();
