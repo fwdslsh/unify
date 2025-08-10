@@ -75,7 +75,6 @@ export function parseArgs(argv) {
     version: false,
     copy: null,
     layouts: null,
-    includes: null,
   };
 
   // Only the first non-option argument is considered a command
@@ -158,18 +157,13 @@ export function parseArgs(argv) {
       i += 2;
       continue;
     }
-    if ((arg === '--includes' || arg === '-c') && nextArg && !nextArg.startsWith('-')) {
-      args.includes = nextArg;
-      i += 2;
-      continue;
-    }
-    if ((arg === '--copy' || arg === '-a') && nextArg && !nextArg.startsWith('-')) {
+    if ((arg === '--copy') && nextArg && !nextArg.startsWith('-')) {
       args.copy = nextArg;
       i += 2;
       continue;
     }
     // Handle --copy without value
-    if (arg === '--copy' || arg === '-a') {
+    if (arg === '--copy') {
       const error = new UnifyError(
         'The --copy option requires a glob pattern value',
         null,
@@ -284,7 +278,7 @@ export function parseArgs(argv) {
     if (arg.startsWith('-')) {
       const validOptions = [
         '--help', '-h', '--version', '-v', '--source', '-s', '--output', '-o',
-        '--copy', '-a', '--port', '-p', '--host', '--layouts', '-l', '--templates', '--includes', '-c',
+        '--copy', '--port', '-p', '--host', '--layouts', '-l', '--templates',
         '--pretty-urls', '--base-url', '--clean', '--no-sitemap', 
         '--fail-on', '--perfection', '--minify', '--verbose', '-u', '-f', '-m', '-V'
       ];

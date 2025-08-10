@@ -84,7 +84,6 @@ export async function processHtmlUnified(
   config = {}
 ) {
   const processingConfig = {
-    componentsDir: ".components",
     layoutsDir: ".layouts",
     defaultLayout: "default.html",
     optimize: config.minify || config.optimize,
@@ -120,9 +119,6 @@ export async function processHtmlUnified(
       processedContent = includeResult;
     }
     
-    // Extract and relocate component assets (styles to head, scripts to end of body)
-    processedContent = await extractAndRelocateComponentAssets(processedContent, extractedAssets);
-
     // Apply HTML optimization only after all includes are processed
     if (processingConfig.optimize !== false) {
       logger.debug(`Optimizing HTML content, optimize=${processingConfig.optimize}`);
@@ -272,25 +268,8 @@ async function processIncludesWithStringReplacement(htmlContent, filePath, sourc
           throw new PathTraversalError(src, sourceRoot);
         }
         
-        // Check if this is a component (in components directory)
-        // Support multiple component directory patterns: .components, custom_components, _components
-        const isComponent = resolvedPath.includes(config.componentsDir) || 
-                            resolvedPath.includes('.components') ||
-                            resolvedPath.includes('custom_components') ||
-                            resolvedPath.includes('_components');
-        
-        let includeContent;
-        if (isComponent) {
-          // Use component processing with asset extraction
-          const componentContent = await fs.readFile(resolvedPath, 'utf-8');
-          const component = extractComponentAssets(componentContent);
-          // Collect extracted assets
-          extractedAssets.styles.push(...component.assets.styles);
-          extractedAssets.scripts.push(...component.assets.scripts);
-          includeContent = component.content;
-        } else {
-          includeContent = await fs.readFile(resolvedPath, 'utf-8');
-        }
+        // All includes are processed uniformly - no special component logic
+        let includeContent = await fs.readFile(resolvedPath, 'utf-8');
         
         // Recursively process nested includes
         const nestedResult = await processIncludesWithStringReplacement(includeContent, resolvedPath, sourceRoot, config, newCallStack);
@@ -1194,16 +1173,10 @@ function processStandaloneSlots(htmlContent) {
  */
 export function getUnifiedConfig(userConfig = {}) {
   let config = {
-    componentsDir: userConfig.components || ".components",
     layoutsDir: userConfig.layouts || ".layouts", 
     defaultLayout: "default.html",
     ...userConfig,
   };
-  
-  // Ensure componentsDir and layoutsDir are absolute paths if they don't start with '.'
-  if (config.componentsDir && !path.isAbsolute(config.componentsDir) && !config.componentsDir.startsWith('.')) {
-    config.componentsDir = path.resolve(config.componentsDir);
-  }
   
   if (config.layoutsDir && !path.isAbsolute(config.layoutsDir) && !config.layoutsDir.startsWith('.')) {
     config.layoutsDir = path.resolve(config.layoutsDir);

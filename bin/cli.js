@@ -119,7 +119,7 @@ Commands:
 Options:
   --source, -s      Source directory (default: src)
   --output, -o      Output directory (default: dist)
-  --copy, -a        Additional files glob pattern to copy recursively
+  --copy            Additional files glob pattern to copy recursively
   --port, -p        Server port (default: 3000)
   --host            Server host (default: localhost)
   --pretty-urls     Generate pretty URLs (about.md → about/index.html)
@@ -144,7 +144,7 @@ Examples:
 
 Notes:
   • src/assets is automatically copied to dist/assets (if exists)
-  • Files/folders starting with _ are not copied to output
+  • Files/folders starting with _ are not copied to output (use for layouts/partials)
 `);
 }
 

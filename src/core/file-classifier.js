@@ -73,9 +73,9 @@ export class FileClassifier {
     
     // Also check for common standard directory names that should be treated as partials
     const commonPartialDirs = [
-      'layouts', 'components', '.components', '.layouts',
+      'layouts', '.layouts',
       'includes', 'partials', 'templates',
-      'custom_components', 'site_layouts'  // Support custom naming conventions
+      'site_layouts'  // Support custom naming conventions
     ];
     
     for (const dirName of commonPartialDirs) {
