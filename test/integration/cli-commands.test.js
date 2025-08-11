@@ -83,8 +83,7 @@ describe('CLI Commands and Options', () => {
         'build',
         '-s', path.join(tempDir, 'content'),
         '-o', outputDir,
-        '-l', path.join(tempDir, 'templates'),
-        '-c', path.join(tempDir, 'includes')
+        '-l', path.join(tempDir, 'templates')
       ]);
 
       expect(result.code).toBe(0);
@@ -460,7 +459,7 @@ describe('CLI Commands and Options', () => {
   });
 
   describe('Assets Glob Option', () => {
-    it('should copy additional assets with --assets glob pattern', async () => {
+    it('should copy additional assets with --copy glob pattern', async () => {
       const structure = {
         'src/index.html': '<h1>Assets Test</h1>',
         'src/assets/image1.png': 'fake-png-content',
@@ -475,7 +474,7 @@ describe('CLI Commands and Options', () => {
         'build',
         '--source', sourceDir,
         '--output', outputDir,
-        '--assets', 'assets/**/*'
+        '--copy', 'assets/**/*'
       ]);
 
       expect(result.code).toBe(0);
@@ -497,9 +496,9 @@ describe('CLI Commands and Options', () => {
       expect(scriptExists).toBeFalsy();
     });
 
-    it('should work with short flag -a', async () => {
+    it('should work with short flag --copy (no short flag available)', async () => {
       const structure = {
-        'src/index.html': '<h1>Short Flag Test</h1>',
+        'src/index.html': '<h1>Copy Flag Test</h1>',
         'src/images/photo.png': 'fake-png'
       };
 
@@ -507,9 +506,9 @@ describe('CLI Commands and Options', () => {
 
       const result = await runCLIInDir(tempDir, [
         'build',
-        '-s', sourceDir,
-        '-o', outputDir,
-        '-a', 'images/**/*'
+        '--source', sourceDir,
+        '--output', outputDir,
+        '--copy', 'images/**/*'
       ]);
 
       expect(result.code).toBe(0);
@@ -529,7 +528,7 @@ describe('CLI Commands and Options', () => {
         'build',
         '--source', sourceDir,
         '--output', outputDir,
-        '--assets', 'nonexistent/**/*'
+        '--copy', 'nonexistent/**/*'
       ]);
 
       expect(result.code).toBe(0);
@@ -538,9 +537,9 @@ describe('CLI Commands and Options', () => {
       expect(indexExists).toBeTruthy();
     });
 
-    it('should build successfully when assets option is not provided', async () => {
+    it('should build successfully when copy option is not provided', async () => {
       const structure = {
-        'src/index.html': '<h1>No Assets Option Test</h1>'
+        'src/index.html': '<h1>No Copy Option Test</h1>'
       };
 
       await createTestStructure(tempDir, structure);
@@ -557,7 +556,7 @@ describe('CLI Commands and Options', () => {
       expect(indexExists).toBeTruthy();
     });
 
-    it('should show error when --assets is provided without value', async () => {
+    it('should show error when --copy is provided without value', async () => {
       const structure = {
         'src/index.html': '<h1>Error Test</h1>'
       };
@@ -568,29 +567,11 @@ describe('CLI Commands and Options', () => {
         'build',
         '--source', sourceDir,
         '--output', outputDir,
-        '--assets'
+        '--copy'
       ]);
 
       expect(result.code).toBe(2); // CLI argument error
-      expect(result.stderr).toContain('The --assets option requires a glob pattern value');
-    });
-
-    it('should show error when -a is provided without value', async () => {
-      const structure = {
-        'src/index.html': '<h1>Error Test</h1>'
-      };
-
-      await createTestStructure(tempDir, structure);
-
-      const result = await runCLIInDir(tempDir, [
-        'build',
-        '--source', sourceDir,
-        '--output', outputDir,
-        '-a'
-      ]);
-
-      expect(result.code).toBe(2); // CLI argument error
-      expect(result.stderr).toContain('The --assets option requires a glob pattern value');
+      expect(result.stderr).toContain('The --copy option requires a glob pattern value');
     });
   });
 });

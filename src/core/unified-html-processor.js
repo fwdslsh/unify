@@ -142,6 +142,9 @@ export async function processHtmlUnified(
         processingConfig,
         extractedAssets  // Pass extracted assets to DOM templating
       );
+    } else if (extractedAssets && (extractedAssets.styles?.length > 0 || extractedAssets.scripts?.length > 0)) {
+      // Apply extracted assets to complete HTML documents even without layouts/templating
+      processedContent = applyExtractedAssets(processedContent, extractedAssets);
     }
 
   // Slot/template injection for HTML files (if layout contains <slot> or <template target="...">)
@@ -266,6 +269,12 @@ async function processIncludesWithStringReplacement(htmlContent, filePath, sourc
         // All includes are processed uniformly - no special component logic
         let includeContent = await fs.readFile(resolvedPath, 'utf-8');
         
+        // Extract assets from the component content for DOM includes
+        const componentAssets = extractComponentAssets(includeContent);
+        includeContent = componentAssets.content;
+        extractedAssets.styles.push(...componentAssets.assets.styles);
+        extractedAssets.scripts.push(...componentAssets.assets.scripts);
+        
         // Recursively process nested includes
         const nestedResult = await processIncludesWithStringReplacement(includeContent, resolvedPath, sourceRoot, config, newCallStack);
         // If the nested result is an object (with assets), extract them
@@ -344,6 +353,32 @@ async function processIncludesWithStringReplacement(htmlContent, filePath, sourc
  */
 function escapeRegExp(string) {
   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Apply extracted assets to HTML content
+ * Styles go to head, scripts go to end of body
+ */
+function applyExtractedAssets(htmlContent, extractedAssets) {
+  let processedContent = htmlContent;
+  
+  // Add styles to head (before </head>)
+  if (extractedAssets.styles && extractedAssets.styles.length > 0) {
+    const headEndRegex = /<\/head>/i;
+    const dedupedStyles = [...new Set(extractedAssets.styles)]; // Remove duplicates
+    const stylesHTML = dedupedStyles.join('\n');
+    processedContent = processedContent.replace(headEndRegex, `${stylesHTML}\n</head>`);
+  }
+  
+  // Add scripts to end of body (before </body>)
+  if (extractedAssets.scripts && extractedAssets.scripts.length > 0) {
+    const bodyEndRegex = /<\/body>/i;
+    const dedupedScripts = [...new Set(extractedAssets.scripts)]; // Remove duplicates
+    const scriptsHTML = dedupedScripts.join('\n');
+    processedContent = processedContent.replace(bodyEndRegex, `${scriptsHTML}\n</body>`);
+  }
+  
+  return processedContent;
 }
 
 /**

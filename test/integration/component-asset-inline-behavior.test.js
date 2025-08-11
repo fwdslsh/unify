@@ -106,7 +106,7 @@ describe('Component Asset Inline Behavior', () => {
     expect(afterComponentScript.trim()).toBe('');
   });
 
-  test('DOM-included components also keep styles inline at include location', async () => {
+  test('DOM-included components move styles to head (modern DOM behavior)', async () => {
     await writeFile(join(sourceDir, 'components/card.html'), `<style>
   .card { border: 1px solid #ccc; padding: 20px; margin: 10px; }
   .card h3 { color: #333; }
@@ -135,15 +135,13 @@ describe('Component Asset Inline Behavior', () => {
     });
     const output = await readFile(join(outputDir, 'index.html'), 'utf-8');
     
-    // Verify style remains inline within the component content
-    expect(output).toContain('<style>');
-    expect(output).toContain('.card { border: 1px solid #ccc; padding: 20px; margin: 10px; }');
+    // Verify component content is included without styles
     expect(output).toContain('<div class="card">');
     expect(output).toContain('<h3>Card Title</h3>');
     
-    // Verify style is NOT in the head section
+    // Verify style IS moved to the head section for DOM includes
     const headContent = output.substring(output.indexOf('<head>'), output.indexOf('</head>'));
-    expect(headContent).not.toContain('.card {');
+    expect(headContent).toContain('.card {');
   });
 
   test('component changes trigger complete page rebuild with updated content', async () => {

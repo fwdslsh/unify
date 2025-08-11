@@ -378,7 +378,7 @@ describe('Final Boss Integration Test', () => {
         tempDir,
         path.join(tempDir, 'content'),
         customOutputDir,
-        ['-l', 'layouts', '-c', 'partials']
+        ['-l', 'layouts']
       );
 
       expect(buildResult.code).toBe(0);
