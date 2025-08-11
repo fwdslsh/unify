@@ -140,83 +140,109 @@ export class DevServer {
    * Serve static files from the output directory
    */
   async serveStaticFile(pathname) {
-    const { outputDir, fallback, cors } = this.config;
-    
-    // Normalize path and prevent directory traversal
+  const { outputDir, fallback, cors } = this.config;
+  // Normalize path and prevent directory traversal
     let filePath = pathname === '/' ? '/index.html' : pathname;
-    if (filePath.endsWith('/')) {
-      filePath += 'index.html';
-    }
-    
-    const fullPath = path.join(outputDir, filePath);
-    
-    // Security check: ensure path is within output directory
-    const resolvedPath = path.resolve(fullPath);
     const resolvedOutputDir = path.resolve(outputDir);
-    
-    if (!resolvedPath.startsWith(resolvedOutputDir)) {
-      return new Response('Forbidden', { status: 403 });
-    }
 
     try {
-      // Try to serve the requested file
-      const file = Bun.file(resolvedPath);
-      
-      if (await file.exists()) {
-        const headers = this.getFileHeaders(resolvedPath, cors);
-        
-        // Inject live reload script for HTML files
-        if (this.config.liveReload && resolvedPath.endsWith('.html')) {
-          const content = await file.text();
-          const withLiveReload = this.injectLiveReloadScript(content);
-          return new Response(withLiveReload, { headers });
-        }
-        
-        return new Response(file, { headers });
-      }
-      
-      // Check if the path corresponds to a directory with an index.html file
-      // This handles cases like /blog -> /blog/index.html
-      if (!path.extname(pathname) && !looksLikeSystemPath(pathname)) {
-        const directoryIndexPath = path.join(outputDir, pathname, 'index.html');
-        const directoryIndexFile = Bun.file(directoryIndexPath);
-        
-        if (await directoryIndexFile.exists()) {
-          const headers = this.getFileHeaders(directoryIndexPath, cors);
-          
-          if (this.config.liveReload) {
-            const content = await directoryIndexFile.text();
-            const withLiveReload = this.injectLiveReloadScript(content);
-            return new Response(withLiveReload, { headers });
+      // If path ends with a slash, always serve directory index
+      if (filePath.endsWith('/')) {
+        const dirIndexPath = path.join(outputDir, filePath, 'index.html');
+        const resolvedDirIndexPath = path.resolve(dirIndexPath);
+        if (resolvedDirIndexPath.startsWith(resolvedOutputDir)) {
+          const dirIndexFile = Bun.file(resolvedDirIndexPath);
+          if (await dirIndexFile.exists()) {
+            const headers = this.getFileHeaders(resolvedDirIndexPath, cors);
+            if (this.config.liveReload && resolvedDirIndexPath.endsWith('.html')) {
+              const content = await dirIndexFile.text();
+              const withLiveReload = this.injectLiveReloadScript(content);
+              return new Response(withLiveReload, { headers });
+            }
+            return new Response(dirIndexFile, { headers });
           }
-          
-          return new Response(directoryIndexFile, { headers });
+        }
+        // If not found, fallback
+        if (fallback && !looksLikeSystemPath(filePath)) {
+          const fallbackPath = path.join(outputDir, fallback);
+          const fallbackFile = Bun.file(fallbackPath);
+          if (await fallbackFile.exists()) {
+            const headers = this.getFileHeaders(fallbackPath, cors);
+            if (this.config.liveReload && fallbackPath.endsWith('.html')) {
+              const content = await fallbackFile.text();
+              const withLiveReload = this.injectLiveReloadScript(content);
+              return new Response(withLiveReload, { headers });
+            }
+            return new Response(fallbackFile, { headers });
+          }
+        }
+        return new Response('Not Found', { status: 404 });
+      } else if (!path.extname(filePath) && !looksLikeSystemPath(filePath)) {
+        // If no trailing slash and no extension, check for exact file first
+        let exactFilePath = filePath + '.html';
+        const resolvedExactFilePath = path.resolve(path.join(outputDir, exactFilePath));
+        if (resolvedExactFilePath.startsWith(resolvedOutputDir)) {
+          const exactFile = Bun.file(resolvedExactFilePath);
+          if (await exactFile.exists()) {
+            const headers = this.getFileHeaders(resolvedExactFilePath, cors);
+            if (this.config.liveReload && resolvedExactFilePath.endsWith('.html')) {
+              const content = await exactFile.text();
+              const withLiveReload = this.injectLiveReloadScript(content);
+              return new Response(withLiveReload, { headers });
+            }
+            return new Response(exactFile, { headers });
+          }
+        }
+        // If not found, check for directory index
+        const dirIndexPath = path.join(outputDir, filePath, 'index.html');
+        const resolvedDirIndexPath = path.resolve(dirIndexPath);
+        if (resolvedDirIndexPath.startsWith(resolvedOutputDir)) {
+          const dirIndexFile = Bun.file(resolvedDirIndexPath);
+          if (await dirIndexFile.exists()) {
+            const headers = this.getFileHeaders(resolvedDirIndexPath, cors);
+            if (this.config.liveReload && resolvedDirIndexPath.endsWith('.html')) {
+              const content = await dirIndexFile.text();
+              const withLiveReload = this.injectLiveReloadScript(content);
+              return new Response(withLiveReload, { headers });
+            }
+            return new Response(dirIndexFile, { headers });
+          }
+        }
+      } else {
+        // Otherwise, treat as a direct file request
+        const resolvedPath = path.resolve(path.join(outputDir, filePath));
+        if (resolvedPath.startsWith(resolvedOutputDir)) {
+          const file = Bun.file(resolvedPath);
+          if (await file.exists()) {
+            const headers = this.getFileHeaders(resolvedPath, cors);
+            if (this.config.liveReload && resolvedPath.endsWith('.html')) {
+              const content = await file.text();
+              const withLiveReload = this.injectLiveReloadScript(content);
+              return new Response(withLiveReload, { headers });
+            }
+            return new Response(file, { headers });
+          }
         }
       }
-      
+
       // Fallback to fallback file (usually index.html for SPAs)
-      // Only use fallback for routes that look like pages (no file extension) and aren't system paths
+      // Only fallback for SPA routes: no extension, not system path
       if (fallback && !path.extname(pathname) && !looksLikeSystemPath(pathname)) {
         const fallbackPath = path.join(outputDir, fallback);
         const fallbackFile = Bun.file(fallbackPath);
-        
         if (await fallbackFile.exists()) {
           const headers = this.getFileHeaders(fallbackPath, cors);
-          
           if (this.config.liveReload && fallbackPath.endsWith('.html')) {
             const content = await fallbackFile.text();
             const withLiveReload = this.injectLiveReloadScript(content);
             return new Response(withLiveReload, { headers });
           }
-          
           return new Response(fallbackFile, { headers });
         }
       }
-      
       return new Response('Not Found', { status: 404 });
-      
     } catch (error) {
-      logger.error(error.formatForCLI ? error.formatForCLI() : `Error serving ${resolvedPath}: ${error.message}`);
+      logger.error(error.formatForCLI ? error.formatForCLI() : `Error serving static file: ${error.message}`);
       return new Response('Internal Server Error', { status: 500 });
     }
   }
@@ -226,28 +252,16 @@ export class DevServer {
    */
   getFileHeaders(filePath, cors = false) {
     const headers = new Headers();
-    
-    // Set content type based on file extension
-    const ext = path.extname(filePath).toLowerCase();
-    const mimeTypes = {
-      '.html': 'text/html; charset=utf-8',
-      '.css': 'text/css',
-      '.js': 'application/javascript',
-      '.json': 'application/json',
-      '.png': 'image/png',
-      '.jpg': 'image/jpeg',
-      '.jpeg': 'image/jpeg',
-      '.gif': 'image/gif',
-      '.svg': 'image/svg+xml',
-      '.ico': 'image/x-icon',
-      '.pdf': 'application/pdf',
-      '.woff': 'font/woff',
-      '.woff2': 'font/woff2',
-      '.ttf': 'font/ttf',
-      '.eot': 'application/vnd.ms-fontobject'
-    };
-    
-    const mimeType = mimeTypes[ext] || 'application/octet-stream';
+    // Use Bun's built-in mime type detection
+    let mimeType = 'application/octet-stream';
+    if (typeof Bun !== 'undefined' && Bun.file) {
+      try {
+        const file = Bun.file(filePath);
+        if (file) {
+          mimeType = file.type || mimeType;
+        }
+      } catch {}
+    }
     headers.set('Content-Type', mimeType);
     
     // CORS headers if enabled

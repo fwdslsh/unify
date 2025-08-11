@@ -1,24 +1,17 @@
-import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
-import fs from 'fs/promises';
-import path from 'path';
-import { init } from '../../src/cli/init.js';
-import { createTempDirectory, cleanupTempDirectory } from '../fixtures/temp-helper.js';
+import { describe, test, expect } from 'bun:test';
 
-describe('Init Command', () => {
-  let tempDir;
-  let originalCwd;
+/**
+ * Unit tests for init command argument parsing
+ * 
+ * These tests focus on the argument parsing logic which can be tested
+ * in isolation without mocking complex dependencies.
+ * 
+ * Note: The main init functionality is tested through integration tests
+ * in test/integration/init.test.js and repository service unit tests
+ * in test/unit/repository-service.test.js
+ */
 
-  beforeEach(async () => {
-    tempDir = await createTempDirectory();
-    originalCwd = process.cwd();
-    process.chdir(tempDir);
-  });
-
-  afterEach(async () => {
-    process.chdir(originalCwd);
-    await cleanupTempDirectory(tempDir);
-  });
-
+describe('Init Command Argument Parsing', () => {
   test('should parse init command with template argument', async () => {
     const { parseArgs } = await import('../../src/cli/args-parser.js');
     
@@ -35,69 +28,40 @@ describe('Init Command', () => {
     expect(args.template).toBeNull();
   });
 
-  test('should throw error for non-existent template', async () => {
-    const args = { 
-      command: 'init', 
-      template: 'nonexistent-template-xyz123' 
-    };
+  test('should parse init command with different template names', async () => {
+    const { parseArgs } = await import('../../src/cli/args-parser.js');
     
-    await expect(init(args)).rejects.toThrow('Starter template \'nonexistent-template-xyz123\' not found');
-  });
-
-  test('should handle network errors gracefully', async () => {
-    // Mock fetch to simulate network error
-    const originalFetch = globalThis.fetch;
-    globalThis.fetch = async () => {
-      throw new Error('Network error');
-    };
+    const templates = ['basic', 'blog', 'docs', 'portfolio', 'custom-name'];
     
-    try {
-      const args = { command: 'init', template: null };
-      await expect(init(args)).rejects.toThrow('Failed to download starter template');
-    } finally {
-      globalThis.fetch = originalFetch;
+    for (const template of templates) {
+      const args = parseArgs(['init', template]);
+      expect(args.command).toBe('init');
+      expect(args.template).toBe(template);
     }
   });
 
-  test('should handle 404 repository not found', async () => {
-    // Mock fetch to simulate 404 response
-    const originalFetch = globalThis.fetch;
-    globalThis.fetch = async (url) => {
-      if (url.includes('nonexistent-repo')) {
-        return new Response(null, { status: 404 });
-      }
-      return originalFetch(url);
-    };
+  test('should handle init command with flags', async () => {
+    const { parseArgs } = await import('../../src/cli/args-parser.js');
     
-    try {
-      const args = { command: 'init', template: 'nonexistent-repo' };
-      await expect(init(args)).rejects.toThrow('Starter template');
-    } finally {
-      globalThis.fetch = originalFetch;
-    }
+    const args = parseArgs(['init', 'basic', '--verbose']);
+    expect(args.command).toBe('init');
+    expect(args.template).toBe('basic');
+    expect(args.verbose).toBe(true);
   });
 
-  test('should handle empty directory check', async () => {
-    // Create some files in the directory
-    await fs.writeFile(path.join(tempDir, 'existing-file.txt'), 'test content');
+  test('should handle init command with version flag', async () => {
+    const { parseArgs } = await import('../../src/cli/args-parser.js');
     
-    // Mock successful download to test directory check logic
-    const originalFetch = globalThis.fetch;
-    globalThis.fetch = async (url) => {
-      // Return empty tarball for testing
-      return new Response(new ArrayBuffer(0), { 
-        status: 200,
-        headers: { 'content-type': 'application/gzip' }
-      });
-    };
+    const args = parseArgs(['init', '--version']);
+    expect(args.command).toBe('init');
+    expect(args.version).toBe(true);
+  });
+
+  test('should handle init command with help flag', async () => {
+    const { parseArgs } = await import('../../src/cli/args-parser.js');
     
-    try {
-      const args = { command: 'init', template: null };
-      // Should not throw error for non-empty directory, just warn
-      // We expect this to fail at extraction stage, but not at directory check
-      await expect(init(args)).rejects.toThrow();
-    } finally {
-      globalThis.fetch = originalFetch;
-    }
+    const args = parseArgs(['init', '--help']);
+    expect(args.command).toBe('init');
+    expect(args.help).toBe(true);
   });
 });

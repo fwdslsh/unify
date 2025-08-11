@@ -7,13 +7,12 @@ import { describe, it, beforeEach, afterEach, expect } from 'bun:test';
 import fs from 'fs/promises';
 import path from 'path';
 import { createTempDirectory, cleanupTempDirectory, createTestStructure } from '../fixtures/temp-helper.js';
+import { startDevServer, stopDevServer, cleanupAllServers } from '../fixtures/server-helper.js';
 
 describe('Server Security', () => {
   let tempDir;
   let sourceDir;
   let outputDir;
-  let serverProcess;
-  let serverPort;
 
   beforeEach(async () => {
     tempDir = await createTempDirectory();
@@ -22,10 +21,8 @@ describe('Server Security', () => {
   });
 
   afterEach(async () => {
-    if (serverProcess) {
-      serverProcess.kill();
-      await serverProcess.exited;
-    }
+    // Clean up any servers created in this test
+    await cleanupAllServers();
     await cleanupTempDirectory(tempDir);
   });
 
@@ -83,7 +80,7 @@ describe('Server Security', () => {
         expect(jsContent).toContain('console.log("Hello");');
 
       } finally {
-        await stopDevServer(server.process);
+        await stopDevServer(server);
       }
     });
 
@@ -114,7 +111,7 @@ describe('Server Security', () => {
         expect(dirResponse.status).toBe(404);
 
       } finally {
-        await stopDevServer(server.process);
+        await stopDevServer(server);
       }
     });
 
@@ -157,7 +154,7 @@ describe('Server Security', () => {
         }
 
       } finally {
-        await stopDevServer(server.process);
+        await stopDevServer(server);
       }
     });
   });
@@ -522,88 +519,3 @@ describe('Server Security', () => {
     });
   });
 });
-
-/**
- * Helper function to start development server for testing
- */
-async function startDevServer(sourceDir, outputDir, timeout = 10000) {
-  const port = 4000 + Math.floor(Math.random() * 1000); // Use high port range to avoid conflicts
-  
-  const cliPath = new URL('../../bin/cli.js', import.meta.url).pathname;
-  const serverProcess = Bun.spawn([
-    Bun.env.BUN_PATH || process.execPath, 
-    cliPath, 
-    'serve',
-    '--source', sourceDir,
-    '--output', outputDir,
-    '--port', port.toString(),
-    '--verbose'
-  ], {
-    stdio: ['pipe', 'pipe', 'pipe'],
-    env: { ...Bun.env, DEBUG: '1' }
-  });
-  
-  // Wait for server to be ready
-  await waitForServer(port, timeout);
-  
-  // Additional wait to ensure build is complete
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  
-  return { process: serverProcess, port };
-}
-
-/**
- * Helper function to find available port
- */
-async function findAvailablePort(startPort) {
-  for (let port = startPort; port < startPort + 100; port++) {
-    try {
-      const server = Bun.serve({
-        port,
-        fetch() {
-          return new Response();
-        }
-      });
-      server.stop();
-      return port;
-    } catch {
-      continue;
-    }
-  }
-  throw new Error('No available port found');
-}
-
-/**
- * Helper function to wait for server to be ready
- */
-async function waitForServer(port, timeout = 10000) {
-  const startTime = Date.now();
-  
-  while (Date.now() - startTime < timeout) {
-    try {
-      const response = await fetch(`http://localhost:${port}`);
-      // Server is ready if it responds with any HTTP status (200, 404, etc.)
-      // This means the server is up and handling requests
-      if (response.status >= 200 && response.status < 600) {
-        // Add a small delay to ensure build process has completed
-        await new Promise(resolve => setTimeout(resolve, 200));
-        return;
-      }
-    } catch {
-      // Server not ready yet
-    }
-    await new Promise(resolve => setTimeout(resolve, 100));
-  }
-  
-  throw new Error(`Server not ready within ${timeout}ms`);
-}
-
-/**
- * Helper function to stop dev server
- */
-async function stopDevServer(process) {
-  if (process) {
-    process.kill();
-    await process.exited;
-  }
-}
