@@ -8,10 +8,10 @@ Streamlined Docker images using single file executables for fast startup and min
 
 ```bash
 # Run unify commands directly
-docker run --rm -v $(pwd)/my-site:/workspace ghcr.io/fwdslsh/unify-cli:latest build
+docker run --rm -v $(pwd)/my-site:/workspace fwdslsh/unify-cli:latest build
 
 # Interactive shell with unify available
-docker run --rm -it -v $(pwd)/my-site:/workspace ghcr.io/fwdslsh/unify-cli:latest sh
+docker run --rm -it -v $(pwd)/my-site:/workspace fwdslsh/unify-cli:latest sh
 ```
 
 ### Production deployment with NGINX
@@ -19,7 +19,7 @@ docker run --rm -it -v $(pwd)/my-site:/workspace ghcr.io/fwdslsh/unify-cli:lates
 ```bash
 docker run --rm -p 8080:80 \
   -v $(pwd)/my-site:/site \
-  ghcr.io/fwdslsh/unify-nginx:latest
+  fwdslsh/unify-nginx:latest
 ```
 
 ### Development with live reload
@@ -27,7 +27,7 @@ docker run --rm -p 8080:80 \
 ```bash
 docker run --rm -p 3000:3000 \
   -v $(pwd)/my-site:/site \
-  ghcr.io/fwdslsh/unify-nginx:latest \
+  fwdslsh/unify-nginx:latest \
   unify serve --source /site --output /var/www/html --port 3000 --host 0.0.0.0
 ```
 
@@ -140,18 +140,18 @@ docker-compose up unify-apache
 
 ```bash
 # Build once
-docker run --rm -v $(pwd):/workspace ghcr.io/fwdslsh/unify-cli:latest \
+docker run --rm -v $(pwd):/workspace fwdslsh/unify-cli:latest \
   build --source src --output dist
 
 # Serve with live reload
-docker run --rm -p 3000:3000 -v $(pwd):/site ghcr.io/fwdslsh/unify-nginx:latest
+docker run --rm -p 3000:3000 -v $(pwd):/site fwdslsh/unify-nginx:latest
 ```
 
 ### CI/CD Pipeline
 
 ```bash
 # In your CI script
-docker run --rm -v $(pwd):/workspace ghcr.io/fwdslsh/unify-cli:latest \
+docker run --rm -v $(pwd):/workspace fwdslsh/unify-cli:latest \
   build --source src --output public --minify --clean
 ```
 
@@ -174,7 +174,7 @@ spec:
     spec:
       containers:
         - name: unify-nginx
-          image: ghcr.io/fwdslsh/unify-nginx:latest
+          image: fwdslsh/unify-nginx:latest
           ports:
             - containerPort: 80
           volumeMounts:
@@ -204,14 +204,6 @@ docker compose --profile prod up
 ```
 
 ## Registry Information
-
-Images are published to both registries:
-
-### GitHub Container Registry (Recommended)
-
-- `ghcr.io/fwdslsh/unify-cli:latest`
-- `ghcr.io/fwdslsh/unify-nginx:latest`
-- `ghcr.io/fwdslsh/unify-apache:latest`
 
 ### Docker Hub
 
@@ -253,7 +245,7 @@ Each build includes:
 chmod -R 755 ./my-site
 
 # Or run with user ID mapping
-docker run --user $(id -u):$(id -g) --rm -v $(pwd):/workspace ghcr.io/fwdslsh/unify-cli:latest
+docker run --user $(id -u):$(id -g) --rm -v $(pwd):/workspace fwdslsh/unify-cli:latest
 ```
 
 **Port already in use:**
@@ -263,14 +255,14 @@ docker run --user $(id -u):$(id -g) --rm -v $(pwd):/workspace ghcr.io/fwdslsh/un
 lsof -i :3000
 
 # Use different port
-docker run -p 3001:3000 ghcr.io/fwdslsh/unify-nginx:latest
+docker run -p 3001:3000 fwdslsh/unify-nginx:latest
 ```
 
 **File watching not working:**
 
 ```bash
 # Ensure files are properly mounted and writable
-docker run --rm -v $(pwd)/my-site:/site:rw ghcr.io/fwdslsh/unify-nginx:latest
+docker run --rm -v $(pwd)/my-site:/site:rw fwdslsh/unify-nginx:latest
 ```
 
 **Docker Compose profiles not working:**
@@ -290,4 +282,4 @@ docker compose version  # Should be v2.0+
 
 - Check container logs: `docker logs <container-id>`
 - Run with verbose output: Add `--verbose` flag to unify commands
-- Interactive debugging: `docker run --rm -it ghcr.io/fwdslsh/unify-cli:latest sh`
+- Interactive debugging: `docker run --rm -it fwdslsh/unify-cli:latest sh`
