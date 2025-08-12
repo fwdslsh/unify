@@ -11,6 +11,3 @@ preload = ["./test/bun-setup.js"]
 # Enable Bun's built-in bundler for imports
 bun = true
 
-# Define build-time constants for executables
-[build]
-define = { BUILD_VERSION = '"0.4.3"' }

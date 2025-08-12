@@ -8,14 +8,15 @@ A modern, lightweight static site generator that brings the power of server-side
 
 ## ✨ Perfect for Frontend Developers
 
-- **Zero Learning Curve**: Uses familiar Apache SSI syntax (`<!--#include file="header.html" -->`) or intuitive `<slot>`, `<template>`, and `<include>` elements.
+- **Zero Learning Curve**: Uses familiar Apache SSI syntax (`<!--#include file="header.html" -->`) and modern DOM templating (`<include>`, `<slot>`, `<template>`)
 - **Modern Tooling**: Built with ESM modules, powered by **Bun** for maximum performance
 - **Live Development**: Built-in dev server with live reload via Server-Sent Events
-- **Multi-Format Support**: HTML, Markdown with frontmatter, and static assets
-- **SEO Optimized**: Automatic sitemap generation
+- **Multi-Format Support**: HTML, Markdown with YAML frontmatter, and static assets
+- **Convention-Based**: Files starting with `_` are non-emitting partials/layouts by convention
+- **SEO Optimized**: Automatic sitemap.xml generation
 - **Framework-Free**: Pure HTML and CSS output—no build complexity or JavaScript frameworks required
-- **High Performance**: Native Bun API support with HTMLRewriter, fs.watch, and Bun.serve
-- **Cross-Platform**: Compile to standalone executables for Linux, macOS, and Windows
+- **High Performance**: Native Bun APIs with HTMLRewriter, fs.watch, and Bun.serve
+- **Cross-Platform**: Standalone executables for Linux, macOS, and Windows
 
 ## 🚀 Quick Start
 
@@ -25,20 +26,25 @@ A modern, lightweight static site generator that brings the power of server-side
 # Install Bun (required runtime)
 curl -fsSL https://bun.sh/install | bash
 
-# Install unify globally
+# Option 1: Install globally via Bun
 bun add -g @fwdslsh/unify
+
+# Option 2: Install cross-platform binary (Linux, macOS, Windows)
+curl -fsSL https://raw.githubusercontent.com/fwdslsh/unify/main/install.sh | bash
+
+# Option 3: User installation (to ~/.local/bin)
+curl -fsSL https://raw.githubusercontent.com/fwdslsh/unify/main/install.sh | bash -s -- --user
 
 # Basic usage with defaults (src => dist)
 unify build                    # Build from src/ to dist/
 unify serve                    # Serve with live reload on port 3000
 unify watch                    # Watch for changes and rebuild
-
-# Create cross-platform executable
-bun run build:executable
+unify init                     # Initialize new project
 
 # Advanced usage with custom options
 unify build --pretty-urls --base-url https://mysite.com
-unify serve --port 8080
+unify build --copy "./assets/**/*.*" --clean
+unify serve --port 8080 --host 0.0.0.0
 ```
 
 ## 🏎️ Bun-Native Performance
@@ -57,12 +63,23 @@ unify is built exclusively for Bun and uses native APIs for maximum performance:
 
 ```html
 <!-- src/index.html -->
-<!--#include virtual="/.components/header.html" -->
+<!--#include virtual="/_includes/header.html" -->
 <main>
   <h1>Welcome!</h1>
-  <p>Build maintainable sites with includes and components.</p>
+  <p>Build maintainable sites with includes and layouts.</p>
 </main>
-<!--#include virtual="/.components/footer.html" -->
+<!--#include virtual="/_includes/footer.html" -->
+```
+
+```html
+<!-- Alternative modern DOM syntax -->
+<include src="/_includes/header.html"></include>
+<main>
+  <template target="title">My Page Title</template>
+  <h1>Welcome!</h1>
+  <p>Use slots and templates for advanced layouts.</p>
+</main>
+<include src="/_includes/footer.html"></include>
 ```
 
 See the [Getting Started Guide](docs/getting-started.md) for a complete tutorial.
@@ -70,10 +87,11 @@ See the [Getting Started Guide](docs/getting-started.md) for a complete tutorial
 ## 📚 Documentation
 
 - **[Getting Started](docs/getting-started.md)** - Your first unify site
-- **[CLI Reference](docs/cli-reference.md)** - Complete command documentation
+- **[CLI Reference](docs/cli-reference.md)** - Complete command documentation  
+- **[Include Syntax](docs/include-syntax.md)** - Apache SSI and DOM templating
+- **[Layouts & Templates](docs/layouts-slots-templates.md)** - Advanced templating features
 - **[Docker Usage](docs/docker-usage.md)** - Container deployment guide
-- **[Template Elements](docs/template-elements-in-markdown.md)** - Advanced templating
-- **[Architecture](docs/ARCHITECTURE.md)** - Technical deep dive
+- **[Architecture](docs/unify-architecture.md)** - Technical deep dive
 
 ## ⚡ Core Commands
 
@@ -85,6 +103,12 @@ unify build
 # Development server with live reload
 unify serve
 
+# Watch for changes without serving
+unify watch
+
+# Initialize new project
+unify init
+
 # Get help
 unify --help
 ```
@@ -93,14 +117,13 @@ See [CLI Reference](docs/cli-reference.md) for all options.
 
 ## 🎯 Why unify?
 
-- **Simple**: Familiar HTML and Apache SSI syntax
+- **Simple**: Familiar HTML and Apache SSI syntax with modern templating
 - **Fast**: Incremental builds and smart dependency tracking  
-- **Modern**: ESM modules, live reload, Docker support
-- **Flexible**: Works with HTML, Markdown, and modern templating
-- **Portable**: Runs on Node.js, Deno, and Bun
-- Dependency tracking and change impact analysis
-- Built-in development server
-- Docker support with multi-stage builds
+- **Modern**: ESM modules, live reload, cross-platform binaries
+- **Flexible**: Works with HTML, Markdown, and convention-based architecture
+- **Portable**: Runs on Bun (optimal), Node.js, and Deno
+- **Secure**: Path traversal prevention and input validation
+- **Developer-Friendly**: Built-in development server with comprehensive error handling
 
 ## 🔒 Security
 
@@ -120,9 +143,56 @@ unify has comprehensive test coverage:
 
 ## 🔗 Cross-Platform Support
 
-- **Node.js** 14+ (native ESM support)
-- **Bun**: `bun run @fwdslsh/unify serve` (faster execution)
-- **Deno**: `deno run --allow-read --allow-write --allow-net npm:@fwdslsh/unify`
+### Runtime Requirements
+
+- **Bun**: Minimum version 1.2.19 (recommended for best performance)
+- **Node.js**: 14+ with native ESM support
+- **Deno**: Latest stable version
+
+### Installation Options
+
+#### 1. Cross-Platform Binary (Recommended)
+
+Download and install standalone executables for Linux, macOS, and Windows:
+
+```bash
+# System-wide installation
+curl -fsSL https://raw.githubusercontent.com/fwdslsh/unify/main/install.sh | bash
+
+# User installation (to ~/.local/bin)
+curl -fsSL https://raw.githubusercontent.com/fwdslsh/unify/main/install.sh | bash -s -- --user
+
+# Specific version
+curl -fsSL https://raw.githubusercontent.com/fwdslsh/unify/main/install.sh | bash -s -- --version v0.4.3
+
+# Manual download from GitHub Releases
+# https://github.com/fwdslsh/unify/releases
+```
+
+#### 2. Via Package Manager
+
+```bash
+# Bun (fastest execution)
+bun add -g @fwdslsh/unify
+bun unify serve
+
+# npm/Node.js
+npm install -g @fwdslsh/unify
+unify serve
+
+# Deno
+deno run --allow-read --allow-write --allow-net npm:@fwdslsh/unify serve
+```
+
+### Supported Platforms
+
+| Platform | Architecture | Binary | Package Manager |
+|----------|-------------|--------|-----------------|
+| Linux | x86_64, ARM64 | ✅ | ✅ |
+| macOS | x86_64, ARM64 (Apple Silicon) | ✅ | ✅ |
+| Windows | x86_64, ARM64 | ✅ | ✅ |
+
+The cross-platform binaries are compiled from Bun and include all dependencies, requiring no additional runtime installation.
 
 ## 🗺️ Roadmap
 
@@ -136,15 +206,16 @@ We welcome contributions! See our [Contributing Guide](CONTRIBUTING.md) for deta
 
 ```bash
 git clone https://github.com/fwdslsh/unify
-cd cli
-npm install
-npm test
-npm run example
+cd unify
+bun install
+bun test
+bun run build
 ```
 
 ### CI/CD Workflows
 
 Our GitHub Actions workflows are optimized for performance and cost efficiency. See [CI/CD Workflows Documentation](docs/cicd-workflows.md) for details on:
+
 - Fast test feedback loops
 - Docker build validation on PRs
 - Automated publishing on releases

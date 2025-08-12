@@ -1,7 +1,7 @@
 ---
 mode: agent
 ---
-Use the test runner to run the project's tests. Review the output, find all the failing tests, and write the list to a file `tests/failing.md`. Then investigate each failing test to determine if the test is valid, if the test is still needed, and/or if the code needs to be fixed.
+Use the test runner to run the project's tests. Review the output, find all the failing tests, and write the list to a file `test/failing.md`. Then investigate each failing test to determine if the test is valid, if the test is still needed, and/or if the code needs to be fixed.
 
 It is important to first ensure that the test assertions are still valid with the current implementation first. This is intended to handle the scenario where the implementation has changed but the test was not updated to match the new implementation. We need to first determine if the test is still validating the correct expectations by checking the git history for the related code to determine if the implementation has recently change and the test needs to be updated. If the related code is removed or depricated, the test should be removed to prevent unnecessary tests and failures. If neither of these are true, and it appears to be a legitimate bug or regression, then do a brief investigation of the problem and a potential fix.
 

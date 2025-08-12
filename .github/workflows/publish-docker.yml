@@ -62,12 +62,15 @@ jobs:
           include:
             - dockerfile: Dockerfile.cli
               image: unify
+              readme: README.cli.md
               platforms: linux/amd64,linux/arm64
             - dockerfile: Dockerfile.nginx
               image: unify-nginx
+              readme: README.nginx.md
               platforms: linux/amd64,linux/arm64
             - dockerfile: Dockerfile.apache
               image: unify-apache
+              readme: README.apache.md
               platforms: linux/amd64,linux/arm64
     steps:
       - name: Checkout code
@@ -129,6 +132,15 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Update Docker Hub README
+        if: github.event_name == 'release'
+        uses: peter-evans/dockerhub-description@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: fwdslsh/${{ matrix.image }}
+          readme-filepath: docker/${{ matrix.readme }}
 
   test-docker-images:
     name: Test Docker Images
