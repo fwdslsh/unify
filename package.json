@@ -1,6 +1,6 @@
 {
   "name": "@fwdslsh/unify",
-  "version": "0.4.7",
+  "version": "0.4.8",
   "description": "A lightweight, framework-free static site generator with Bun native APIs",
   "type": "module",
   "main": "src/index.js",
@@ -24,7 +24,7 @@
     "build:executable": "bun run scripts/build-executables.js",
     "build:cross-platform": "bun run scripts/build-executables.js",
     "build:linux": "bun build --compile --target=bun-linux-x64 ./bin/cli.js --outfile unify-linux",
-    "build:macos": "bun build --compile --target=bun-darwin-arm64 ./bin/cli.js --outfile unify-macos", 
+    "build:macos": "bun build --compile --target=bun-darwin-arm64 ./bin/cli.js --outfile unify-macos",
     "build:windows": "bun build --compile --target=bun-windows-x64 ./bin/cli.js --outfile unify-windows.exe"
   },
   "keywords": [
