@@ -150,7 +150,7 @@ check_glibc() {
 
 # Get latest release version
 get_latest_version() {
-    log_info "Fetching latest release information..."
+    log_info "Fetching latest release information..." >&2
     
     if command_exists curl; then
         curl -s "${GITHUB_API_URL}/releases/latest" | grep '"tag_name"' | cut -d'"' -f4
@@ -297,6 +297,13 @@ install_unify() {
     
     # Get version to install
     if [[ -z "$VERSION" ]]; then
+        VERSION=$(get_latest_version)
+        if [[ -z "$VERSION" ]]; then
+            log_error "Failed to fetch latest version"
+            exit 1
+        fi
+    elif [[ "$VERSION" == "latest" ]]; then
+        # Resolve "latest" to actual version tag
         VERSION=$(get_latest_version)
         if [[ -z "$VERSION" ]]; then
             log_error "Failed to fetch latest version"
