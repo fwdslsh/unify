@@ -190,6 +190,10 @@ async function findAvailablePort(startPort) {
  * @param {number} timeout - Timeout in milliseconds
  */
 async function waitForServer(port, timeout = 15000) {
+  // Windows might need more time for server startup
+  if (process.platform === 'win32' && timeout === 15000) {
+    timeout = 30000; // Double timeout for Windows
+  }
   const startTime = Date.now();
   let lastError = null;
 

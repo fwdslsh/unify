@@ -60,15 +60,21 @@ export class DevServer {
 
     try {
       logger.info(`Starting development server on http://${config.hostname}:${config.port}`);
-      this.server = Bun.serve({
+      const serverOptions = {
         port: config.port,
         hostname: config.hostname,
         fetch: this.handleRequest.bind(this),
         error: this.handleError.bind(this),
         development: true,
-        reusePort: true,
         idleTimeout: 255 // Maximum allowed value in Bun (255 seconds = ~4.25 minutes)
-      });
+      };
+      
+      // reusePort is not supported on Windows
+      if (process.platform !== 'win32') {
+        serverOptions.reusePort = true;
+      }
+      
+      this.server = Bun.serve(serverOptions);
       if (!this.server) {
         logger.error('Bun.serve did not return a server instance.');
         throw new Error('Failed to start Bun server.');

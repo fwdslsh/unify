@@ -8,6 +8,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { processIncludes, extractIncludeDependencies, hasIncludes, parseIncludeDirective } from '../../src/core/include-processor.js';
 import { IncludeNotFoundError } from '../../src/utils/errors.js';
+import { crossPlatformPath } from '../test-utils.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const testFixturesDir = path.join(__dirname, '../fixtures/include-processor');
@@ -117,8 +118,8 @@ describe('include-processor', () => {
       const deps = extractIncludeDependencies(html, filePath, testFixturesDir);
       
       expect(deps.length).toBe(2);
-      expect(deps.some(dep => dep.endsWith('header.html'))).toBeTruthy();
-      expect(deps.some(dep => dep.endsWith('footer.html'))).toBeTruthy();
+      expect(deps.some(dep => crossPlatformPath.pathEndsWith(dep, 'header.html'))).toBeTruthy();
+      expect(deps.some(dep => crossPlatformPath.pathEndsWith(dep, 'footer.html'))).toBeTruthy();
     });
     
     it('should extract virtual dependencies', () => {
@@ -128,7 +129,7 @@ describe('include-processor', () => {
       const deps = extractIncludeDependencies(html, filePath, testFixturesDir);
       
       expect(deps.length).toBe(1);
-      expect(deps[0].endsWith('header.html')).toBeTruthy();
+      expect(crossPlatformPath.pathEndsWith(deps[0], 'header.html')).toBeTruthy();
     });
   });
   

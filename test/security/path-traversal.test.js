@@ -3,12 +3,15 @@
  */
 
 import { describe, it, expect } from 'bun:test';
+import path from 'path';
 import { resolveIncludePath, isPathWithinDirectory } from '../../src/utils/path-resolver.js';
 import { PathTraversalError } from '../../src/utils/errors.js';
+import { crossPlatformPath } from '../test-utils.js';
 
 describe('path-traversal security', () => {
-  const sourceRoot = '/safe/source';
-  const currentFile = '/safe/source/index.html';
+  const testPaths = crossPlatformPath.getSecurityTestPaths();
+  const sourceRoot = testPaths.safeSource;
+  const currentFile = testPaths.safeFile;
   
   describe('resolveIncludePath', () => {
     it('should prevent file include path traversal with ../', () => {
@@ -24,46 +27,54 @@ describe('path-traversal security', () => {
     });
     
     it('should prevent Windows-style path traversal', () => {
-      // On Unix systems, backslashes are treated as literal characters, not path separators
-      // But we should still prevent obvious traversal attempts
-      const result = resolveIncludePath('file', '..\\..\\..\\windows\\system32\\config', currentFile, sourceRoot);
-      // This should resolve to a safe path within source root
-      expect(result.startsWith(sourceRoot)).toBeTruthy();
+      // Use platform-appropriate malicious paths - should throw an error
+      const maliciousPath = process.platform === 'win32' ? '..\\..\\..\\Windows\\System32\\config' : '../../../etc/passwd';
+      expect(() => {
+        resolveIncludePath('file', maliciousPath, currentFile, sourceRoot);
+      }).toThrow(PathTraversalError);
     });
     
     it('should prevent encoded path traversal attempts', () => {
       // URL encoding should be treated as literal characters, not decoded
-      const result = resolveIncludePath('file', '%2e%2e%2f%2e%2e%2f%2e%2e%2fetc%2fpasswd', currentFile, sourceRoot);
+      // Since the encoded path contains literal %2e characters, it should resolve safely
+      const result = resolveIncludePath('file', testPaths.encodedTraversalPath, currentFile, sourceRoot);
       // This should resolve to a safe path within source root
-      expect(result.startsWith(sourceRoot)).toBeTruthy();
+      expect(crossPlatformPath.pathStartsWith(result, sourceRoot)).toBeTruthy();
     });
     
     it('should allow safe relative paths', () => {
       const result = resolveIncludePath('file', 'safe/header.html', currentFile, sourceRoot);
-      expect(result.includes('safe/header.html')).toBeTruthy();
-      expect(result.startsWith(sourceRoot)).toBeTruthy();
+      expect(crossPlatformPath.pathContains(result, 'safe/header.html')).toBeTruthy();
+      expect(crossPlatformPath.pathStartsWith(result, sourceRoot)).toBeTruthy();
     });
     
     it('should allow safe virtual paths', () => {
       const result = resolveIncludePath('virtual', '/includes/header.html', currentFile, sourceRoot);
-      expect(result.includes('includes/header.html')).toBeTruthy();
-      expect(result.startsWith(sourceRoot)).toBeTruthy();
+      expect(crossPlatformPath.pathContains(result, 'includes/header.html')).toBeTruthy();
+      expect(crossPlatformPath.pathStartsWith(result, sourceRoot)).toBeTruthy();
     });
   });
   
   describe('isPathWithinDirectory', () => {
     it('should return true for paths within directory', () => {
-      expect(isPathWithinDirectory('/safe/source/file.html', '/safe/source')).toBe(true);
-      expect(isPathWithinDirectory('/safe/source/sub/file.html', '/safe/source')).toBe(true);
+      const testFile1 = crossPlatformPath.testPath('safe', 'source', 'file.html');
+      const testFile2 = crossPlatformPath.testPath('safe', 'source', 'sub', 'file.html');
+      const testDir = crossPlatformPath.testPath('safe', 'source');
+      expect(isPathWithinDirectory(testFile1, testDir)).toBe(true);
+      expect(isPathWithinDirectory(testFile2, testDir)).toBe(true);
     });
     
     it('should return false for paths outside directory', () => {
-      expect(isPathWithinDirectory('/etc/passwd', '/safe/source')).toBe(false);
-      expect(isPathWithinDirectory('/safe/other/file.html', '/safe/source')).toBe(false);
+      const outsideFile1 = testPaths.maliciousSystemPath;
+      const outsideFile2 = crossPlatformPath.testPath('safe', 'other', 'file.html');
+      const testDir = crossPlatformPath.testPath('safe', 'source');
+      expect(isPathWithinDirectory(outsideFile1, testDir)).toBe(false);
+      expect(isPathWithinDirectory(outsideFile2, testDir)).toBe(false);
     });
     
     it('should return true for exact directory match', () => {
-      expect(isPathWithinDirectory('/safe/source', '/safe/source')).toBe(true);
+      const testDir = crossPlatformPath.testPath('safe', 'source');
+      expect(isPathWithinDirectory(testDir, testDir)).toBe(true);
     });
     
     it('should handle relative paths correctly', () => {
@@ -72,7 +83,10 @@ describe('path-traversal security', () => {
     });
     
     it('should prevent path traversal in directory check', () => {
-      expect(isPathWithinDirectory('/safe/source/../../../etc/passwd', '/safe/source')).toBe(false);
+      // Create a path that uses .. to try to escape the directory
+      const testDir = crossPlatformPath.testPath('safe', 'source');
+      const maliciousPath = path.join(testDir, '..', '..', '..', 'etc', 'passwd');
+      expect(isPathWithinDirectory(maliciousPath, testDir)).toBe(false);
     });
   });
   
@@ -91,14 +105,14 @@ describe('path-traversal security', () => {
     
     it('should handle paths with multiple slashes', () => {
       const result = resolveIncludePath('virtual', '//includes///header.html', currentFile, sourceRoot);
-      expect(result.startsWith(sourceRoot)).toBeTruthy();
-      expect(result.includes('includes/header.html')).toBeTruthy(); // Should normalize to single slashes
+      expect(crossPlatformPath.pathStartsWith(result, sourceRoot)).toBeTruthy();
+      expect(crossPlatformPath.pathContains(result, 'includes/header.html')).toBeTruthy(); // Should normalize to single slashes
     });
     
     it('should handle Windows and Unix path separators', () => {
       // This should work on both systems
       const result = resolveIncludePath('file', 'includes/header.html', currentFile, sourceRoot);
-      expect(result.includes('header.html')).toBeTruthy();
+      expect(crossPlatformPath.pathContains(result, 'header.html')).toBeTruthy();
     });
   });
   
@@ -114,8 +128,8 @@ describe('path-traversal security', () => {
       const fileResult = resolveIncludePath('file', 'header.html', currentFile, sourceRoot);
       const virtualResult = resolveIncludePath('virtual', '/header.html', currentFile, sourceRoot);
       
-      expect(fileResult.includes('header.html')).toBeTruthy();
-      expect(virtualResult.includes('header.html')).toBeTruthy();
+      expect(crossPlatformPath.pathContains(fileResult, 'header.html')).toBeTruthy();
+      expect(crossPlatformPath.pathContains(virtualResult, 'header.html')).toBeTruthy();
     });
   });
 });
