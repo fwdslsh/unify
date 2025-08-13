@@ -2,42 +2,12 @@ name: Run Tests
 
 on:
   push:
+  pull_request:
     branches:
       - main
-      - test
+  workflow_dispatch:
 
 jobs:
   run-tests:
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-          
-      - name: Install dependencies
-        run: bun install
-        
-      - name: Run tests
-        run: bun test
-        
-      - name: Verify package structure
-        run: |
-          # Verify main entry points exist
-          test -f bin/cli.js
-          test -f package.json
-          # Verify package can be installed
-          bun install --production --dry-run
-        
-      - name: Build test executable
-        run: bun build --compile --outfile unify-test bin/cli.js
-        
-      - name: Test executable
-        run: ./unify-test --version
-      
-      - name: Copy executable to workspace
-        run: mkdir -p dist && cp unify-test dist/unify-linux-x64             
+    name: Run Tests
+    uses: fwdslsh/.github/.github/workflows/bun-test.yml@main             
