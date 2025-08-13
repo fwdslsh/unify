@@ -44,10 +44,6 @@ dist/
 build/
 out/
 
-# Example build output (keep example source, ignore builds)
-example/dist/
-example/advanced/dist/
-
 # Compiled executables
 unify-test
 unify-linux*
