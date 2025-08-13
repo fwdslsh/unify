@@ -47,7 +47,7 @@ export class DevServer {
   async start(options = {}) {
     const config = {
       port: 3000,
-      hostname: 'localhost',
+      hostname: '127.0.0.1', // Use explicit IPv4 for Windows compatibility
       outputDir: 'dist',
       fallback: 'index.html',
       cors: true,
@@ -60,7 +60,6 @@ export class DevServer {
 
     try {
       logger.info(`Starting development server on http://${config.hostname}:${config.port}`);
-      
       this.server = Bun.serve({
         port: config.port,
         hostname: config.hostname,
@@ -70,22 +69,19 @@ export class DevServer {
         reusePort: true,
         idleTimeout: 255 // Maximum allowed value in Bun (255 seconds = ~4.25 minutes)
       });
-
+      if (!this.server) {
+        logger.error('Bun.serve did not return a server instance.');
+        throw new Error('Failed to start Bun server.');
+      }
       this.isRunning = true;
       logger.success(`Development server running at http://${config.hostname}:${config.port}`);
-      
       // Open browser if requested
       if (config.openBrowser) {
         await this.openBrowser(`http://${config.hostname}:${config.port}`);
       }
-
       return this;
     } catch (error) {
-      if (error.formatForCLI) {
-        logger.error(error.formatForCLI());
-      } else {
-        logger.error('Failed to start development server:', error.message);
-      }
+      logger.error('Failed to start development server:', error?.message || error);
       throw error;
     }
   }
