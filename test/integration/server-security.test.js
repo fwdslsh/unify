@@ -174,7 +174,7 @@ describe('Server Security', () => {
         '../../../etc/passwd',
         '..\\..\\..\\windows\\system32\\config\\sam',
         '../package.json',
-        '../../bin/cli.js',
+        '../../src/cli.js',
         '../src/index.html',
         '..%2F..%2F..%2Fetc%2Fpasswd',
         '..%5C..%5C..%5Cwindows%5Csystem32%5Cconfig%5Csam',

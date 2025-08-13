@@ -14,7 +14,7 @@ import os from 'os';
  */
 export async function runCLI(args, options = {}) {
   // Create a subprocess for isolation
-  const cliUrl = new URL('../bin/cli.js', import.meta.url);
+  const cliUrl = new URL('../src/cli.js', import.meta.url);
   // Use fileURLToPath for proper cross-platform path handling
   const cliPath = fileURLToPath(cliUrl);
   

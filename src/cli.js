@@ -1,11 +1,11 @@
 #!/usr/bin/env bun
 
-import { parseArgs } from '../src/cli/args-parser.js';
-import { build } from '../src/core/file-processor.js';
-import { watch } from '../src/core/file-watcher.js';
-import { DevServer } from '../src/server/dev-server.js';
-import { init } from '../src/cli/init.js';
-import { logger } from '../src/utils/logger.js';
+import { parseArgs } from './cli/args-parser.js';
+import { build } from './core/file-processor.js';
+import { watch } from './core/file-watcher.js';
+import { DevServer } from './server/dev-server.js';
+import { init } from './cli/init.js';
+import { logger } from './utils/logger.js';
 import pkg from "../package.json";
 
 async function main() {
@@ -96,7 +96,7 @@ async function main() {
     } catch {}
     // Exit with code 2 for usage/argument errors (UnifyError with suggestions), 1 for build errors
     if (error) {
-      const { BuildError, UnifyError } = await import('../src/utils/errors.js');
+      const { BuildError, UnifyError } = await import('./utils/errors.js');
       // Prioritize usage/argument errors for exit code 2
       if (error.errorType === 'UsageError') {
         await flushAndExit(2);

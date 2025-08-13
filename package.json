@@ -3,9 +3,9 @@
   "version": "0.4.9",
   "description": "A lightweight, framework-free static site generator with Bun native APIs",
   "type": "module",
-  "main": "src/index.js",
+  "main": "src/cli.js",
   "bin": {
-    "unify": "bin/cli.js"
+    "unify": "src/cli.js"
   },
   "private": false,
   "publishConfig": {
@@ -16,16 +16,16 @@
   },
   "scripts": {
     "test": "bun test",
-    "watch": "bun run bin/cli.js watch --source example/src --output example/dist",
-    "serve": "bun run bin/cli.js serve --source example/src --port 3000",
+    "watch": "bun run src/cli.js watch --source example/src --output example/dist",
+    "serve": "bun run src/cli.js serve --source example/src --port 3000",
     "example": "bun run build && bun run serve --pretty-urls",
-    "build": "bun run bin/cli.js build --source example/src --output example/dist",
-    "build:advanced": "rm -rf example/advanced/dist && bun run ./bin/cli.js build -s example/advanced/src/ -o example/advanced/dist/ -l example/advanced/src/site_layouts/",
+    "build": "bun run src/cli.js build --source example/src --output example/dist",
+    "build:advanced": "rm -rf example/advanced/dist && bun run ./src/cli.js build -s example/advanced/src/ -o example/advanced/dist/ -l example/advanced/src/site_layouts/",
     "build:executable": "bun run scripts/build-executables.js",
     "build:cross-platform": "bun run scripts/build-executables.js",
-    "build:linux": "bun build --compile --target=bun-linux-x64 ./bin/cli.js --outfile unify-linux",
-    "build:macos": "bun build --compile --target=bun-darwin-arm64 ./bin/cli.js --outfile unify-macos",
-    "build:windows": "bun build --compile --target=bun-windows-x64 ./bin/cli.js --outfile unify-windows.exe"
+    "build:linux": "bun build --compile --target=bun-linux-x64 ./src/cli.js --outfile unify-linux",
+    "build:macos": "bun build --compile --target=bun-darwin-arm64 ./src/cli.js --outfile unify-macos",
+    "build:windows": "bun build --compile --target=bun-windows-x64 ./src/cli.js --outfile unify-windows.exe"
   },
   "keywords": [
     "static-site-generator",

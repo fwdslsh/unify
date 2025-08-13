@@ -89,7 +89,7 @@ export async function startDevServer(sourceDir, outputDir, options = {}) {
   const port = await findAvailablePort(basePort);
 
   // Use fileURLToPath for cross-platform compatibility
-  const cliUrl = new URL("../../bin/cli.js", import.meta.url);
+  const cliUrl = new URL("../../src/cli.js", import.meta.url);
   const cliPath = fileURLToPath(cliUrl);
   
   // Use AbortController for proper cleanup

@@ -16,7 +16,7 @@ console.log('1. Checking help text includes init command...');
 const { runCommand } = await import('../test/test-utils.js');
 
 try {
-  const helpResult = await runCommand(process.execPath, ['run', 'bin/cli.js', '--help'], {
+  const helpResult = await runCommand(process.execPath, ['run', 'src/cli.js', '--help'], {
     cwd: process.cwd()
   });
   
@@ -32,7 +32,7 @@ try {
 // Test 2: Unknown template error handling
 console.log('2. Testing unknown template error handling...');
 try {
-  const errorResult = await runCommand(process.execPath, ['./bin/cli.js', 'init', 'definitely-nonexistent-xyz123'], {
+  const errorResult = await runCommand(process.execPath, ['./src/cli.js', 'init', 'definitely-nonexistent-xyz123'], {
     cwd: '/tmp'
   });
   
@@ -66,7 +66,7 @@ try {
 // Test 4: Command recognition
 console.log('4. Testing command recognition...');
 try {
-  const versionResult = await runCommand(process.execPath, ['run', 'bin/cli.js', '--version'], {
+  const versionResult = await runCommand(process.execPath, ['run', 'src/cli.js', '--version'], {
     cwd: process.cwd()
   });
   

@@ -223,7 +223,7 @@ bun run build
 bun run build:advanced
 
 # Build executable - fast (~65ms)
-bun build --compile --outfile unify-test bin/cli.js
+bun build --compile --outfile unify-test src/cli.js
 
 # Docker build CLI image - NEVER CANCEL, takes ~10 minutes
 # Use timeout 600+ seconds minimum
@@ -236,15 +236,15 @@ docker build -f docker/Dockerfile.cli -t unify-cli-test .
 bun run serve
 
 # Or directly with CLI
-bun run bin/cli.js serve --port 3000
+bun run src/cli.js serve --port 3000
 ```
 
 ### CLI Usage Validation
 ```bash
 # Test CLI commands
-bun run bin/cli.js --version    # Should show: unify v0.4.3
-bun run bin/cli.js --help       # Show all commands and options
-bun run bin/cli.js build --source example/src --output /tmp/test-output
+bun run src/cli.js --version    # Should show: unify v0.4.3
+bun run src/cli.js --help       # Show all commands and options
+bun run src/cli.js build --source example/src --output /tmp/test-output
 ```
 
 ## Validation Requirements
@@ -254,7 +254,7 @@ bun run bin/cli.js build --source example/src --output /tmp/test-output
 ### Basic Build Validation
 ```bash
 # 1. Clean build from example
-bun run bin/cli.js build --source example/src --output /tmp/validate-output
+bun run src/cli.js build --source example/src --output /tmp/validate-output
 
 # 2. Check output structure
 ls -la /tmp/validate-output/  # Should show: *.html, css/, sitemap.xml
@@ -330,8 +330,8 @@ ls test/
 {
   "scripts": {
     "test": "bun test",
-    "build": "bun run bin/cli.js build --source example/src --output example/dist",
-    "serve": "bun run bin/cli.js serve --source example/src --port 3000",
+    "build": "bun run src/cli.js build --source example/src --output example/dist",
+    "serve": "bun run src/cli.js serve --source example/src --port 3000",
     "build:executable": "bun run scripts/build-executables.js"
   }
 }

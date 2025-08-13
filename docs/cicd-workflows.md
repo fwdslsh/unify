@@ -154,7 +154,7 @@ docker build -f docker/Dockerfile.cli -t unify:cli .
 docker build -f docker/Dockerfile.nginx -t unify:nginx .
 
 # Test executable build
-bun build --compile --outfile unify-test bin/cli.js
+bun build --compile --outfile unify-test src/cli.js
 ./unify-test --version
 ```
 

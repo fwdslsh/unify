@@ -150,7 +150,7 @@ describe('myFunction', () => {
 bun run benchmark
 
 # Profile memory usage
-bun --inspect bin/cli.js build --source example/src
+bun --inspect src/cli.js build --source example/src
 
 # Test with large sites
 bun run test:large
@@ -319,7 +319,7 @@ We follow the [Contributor Covenant](https://www.contributor-covenant.org/):
 
 ### Understanding the Codebase
 
-- Start with `bin/cli.js` to understand entry points
+- Start with `src/cli.js` to understand entry points
 - Read `src/core/file-processor.js` for build logic
 - Explore `test/` for usage examples
 - Check `example/` for real-world usage

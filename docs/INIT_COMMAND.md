@@ -33,7 +33,7 @@ unify init blog              # Downloads fwdslsh/unify-starter-blog
 
 ### CLI Integration
 - Added to `src/cli/args-parser.js` with proper argument parsing
-- Integrated into `bin/cli.js` command dispatcher
+- Integrated into `src/cli.js` command dispatcher
 - Updated help text and usage examples
 
 ### Core Module
