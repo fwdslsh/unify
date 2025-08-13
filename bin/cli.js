@@ -14,12 +14,12 @@ async function main() {
     
     // Always show version/help output if requested, regardless of command
     if (args.version) {
-      console.log(`unify v${pkg.version}`);
-      process.exit(0);
+      process.stdout.write(`unify v${pkg.version}\n`);
+      await flushAndExit(0);
     }
     if (args.help) {
       showHelp();
-      process.exit(0);
+      await flushAndExit(0);
     }
 
     // Set logging level based on verbose flag
@@ -36,9 +36,9 @@ async function main() {
     // Only allow valid commands
     const validCommands = ['build', 'watch', 'serve', 'init'];
     if (!validCommands.includes(args.command)) {
-      showHelp();
-      console.error(`\nUnknown command: ${args.command}`);
-      process.exit(2);
+  showHelp();
+  process.stderr.write(`\nUnknown command: ${args.command}\n`);
+  await flushAndExit(2);
     }
 
     // Execute commands
@@ -99,13 +99,13 @@ async function main() {
       const { BuildError, UnifyError } = await import('../src/utils/errors.js');
       // Prioritize usage/argument errors for exit code 2
       if (error.errorType === 'UsageError') {
-        process.exit(2);
+        await flushAndExit(2);
       } else if (error instanceof BuildError) {
-        process.exit(1);
+        await flushAndExit(1);
       } else if (error instanceof UnifyError && error.suggestions && Array.isArray(error.suggestions)) {
-        process.exit(2);
+        await flushAndExit(2);
       } else {
-        process.exit(1);
+        await flushAndExit(1);
       }
     }
   }
@@ -154,6 +154,16 @@ Notes:
   • src/assets is automatically copied to dist/assets (if exists)
   • Files/folders starting with _ are not copied to output (use for layouts/partials)
 `);
+}
+
+// Ensures output is flushed before exiting (especially on Windows)
+async function flushAndExit(code) {
+  try {
+    process.stdout.write("");
+    process.stderr.write("");
+    await new Promise(resolve => setTimeout(resolve, 15));
+  } catch {}
+  process.exit(code);
 }
 
 main();

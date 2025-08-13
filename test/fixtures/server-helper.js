@@ -4,6 +4,7 @@
  */
 
 import path from 'path';
+import { fileURLToPath } from 'url';
 
 // Global set to track all server instances across tests
 const activeServers = new Set();
@@ -25,6 +26,19 @@ process.on('exit', async () => {
   await cleanupAllServers();
 });
 
+process.on('beforeExit', async () => {
+  await cleanupAllServers();
+});
+
+// Windows-specific cleanup
+if (process.platform === 'win32') {
+  process.on('SIGBREAK', async () => {
+    console.log('\n🔄 Cleaning up servers on break...');
+    await cleanupAllServers();
+    process.exit(1);
+  });
+}
+
 /**
  * Cleanup all active servers
  */
@@ -41,6 +55,11 @@ export async function cleanupAllServers() {
   
   await Promise.allSettled(cleanupPromises);
   activeServers.clear();
+  
+  // Additional cleanup delay on Windows to ensure ports are released
+  if (process.platform === 'win32') {
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
 }
 
 /**
@@ -65,13 +84,29 @@ export async function startDevServer(sourceDir, outputDir, options = {}) {
     clean: true,
   });
 
-  // Find an available port more reliably
-  const port = await findAvailablePort(4000 + Math.floor(Math.random() * 1000));
+  // Find an available port more reliably with wider range to avoid conflicts
+  const basePort = 4000 + Math.floor(Math.random() * 5000); // Wider port range
+  const port = await findAvailablePort(basePort);
 
-  const cliPath = new URL("../../bin/cli.js", import.meta.url).pathname;
+  // Use fileURLToPath for cross-platform compatibility
+  const cliUrl = new URL("../../bin/cli.js", import.meta.url);
+  const cliPath = fileURLToPath(cliUrl);
   
   // Use AbortController for proper cleanup
   const abortController = new AbortController();
+  
+  const spawnOptions = {
+    stdio: ["pipe", "pipe", "pipe"],
+    env: { ...Bun.env, DEBUG: verbose ? "1" : "0" },
+    signal: abortController.signal,
+    cwd: workingDir || process.cwd()
+  };
+  
+  // On Windows, ensure we don't have conflicting spawn options
+  if (process.platform === 'win32') {
+    // Windows-specific adjustments if needed
+    spawnOptions.windowsHide = true;
+  }
   
   const serverProcess = Bun.spawn(
     [
@@ -86,12 +121,7 @@ export async function startDevServer(sourceDir, outputDir, options = {}) {
       port.toString(),
       ...(verbose ? ["--verbose"] : [])
     ],
-    {
-      stdio: ["pipe", "pipe", "pipe"],
-      env: { ...Bun.env, DEBUG: verbose ? "1" : "0" },
-      signal: abortController.signal,
-      cwd: workingDir || process.cwd()
-    }
+    spawnOptions
   );
 
   // Create server object with cleanup capability
@@ -104,19 +134,36 @@ export async function startDevServer(sourceDir, outputDir, options = {}) {
         // Signal the process to terminate
         abortController.abort();
         
-        // Give it a moment to gracefully shut down
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Platform-specific graceful shutdown timing
+        const gracefulDelay = process.platform === 'win32' ? 200 : 100;
+        await new Promise(resolve => setTimeout(resolve, gracefulDelay));
         
         // Force kill if still running
         if (!serverProcess.killed) {
-          serverProcess.kill("SIGTERM");
+          // On Windows, try different termination signals
+          if (process.platform === 'win32') {
+            // Windows doesn't support SIGTERM reliably, use 'SIGKILL' directly
+            try {
+              serverProcess.kill("SIGKILL");
+            } catch (killError) {
+              // Ignore kill errors - process might already be dead
+            }
+          } else {
+            // Unix-like systems: try SIGTERM first, then SIGKILL
+            serverProcess.kill("SIGTERM");
+          }
           
-          // Wait for process to exit or force kill after timeout
+          // Wait for process to exit with longer timeout on Windows
+          const killTimeoutMs = process.platform === 'win32' ? 5000 : 2000;
           const killTimeout = setTimeout(() => {
             if (!serverProcess.killed) {
-              serverProcess.kill("SIGKILL");
+              try {
+                serverProcess.kill("SIGKILL");
+              } catch (killError) {
+                // Ignore kill errors
+              }
             }
-          }, 2000);
+          }, killTimeoutMs);
           
           try {
             await serverProcess.exited;
@@ -125,6 +172,11 @@ export async function startDevServer(sourceDir, outputDir, options = {}) {
             clearTimeout(killTimeout);
             // Process already exited or was killed
           }
+        }
+        
+        // Additional cleanup time on Windows
+        if (process.platform === 'win32') {
+          await new Promise(resolve => setTimeout(resolve, 200));
         }
         
         // Remove from active servers
@@ -168,12 +220,16 @@ async function findAvailablePort(startPort) {
       // Try to create a temporary server on this port
       const testServer = Bun.serve({
         port,
+        hostname: '127.0.0.1', // Explicit localhost binding
         fetch: () => new Response("test"),
       });
       
       // If successful, stop it and return the port
       testServer.stop();
-      await new Promise(resolve => setTimeout(resolve, 50)); // Brief wait for cleanup
+      
+      // Longer cleanup wait on Windows
+      const cleanupDelay = process.platform === 'win32' ? 200 : 50;
+      await new Promise(resolve => setTimeout(resolve, cleanupDelay));
       return port;
     } catch {
       // Port is in use, try next one
@@ -190,23 +246,30 @@ async function findAvailablePort(startPort) {
  * @param {number} timeout - Timeout in milliseconds
  */
 async function waitForServer(port, timeout = 15000) {
+  // Windows might need more time for server startup
+  if (process.platform === 'win32' && timeout === 15000) {
+    timeout = 45000; // Triple timeout for Windows CI environments
+  }
   const startTime = Date.now();
   let lastError = null;
 
   while (Date.now() - startTime < timeout) {
     try {
+      // Use longer timeout on Windows for each request
+      const requestTimeout = process.platform === 'win32' ? 3000 : 1000;
       const response = await fetch(`http://localhost:${port}`, {
-        signal: AbortSignal.timeout(1000) // 1 second timeout per request
+        signal: AbortSignal.timeout(requestTimeout)
       });
       
       // Server is ready if it responds with any HTTP status
       if (response.status >= 200 && response.status < 600) {
         // Additional stability check - make sure it responds consistently
-        await new Promise(resolve => setTimeout(resolve, 100));
+        const stabilityDelay = process.platform === 'win32' ? 300 : 100;
+        await new Promise(resolve => setTimeout(resolve, stabilityDelay));
         
         try {
           const confirmResponse = await fetch(`http://localhost:${port}`, {
-            signal: AbortSignal.timeout(1000)
+            signal: AbortSignal.timeout(requestTimeout)
           });
           if (confirmResponse.status >= 200 && confirmResponse.status < 600) {
             return; // Server is stable and ready
@@ -220,7 +283,9 @@ async function waitForServer(port, timeout = 15000) {
       // Server not ready yet, continue waiting
     }
     
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    // Longer polling interval on Windows
+    const pollInterval = process.platform === 'win32' ? 500 : 200;
+    await new Promise((resolve) => setTimeout(resolve, pollInterval));
   }
 
   throw new Error(`Server not ready within ${timeout}ms. Last error: ${lastError?.message || 'unknown'}`);

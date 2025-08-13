@@ -330,14 +330,14 @@ describe('FileClassifier', () => {
     test('should identify underscore directories as non-emitting', () => {
       expect(classifier.isNonEmittingDirectory('_includes')).toBe(true);
       expect(classifier.isNonEmittingDirectory('_components')).toBe(true);
-      expect(classifier.isNonEmittingDirectory('blog/_includes')).toBe(true);
-      expect(classifier.isNonEmittingDirectory('_assets/images')).toBe(true);
+      expect(classifier.isNonEmittingDirectory(path.join('blog', '_includes'))).toBe(true);
+      expect(classifier.isNonEmittingDirectory(path.join('_assets', 'images'))).toBe(true);
     });
 
     test('should identify regular directories as emitting', () => {
       expect(classifier.isNonEmittingDirectory('blog')).toBe(false);
       expect(classifier.isNonEmittingDirectory('docs')).toBe(false);
-      expect(classifier.isNonEmittingDirectory('assets/images')).toBe(false);
+      expect(classifier.isNonEmittingDirectory(path.join('assets', 'images'))).toBe(false);
       expect(classifier.isNonEmittingDirectory('css')).toBe(false);
     });
   });
