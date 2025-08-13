@@ -121,12 +121,14 @@ export function parseArgs(argv) {
           'Check for typos in the command name',
           'Check the documentation for supported commands'
         );
-        throw new UnifyError(
+        const error = new UnifyError(
           `Unknown command: ${arg}`,
           null,
           null,
           suggestions
         );
+        error.errorType = 'UsageError';
+        throw error;
       }
     }
     // If not a flag/option, and command already found
@@ -138,7 +140,7 @@ export function parseArgs(argv) {
         continue;
       }
       // Otherwise treat as unknown option
-      throw new UnifyError(
+      const error = new UnifyError(
         `Unknown option: ${arg}`,
         null,
         null,
@@ -147,6 +149,8 @@ export function parseArgs(argv) {
           'Check for typos in the argument'
         ]
       );
+      error.errorType = 'UsageError';
+      throw error;
     }
 
     // Options with values
@@ -293,15 +297,17 @@ export function parseArgs(argv) {
         'Check for typos in the option name',
         'Check the documentation for supported flags'
       );
-      throw new UnifyError(
+      const error = new UnifyError(
         `Unknown option: ${arg}`,
         null,
         null,
         suggestions
       );
+      error.errorType = 'UsageError';
+      throw error;
     } else {
       // Non-option argument that's not a command
-      throw new UnifyError(
+      const error = new UnifyError(
         `Unknown option: ${arg}`,
         null,
         null,
@@ -310,6 +316,8 @@ export function parseArgs(argv) {
           'Check for typos in the argument'
         ]
       );
+      error.errorType = 'UsageError';
+      throw error;
     }
   }
 

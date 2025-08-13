@@ -191,7 +191,7 @@ export async function build(options = {}) {
     try {
       await fs.access(sourceRoot);
     } catch (error) {
-      throw new UnifyError(
+      const dirError = new UnifyError(
         `Source directory not found: ${sourceRoot}`,
         null,
         null,
@@ -202,6 +202,8 @@ export async function build(options = {}) {
           "Create the source directory if it doesn't exist",
         ]
       );
+      dirError.errorType = 'UsageError';
+      throw dirError;
     }
 
     // Clean output directory if requested
@@ -763,12 +765,13 @@ export async function incrementalBuild(
           results.processed++;
           logger.debug(`Rebuilt Markdown: ${relativePath}`);
         } else {
-          // For assets, only copy if referenced (or during initial build) and NOT a partial file
+          // For assets, copy if referenced OR if it's a new file during incremental build
           const isPartial = isPartialFile(filePath, config);
-          if (!isPartial && (assets.isAssetReferenced(filePath) || !assetTracker)) {
+          const isNewFile = !fileModificationCache.has(filePath);
+          if (!isPartial && (assets.isAssetReferenced(filePath) || !assetTracker || isNewFile)) {
             await copyAsset(filePath, sourceRoot, outputRoot);
             results.copied++;
-            logger.debug(`Copied: ${relativePath}`);
+            logger.debug(`Copied ${isNewFile ? 'new ' : ''}asset: ${relativePath}`);
           } else {
             if (isPartial) {
               logger.debug(`Skipped partial file: ${relativePath}`);
