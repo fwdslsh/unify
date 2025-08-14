@@ -8,10 +8,12 @@ Run Unify in Docker:
 
 ```bash
 # Build a static site
-docker run --rm -v $(pwd):/site fwdslsh/unify:latest build --source /site/src --output /site/dist
+docker run --rm -v $(pwd):/workspace:rw -u $(id -u):$(id -g) fwdslsh/unify:latest build --source src --output dist
 
 # Start development server
-docker run --rm -p 3000:3000 -v $(pwd):/site fwdslsh/unify:latest serve --source /site/dist --port 3000
+docker run --rm -p 3000:3000 -v $(pwd):/workspace:rw -u $(id -u):$(id -g) fwdslsh/unify:latest serve --host 0.0.0.0
+
+# Then open http://localhost:3000 in your browser to view the site.
 ```
 
 ### Common Options
@@ -31,9 +33,7 @@ docker run --rm -p 3000:3000 -v $(pwd):/site fwdslsh/unify:latest serve --source
 
 ```bash
 # Build with pretty URLs and minification
-docker run --rm -v $(pwd):/site fwdslsh/unify:latest build \
-  --source /site/src \
-  --output /site/dist \
+docker run --rm -v $(pwd):/workspace -u $(id -u):$(id -g) fwdslsh/unify:latest build \
   --pretty-urls \
   --minify
 ```
