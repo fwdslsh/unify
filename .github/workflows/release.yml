@@ -44,44 +44,19 @@ jobs:
   # Call Docker publishing workflow
   docker:
     name: Publish Docker Image
-    needs: [build, release]
+    needs: [download]
     if: ${{ !cancelled() && needs.release.result == 'success' }}
     uses: fwdslsh/toolkit/.github/workflows/publish-docker.yml@main
     with:
       tag:  ${{ github.event.inputs.tag || github.ref_name }}
       description: Unify is a SSG that provides a minimal tool set to allow developers to build lightweight web sites
-      dockerfile: ./docker/Dockerfile.cli
-      readme: ./docker/README.cli.md
     secrets: inherit
   
-  docker-apache:
-    name: Publish Docker Image
-    needs: [build, release]
-    if: ${{ !cancelled() && needs.release.result == 'success' }}
-    uses: fwdslsh/toolkit/.github/workflows/publish-docker.yml@main
-    with:
-      tag:  ${{ github.event.inputs.tag || github.ref_name }}
-      description: This image provides an Apache HTTP server configured for Unify static sites, with SSI includes and optimized caching.
-      dockerfile: ./docker/Dockerfile.apache
-      readme: ./docker/README.apache.md
-    secrets: inherit
-
-  docker-nginx:
-    name: Publish Docker Image
-    needs: [build, release]
-    if: ${{ !cancelled() && needs.release.result == 'success' }}
-    uses: fwdslsh/toolkit/.github/workflows/publish-docker.yml@main
-    with:
-      tag:  ${{ github.event.inputs.tag || github.ref_name }}
-      description: This image provides the Unify CLI for building and serving static sites using Bun. Optimized for fast builds, CI/CD, and local development.
-      dockerfile: ./docker/Dockerfile.nginx
-      readme: ./docker/README.nginx.md
-    secrets: inherit
 
   # Call NPM publishing workflow
   publish-npm:
     name: Publish NPM Package
-    needs: [build, release]
+    needs: [build]
     if: ${{ !cancelled() && needs.release.result == 'success' }}
     uses: fwdslsh/toolkit/.github/workflows/publish-npm.yml@main
     secrets: inherit
