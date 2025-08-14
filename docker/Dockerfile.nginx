@@ -1,5 +1,3 @@
-# Streamlined Docker build using single file executable with NGINX
-# Using Debian-based nginx for glibc compatibility with Bun executables
 FROM nginx:1.25-bookworm
 
 # Install utilities for health checks

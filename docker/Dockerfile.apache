@@ -17,6 +17,10 @@ RUN a2enmod include headers \
 # Remove default config and add our own (immutable, not writable by the container)
 COPY docker/apache.conf /etc/apache2/sites-available/000-default.conf
 
+# Copy the single file executable
+COPY dist/unify-linux-x64 /usr/local/bin/unify
+RUN chmod +x /usr/local/bin/unify
+
 # Prepare the web root and Apache runtime directory with correct ownership/permissions
 RUN mkdir -p /var/www/html /var/run/apache2 /var/log/apache2 \
  && chown -R htmluser:www-data /var/www/html \

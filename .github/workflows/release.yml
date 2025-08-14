@@ -32,6 +32,12 @@ jobs:
       tag: ${{ github.event.inputs.tag || github.ref_name }}
     secrets: inherit
 
+  download:
+    name: Download all artifacts
+    uses: actions/download-artifact@v4
+    with:
+      path: ./dist
+      
   # Call Docker publishing workflow
   docker:
     name: Publish Docker Image
