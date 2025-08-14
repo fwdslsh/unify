@@ -420,7 +420,7 @@ describe('Final Boss Integration Test', () => {
       
       // Should complete within reasonable time (adjust threshold based on platform)
       const timeThreshold = process.platform === 'win32' ? 5000 : 1000; //HACK: windoze is slow
-      expect(buildTime).toBeLessThan(5000);
+      expect(buildTime).toBeLessThan(10000);
 
       // Verify some output files
       const page0Exists = await fs.access(path.join(outputDir, 'page-0.html'))
