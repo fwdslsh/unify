@@ -34,10 +34,13 @@ jobs:
 
   download:
     name: Download all artifacts
-    uses: actions/download-artifact@v4
-    with:
-      path: ./dist
-      
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v5
+        with:
+          path: ./dist
+
   # Call Docker publishing workflow
   docker:
     name: Publish Docker Image
