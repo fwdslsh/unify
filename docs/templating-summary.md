@@ -1,13 +1,13 @@
 # Templating System Summary
 
-A concise overview of unify's four templating features.
+A concise overview of unify's four templating features using web platform standards.
 
 ## Core Concepts
   
 - **Includes** → Component insertion via comments or elements
 - **Layouts** → HTML structure with `<slot>` placeholders  
 - **Slots** → Content placeholders with optional names and default content
-- **Templates** → Content containers with `target` attributes that replace associated slots
+- **Templates** → Content containers with `slot` attributes that replace associated slots
 
 ## How It Works
 
@@ -30,7 +30,7 @@ A concise overview of unify's four templating features.
    `src/index.html`
 
    ```html
-   <template target="title">Home Page</template>
+   <template slot="title">Home Page</template>
 
    <div id="home-content">
      <h1>Welcome home!</h1>
@@ -74,7 +74,8 @@ A concise overview of unify's four templating features.
 | ------------------------------- | -------------------------------- | ------------------------------------------- |
 | `<slot name="x">`               | Content placeholder              | `<slot name="title">Default</slot>`         |
 | `<slot></slot>`                 | Default content area             | `<slot></slot>`                             |
-| `<template target="x">`      | Content for named slot           | `<template target="title">Hi</template>` |
+| `<template slot="x">`           | Content for named slot           | `<template slot="title">Hi</template>`     |
+| `<element slot="x">`            | Element assigned to named slot   | `<aside slot="sidebar">Content</aside>`    |
 | `data-layout="path"`            | Layout selection                 | `<div data-layout="base.html">`             |
 | `<!--#include virtual="/x" -->` | Include from source root         | `<!--#include virtual="/header.html" -->`   |
 | `<!--#include file="x" -->`     | Include relative to current file | `<!--#include file="../nav.html" -->`       |
@@ -104,16 +105,24 @@ src/
 Pages contain exactly:
 
 - **One root element** with optional `data-layout` attribute
-- **Zero or more** `<template target="name">` elements
+- **Zero or more** `<template slot="name">` elements or elements with `slot="name"` attributes
 - **Zero or more** `<script>` and `<style>` elements
 - **Include directives** (comments or elements) within the root element
 
+## Slot Content Options
+
+Pages can provide content for named slots using either:
+
+- **`<template slot="name">`** - Hidden when viewing the raw page in a browser
+- **`<element slot="name">`** - Visible when viewing the raw page in a browser
+
 ## Key Benefits
 
-- **Simple**: Only 3 new attributes added to standard HTML
+- **Simple**: Uses standard web platform `slot` attributes
 - **Flexible**: Slots have defaults, content can be mixed and matched
 - **Modular**: Components are reusable and customizable
 - **Standard**: Works with existing HTML and Markdown workflows
+- **Raw-viewable**: Choose whether slot content is visible in uncompiled pages
 
 ## Example Flow
 
@@ -140,7 +149,7 @@ Pages contain exactly:
 
 ```html
 <div data-layout="base">
-  <template target="title">My Card Page</template>
+  <template slot="title">My Card Page</template>
   
   <p>This goes to the layout's main slot</p>
   <!--#include virtual="/.components/card.html" -->

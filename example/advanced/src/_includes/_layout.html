@@ -8,6 +8,21 @@
   </head>
   <body>
     <!--#include virtual="/_includes/header.html" -->
+    
+    <!-- Notice slot for visible content -->
+    <slot name="notice"></slot>
+    
+    <!-- Alert slot for demo -->
+    <slot name="alert"></slot>
+    
+    <!-- Sidebar slot for navigation -->
+    <aside class="sidebar">
+      <slot name="sidebar">
+        <h3>Default Sidebar</h3>
+        <p>No custom sidebar content provided.</p>
+      </slot>
+    </aside>
+    
     <main class="default-layout">
       <slot></slot> <!-- unnamed slot receives default content -->
     </main>

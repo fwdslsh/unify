@@ -148,8 +148,6 @@ unify watch [options]
 - **Behavior:** Copies matching files to output directory preserving relative paths
 - **Note:** Use quotes around patterns with special characters. The `src/assets` directory is automatically copied if it exists.
 
-> **Removed:** `--layouts`, `--components`, `--assets` (replaced by conventions and --copy)
-
 #### Build Options
 
 **`--pretty-urls`**
@@ -327,33 +325,108 @@ Valid layout filenames:
 
 ### Slots & Templates
 
-Slot/template injection applies to both HTML and Markdown files.
-Pages may use `<template target="name">...</template>` to provide named slot content for layouts.
-Layouts may use `<slot name="name"></slot>` for named slots, and `<slot></slot>` for default slot.
-During build, all `<template target="...">` elements are extracted from the page and injected into corresponding `<slot name="...">` in the layout chain. The main page content is injected into the default slot.
+Slot/template injection applies to both HTML and Markdown files using standard web platform semantics.
+
+#### Layout Authoring
+
+Layouts must declare insertion points with standard `<slot>` elements (named and default). `<slot>` elements are kept in normal light DOM (not inside an actual shadow root) so that **their children render as fallback when a layout is opened directly in a browser** (outside Unify). This matches platform behavior: the `<slot>` element's children act as fallback when nothing is assigned. ([MDN: slot element](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/slot), [JavaScript.info: Shadow DOM slots](https://javascript.info/slots-composition))
+
+When a layout file is viewed directly in a browser (not processed by Unify), **named and unnamed `<slot>`s display their fallback children**. This relies on standard browser behavior for `<slot>` fallback content rendered outside of a shadow tree.
+
+#### Page Projection Syntax
+
+Pages may provide named projections using either:
+
+- **`<template slot="name">`** (inert/hidden in raw page view; compiled by Unify)
+- **Elements with `slot="name"`** (visible in raw page view)
+
+**`<template slot="name">…</template>` behavior:**
+
+- Hidden when the uncompiled page is opened in a browser (since `<template>` is inert and not rendered)
+- Unify consumes `template.content` and injects it into `<slot name="name">`
+- The `<template>` wrapper is removed from output (only its content appears where slotted)
+
+**`<any-element slot="name">…</any-element>` behavior:**
+
+- Visible in raw view (because it's not inside `<template>`)
+- Unify moves that element's subtree into `<slot name="name">`
+- The original element is removed from its original position in the compiled output and appears in the slot position
+
+Reference: `slot` is a standard global attribute assigning nodes to a `<slot name="…">`; elements without a `slot` attribute map to the **unnamed** slot. ([MDN: slot global attribute](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Global_attributes/slot))
+
+#### Default Slot Semantics
+
+Content without a `slot` attribute is assigned to the default `<slot>` in document order. If the layout has no default slot, Unify warns or errors based on configuration.
+
+#### Fallback Content
+
+If no page content is assigned to a given named slot, Unify **emits the fallback children of that `<slot>`** as the compiled output, preserving author order and whitespace. This mirrors standard slot fallback rules.
+
+#### Processing Model
+
+1. **Collect Layout**: Parse the layout DOM. If a `<template shadowrootmode>` exists (experimental), use its children as the slot tree; otherwise use the layout's top-level content.
+
+2. **Collect Page Projections**: Build two maps:
+   - **Named projections**: For each `<template slot="X">`, take `template.content` (fragment). For each non-template `[slot="X"]`, take the element node (subtree).
+   - **Default projection**: all top-level nodes **without** a `slot` attribute.
+
+3. **Assign & Compose** (mirror platform behavior):
+   - For each `<slot name="X">` in the layout, append all assigned nodes for `X` in document order (multiple assignees allowed)
+   - For the **unnamed** `<slot>`, append the default projection in document order
+   - If a slot has **no assigned nodes**, output its **fallback children** as authored
+
+4. **Node relocation semantics**:
+   - `<template slot="X">`: remove the template after consuming its `content`; inject only the fragment
+   - Non-template `[slot="X"]`: remove the original element from its source position and inject it in the slot's position
+
+5. **Output**: Emit a single, flat HTML document with projected content in place of `<slot>` elements
+
+#### Experimental: Declarative Shadow DOM Flavored Layouts
+
+**Experimental:** Layouts may be authored with `<template shadowrootmode="…">` for familiarity with Declarative Shadow DOM. **Unify does not ship a shadow root**; it uses the template's children as the layout's slot tree during compilation. ([MDN: Using shadow DOM](https://developer.mozilla.org/en-US/docs/Web/API/Web_components/Using_shadow_DOM), [web.dev: Declarative Shadow DOM](https://web.dev/articles/declarative-shadow-dom), [GitHub: declarative-shadow-dom](https://github.com/mfreed7/declarative-shadow-dom/blob/master/README.md))
+
+```html
+<template shadowrootmode="open">
+  <!-- layout content with <slot> and fallback -->
+  <slot name="sidebar">Default sidebar content</slot>
+  <slot>Main content area</slot>
+</template>
+```
+
+#### Validation & Warnings
+
+- **Unmatched slot names** in pages: warn (configurable to error)
+- **Multiple assignments** to the same slot: allowed; preserve document order (aligns with platform behavior)
+- **Missing default slot** when page has un-slotted content: warn/error per config
 
 **Example:**
 
 ```html
 <!-- Page content -->
-<template target="sidebar">Sidebar content</template>
-<template target="footer">Footer content</template>
+<template slot="sidebar">Sidebar content</template>
+<aside slot="footer">Footer content (visible in raw view)</aside>
 <main>Main content</main>
 ```
 
 ```html
 <!-- Layout content -->
 <body>
-  <slot name="sidebar"></slot>
-  <slot></slot>
-  <slot name="footer"></slot>
+  <slot name="sidebar">Default sidebar fallback</slot>
+  <slot>Default main content</slot>
+  <slot name="footer">Default footer fallback</slot>
 </body>
 ```
 
+**Raw File Behavior:**
+
+- **Open a page directly**: default content is visible; named slot content is hidden if authored inside `<template>`
+- **Open a layout directly**: all slot fallback is visible, since `<slot>` outside a shadow tree displays its children
+
 **Rationale:**
 
-- This ensures component-based, reusable layouts for all page types, and matches developer expectations for slot/template behavior.
-- Override precedence is explicit and predictable.
+- This ensures component-based, reusable layouts for all page types, and matches developer expectations for slot/template behavior using web platform standards
+- Override precedence is explicit and predictable
+- Source order of assigned nodes is preserved for accessibility and meaningful reading order
 
 ### Overrides
 
@@ -405,6 +478,36 @@ During build, all `<template target="...">` elements are extracted from the page
 - Handle projects with 1000+ pages
 - Handle page that are over 5MB
 - Efficient processing of large asset collections
+
+## Migration Guide: Template Target to Slot Attributes
+
+### Backward Compatibility
+
+The legacy `<template target="…">` syntax has been removed in favor of standard web platform `slot` attributes.
+
+### Migration Steps
+
+Replace the old syntax:
+
+```html
+<template target="sidebar">…</template>
+```
+
+with either:
+
+```html
+<template slot="sidebar">…</template>  <!-- hidden in raw view -->
+```
+
+or:
+
+```html
+<aside slot="sidebar">…</aside>        <!-- visible in raw view -->
+```
+
+### Optional CLI Migration Tool
+
+A future `unify migrate slots` command may be added to automatically rewrite `<template target="X">` → `<template slot="X">`.
 
 ## Compatibility Requirements
 

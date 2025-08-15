@@ -69,7 +69,7 @@ This content will be placed in the default slot of the layout.
 
 **HTML page with automatic layout:**
 ```html
-<template target="head">
+<template slot="head">
   <title>About Us - My Site</title>
   <meta name="description" content="Learn more about our company">
 </template>
@@ -152,8 +152,8 @@ Example of the wrapping process:
 
 **Page: `src/blog/post.html`**
 ```html
-<template target="title">My First Post</template>
-<template target="meta">
+<template slot="title">My First Post</template>
+<template slot="meta">
   <meta name="author" content="John Doe">
 </template>
 <h1>Welcome to my blog</h1>
@@ -206,8 +206,8 @@ Use `<template>` elements for modern component-based templating:
 **Page using template: `src/index.html`**
 ```html
 <div data-layout="_custom.layout.html">
-  <template target="title">Welcome to My Site</template>
-  <template target="meta">
+  <template slot="title">Welcome to My Site</template>
+  <template slot="meta">
     <meta name="keywords" content="static site, generator">
   </template>
   
@@ -239,14 +239,14 @@ Use the `data-layout` attribute to specify layouts and fill slots:
 **Page with data-layout:**
 ```html
 <div data-layout="_blog.layout.html">
-  <template target="sidebar">
+  <template slot="sidebar">
     <h3>Recent Posts</h3>
     <ul>
       <li><a href="/post1">First Post</a></li>
       <li><a href="/post2">Second Post</a></li>
     </ul>
   </template>
-  <template target="meta">
+  <template slot="meta">
     <meta name="author" content="John Doe">
   </template>
   
@@ -259,14 +259,14 @@ Use the `data-layout` attribute to specify layouts and fill slots:
 **Alternative placement on html/body elements:**
 ```html
 <html data-layout="_blog.layout.html">
-  <template target="title">My Page Title</template>
+  <template slot="title">My Page Title</template>
   <!-- Page content -->
 </html>
 
 <!-- OR -->
 
 <body data-layout="_blog.layout.html">
-  <template target="header">Custom Header</template>
+  <template slot="header">Custom Header</template>
   <!-- Page content -->
 </body>
 ```
@@ -279,6 +279,79 @@ Layout paths are resolved in this order:
 2. **Relative to current directory**: `data-layout="_custom.layout.html"` → current directory
 3. **Search up directory tree**: Look for matching layout in parent directories
 4. **Fallback to _includes**: `src/_includes/_layout.html` if it exists
+
+### Slot Content Options
+
+Pages can provide content for named slots using two approaches with different raw-view behaviors:
+
+#### Template Slot (Hidden in Raw View)
+
+Use `<template slot="name">` for content that should be hidden when viewing the uncompiled page directly in a browser:
+
+```html
+<div data-layout="_blog.layout.html">
+  <template slot="sidebar">
+    <h3>Recent Posts</h3>
+    <ul>
+      <li><a href="/post1">First Post</a></li>
+    </ul>
+  </template>
+  
+  <h1>Main Blog Post</h1>
+  <p>This content is visible in both raw and compiled views.</p>
+</div>
+```
+
+**Raw page view**: Only the `<h1>` and `<p>` are visible; the sidebar content is hidden since `<template>` is inert.
+
+**Compiled output**: Sidebar content appears in the layout's `<slot name="sidebar">` position.
+
+#### Element Slot (Visible in Raw View)
+
+Use any element with `slot="name"` for content that should be visible when viewing the uncompiled page:
+
+```html
+<div data-layout="_blog.layout.html">
+  <aside slot="sidebar">
+    <h3>Recent Posts</h3>
+    <ul>
+      <li><a href="/post1">First Post</a></li>
+    </ul>
+  </aside>
+  
+  <h1>Main Blog Post</h1>
+  <p>This content is visible in both raw and compiled views.</p>
+</div>
+```
+
+**Raw page view**: Both the sidebar and main content are visible.
+
+**Compiled output**: The `<aside>` element is moved to the layout's `<slot name="sidebar">` position.
+
+#### Layout Fallback Content
+
+Layouts can provide fallback content that displays when slots are empty:
+
+```html
+<html>
+<head>
+  <title><slot name="title">Default Site Title</slot></title>
+</head>
+<body>
+  <aside>
+    <slot name="sidebar">
+      <h3>Default Sidebar</h3>
+      <p>No custom sidebar provided.</p>
+    </slot>
+  </aside>
+  <main>
+    <slot>Default main content</slot>
+  </main>
+</body>
+</html>
+```
+
+When a layout file is viewed directly in a browser, **all slot fallback content is visible** since `<slot>` elements outside of a shadow DOM display their children.
 
 ## Slot System
 
@@ -324,22 +397,22 @@ Define specific content areas with named slots:
 **Page filling named slots:**
 ```html
 <div data-layout="layouts/complex.html">
-  <template target="head">
+  <template slot="head">
     <title>Custom Page Title</title>
     <link rel="stylesheet" href="/custom.css">
   </template>
   
-  <template target="header">
+  <template slot="header">
     <h1>Custom Header</h1>
     <nav>...</nav>
   </template>
   
-  <template target="sidebar">
+  <template slot="sidebar">
     <h3>Page Navigation</h3>
     <ul>...</ul>
   </template>
   
-  <template target="footer">
+  <template slot="footer">
     <p>Custom footer for this page</p>
   </template>
   
@@ -361,7 +434,7 @@ The unnamed slot receives content not in named templates:
 
 <!-- Page -->
 <div data-layout="layout.html">
-  <template target="title">Page Title</template>
+  <template slot="title">Page Title</template>
   
   <!-- This content goes to the default slot -->
   <h1>Main Heading</h1>
@@ -422,10 +495,10 @@ Build reusable components with slots:
 ```html
 <div data-layout="_layout.html">
   <!--#include virtual="/_includes/card.html" -->
-  <template target="header">
+  <template slot="header">
     <h3>Product Card</h3>
   </template>
-  <template target="footer">
+  <template slot="footer">
     <button>Buy Now</button>
   </template>
   
@@ -470,15 +543,15 @@ Create specialized layouts for different content types:
 **Using blog layout:**
 ```html
 <!-- This page is in src/blog/ directory, so it automatically uses _blog.layout.html -->
-<template target="head">
+<template slot="head">
   <title>My Blog Post - My Site</title>
   <meta name="description" content="A great blog post">
 </template>
-<template target="post-meta">
+<template slot="post-meta">
   <h1>My Blog Post</h1>
   <p class="meta">Published on January 1, 2024</p>
 </template>
-<template target="comments">
+<template slot="comments">
   <!--#include virtual="/_includes/comments.html" -->
 </template>
 
@@ -658,7 +731,7 @@ unify build --source src --output debug-dist
 
 <!-- unify -->
 <div data-layout="layouts/base.html">
-  <template target="title">Page Title</template>
+  <template slot="title">Page Title</template>
   Content here (goes to default slot)
 </div>
 ```
