@@ -50,7 +50,7 @@ Create `src/_layout.html` (folder-scoped layout):
 </html>
 ```
 
-Or create `src/_includes/_layout.html` (fallback layout):
+Or create `src/_includes/layout.html` (site-wide fallback layout):
 
 ```html
 <!DOCTYPE html>
@@ -99,7 +99,7 @@ Create `src/_includes/footer.html`:
 Create `src/index.html`:
 
 ```html
-<template target="head">
+<template slot="head">
   <title>Welcome - My Site</title>
 </template>
 <div>
@@ -148,8 +148,8 @@ unify uses conventions to organize your site:
 
 - **Pages**: Any `.html` or `.md` file not starting with `_`
 - **Partials**: Files starting with `_` (non-emitting)
-- **Layouts**: Files starting with `_` and ending with `layout.html` or `layout.htm`
-- **Shared Components**: Files in `_includes/` directory
+- **Layouts**: Files starting with `_` (recommended to end with `.layout.html` or `.layout.htm`)
+- **Shared Components**: Files in `_includes/` directory (no `_` prefix required)
 
 ### Layout System
 
@@ -162,10 +162,25 @@ Valid layout file names:
 
 #### Layout Discovery
 
-1. **Folder Layout**: Looks for layout files in the page's directory
-2. **Parent Directories**: Climbs up to find the nearest layout
-3. **Fallback Layout**: Uses `_includes/_layout.html` if it exists
+1. **Explicit Override**: `data-layout` attribute or frontmatter (supports short names like `data-layout="blog"`)
+2. **Auto Discovery**: Looks for `_*.layout.html` then `_*.html` files in page directory and parent directories
+3. **Site-wide Fallback**: Uses `_includes/layout.html` if it exists (no underscore prefix required)
 4. **No Layout**: Renders page content as-is
+
+#### Short Name Layout References
+
+For convenience, you can use short names instead of full file paths:
+
+```html
+<!-- Instead of data-layout="_blog.layout.html" -->
+<div data-layout="blog">
+  <h1>Blog Post</h1>
+</div>
+```
+
+Short names automatically resolve to:
+- Same directory: `_blog.layout.html`, `_blog.html`
+- `_includes` directory: `blog.layout.html`, `blog.html`
 
 ### Include System
 
@@ -200,7 +215,7 @@ unify uses Apache SSI syntax for includes:
 ```
 src/
 ├── _includes/
-│   ├── _layout.html          # Fallback layout
+│   ├── layout.html           # Site-wide fallback layout
 │   ├── header.html           # Shared header
 │   ├── footer.html           # Shared footer
 │   └── blog-nav.html         # Blog navigation
@@ -218,7 +233,7 @@ src/
 ```
 src/
 ├── _includes/
-│   ├── _layout.html          # Fallback layout
+│   ├── layout.html           # Site-wide fallback layout
 │   ├── nav.html              # Main navigation
 │   └── footer.html           # Footer
 ├── pages/
@@ -236,7 +251,7 @@ src/
 ```
 src/
 ├── _includes/
-│   ├── _layout.html          # Global fallback
+│   ├── layout.html           # Site-wide fallback
 │   ├── header.html
 │   └── footer.html
 ├── docs/

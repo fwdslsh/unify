@@ -21,10 +21,9 @@ describe('slot system v0.5.0', () => {
   beforeEach(async () => {
     // Create test directories
     sourceDir = path.join(testFixturesDir, 'src');
-    layoutsDir = path.join(sourceDir, '.layouts');
+    layoutsDir = sourceDir; // Use source directory for layouts now (no .layouts directory)
     
     await fs.mkdir(sourceDir, { recursive: true });
-    await fs.mkdir(layoutsDir, { recursive: true });
     
     dependencyTracker = new DependencyTracker();
   });
@@ -273,5 +272,98 @@ describe('slot system v0.5.0', () => {
     expect(section1Index).toBeLessThan(section2Index);
     expect(section2Index).toBeLessThan(section3Index);
     expect(html).not.toContain('Default content');
+  });
+
+  it('should handle short name layout references', async () => {
+    // Create named layout file with .layout. convention
+    const layoutContent = `<!DOCTYPE html>
+<html>
+<body>
+  <header>
+    <slot name="header">Default header</slot>
+  </header>
+  <main>
+    <slot>Default main content</slot>
+  </main>
+</body>
+</html>`;
+    
+    await fs.writeFile(path.join(layoutsDir, '_blog.layout.html'), layoutContent);
+    
+    // Create page with short name reference
+    const pageContent = `<div data-layout="blog">
+<template slot="header">
+  <h1>Blog Post Title</h1>
+</template>
+<article>
+  <p>This is the blog post content.</p>
+</article>
+</div>`;
+    
+    const pagePath = path.join(sourceDir, 'post.html');
+    await fs.writeFile(pagePath, pageContent);
+    
+    // Process the page
+    const result = await processHtmlUnified(
+      pageContent,
+      pagePath,
+      sourceDir,
+      dependencyTracker,
+      {}
+    );
+    
+    const html = result.content;
+    
+    // Verify short name resolved to correct layout
+    expect(html).toContain('<h1>Blog Post Title</h1>');  // Header slot content
+    expect(html).toContain('<article>');  // Main content
+    expect(html).toContain('This is the blog post content');
+    expect(html).not.toContain('Default header');  // Should not have fallback
+    expect(html).not.toContain('Default main content');  // Should not have fallback
+  });
+
+  it('should prefer .layout. files over non-.layout. files', async () => {
+    // Create both types of layout files
+    const preferredLayoutContent = `<!DOCTYPE html>
+<html>
+<body>
+  <h1>Preferred Layout</h1>
+  <slot>Content</slot>
+</body>
+</html>`;
+    
+    const secondaryLayoutContent = `<!DOCTYPE html>
+<html>
+<body>
+  <h1>Secondary Layout</h1>
+  <slot>Content</slot>
+</body>
+</html>`;
+    
+    await fs.writeFile(path.join(layoutsDir, '_blog.layout.html'), preferredLayoutContent);
+    await fs.writeFile(path.join(layoutsDir, '_blog.html'), secondaryLayoutContent);
+    
+    // Create page with short name reference
+    const pageContent = `<div data-layout="blog">
+<p>Test content</p>
+</div>`;
+    
+    const pagePath = path.join(sourceDir, 'post.html');
+    await fs.writeFile(pagePath, pageContent);
+    
+    // Process the page
+    const result = await processHtmlUnified(
+      pageContent,
+      pagePath,
+      sourceDir,
+      dependencyTracker,
+      {}
+    );
+    
+    const html = result.content;
+    
+    // Verify preferred layout was used
+    expect(html).toContain('Preferred Layout');
+    expect(html).not.toContain('Secondary Layout');
   });
 });

@@ -41,8 +41,6 @@ describe('Complete HTML Layout Bug', () => {
     await fs.writeFile(filePath, completeHtml);
 
     // Create a default layout that would wrap content
-    const layoutsDir = path.join(sourceDir, '.layouts');
-    await fs.mkdir(layoutsDir, { recursive: true });
     const layoutContent = `<!DOCTYPE html>
 <html>
 <head>
@@ -54,7 +52,7 @@ describe('Complete HTML Layout Bug', () => {
   <footer>Site Footer</footer>
 </body>
 </html>`;
-    await fs.writeFile(path.join(layoutsDir, 'default.html'), layoutContent);
+    await fs.writeFile(path.join(sourceDir, '_layout.html'), layoutContent);
 
     // Process the HTML
     const result = await processHtmlUnified(
@@ -76,17 +74,17 @@ describe('Complete HTML Layout Bug', () => {
     expect(result.content.includes('My Complete Page')).toBe(true);
   });
 
-  it('should apply layout to HTML fragments', async () => {
-    // Create an HTML fragment (no <html> tag)
-    const fragmentHtml = `<h1>This is a fragment</h1>
-<p>It should get wrapped in a layout.</p>`;
+  it('should apply layout to HTML fragments with explicit layout', async () => {
+    // Create an HTML fragment (no <html> tag) with explicit layout attribute
+    const fragmentHtml = `<div data-layout="_layout.html">
+<h1>This is a fragment</h1>
+<p>It should get wrapped in a layout.</p>
+</div>`;
 
     const filePath = path.join(sourceDir, 'fragment.html');
     await fs.writeFile(filePath, fragmentHtml);
 
-    // Create a default layout
-    const layoutsDir = path.join(sourceDir, '.layouts');
-    await fs.mkdir(layoutsDir, { recursive: true });
+    // Create layout in same directory as the fragment
     const layoutContent = `<!DOCTYPE html>
 <html>
 <head>
@@ -98,7 +96,7 @@ describe('Complete HTML Layout Bug', () => {
   <footer>Site Footer</footer>
 </body>
 </html>`;
-    await fs.writeFile(path.join(layoutsDir, 'default.html'), layoutContent);
+    await fs.writeFile(path.join(sourceDir, '_layout.html'), layoutContent);
 
     // Process the HTML
     const result = await processHtmlUnified(
@@ -136,8 +134,6 @@ describe('Complete HTML Layout Bug', () => {
     await fs.writeFile(filePath, completeHtmlWithLayout);
 
     // Create custom layout
-    const layoutsDir = path.join(sourceDir, '.layouts');
-    await fs.mkdir(layoutsDir, { recursive: true });
     const customLayoutContent = `<!DOCTYPE html>
 <html>
 <head>
@@ -148,7 +144,7 @@ describe('Complete HTML Layout Bug', () => {
   <slot></slot>
 </body>
 </html>`;
-    await fs.writeFile(path.join(layoutsDir, 'custom.html'), customLayoutContent);
+    await fs.writeFile(path.join(sourceDir, 'custom.html'), customLayoutContent);
 
     // Process the HTML
     const result = await processHtmlUnified(

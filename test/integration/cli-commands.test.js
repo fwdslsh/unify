@@ -82,8 +82,7 @@ describe('CLI Commands and Options', () => {
       const result = await runCLIInDir(tempDir, [
         'build',
         '-s', path.join(tempDir, 'content'),
-        '-o', outputDir,
-        '-l', path.join(tempDir, 'templates')
+        '-o', outputDir
       ]);
 
       expect(result.code).toBe(0);
@@ -424,7 +423,6 @@ describe('CLI Commands and Options', () => {
         'build',
         '-s', path.join(tempDir, 'content'),
         '--output', outputDir,
-        '-l', path.join(tempDir, 'templates'),
         '--pretty-urls',
         '-p', '3000' // This would be for serve, but testing parsing
       ]);

@@ -50,7 +50,7 @@ describe('Final Boss Integration Test', () => {
         }),
 
         // Base layout
-        'src/.layouts/base.html': `<!DOCTYPE html>
+        'src/_includes/base.html': `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -85,7 +85,7 @@ describe('Final Boss Integration Test', () => {
 </div>`,
 
         // Main pages using simplified layout system
-        'src/index.html': `<div data-layout="/.layouts/base.html">
+        'src/index.html': `<div data-layout="base">
   <template slot="title">Home - Final Boss Test</template>
   <template slot="description">Welcome to our comprehensive test site</template>
   
@@ -103,7 +103,7 @@ describe('Final Boss Integration Test', () => {
   </ul>
 </div>`,
 
-        'src/about.html': `<div data-layout="/.layouts/base.html">
+        'src/about.html': `<div data-layout="base">
   <template slot="title">About - Final Boss Test</template>
   <template slot="description">Learn about our test methodology</template>
   
@@ -113,7 +113,7 @@ describe('Final Boss Integration Test', () => {
   <!--#include virtual="/.components/card.html" -->
 </div>`,
 
-        'src/features.html': `<div data-layout="/.layouts/base.html">
+        'src/features.html': `<div data-layout="base">
   <template slot="title">Features - Final Boss Test</template>
   <template slot="description">Explore all the features we test</template>
   
@@ -214,7 +214,7 @@ This is a test blog post written in Markdown.
           homepage: 'https://edge.example.com'
         }),
 
-        'src/.layouts/default.html': `<!DOCTYPE html>
+        'src/_includes/default.html': `<!DOCTYPE html>
 <html>
 <head>
   <title><slot name="title">Default</slot></title>
@@ -225,7 +225,7 @@ This is a test blog post written in Markdown.
 </html>`,
 
         // Test with missing component (should build but show error)
-        'src/test-missing.html': `<div data-layout="/.layouts/default.html">
+        'src/test-missing.html': `<div data-layout="default">
   <template slot="title">Missing Component Test</template>
   <!--#include virtual="/.components/missing.html" -->
   <p>This page tries to include a missing component.</p>
@@ -247,7 +247,7 @@ This is a test blog post written in Markdown.
   <!--#include virtual="/.components/circular-a.html" -->
 </div>`,
 
-        'src/test-circular.html': `<div data-layout="/.layouts/default.html">
+        'src/test-circular.html': `<div data-layout="default">
   <template slot="title">Circular Test</template>
   <!--#include virtual="/.components/circular-a.html" -->
 </div>`
@@ -378,7 +378,7 @@ describe('Final Boss Integration Test', () => {
         tempDir,
         path.join(tempDir, 'content'),
         customOutputDir,
-        ['-l', 'layouts']
+        []
       );
 
       expect(buildResult.code).toBe(0);

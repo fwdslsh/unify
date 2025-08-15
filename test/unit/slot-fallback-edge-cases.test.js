@@ -19,10 +19,8 @@ describe('slot fallback edge cases', () => {
   
   beforeEach(async () => {
     sourceDir = path.join(testFixturesDir, 'src');
-    layoutsDir = path.join(sourceDir, '.layouts');
     
     await fs.mkdir(sourceDir, { recursive: true });
-    await fs.mkdir(layoutsDir, { recursive: true });
     
     dependencyTracker = new DependencyTracker();
   });
@@ -37,7 +35,7 @@ describe('slot fallback edge cases', () => {
   
   it('should use fallback when page has only whitespace', async () => {
     const layoutContent = `<html><body><slot>Fallback content</slot></body></html>`;
-    await fs.writeFile(path.join(layoutsDir, '_layout.html'), layoutContent);
+    await fs.writeFile(path.join(sourceDir, '_layout.html'), layoutContent);
     
     const pageContent = `<div data-layout="_layout.html">   \n\t  </div>`;
     const pagePath = path.join(sourceDir, 'whitespace.html');
@@ -50,7 +48,7 @@ describe('slot fallback edge cases', () => {
   
   it('should use fallback when page has only comments', async () => {
     const layoutContent = `<html><body><slot>Fallback content</slot></body></html>`;
-    await fs.writeFile(path.join(layoutsDir, '_layout.html'), layoutContent);
+    await fs.writeFile(path.join(sourceDir, '_layout.html'), layoutContent);
     
     const pageContent = `<div data-layout="_layout.html"><!-- just a comment --></div>`;
     const pagePath = path.join(sourceDir, 'comment.html');
@@ -63,7 +61,7 @@ describe('slot fallback edge cases', () => {
   
   it('should use page content when it has meaningful content', async () => {
     const layoutContent = `<html><body><slot>Fallback content</slot></body></html>`;
-    await fs.writeFile(path.join(layoutsDir, '_layout.html'), layoutContent);
+    await fs.writeFile(path.join(sourceDir, '_layout.html'), layoutContent);
     
     const pageContent = `<div data-layout="_layout.html"><p>Real content</p></div>`;
     const pagePath = path.join(sourceDir, 'meaningful.html');
@@ -76,7 +74,7 @@ describe('slot fallback edge cases', () => {
   
   it('should handle mixed comments and whitespace correctly', async () => {
     const layoutContent = `<html><body><slot>Fallback content</slot></body></html>`;
-    await fs.writeFile(path.join(layoutsDir, '_layout.html'), layoutContent);
+    await fs.writeFile(path.join(sourceDir, '_layout.html'), layoutContent);
     
     const pageContent = `<div data-layout="_layout.html">
       <!-- comment 1 -->

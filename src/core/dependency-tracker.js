@@ -219,8 +219,9 @@ export class DependencyTracker {
           // Path with directory structure, relative to source root
           resolvedLayoutPath = path.join(sourceRoot, layoutPath);
         } else {
-          // Bare filename, relative to layouts directory
-          resolvedLayoutPath = path.join(sourceRoot, '.layouts', layoutPath);
+          // Bare filename, relative to current page directory
+          const pageDir = path.dirname(pagePath);
+          resolvedLayoutPath = path.join(pageDir, layoutPath);
         }
         
         dependencies.push(resolvedLayoutPath);

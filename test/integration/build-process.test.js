@@ -230,19 +230,19 @@ describe('build-process integration', () => {
 
   
   it('should apply default layout unless the source page includes an <html> element explicitly', async () => {
-    // Create layouts directory with default.html
-    await fs.mkdir(path.join(sourceDir, '.layouts'), { recursive: true });
+    // Create _includes directory with layout.html
+    await fs.mkdir(path.join(sourceDir, '_includes'), { recursive: true });
     await fs.writeFile(
-      path.join(sourceDir, '.layouts', 'default.html'),
+      path.join(sourceDir, '_includes', 'layout.html'),
       `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>{{ title }}</title>
+  <title><slot name="title">Default Title</slot></title>
 </head>
 <body>
   <header><h1>Default Layout</h1></header>
-  <main>{{ content }}</main>
+  <main><slot></slot></main>
   <footer><p>Default Footer</p></footer>
 </body>
 </html>`
@@ -251,9 +251,7 @@ describe('build-process integration', () => {
     // Create markdown file without html element
     await fs.writeFile(
       path.join(sourceDir, 'test-markdown.md'),
-      `---
-title: Test Page
----
+      `<template slot="title">Test Page</template>
 
 # Test Content
 
@@ -299,8 +297,6 @@ title: Partial HTML Page
     await build({
       source: sourceDir,
       output: outputDir,
-      components: '.components',
-      layouts: '.layouts',
       clean: true
     });
     
@@ -326,8 +322,6 @@ title: Partial HTML Page
     await build({
       source: sourceDir,
       output: outputDir,
-      components: '.components',
-      layouts: '.layouts',
       clean: true
     });
     // PATCH: Assert output file exists and print its contents for debug

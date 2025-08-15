@@ -269,13 +269,8 @@ export async function build(options = {}) {
       // Exclude files in components or layouts directories
       const relativePath = path.relative(sourceRoot, file);
       const pathParts = relativePath.split(path.sep);
-      if (
-        config.components &&
-        pathParts.includes(path.basename(config.components))
-      ) {
-        return false;
-      }
-      if (config.layouts && pathParts.includes(path.basename(config.layouts))) {
+      // Files in _includes and _* directories are non-emitting by convention
+      if (pathParts.some(part => part.startsWith('_'))) {
         return false;
       }
       return (
@@ -732,7 +727,7 @@ export async function incrementalBuild(
           }
         } else if (isMarkdownFile(filePath)) {
           // Load layout for markdown processing
-          const layoutFile = await findLayoutFile(sourceRoot, config.layouts);
+          // Layout discovery is now handled by the unified HTML processor
           let layoutContent = null;
           if (layoutFile) {
             try {
@@ -1025,43 +1020,7 @@ function getOutputPathWithPrettyUrls(
  * @param {string} sourceRoot - Source root directory
  * @returns {Promise<string|null>} Path to layout file or null if not found
  */
-async function findLayoutFile(sourceRoot, layoutsDir = ".layouts") {
-  const possibleLayouts = [
-    path.join(sourceRoot, "layout.html"),
-    path.join(sourceRoot, "_layout.html"),
-    path.join(sourceRoot, "templates", "layout.html"),
-    path.join(sourceRoot, layoutsDir, "default.html"),
-    path.join(sourceRoot, "layouts", "default.html"), // Legacy support
-    path.join(sourceRoot, ".components", "layout.html"), // Components directory fallback
-  ];
 
-  for (const layoutPath of possibleLayouts) {
-    try {
-      await fs.access(layoutPath);
-      return layoutPath;
-    } catch {
-      // File doesn't exist, try next
-    }
-  }
-
-  return null;
-}
-
-/**
- * Check if default.html layout exists in the layouts directory
- * @param {string} sourceRoot - Source root directory
- * @param {string} layoutsDir - Layouts directory name
- * @returns {Promise<boolean>} True if default.html exists
- */
-async function hasDefaultLayout(sourceRoot, layoutsDir = ".layouts") {
-  const defaultLayoutPath = path.join(sourceRoot, layoutsDir, "default.html");
-  try {
-    await fs.access(defaultLayoutPath);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 /**
  * Create basic HTML structure for content without layout
@@ -1196,43 +1155,9 @@ async function processMarkdownFile(
     finalContent = wrapInLayout(htmlWithAnchors, metadata, layoutContent);
     logger.debug("Applied specified layout");
   } else {
-    const hasDefault = await hasDefaultLayout(sourceRoot, layoutsDir);
-    if (hasDefault) {
-      const defaultLayoutPath = path.join(
-        sourceRoot,
-        layoutsDir,
-        "default.html"
-      );
-      try {
-        const defaultLayoutContent = await fs.readFile(
-          defaultLayoutPath,
-          "utf-8"
-        );
-        finalContent = wrapInLayout(
-          htmlWithAnchors,
-          metadata,
-          defaultLayoutContent
-        );
-        logger.debug("Applied default layout");
-      } catch (error) {
-        if (failFast) {
-          throw new BuildError(
-            `Build failed due to missing default layout: ${error.message}`,
-            [{ file: filePath, error: error.message }]
-          );
-        }
-        logger.warn(`Could not read default layout: ${error.message}`);
-        finalContent = createBasicHtmlStructure(
-          htmlWithAnchors,
-          title,
-          excerpt
-        );
-        logger.debug("Created basic HTML structure (default layout failed)");
-      }
-    } else {
-      finalContent = createBasicHtmlStructure(htmlWithAnchors, title, excerpt);
-      logger.debug("Created basic HTML structure (no layout available)");
-    }
+    // Layout discovery is now handled by the unified HTML processor
+    finalContent = htmlWithAnchors;
+    logger.debug("No explicit layout specified, will use unified processor layout discovery");
   }
 
   // Remove any remaining include directives from output

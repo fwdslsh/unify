@@ -87,8 +87,7 @@ export async function processHtmlUnified(
   config = {}
 ) {
   const processingConfig = {
-    layoutsDir: ".layouts",
-    defaultLayout: "default.html",
+    layoutsDir: ".layouts", // Deprecated but kept for compatibility
     optimize: config.minify || config.optimize,
     ...config,
   };
@@ -554,9 +553,8 @@ function shouldUseDOMMode(content) {
  */
 async function processDOMMode(pageContent, pagePath, sourceRoot, config = {}, extractedAssets = null) {
   const domConfig = { 
-    layoutsDir: '.layouts',
+    layoutsDir: '.layouts', // Deprecated but kept for compatibility
     componentsDir: '.components', 
-    defaultLayout: 'default.html',
     sourceRoot, 
     ...config 
   };
@@ -576,7 +574,7 @@ async function processDOMMode(pageContent, pagePath, sourceRoot, config = {}, ex
   // Detect layout from HTML content using regex-based parsing
   let layoutPath;
   try {
-    layoutPath = await detectLayoutFromHTML(pageContent, sourceRoot, domConfig);
+    layoutPath = await detectLayoutFromHTML(pageContent, sourceRoot, domConfig, pagePath);
     logger.debug(`Using layout: ${layoutPath}`);
     let layoutContent = await fs.readFile(layoutPath, 'utf-8');
 
@@ -648,25 +646,34 @@ ${pageContent}
 /**
  * Detect which layout to use for a page using regex-based HTML parsing
  */
-async function detectLayoutFromHTML(htmlContent, sourceRoot, config) {
+async function detectLayoutFromHTML(htmlContent, sourceRoot, config, pagePath) {
   // Look for data-layout attribute in HTML content
   const layoutMatch = htmlContent.match(/data-layout=["']([^"']+)["']/i);
   
   if (layoutMatch) {
     const layoutAttr = layoutMatch[1];
-    return resolveResourcePath(layoutAttr, sourceRoot, config.layoutsDir, 'layout');
+    
+    // Use LayoutDiscovery system for both full paths and short names
+    const { LayoutDiscovery } = await import('./layout-discovery.js');
+    const discovery = new LayoutDiscovery();
+    
+    const resolvedLayoutPath = await discovery.resolveLayoutOverride(layoutAttr, sourceRoot, pagePath);
+    if (resolvedLayoutPath) {
+      return resolvedLayoutPath;
+    }
+    
+    // If layout override resolution failed, throw error
+    throw new LayoutError(
+      pagePath,
+      `Layout not found: ${layoutAttr}`,
+      [sourceRoot]
+    );
   }
   
-  // Fall back to default layout
-  let defaultLayoutPath;
-  if (path.isAbsolute(config.layoutsDir)) {
-    // If layoutsDir is an absolute path (from CLI), use it directly
-    defaultLayoutPath = path.join(config.layoutsDir, config.defaultLayout);
-  } else {
-    // If layoutsDir is relative, join with sourceRoot
-    defaultLayoutPath = path.join(sourceRoot, config.layoutsDir, config.defaultLayout);
-  }
-  return defaultLayoutPath;
+  // Fall back to discovered layout using LayoutDiscovery
+  const { LayoutDiscovery } = await import('./layout-discovery.js');
+  const discovery = new LayoutDiscovery();
+  return await discovery.findLayoutForPage(pagePath, sourceRoot);
 }
 
 /**
@@ -1137,32 +1144,56 @@ async function processDOMTemplating(htmlContent, filePath, sourceRoot, config, e
       }
     }
 
-    // Check if no html tag exists, apply the default layout
+    // Check if no html tag exists, use layout discovery to find appropriate layout
     if (!htmlContent.includes("<html")) {
-      // If no html tag, we assume a default layout is needed
-      try {
-        return await processLayoutAttribute(
-          htmlContent,
-          config.defaultLayout,  // Just pass the filename, not the full path
-          filePath,
-          sourceRoot,
-          config,
-          extractedAssets  // Pass extracted assets
-        );
-      } catch (error) {
-        // For default layouts, always gracefully degrade
-        // since they are implicit/automatic, not explicitly requested by the user
-        logger.warn(`Default layout not found for ${path.relative(sourceRoot, filePath)}: ${error.message}`);
-        return `<!DOCTYPE html>
+      // Use the layout discovery system to find the best layout for this page
+      const { LayoutDiscovery } = await import('./layout-discovery.js');
+      const discovery = new LayoutDiscovery();
+      const discoveredLayoutPath = await discovery.findLayoutForPage(filePath, sourceRoot);
+      
+      if (discoveredLayoutPath) {
+        try {
+          // Get the relative layout path from the discovered absolute path
+          const relativeLayoutPath = path.relative(path.dirname(filePath), discoveredLayoutPath);
+          return await processLayoutAttribute(
+            htmlContent,
+            relativeLayoutPath,
+            filePath,
+            sourceRoot,
+            config,
+            extractedAssets
+          );
+        } catch (error) {
+          logger.warn(`Layout processing failed for ${path.relative(sourceRoot, filePath)}: ${error.message}`);
+          // Fall through to basic HTML wrapper
+        }
+      }
+      
+      // No layout found, wrap in basic HTML structure and inject assets
+      
+      // Inject assets into basic HTML structure
+      let stylesHTML = '';
+      let scriptsHTML = '';
+      
+      if (extractedAssets?.styles?.length > 0) {
+        const dedupedStyles = [...new Set(extractedAssets.styles)];
+        stylesHTML = '\n' + dedupedStyles.join('\n');
+      }
+      
+      if (extractedAssets?.scripts?.length > 0) {
+        const dedupedScripts = [...new Set(extractedAssets.scripts)];
+        scriptsHTML = '\n' + dedupedScripts.join('\n');
+      }
+      
+      return `<!DOCTYPE html>
 <html>
 <head>
-  <title>Page</title>
+  <title>Page</title>${stylesHTML}
 </head>
 <body>
-${htmlContent}
+${htmlContent}${scriptsHTML}
 </body>
 </html>`;
-      }
     }
 
     // If no layout, process any standalone slots
@@ -1197,37 +1228,16 @@ async function processLayoutAttribute(
   config,
   extractedAssets = { styles: [], scripts: [] }
 ) {
-  // Resolve layout path
-  let resolvedLayoutPath;
+  // Use LayoutDiscovery system for both full paths and short names
+  const { LayoutDiscovery } = await import('./layout-discovery.js');
+  const discovery = new LayoutDiscovery();
   
-  if (layoutPath.startsWith("/")) {
-    // Absolute path from source root
-    resolvedLayoutPath = path.join(sourceRoot, layoutPath.substring(1));
-  } else if (layoutPath.includes('/')) {
-    // Path with directory structure, relative to source root
-    resolvedLayoutPath = path.join(sourceRoot, layoutPath);
-  } else {
-    // Bare filename, relative to layouts directory
-    if (path.isAbsolute(config.layoutsDir)) {
-      // layoutsDir is absolute path (from CLI)
-      resolvedLayoutPath = path.join(config.layoutsDir, layoutPath);
-    } else {
-      // layoutsDir is relative path (default or relative)
-      resolvedLayoutPath = path.join(sourceRoot, config.layoutsDir, layoutPath);
-    }
-  }
-
-  // Security check - allow layouts in configured layouts directory or within source root
-  const layoutsBaseDir = path.isAbsolute(config.layoutsDir) 
-    ? config.layoutsDir 
-    : path.join(sourceRoot, config.layoutsDir);
-    
-  if (!isPathWithinDirectory(resolvedLayoutPath, sourceRoot) && 
-      !isPathWithinDirectory(resolvedLayoutPath, layoutsBaseDir)) {
+  const resolvedLayoutPath = await discovery.resolveLayoutOverride(layoutPath, sourceRoot, filePath);
+  if (!resolvedLayoutPath) {
     throw new LayoutError(
-      resolvedLayoutPath,
-      `Layout path outside allowed directories: ${layoutPath}`,
-      [layoutsBaseDir, path.join(sourceRoot, config.layoutsDir)]
+      filePath,
+      `Layout not found: ${layoutPath}`,
+      [sourceRoot]
     );
   }
 
@@ -1347,8 +1357,7 @@ function processStandaloneSlots(htmlContent) {
  */
 export function getUnifiedConfig(userConfig = {}) {
   let config = {
-    layoutsDir: userConfig.layouts || ".layouts", 
-    defaultLayout: "default.html",
+    layoutsDir: userConfig.layouts || ".layouts", // Deprecated but kept for compatibility
     ...userConfig,
   };
   

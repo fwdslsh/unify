@@ -75,7 +75,7 @@ unify is built exclusively for Bun and uses native APIs for maximum performance:
 <!-- Alternative modern DOM syntax -->
 <include src="/_includes/header.html"></include>
 <main>
-  <template target="title">My Page Title</template>
+  <template slot="title">My Page Title</template>
   <h1>Welcome!</h1>
   <p>Use slots and templates for advanced layouts.</p>
 </main>

@@ -15,15 +15,15 @@ This example demonstrates the `unify` convention-based static site generator tha
 example/advanced/
 ├── src/
 │   ├── _includes/
-│   │   ├── _layout.html         # Fallback layout
+│   │   ├── layout.html          # Site-wide fallback layout
 │   │   ├── header.html          # Shared header component
 │   │   ├── footer.html          # Shared footer component
 │   │   ├── navigation.html      # Navigation component
 │   │   ├── card.html            # Card component  
 │   │   └── alert.html           # Alert component
 │   ├── _blog.layout.html        # Blog-specific layout using naming pattern
-│   ├── index.html               # Homepage (uses _includes/_layout.html)
-│   ├── about.html               # About page (uses _includes/_layout.html)
+│   ├── index.html               # Homepage (uses _includes/layout.html)
+│   ├── about.html               # About page (uses _includes/layout.html)
 │   ├── blog.html                # Blog page (uses _blog.layout.html)
 │   └── styles/
 │       └── site.css             # Global styles
@@ -51,19 +51,40 @@ Pages are automatically wrapped with the nearest layout file using naming patter
 
 ### 2. Layout Naming Patterns
 
-Valid layout filenames:
+**Recommended layout filenames:**
 - `_layout.html`, `_layout.htm` (standard)
 - `_blog.layout.html`, `_docs.layout.htm` (extended patterns)
 - `_documentation.layout.html` (complex naming)
 
+**Also valid (but less clear):**
+- `_blog.html`, `_main.htm`, `_template.html` (works but less obvious purpose)
+
+**Special case for `_includes` directory:**
+- Files in `_includes/` don't require underscore prefix (e.g., `layout.html`, `blog.layout.html`)
+
 ### 3. Layout Discovery Process
 
-1. **Folder Layout**: Searches current directory for layout files
-2. **Parent Directory Climb**: Walks up directory tree to find nearest layout
-3. **Fallback Layout**: Uses `_includes/_layout.html` if it exists
+1. **Explicit Override**: `data-layout` attribute or frontmatter (supports short names like `data-layout="blog"`)
+2. **Auto Discovery**: Searches for `_*.layout.html` then `_*.html` files in page directory and parent directories  
+3. **Site-wide Fallback**: Uses `_includes/layout.html` if it exists (no underscore prefix required)
 4. **No Layout**: Renders content as-is
 
-### 4. Slot System
+### 4. Short Name Layout References
+
+For convenience, you can use short names instead of full file paths:
+
+```html
+<!-- Instead of data-layout="_blog.layout.html" -->
+<div data-layout="blog">
+  <h1>Blog Post</h1>
+</div>
+```
+
+Short names automatically resolve to:
+- Same directory: `_blog.layout.html`, `_blog.html`
+- `_includes` directory: `blog.layout.html`, `blog.html`
+
+### 5. Slot System
 
 Named slots in layouts:
 ```html
@@ -80,7 +101,7 @@ Content for slots:
 <h1>Main Content</h1>
 ```
 
-### 5. Component Inclusion
+### 6. Component Inclusion
 
 Include components using Apache SSI syntax:
 ```html
@@ -106,7 +127,7 @@ unify build --source example/advanced/src --output example/advanced/dist
 
 The `index.html` file will be processed into a complete HTML document:
 
-- Layout `_includes/_layout.html` provides the base structure
+- Layout `_includes/layout.html` provides the base structure
 - Named slots (`title`) filled from `<template slot="...">`
 - Default content goes into the unnamed `<slot></slot>`
 - Include directives replaced with component content
@@ -136,10 +157,11 @@ Valid layout filenames:
 - `_custom.layout.html` (descriptive naming)
 
 ### Layout Discovery Order
-1. Current directory for layout files
-2. Parent directories (climbing up)
-3. Fallback to `_includes/_layout.html`
-4. No layout (render content as-is)
+1. **Explicit Override**: `data-layout` attribute or frontmatter (supports short names)
+2. **Auto Discovery**: Current directory for `_*.layout.html` then `_*.html` files  
+3. **Parent directories**: Climbing up the directory tree
+4. **Site-wide fallback**: `_includes/layout.html` (no underscore prefix required)
+5. **No layout**: Render content as-is
 
 ## 🚀 Benefits
 

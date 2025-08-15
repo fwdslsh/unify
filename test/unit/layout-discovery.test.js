@@ -156,10 +156,17 @@ describe('LayoutDiscovery', () => {
     });
 
     test('should reject non-layout files', () => {
-      expect(discovery.isLayoutFileName('layout.html')).toBe(false);
-      expect(discovery.isLayoutFileName('_component.html')).toBe(false);
-      expect(discovery.isLayoutFileName('_custom.template.html')).toBe(false);
-      expect(discovery.isLayoutFileName('custom.layout.html')).toBe(false);
+      expect(discovery.isLayoutFileName('layout.html')).toBe(false);  // No underscore prefix
+      expect(discovery.isLayoutFileName('custom.layout.html')).toBe(false);  // No underscore prefix
+      expect(discovery.isLayoutFileName('_component.txt')).toBe(false);  // Wrong extension
+      expect(discovery.isLayoutFileName('component.html')).toBe(false);  // No underscore prefix
+    });
+
+    test('should accept any _*.html files as potential layouts', () => {
+      expect(discovery.isLayoutFileName('_component.html')).toBe(true);  // Valid layout file
+      expect(discovery.isLayoutFileName('_custom.template.html')).toBe(true);  // Valid layout file
+      expect(discovery.isLayoutFileName('_anything.html')).toBe(true);  // Valid layout file
+      expect(discovery.isLayoutFileName('_file.htm')).toBe(true);  // Valid layout file
     });
   });
 

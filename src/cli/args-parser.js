@@ -164,11 +164,6 @@ export function parseArgs(argv) {
       i += 2;
       continue;
     }
-    if ((arg === '--layouts' || arg === '-l' || arg === '--templates') && nextArg && !nextArg.startsWith('-')) {
-      args.layouts = nextArg;
-      i += 2;
-      continue;
-    }
     if ((arg === '--copy') && nextArg && !nextArg.startsWith('-')) {
       args.copy = nextArg;
       i += 2;

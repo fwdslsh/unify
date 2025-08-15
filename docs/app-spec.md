@@ -250,8 +250,33 @@ project/
 └── dist/                     # Output
 ```
 
-- Any file or folder starting with `_` is **non-emitting** by convention.
-- `src/_includes/` is a conventional home for shared partials/layouts. Its contents are not copied to `dist/` unless referenced as non-HTML assets.
+### Underscore Prefix Exclusion Rules
+
+**Files and directories with underscore prefix (`_`) are excluded from build output:**
+
+- **`_` directories**: Entire directories starting with `_` (like `_includes/`, `_components/`) are non-emitting
+- **`_` files**: Individual files starting with `_` (like `_layout.html`, `_partial.html`) are non-emitting
+- **Exception**: Files inside `_` directories do NOT need additional `_` prefix to be excluded
+
+**Examples:**
+
+```
+src/
+├── _includes/
+│   ├── layout.html           # ✅ Excluded (in _ directory)
+│   ├── header.html           # ✅ Excluded (in _ directory)  
+│   └── _legacy.html          # ✅ Excluded (_ prefix redundant but allowed)
+├── blog/
+│   ├── _blog.layout.html     # ✅ Excluded (_ prefix required)
+│   ├── _sidebar.html         # ✅ Excluded (_ prefix required)
+│   ├── helper.html           # ❌ Included (no _ prefix, will be rendered as page)
+│   └── post.html             # ✅ Included (intended page)
+└── _drafts/
+    ├── unfinished.html       # ✅ Excluded (in _ directory)
+    └── notes.md              # ✅ Excluded (in _ directory)
+```
+
+**Key principle**: Use `_` prefix on files when you want to keep layouts/components in the same directory as pages but exclude them from output. Files in `_` directories are automatically excluded regardless of their individual naming.
 
 ## File Processing Rules
 
@@ -271,7 +296,7 @@ project/
 - **Asset Reference Tracking:** Only referenced assets are copied to output
 - **Automatic `src/assets` Copying:** The `src/assets` directory is automatically copied to `dist/assets` if it exists, preserving folder structure
 - **Additional File Copying:** Use `--copy` option to copy additional files with glob patterns
-- **Underscore Prefix Convention:** Files and folders starting with `_` are non-emitting and only used for processing (partials, layouts, etc.)
+- **Underscore Prefix Exclusion:** Files and folders starting with `_` are automatically excluded from build output (see Underscore Prefix Exclusion Rules above)
 
 ### Include System
 
@@ -298,30 +323,113 @@ Resolution:
 
 ### Layout System
 
-#### Discovery
+#### Layout Discovery Process
 
-1. Nearest layout file that matches the naming pattern in page's folder.
-2. Climb to `src/` root.
-3. Apply layouts as nested wrappers.
-4. Optional: if `src/_includes/_layout.html` exists and no folder layout found, use it.
-5. Else: render page content as-is.
+Unify uses a hierarchical layout discovery system that automatically finds the most appropriate layout for each page:
+
+**1. Explicit Layout Override (Highest Priority)**
+- If a page has `data-layout="filename.html"` attribute, use that specific layout
+- Layout path resolution supports both full paths and convenient short names:
+
+**Full Path Syntax:**
+  - `data-layout="_custom.layout.html"` → Look in same directory as page
+  - `data-layout="/path/layout.html"` → Look from source root
+  - `data-layout="subdir/layout.html"` → Look relative to source root
+
+**Short Name Syntax (Convenience Feature):**
+  - `data-layout="blog"` → Searches for layout files matching the pattern:
+    - Same directory: `_blog.layout.html`, `_blog.layout.htm`, `_blog.html`, `_blog.htm`
+    - `_includes` directory: `blog.layout.html`, `blog.layout.htm`, `blog.html`, `blog.htm`
+  - Short names drop the prefix (`_`), layout segment (`.layout`), and file extension
+  - Discovery priority: files with `.layout.` segment are found first
+  - Examples:
+    - `data-layout="blog"` finds `_blog.layout.html` (preferred) or `_blog.html` in same directory
+    - `data-layout="docs"` finds `docs.layout.html` (preferred) or `docs.html` in `_includes`
+    - `data-layout="api"` finds `_api.layout.html` (preferred) or `_api.html` in same directory
+
+**2. Automatic Layout Discovery (Default Behavior)**
+- Start in the page's directory
+- Look for files matching the naming pattern: `_*.layout.html`, `_*.layout.htm`, `_*.html`, or `_*.htm`
+- Pattern matching preference: files with `.layout.` segment are preferred over files without
+- If found, use the first matching layout file
+- If not found, move up to parent directory and repeat
+- Continue climbing the directory tree until reaching source root
+- Multiple layouts in the same directory: `.layout.` files take priority, then first match alphabetically
+
+**3. Site-wide Fallback Layout (Lowest Priority)**
+- If no layout found in directory tree, look for `src/_includes/layout.html`
+- Note: Files in `_includes` directory do **NOT** require underscore prefix
+- This serves as the default site layout for all pages
+
+**4. No Layout**
+- If no layout is found at any level, render page content as-is
 
 #### Layout Naming Convention
 
-Layout files must:
+**For regular directories:**
+- Layout files must start with underscore (`_`) to be excluded from build output
+- Including `.layout.` in the filename is **recommended** but not required for clarity and intent
+- Files are discovered by underscore prefix, not by specific naming pattern
 
-- Start with underscore (`_`)
-- End with `layout.html` or `layout.htm`
+**Recommended examples:**
+- `_layout.html` (standard default layout)
+- `_blog.layout.html` (specific blog layout) 
+- `_documentation.layout.html` (documentation-specific layout)
 
-Valid layout filenames:
+**Also valid (but less clear):**
+- `_blog.html` (works but less obvious it's a layout)
+- `_main.htm` (works but ambiguous purpose)
+- `_template.html` (works but generic naming)
 
-- `_layout.html`, `_layout.htm` (standard)
-- `_custom.layout.html`, `_blog.layout.htm` (extended pattern)
-- `_documentation.layout.html`, `_admin-panel.layout.htm` (complex naming)
+**For `_includes` directory only:**
+- Layout files do NOT require underscore prefix (entire directory is excluded)
+- Including `.layout.` in the filename is **recommended** for consistency and clarity
+- `src/_includes/layout.html` is the conventional site-wide fallback
 
-#### Fallback Layout
+**Recommended in `_includes`:**
+- `layout.html` (site-wide fallback)
+- `blog.layout.html` (named blog layout)
+- `docs.layout.html` (named documentation layout)
 
-- `src/_includes/_layout.html` serves as the fallback layout when no folder-scoped layout is found
+**Discovery Priority:**
+When multiple layout files exist in the same directory, Unify prioritizes:
+1. Files with `.layout.` segment (e.g., `_blog.layout.html`)
+2. Files without `.layout.` segment, alphabetically (e.g., `_blog.html`, `_main.html`)
+
+#### Example Directory Structure
+
+```
+src/
+├── _includes/
+│   ├── layout.html              # Site-wide fallback (no _ prefix needed)
+│   ├── blog.layout.html         # Named blog layout in _includes
+│   └── docs.layout.html         # Named docs layout in _includes
+├── _layout.html                 # Root layout for all pages in src/
+├── blog/
+│   ├── _blog.layout.html        # Blog-specific layout
+│   ├── post1.html               # Uses _blog.layout.html
+│   └── post2.html               # Uses _blog.layout.html
+├── docs/
+│   ├── api/
+│   │   ├── _api.layout.html     # API docs layout
+│   │   └── endpoints.html       # Uses _api.layout.html
+│   ├── _docs.layout.html        # General docs layout
+│   └── guide.html               # Uses _docs.layout.html
+├── about.html                   # Uses src/_layout.html
+└── index.html                   # Uses src/_layout.html
+```
+
+**Layout Discovery Examples:**
+- `blog/post1.html` uses `blog/_blog.layout.html` (auto-discovery)
+- `docs/api/endpoints.html` uses `docs/api/_api.layout.html` (auto-discovery)
+- `docs/guide.html` uses `docs/_docs.layout.html` (auto-discovery)
+- `about.html` and `index.html` use `src/_layout.html` (auto-discovery)
+- If `src/_layout.html` didn't exist, they would use `src/_includes/layout.html` (fallback)
+
+**Short Name Reference Examples:**
+- `<html data-layout="blog">` → Finds `_blog.layout.html` (preferred) or `_blog.html` in same directory, or `blog.layout.html` (preferred) or `blog.html` in `_includes`
+- `<html data-layout="docs">` → Finds `_docs.layout.html` (preferred) or `_docs.html` in same directory, or `docs.layout.html` (preferred) or `docs.html` in `_includes`
+- `<html data-layout="api">` → Finds `_api.layout.html` (preferred) or `_api.html` in same directory, or `api.layout.html` (preferred) or `api.html` in `_includes`
 
 ### Slots & Templates
 
@@ -422,8 +530,10 @@ If no page content is assigned to a given named slot, Unify **emits the fallback
 
 - For HTML files: `data-layout` attribute takes precedence over frontmatter and discovered layout chain.
 - For Markdown files: frontmatter `layout` key takes precedence over discovered layout chain.
-- If no override is found, the nearest layout is discovered by climbing the directory tree, then falling back to `_includes/_layout.html` if present.
-- `data-layout` accepts relative paths or absolute-from-`src` paths.
+- If no override is found, the nearest layout is discovered by climbing the directory tree, then falling back to `_includes/layout.html` if present.
+- `data-layout` accepts:
+  - **Full paths**: relative paths or absolute-from-`src` paths (e.g., `_custom.layout.html`, `/path/layout.html`)
+  - **Short names**: convenient references that resolve to layout files (e.g., `blog` → `_blog.layout.html`)
 
 ## Dependency Tracking
 

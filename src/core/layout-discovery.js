@@ -17,16 +17,34 @@ export class LayoutDiscovery {
     try {
       const files = await fs.readdir(directory);
       
-      // Look for files that match the pattern: _*.layout.htm(l) or _layout.htm(l)
+      // Separate files into preferred (.layout.) and secondary (no .layout.)
+      const preferredFiles = [];
+      const secondaryFiles = [];
+      
       for (const file of files) {
         if (this.isLayoutFileName(file)) {
-          const layoutPath = path.join(directory, file);
-          try {
-            await fs.access(layoutPath);
-            return layoutPath;
-          } catch {
-            // File not accessible, continue
+          if (file.includes('.layout.')) {
+            preferredFiles.push(file);
+          } else {
+            secondaryFiles.push(file);
           }
+        }
+      }
+      
+      // Sort both arrays alphabetically for deterministic results
+      preferredFiles.sort();
+      secondaryFiles.sort();
+      
+      // Check preferred files first, then secondary files
+      const orderedFiles = [...preferredFiles, ...secondaryFiles];
+      
+      for (const file of orderedFiles) {
+        const layoutPath = path.join(directory, file);
+        try {
+          await fs.access(layoutPath);
+          return layoutPath;
+        } catch {
+          // File not accessible, continue
         }
       }
     } catch {
@@ -47,13 +65,8 @@ export class LayoutDiscovery {
       return false;
     }
     
-    // Must end with layout.html or layout.htm
-    if (fileName.endsWith('layout.html') || fileName.endsWith('layout.htm')) {
-      return true;
-    }
-    
-    // Also support the basic _layout.html and _layout.htm patterns
-    if (fileName === '_layout.html' || fileName === '_layout.htm') {
+    // Must end with .html or .htm
+    if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
       return true;
     }
     
@@ -89,41 +102,11 @@ export class LayoutDiscovery {
     }
     
     // No folder-scoped layout found, check for fallback layout in _includes
-    const fallbackLayoutPath = path.join(sourceRoot, '_includes', '_layout.html');
-    try {
-      await fs.access(fallbackLayoutPath);
-      logger.debug(`Found fallback layout: ${path.relative(sourceRoot, fallbackLayoutPath)}`);
-      return fallbackLayoutPath;
-    } catch {
-      // Check .htm variant
-      const fallbackLayoutPathHtm = path.join(sourceRoot, '_includes', '_layout.htm');
-      try {
-        await fs.access(fallbackLayoutPathHtm);
-        logger.debug(`Found fallback layout: ${path.relative(sourceRoot, fallbackLayoutPathHtm)}`);
-        return fallbackLayoutPathHtm;
-      } catch {
-        // No fallback layout found
-      }
-    }
-
-    // Check for default.html in .layouts directory (convention support)
-    const defaultLayoutPath = path.join(sourceRoot, '.layouts', 'default.html');
-    try {
-      await fs.access(defaultLayoutPath);
-      logger.debug(`Found default layout: ${path.relative(sourceRoot, defaultLayoutPath)}`);
-      return defaultLayoutPath;
-    } catch {
-      // No default layout found
-    }
-
-    // Also check legacy layouts directory
-    const legacyDefaultLayoutPath = path.join(sourceRoot, 'layouts', 'default.html');
-    try {
-      await fs.access(legacyDefaultLayoutPath);
-      logger.debug(`Found legacy default layout: ${path.relative(sourceRoot, legacyDefaultLayoutPath)}`);
-      return legacyDefaultLayoutPath;
-    } catch {
-      // No legacy default layout found
+    // According to spec: _includes directory files do NOT require underscore prefix
+    const fallbackLayout = await this.findFallbackLayoutInIncludes(sourceRoot);
+    if (fallbackLayout) {
+      logger.debug(`Found fallback layout: ${path.relative(sourceRoot, fallbackLayout)}`);
+      return fallbackLayout;
     }
     
     logger.debug(`No layout found for page: ${path.relative(sourceRoot, pagePath)}`);
@@ -169,6 +152,75 @@ export class LayoutDiscovery {
   }
   
   /**
+   * Find fallback layout in _includes directory with flexible naming
+   * @param {string} sourceRoot - Absolute path to source directory
+   * @returns {Promise<string|null>} Path to fallback layout or null
+   */
+  async findFallbackLayoutInIncludes(sourceRoot) {
+    const includesDir = path.join(sourceRoot, '_includes');
+    
+    try {
+      const files = await fs.readdir(includesDir);
+      
+      // Separate files into preferred (.layout.) and secondary (no .layout.)
+      const preferredFiles = [];
+      const secondaryFiles = [];
+      
+      for (const file of files) {
+        if (this.isIncludesLayoutFileName(file)) {
+          if (file.includes('.layout.')) {
+            preferredFiles.push(file);
+          } else {
+            secondaryFiles.push(file);
+          }
+        }
+      }
+      
+      // Sort both arrays alphabetically for deterministic results
+      preferredFiles.sort();
+      secondaryFiles.sort();
+      
+      // Check preferred files first, then secondary files
+      const orderedFiles = [...preferredFiles, ...secondaryFiles];
+      
+      for (const file of orderedFiles) {
+        const layoutPath = path.join(includesDir, file);
+        try {
+          await fs.access(layoutPath);
+          return layoutPath;
+        } catch {
+          // File not accessible, continue
+        }
+      }
+    } catch {
+      // Directory not readable or doesn't exist
+    }
+    
+    return null;
+  }
+
+  /**
+   * Check if a filename in _includes matches layout naming convention
+   * @param {string} fileName - Name of the file to check
+   * @returns {boolean} True if matches layout pattern
+   */
+  isIncludesLayoutFileName(fileName) {
+    // In _includes, we look for layout.html/htm (no underscore required)
+    // Also accept underscore prefixed files for compatibility
+    if ((fileName === 'layout.html' || fileName === 'layout.htm') ||
+        (fileName === '_layout.html' || fileName === '_layout.htm')) {
+      return true;
+    }
+    
+    // Also accept any file ending with .layout.html/htm
+    if (fileName.endsWith('.layout.html') || fileName.endsWith('.layout.htm')) {
+      return true;
+    }
+    
+    return false;
+  }
+
+  /**
    * Resolve layout path from data-layout attribute or frontmatter
    * @param {string} layoutSpec - Layout specification from data-layout or frontmatter
    * @param {string} sourceRoot - Absolute path to source directory
@@ -182,6 +234,12 @@ export class LayoutDiscovery {
     
     logger.debug(`Resolving layout override: ${layoutSpec}`);
     
+    // Check if this is a short name (no path separators, no extension)
+    if (!layoutSpec.includes('/') && !layoutSpec.includes('\\') && !path.extname(layoutSpec)) {
+      return await this.resolveShortNameLayout(layoutSpec, sourceRoot, pagePath);
+    }
+    
+    // Full path resolution
     let layoutPath;
     
     // If path starts with /, resolve from source root
@@ -209,19 +267,70 @@ export class LayoutDiscovery {
         logger.debug(`Resolved layout override: ${path.relative(sourceRoot, layoutPathHtm)}`);
         return layoutPathHtm;
       } catch {
-        // Try in .layouts directory as fallback
-        const layoutsPath = path.join(sourceRoot, '.layouts', layoutSpec);
-        const layoutsPathWithExt = layoutsPath.endsWith('.html') ? layoutsPath : layoutsPath + '.html';
-        try {
-          await fs.access(layoutsPathWithExt);
-          logger.debug(`Resolved layout override from .layouts: ${path.relative(sourceRoot, layoutsPathWithExt)}`);
-          return layoutsPathWithExt;
-        } catch {
-          logger.warn(`Layout override not found: ${layoutSpec}`);
-          return null;
-        }
+        logger.warn(`Layout override not found: ${layoutSpec}`);
+        return null;
       }
     }
+  }
+
+  /**
+   * Resolve short name layout reference (e.g., "blog" -> "_blog.layout.html")
+   * @param {string} shortName - Short name without prefix, .layout, or extension
+   * @param {string} sourceRoot - Absolute path to source directory
+   * @param {string} pagePath - Absolute path to the page file
+   * @returns {Promise<string|null>} Absolute path to layout file, or null if not found
+   */
+  async resolveShortNameLayout(shortName, sourceRoot, pagePath) {
+    logger.debug(`Resolving short name layout: ${shortName}`);
+    
+    const pageDir = path.dirname(pagePath);
+    
+    // Generate possible filenames in order of preference
+    const sameDirectoryOptions = [
+      `_${shortName}.layout.html`,
+      `_${shortName}.layout.htm`,
+      `_${shortName}.html`,
+      `_${shortName}.htm`
+    ];
+    
+    const includesDirectoryOptions = [
+      `${shortName}.layout.html`,
+      `${shortName}.layout.htm`, 
+      `${shortName}.html`,
+      `${shortName}.htm`,
+      `_${shortName}.layout.html`,
+      `_${shortName}.layout.htm`,
+      `_${shortName}.html`, 
+      `_${shortName}.htm`
+    ];
+    
+    // Check same directory first
+    for (const filename of sameDirectoryOptions) {
+      const layoutPath = path.join(pageDir, filename);
+      try {
+        await fs.access(layoutPath);
+        logger.debug(`Resolved short name layout: ${path.relative(sourceRoot, layoutPath)}`);
+        return layoutPath;
+      } catch {
+        // File doesn't exist, continue
+      }
+    }
+    
+    // Check _includes directory
+    const includesDir = path.join(sourceRoot, '_includes');
+    for (const filename of includesDirectoryOptions) {
+      const layoutPath = path.join(includesDir, filename);
+      try {
+        await fs.access(layoutPath);
+        logger.debug(`Resolved short name layout: ${path.relative(sourceRoot, layoutPath)}`);
+        return layoutPath;
+      } catch {
+        // File doesn't exist, continue
+      }
+    }
+    
+    logger.warn(`Short name layout not found: ${shortName}`);
+    return null;
   }
   
   /**
@@ -251,27 +360,14 @@ export class LayoutDiscovery {
     dependencies.push(...layoutChain);
     
     // Also include fallback layout as a potential dependency
-    const fallbackLayoutPath = path.join(sourceRoot, '_includes', '_layout.html');
-    const fallbackLayoutPathHtm = path.join(sourceRoot, '_includes', '_layout.htm');
-    
-    try {
-      await fs.access(fallbackLayoutPath);
-      if (!dependencies.includes(fallbackLayoutPath)) {
-        dependencies.push(fallbackLayoutPath);
-      }
-    } catch {
-      try {
-        await fs.access(fallbackLayoutPathHtm);
-        if (!dependencies.includes(fallbackLayoutPathHtm)) {
-          dependencies.push(fallbackLayoutPathHtm);
-        }
-      } catch {
-        // No fallback layout
-      }
+    const fallbackLayout = await this.findFallbackLayoutInIncludes(sourceRoot);
+    if (fallbackLayout && !dependencies.includes(fallbackLayout)) {
+      dependencies.push(fallbackLayout);
     }
     
     return dependencies;
   }
+
 }
 
 // Export singleton instance

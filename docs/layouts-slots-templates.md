@@ -16,22 +16,29 @@ The template system supports three main concepts:
 
 unify automatically discovers and applies layouts based on file naming conventions and directory structure:
 
-1. **Folder Layout**: Searches for layout files in the page's directory
-2. **Parent Directory Climb**: Walks up the directory tree to find the nearest layout
-3. **Fallback Layout**: Uses `_includes/_layout.html` if it exists and no folder layout is found
+1. **Explicit Override**: `data-layout` attribute or frontmatter (supports short names like `data-layout="blog"`)
+2. **Auto Discovery**: Searches for `_*.layout.html` then `_*.html` files in page directory and parent directories
+3. **Site-wide Fallback**: Uses `_includes/layout.html` if it exists (no underscore prefix required)
 4. **No Layout**: Renders page content as-is if no layout is found
 
 ### Layout Naming Convention
 
-Layout files must follow specific naming patterns:
+Layout files use these conventions:
 
-- **Start with underscore** (`_`)
-- **End with `layout.html` or `layout.htm`**
+- **Required**: Start with underscore (`_`) to exclude from build output
+- **Recommended**: Include `.layout.` for clarity and intent
+- **Discovery priority**: Files with `.layout.` segment are preferred over files without
 
-**Valid layout filenames:**
+**Recommended layout filenames:**
 - `_layout.html`, `_layout.htm` (standard)
 - `_custom.layout.html`, `_blog.layout.htm` (extended patterns)
 - `_documentation.layout.html`, `_admin-panel.layout.htm` (complex naming)
+
+**Also valid (but less clear):**
+- `_blog.html`, `_main.htm`, `_template.html` (works but less obvious purpose)
+
+**Special case for `_includes` directory:**
+- Files in `_includes/` don't require underscore prefix (e.g., `layout.html`, `blog.layout.html`)
 
 ### Basic Layout Usage
 
@@ -96,7 +103,7 @@ src/
 ```
 src/
 ├── _includes/
-│   ├── _layout.html          # Fallback layout
+│   ├── layout.html           # Site-wide fallback layout
 │   ├── header.html           # Global header
 │   └── footer.html           # Global footer
 ├── blog/
@@ -109,24 +116,42 @@ src/
 │   ├── _toc.html             # Table of contents
 │   ├── guide.html            # Guide (uses _docs.layout.html)
 │   └── api.html              # API docs (uses _docs.layout.html)
-├── index.html                # Homepage (uses _includes/_layout.html)
-└── about.html                # About (uses _includes/_layout.html)
+├── index.html                # Homepage (uses _includes/layout.html)
+└── about.html                # About (uses _includes/layout.html)
 ```
 
 ### Layout Selection and Overrides
 
 Layouts are selected in order of precedence:
 
-1. **Data attribute**: `<div data-layout="_custom.layout.html">` or on html/body elements
+1. **Data attribute**: `<div data-layout="_custom.layout.html">` or `<div data-layout="blog">` (supports short names)
 2. **Frontmatter**: `layout: custom` (for markdown files - searches for `_custom.layout.html`)
-3. **Folder layout**: Nearest layout file matching naming pattern in directory tree
-4. **Fallback layout**: `_includes/_layout.html` if it exists
+3. **Auto discovery**: Nearest layout file in directory tree (`_*.layout.html` preferred over `_*.html`)
+4. **Site-wide fallback**: `_includes/layout.html` if it exists
 5. **No layout**: Renders page content as-is
 
 ```html
-<!-- Page with data-layout attribute override -->
+<!-- Page with full path data-layout attribute -->
 <div data-layout="_custom.layout.html">
   <h1>My Blog Post</h1>
+</div>
+
+<!-- Page with short name data-layout attribute -->
+<div data-layout="blog">
+  <h1>My Blog Post</h1>
+</div>
+```
+
+#### Short Name Layout References
+
+Short names provide a convenient way to reference layouts without full file paths:
+
+```html
+<!-- Short name automatically resolves to: -->
+<!-- Same directory: _blog.layout.html, _blog.html -->
+<!-- _includes directory: blog.layout.html, blog.html -->
+<div data-layout="blog">
+  <h1>Blog Content</h1>
 </div>
 ```
 
@@ -275,10 +300,11 @@ Use the `data-layout` attribute to specify layouts and fill slots:
 
 Layout paths are resolved in this order:
 
-1. **Absolute from source**: `data-layout="/_includes/_layout.html"` → `src/_includes/_layout.html`
-2. **Relative to current directory**: `data-layout="_custom.layout.html"` → current directory
-3. **Search up directory tree**: Look for matching layout in parent directories
-4. **Fallback to _includes**: `src/_includes/_layout.html` if it exists
+1. **Short names**: `data-layout="blog"` → Searches for `_blog.layout.html`, `_blog.html` in same directory and `blog.layout.html`, `blog.html` in `_includes`
+2. **Absolute from source**: `data-layout="/_includes/layout.html"` → `src/_includes/layout.html`
+3. **Relative to current directory**: `data-layout="_custom.layout.html"` → current directory
+4. **Auto discovery**: Search up directory tree for `_*.layout.html` then `_*.html` files
+5. **Site-wide fallback**: `src/_includes/layout.html` if it exists
 
 ### Slot Content Options
 
@@ -699,9 +725,10 @@ This content will use the custom-layout layout file.
 
 **Layout not applied:**
 
-- Confirm layout file exists in `.layouts/` directory
-- Check frontmatter layout name matches filename
+- Confirm layout file follows naming conventions (`_*.layout.html` or `_*.html`)
+- Check frontmatter layout name matches filename (without `_` prefix)
 - Verify layout has proper slot placeholders
+- For short names, ensure layout exists in same directory or `_includes/`
 
 **Template elements not working:**
 
