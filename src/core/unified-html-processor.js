@@ -55,7 +55,15 @@ function shouldFailFast(config, errorType = 'error') {
     const nestedLayoutPath = nestedLayoutMatch[1];
     // Recursively process the nested layout, but pass the current slot data as page content
     const slotResult = extractSlotDataFromHTML(pageContent);
-    const layoutWithSlots = applySlots(layoutContent, slotResult.slots);
+    const slotApplication = applySlots(layoutContent, slotResult.slots, config);
+    const layoutWithSlots = slotApplication.result;
+    
+    // Log any slot warnings
+    if (slotApplication.warnings.length > 0) {
+      slotApplication.warnings.forEach(warning => {
+        logger.warn(`Slot validation: ${warning.message}`);
+      });
+    }
     
     // Now process the nested layout with the slot-applied content as the page content
     return await processLayoutAttribute(
@@ -147,7 +155,7 @@ export async function processHtmlUnified(
       processedContent = applyExtractedAssets(processedContent, extractedAssets);
     }
 
-  // Slot/template injection for HTML files (if layout contains <slot> or <template target="...">)
+  // Slot/template injection for HTML files (if layout contains <slot> or <template slot="...">)
   // This is now handled in file-processor.js after layout chain is discovered and applied
   return {
     content: processedContent,
@@ -533,7 +541,6 @@ async function optimizeHtmlContent(html) {
 function shouldUseDOMMode(content) {
   return content.includes('<include ') || 
          content.includes('<slot') || 
-         content.includes('target=') ||
          content.includes('data-layout=');
 }
 
@@ -577,7 +584,15 @@ async function processDOMMode(pageContent, pagePath, sourceRoot, config = {}, ex
     const slotResult = extractSlotDataFromHTML(pageContent);
 
     // Apply slots to layout using string replacement
-    let processedHTML = applySlots(layoutContent, slotResult.slots);
+    const slotApplication = applySlots(layoutContent, slotResult.slots, config);
+    let processedHTML = slotApplication.result;
+    
+    // Log any slot warnings
+    if (slotApplication.warnings.length > 0) {
+      slotApplication.warnings.forEach(warning => {
+        logger.warn(`Slot validation: ${warning.message}`);
+      });
+    }
 
     // Inject extracted assets from component processing into the layout
     if (extractedAssets && (extractedAssets.styles?.length > 0 || extractedAssets.scripts?.length > 0)) {
@@ -849,37 +864,73 @@ function hasDOMTemplating(content) {
 }
 
 /**
- * Extract slot content from HTML using regex-based parsing (consolidated from both processors)
+ * Extract slot content from HTML using regex-based parsing (v0.5.0 spec-compliant)
+ * Supports both <template slot="name"> and regular elements with slot="name" attribute
  * @param {string} htmlContent - HTML content to extract slots from
- * @returns {Object} Object with slot names as keys and content as values
+ * @returns {Object} Object with slots, styles, scripts, and slot metadata
  */
 function extractSlotDataFromHTML(htmlContent) {
   const slots = {};
+  const slotOrder = {}; // Track document order for multiple assignments
   const extractedStyles = [];
   const extractedScripts = [];
   
   let match;
+  let orderIndex = 0;
 
-  
-  // Extract named slots with target attribute (spec-compliant)
-  const targetRegex = /<template[^>]+target=["']([^"']+)["'][^>]*>([\s\S]*?)<\/template>/gi;
-  while ((match = targetRegex.exec(htmlContent)) !== null) {
-    const targetName = match[1];
+  // Extract named slots with slot attribute on template elements
+  const templateSlotRegex = /<template[^>]+slot=["']([^"']+)["'][^>]*>([\s\S]*?)<\/template>/gi;
+  while ((match = templateSlotRegex.exec(htmlContent)) !== null) {
+    const slotName = match[1];
     const content = match[2];
-    slots[targetName] = content;
+    if (!slots[slotName]) {
+      slots[slotName] = [];
+      slotOrder[slotName] = [];
+    }
+    slots[slotName].push(content);
+    slotOrder[slotName].push(orderIndex++);
   }
   
-  // Extract default slot content from template without target attributes
-  const defaultTemplateRegex = /<template(?!\s+(?:target)=)[^>]*>([\s\S]*?)<\/template>/gi;
+  // Extract named slots with slot attribute on regular elements
+  // Use a more robust regex that handles slot attribute anywhere in the tag
+  const elementSlotRegex = /<(\w+)([^>]*\s+slot=["']([^"']+)["'][^>]*)>([\s\S]*?)<\/\1>/gi;
+  while ((match = elementSlotRegex.exec(htmlContent)) !== null) {
+    const tagName = match[1];
+    const slotName = match[3]; // slot name is now in group 3
+    const fullElement = match[0];
+    
+    // Skip template elements (already handled above)
+    if (tagName.toLowerCase() === 'template') continue;
+    
+    if (!slots[slotName]) {
+      slots[slotName] = [];
+      slotOrder[slotName] = [];
+    }
+    // Remove the slot attribute from the element when adding to slot
+    const cleanedElement = fullElement.replace(/\s+slot=["'][^"']+["']/, '');
+    slots[slotName].push(cleanedElement);
+    slotOrder[slotName].push(orderIndex++);
+  }
+  
+  // Extract default slot content from template without slot attributes
+  const defaultTemplateRegex = /<template(?!\s+slot=)[^>]*>([\s\S]*?)<\/template>/gi;
   match = defaultTemplateRegex.exec(htmlContent);
   if (match) {
-    slots['default'] = match[1];
+    if (!slots['default']) {
+      slots['default'] = [];
+      slotOrder['default'] = [];
+    }
+    slots['default'].push(match[1]);
+    slotOrder['default'].push(orderIndex++);
   } else {
-    // Extract default slot content (everything not in a template)
+    // Extract default slot content (everything not in a template or with slot attribute)
     let defaultContent = htmlContent;
     
     // Remove all template elements
     defaultContent = defaultContent.replace(/<template[^>]*>[\s\S]*?<\/template>/gi, '');
+    
+    // Remove all elements with slot attribute
+    defaultContent = defaultContent.replace(/<(\w+)([^>]*\s+slot=["'][^"']+["'][^>]*)>([\s\S]*?)<\/\1>/gi, '');
     
     // Extract and preserve script and style elements instead of removing them
     const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
@@ -910,68 +961,144 @@ function extractSlotDataFromHTML(htmlContent) {
     
     defaultContent = defaultContent.trim();
     if (defaultContent) {
-      slots['default'] = defaultContent;
+      if (!slots['default']) {
+        slots['default'] = [];
+        slotOrder['default'] = [];
+      }
+      slots['default'].push(defaultContent);
+      slotOrder['default'].push(orderIndex++);
+    }
+  }
+  
+  // Convert slot arrays to strings, preserving document order
+  const consolidatedSlots = {};
+  for (const [slotName, contents] of Object.entries(slots)) {
+    if (contents.length === 1) {
+      consolidatedSlots[slotName] = contents[0];
+    } else if (contents.length > 1) {
+      // Multiple assignments to same slot - preserve document order
+      const orderedContents = contents
+        .map((content, idx) => ({ content, order: slotOrder[slotName][idx] }))
+        .sort((a, b) => a.order - b.order)
+        .map(item => item.content);
+      consolidatedSlots[slotName] = orderedContents.join('\n');
     }
   }
   
   return {
-    slots,
+    slots: consolidatedSlots,
     styles: extractedStyles,
-    scripts: extractedScripts
+    scripts: extractedScripts,
+    hasMultipleAssignments: Object.values(slots).some(arr => arr.length > 1)
   };
 }
 
 /**
- * Apply slot content to layout using string replacement (consolidated implementation)
+ * Apply slot content to layout using string replacement (v0.5.0 spec-compliant)
+ * Properly handles fallback content and validation warnings
  * @param {string} layoutContent - Layout HTML content
  * @param {Object} slotData - Slot data to apply
- * @returns {string} Layout with slots replaced
+ * @param {Object} config - Configuration for validation
+ * @returns {Object} Object with result HTML and validation warnings
  */
-function applySlots(layoutContent, slotData) {
+function applySlots(layoutContent, slotData, config = {}) {
   let result = layoutContent;
+  const warnings = [];
+  const usedSlots = new Set();
   
-  // Replace named slots
+  // Find all slot names in the layout for validation
+  const layoutSlotNames = new Set();
+  const slotNameRegex = /<slot\s+name=["']([^"']+)["']/gi;
+  let match;
+  while ((match = slotNameRegex.exec(layoutContent)) !== null) {
+    layoutSlotNames.add(match[1]);
+  }
+  
+  // Check for unmatched slot names in page content
+  for (const slotName of Object.keys(slotData)) {
+    if (slotName !== 'default' && !layoutSlotNames.has(slotName)) {
+      warnings.push({
+        type: 'unmatched-slot',
+        message: `Page defines slot "${slotName}" but layout has no matching <slot name="${slotName}">`
+      });
+    }
+  }
+  
+  // Replace named slots with content or fallback
   for (const [slotName, content] of Object.entries(slotData)) {
     if (slotName === 'default') continue;
     
-    const slotRegex = new RegExp(`<slot\\s+name=["']${slotName}["'][^>]*>.*?</slot>`, 'gi');
-    const simpleSlotRegex = new RegExp(`<slot\\s+name=["']${slotName}["'][^>]*\\s*/?>`, 'gi');
+    // More precise regex for named slots with fallback content capture
+    const namedSlotRegex = new RegExp(`<slot\\s+name=["']${escapeRegex(slotName)}["'][^>]*>([\\s\\S]*?)</slot>`, 'gi');
+    const namedSlotSelfClosing = new RegExp(`<slot\\s+name=["']${escapeRegex(slotName)}["'][^>]*\\s*/?>`, 'gi');
     
-    result = result.replace(slotRegex, content);
-    result = result.replace(simpleSlotRegex, content);
+    if (namedSlotRegex.test(result) || namedSlotSelfClosing.test(result)) {
+      usedSlots.add(slotName);
+      // Reset regex lastIndex
+      namedSlotRegex.lastIndex = 0;
+      namedSlotSelfClosing.lastIndex = 0;
+      
+      result = result.replace(namedSlotRegex, content);
+      result = result.replace(namedSlotSelfClosing, content);
+    }
   }
   
-  // Replace default slot
-  const defaultSlotRegex = /<slot(?:\s+[^>]*)?>(.*?)<\/slot>/gi;
-  const defaultSlotSelfClosing = /<slot(?:\s+[^>]*)?\/>/gi;
+  // Replace default slot with content or fallback (handle multiline content)
+  const defaultSlotRegex = /<slot(?!\s+name)(?:\s+[^>]*)?>([\s\S]*?)<\/slot>/gi;
+  const defaultSlotSelfClosing = /<slot(?!\s+name)(?:\s+[^>]*)?\/>/gi;
   
-  result = result.replace(defaultSlotRegex, slotData.default || '$1');
-  result = result.replace(defaultSlotSelfClosing, slotData.default || '');
+  const hasDefaultSlot = defaultSlotRegex.test(result) || defaultSlotSelfClosing.test(result);
   
-  // Replace any remaining named slots with their default content
+  // Reset regex lastIndex for actual replacements
+  defaultSlotRegex.lastIndex = 0;
+  defaultSlotSelfClosing.lastIndex = 0;
+  
+  // Check if default content is meaningful (not just whitespace/comments)
+  const hasMeaningfulDefaultContent = slotData.default && 
+    slotData.default.replace(/<!--[\s\S]*?-->/g, '').trim().length > 0;
+  
+  if (hasDefaultSlot && hasMeaningfulDefaultContent) {
+    // Page has meaningful default content, replace slot with page content
+    result = result.replace(defaultSlotRegex, slotData.default);
+    result = result.replace(defaultSlotSelfClosing, slotData.default);
+  } else if (hasDefaultSlot) {
+    // No meaningful page content provided, use slot's fallback content
+    result = result.replace(defaultSlotRegex, '$1'); // Use fallback content (captured group)
+    result = result.replace(defaultSlotSelfClosing, ''); // Remove self-closing slots
+  } else if (hasMeaningfulDefaultContent) {
+    // Page has default content but layout has no default slot
+    warnings.push({
+      type: 'missing-default-slot',
+      message: 'Page has default content but layout has no default <slot> element'
+    });
+  }
+  
+  // Replace any remaining named slots with their fallback content
   result = result.replace(
-    /<slot\s+name=["'][^"']*["'][^>]*>(.*?)<\/slot>/gs,
-    '$1' // Replace with the default content (everything between slot tags)
+    /<slot\s+name=["'][^"']*["'][^>]*>([\s\S]*?)<\/slot>/gs,
+    '$1' // Use fallback content
   );
   
-  // Replace any remaining self-closing named slots (remove them since no default content)
+  // Remove any remaining self-closing named slots
   result = result.replace(
     /<slot\s+name=["'][^"']*["'][^>]*\/>/g,
-    '' // Remove self-closing slots with no content
+    '' // Remove since no fallback available
   );
+  
+  return {
+    result,
+    warnings,
+    usedSlots: Array.from(usedSlots)
+  };
+}
 
-  // Replace any remaining unnamed default slots with their content or remove them
-  result = result.replace(
-    /<slot(?!\s+name)(?:\s[^>]*)?>([^<]*(?:<(?!\/slot>)[^<]*)*)<\/slot>/gs,
-    '$1' // Replace with default content
-  );
-  
-  result = result.replace(
-    /<slot(?!\s+name)(?:\s[^>]*)?\/>/g,
-    '' // Remove self-closing default slots with no content
-  );
-  
-  return result;
+/**
+ * Escape special regex characters
+ * @param {string} str - String to escape
+ * @returns {string} Escaped string
+ */
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 /**
@@ -1137,7 +1264,15 @@ async function processLayoutAttribute(
     console.log(`DEBUG: Found nested layout in ${layoutPath}: ${nestedLayoutPath}`);
     // Recursively process the nested layout, but pass the current slot data as page content
     const slotResult = extractSlotDataFromHTML(pageContent);
-    const layoutWithSlots = applySlots(layoutContent, slotResult.slots);
+    const slotApplication = applySlots(layoutContent, slotResult.slots, config);
+    const layoutWithSlots = slotApplication.result;
+    
+    // Log any slot warnings
+    if (slotApplication.warnings.length > 0) {
+      slotApplication.warnings.forEach(warning => {
+        logger.warn(`Slot validation: ${warning.message}`);
+      });
+    }
     
     // Now process the nested layout with the slot-applied content as the page content
     return await processLayoutAttribute(
@@ -1179,7 +1314,16 @@ async function processLayoutAttribute(
     }
   }
   
-  return applySlots(finalLayout, slotResult.slots);
+  const slotApplication = applySlots(finalLayout, slotResult.slots, config);
+  
+  // Log any slot warnings
+  if (slotApplication.warnings.length > 0) {
+    slotApplication.warnings.forEach(warning => {
+      logger.warn(`Slot validation: ${warning.message}`);
+    });
+  }
+  
+  return slotApplication.result;
 }
 
 /**

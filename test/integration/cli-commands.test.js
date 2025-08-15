@@ -414,7 +414,7 @@ describe('CLI Commands and Options', () => {
   describe('Mixed Flag Formats', () => {
     it('should handle mixed long and short flags', async () => {
       const structure = {
-        'content/index.html': '<div data-layout="base.html"><template target="content">Mixed Flags</template></div>',
+        'content/index.html': '<div data-layout="base.html"><template slot="content">Mixed Flags</template></div>',
         'templates/base.html': '<!DOCTYPE html><html><body><slot name="content">Default</slot></body></html>'
       };
 

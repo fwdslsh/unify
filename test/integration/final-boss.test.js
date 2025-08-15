@@ -86,8 +86,8 @@ describe('Final Boss Integration Test', () => {
 
         // Main pages using simplified layout system
         'src/index.html': `<div data-layout="/.layouts/base.html">
-  <template target="title">Home - Final Boss Test</template>
-  <template target="description">Welcome to our comprehensive test site</template>
+  <template slot="title">Home - Final Boss Test</template>
+  <template slot="description">Welcome to our comprehensive test site</template>
   
   <h1>Welcome to Final Boss Test Site</h1>
   <p>This site tests all major Unify features.</p>
@@ -104,8 +104,8 @@ describe('Final Boss Integration Test', () => {
 </div>`,
 
         'src/about.html': `<div data-layout="/.layouts/base.html">
-  <template target="title">About - Final Boss Test</template>
-  <template target="description">Learn about our test methodology</template>
+  <template slot="title">About - Final Boss Test</template>
+  <template slot="description">Learn about our test methodology</template>
   
   <h1>About This Test</h1>
   <p>This is a comprehensive integration test for Unify.</p>
@@ -114,8 +114,8 @@ describe('Final Boss Integration Test', () => {
 </div>`,
 
         'src/features.html': `<div data-layout="/.layouts/base.html">
-  <template target="title">Features - Final Boss Test</template>
-  <template target="description">Explore all the features we test</template>
+  <template slot="title">Features - Final Boss Test</template>
+  <template slot="description">Explore all the features we test</template>
   
   <h1>Features</h1>
   <p>Here are all the features this test covers:</p>
@@ -226,7 +226,7 @@ This is a test blog post written in Markdown.
 
         // Test with missing component (should build but show error)
         'src/test-missing.html': `<div data-layout="/.layouts/default.html">
-  <template target="title">Missing Component Test</template>
+  <template slot="title">Missing Component Test</template>
   <!--#include virtual="/.components/missing.html" -->
   <p>This page tries to include a missing component.</p>
 </div>`,
@@ -248,7 +248,7 @@ This is a test blog post written in Markdown.
 </div>`,
 
         'src/test-circular.html': `<div data-layout="/.layouts/default.html">
-  <template target="title">Circular Test</template>
+  <template slot="title">Circular Test</template>
   <!--#include virtual="/.components/circular-a.html" -->
 </div>`
       };

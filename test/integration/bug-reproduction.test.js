@@ -54,7 +54,7 @@ it('DOM Mode include processing bug reproduction', async () => {
   await fs.writeFile(
     path.join(sourceDir, 'blog.html'),
     `<body data-layout="/site_layouts/blog.html">
-  <template target="title">Welcome to DOM Mode</template>
+  <template slot="title">Welcome to DOM Mode</template>
 
   <h2>Hello!</h2>
   <p>This is a test page.</p>

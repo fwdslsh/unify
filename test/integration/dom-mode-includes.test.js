@@ -123,7 +123,7 @@ describe('DOM Mode Include Processing', () => {
   </style>
 </head>
 <body class="blog-layout">
-  <template target="header">
+  <template slot="header">
     <h1>My Blog</h1>
   </template>
   <main class="blog-content">
@@ -137,8 +137,8 @@ describe('DOM Mode Include Processing', () => {
     await fs.writeFile(
       path.join(sourceDir, 'blog.html'),
       `<body data-layout="/_includes/blog.layout.html">
-  <template target="title">Welcome to DOM Mode</template>
-  <template target="header">
+  <template slot="title">Welcome to DOM Mode</template>
+  <template slot="header">
     <h1>🧱 Unify DOM Mode</h1>
     <p>Modern templating with pure HTML</p>
   </template>
@@ -163,7 +163,7 @@ describe('DOM Mode Include Processing', () => {
 
   <include src="/custom_components/navigation.html" />
 
-  <template target="footer">
+  <template slot="footer">
     <p>© 2025 - Built with Unify DOM Mode</p>
     <p><a href="https://github.com/yourusername/unify">View on GitHub</a></p>
   </template>
@@ -253,7 +253,7 @@ describe('DOM Mode Include Processing', () => {
     await fs.writeFile(
       path.join(sourceDir, 'blog.html'),
       `<body data-layout="/_includes/blog.layout.html">
-  <template target="title">Nested Include Test</template>
+  <template slot="title">Nested Include Test</template>
   
   <h2>Testing Nested Includes</h2>
   <include src="/custom_components/nested.html" />

@@ -22,7 +22,6 @@ Transform source HTML/Markdown files with includes and layouts into a complete s
 - Apache SSI-style includes (`<!--#include file="header.html" -->`)
 - Modern DOM templating with `<template>`, `<slot>`, and `<include>` elements
 - Markdown processing with YAML frontmatter
-- **Scoped Styles for Components**: Use the `@scope` rule and CSS nesting to encapsulate styles for specific components or layouts, ensuring maintainable and isolated styling.
 
 ### Additional Features
 
@@ -382,18 +381,6 @@ If no page content is assigned to a given named slot, Unify **emits the fallback
 
 5. **Output**: Emit a single, flat HTML document with projected content in place of `<slot>` elements
 
-#### Experimental: Declarative Shadow DOM Flavored Layouts
-
-**Experimental:** Layouts may be authored with `<template shadowrootmode="…">` for familiarity with Declarative Shadow DOM. **Unify does not ship a shadow root**; it uses the template's children as the layout's slot tree during compilation. ([MDN: Using shadow DOM](https://developer.mozilla.org/en-US/docs/Web/API/Web_components/Using_shadow_DOM), [web.dev: Declarative Shadow DOM](https://web.dev/articles/declarative-shadow-dom), [GitHub: declarative-shadow-dom](https://github.com/mfreed7/declarative-shadow-dom/blob/master/README.md))
-
-```html
-<template shadowrootmode="open">
-  <!-- layout content with <slot> and fallback -->
-  <slot name="sidebar">Default sidebar content</slot>
-  <slot>Main content area</slot>
-</template>
-```
-
 #### Validation & Warnings
 
 - **Unmatched slot names** in pages: warn (configurable to error)
@@ -479,36 +466,6 @@ If no page content is assigned to a given named slot, Unify **emits the fallback
 - Handle projects with 1000+ pages
 - Handle page that are over 5MB
 - Efficient processing of large asset collections
-
-## Migration Guide: Template Target to Slot Attributes
-
-### Backward Compatibility
-
-The legacy `<template target="…">` syntax has been removed in favor of standard web platform `slot` attributes.
-
-### Migration Steps
-
-Replace the old syntax:
-
-```html
-<template target="sidebar">…</template>
-```
-
-with either:
-
-```html
-<template slot="sidebar">…</template>  <!-- hidden in raw view -->
-```
-
-or:
-
-```html
-<aside slot="sidebar">…</aside>        <!-- visible in raw view -->
-```
-
-### Optional CLI Migration Tool
-
-A future `unify migrate slots` command may be added to automatically rewrite `<template target="X">` → `<template slot="X">`.
 
 ## Compatibility Requirements
 
