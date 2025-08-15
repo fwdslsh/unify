@@ -16,6 +16,16 @@ permissions:
   packages: write
 
 jobs:
+  init:
+    name: Initialize
+    runs-on: ubuntu-latest
+    steps:
+     
+      - name: Env Check
+        run: |
+          echo "Release: ${{ github.event.inputs.tag || github.ref_name }}"
+        shell: bash
+
   # First, build all binaries
   build:
     name: Build Binaries
