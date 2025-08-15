@@ -22,6 +22,7 @@ Transform source HTML/Markdown files with includes and layouts into a complete s
 - Apache SSI-style includes (`<!--#include file="header.html" -->`)
 - Modern DOM templating with `<template>`, `<slot>`, and `<include>` elements
 - Markdown processing with YAML frontmatter
+- **Scoped Styles for Components**: Use the `@scope` rule and CSS nesting to encapsulate styles for specific components or layouts, ensuring maintainable and isolated styling.
 
 ### Additional Features
 
