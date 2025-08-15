@@ -520,3 +520,7 @@ If no page content is assigned to a given named slot, Unify **emits the fallback
 - Graceful handling of missing includes
 - Robust error recovery during builds
 - Cross-platform compatibility
+
+### Scoped Styles
+
+Unify assumes that developers will utilize the `@scope` rule and CSS nesting features to manage component style scoping themselves. These modern CSS features provide a robust way to encapsulate styles for components and layouts. For developers targeting legacy browsers that do not support `@scope`, a polyfill such as [scoped-css-polyfill](https://github.com/GoogleChromeLabs/scoped-css-polyfill) can be leveraged to ensure compatibility. This approach allows Unify to maintain a lightweight and framework-free architecture while empowering developers to adopt modern CSS practices.
