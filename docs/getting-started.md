@@ -148,22 +148,25 @@ unify uses conventions to organize your site:
 
 - **Pages**: Any `.html` or `.md` file not starting with `_`
 - **Partials**: Files starting with `_` (non-emitting)
-- **Layouts**: Files starting with `_` (recommended to end with `.layout.html` or `.layout.htm`)
+- **Layouts**: Only `_layout.html` or `_layout.htm` are auto-discovered; named layouts require `.layout.htm(l)` suffix for short name resolution
 - **Shared Components**: Files in `_includes/` directory (no `_` prefix required)
 
 ### Layout System
 
 #### Layout Naming Patterns
 
-Valid layout file names:
-- `_layout.html`, `_layout.htm` (standard)
-- `_custom.layout.html`, `_blog.layout.htm` (extended patterns)
-- `_documentation.layout.html`, `_admin-panel.layout.htm` (complex naming)
+Auto-discovered layout files:
+- `_layout.html`, `_layout.htm` (automatically applied to pages)
+
+Named layout files (referenced via data-layout or frontmatter):
+- `_custom.layout.html`, `_blog.layout.htm` (findable via short names)
+- `_documentation.layout.html`, `_admin-panel.layout.htm` (findable via short names)
+- Any other `_*.html` file (must use full path reference)
 
 #### Layout Discovery
 
 1. **Explicit Override**: `data-layout` attribute or frontmatter (supports short names like `data-layout="blog"`)
-2. **Auto Discovery**: Looks for `_*.layout.html` then `_*.html` files in page directory and parent directories
+2. **Auto Discovery**: Looks for `_layout.html` or `_layout.htm` files only in page directory and parent directories
 3. **Site-wide Fallback**: Uses `_includes/layout.html` if it exists (no underscore prefix required)
 4. **No Layout**: Renders page content as-is
 
@@ -178,9 +181,10 @@ For convenience, you can use short names instead of full file paths:
 </div>
 ```
 
-Short names automatically resolve to:
-- Same directory: `_blog.layout.html`, `_blog.html`
-- `_includes` directory: `blog.layout.html`, `blog.html`
+Short names automatically resolve to (must have `.layout.htm(l)` suffix):
+- Search up directory hierarchy: `_blog.layout.html` or `_blog.layout.htm`
+- Then `_includes` directory: `blog.layout.html` or `blog.layout.htm`
+- Warning produced if short name doesn't resolve
 
 ### Include System
 

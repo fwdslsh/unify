@@ -1,19 +1,32 @@
-<div data-layout="_blog.layout.html">
-  <template slot="title">Welcome to My Blog</template>
-  <template slot="header">
-    <h1>🧱 My Blog</h1>
-    <p>Convention-based blogging with Unify</p>
-  </template>
+<!DOCTYPE html>
+<html lang="en">
 
-  <h2>Hello!</h2>
-  <p>This is a blog post rendered with the Unify blog layout. This content goes into the unnamed slot.</p>
+<head>
+  <title>Welcome to My Blog</title>
+  <link rel="layout" href="_blog.layout.html">
+</head>
 
-  <!--#include virtual="/_includes/alert.html" -->
+<body>
 
-  <h3>Components Example</h3>
-  <p>Here are some reusable components:</p>
+  <div>
 
-  <!--#include virtual="/_includes/card.html" -->
+    <template slot="header">
+      <h1>🧱 My Blog</h1>
+      <p>Convention-based blogging with Unify</p>
+    </template>
 
-  <!--#include virtual="/_includes/navigation.html" -->
-</div>
+    <h2>Hello!</h2>
+    <p>This is a blog post rendered with the Unify blog layout. This content goes into the unnamed slot.</p>
+
+    <!--#include virtual="/_includes/alert.html" -->
+
+    <h3>Components Example</h3>
+    <p>Here are some reusable components:</p>
+
+    <!--#include virtual="/_includes/card.html" -->
+
+    <!--#include virtual="/_includes/navigation.html" -->
+  </div>
+</body>
+
+</html>

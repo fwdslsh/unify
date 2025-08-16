@@ -17,28 +17,31 @@ The template system supports three main concepts:
 unify automatically discovers and applies layouts based on file naming conventions and directory structure:
 
 1. **Explicit Override**: `data-layout` attribute or frontmatter (supports short names like `data-layout="blog"`)
-2. **Auto Discovery**: Searches for `_*.layout.html` then `_*.html` files in page directory and parent directories
+2. **Auto Discovery**: Searches for `_layout.html` or `_layout.htm` files in page directory and parent directories
 3. **Site-wide Fallback**: Uses `_includes/layout.html` if it exists (no underscore prefix required)
 4. **No Layout**: Renders page content as-is if no layout is found
 
 ### Layout Naming Convention
 
-Layout files use these conventions:
+**Automatic Layout Discovery:**
+- Only files named exactly `_layout.html` or `_layout.htm` are automatically discovered and applied
+- These files must be in the page's directory or a parent directory
+- Site-wide fallback: `_includes/layout.html` or `_includes/layout.htm` (no underscore prefix)
 
-- **Required**: Start with underscore (`_`) to exclude from build output
-- **Recommended**: Include `.layout.` for clarity and intent
-- **Discovery priority**: Files with `.layout.` segment are preferred over files without
+**Named Layouts (Referenced Explicitly via data-layout or frontmatter):**
+- Can be located anywhere in src directory
+- Can have any filename (e.g., `_custom.html`, `_blog-template.html`)
+- For short name discovery (e.g., `data-layout="blog"`), must follow pattern `_[name].layout.htm(l)`
+- Files in `_includes/` don't require underscore prefix for short names
 
-**Recommended layout filenames:**
-- `_layout.html`, `_layout.htm` (standard)
-- `_custom.layout.html`, `_blog.layout.htm` (extended patterns)
-- `_documentation.layout.html`, `_admin-panel.layout.htm` (complex naming)
-
-**Also valid (but less clear):**
-- `_blog.html`, `_main.htm`, `_template.html` (works but less obvious purpose)
+**Recommended naming patterns:**
+- `_layout.html`, `_layout.htm` (auto-discovered default layout)
+- `_blog.layout.html`, `_documentation.layout.htm` (named layouts, findable via short names)
+- `_custom-template.html` (must reference via full path)
 
 **Special case for `_includes` directory:**
-- Files in `_includes/` don't require underscore prefix (e.g., `layout.html`, `blog.layout.html`)
+- `layout.html` or `layout.htm` serves as site-wide fallback
+- Named layouts should follow pattern `[name].layout.htm(l)` for short name discovery
 
 ### Basic Layout Usage
 
@@ -126,7 +129,7 @@ Layouts are selected in order of precedence:
 
 1. **Data attribute**: `<div data-layout="_custom.layout.html">` or `<div data-layout="blog">` (supports short names)
 2. **Frontmatter**: `layout: custom` (for markdown files - searches for `_custom.layout.html`)
-3. **Auto discovery**: Nearest layout file in directory tree (`_*.layout.html` preferred over `_*.html`)
+3. **Auto discovery**: Nearest `_layout.html` or `_layout.htm` file in directory tree
 4. **Site-wide fallback**: `_includes/layout.html` if it exists
 5. **No layout**: Renders page content as-is
 

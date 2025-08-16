@@ -284,12 +284,110 @@ src/
 
 - Pages: `.htm(l)` files not starting with `_` are emitted as pages.
 - Partials: `.htm(l)` files starting with `_` are non-emitting partials.
-- Layouts: Files starting with `_` and ending with `layout.html` or `layout.htm` provide folder-scoped layouts.
+- Layouts: Only files named `_layout.html` or `_layout.htm` are automatically applied as folder-scoped layouts.
 
 ### Markdown Files (`.md`)
 
-- Processed with frontmatter extraction and Markdown→HTML conversion.
-- Layout discovery or override applies.
+- Processed with frontmatter extraction and Markdown→HTML conversion
+- Support YAML frontmatter with head synthesis for metadata
+- Layout discovery or override applies
+- Head content synthesized from frontmatter (no `<head>` allowed in body)
+
+### Head & Metadata Processing
+
+#### HTML Pages
+- **Front matter:** NOT supported
+- **Head content:** Standard `<head>` element allowed; merged with layout head during build
+
+#### Markdown Pages
+- **Front matter:** Supported via YAML with head synthesis
+- **Head content:** NO `<head>` allowed in body; synthesized from frontmatter only
+
+#### Frontmatter Head Schema (Markdown only)
+
+```yaml
+title: string                     # Optional, becomes <title>
+description: string               # Optional, becomes <meta name="description" ...>
+
+head:                              # Optional container for head sections
+  meta:                            # Optional list of attribute maps -> <meta ...>
+    - name: robots
+      content: "index,follow"
+    - property: og:title
+      content: "Page Title"
+
+  link:                            # Optional list of attribute maps -> <link ...>
+    - rel: canonical
+      href: "https://example.com/page"
+    - rel: preload
+      as: image
+      href: "/img/hero.avif"
+
+  script:                          # Optional list -> <script ...> or JSON-LD
+    # External script
+    - src: "/js/analytics.js"
+      defer: true
+    # JSON-LD block
+    - type: "application/ld+json"
+      json:
+        "@context": "https://schema.org"
+        "@type": "Article"
+        headline: "Getting Started"
+
+  style:                           # Optional list -> <style> or stylesheet link
+    # Inline CSS
+    - inline: |
+        .hero { contain: paint; }
+    # External stylesheet
+    - href: "/css/print.css"
+      media: "print"
+```
+
+#### Head Merge Algorithm
+
+When combining layout `<head>` + page `<head>` (or synthesized head):
+
+1. **Base order:** Start with layout head nodes, append page head nodes
+2. **Precedence:** Page version wins when nodes represent same semantic content
+3. **Deduplication by identity keys:**
+   - `<title>`: Keep last one (page wins)
+   - `<meta>`: Dedupe by `name` or `property` attribute (last wins)
+   - `<link>`: Dedupe `rel="canonical"` (last wins); others dedupe by `(rel, href)` pair
+   - `<script>`: Dedupe by `src` (last wins); inline scripts never deduped
+   - `<style>`: External handled by `<link>` rules; inline never deduped
+   - Unknown elements: Append without deduplication
+4. **Safety:** Apply existing sanitization and path traversal prevention
+
+#### Synthesis Rules (Markdown → `<head>`)
+
+- `title` present → emit `<title>…</title>`
+- `description` present → emit `<meta name="description" content="…">`
+- `head.meta` items → emit `<meta …>` with given attributes
+- `head.link` items → emit `<link …>`
+- `head.script` items:
+  - With `json` key → emit `<script type="application/ld+json">[minified JSON]</script>`
+  - Without `json` → emit `<script …></script>` with provided attributes
+- `head.style` items:
+  - With `inline` → emit `<style>…</style>`
+  - With `href` → emit `<link rel="stylesheet" …>`
+
+#### Validation Rules
+
+**File-type constraints:**
+- HTML pages: ERROR if frontmatter detected
+- Markdown pages: ERROR if body contains `<head>` element
+
+**Frontmatter schema (Markdown only):**
+- `title`: Must be string; WARN if conflicts with `head.meta` title entries
+- `description`: Must be string; WARN if conflicts with `head.meta` description
+- `head.meta`: List of attribute maps; WARN if empty items
+- `head.link`: List of attribute maps; WARN if missing both `rel` and `href`
+- `head.script`: List of attribute maps; WARN if both `src` and `json` present or neither present
+- `head.style`: List of attribute maps; WARN if missing both `inline` and `href` or both present
+
+**Merge-time diagnostics:**
+- WARN when deduping replaces layout values with page values
+- No warning for appended inline styles/scripts (by design)
 
 ### Static Assets
 
@@ -325,39 +423,42 @@ Resolution:
 
 #### Layout Discovery Process
 
-Unify uses a hierarchical layout discovery system that automatically finds the most appropriate layout for each page:
+Unify uses a hierarchical layout discovery system with both automatic and explicit layout selection:
 
 **1. Explicit Layout Override (Highest Priority)**
-- If a page has `data-layout="filename.html"` attribute, use that specific layout
-- Layout path resolution supports both full paths and convenient short names:
+- HTML pages: `data-layout` attribute
+- Markdown pages: `layout` key in frontmatter
+- Layout files can be located anywhere in the src directory with any filename
+- Layout path resolution supports:
 
 **Full Path Syntax:**
-  - `data-layout="_custom.layout.html"` → Look in same directory as page
-  - `data-layout="/path/layout.html"` → Look from source root
-  - `data-layout="subdir/layout.html"` → Look relative to source root
+  - `data-layout="custom.html"` → Look relative to current page directory
+  - `data-layout="/path/to/layout.html"` → Look from source root (absolute path)
+  - `data-layout="../shared/layout.html"` → Look relative to current page
 
 **Short Name Syntax (Convenience Feature):**
-  - `data-layout="blog"` → Searches for layout files matching the pattern:
-    - Same directory: `_blog.layout.html`, `_blog.layout.htm`, `_blog.html`, `_blog.htm`
-    - `_includes` directory: `blog.layout.html`, `blog.layout.htm`, `blog.html`, `blog.htm`
-  - Short names drop the prefix (`_`), layout segment (`.layout`), and file extension
-  - Discovery priority: files with `.layout.` segment are found first
+  - `data-layout="blog"` → Searches for `_blog.layout.html` or `_blog.layout.htm`
+  - Short names drop the underscore prefix (`_`), layout segment (`.layout`), and file extension
+  - Search order for short names:
+    1. Current directory up through parent directories to source root
+    2. Then `_includes` directory
+  - **Important**: Files must have `.layout.html` or `.layout.htm` suffix to be found via short name
+  - If no matching file found, a warning is produced
   - Examples:
-    - `data-layout="blog"` finds `_blog.layout.html` (preferred) or `_blog.html` in same directory
-    - `data-layout="docs"` finds `docs.layout.html` (preferred) or `docs.html` in `_includes`
-    - `data-layout="api"` finds `_api.layout.html` (preferred) or `_api.html` in same directory
+    - `data-layout="blog"` finds `_blog.layout.html` in directory hierarchy
+    - `data-layout="docs"` finds `_docs.layout.htm` in directory hierarchy or `_includes`
+    - `data-layout="api"` finds `_api.layout.html` in directory hierarchy
 
 **2. Automatic Layout Discovery (Default Behavior)**
+- **Only applies to files named exactly `_layout.html` or `_layout.htm`**
 - Start in the page's directory
-- Look for files matching the naming pattern: `_*.layout.html`, `_*.layout.htm`, `_*.html`, or `_*.htm`
-- Pattern matching preference: files with `.layout.` segment are preferred over files without
-- If found, use the first matching layout file
+- Look for `_layout.html` or `_layout.htm`
 - If not found, move up to parent directory and repeat
 - Continue climbing the directory tree until reaching source root
-- Multiple layouts in the same directory: `.layout.` files take priority, then first match alphabetically
+- **Note**: Other layout files (e.g., `_blog.layout.html`, `_custom.html`) are NOT automatically applied
 
 **3. Site-wide Fallback Layout (Lowest Priority)**
-- If no layout found in directory tree, look for `src/_includes/layout.html`
+- If no `_layout.htm(l)` found in directory tree, look for `src/_includes/layout.html` or `src/_includes/layout.htm`
 - Note: Files in `_includes` directory do **NOT** require underscore prefix
 - This serves as the default site layout for all pages
 
@@ -366,35 +467,39 @@ Unify uses a hierarchical layout discovery system that automatically finds the m
 
 #### Layout Naming Convention
 
+**Automatic Layout Discovery:**
+- Only `_layout.html` or `_layout.htm` files are automatically applied
+- These files must be named exactly as shown (with underscore prefix)
+- Automatically discovered by climbing directory hierarchy
+
+**Named Layouts (Referenced Explicitly):**
+- Can be located anywhere in src directory
+- Can have any filename (e.g., `header.html`, `blog-template.html`, `_custom.html`)
+- Must be referenced explicitly via `data-layout` or frontmatter `layout`
+- For short name discovery, must follow naming pattern `_[name].layout.htm(l)`
+- Layouts in the `_includes` folder do not require the `_` prefix for short name discovery
+
 **For regular directories:**
-- Layout files must start with underscore (`_`) to be excluded from build output
-- Including `.layout.` in the filename is **recommended** but not required for clarity and intent
-- Files are discovered by underscore prefix, not by specific naming pattern
+- Layout files should start with underscore (`_`) to be excluded from build output, unless in the `_includes` folder.
+- Including `.layout.` in the filename is **required** for short name discovery
+- Without `.layout.` suffix, layouts must be referenced by full path
 
-**Recommended examples:**
-- `_layout.html` (standard default layout)
-- `_blog.layout.html` (specific blog layout) 
-- `_documentation.layout.html` (documentation-specific layout)
+**Examples:**
+- `_layout.html` (auto-discovered default layout)
+- `_blog.layout.html` (named layout, findable via `data-layout="blog"`)
+- `_documentation.layout.html` (named layout, findable via `data-layout="documentation"`)
+- `custom-template.html` (must reference via full path like `data-layout="custom-template.html"`)
+- `_sidebar.html` (must reference via full path, not findable via short name)
 
-**Also valid (but less clear):**
-- `_blog.html` (works but less obvious it's a layout)
-- `_main.htm` (works but ambiguous purpose)
-- `_template.html` (works but generic naming)
-
-**For `_includes` directory only:**
+**For `_includes` directory:**
 - Layout files do NOT require underscore prefix (entire directory is excluded)
-- Including `.layout.` in the filename is **recommended** for consistency and clarity
-- `src/_includes/layout.html` is the conventional site-wide fallback
+- `layout.html` or `layout.htm` serves as site-wide fallback
+- Named layouts should follow pattern `[name].layout.htm(l)` for short name discovery
 
-**Recommended in `_includes`:**
+**Examples in `_includes`:**
 - `layout.html` (site-wide fallback)
-- `blog.layout.html` (named blog layout)
-- `docs.layout.html` (named documentation layout)
-
-**Discovery Priority:**
-When multiple layout files exist in the same directory, Unify prioritizes:
-1. Files with `.layout.` segment (e.g., `_blog.layout.html`)
-2. Files without `.layout.` segment, alphabetically (e.g., `_blog.html`, `_main.html`)
+- `blog.layout.html` (findable via `data-layout="blog"`)
+- `docs.layout.html` (findable via `data-layout="docs"`)
 
 #### Example Directory Structure
 
@@ -420,16 +525,22 @@ src/
 ```
 
 **Layout Discovery Examples:**
-- `blog/post1.html` uses `blog/_blog.layout.html` (auto-discovery)
-- `docs/api/endpoints.html` uses `docs/api/_api.layout.html` (auto-discovery)
-- `docs/guide.html` uses `docs/_docs.layout.html` (auto-discovery)
-- `about.html` and `index.html` use `src/_layout.html` (auto-discovery)
-- If `src/_layout.html` didn't exist, they would use `src/_includes/layout.html` (fallback)
+- `blog/post1.html` uses `blog/_layout.html` if it exists (auto-discovery)
+- `docs/api/endpoints.html` uses `docs/api/_layout.html` if it exists (auto-discovery)
+- `docs/guide.html` uses `docs/_layout.html` if it exists (auto-discovery)
+- `about.html` and `index.html` use `src/_layout.html` if it exists (auto-discovery)
+- If `src/_layout.html` doesn't exist, they use `src/_includes/layout.html` (fallback)
 
 **Short Name Reference Examples:**
-- `<html data-layout="blog">` → Finds `_blog.layout.html` (preferred) or `_blog.html` in same directory, or `blog.layout.html` (preferred) or `blog.html` in `_includes`
-- `<html data-layout="docs">` → Finds `_docs.layout.html` (preferred) or `_docs.html` in same directory, or `docs.layout.html` (preferred) or `docs.html` in `_includes`
-- `<html data-layout="api">` → Finds `_api.layout.html` (preferred) or `_api.html` in same directory, or `api.layout.html` (preferred) or `api.html` in `_includes`
+- `<html data-layout="blog">` → Finds `_blog.layout.html` or `_blog.layout.htm` in directory hierarchy or `_includes`
+- `<html data-layout="docs">` → Finds `_docs.layout.html` or `_docs.layout.htm` in directory hierarchy or `_includes`
+- `<html data-layout="api">` → Finds `_api.layout.html` or `_api.layout.htm` in directory hierarchy or `_includes`
+- If short name doesn't resolve to a `.layout.htm(l)` file, a warning is produced
+
+**Full Path Reference Examples:**
+- `<html data-layout="/shared/base.html">` → Uses `src/shared/base.html`
+- `<html data-layout="../layouts/blog.html">` → Uses layout relative to page
+- `<html data-layout="custom.html">` → Uses `custom.html` in same directory as page
 
 ### Slots & Templates
 
@@ -534,6 +645,13 @@ If no page content is assigned to a given named slot, Unify **emits the fallback
 - `data-layout` accepts:
   - **Full paths**: relative paths or absolute-from-`src` paths (e.g., `_custom.layout.html`, `/path/layout.html`)
   - **Short names**: convenient references that resolve to layout files (e.g., `blog` → `_blog.layout.html`)
+
+**Head override precedence:**
+
+- Layout `<head>` provides base metadata and styles
+- Page `<head>` (HTML) or synthesized head (Markdown) takes precedence via merge algorithm
+- Deduplication ensures page-specific metadata wins over layout defaults
+- Multiple inline styles and scripts from both layout and page are preserved
 
 ## Dependency Tracking
 

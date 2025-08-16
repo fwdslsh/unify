@@ -125,7 +125,7 @@ describe('layout discovery new spec', () => {
 </body>
 </html>`;
     
-    await fs.writeFile(path.join(blogDir, '_blog.layout.html'), blogLayoutContent);
+    await fs.writeFile(path.join(blogDir, '_layout.html'), blogLayoutContent);
     
     // Create page directly in blog directory (not nested deeper)
     const pageContent = `<article>
