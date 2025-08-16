@@ -20,7 +20,7 @@ Transform source HTML/Markdown files with includes and layouts into a complete s
 ### Key Features
 
 - Apache SSI-style includes (`<!--#include file="header.html" -->`)
-- Modern DOM templating with `<template>`, `<slot>`, and `<include>` elements
+- Modern DOM templating with `<template>`, `data-slot` attributes, and `<include>` elements
 - Markdown processing with YAML frontmatter
 
 ### Additional Features
@@ -179,6 +179,7 @@ unify watch [options]
 - **Behavior:** Controls when the build process should exit with error code 1
 
 Examples:
+
 - `--fail-on warning`: Fail on any warning or error
 - `--fail-on error`: Fail only on errors (not warnings)
 - No flag: Only fail on fatal build errors (default behavior)
@@ -264,7 +265,7 @@ project/
 src/
 ├── _includes/
 │   ├── layout.html           # ✅ Excluded (in _ directory)
-│   ├── header.html           # ✅ Excluded (in _ directory)  
+│   ├── header.html           # ✅ Excluded (in _ directory)
 │   └── _legacy.html          # ✅ Excluded (_ prefix redundant but allowed)
 ├── blog/
 │   ├── _blog.layout.html     # ✅ Excluded (_ prefix required)
@@ -286,6 +287,58 @@ src/
 - Partials: `.htm(l)` files starting with `_` are non-emitting partials.
 - Layouts: Only files named `_layout.html` or `_layout.htm` are automatically applied as folder-scoped layouts.
 
+#### HTML Page Types
+
+HTML pages can be either **page fragments** or **full HTML documents**:
+
+**Page Fragments:**
+
+- HTML content without `<!DOCTYPE>`, `<html>`, `<head>`, or `<body>` elements
+- Content is treated as fragment and inserted into layout's default slot (`data-slot="default"`) as-is
+  - Head and template elements found in the fragment are processed as described in this document.
+- Can use `data-layout` attribute on the root element for named layout discovery
+  - Multiple elements with a data-layout attribute inside of a fragment page should result in an error.
+- Example:
+
+```html
+<div data-layout="blog">
+  <h1>Article Title</h1>
+  <p>Article content...</p>
+</div>
+```
+
+**Full HTML Documents:**
+
+- Complete HTML documents with `<!DOCTYPE html>`, `<html>`, `<head>`, and `<body>` elements
+- Document elements are merged with the layout during processing
+  - Page attributes win if there is a conflict
+  - Page content is appended to matching elements
+- Layout discovery can be specified via `<link rel="layout">` in the document head
+- Example:
+
+```html
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Page Title</title>
+    <link rel="layout" href="/layouts/blog.html" />
+  </head>
+  <body>
+    <h1>Article Title</h1>
+    <p>Article content...</p>
+  </body>
+</html>
+```
+
+#### HTML Document Merging
+
+When processing full HTML documents with layouts:
+
+1. **DOCTYPE**: Pages's DOCTYPE is used in final output if it exists. Otherwise fallback to Layout's DOCTYPE
+2. **HTML Element**: Layout's `<html>` element and attributes are preserved. Page's html element's attributes are added and overwrite the layout's attributes when there is a conflict.
+3. **HEAD Element**: Page head content is merged with layout head using the head merge algorithm (see Head Merge Algorithm section)
+4. **BODY Element**: Page body content is inserted into the layout's default `data-slot="default"` element
+
 ### Markdown Files (`.md`)
 
 - Processed with frontmatter extraction and Markdown→HTML conversion
@@ -296,34 +349,36 @@ src/
 ### Head & Metadata Processing
 
 #### HTML Pages
+
 - **Front matter:** NOT supported
 - **Head content:** Standard `<head>` element allowed; merged with layout head during build
 
 #### Markdown Pages
+
 - **Front matter:** Supported via YAML with head synthesis
 - **Head content:** NO `<head>` allowed in body; synthesized from frontmatter only
 
 #### Frontmatter Head Schema (Markdown only)
 
 ```yaml
-title: string                     # Optional, becomes <title>
-description: string               # Optional, becomes <meta name="description" ...>
+title: string # Optional, becomes <title>
+description: string # Optional, becomes <meta name="description" ...>
 
-head:                              # Optional container for head sections
-  meta:                            # Optional list of attribute maps -> <meta ...>
+head: # Optional container for head sections
+  meta: # Optional list of attribute maps -> <meta ...>
     - name: robots
       content: "index,follow"
     - property: og:title
       content: "Page Title"
 
-  link:                            # Optional list of attribute maps -> <link ...>
+  link: # Optional list of attribute maps -> <link ...>
     - rel: canonical
       href: "https://example.com/page"
     - rel: preload
       as: image
       href: "/img/hero.avif"
 
-  script:                          # Optional list -> <script ...> or JSON-LD
+  script: # Optional list -> <script ...> or JSON-LD
     # External script
     - src: "/js/analytics.js"
       defer: true
@@ -334,7 +389,7 @@ head:                              # Optional container for head sections
         "@type": "Article"
         headline: "Getting Started"
 
-  style:                           # Optional list -> <style> or stylesheet link
+  style: # Optional list -> <style> or stylesheet link
     # Inline CSS
     - inline: |
         .hero { contain: paint; }
@@ -374,10 +429,12 @@ When combining layout `<head>` + page `<head>` (or synthesized head):
 #### Validation Rules
 
 **File-type constraints:**
+
 - HTML pages: ERROR if frontmatter detected
 - Markdown pages: ERROR if body contains `<head>` element
 
 **Frontmatter schema (Markdown only):**
+
 - `title`: Must be string; WARN if conflicts with `head.meta` title entries
 - `description`: Must be string; WARN if conflicts with `head.meta` description
 - `head.meta`: List of attribute maps; WARN if empty items
@@ -386,6 +443,7 @@ When combining layout `<head>` + page `<head>` (or synthesized head):
 - `head.style`: List of attribute maps; WARN if missing both `inline` and `href` or both present
 
 **Merge-time diagnostics:**
+
 - WARN when deduping replaces layout values with page values
 - No warning for appended inline styles/scripts (by design)
 
@@ -426,30 +484,44 @@ Resolution:
 Unify uses a hierarchical layout discovery system with both automatic and explicit layout selection:
 
 **1. Explicit Layout Override (Highest Priority)**
-- HTML pages: `data-layout` attribute
+
+- HTML pages: `data-layout` attribute on root element OR `<link rel="layout">` in document head
 - Markdown pages: `layout` key in frontmatter
 - Layout files can be located anywhere in the src directory with any filename
 - Layout path resolution supports:
 
 **Full Path Syntax:**
-  - `data-layout="custom.html"` → Look relative to current page directory
-  - `data-layout="/path/to/layout.html"` → Look from source root (absolute path)
-  - `data-layout="../shared/layout.html"` → Look relative to current page
+
+- `data-layout="custom.html"` → Look relative to current page directory
+- `data-layout="/path/to/layout.html"` → Look from source root (absolute path)
+- `data-layout="../shared/layout.html"` → Look relative to current page
+
+**Link Element Layout Discovery (Full HTML Documents Only):**
+
+- `<link rel="layout" href="custom.html">` → Look relative to current page directory
+- `<link rel="layout" href="/path/to/layout.html">` → Look from source root (absolute path)
+- `<link rel="layout" href="../shared/layout.html">` → Look relative to current page
+- Uses typical layout discovery on the `href` value (same path resolution as `data-layout`)
+- Only applies to full HTML documents with `<head>` element
+- Takes precedence over `data-layout` attribute if both are present
 
 **Short Name Syntax (Convenience Feature):**
-  - `data-layout="blog"` → Searches for `_blog.layout.html` or `_blog.layout.htm`
-  - Short names drop the underscore prefix (`_`), layout segment (`.layout`), and file extension
-  - Search order for short names:
-    1. Current directory up through parent directories to source root
-    2. Then `_includes` directory
-  - **Important**: Files must have `.layout.html` or `.layout.htm` suffix to be found via short name
-  - If no matching file found, a warning is produced
-  - Examples:
-    - `data-layout="blog"` finds `_blog.layout.html` in directory hierarchy
-    - `data-layout="docs"` finds `_docs.layout.htm` in directory hierarchy or `_includes`
-    - `data-layout="api"` finds `_api.layout.html` in directory hierarchy
+
+- `data-layout="blog"` → Searches for `_blog.layout.html` or `_blog.layout.htm`
+- `<link rel="layout" href="blog">` → Same search pattern as `data-layout="blog"`
+- Short names drop the underscore prefix (`_`), layout segment (`.layout`), and file extension
+- Search order for short names:
+  1. Current directory up through parent directories to source root
+  2. Then `_includes` directory
+- **Important**: Files must have `.layout.html` or `.layout.htm` suffix to be found via short name
+- If no matching file found, a warning is produced
+- Examples:
+  - `data-layout="blog"` finds `_blog.layout.html` in directory hierarchy
+  - `data-layout="docs"` finds `_docs.layout.htm` in directory hierarchy or `_includes`
+  - `data-layout="api"` finds `_api.layout.html` in directory hierarchy
 
 **2. Automatic Layout Discovery (Default Behavior)**
+
 - **Only applies to files named exactly `_layout.html` or `_layout.htm`**
 - Start in the page's directory
 - Look for `_layout.html` or `_layout.htm`
@@ -458,21 +530,25 @@ Unify uses a hierarchical layout discovery system with both automatic and explic
 - **Note**: Other layout files (e.g., `_blog.layout.html`, `_custom.html`) are NOT automatically applied
 
 **3. Site-wide Fallback Layout (Lowest Priority)**
+
 - If no `_layout.htm(l)` found in directory tree, look for `src/_includes/layout.html` or `src/_includes/layout.htm`
 - Note: Files in `_includes` directory do **NOT** require underscore prefix
 - This serves as the default site layout for all pages
 
 **4. No Layout**
+
 - If no layout is found at any level, render page content as-is
 
 #### Layout Naming Convention
 
 **Automatic Layout Discovery:**
+
 - Only `_layout.html` or `_layout.htm` files are automatically applied
 - These files must be named exactly as shown (with underscore prefix)
 - Automatically discovered by climbing directory hierarchy
 
 **Named Layouts (Referenced Explicitly):**
+
 - Can be located anywhere in src directory
 - Can have any filename (e.g., `header.html`, `blog-template.html`, `_custom.html`)
 - Must be referenced explicitly via `data-layout` or frontmatter `layout`
@@ -480,11 +556,13 @@ Unify uses a hierarchical layout discovery system with both automatic and explic
 - Layouts in the `_includes` folder do not require the `_` prefix for short name discovery
 
 **For regular directories:**
+
 - Layout files should start with underscore (`_`) to be excluded from build output, unless in the `_includes` folder.
 - Including `.layout.` in the filename is **required** for short name discovery
 - Without `.layout.` suffix, layouts must be referenced by full path
 
 **Examples:**
+
 - `_layout.html` (auto-discovered default layout)
 - `_blog.layout.html` (named layout, findable via `data-layout="blog"`)
 - `_documentation.layout.html` (named layout, findable via `data-layout="documentation"`)
@@ -492,11 +570,13 @@ Unify uses a hierarchical layout discovery system with both automatic and explic
 - `_sidebar.html` (must reference via full path, not findable via short name)
 
 **For `_includes` directory:**
+
 - Layout files do NOT require underscore prefix (entire directory is excluded)
 - `layout.html` or `layout.htm` serves as site-wide fallback
 - Named layouts should follow pattern `[name].layout.htm(l)` for short name discovery
 
 **Examples in `_includes`:**
+
 - `layout.html` (site-wide fallback)
 - `blog.layout.html` (findable via `data-layout="blog"`)
 - `docs.layout.html` (findable via `data-layout="docs"`)
@@ -525,6 +605,7 @@ src/
 ```
 
 **Layout Discovery Examples:**
+
 - `blog/post1.html` uses `blog/_layout.html` if it exists (auto-discovery)
 - `docs/api/endpoints.html` uses `docs/api/_layout.html` if it exists (auto-discovery)
 - `docs/guide.html` uses `docs/_layout.html` if it exists (auto-discovery)
@@ -532,117 +613,260 @@ src/
 - If `src/_layout.html` doesn't exist, they use `src/_includes/layout.html` (fallback)
 
 **Short Name Reference Examples:**
+
 - `<html data-layout="blog">` → Finds `_blog.layout.html` or `_blog.layout.htm` in directory hierarchy or `_includes`
 - `<html data-layout="docs">` → Finds `_docs.layout.html` or `_docs.layout.htm` in directory hierarchy or `_includes`
 - `<html data-layout="api">` → Finds `_api.layout.html` or `_api.layout.htm` in directory hierarchy or `_includes`
 - If short name doesn't resolve to a `.layout.htm(l)` file, a warning is produced
 
 **Full Path Reference Examples:**
+
 - `<html data-layout="/shared/base.html">` → Uses `src/shared/base.html`
 - `<html data-layout="../layouts/blog.html">` → Uses layout relative to page
 - `<html data-layout="custom.html">` → Uses `custom.html` in same directory as page
 
-### Slots & Templates
+### Layouts and Slots
 
-Slot/template injection applies to both HTML and Markdown files using standard web platform semantics.
+Unify composes pages with layouts using a simple, standards-adjacent mechanism:
 
-#### Layout Authoring
+- **Layouts** define insertion points with `data-slot` attributes.
+- **Pages** provide content for those slots using the same `data-slot` attribute.
+- Composition happens entirely at build/dev time — no runtime or shadow DOM involved.
 
-Layouts must declare insertion points with standard `<slot>` elements (named and default). `<slot>` elements are kept in normal light DOM (not inside an actual shadow root) so that **their children render as fallback when a layout is opened directly in a browser** (outside Unify). This matches platform behavior: the `<slot>` element's children act as fallback when nothing is assigned. ([MDN: slot element](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/slot), [JavaScript.info: Shadow DOM slots](https://javascript.info/slots-composition))
+> **Tagline:** _Slots without the shadow baggage._  
+> Unify reuses the intuitive slot model, but with plain HTML `data-slot` attributes — no shadow DOM, no polyfills, no surprises.
 
-When a layout file is viewed directly in a browser (not processed by Unify), **named and unnamed `<slot>`s display their fallback children**. This relies on standard browser behavior for `<slot>` fallback content rendered outside of a shadow tree.
+#### Layout Targets
 
-#### Page Projection Syntax
-
-Pages may provide named projections using either:
-
-- **`<template slot="name">`** (inert/hidden in raw page view; compiled by Unify)
-- **Elements with `slot="name"`** (visible in raw page view)
-
-**`<template slot="name">…</template>` behavior:**
-
-- Hidden when the uncompiled page is opened in a browser (since `<template>` is inert and not rendered)
-- Unify consumes `template.content` and injects it into `<slot name="name">`
-- The `<template>` wrapper is removed from output (only its content appears where slotted)
-
-**`<any-element slot="name">…</any-element>` behavior:**
-
-- Visible in raw view (because it's not inside `<template>`)
-- Unify moves that element's subtree into `<slot name="name">`
-- The original element is removed from its original position in the compiled output and appears in the slot position
-
-Reference: `slot` is a standard global attribute assigning nodes to a `<slot name="…">`; elements without a `slot` attribute map to the **unnamed** slot. ([MDN: slot global attribute](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Global_attributes/slot))
-
-#### Default Slot Semantics
-
-Content without a `slot` attribute is assigned to the default `<slot>` in document order. If the layout has no default slot, Unify warns or errors based on configuration.
-
-#### Fallback Content
-
-If no page content is assigned to a given named slot, Unify **emits the fallback children of that `<slot>`** as the compiled output, preserving author order and whitespace. This mirrors standard slot fallback rules.
-
-#### Processing Model
-
-1. **Collect Layout**: Parse the layout DOM. If a `<template shadowrootmode>` exists (experimental), use its children as the slot tree; otherwise use the layout's top-level content.
-
-2. **Collect Page Projections**: Build two maps:
-   - **Named projections**: For each `<template slot="X">`, take `template.content` (fragment). For each non-template `[slot="X"]`, take the element node (subtree).
-   - **Default projection**: all top-level nodes **without** a `slot` attribute.
-
-3. **Assign & Compose** (mirror platform behavior):
-   - For each `<slot name="X">` in the layout, append all assigned nodes for `X` in document order (multiple assignees allowed)
-   - For the **unnamed** `<slot>`, append the default projection in document order
-   - If a slot has **no assigned nodes**, output its **fallback children** as authored
-
-4. **Node relocation semantics**:
-   - `<template slot="X">`: remove the template after consuming its `content`; inject only the fragment
-   - Non-template `[slot="X"]`: remove the original element from its source position and inject it in the slot's position
-
-5. **Output**: Emit a single, flat HTML document with projected content in place of `<slot>` elements
-
-#### Validation & Warnings
-
-- **Unmatched slot names** in pages: warn (configurable to error)
-- **Multiple assignments** to the same slot: allowed; preserve document order (aligns with platform behavior)
-- **Missing default slot** when page has un-slotted content: warn/error per config
-
-**Example:**
+In a layout, any element with `data-slot="name"` marks an insertion point:
 
 ```html
-<!-- Page content -->
-<template slot="sidebar">Sidebar content</template>
-<aside slot="footer">Footer content (visible in raw view)</aside>
-<main>Main content</main>
-```
-
-```html
-<!-- Layout content -->
 <body>
-  <slot name="sidebar">Default sidebar fallback</slot>
-  <slot>Default main content</slot>
-  <slot name="footer">Default footer fallback</slot>
+  <header>…</header>
+  <main data-slot="default"></main>
+  <aside data-slot="sidebar"></aside>
+  <footer>…</footer>
 </body>
 ```
 
-**Raw File Behavior:**
+- `data-slot="default"` is the default insertion point.
+- If no `data-slot="default"` exists, Unify injects the page body into the first `<main>` element.
 
-- **Open a page directly**: default content is visible; named slot content is hidden if authored inside `<template>`
-- **Open a layout directly**: all slot fallback is visible, since `<slot>` outside a shadow tree displays its children
+#### Page Providers
 
-**Rationale:**
+Pages declare which slot their content should flow into using the same attribute:
 
-- This ensures component-based, reusable layouts for all page types, and matches developer expectations for slot/template behavior using web platform standards
-- Override precedence is explicit and predictable
-- Source order of assigned nodes is preserved for accessibility and meaningful reading order
+**Preferred (non-rendering):**
+
+```html
+<template data-slot="sidebar">
+  <nav>Local nav…</nav>
+</template>
+```
+
+**Visible in standalone previews (rendered, then moved at build time):**
+
+```html
+<section data-slot="sidebar">
+  <nav>Local nav…</nav>
+</section>
+```
+
+Both forms are valid. Use `<template>` when you don't want slot content to render standalone, and normal elements when you _do_.
+
+#### Head Merging
+
+When a page specifies a layout with `<link rel="layout" href="…">` or equivalent:
+
+- Unify merges the page `<head>` into the layout `<head>` using the approved merge + dedupe rules.
+- Page `<title>`, `<meta name="description">`, `<link rel="canonical">`, etc. override the layout's values with warnings for potential conflicts.
+
+#### Diagnostics
+
+During build, Unify warns if:
+
+- A page references a `data-slot` not present in the layout.
+- A declared layout cannot be found.
+- A page head entry overrides an identity key from the layout (`title`, description, canonical, etc.).
+
+#### Fragment Pages and Markdown
+
+Unify supports **fragment pages** — pages that omit `<html>`, `<head>`, and `<body>` wrappers and only contain content.
+
+- When a file has no `<html>` root, Unify treats it as a fragment.
+- The fragment is injected into the layout's `data-slot="default"`.
+- Any `<template data-slot="name">` or elements with `data-slot="name"` inside the fragment are moved into the corresponding layout slot.
+- The dev server automatically wraps fragment pages in their layout for accurate previews.
+
+**Markdown Defaults:**
+
+Markdown files (`.md`) are always compiled to fragments:
+
+- The converted HTML body is injected into `data-slot="default"`.
+- Frontmatter in Markdown provides head metadata (title, description, etc.) that is merged into the layout `<head>` using the same merge + dedupe rules as full HTML pages.
+- Authors don't need to add `<html>` or `<head>` in Markdown — only content and optional `data-slot` templates.
+
+This ensures content-heavy workflows (like documentation or blogs) stay lightweight and author-friendly, while Unify guarantees that final output is always a complete, valid HTML document.
+
+#### Example: Composing with `data-slot`
+
+**Layout (`/_layouts/base.html`):**
+
+```html
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Site Title</title>
+    <meta name="description" content="Default description" />
+  </head>
+  <body>
+    <header>Global Header</header>
+
+    <main data-slot="default"></main>
+    <aside data-slot="sidebar"></aside>
+
+    <footer>Global Footer</footer>
+  </body>
+</html>
+```
+
+**Page (`/pages/about.html`):**
+
+```html
+<!DOCTYPE html>
+<html>
+  <head>
+    <link rel="layout" href="/_layouts/base.html" />
+    <title>About Us</title>
+    <meta name="description" content="Learn about our company history." />
+  </head>
+  <body>
+    <h1>About</h1>
+    <p>Our company was founded in…</p>
+
+    <template data-slot="sidebar">
+      <nav>
+        <ul>
+          <li><a href="/team">Team</a></li>
+          <li><a href="/careers">Careers</a></li>
+        </ul>
+      </nav>
+    </template>
+  </body>
+</html>
+```
+
+**Final Output (after Unify build):**
+
+```html
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>About Us</title>
+    <meta name="description" content="Learn about our company history." />
+  </head>
+  <body>
+    <header>Global Header</header>
+
+    <main>
+      <h1>About</h1>
+      <p>Our company was founded in…</p>
+    </main>
+
+    <aside>
+      <nav>
+        <ul>
+          <li><a href="/team">Team</a></li>
+          <li><a href="/careers">Careers</a></li>
+        </ul>
+      </nav>
+    </aside>
+
+    <footer>Global Footer</footer>
+  </body>
+</html>
+```
+
+#### Example: Fragment Page
+
+**Layout (`/_layouts/docs.html`):**
+
+```html
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Docs – My Site</title>
+    <meta name="description" content="Documentation layout" />
+  </head>
+  <body>
+    <header>Docs Header</header>
+
+    <main data-slot="default"></main>
+    <aside data-slot="sidebar"></aside>
+
+    <footer>Docs Footer</footer>
+  </body>
+</html>
+```
+
+**Page (`/pages/docs/index.html` – fragment style):**
+
+```html
+<h1>Documentation</h1>
+<p>Welcome to the docs. Use the navigation to explore topics.</p>
+
+<template data-slot="sidebar">
+  <nav>
+    <ul>
+      <li><a href="/docs/getting-started">Getting Started</a></li>
+      <li><a href="/docs/api">API Reference</a></li>
+    </ul>
+  </nav>
+</template>
+```
+
+**Final Output (after Unify build):**
+
+```html
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Docs – My Site</title>
+    <meta name="description" content="Documentation layout" />
+  </head>
+  <body>
+    <header>Docs Header</header>
+
+    <main>
+      <h1>Documentation</h1>
+      <p>Welcome to the docs. Use the navigation to explore topics.</p>
+    </main>
+
+    <aside>
+      <nav>
+        <ul>
+          <li><a href="/docs/getting-started">Getting Started</a></li>
+          <li><a href="/docs/api">API Reference</a></li>
+        </ul>
+      </nav>
+    </aside>
+
+    <footer>Docs Footer</footer>
+  </body>
+</html>
+```
 
 ### Overrides
 
 **Layout override precedence:**
 
-- For HTML files: `data-layout` attribute takes precedence over frontmatter and discovered layout chain.
+- For HTML files:
+  1. `<link rel="layout">` in document head (highest priority, full HTML documents only)
+  2. `data-layout` attribute on root element
+  3. Automatic layout discovery chain
 - For Markdown files: frontmatter `layout` key takes precedence over discovered layout chain.
 - If no override is found, the nearest layout is discovered by climbing the directory tree, then falling back to `_includes/layout.html` if present.
-- `data-layout` accepts:
+- Both `<link rel="layout" href="...">` and `data-layout` accept:
   - **Full paths**: relative paths or absolute-from-`src` paths (e.g., `_custom.layout.html`, `/path/layout.html`)
   - **Short names**: convenient references that resolve to layout files (e.g., `blog` → `_blog.layout.html`)
 
@@ -716,7 +940,6 @@ If no page content is assigned to a given named slot, Unify **emits the fallback
 - Convention over configuration.
 
 ## Success Criteria
-
 
 ### Functional Requirements
 

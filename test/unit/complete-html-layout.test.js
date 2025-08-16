@@ -48,7 +48,7 @@ describe('Complete HTML Layout Bug', () => {
 </head>
 <body>
   <header>Site Header</header>
-  <slot></slot>
+  <main data-slot="default"></main>
   <footer>Site Footer</footer>
 </body>
 </html>`;
@@ -92,7 +92,7 @@ describe('Complete HTML Layout Bug', () => {
 </head>
 <body>
   <header>Site Header</header>
-  <slot></slot>
+  <main data-slot="default"></main>
   <footer>Site Footer</footer>
 </body>
 </html>`;
@@ -141,7 +141,7 @@ describe('Complete HTML Layout Bug', () => {
 </head>
 <body>
   <nav>Custom Nav</nav>
-  <slot></slot>
+  <main data-slot="default"></main>
 </body>
 </html>`;
     await fs.writeFile(path.join(sourceDir, 'custom.html'), customLayoutContent);
@@ -160,7 +160,9 @@ describe('Complete HTML Layout Bug', () => {
 
     // The result should use the explicit layout
     expect(result.content.includes('Custom Nav')).toBe(true);
-    expect(result.content.includes('Custom Layout')).toBe(true);
+    expect(result.content.includes('My Page')).toBe(true); // Page title should override layout title
     expect(result.content.includes('Content with explicit layout')).toBe(true);
+    expect(result.content.includes('<title>My Page</title>')).toBe(true); // Page title wins
+    expect(result.content).not.toContain('Custom Layout'); // Layout title should be replaced
   });
 });

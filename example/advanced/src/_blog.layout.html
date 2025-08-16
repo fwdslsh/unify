@@ -2,9 +2,7 @@
 <html>
 
 <head>
-  <title>
-    <slot name="title">My Blog</slot>
-  </title>
+  <title data-slot="title">My Blog</title>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="/styles/site.css">
@@ -38,12 +36,12 @@
 
 <body class="blog-layout">
   <header class="blog-header">
-    <slot name="header">
+    <div data-slot="header">
       <h1>My Blog</h1>
-    </slot>
+    </div>
   </header>
-  <main class="blog-content">
-    <slot></slot> <!-- Main blog content -->
+  <main class="blog-content" data-slot="default">
+    <!-- Main blog content -->
   </main>
   <!--#include virtual="/_includes/footer.html" -->
 </body>

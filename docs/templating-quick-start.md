@@ -7,9 +7,9 @@ A simple introduction to unify's templating features. Learn the basics of layout
 
 unify has four simple templating features:
 
-- **Layouts** → Page structure with `<slot name="example">` placeholders
+- **Layouts** → Page structure with `data-slot="example"` placeholders
 - **Slots** → Content placeholders in layouts with optional default content
-- **Templates** → Content containers with `<template slot="example">`
+- **Templates** → Content containers with `<template data-slot="example">`
 - **Includes** → Component insertion with `<!--#include virtual="..." -->` or `<include src="...">`
 
 ## 1. Layouts (Page Structure)
@@ -22,22 +22,22 @@ unify has four simple templating features:
 <!DOCTYPE html>
 <html>
 <head>
-  <title><slot name="title">Default Site Title</slot></title>
-  <slot name="head"></slot>
+  <title data-slot="title">Default Site Title</title>
+  <div data-slot="head"></div>
 </head>
 <body>
   <header>
-    <slot name="header">
+    <div data-slot="header">
       <h1>My Website</h1>
-    </slot>
+    </div>
   </header>
-  <main>
-    <slot></slot> <!-- Default slot for main content -->
+  <main data-slot="default">
+    <!-- Default slot for main content -->
   </main>
   <footer>
-    <slot name="footer">
+    <div data-slot="footer">
       <p>&copy; 2024 My Site</p>
-    </slot>
+    </div>
   </footer>
 </body>
 </html>
@@ -47,8 +47,8 @@ unify has four simple templating features:
 
 ```html
 <div data-layout="default">
-  <template slot="title">About Us - My Site</template>
-  <template slot="header">
+  <template data-slot="title">About Us - My Site</template>
+  <template data-slot="header">
     <h1>About Our Company</h1>
   </template>
   
@@ -82,17 +82,17 @@ This markdown content goes to the default slot in the layout.
 <!DOCTYPE html>
 <html>
 <head>
-  <title><slot name="title">Default Article Title</slot></title>
-  <slot name="head"></slot>
+  <title data-slot="title">Default Article Title</title>
+  <div data-slot="head"></div>
 </head>
 <body>
   <article>
     <header>
-      <h1><slot name="headline"></slot></h1>
-      <p class="meta"><slot name="meta">Published recently</slot></p>
+      <h1 data-slot="headline"></h1>
+      <p class="meta" data-slot="meta">Published recently</p>
     </header>
     <div class="content">
-      <slot></slot> <!-- Main article content -->
+      <div data-slot="default"></div> <!-- Main article content -->
     </div>
   </article>
 </body>
@@ -103,10 +103,10 @@ This markdown content goes to the default slot in the layout.
 
 ```html
 <div data-layout="article">
-  <template slot="title">Amazing Discovery - My Blog</template>
-  <template slot="headline">Scientists Make Amazing Discovery</template>
-  <template slot="meta">Published on March 15, 2024 by Jane Doe</template>
-  <template slot="head">
+  <template data-slot="title">Amazing Discovery - My Blog</template>
+  <template data-slot="headline">Scientists Make Amazing Discovery</template>
+  <template data-slot="meta">Published on March 15, 2024 by Jane Doe</template>
+  <template data-slot="head">
     <meta name="description" content="Learn about this amazing discovery">
   </template>
   
@@ -128,25 +128,25 @@ This markdown content goes to the default slot in the layout.
 <!DOCTYPE html>
 <html>
 <head>
-  <slot name="head">
+  <div data-slot="head">
     <!-- Default head content if no template provides it -->
     <meta charset="UTF-8">
     <title>My Website</title>
-  </slot>
+  </div>
 </head>
 <body>
   <header>
-    <slot name="header">
+    <div data-slot="header">
       <h1>Default Header</h1>
-    </slot>
+    </div>
   </header>
-  <main>
-    <slot></slot> <!-- Default slot - gets content not in named templates -->
+  <main data-slot="default">
+    <!-- Default slot - gets content not in named templates -->
   </main>
   <footer>
-    <slot name="footer">
+    <div data-slot="footer">
       <p>&copy; 2024 My Site</p>
-    </slot>
+    </div>
   </footer>
 </body>
 </html>
@@ -156,11 +156,11 @@ This markdown content goes to the default slot in the layout.
 
 ```html
 <div data-layout="page">
-  <template slot="head">
+  <template data-slot="head">
     <title>Contact Us - My Site</title>
     <meta name="description" content="Get in touch with us">
   </template>
-  <template slot="header">
+  <template data-slot="header">
     <h1>Contact Us</h1>
   </template>
   <!-- No footer template provided - uses default from layout -->
@@ -173,9 +173,9 @@ This markdown content goes to the default slot in the layout.
 
 **Key concepts:**
 
-- Named slots: `<slot name="title">` → filled by `<template slot="title">`
-- Default slot: `<slot></slot>` → gets content not in named templates
-- Fallback content: Content inside `<slot>` tags is used when no template fills the slot
+- Named slots: `data-slot="title"` → filled by `<template data-slot="title">`
+- Default slot: `data-slot="default"` → gets content not in named templates
+- Fallback content: Content inside elements with `data-slot` attributes is used when no template fills the slot
 
 ## 4. Includes (Component Insertion)
 
@@ -185,12 +185,10 @@ This markdown content goes to the default slot in the layout.
 
 ```html
 <header class="site-header">
-  <h1><slot name="site-title">My Website</slot></h1>
-  <nav>
-    <slot name="navigation">
-      <a href="/">Home</a>
-      <a href="/about">About</a>
-    </slot>
+  <h1 data-slot="site-title">My Website</h1>
+  <nav data-slot="navigation">
+    <a href="/">Home</a>
+    <a href="/about">About</a>
   </nav>
 </header>
 ```
@@ -202,8 +200,8 @@ This markdown content goes to the default slot in the layout.
 <html>
 <body>
   <!--#include virtual="/.components/site-header.html" -->
-  <template slot="site-title">Welcome to My Site</template>
-  <template slot="navigation">
+  <template data-slot="site-title">Welcome to My Site</template>
+  <template data-slot="navigation">
     <a href="/">Home</a>
     <a href="/about">About</a>
     <a href="/contact">Contact</a>
@@ -224,7 +222,7 @@ This markdown content goes to the default slot in the layout.
 <html>
 <body>
   <include src="/.components/site-header.html"></include>
-  <template slot="site-title">Our Products</template>
+  <template data-slot="site-title">Our Products</template>
   
   <main>
     <h2>Product Catalog</h2>
@@ -249,16 +247,16 @@ The real power comes from combining layouts, slots, templates, and includes:
 ```html
 <div class="card">
   <div class="card-header">
-    <h3><slot name="title">Product Title</slot></h3>
-    <p class="price"><slot name="price">$0.00</slot></p>
+    <h3 data-slot="title">Product Title</h3>
+    <p class="price" data-slot="price">$0.00</p>
   </div>
-  <div class="card-body">
-    <slot></slot> <!-- Main product description -->
+  <div class="card-body" data-slot="default">
+    <!-- Main product description -->
   </div>
   <div class="card-footer">
-    <slot name="actions">
+    <div data-slot="actions">
       <button>Learn More</button>
-    </slot>
+    </div>
   </div>
 </div>
 ```
@@ -269,17 +267,17 @@ The real power comes from combining layouts, slots, templates, and includes:
 <!DOCTYPE html>
 <html>
 <head>
-  <title><slot name="title">My Shop</slot></title>
-  <slot name="head"></slot>
+  <title data-slot="title">My Shop</title>
+  <div data-slot="head"></div>
 </head>
 <body>
   <header>
-    <slot name="header">
+    <div data-slot="header">
       <h1>My Online Shop</h1>
-    </slot>
+    </div>
   </header>
-  <main class="product-grid">
-    <slot></slot> <!-- Products go here -->
+  <main class="product-grid" data-slot="default">
+    <!-- Products go here -->
   </main>
 </body>
 </html>
@@ -289,25 +287,25 @@ The real power comes from combining layouts, slots, templates, and includes:
 
 ```html
 <div data-layout="shop">
-  <template slot="title">Amazing Products - My Shop</template>
-  <template slot="header">
+  <template data-slot="title">Amazing Products - My Shop</template>
+  <template data-slot="header">
     <h1>Our Amazing Products</h1>
     <p>Find exactly what you need</p>
   </template>
   
   <!-- Include and customize product cards -->
   <!--#include virtual="/.components/product-card.html" -->
-  <template slot="title">Super Widget</template>
-  <template slot="price">$29.99</template>
-  <template slot="actions">
+  <template data-slot="title">Super Widget</template>
+  <template data-slot="price">$29.99</template>
+  <template data-slot="actions">
     <button class="btn-primary">Buy Now</button>
     <button class="btn-secondary">Add to Cart</button>
   </template>
   <p>The most amazing widget you'll ever own!</p>
   
   <!--#include virtual="/.components/product-card.html" -->
-  <template slot="title">Mega Gadget</template>
-  <template slot="price">$49.99</template>
+  <template data-slot="title">Mega Gadget</template>
+  <template data-slot="price">$49.99</template>
   <p>This gadget will revolutionize your workflow.</p>
 </div>
 ```
@@ -341,9 +339,9 @@ src/
 |---------|--------|---------|
 | Layout selection | `data-layout="path/layout.html"` | Specify which layout to use |
 | Layout selection (MD) | `layout: default` in frontmatter | Specify layout for markdown |
-| Named slot | `<slot name="title">Default</slot>` | Content placeholder with fallback |
-| Default slot | `<slot></slot>` | Main content area |
-| Fill slot | `<template slot="title">Content</template>` | Provide content for named slot |
+| Named slot | `data-slot="title"` | Content placeholder with fallback |
+| Default slot | `data-slot="default"` | Main content area |
+| Fill slot | `<template data-slot="title">Content</template>` | Provide content for named slot |
 | Virtual include | `<!--#include virtual="/file.html" -->` | Include from source root |
 | File include | `<!--#include file="../file.html" -->` | Include relative path |
 | Element include | `<include src="/file.html"></include>` | Element syntax for includes |
@@ -357,18 +355,17 @@ src/
 <!DOCTYPE html>
 <html>
 <head>
-  <title><slot name="title">My Blog</slot></title>
+  <title data-slot="title">My Blog</title>
 </head>
 <body>
   <article>
     <header>
-      <h1><slot name="headline"></slot></h1>
+      <h1 data-slot="headline"></h1>
       <p class="meta">
-        By <slot name="author">Anonymous</slot> on <slot name="date"></slot>
+        By <span data-slot="author">Anonymous</span> on <span data-slot="date"></span>
       </p>
     </header>
-    <div class="content">
-      <slot></slot>
+    <div class="content" data-slot="default">
     </div>
   </article>
 </body>
@@ -376,10 +373,10 @@ src/
 
 <!-- blog/my-post.html -->
 <div data-layout="blog">
-  <template slot="title">My First Post - My Blog</template>
-  <template slot="headline">Welcome to My Blog</template>
-  <template slot="author">Jane Smith</template>
-  <template slot="date">March 15, 2024</template>
+  <template data-slot="title">My First Post - My Blog</template>
+  <template data-slot="headline">Welcome to My Blog</template>
+  <template data-slot="author">Jane Smith</template>
+  <template data-slot="date">March 15, 2024</template>
   
   <p>This is my first blog post content...</p>
   <p>More content here...</p>
@@ -392,12 +389,10 @@ src/
 <!-- .components/site-header.html -->
 <header class="site-header">
   <div class="container">
-    <h1><slot name="site-title">My Website</slot></h1>
-    <nav>
-      <slot name="navigation">
-        <a href="/">Home</a>
-        <a href="/about">About</a>
-      </slot>
+    <h1 data-slot="site-title">My Website</h1>
+    <nav data-slot="navigation">
+      <a href="/">Home</a>
+      <a href="/about">About</a>
     </nav>
   </div>
 </header>
@@ -405,8 +400,8 @@ src/
 <!-- Any page using the header -->
 <div data-layout="default">
   <!--#include virtual="/.components/site-header.html" -->
-  <template slot="site-title">Welcome to My Site</template>
-  <template slot="navigation">
+  <template data-slot="site-title">Welcome to My Site</template>
+  <template data-slot="navigation">
     <a href="/">Home</a>
     <a href="/products">Products</a>
     <a href="/contact">Contact</a>
@@ -430,9 +425,10 @@ Start with layouts for basic page structure, add templates to fill slots with co
 
 **Key attributes added to standard HTML:**
 
-- `<template slot="name">` - Content for named slots
+- `<template data-slot="name">` - Content for named slots
 - `<include src="path">` - Element syntax for includes
 - `data-layout="path"` - Layout selection for pages
+- `data-slot="name"` - Slot placeholders in layouts
 
 ## Next Steps
 

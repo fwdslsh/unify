@@ -41,7 +41,7 @@ describe('Complex Integration Scenarios', () => {
             <link rel="stylesheet" href="/css/main.css">
           </head>
           <body>
-            <slot></slot>
+            <main data-slot="default"></main>
             <script src="/js/main.js"></script>
           </body>
           </html>
@@ -171,7 +171,7 @@ Another great post.
 </head>
 <body>
   <!--#include file="../includes/header.html" -->
-  <main><slot></slot></main>
+  <main><main data-slot="default"></main></main>
   <!--#include file="../includes/footer.html" -->
   <script src="/js/main.js"></script>
 </body>
@@ -288,7 +288,7 @@ Another great post.
         'src/_includes/child.html': `
           <div data-layout="parent">
             <div class="child-wrapper">
-              <slot></slot>
+              <main data-slot="default"></main>
             </div>
           </div>
         `,
@@ -296,7 +296,7 @@ Another great post.
         'src/_includes/parent.html': `
           <div data-layout="grandparent">
             <div class="parent-wrapper">
-              <slot></slot>
+              <main data-slot="default"></main>
             </div>
           </div>
         `,
@@ -309,7 +309,7 @@ Another great post.
           </head>
           <body>
             <div class="grandparent-wrapper">
-              <slot></slot>
+              <main data-slot="default"></main>
             </div>
           </body>
           </html>
@@ -367,10 +367,10 @@ This is blog post number ${i}.
       });
       
       // Layouts
-      structure['src/_includes/home.html'] = '<!DOCTYPE html><html><head><title>Home</title></head><body><!--#include file="../includes/header.html" --><main><slot></slot></main><!--#include file="../includes/footer.html" --></body></html>';
-      structure['src/_includes/page.html'] = '<!DOCTYPE html><html><head><title>Page</title></head><body><!--#include file="../includes/header.html" --><main><slot></slot></main><!--#include file="../includes/footer.html" --></body></html>';
-      structure['src/_includes/blog.html'] = '<!DOCTYPE html><html><head><title>Blog</title></head><body><!--#include file="../includes/header.html" --><article><slot></slot></article><!--#include file="../includes/footer.html" --></body></html>';
-      structure['src/_includes/category.html'] = '<!DOCTYPE html><html><head><title>Category</title></head><body><!--#include file="../includes/header.html" --><section><slot></slot></section><!--#include file="../includes/footer.html" --></body></html>';
+      structure['src/_includes/home.html'] = '<!DOCTYPE html><html><head><title>Home</title></head><body><!--#include file="../includes/header.html" --><main><main data-slot="default"></main></main><!--#include file="../includes/footer.html" --></body></html>';
+      structure['src/_includes/page.html'] = '<!DOCTYPE html><html><head><title>Page</title></head><body><!--#include file="../includes/header.html" --><main><main data-slot="default"></main></main><!--#include file="../includes/footer.html" --></body></html>';
+      structure['src/_includes/blog.html'] = '<!DOCTYPE html><html><head><title>Blog</title></head><body><!--#include file="../includes/header.html" --><article><main data-slot="default"></main></article><!--#include file="../includes/footer.html" --></body></html>';
+      structure['src/_includes/category.html'] = '<!DOCTYPE html><html><head><title>Category</title></head><body><!--#include file="../includes/header.html" --><section><main data-slot="default"></main></section><!--#include file="../includes/footer.html" --></body></html>';
       
       // Includes
       structure['src/includes/header.html'] = '<header><h1>My Blog</h1><!--#include file="nav.html" --></header>';
@@ -435,7 +435,7 @@ This is blog post number ${i}.
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-  <slot></slot>
+  <main data-slot="default"></main>
 </body>
 </html>`,
         'src/includes/content.html': '<p>This content has      multiple    spaces     that will be minified.</p>',

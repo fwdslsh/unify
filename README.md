@@ -5,10 +5,11 @@
 
 A modern, lightweight static site generator that brings the power of server-side includes, markdown processing, and live development to your workflow. Build maintainable static sites with component-based architecture—no more copying and pasting headers, footers, and navigation across multiple pages!
 
+> So simple, it shouldn't be this powerful!
 
 ## ✨ Perfect for Frontend Developers
 
-- **Zero Learning Curve**: Uses familiar Apache SSI syntax (`<!--#include file="header.html" -->`) and modern DOM templating (`<include>`, `<slot>`, `<template>`)
+- **Zero Learning Curve**: Uses familiar Apache SSI syntax (`<!--#include file="header.html" -->`) and modern DOM templating (`<include>`, `data-slot`, `<template>`)
 - **Modern Tooling**: Built with ESM modules, powered by **Bun** for maximum performance
 - **Live Development**: Built-in dev server with live reload via Server-Sent Events
 - **Multi-Format Support**: HTML, Markdown with YAML frontmatter, and static assets
@@ -75,9 +76,9 @@ unify is built exclusively for Bun and uses native APIs for maximum performance:
 <!-- Alternative modern DOM syntax -->
 <include src="/_includes/header.html"></include>
 <main>
-  <template slot="title">My Page Title</template>
+  <template data-slot="title">My Page Title</template>
   <h1>Welcome!</h1>
-  <p>Use slots and templates for advanced layouts.</p>
+  <p>Use data-slot attributes and templates for advanced layouts.</p>
 </main>
 <include src="/_includes/footer.html"></include>
 ```

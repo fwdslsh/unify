@@ -251,7 +251,7 @@ describe('build-process integration', () => {
     // Create markdown file without html element
     await fs.writeFile(
       path.join(sourceDir, 'test-markdown.md'),
-      `<template slot="title">Test Page</template>
+      `<template data-slot="title">Test Page</template>
 
 # Test Content
 

@@ -1,5 +1,5 @@
 /**
- * Tests for slot fallback content edge cases
+ * Tests for data-slot fallback content edge cases
  */
 
 import { describe, it, beforeEach, afterEach, expect } from 'bun:test';
@@ -12,7 +12,7 @@ import { DependencyTracker } from '../../src/core/dependency-tracker.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const testFixturesDir = path.join(__dirname, '../fixtures/slot-fallback-edge-cases');
 
-describe('slot fallback edge cases', () => {
+describe('data-slot fallback edge cases', () => {
   let sourceDir;
   let layoutsDir;
   let dependencyTracker;
@@ -34,7 +34,7 @@ describe('slot fallback edge cases', () => {
   });
   
   it('should use fallback when page has only whitespace', async () => {
-    const layoutContent = `<html><body><slot>Fallback content</slot></body></html>`;
+    const layoutContent = `<html><body><div data-slot="default">Fallback content</div></body></html>`;
     await fs.writeFile(path.join(sourceDir, '_layout.html'), layoutContent);
     
     const pageContent = `<div data-layout="_layout.html">   \n\t  </div>`;
@@ -43,11 +43,11 @@ describe('slot fallback edge cases', () => {
     
     const result = await processHtmlUnified(pageContent, pagePath, sourceDir, dependencyTracker, {});
     expect(result.content).toContain('Fallback content');
-    expect(result.content).not.toContain('<slot>');
+    expect(result.content).toContain('data-slot="default"');
   });
   
   it('should use fallback when page has only comments', async () => {
-    const layoutContent = `<html><body><slot>Fallback content</slot></body></html>`;
+    const layoutContent = `<html><body><div data-slot="default">Fallback content</div></body></html>`;
     await fs.writeFile(path.join(sourceDir, '_layout.html'), layoutContent);
     
     const pageContent = `<div data-layout="_layout.html"><!-- just a comment --></div>`;
@@ -56,11 +56,11 @@ describe('slot fallback edge cases', () => {
     
     const result = await processHtmlUnified(pageContent, pagePath, sourceDir, dependencyTracker, {});
     expect(result.content).toContain('Fallback content');
-    expect(result.content).not.toContain('<slot>');
+    expect(result.content).toContain('data-slot="default"');
   });
   
   it('should use page content when it has meaningful content', async () => {
-    const layoutContent = `<html><body><slot>Fallback content</slot></body></html>`;
+    const layoutContent = `<html><body><div data-slot="default">Fallback content</div></body></html>`;
     await fs.writeFile(path.join(sourceDir, '_layout.html'), layoutContent);
     
     const pageContent = `<div data-layout="_layout.html"><p>Real content</p></div>`;
@@ -73,7 +73,7 @@ describe('slot fallback edge cases', () => {
   });
   
   it('should handle mixed comments and whitespace correctly', async () => {
-    const layoutContent = `<html><body><slot>Fallback content</slot></body></html>`;
+    const layoutContent = `<html><body><div data-slot="default">Fallback content</div></body></html>`;
     await fs.writeFile(path.join(sourceDir, '_layout.html'), layoutContent);
     
     const pageContent = `<div data-layout="_layout.html">
@@ -86,6 +86,6 @@ describe('slot fallback edge cases', () => {
     
     const result = await processHtmlUnified(pageContent, pagePath, sourceDir, dependencyTracker, {});
     expect(result.content).toContain('Fallback content');
-    expect(result.content).not.toContain('<slot>');
+    expect(result.content).toContain('data-slot="default"');
   });
 });

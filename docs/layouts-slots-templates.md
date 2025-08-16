@@ -10,16 +10,74 @@ The template system supports three main concepts:
 - **Slots**: Placeholders for content insertion
 - **Templates**: Modern component-based templating
 
+## HTML Page Types
+
+unify supports two types of HTML pages with different processing behavior:
+
+### Page Fragments
+
+HTML content without complete document structure (`<!DOCTYPE>`, `<html>`, `<head>`, `<body>` elements):
+
+```html
+<div data-layout="blog">
+  <h1>Article Title</h1>
+  <p>This is a page fragment.</p>
+</div>
+```
+
+**Features:**
+- Content is treated as fragment and inserted into layout's default slot
+- Can use `data-layout` attribute on root element for layout discovery
+- **Validation**: Only one `data-layout` attribute allowed per fragment
+- Head and template elements found in fragments are processed normally
+
+### Full HTML Documents
+
+Complete HTML documents with `<!DOCTYPE html>`, `<html>`, `<head>`, and `<body>` elements:
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Page Title</title>
+  <link rel="layout" href="/layouts/blog.html">
+</head>
+<body>
+  <h1>Article Title</h1>
+  <p>This is a full HTML document.</p>
+</body>
+</html>
+```
+
+**Features:**
+- Document elements are merged with the layout during processing
+- Layout discovery via `<link rel="layout">` in document head (highest priority)
+- Can also use `data-layout` attribute (lower priority)
+- **Document Merging**:
+  - Page's DOCTYPE is used if present, otherwise layout's DOCTYPE
+  - Layout's `<html>` attributes preserved, page's attributes added/override on conflict
+  - HEAD content merged using head merge algorithm (page content wins on conflicts)
+  - BODY content inserted into layout's default `<slot>` element
+
 ## Layout System
 
 ### Convention-Based Layout Discovery
 
 unify automatically discovers and applies layouts based on file naming conventions and directory structure:
 
-1. **Explicit Override**: `data-layout` attribute or frontmatter (supports short names like `data-layout="blog"`)
-2. **Auto Discovery**: Searches for `_layout.html` or `_layout.htm` files in page directory and parent directories
-3. **Site-wide Fallback**: Uses `_includes/layout.html` if it exists (no underscore prefix required)
-4. **No Layout**: Renders page content as-is if no layout is found
+**Layout Discovery Precedence (highest to lowest):**
+
+1. **`<link rel="layout">` in document head** (full HTML documents only)
+2. **`data-layout` attribute** on root element (fragments) or any element (full documents)
+3. **Frontmatter `layout` key** (Markdown files only)
+4. **Auto Discovery**: Searches for `_layout.html` or `_layout.htm` files in page directory and parent directories
+5. **Site-wide Fallback**: Uses `_includes/layout.html` if it exists (no underscore prefix required)
+6. **No Layout**: Renders page content as-is if no layout is found
+
+**Layout Path Resolution:**
+- **Full paths**: `href="/layouts/blog.html"` or `data-layout="../shared/layout.html"`
+- **Short names**: `href="blog"` or `data-layout="blog"` → searches for `_blog.layout.html` in directory hierarchy and `_includes`
+- **Relative paths**: `href="custom.html"` → relative to current page directory
 
 ### Layout Naming Convention
 
@@ -88,6 +146,97 @@ This content will be placed in the default slot of the layout.
   <p>This content will be placed in the default slot.</p>
 </div>
 ```
+
+### New Layout Discovery Methods
+
+#### Using `<link rel="layout">` in Full HTML Documents
+
+**Layout file: `src/_includes/blog.layout.html`**
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Blog Layout</title>
+  <slot name="head"></slot>
+</head>
+<body>
+  <header>
+    <h1>My Blog</h1>
+  </header>
+  <main>
+    <slot></slot>
+  </main>
+</body>
+</html>
+```
+
+**Full HTML document: `src/posts/my-post.html`**
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <title>My Blog Post</title>
+  <link rel="layout" href="../_includes/blog.layout.html">
+  <meta name="description" content="A great blog post">
+</head>
+<body>
+  <article>
+    <h2>My Blog Post</h2>
+    <p>This is the content of my blog post.</p>
+  </article>
+</body>
+</html>
+```
+
+**Result:** The page and layout are merged with:
+- Page's DOCTYPE (`<!DOCTYPE html>`) used
+- Layout's `<html>` attributes preserved
+- Page's `<title>` wins over layout's title
+- Page's meta description added to head
+- Page's body content goes into layout's default slot
+
+#### Using Short Names for Layout Discovery
+
+**Layout file: `src/_blog.layout.html`**
+```html
+<!DOCTYPE html>
+<html>
+<head><title>Blog Layout</title></head>
+<body>
+  <div class="blog-container">
+    <slot></slot>
+  </div>
+</body>
+</html>
+```
+
+**Page fragment: `src/posts/article.html`**
+```html
+<article data-layout="blog">
+  <h1>Article Title</h1>
+  <p>Article content goes here.</p>
+</article>
+```
+
+**Full HTML document: `src/posts/full-article.html`**
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Full Article</title>
+  <link rel="layout" href="blog">
+</head>
+<body>
+  <article>
+    <h1>Full Article Title</h1>
+    <p>Full article content.</p>
+  </article>
+</body>
+</html>
+```
+
+Both examples will use the `_blog.layout.html` layout file via short name resolution.
 
 ### Layout Directory Structure Examples
 

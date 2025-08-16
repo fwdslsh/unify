@@ -122,7 +122,7 @@ describe('Live Reload Functionality', () => {
     it('should serve layout-processed content correctly', async () => {
       const structure = {
         'src/page.html': '<div><h1>Content</h1></div>',
-        'src/_includes/layout.html': '<!DOCTYPE html><html><body>Layout: <slot></slot></body></html>'
+        'src/_includes/layout.html': '<!DOCTYPE html><html><body>Layout: <main data-slot="default"></main></body></html>'
       };
 
       await createTestStructure(tempDir, structure);

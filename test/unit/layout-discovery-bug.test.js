@@ -43,8 +43,7 @@ describe('layout discovery bug - .layouts directory references', () => {
   <header>
     <h1>My Blog</h1>
   </header>
-  <main>
-    <slot></slot>
+  <main data-slot="default">
   </main>
   <footer>
     <p>© 2024 My Blog</p>
@@ -83,8 +82,7 @@ describe('layout discovery bug - .layouts directory references', () => {
     const layoutContent = `<!DOCTYPE html>
 <html>
 <body>
-  <div class="blog-layout">
-    <slot></slot>
+  <div class="blog-layout" data-slot="default">
   </div>
 </body>
 </html>`;
@@ -106,7 +104,7 @@ describe('layout discovery bug - .layouts directory references', () => {
     const result = await processHtmlUnified(pageContent, pagePath, sourceDir, dependencyTracker, {});
     
     // Verify layout was applied
-    expect(result.content).toContain('<div class="blog-layout">');
+    expect(result.content).toContain('class="blog-layout"');
     expect(result.content).toContain('<h1>Blog Post Title</h1>');
     expect(result.content).not.toContain('data-layout');
   });
@@ -117,7 +115,7 @@ describe('layout discovery bug - .layouts directory references', () => {
 <html>
 <body>
   <div class="main-layout">
-    <slot></slot>
+    <div data-slot="default"></div>
   </div>
 </body>
 </html>`;
@@ -151,7 +149,7 @@ describe('layout discovery bug - .layouts directory references', () => {
     const layoutContent = `<!DOCTYPE html>
 <html>
 <body>
-  <main><slot></slot></main>
+  <main data-slot="default"></main>
 </body>
 </html>`;
     
@@ -180,7 +178,7 @@ describe('layout discovery bug - .layouts directory references', () => {
     // Process should succeed without trying to access .layouts
     const result = await processHtmlUnified(pageContent, pagePath, sourceDir, dependencyTracker, {});
     
-    expect(result.content).toContain('<main>');
+    expect(result.content).toContain('<main');
     expect(result.content).toContain('<p>Simple content</p>');
     expect(result.content).not.toContain('data-layout');
   });

@@ -44,7 +44,7 @@ describe('layout discovery new spec', () => {
 <body>
   <header>Site Header</header>
   <main>
-    <slot></slot>
+    <main data-slot="default"></main>
   </main>
   <footer>Site Footer</footer>
 </body>
@@ -79,7 +79,7 @@ describe('layout discovery new spec', () => {
     const fallbackLayoutContent = `<!DOCTYPE html>
 <html>
 <head><title>Fallback Layout</title></head>
-<body><slot></slot></body>
+<body><main data-slot="default"></main></body>
 </html>`;
     
     await fs.writeFile(path.join(includesDir, 'layout.html'), fallbackLayoutContent);
@@ -90,7 +90,7 @@ describe('layout discovery new spec', () => {
 <head><title>Local Layout</title></head>
 <body>
   <nav>Local Nav</nav>
-  <slot></slot>
+  <main data-slot="default"></main>
 </body>
 </html>`;
     
@@ -121,7 +121,7 @@ describe('layout discovery new spec', () => {
 <head><title>Blog Layout</title></head>
 <body>
   <header>Blog Header</header>
-  <slot></slot>
+  <main data-slot="default"></main>
 </body>
 </html>`;
     
@@ -150,7 +150,7 @@ describe('layout discovery new spec', () => {
     const blogLayoutContent = `<!DOCTYPE html>
 <html>
 <head><title>Blog Layout</title></head>
-<body><slot></slot></body>
+<body><main data-slot="default"></main></body>
 </html>`;
     
     const customLayoutContent = `<!DOCTYPE html>
@@ -158,7 +158,7 @@ describe('layout discovery new spec', () => {
 <head><title>Custom Layout</title></head>
 <body>
   <div class="custom">
-    <slot></slot>
+    <main data-slot="default"></main>
   </div>
 </body>
 </html>`;

@@ -1,34 +1,34 @@
 <div>
-  <!-- Example demonstrating both slot content approaches -->
-  <template slot="title">Slot Content Examples</template>
+  <!-- Example demonstrating both data-slot content approaches -->
+  <template data-slot="title">Data-Slot Content Examples</template>
   
   <!-- Hidden sidebar content (not visible in raw view) -->
-  <template slot="sidebar">
+  <template data-slot="sidebar">
     <h3>Quick Navigation</h3>
     <ul>
-      <li><a href="#template">Template Slots</a></li>
-      <li><a href="#element">Element Slots</a></li>
+      <li><a href="#template">Template Data-Slots</a></li>
+      <li><a href="#element">Element Data-Slots</a></li>
       <li><a href="#comparison">Comparison</a></li>
     </ul>
   </template>
 
   <!-- Visible alert box (visible in raw view) -->
-  <aside slot="alert" style="background: #e7f3ff; padding: 1rem; margin: 1rem 0; border-left: 4px solid #0066cc;">
+  <aside data-slot="alert" style="background: #e7f3ff; padding: 1rem; margin: 1rem 0; border-left: 4px solid #0066cc;">
     <strong>Note:</strong> This alert box is visible even when viewing this page directly in a browser!
   </aside>
 
-  <h2 id="template">Template Slot Content</h2>
-  <p>The sidebar navigation above uses <code>&lt;template slot="sidebar"&gt;</code>, so it's hidden when viewing this file directly in a browser.</p>
+  <h2 id="template">Template Data-Slot Content</h2>
+  <p>The sidebar navigation above uses <code>&lt;template data-slot="sidebar"&gt;</code>, so it's hidden when viewing this file directly in a browser.</p>
 
-  <h2 id="element">Element Slot Content</h2>
-  <p>The alert box above uses <code>&lt;aside slot="alert"&gt;</code>, so it's visible when viewing this file directly in a browser.</p>
+  <h2 id="element">Element Data-Slot Content</h2>
+  <p>The alert box above uses <code>&lt;aside data-slot="alert"&gt;</code>, so it's visible when viewing this file directly in a browser.</p>
 
   <h2 id="comparison">When to Use Each Approach</h2>
   <dl>
-    <dt><code>&lt;template slot="name"&gt;</code></dt>
+    <dt><code>&lt;template data-slot="name"&gt;</code></dt>
     <dd>Use for layout-specific content like navigation, meta tags, or content that only makes sense within the compiled layout.</dd>
     
-    <dt><code>&lt;element slot="name"&gt;</code></dt>
+    <dt><code>&lt;element data-slot="name"&gt;</code></dt>
     <dd>Use for content that should be visible and meaningful even when viewing the raw page file directly.</dd>
   </dl>
 </div>

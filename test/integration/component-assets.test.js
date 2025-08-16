@@ -224,7 +224,7 @@ describe('Component Asset Processing', () => {
 </head>
 <body>
   <div class="container">
-    <slot></slot>
+    <main data-slot="default"></main>
   </div>
   
   <script>

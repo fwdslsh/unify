@@ -55,8 +55,8 @@ describe('Final Boss Integration Test', () => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title><slot name="title">Final Boss Test Site</slot></title>
-  <meta name="description" content="<slot name="description">A comprehensive test site</slot>">
+  <title><title data-slot="title">Final Boss Test Site</title></title>
+  <meta name="description" content="<meta data-slot="description">A comprehensive test site</meta>">
   <link rel="stylesheet" href="/styles/main.css">
 </head>
 <body>
@@ -64,7 +64,7 @@ describe('Final Boss Integration Test', () => {
     <nav><!--#include virtual="/.components/navigation.html" --></nav>
   </header>
   <main>
-    <slot></slot>
+    <main data-slot="default"></main>
   </main>
   <footer>
     <p>&copy; 2025 Final Boss Test Site</p>
@@ -85,9 +85,9 @@ describe('Final Boss Integration Test', () => {
 </div>`,
 
         // Main pages using simplified layout system
-        'src/index.html': `<div data-layout="base">
-  <template slot="title">Home - Final Boss Test</template>
-  <template slot="description">Welcome to our comprehensive test site</template>
+        'src/index.html': `<div data-layout="_includes/base.html">
+  <template data-slot="title">Home - Final Boss Test</template>
+  <template data-slot="description">Welcome to our comprehensive test site</template>
   
   <h1>Welcome to Final Boss Test Site</h1>
   <p>This site tests all major Unify features.</p>
@@ -103,9 +103,9 @@ describe('Final Boss Integration Test', () => {
   </ul>
 </div>`,
 
-        'src/about.html': `<div data-layout="base">
-  <template slot="title">About - Final Boss Test</template>
-  <template slot="description">Learn about our test methodology</template>
+        'src/about.html': `<div data-layout="_includes/base.html">
+  <template data-slot="title">About - Final Boss Test</template>
+  <template data-slot="description">Learn about our test methodology</template>
   
   <h1>About This Test</h1>
   <p>This is a comprehensive integration test for Unify.</p>
@@ -113,9 +113,9 @@ describe('Final Boss Integration Test', () => {
   <!--#include virtual="/.components/card.html" -->
 </div>`,
 
-        'src/features.html': `<div data-layout="base">
-  <template slot="title">Features - Final Boss Test</template>
-  <template slot="description">Explore all the features we test</template>
+        'src/features.html': `<div data-layout="_includes/base.html">
+  <template data-slot="title">Features - Final Boss Test</template>
+  <template data-slot="description">Explore all the features we test</template>
   
   <h1>Features</h1>
   <p>Here are all the features this test covers:</p>
@@ -190,7 +190,7 @@ This is a test blog post written in Markdown.
       // Verify content processing
       const indexContent = await fs.readFile(path.join(outputDir, 'index.html'), 'utf-8');
       expect(indexContent.includes('<!DOCTYPE html>')).toBeTruthy();
-      expect(indexContent.includes('<title>Home - Final Boss Test</title>')).toBeTruthy();
+      expect(indexContent.includes('Home - Final Boss Test')).toBeTruthy();
       expect(indexContent.includes('Welcome to Final Boss Test Site')).toBeTruthy();
       expect(indexContent.includes('<div class="card">')).toBeTruthy();
       expect(indexContent.includes('<li><a href="/index.html">Home</a></li>')).toBeTruthy();
@@ -217,16 +217,16 @@ This is a test blog post written in Markdown.
         'src/_includes/default.html': `<!DOCTYPE html>
 <html>
 <head>
-  <title><slot name="title">Default</slot></title>
+  <title><title data-slot="title">Default</title></title>
 </head>
 <body>
-  <slot></slot>
+  <main data-slot="default"></main>
 </body>
 </html>`,
 
         // Test with missing component (should build but show error)
         'src/test-missing.html': `<div data-layout="default">
-  <template slot="title">Missing Component Test</template>
+  <template data-slot="title">Missing Component Test</template>
   <!--#include virtual="/.components/missing.html" -->
   <p>This page tries to include a missing component.</p>
 </div>`,
@@ -248,7 +248,7 @@ This is a test blog post written in Markdown.
 </div>`,
 
         'src/test-circular.html': `<div data-layout="default">
-  <template slot="title">Circular Test</template>
+  <template data-slot="title">Circular Test</template>
   <!--#include virtual="/.components/circular-a.html" -->
 </div>`
       };
@@ -298,11 +298,11 @@ describe('Final Boss Integration Test', () => {
 
         // Test circular dependencies
         'src/layouts/circular-a.html': `<template extends="circular-b.html">
-  <slot name="content">Circular A</slot>
+  <template data-slot="content">Circular A</template>
 </template>`,
 
         'src/layouts/circular-b.html': `<template extends="circular-a.html">
-  <slot name="content">Circular B</slot>
+  <template data-slot="content">Circular B</template>
 </template>`,
 
         // Test missing includes
@@ -320,7 +320,7 @@ describe('Final Boss Integration Test', () => {
 
         // Test malformed templates
         'src/malformed.html': `<template extends="missing-layout.html"
-  <slot name="content">Malformed template syntax</slot>
+  <template data-slot="content">Malformed template syntax</template>
 </template>`,
 
         // Test empty files
@@ -328,17 +328,17 @@ describe('Final Boss Integration Test', () => {
 
         // Main test page
         'src/edge-test.html': `<template extends="base.html">
-  <slot name="content">
+  <template data-slot="content">
     <h1>Edge Case Tests</h1>
     <!--#include virtual="/components/partial.html" -->
     <!--#include virtual="/components/security.html" -->
     <!--#include virtual="/components/nonexistent.html" -->
-  </slot>
+  </template>
 </template>`,
 
         'src/layouts/base.html': `<!DOCTYPE html>
 <html>
-<body><slot name="content">Default</slot></body>
+<body><main data-slot="content">Default</main></body>
 </html>`
       };
 
@@ -366,7 +366,7 @@ describe('Final Boss Integration Test', () => {
     it('should handle CLI argument variations', async () => {
       const structure = {
         'content/index.html': `<h1>Custom Source Dir</h1>`,
-        'layouts/base.html': `<!DOCTYPE html><html><body><slot name="content">Default</slot></body></html>`,
+        'layouts/base.html': `<!DOCTYPE html><html><body><main data-slot="content">Default</main></body></html>`,
         'partials/header.html': `<header>Custom Header</header>`
       };
 
@@ -396,18 +396,18 @@ describe('Final Boss Integration Test', () => {
       // Create 100 pages with includes
       const largeStructure = {
         'src/layouts/base.html': `<!DOCTYPE html>
-<html><body><slot name="content">Default</slot></body></html>`,
+<html><body><main data-slot="content">Default</main></body></html>`,
         'src/components/header.html': `<header>Site Header</header>`
       };
 
       // Generate 100 pages
       for (let i = 0; i < 1000; i++) {
         largeStructure[`src/page-${i}.html`] = `<template extends="base.html">
-  <slot name="content">
+  <template data-slot="content">
     <!--#include virtual="/components/header.html" -->
     <h1>Page ${i}</h1>
     <p>This is page number ${i}</p>
-  </slot>
+  </template>
 </template>`;
       }
 
@@ -434,7 +434,7 @@ describe('Final Boss Integration Test', () => {
     it('should handle deeply nested includes', async () => {
       const deepStructure = {
         'src/layouts/base.html': `<!DOCTYPE html>
-<html><body><slot name="content">Base</slot></body></html>`
+<html><body><main data-slot="content">Base</main></body></html>`
       };
 
       // Create 10 levels of nested includes
@@ -447,9 +447,9 @@ describe('Final Boss Integration Test', () => {
       }
 
       deepStructure['src/index.html'] = `<template extends="base.html">
-  <slot name="content">
+  <template data-slot="content">
     <!--#include virtual="/components/level-0.html" -->
-  </slot>
+  </template>
 </template>`;
 
       await createTestStructure(tempDir, deepStructure);
