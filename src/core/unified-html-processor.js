@@ -451,12 +451,19 @@ function applySlotInjectionToInclude(componentContent, slotContent) {
   // Match elements with data-slot attributes
   const slotElementRegex = /<(\w+)([^>]*\s+data-slot=["']([^"']+)["'][^>]*)>([\s\S]*?)<\/\1>/gi;
   let match;
+  let hasExplicitSlots = false;
   
   while ((match = slotElementRegex.exec(slotContent)) !== null) {
+    hasExplicitSlots = true;
     const [fullElement, tagName, attributes, slotName, innerContent] = match;
     // Store the full element content (with the wrapping element but without data-slot)
     const cleanedElement = fullElement.replace(/\s+data-slot=["'][^"']+["']/, '');
     slotProviders[slotName] = cleanedElement;
+  }
+  
+  // If no explicit slot targeting was found, treat the entire content as default slot content
+  if (!hasExplicitSlots && slotContent.trim()) {
+    slotProviders['default'] = slotContent.trim();
   }
   
   // Apply slots to the component content
@@ -1615,14 +1622,21 @@ async function processLayoutAttribute(
   }
 
   // Process includes in the layout content first
-  layoutContent = await processIncludes(
+  const layoutIncludeResult = await processIncludesWithStringReplacement(
     layoutContent,
     resolvedLayoutPath,
     sourceRoot,
-    new Set(),
-    0,
-    null // No dependency tracker needed for layout processing
+    config
   );
+  
+  // Extract layout content and any additional assets
+  if (typeof layoutIncludeResult === 'object' && layoutIncludeResult.content !== undefined) {
+    layoutContent = layoutIncludeResult.content;
+    extractedAssets.styles.push(...layoutIncludeResult.styles);
+    extractedAssets.scripts.push(...layoutIncludeResult.scripts);
+  } else {
+    layoutContent = layoutIncludeResult;
+  }
 
   // Check if page is a full HTML document
   const pageStructure = analyzeHtmlStructure(pageContent);

@@ -36,19 +36,17 @@ export class BuildCache {
   }
 
   /**
-   * Generate hash for file using native hashing
+   * Generate hash for file using Bun's native hashing
    * @param {string} filePath - Path to the file
    * @returns {Promise<string>} File hash
    */
   async hashFile(filePath) {
     try {
-      const { file } = await import('bun');
-      const fileObj = file(filePath);
-      const arrayBuffer = await fileObj.arrayBuffer();
+      const file = Bun.file(filePath);
+      const arrayBuffer = await file.arrayBuffer();
       
-      // Use native hash function (SHA-256)
-      const { CryptoHasher } = await import('bun');
-      const hasher = new CryptoHasher('sha256');
+      // Use Bun's native hash function (SHA-256 by default)
+      const hasher = new Bun.CryptoHasher('sha256');
       hasher.update(arrayBuffer);
       return hasher.digest('hex');
     } catch (error) {
@@ -58,14 +56,13 @@ export class BuildCache {
   }
 
   /**
-   * Generate hash for string content using native hashing
+   * Generate hash for string content using Bun's native hashing
    * @param {string} content - Content to hash
-   * @returns {Promise<string>} Content hash
+   * @returns {string} Content hash
    */
-  async hashContent(content) {
+  hashContent(content) {
     try {
-      const { CryptoHasher } = await import('bun');
-      const hasher = new CryptoHasher('sha256');
+      const hasher = new Bun.CryptoHasher('sha256');
       hasher.update(content);
       return hasher.digest('hex');
     } catch (error) {
