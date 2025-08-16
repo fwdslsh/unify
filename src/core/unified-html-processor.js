@@ -17,7 +17,6 @@ import {
   LayoutError
 } from "../utils/errors.js";
 import { isPathWithinDirectory, resolveIncludePath, resolveResourcePath } from "../utils/path-resolver.js";
-import { hasFeature } from "../utils/runtime-detector.js";
 
 /**
  * Determine if processing should fail fast based on configuration
@@ -55,7 +54,15 @@ function shouldFailFast(config, errorType = 'error') {
     const nestedLayoutPath = nestedLayoutMatch[1];
     // Recursively process the nested layout, but pass the current slot data as page content
     const slotResult = extractSlotDataFromHTML(pageContent);
-    const layoutWithSlots = applySlots(layoutContent, slotResult.slots);
+    const slotApplication = applySlots(layoutContent, slotResult.slots, config);
+    const layoutWithSlots = slotApplication.result;
+    
+    // Log any slot warnings
+    if (slotApplication.warnings.length > 0) {
+      slotApplication.warnings.forEach(warning => {
+        logger.warn(`Slot validation: ${warning.message}`);
+      });
+    }
     
     // Now process the nested layout with the slot-applied content as the page content
     return await processLayoutAttribute(
@@ -79,8 +86,7 @@ export async function processHtmlUnified(
   config = {}
 ) {
   const processingConfig = {
-    layoutsDir: ".layouts",
-    defaultLayout: "default.html",
+    layoutsDir: ".layouts", // Deprecated but kept for compatibility
     optimize: config.minify || config.optimize,
     ...config,
   };
@@ -147,7 +153,7 @@ export async function processHtmlUnified(
       processedContent = applyExtractedAssets(processedContent, extractedAssets);
     }
 
-  // Slot/template injection for HTML files (if layout contains <slot> or <template target="...">)
+  // Slot/template injection for HTML files (if layout contains <slot> or <template slot="...">)
   // This is now handled in file-processor.js after layout chain is discovered and applied
   return {
     content: processedContent,
@@ -241,17 +247,26 @@ async function processIncludesWithStringReplacement(htmlContent, filePath, sourc
   }
   
   // Recursively process DOM includes until none remain (up to max depth)
-  const domIncludeRegex = /<include\s+src="([^"]+)"[^>]*>(?:<\/include>)?/g;
+  const domIncludeRegex = /<include\s+src="([^"]+)"[^>]*>([\s\S]*?)<\/include>/g;
+  const selfClosingIncludeRegex = /<include\s+src="([^"]+)"[^>]*\/>/g;
   let depth = 0;
   const maxDepth = 10;
   let hasDomIncludes = true;
   while (hasDomIncludes && depth < maxDepth) {
     domIncludeRegex.lastIndex = 0;
+    selfClosingIncludeRegex.lastIndex = 0;
+    
+    // Process includes with children (slot injection)
     let domMatches = [...processedContent.matchAll(domIncludeRegex)];
-    hasDomIncludes = domMatches.length > 0;
+    // Process self-closing includes (no slot injection)
+    let selfClosingMatches = [...processedContent.matchAll(selfClosingIncludeRegex)];
+    
+    hasDomIncludes = domMatches.length > 0 || selfClosingMatches.length > 0;
     depth++;
+    
+    // Process includes with slot content
     for (const domMatch of domMatches) {
-      const [fullMatch, src] = domMatch;
+      const [fullMatch, src, slotContent] = domMatch;
       try {
         let resolvedPath;
         if (src.startsWith('/')) {
@@ -266,7 +281,7 @@ async function processIncludesWithStringReplacement(htmlContent, filePath, sourc
           throw new PathTraversalError(src, sourceRoot);
         }
         
-        // All includes are processed uniformly - no special component logic
+        // Read the include content
         let includeContent = await fs.readFile(resolvedPath, 'utf-8');
         
         // Extract assets from the component content for DOM includes
@@ -274,6 +289,11 @@ async function processIncludesWithStringReplacement(htmlContent, filePath, sourc
         includeContent = componentAssets.content;
         extractedAssets.styles.push(...componentAssets.assets.styles);
         extractedAssets.scripts.push(...componentAssets.assets.scripts);
+        
+        // Process slot injection if slot content is provided
+        if (slotContent && slotContent.trim()) {
+          includeContent = applySlotInjectionToInclude(includeContent, slotContent);
+        }
         
         // Recursively process nested includes
         const nestedResult = await processIncludesWithStringReplacement(includeContent, resolvedPath, sourceRoot, config, newCallStack);
@@ -288,7 +308,7 @@ async function processIncludesWithStringReplacement(htmlContent, filePath, sourc
         
         processedContent = (processedContent || '')
           .replace(fullMatch, includeContent || '');
-        logger.debug(`Processed include element: ${src} -> ${resolvedPath}`);
+        logger.debug(`Processed include element with slots: ${src} -> ${resolvedPath}`);
       } catch (error) {
         let resolvedPath;
         if (src.startsWith('/')) {
@@ -314,6 +334,76 @@ async function processIncludesWithStringReplacement(htmlContent, filePath, sourc
           throw new BuildError(msg, [{ file: errorFilePath, error: msg }]);
         }
         logger.warn(`Include element not found: ${src} in ${errorFilePath}`);
+        processedContent = (processedContent || '')
+          .replace(fullMatch, `<!-- Include not found: ${src} -->`);
+      }
+    }
+    
+    // Process self-closing includes (no slot injection)
+    for (const selfClosingMatch of selfClosingMatches) {
+      const [fullMatch, src] = selfClosingMatch;
+      try {
+        let resolvedPath;
+        if (src.startsWith('/')) {
+          // Absolute path from source root
+          resolvedPath = path.resolve(sourceRoot, src.replace(/^\/+/,''));
+        } else {
+          // Relative path from current file
+          resolvedPath = path.resolve(path.dirname(filePath), src);
+        }
+        // Security: ensure resolved path is within source root
+        if (!isPathWithinDirectory(resolvedPath, sourceRoot)) {
+          throw new PathTraversalError(src, sourceRoot);
+        }
+        
+        // Read the include content
+        let includeContent = await fs.readFile(resolvedPath, 'utf-8');
+        
+        // Extract assets from the component content for DOM includes
+        const componentAssets = extractComponentAssets(includeContent);
+        includeContent = componentAssets.content;
+        extractedAssets.styles.push(...componentAssets.assets.styles);
+        extractedAssets.scripts.push(...componentAssets.assets.scripts);
+        
+        // Recursively process nested includes
+        const nestedResult = await processIncludesWithStringReplacement(includeContent, resolvedPath, sourceRoot, config, newCallStack);
+        // If the nested result is an object (with assets), extract them
+        if (typeof nestedResult === 'object' && nestedResult.content !== undefined) {
+          includeContent = nestedResult.content;
+          extractedAssets.styles.push(...nestedResult.styles);
+          extractedAssets.scripts.push(...nestedResult.scripts);
+        } else {
+          includeContent = nestedResult;
+        }
+        
+        processedContent = (processedContent || '')
+          .replace(fullMatch, includeContent || '');
+        logger.debug(`Processed self-closing include element: ${src} -> ${resolvedPath}`);
+      } catch (error) {
+        let resolvedPath;
+        if (src.startsWith('/')) {
+          resolvedPath = path.resolve(sourceRoot, src.replace(/^\/+/,''));
+        } else {
+          resolvedPath = path.resolve(path.dirname(filePath), src);
+        }
+        const errorFilePath = resolvedPath || filePath;
+        if (error.code === 'ENOENT' && !error.formatForCLI) {
+          error = new IncludeNotFoundError(src, errorFilePath, [resolvedPath]);
+        }
+        if (shouldFailFast(config, 'error')) {
+          let msg;
+          if (error instanceof CircularDependencyError) {
+            msg = `Include circular dependency: ${src} in ${errorFilePath}`;
+          } else if (error instanceof PathTraversalError) {
+            msg = `Include path traversal: ${src} in ${errorFilePath}`;
+          } else if (error instanceof IncludeNotFoundError) {
+            msg = `Include not found: ${src} in ${errorFilePath}`;
+          } else {
+            msg = `Include element error: ${src} in ${errorFilePath}: ${error.message}`;
+          }
+          throw new BuildError(msg, [{ file: errorFilePath, error: msg }]);
+        }
+        logger.warn(`Self-closing include element not found: ${src} in ${errorFilePath}`);
         processedContent = (processedContent || '')
           .replace(fullMatch, `<!-- Include not found: ${src} -->`);
       }
@@ -346,6 +436,47 @@ async function processIncludesWithStringReplacement(htmlContent, filePath, sourc
       scripts: []
     };
   }
+}
+
+/**
+ * Apply slot injection to included component content
+ * @param {string} componentContent - The component HTML content with data-slot targets
+ * @param {string} slotContent - The slot content provided within the include element
+ * @returns {string} Component content with slots injected
+ */
+function applySlotInjectionToInclude(componentContent, slotContent) {
+  // Extract slot providers from the include element's children
+  const slotProviders = {};
+  
+  // Match elements with data-slot attributes
+  const slotElementRegex = /<(\w+)([^>]*\s+data-slot=["']([^"']+)["'][^>]*)>([\s\S]*?)<\/\1>/gi;
+  let match;
+  
+  while ((match = slotElementRegex.exec(slotContent)) !== null) {
+    const [fullElement, tagName, attributes, slotName, innerContent] = match;
+    // Store the full element content (with the wrapping element but without data-slot)
+    const cleanedElement = fullElement.replace(/\s+data-slot=["'][^"']+["']/, '');
+    slotProviders[slotName] = cleanedElement;
+  }
+  
+  // Apply slots to the component content
+  let result = componentContent;
+  
+  // For each slot provider, find and replace the corresponding slot target in the component
+  for (const [slotName, slotHtml] of Object.entries(slotProviders)) {
+    // Find elements with data-slot="slotName" in the component and replace their entire element
+    const targetSlotRegex = new RegExp(
+      `<(\\w+)([^>]*\\s+data-slot=["']${escapeRegExp(slotName)}["'][^>]*)>[\\s\\S]*?<\\/\\1>`,
+      'gi'
+    );
+    
+    result = result.replace(targetSlotRegex, slotHtml);
+  }
+  
+  // Final cleanup: Remove any remaining data-slot attributes from unused slots in the component
+  result = result.replace(/\s+data-slot=["'][^"']+["']/g, '');
+  
+  return result;
 }
 
 /**
@@ -480,11 +611,8 @@ function resolveIncludePathInternal(type, includePath, currentFile, sourceRoot) 
  * @returns {string} Optimized HTML
  */
 async function optimizeHtmlContent(html) {
-  // Check if HTMLRewriter is available
-  if (!hasFeature('htmlRewriter')) {
-    logger.debug('HTMLRewriter not available, skipping HTML optimization');
-    return html;
-  }
+  // HTMLRewriter is always available
+  // Proceed with optimization
   
   const rewriter = new HTMLRewriter();
 
@@ -532,9 +660,9 @@ async function optimizeHtmlContent(html) {
  */
 function shouldUseDOMMode(content) {
   return content.includes('<include ') || 
-         content.includes('<slot') || 
-         content.includes('target=') ||
-         content.includes('data-layout=');
+         content.includes('data-slot=') || 
+         content.includes('data-layout=') ||
+         content.includes('rel="layout"');
 }
 
 /**
@@ -547,69 +675,68 @@ function shouldUseDOMMode(content) {
  */
 async function processDOMMode(pageContent, pagePath, sourceRoot, config = {}, extractedAssets = null) {
   const domConfig = { 
-    layoutsDir: '.layouts',
+    layoutsDir: '.layouts', // Deprecated but kept for compatibility
     componentsDir: '.components', 
-    defaultLayout: 'default.html',
     sourceRoot, 
     ...config 
   };
 
-  // Check if this is a complete HTML document (has <html> tag)
-  const isCompleteHtml = pageContent.includes('<html');
-  // Check for explicit data-layout attribute
+  // Analyze HTML structure
+  const htmlStructure = analyzeHtmlStructure(pageContent);
+  
+  // Validate data-layout attributes for fragments early
+  validateDataLayoutAttributes(pageContent, htmlStructure.isFullDocument);
+  
+  // Check for explicit layout indicators
   const layoutMatch = pageContent.match(/data-layout=["']([^"']+)["']/i);
-  const hasExplicitLayout = !!layoutMatch;
+  const linkLayoutHref = htmlStructure.isFullDocument ? extractLinkLayoutHref(pageContent) : null;
+  const hasExplicitLayout = !!layoutMatch || !!linkLayoutHref;
 
   // For complete HTML documents without explicit layout, don't apply any layout
-  if (isCompleteHtml && !hasExplicitLayout) {
+  if (htmlStructure.isFullDocument && !hasExplicitLayout) {
     logger.debug(`Skipping layout for complete HTML document: ${path.relative(sourceRoot, pagePath)}`);
     return pageContent;
   }
 
-  // Detect layout from HTML content using regex-based parsing
+  // Use the same layout processing logic as processDOMTemplating
+  const layoutSpec = linkLayoutHref || (layoutMatch ? layoutMatch[1] : null);
+  
+  if (layoutSpec) {
+    try {
+      return await processLayoutAttribute(
+        pageContent,
+        layoutSpec,
+        pagePath,
+        sourceRoot,
+        domConfig,
+        extractedAssets
+      );
+    } catch (error) {
+      // In fail-fast mode, fail fast on layout detection errors
+      if (shouldFailFast(domConfig, 'error')) {
+        throw new Error(`Layout not found in fail-fast mode for ${path.relative(sourceRoot, pagePath)}: ${error.message}`);
+      }
+      // Graceful degradation: if specific layout is missing, log warning and continue with discovery
+      logger.warn(`Layout not found for ${path.relative(sourceRoot, pagePath)}: ${error.message}`);
+    }
+  }
+
+  // Fall back to layout discovery
   let layoutPath;
   try {
-    layoutPath = await detectLayoutFromHTML(pageContent, sourceRoot, domConfig);
-    logger.debug(`Using layout: ${layoutPath}`);
-    let layoutContent = await fs.readFile(layoutPath, 'utf-8');
-
-    // Extract slot content from page HTML using regex-based parsing
-    const slotResult = extractSlotDataFromHTML(pageContent);
-
-    // Apply slots to layout using string replacement
-    let processedHTML = applySlots(layoutContent, slotResult.slots);
-
-    // Inject extracted assets from component processing into the layout
-    if (extractedAssets && (extractedAssets.styles?.length > 0 || extractedAssets.scripts?.length > 0)) {
-      // Inject styles into head (before </head>)
-      if (extractedAssets.styles.length > 0) {
-        const headEndRegex = /<\/head>/i;
-        const dedupedStyles = [...new Set(extractedAssets.styles)]; // Remove duplicates
-        const stylesHTML = dedupedStyles.join('\n');
-        processedHTML = processedHTML.replace(headEndRegex, `${stylesHTML}\n</head>`);
-      }
-      
-      // Inject scripts into end of body (before </body>)
-      if (extractedAssets.scripts.length > 0) {
-        const bodyEndRegex = /<\/body>/i;
-        const dedupedScripts = [...new Set(extractedAssets.scripts)]; // Remove duplicates
-        const scriptsHTML = dedupedScripts.join('\n');
-        processedHTML = processedHTML.replace(bodyEndRegex, `${scriptsHTML}\n</body>`);
-      }
-    }
-
-    // Check if the layout itself has a data-layout attribute (nested layouts)
-    const nestedLayoutMatch = layoutContent.match(/data-layout=["']([^"']+)["']/i);
-    if (nestedLayoutMatch) {
-      const nestedLayoutPath = nestedLayoutMatch[1];
-      // Recursively process the nested layout using DOM mode
-      return await processDOMMode(processedHTML, layoutPath, sourceRoot, domConfig, extractedAssets);
-    }
-
-    // Process any remaining includes in the result (shouldn't be many since includes were processed earlier)
-    processedHTML = await processIncludesInHTML(processedHTML, layoutPath, sourceRoot, domConfig);
-
-    return processedHTML;
+    layoutPath = await detectLayoutFromHTML(pageContent, sourceRoot, domConfig, pagePath);
+    logger.debug(`Using discovered layout: ${layoutPath}`);
+    
+    // Use processLayoutAttribute for consistent processing
+    const relativeLayoutPath = path.relative(path.dirname(pagePath), layoutPath);
+    return await processLayoutAttribute(
+      pageContent,
+      relativeLayoutPath,
+      pagePath,
+      sourceRoot,
+      domConfig,
+      extractedAssets
+    );
     
   } catch (error) {
     // Use shouldFailFast to determine whether to throw or warn
@@ -631,27 +758,125 @@ ${pageContent}
 }
 
 /**
+ * Detect if HTML content is a full document or page fragment
+ * @param {string} htmlContent - HTML content to analyze
+ * @returns {Object} Analysis result with document type and structure info
+ */
+function analyzeHtmlStructure(htmlContent) {
+  const hasDoctype = /<!DOCTYPE\s+html/i.test(htmlContent);
+  const hasHtmlTag = /<html[^>]*>/i.test(htmlContent);
+  const hasHeadTag = /<head[^>]*>/i.test(htmlContent);
+  const hasBodyTag = /<body[^>]*>/i.test(htmlContent);
+  
+  const isFullDocument = hasDoctype && hasHtmlTag && hasHeadTag && hasBodyTag;
+  
+  return {
+    isFullDocument,
+    hasDoctype,
+    hasHtmlTag,
+    hasHeadTag,
+    hasBodyTag
+  };
+}
+
+/**
+ * Extract link rel=layout from HTML head element
+ * @param {string} htmlContent - HTML content to search
+ * @returns {string|null} Layout href value or null if not found
+ */
+function extractLinkLayoutHref(htmlContent) {
+  // Only look in head section for link rel=layout
+  const headMatch = htmlContent.match(/<head[^>]*>([\s\S]*?)<\/head>/i);
+  if (!headMatch) {
+    return null;
+  }
+  
+  const headContent = headMatch[1];
+  const linkMatch = headContent.match(/<link[^>]+rel=["']layout["'][^>]*>/i);
+  if (!linkMatch) {
+    return null;
+  }
+  
+  const hrefMatch = linkMatch[0].match(/href=["']([^"']+)["']/i);
+  return hrefMatch ? hrefMatch[1] : null;
+}
+
+/**
+ * Validate data-layout attributes in fragments
+ * @param {string} htmlContent - HTML content to validate
+ * @param {boolean} isFullDocument - Whether this is a full HTML document
+ * @throws {Error} If multiple data-layout attributes found in fragment
+ */
+function validateDataLayoutAttributes(htmlContent, isFullDocument) {
+  if (isFullDocument) {
+    return; // Full documents can have data-layout in any element
+  }
+  
+  // For fragments, count data-layout attributes
+  const dataLayoutMatches = htmlContent.match(/data-layout=["'][^"']*["']/gi);
+  if (dataLayoutMatches && dataLayoutMatches.length > 1) {
+    throw new BuildError(
+      'Fragment pages cannot have multiple data-layout attributes',
+      [{ error: `Found ${dataLayoutMatches.length} data-layout attributes in fragment` }]
+    );
+  }
+}
+
+/**
  * Detect which layout to use for a page using regex-based HTML parsing
  */
-async function detectLayoutFromHTML(htmlContent, sourceRoot, config) {
-  // Look for data-layout attribute in HTML content
+async function detectLayoutFromHTML(htmlContent, sourceRoot, config, pagePath) {
+  const htmlStructure = analyzeHtmlStructure(htmlContent);
+  
+  // For full HTML documents, check link rel=layout first (highest priority)
+  if (htmlStructure.isFullDocument) {
+    const linkLayoutHref = extractLinkLayoutHref(htmlContent);
+    if (linkLayoutHref) {
+      logger.debug(`Found link rel=layout: ${linkLayoutHref}`);
+      
+      const { LayoutDiscovery } = await import('./layout-discovery.js');
+      const discovery = new LayoutDiscovery();
+      
+      const resolvedLayoutPath = await discovery.resolveLayoutOverride(linkLayoutHref, sourceRoot, pagePath);
+      if (resolvedLayoutPath) {
+        return resolvedLayoutPath;
+      }
+      
+      throw new LayoutError(
+        pagePath,
+        `Layout not found via link rel=layout: ${linkLayoutHref}`,
+        [sourceRoot]
+      );
+    }
+  }
+  
+  // Look for data-layout attribute in HTML content (lower priority)
   const layoutMatch = htmlContent.match(/data-layout=["']([^"']+)["']/i);
   
   if (layoutMatch) {
     const layoutAttr = layoutMatch[1];
-    return resolveResourcePath(layoutAttr, sourceRoot, config.layoutsDir, 'layout');
+    
+    // Use LayoutDiscovery system for both full paths and short names
+    const { LayoutDiscovery } = await import('./layout-discovery.js');
+    const discovery = new LayoutDiscovery();
+    
+    const resolvedLayoutPath = await discovery.resolveLayoutOverride(layoutAttr, sourceRoot, pagePath);
+    if (resolvedLayoutPath) {
+      return resolvedLayoutPath;
+    }
+    
+    // If layout override resolution failed, throw error
+    throw new LayoutError(
+      pagePath,
+      `Layout not found: ${layoutAttr}`,
+      [sourceRoot]
+    );
   }
   
-  // Fall back to default layout
-  let defaultLayoutPath;
-  if (path.isAbsolute(config.layoutsDir)) {
-    // If layoutsDir is an absolute path (from CLI), use it directly
-    defaultLayoutPath = path.join(config.layoutsDir, config.defaultLayout);
-  } else {
-    // If layoutsDir is relative, join with sourceRoot
-    defaultLayoutPath = path.join(sourceRoot, config.layoutsDir, config.defaultLayout);
-  }
-  return defaultLayoutPath;
+  // Fall back to discovered layout using LayoutDiscovery
+  const { LayoutDiscovery } = await import('./layout-discovery.js');
+  const discovery = new LayoutDiscovery();
+  return await discovery.findLayoutForPage(pagePath, sourceRoot);
 }
 
 /**
@@ -840,46 +1065,83 @@ function cleanupDOMOutput(html) {
  * @returns {boolean} True if content has DOM templating
  */
 function hasDOMTemplating(content) {
-  // Check for slot elements or layout attributes
+  // Check for data-slot attributes, template elements, or layout attributes
   return (
-    content.includes("<slot") ||
+    content.includes("data-slot=") ||
     content.includes("<template") ||
-    content.includes("data-layout=")
+    content.includes("data-layout=") ||
+    content.includes('rel="layout"')
   );
 }
 
 /**
- * Extract slot content from HTML using regex-based parsing (consolidated from both processors)
+ * Extract slot content from HTML using regex-based parsing (v0.5.0 spec-compliant)
+ * Supports both <template data-slot="name"> and regular elements with data-slot="name" attribute
  * @param {string} htmlContent - HTML content to extract slots from
- * @returns {Object} Object with slot names as keys and content as values
+ * @returns {Object} Object with slots, styles, scripts, and slot metadata
  */
 function extractSlotDataFromHTML(htmlContent) {
   const slots = {};
+  const slotOrder = {}; // Track document order for multiple assignments
   const extractedStyles = [];
   const extractedScripts = [];
   
   let match;
+  let orderIndex = 0;
 
-  
-  // Extract named slots with target attribute (spec-compliant)
-  const targetRegex = /<template[^>]+target=["']([^"']+)["'][^>]*>([\s\S]*?)<\/template>/gi;
-  while ((match = targetRegex.exec(htmlContent)) !== null) {
-    const targetName = match[1];
+  // Extract named slots with data-slot attribute on template elements
+  const templateSlotRegex = /<template[^>]+data-slot=["']([^"']+)["'][^>]*>([\s\S]*?)<\/template>/gi;
+  while ((match = templateSlotRegex.exec(htmlContent)) !== null) {
+    const slotName = match[1];
     const content = match[2];
-    slots[targetName] = content;
+    if (!slots[slotName]) {
+      slots[slotName] = [];
+      slotOrder[slotName] = [];
+    }
+    slots[slotName].push(content);
+    slotOrder[slotName].push(orderIndex++);
   }
   
-  // Extract default slot content from template without target attributes
-  const defaultTemplateRegex = /<template(?!\s+(?:target)=)[^>]*>([\s\S]*?)<\/template>/gi;
+  // Extract named slots with data-slot attribute on regular elements
+  // Use a more robust regex that handles data-slot attribute anywhere in the tag
+  const elementSlotRegex = /<(\w+)([^>]*\s+data-slot=["']([^"']+)["'][^>]*)>([\s\S]*?)<\/\1>/gi;
+  while ((match = elementSlotRegex.exec(htmlContent)) !== null) {
+    const tagName = match[1];
+    const slotName = match[3]; // slot name is now in group 3
+    const fullElement = match[0];
+    
+    // Skip template elements (already handled above)
+    if (tagName.toLowerCase() === 'template') continue;
+    
+    if (!slots[slotName]) {
+      slots[slotName] = [];
+      slotOrder[slotName] = [];
+    }
+    // Remove the data-slot attribute from the element when adding to slot
+    const cleanedElement = fullElement.replace(/\s+data-slot=["'][^"']+["']/, '');
+    slots[slotName].push(cleanedElement);
+    slotOrder[slotName].push(orderIndex++);
+  }
+  
+  // Extract default slot content from template without data-slot attributes
+  const defaultTemplateRegex = /<template(?!\s+data-slot=)[^>]*>([\s\S]*?)<\/template>/gi;
   match = defaultTemplateRegex.exec(htmlContent);
   if (match) {
-    slots['default'] = match[1];
+    if (!slots['default']) {
+      slots['default'] = [];
+      slotOrder['default'] = [];
+    }
+    slots['default'].push(match[1]);
+    slotOrder['default'].push(orderIndex++);
   } else {
-    // Extract default slot content (everything not in a template)
+    // Extract default slot content (everything not in a template or with data-slot attribute)
     let defaultContent = htmlContent;
     
     // Remove all template elements
     defaultContent = defaultContent.replace(/<template[^>]*>[\s\S]*?<\/template>/gi, '');
+    
+    // Remove all elements with data-slot attribute
+    defaultContent = defaultContent.replace(/<(\w+)([^>]*\s+data-slot=["'][^"']+["'][^>]*)>([\s\S]*?)<\/\1>/gi, '');
     
     // Extract and preserve script and style elements instead of removing them
     const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
@@ -910,68 +1172,144 @@ function extractSlotDataFromHTML(htmlContent) {
     
     defaultContent = defaultContent.trim();
     if (defaultContent) {
-      slots['default'] = defaultContent;
+      if (!slots['default']) {
+        slots['default'] = [];
+        slotOrder['default'] = [];
+      }
+      slots['default'].push(defaultContent);
+      slotOrder['default'].push(orderIndex++);
+    }
+  }
+  
+  // Convert slot arrays to strings, preserving document order
+  const consolidatedSlots = {};
+  for (const [slotName, contents] of Object.entries(slots)) {
+    if (contents.length === 1) {
+      consolidatedSlots[slotName] = contents[0];
+    } else if (contents.length > 1) {
+      // Multiple assignments to same slot - preserve document order
+      const orderedContents = contents
+        .map((content, idx) => ({ content, order: slotOrder[slotName][idx] }))
+        .sort((a, b) => a.order - b.order)
+        .map(item => item.content);
+      consolidatedSlots[slotName] = orderedContents.join('\n');
     }
   }
   
   return {
-    slots,
+    slots: consolidatedSlots,
     styles: extractedStyles,
-    scripts: extractedScripts
+    scripts: extractedScripts,
+    hasMultipleAssignments: Object.values(slots).some(arr => arr.length > 1)
   };
 }
 
 /**
- * Apply slot content to layout using string replacement (consolidated implementation)
+ * Apply slot content to layout using string replacement (v0.5.0 spec-compliant)
+ * Properly handles fallback content and validation warnings
  * @param {string} layoutContent - Layout HTML content
  * @param {Object} slotData - Slot data to apply
- * @returns {string} Layout with slots replaced
+ * @param {Object} config - Configuration for validation
+ * @returns {Object} Object with result HTML and validation warnings
  */
-function applySlots(layoutContent, slotData) {
+function applySlots(layoutContent, slotData, config = {}) {
   let result = layoutContent;
+  const warnings = [];
+  const usedSlots = new Set();
   
-  // Replace named slots
+  // Find all data-slot names in the layout for validation
+  const layoutSlotNames = new Set();
+  const slotNameRegex = /data-slot=["']([^"']+)["']/gi;
+  let match;
+  while ((match = slotNameRegex.exec(layoutContent)) !== null) {
+    layoutSlotNames.add(match[1]);
+  }
+  
+  // Check for unmatched slot names in page content
+  for (const slotName of Object.keys(slotData)) {
+    if (slotName !== 'default' && !layoutSlotNames.has(slotName)) {
+      warnings.push({
+        type: 'unmatched-slot',
+        message: `Page defines slot "${slotName}" but layout has no matching data-slot="${slotName}"`
+      });
+    }
+  }
+  
+  // Replace named slots with content or fallback
   for (const [slotName, content] of Object.entries(slotData)) {
     if (slotName === 'default') continue;
     
-    const slotRegex = new RegExp(`<slot\\s+name=["']${slotName}["'][^>]*>.*?</slot>`, 'gi');
-    const simpleSlotRegex = new RegExp(`<slot\\s+name=["']${slotName}["'][^>]*\\s*/?>`, 'gi');
+    // Find elements with data-slot="slotName" and replace their content
+    // Use a more precise regex that matches the specific opening tag and its corresponding closing tag
+    const namedSlotRegex = new RegExp(`(<(\\w+)([^>]*\\s+data-slot=["']${escapeRegex(slotName)}["'][^>]*)>)([\\s\\S]*?)(<\\/\\2>)`, 'gi');
     
-    result = result.replace(slotRegex, content);
-    result = result.replace(simpleSlotRegex, content);
+    if (namedSlotRegex.test(result)) {
+      usedSlots.add(slotName);
+      // Reset regex lastIndex
+      namedSlotRegex.lastIndex = 0;
+      
+      // Replace the content between opening and closing tags and remove data-slot attribute
+      result = result.replace(namedSlotRegex, (match, openingTag, tagName, attributes, oldContent, closingTag) => {
+        // Remove the data-slot attribute from the opening tag
+        const cleanedAttributes = attributes.replace(/\s+data-slot=["'][^"']+["']/, '');
+        const cleanedOpeningTag = `<${tagName}${cleanedAttributes}>`;
+        return `${cleanedOpeningTag}${content}${closingTag}`;
+      });
+    }
   }
   
-  // Replace default slot
-  const defaultSlotRegex = /<slot(?:\s+[^>]*)?>(.*?)<\/slot>/gi;
-  const defaultSlotSelfClosing = /<slot(?:\s+[^>]*)?\/>/gi;
+  // Replace default slot with content or fallback
+  // Check if default content is meaningful (not just whitespace/comments)
+  const hasMeaningfulDefaultContent = slotData.default && 
+    slotData.default.replace(/<!--[\s\S]*?-->/g, '').trim().length > 0;
   
-  result = result.replace(defaultSlotRegex, slotData.default || '$1');
-  result = result.replace(defaultSlotSelfClosing, slotData.default || '');
+  // Look for data-slot="default" first
+  const defaultSlotRegex = /(<(\w+)([^>]*\s+data-slot=["']default["'][^>]*)>)([\s\S]*?)(<\/\2>)/gi;
+  const hasDefaultSlot = defaultSlotRegex.test(result);
   
-  // Replace any remaining named slots with their default content
-  result = result.replace(
-    /<slot\s+name=["'][^"']*["'][^>]*>(.*?)<\/slot>/gs,
-    '$1' // Replace with the default content (everything between slot tags)
-  );
+  if (hasDefaultSlot && hasMeaningfulDefaultContent) {
+    // Page has meaningful default content, replace default slot content
+    defaultSlotRegex.lastIndex = 0;
+    result = result.replace(defaultSlotRegex, (match, openingTag, tagName, attributes, oldContent, closingTag) => {
+      // Remove the data-slot attribute from the opening tag
+      const cleanedAttributes = attributes.replace(/\s+data-slot=["'][^"']+["']/, '');
+      const cleanedOpeningTag = `<${tagName}${cleanedAttributes}>`;
+      return `${cleanedOpeningTag}${slotData.default}${closingTag}`;
+    });
+  } else if (!hasDefaultSlot && hasMeaningfulDefaultContent) {
+    // No data-slot="default" found, look for first <main> element as fallback
+    const mainElementRegex = /(<main[^>]*>)([\s\S]*?)(<\/main>)/i;
+    const hasMainElement = mainElementRegex.test(result);
+    
+    if (hasMainElement) {
+      result = result.replace(mainElementRegex, `$1${slotData.default}$3`);
+    } else {
+      // No default slot or main element found
+      warnings.push({
+        type: 'missing-default-slot',
+        message: 'Page has default content but layout has no data-slot="default" or <main> element'
+      });
+    }
+  }
   
-  // Replace any remaining self-closing named slots (remove them since no default content)
-  result = result.replace(
-    /<slot\s+name=["'][^"']*["'][^>]*\/>/g,
-    '' // Remove self-closing slots with no content
-  );
+  // Final cleanup: Remove any remaining data-slot attributes from unused slots
+  // This handles fallback content slots that were not replaced
+  result = result.replace(/\s+data-slot=["'][^"']+["']/g, '');
+  
+  return {
+    result,
+    warnings,
+    usedSlots: Array.from(usedSlots)
+  };
+}
 
-  // Replace any remaining unnamed default slots with their content or remove them
-  result = result.replace(
-    /<slot(?!\s+name)(?:\s[^>]*)?>([^<]*(?:<(?!\/slot>)[^<]*)*)<\/slot>/gs,
-    '$1' // Replace with default content
-  );
-  
-  result = result.replace(
-    /<slot(?!\s+name)(?:\s[^>]*)?\/>/g,
-    '' // Remove self-closing default slots with no content
-  );
-  
-  return result;
+/**
+ * Escape special regex characters
+ * @param {string} str - String to escape
+ * @returns {string} Escaped string
+ */
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 /**
@@ -984,14 +1322,23 @@ function applySlots(layoutContent, slotData) {
  */
 async function processDOMTemplating(htmlContent, filePath, sourceRoot, config, extractedAssets = { styles: [], scripts: [] }) {
   try {
-    // Check for layout attribute using regex parsing
+    // Analyze HTML structure
+    const htmlStructure = analyzeHtmlStructure(htmlContent);
+    
+    // Validate data-layout attributes for fragments early
+    validateDataLayoutAttributes(htmlContent, htmlStructure.isFullDocument);
+    
+    // Check for layout indicators (link rel=layout has higher priority than data-layout)
+    const linkLayoutHref = htmlStructure.isFullDocument ? extractLinkLayoutHref(htmlContent) : null;
     const layoutMatch = htmlContent.match(/data-layout=["']([^"']+)["']/i);
-    if (layoutMatch) {
-      const layoutAttr = layoutMatch[1];
+    
+    const layoutSpec = linkLayoutHref || (layoutMatch ? layoutMatch[1] : null);
+    
+    if (layoutSpec) {
       try {
         return await processLayoutAttribute(
           htmlContent,
-          layoutAttr,
+          layoutSpec,
           filePath,
           sourceRoot,
           config,
@@ -1004,42 +1351,69 @@ async function processDOMTemplating(htmlContent, filePath, sourceRoot, config, e
         }
         // Graceful degradation: if specific layout is missing, log warning and return original content
         logger.warn(`Layout not found for ${path.relative(sourceRoot, filePath)}: ${error.message}`);
-        // Remove data-layout attribute from content to avoid reprocessing
-        const contentWithoutLayout = htmlContent.replace(/\s*data-layout=["'][^"']*["']/gi, '');
+        // Remove layout attributes from content to avoid reprocessing
+        let contentWithoutLayout = htmlContent.replace(/\s*data-layout=["'][^"']*["']/gi, '');
+        if (linkLayoutHref) {
+          contentWithoutLayout = contentWithoutLayout.replace(/<link[^>]+rel=["']layout["'][^>]*>/gi, '');
+        }
         return contentWithoutLayout;
       }
     }
 
-    // Check if no html tag exists, apply the default layout
-    if (!htmlContent.includes("<html")) {
-      // If no html tag, we assume a default layout is needed
-      try {
-        return await processLayoutAttribute(
-          htmlContent,
-          config.defaultLayout,  // Just pass the filename, not the full path
-          filePath,
-          sourceRoot,
-          config,
-          extractedAssets  // Pass extracted assets
-        );
-      } catch (error) {
-        // For default layouts, always gracefully degrade
-        // since they are implicit/automatic, not explicitly requested by the user
-        logger.warn(`Default layout not found for ${path.relative(sourceRoot, filePath)}: ${error.message}`);
-        return `<!DOCTYPE html>
+    // Check if this is a fragment (no html tag), use layout discovery to find appropriate layout
+    if (!htmlStructure.isFullDocument) {
+      // Use the layout discovery system to find the best layout for this page
+      const { LayoutDiscovery } = await import('./layout-discovery.js');
+      const discovery = new LayoutDiscovery();
+      const discoveredLayoutPath = await discovery.findLayoutForPage(filePath, sourceRoot);
+      
+      if (discoveredLayoutPath) {
+        try {
+          // Get the relative layout path from the discovered absolute path
+          const relativeLayoutPath = path.relative(path.dirname(filePath), discoveredLayoutPath);
+          return await processLayoutAttribute(
+            htmlContent,
+            relativeLayoutPath,
+            filePath,
+            sourceRoot,
+            config,
+            extractedAssets
+          );
+        } catch (error) {
+          logger.warn(`Layout processing failed for ${path.relative(sourceRoot, filePath)}: ${error.message}`);
+          // Fall through to basic HTML wrapper
+        }
+      }
+      
+      // No layout found, wrap in basic HTML structure and inject assets
+      
+      // Inject assets into basic HTML structure
+      let stylesHTML = '';
+      let scriptsHTML = '';
+      
+      if (extractedAssets?.styles?.length > 0) {
+        const dedupedStyles = [...new Set(extractedAssets.styles)];
+        stylesHTML = '\n' + dedupedStyles.join('\n');
+      }
+      
+      if (extractedAssets?.scripts?.length > 0) {
+        const dedupedScripts = [...new Set(extractedAssets.scripts)];
+        scriptsHTML = '\n' + dedupedScripts.join('\n');
+      }
+      
+      return `<!DOCTYPE html>
 <html>
 <head>
-  <title>Page</title>
+  <title>Page</title>${stylesHTML}
 </head>
 <body>
-${htmlContent}
+${htmlContent}${scriptsHTML}
 </body>
 </html>`;
-      }
     }
 
-    // If no layout, process any standalone slots
-    if (htmlContent.includes("<slot")) {
+    // If no layout, process any standalone data-slot attributes
+    if (htmlContent.includes("data-slot=")) {
       return processStandaloneSlots(htmlContent);
     }
 
@@ -1051,6 +1425,148 @@ ${htmlContent}
       filePath
     );
   }
+}
+
+/**
+ * Extract document parts from full HTML document
+ * @param {string} htmlContent - Full HTML document content
+ * @returns {Object} Object with doctype, html attributes, head content, and body content
+ */
+function extractHtmlDocumentParts(htmlContent) {
+  // Extract DOCTYPE
+  const doctypeMatch = htmlContent.match(/<!DOCTYPE[^>]*>/i);
+  const doctype = doctypeMatch ? doctypeMatch[0] : null;
+  
+  // Extract html tag with attributes
+  const htmlMatch = htmlContent.match(/<html([^>]*)>/i);
+  const htmlAttributes = htmlMatch ? htmlMatch[1].trim() : '';
+  
+  // Extract head content (everything inside <head>...</head>)
+  const headMatch = htmlContent.match(/<head[^>]*>([\s\S]*?)<\/head>/i);
+  const headContent = headMatch ? headMatch[1] : '';
+  
+  // Extract body content (everything inside <body>...</body>)
+  const bodyMatch = htmlContent.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  const bodyContent = bodyMatch ? bodyMatch[1] : '';
+  
+  return {
+    doctype,
+    htmlAttributes,
+    headContent,
+    bodyContent
+  };
+}
+
+/**
+ * Merge full HTML document with layout
+ * @param {string} pageContent - Full HTML document content
+ * @param {string} layoutContent - Layout HTML content
+ * @param {Object} config - Processing configuration
+ * @returns {Object} Merged result with warnings
+ */
+function mergeHtmlDocumentWithLayout(pageContent, layoutContent, config) {
+  const pageParts = extractHtmlDocumentParts(pageContent);
+  const layoutParts = extractHtmlDocumentParts(layoutContent);
+  
+  // 1. DOCTYPE: Page's DOCTYPE wins if it exists, otherwise layout's
+  const finalDoctype = pageParts.doctype || layoutParts.doctype || '<!DOCTYPE html>';
+  
+  // 2. HTML attributes: Layout's attributes preserved, page's added/overwrite on conflict
+  let finalHtmlAttributes = layoutParts.htmlAttributes;
+  if (pageParts.htmlAttributes) {
+    // Parse attributes to handle conflicts
+    const pageAttrs = parseHtmlAttributes(pageParts.htmlAttributes);
+    const layoutAttrs = parseHtmlAttributes(layoutParts.htmlAttributes);
+    
+    // Merge: page attributes overwrite layout attributes
+    const mergedAttrs = { ...layoutAttrs, ...pageAttrs };
+    finalHtmlAttributes = Object.entries(mergedAttrs)
+      .map(([key, value]) => value === true ? key : `${key}="${value}"`)
+      .join(' ');
+  }
+  
+  // 3. HEAD: Use existing head merge algorithm
+  const mergedHeadContent = mergeHeadContent(layoutParts.headContent, pageParts.headContent);
+  
+  // 4. BODY: Extract slots from page body content and apply to layout
+  const pageBodySlotResult = extractSlotDataFromHTML(pageParts.bodyContent);
+  const bodySlots = { default: pageBodySlotResult.slots.default || pageParts.bodyContent, ...pageBodySlotResult.slots };
+  
+  // Extract layout body content and apply slots to it
+  const layoutBodyMatch = layoutContent.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+  const layoutBodyContent = layoutBodyMatch ? layoutBodyMatch[1] : '';
+  const layoutBodyTag = layoutBodyMatch ? layoutBodyMatch[0].match(/<body[^>]*>/i)?.[0] || '<body>' : '<body>';
+  
+  const slotApplication = applySlots(layoutBodyContent, bodySlots, config);
+  
+  // Reconstruct full document
+  const htmlTag = finalHtmlAttributes ? `<html ${finalHtmlAttributes}>` : '<html>';
+  const reconstructedDocument = `${finalDoctype}
+${htmlTag}
+<head>
+${mergedHeadContent}
+</head>
+${layoutBodyTag}
+${slotApplication.result}
+</body>
+</html>`;
+  
+  return {
+    result: reconstructedDocument,
+    warnings: slotApplication.warnings
+  };
+}
+
+/**
+ * Parse HTML attributes string into object
+ * @param {string} attributesStr - HTML attributes string
+ * @returns {Object} Parsed attributes object
+ */
+function parseHtmlAttributes(attributesStr) {
+  const attrs = {};
+  if (!attributesStr) return attrs;
+  
+  // Simple regex to parse key="value" or key=value or standalone key
+  // Allow hyphens in attribute names (for data-* attributes)
+  const attrRegex = /([\w-]+)(?:=["']([^"']*)["']|=([^\s]+)|(?=\s|$))/g;
+  let match;
+  
+  while ((match = attrRegex.exec(attributesStr)) !== null) {
+    const [, key, quotedValue, unquotedValue] = match;
+    attrs[key] = quotedValue || unquotedValue || true;
+  }
+  
+  return attrs;
+}
+
+/**
+ * Merge head content from layout and page (simplified version of head merge algorithm)
+ * @param {string} layoutHead - Layout head content
+ * @param {string} pageHead - Page head content
+ * @returns {string} Merged head content
+ */
+function mergeHeadContent(layoutHead, pageHead) {
+  // For now, simple approach: layout head + page head (page wins on conflicts)
+  // This should eventually use the full head merge algorithm from the spec
+  let merged = layoutHead;
+  
+  if (pageHead) {
+    // Extract titles - page title wins
+    const pageTitle = pageHead.match(/<title[^>]*>([^<]*)<\/title>/i);
+    if (pageTitle) {
+      // Remove layout title if exists
+      merged = merged.replace(/<title[^>]*>[^<]*<\/title>/i, '');
+      merged += '\n' + pageTitle[0];
+    }
+    
+    // Add other page head content
+    const cleanPageHead = pageHead.replace(/<title[^>]*>[^<]*<\/title>/i, '');
+    if (cleanPageHead.trim()) {
+      merged += '\n' + cleanPageHead;
+    }
+  }
+  
+  return merged;
 }
 
 /**
@@ -1070,37 +1586,16 @@ async function processLayoutAttribute(
   config,
   extractedAssets = { styles: [], scripts: [] }
 ) {
-  // Resolve layout path
-  let resolvedLayoutPath;
+  // Use LayoutDiscovery system for both full paths and short names
+  const { LayoutDiscovery } = await import('./layout-discovery.js');
+  const discovery = new LayoutDiscovery();
   
-  if (layoutPath.startsWith("/")) {
-    // Absolute path from source root
-    resolvedLayoutPath = path.join(sourceRoot, layoutPath.substring(1));
-  } else if (layoutPath.includes('/')) {
-    // Path with directory structure, relative to source root
-    resolvedLayoutPath = path.join(sourceRoot, layoutPath);
-  } else {
-    // Bare filename, relative to layouts directory
-    if (path.isAbsolute(config.layoutsDir)) {
-      // layoutsDir is absolute path (from CLI)
-      resolvedLayoutPath = path.join(config.layoutsDir, layoutPath);
-    } else {
-      // layoutsDir is relative path (default or relative)
-      resolvedLayoutPath = path.join(sourceRoot, config.layoutsDir, layoutPath);
-    }
-  }
-
-  // Security check - allow layouts in configured layouts directory or within source root
-  const layoutsBaseDir = path.isAbsolute(config.layoutsDir) 
-    ? config.layoutsDir 
-    : path.join(sourceRoot, config.layoutsDir);
-    
-  if (!isPathWithinDirectory(resolvedLayoutPath, sourceRoot) && 
-      !isPathWithinDirectory(resolvedLayoutPath, layoutsBaseDir)) {
+  const resolvedLayoutPath = await discovery.resolveLayoutOverride(layoutPath, sourceRoot, filePath);
+  if (!resolvedLayoutPath) {
     throw new LayoutError(
-      resolvedLayoutPath,
-      `Layout path outside allowed directories: ${layoutPath}`,
-      [layoutsBaseDir, path.join(sourceRoot, config.layoutsDir)]
+      filePath,
+      `Layout not found: ${layoutPath}`,
+      [sourceRoot]
     );
   }
 
@@ -1129,15 +1624,47 @@ async function processLayoutAttribute(
     null // No dependency tracker needed for layout processing
   );
 
+  // Check if page is a full HTML document
+  const pageStructure = analyzeHtmlStructure(pageContent);
+  
+  
+  if (pageStructure.isFullDocument) {
+    // Use HTML document merging for full documents
+    const mergeResult = mergeHtmlDocumentWithLayout(pageContent, layoutContent, config);
+    
+    // Log any warnings
+    if (mergeResult.warnings.length > 0) {
+      mergeResult.warnings.forEach(warning => {
+        logger.warn(`HTML document merge: ${warning.message}`);
+      });
+    }
+    
+    // Apply extracted assets
+    let finalResult = mergeResult.result;
+    if (extractedAssets && (extractedAssets.styles?.length > 0 || extractedAssets.scripts?.length > 0)) {
+      finalResult = applyExtractedAssets(finalResult, extractedAssets);
+    }
+    
+    return finalResult;
+  }
+
+  // Fragment processing (existing logic)
   // Check if the layout itself has a data-layout attribute (nested layouts)
-  // Process this BEFORE applying slots to avoid content overwriting layout attributes
   const nestedLayoutMatch = layoutContent.match(/data-layout=["']([^"']+)["']/i);
   if (nestedLayoutMatch) {
     const nestedLayoutPath = nestedLayoutMatch[1];
-    console.log(`DEBUG: Found nested layout in ${layoutPath}: ${nestedLayoutPath}`);
+    logger.debug(`Found nested layout in ${layoutPath}: ${nestedLayoutPath}`);
     // Recursively process the nested layout, but pass the current slot data as page content
     const slotResult = extractSlotDataFromHTML(pageContent);
-    const layoutWithSlots = applySlots(layoutContent, slotResult.slots);
+    const slotApplication = applySlots(layoutContent, slotResult.slots, config);
+    const layoutWithSlots = slotApplication.result;
+    
+    // Log any slot warnings
+    if (slotApplication.warnings.length > 0) {
+      slotApplication.warnings.forEach(warning => {
+        logger.warn(`Slot validation: ${warning.message}`);
+      });
+    }
     
     // Now process the nested layout with the slot-applied content as the page content
     return await processLayoutAttribute(
@@ -1179,7 +1706,16 @@ async function processLayoutAttribute(
     }
   }
   
-  return applySlots(finalLayout, slotResult.slots);
+  const slotApplication = applySlots(finalLayout, slotResult.slots, config);
+  
+  // Log any slot warnings
+  if (slotApplication.warnings.length > 0) {
+    slotApplication.warnings.forEach(warning => {
+      logger.warn(`Slot validation: ${warning.message}`);
+    });
+  }
+  
+  return slotApplication.result;
 }
 
 /**
@@ -1188,11 +1724,9 @@ async function processLayoutAttribute(
  * @returns {string} Processed HTML
  */
 function processStandaloneSlots(htmlContent) {
-  // For standalone slots, we just remove empty slot elements
-  // This handles cases where slots exist but no template is extending
-  return htmlContent
-    .replace(/<slot[^>]*><\/slot>/gs, "")
-    .replace(/<slot[^>]*\/>/g, "");
+  // For standalone data-slot attributes, no processing needed in the new system
+  // The data-slot system doesn't require removing elements like the old <slot> system
+  return htmlContent;
 }
 }
 
@@ -1203,8 +1737,7 @@ function processStandaloneSlots(htmlContent) {
  */
 export function getUnifiedConfig(userConfig = {}) {
   let config = {
-    layoutsDir: userConfig.layouts || ".layouts", 
-    defaultLayout: "default.html",
+    layoutsDir: userConfig.layouts || ".layouts", // Deprecated but kept for compatibility
     ...userConfig,
   };
   
@@ -1235,11 +1768,8 @@ export function shouldUseUnifiedProcessing(htmlContent) {
  * @returns {Promise<string>} Optimized HTML content
  */
 export async function optimizeHtml(htmlContent) {
-  // Check if HTMLRewriter is available
-  if (!hasFeature('htmlRewriter')) {
-    logger.debug('HTMLRewriter not available, skipping HTML optimization');
-    return htmlContent;
-  }
+  // HTMLRewriter is always available
+  // Proceed with optimization
   
   const rewriter = new HTMLRewriter();
 
@@ -1295,11 +1825,8 @@ export async function extractHtmlMetadata(htmlContent) {
     openGraph: {}
   };
 
-  // Check if HTMLRewriter is available
-  if (!hasFeature('htmlRewriter')) {
-    logger.debug('HTMLRewriter not available, skipping HTML metadata extraction');
-    return metadata;
-  }
+  // HTMLRewriter is always available
+  // Proceed with metadata extraction
 
   const rewriter = new HTMLRewriter();
 

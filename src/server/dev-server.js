@@ -1,10 +1,12 @@
 /**
  * Development server with live reload support
- * Uses Bun.serve for high-performance HTTP serving
+ * Provides high-performance HTTP serving with live reload
  */
 
 import path from 'path';
 import { logger } from '../utils/logger.js';
+
+import pkg from "../../package.json";
 
 /**
  * Check if a path looks like a system file that should not trigger SPA fallback
@@ -66,7 +68,7 @@ export class DevServer {
         fetch: this.handleRequest.bind(this),
         error: this.handleError.bind(this),
         development: true,
-        idleTimeout: 255 // Maximum allowed value in Bun (255 seconds = ~4.25 minutes)
+        idleTimeout: 255 // Maximum allowed value (255 seconds = ~4.25 minutes)
       };
       
       // reusePort is not supported on Windows
@@ -76,8 +78,8 @@ export class DevServer {
       
       this.server = Bun.serve(serverOptions);
       if (!this.server) {
-        logger.error('Bun.serve did not return a server instance.');
-        throw new Error('Failed to start Bun server.');
+        logger.error('Server failed to start.');
+        throw new Error('Failed to start development server.');
       }
       this.isRunning = true;
       logger.success(`Development server running at http://${config.hostname}:${config.port}`);
@@ -93,7 +95,7 @@ export class DevServer {
   }
 
   /**
-   * Handle HTTP requests with native Bun routing
+   * Handle HTTP requests with native routing
    */
   async handleRequest(request) {
     const url = new URL(request.url);
@@ -254,7 +256,7 @@ export class DevServer {
    */
   getFileHeaders(filePath, cors = false) {
     const headers = new Headers();
-    // Use Bun's built-in mime type detection
+    // Use native mime type detection
     let mimeType = 'application/octet-stream';
     if (typeof Bun !== 'undefined' && Bun.file) {
       try {
@@ -314,7 +316,7 @@ export class DevServer {
           return;
         }
         
-        // Send periodic heartbeat to keep connection alive (every 25 seconds, before Bun's timeout)
+        // Send periodic heartbeat to keep connection alive (every 25 seconds)
         const heartbeatInterval = setInterval(() => {
           if (!client.active) {
             clearInterval(heartbeatInterval);
@@ -391,7 +393,7 @@ export class DevServer {
     if (pathname === '/api/info' && method === 'GET') {
       return new Response(JSON.stringify({
         server: 'Unify Dev Server',
-        version: Bun.version,
+        version: pkg.version,
         config: {
           port: this.config.port,
           outputDir: this.config.outputDir,
@@ -544,11 +546,11 @@ export class DevServer {
   }
 
   /**
-   * Open browser to the server URL using Bun subprocess
+   * Open browser to the server URL using subprocess
    */
   async openBrowser(url) {
     try {
-      // Use Bun's subprocess API
+      // Use native subprocess API
       const proc = Bun.spawn(['open', url], {
         stdio: ['ignore', 'ignore', 'ignore'],
         detached: true

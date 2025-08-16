@@ -1,6 +1,6 @@
 <div>
   <!-- Uses fallback layout since no layout file is found in this directory -->
-  <template target="title">About Unify</template>
+  <template slot="title">About Unify</template>
 
   <h2>What is Unify?</h2>
   <p>Unify is a convention-based static site generator that uses pure HTML with minimal custom elements.</p>
@@ -13,7 +13,7 @@
   <h3>How It Works</h3>
   <ol>
     <li>Pages are automatically wrapped with the nearest layout file</li>
-    <li>Content goes into slots using <code>&lt;template target="name"&gt;</code></li>
+    <li>Content goes into slots using <code>&lt;template slot="name"&gt;</code></li>
     <li>Components are included with <code>&lt;!--#include virtual="..." --&gt;</code></li>
     <li>Layout files use naming pattern <code>_*.layout.html</code></li>
   </ol>

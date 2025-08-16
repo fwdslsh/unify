@@ -18,10 +18,11 @@ export async function runCLI(args, options = {}) {
   // Use fileURLToPath for proper cross-platform path handling
   const cliPath = fileURLToPath(cliUrl);
   
-  const proc = Bun.spawn([process.execPath, cliPath, ...args], {
+  const { spawn } = await import('bun');
+  const proc = spawn([process.execPath, cliPath, ...args], {
     cwd: options.cwd || import.meta.dir,
     stdio: ['pipe', 'pipe', 'pipe'],
-    env: { ...Bun.env, ...options.env },
+    env: { ...process.env, ...options.env },
     ...options
   });
   
@@ -94,14 +95,15 @@ export async function runCLI(args, options = {}) {
 }
 
 /**
- * Run any command using Bun.spawn
+ * Run any command using native spawn
  * @param {string} command - Command to run
  * @param {Array<string>} args - Command arguments
  * @param {Object} options - Spawn options
  * @returns {Promise<Object>} Result with code, stdout, stderr
  */
 export async function runCommand(command, args = [], options = {}) {
-  const proc = Bun.spawn([command, ...args], {
+  const { spawn } = await import('bun');
+  const proc = spawn([command, ...args], {
     cwd: options.cwd || process.cwd(),
     stdio: ['pipe', 'pipe', 'pipe'],
     env: options.env || {},

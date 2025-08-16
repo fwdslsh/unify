@@ -1,19 +1,45 @@
-<div data-layout="_blog.layout.html">
-  <template target="title">Welcome to My Blog</template>
-  <template target="header">
-    <h1>🧱 My Blog</h1>
-    <p>Convention-based blogging with Unify</p>
-  </template>
+<!DOCTYPE html>
+<html lang="en">
 
-  <h2>Hello!</h2>
-  <p>This is a blog post rendered with the Unify blog layout. This content goes into the unnamed slot.</p>
+<head>
+  <title>Welcome to My Blog</title>
+  <link rel="layout" href="_blog.layout.html">
+</head>
 
-  <!--#include virtual="/_includes/alert.html" -->
+<body>
+  <include src="_includes/adv-nav.html">
+    <!-- Provide your own brand/link/actions by naming slots -->
+    <a data-slot="brand" href="/">Unify<span aria-hidden="true">·</span>Site</a>
 
-  <h3>Components Example</h3>
-  <p>Here are some reusable components:</p>
+    <ul data-slot="links" role="list">
+      <li><a href="/docs/">Docs</a></li>
+      <li><a href="/recipes/">Recipes3</a></li>
+      <li><a href="/blog/">Blog</a></li>
+    </ul>
 
-  <!--#include virtual="/_includes/card.html" -->
+    <div data-slot="actions">
+      <a class="u-btn" href="/start/">Unify Rocks</a>
+    </div>
+  </include>
+  <div>
 
-  <!--#include virtual="/_includes/navigation.html" -->
-</div>
+    <template data-slot="header">
+      <h1>My Unify Blog</h1>
+      <p>Convention-based blogging with Unify</p>
+    </template>
+
+    <h2>Hello!</h2>
+    <p>This is a blog post rendered with the Unify blog layout. This content goes into the unnamed slot.</p>
+
+    <!--#include virtual="/_includes/alert.html" -->
+
+    <h3>Components Example</h3>
+    <p>Here are some reusable components:</p>
+
+    <!--#include virtual="/_includes/card.html" -->
+
+    <!--#include virtual="/_includes/navigation.html" -->
+  </div>
+</body>
+
+</html>

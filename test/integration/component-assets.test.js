@@ -17,7 +17,7 @@ describe('Component Asset Processing', () => {
   let sourceDir = null;
   let outputDir = null;
   let componentsDir = null;
-  let layoutsDir = null;
+  let includesDir = null;
 
   beforeEach(async () => {
     // Create unique test directories for each test
@@ -25,14 +25,14 @@ describe('Component Asset Processing', () => {
     sourceDir = path.join(testDir, 'src');
     outputDir = path.join(testDir, 'dist');
     componentsDir = path.join(sourceDir, '.components');
-    layoutsDir = path.join(sourceDir, '.layouts');
+    includesDir = path.join(sourceDir, '_includes');
 
     // Clean up and create test directories
     await fs.rm(testDir, { recursive: true, force: true });
     await fs.mkdir(testDir, { recursive: true });
     await fs.mkdir(sourceDir, { recursive: true });
     await fs.mkdir(componentsDir, { recursive: true });
-    await fs.mkdir(layoutsDir, { recursive: true });
+    await fs.mkdir(includesDir, { recursive: true });
 
     // Create a component with styles only
     await fs.writeFile(
@@ -199,7 +199,7 @@ describe('Component Asset Processing', () => {
 
     // Create a layout that includes styles and scripts
     await fs.writeFile(
-      path.join(layoutsDir, 'default.html'),
+      path.join(includesDir, 'layout.html'),
       `<!DOCTYPE html>
 <html>
 <head>
@@ -224,7 +224,7 @@ describe('Component Asset Processing', () => {
 </head>
 <body>
   <div class="container">
-    <slot></slot>
+    <main data-slot="default"></main>
   </div>
   
   <script>
@@ -246,7 +246,7 @@ describe('Component Asset Processing', () => {
       sourceDir = null;
       outputDir = null;
       componentsDir = null;
-      layoutsDir = null;
+      includesDir = null;
     }
   });
 
@@ -265,13 +265,15 @@ describe('Component Asset Processing', () => {
     await build({
       source: sourceDir,
       output: outputDir,
-      components: componentsDir,
-      layouts: layoutsDir
     });
 
     // Read the output file
     const outputFile = path.join(outputDir, 'styles-test.html');
     const outputContent = await fs.readFile(outputFile, 'utf-8');
+    
+    console.log('=== OUTPUT CONTENT ===');
+    console.log(outputContent);
+    console.log('=== END OUTPUT ===');
 
     // Check that the page was built successfully
     expect(outputContent.includes('<!DOCTYPE html>')).toBeTruthy();
@@ -321,8 +323,6 @@ describe('Component Asset Processing', () => {
     await build({
       source: sourceDir,
       output: outputDir,
-      components: componentsDir,
-      layouts: layoutsDir
     });
 
     // Read the output file
@@ -387,8 +387,6 @@ describe('Component Asset Processing', () => {
     await build({
       source: sourceDir,
       output: outputDir,
-      components: componentsDir,
-      layouts: layoutsDir
     });
 
     // Read the output file
@@ -454,8 +452,6 @@ describe('Component Asset Processing', () => {
     await build({
       source: sourceDir,
       output: outputDir,
-      components: componentsDir,
-      layouts: layoutsDir
     });
 
     // Read the output file
@@ -504,8 +500,6 @@ describe('Component Asset Processing', () => {
     await build({
       source: sourceDir,
       output: outputDir,
-      components: componentsDir,
-      layouts: layoutsDir
     });
 
     // Read the output file

@@ -2,12 +2,11 @@
 <html lang="en">
 <head>
   <!--#include virtual="/_includes/head.html" -->
-  <slot name="title"><title>Unify by fwdslsh</title></slot>
+  <div data-slot="title"><title>Unify by fwdslsh</title></div>
 </head>
 <body>
   <!--#include virtual="/_includes/header.html" -->
-  <main>
-    <slot></slot>
+  <main data-slot="default">
   </main>
   <!--#include virtual="/_includes/footer.html" -->
 </body>

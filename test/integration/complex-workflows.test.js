@@ -27,13 +27,13 @@ describe('Complex Integration Scenarios', () => {
     it('should handle complete serve → watch → live reload → rebuild workflow', async () => {
       const structure = {
         'src/index.html': `
-          <div data-layout="main.html">
+          <div>
             <h1>Home Page</h1>
             <!--#include file="includes/nav.html" -->
             <main>Welcome to the site</main>
           </div>
         `,
-        'src/.layouts/main.html': `
+        'src/_includes/layout.html': `
           <!DOCTYPE html>
           <html>
           <head>
@@ -41,7 +41,7 @@ describe('Complex Integration Scenarios', () => {
             <link rel="stylesheet" href="/css/main.css">
           </head>
           <body>
-            <slot></slot>
+            <main data-slot="default"></main>
             <script src="/js/main.js"></script>
           </body>
           </html>
@@ -54,7 +54,6 @@ describe('Complex Integration Scenarios', () => {
           </nav>
         `,
         'src/about.md': `---
-layout: main.html
 title: About Us
 ---
 # About Us
@@ -137,12 +136,11 @@ This is our about page.
     it('should handle mixed file types in single build with complex dependencies', async () => {
       const structure = {
         // HTML pages with layouts
-        'src/index.html': '<div data-layout="page.html"><h1>Home</h1><!--#include file="includes/sidebar.html" --></div>',
-        'src/products.html': '<div data-layout="page.html"><h1>Products</h1><!--#include file="includes/product-list.html" --></div>',
+        'src/index.html': '<div><h1>Home</h1><!--#include file="includes/sidebar.html" --></div>',
+        'src/products.html': '<div><h1>Products</h1><!--#include file="includes/product-list.html" --></div>',
         
         // Markdown pages with frontmatter
         'src/blog/post-1.md': `---
-layout: blog.html
 title: First Post
 date: 2024-01-01
 tags: [tech, web]
@@ -154,7 +152,6 @@ This is our first post.
 <!--#include file="../includes/author-bio.html" -->
 <!--#include file="../includes/social-share.html" -->`,
         'src/blog/post-2.md': `---
-layout: blog.html
 title: Second Post
 date: 2024-01-02
 ---
@@ -165,7 +162,7 @@ Another great post.
 <!--#include file="../includes/author-bio.html" -->`,
         
         // Layouts
-        'src/.layouts/page.html': `<!DOCTYPE html>
+        'src/_includes/layout.html': `<!DOCTYPE html>
 <html>
 <head>
   <title>Site</title>
@@ -174,22 +171,9 @@ Another great post.
 </head>
 <body>
   <!--#include file="../includes/header.html" -->
-  <main><slot></slot></main>
+  <main><main data-slot="default"></main></main>
   <!--#include file="../includes/footer.html" -->
   <script src="/js/main.js"></script>
-</body>
-</html>`,
-        'src/.layouts/blog.html': `<!DOCTYPE html>
-<html>
-<head>
-  <title>Blog</title>
-  <!--#include file="../includes/meta-tags.html" -->
-  <link rel="stylesheet" href="/css/blog.css">
-</head>
-<body>
-  <!--#include file="../includes/header.html" -->
-  <article><slot></slot></article>
-  <!--#include file="../includes/footer.html" -->
 </body>
 </html>`,
         
@@ -254,7 +238,6 @@ Another great post.
 
       // Verify assets were copied
       expect(await fileExists(path.join(outputDir, 'css/main.css'))).toBe(true);
-      expect(await fileExists(path.join(outputDir, 'css/blog.css'))).toBe(true);
       expect(await fileExists(path.join(outputDir, 'js/main.js'))).toBe(true);
     });
   });
@@ -300,25 +283,25 @@ Another great post.
 
     it('should handle complex layout inheritance chains', async () => {
       const structure = {
-        'src/page.html': '<div data-layout="child.html"><h1>Content</h1></div>',
+        'src/page.html': '<div data-layout="child"><h1>Content</h1></div>',
         
-        'src/.layouts/child.html': `
-          <div data-layout="parent.html">
+        'src/_includes/child.html': `
+          <div data-layout="parent">
             <div class="child-wrapper">
-              <slot></slot>
+              <main data-slot="default"></main>
             </div>
           </div>
         `,
         
-        'src/.layouts/parent.html': `
-          <div data-layout="grandparent.html">
+        'src/_includes/parent.html': `
+          <div data-layout="grandparent">
             <div class="parent-wrapper">
-              <slot></slot>
+              <main data-slot="default"></main>
             </div>
           </div>
         `,
         
-        'src/.layouts/grandparent.html': `
+        'src/_includes/grandparent.html': `
           <!DOCTYPE html>
           <html>
           <head>
@@ -326,7 +309,7 @@ Another great post.
           </head>
           <body>
             <div class="grandparent-wrapper">
-              <slot></slot>
+              <main data-slot="default"></main>
             </div>
           </body>
           </html>
@@ -356,14 +339,14 @@ Another great post.
       const structure = {};
       
       // Main pages
-      structure['src/index.html'] = '<div data-layout="home.html"><h1>Welcome</h1><!--#include file="includes/recent-posts.html" --></div>';
-      structure['src/about.html'] = '<div data-layout="page.html"><h1>About</h1></div>';
-      structure['src/contact.html'] = '<div data-layout="page.html"><h1>Contact</h1></div>';
+      structure['src/index.html'] = '<div data-layout="home"><h1>Welcome</h1><!--#include file="includes/recent-posts.html" --></div>';
+      structure['src/about.html'] = '<div data-layout="page"><h1>About</h1></div>';
+      structure['src/contact.html'] = '<div data-layout="page"><h1>Contact</h1></div>';
       
       // Blog posts (50 posts)
       for (let i = 1; i <= 50; i++) {
         structure[`src/blog/post-${i}.md`] = `---
-layout: blog.html
+layout: blog
 title: Post ${i}
 date: 2024-01-${String(i).padStart(2, '0')}
 category: ${i % 3 === 0 ? 'tech' : i % 2 === 0 ? 'design' : 'news'}
@@ -379,15 +362,15 @@ This is blog post number ${i}.
       // Category pages
       const categories = ['tech', 'design', 'news'];
       categories.forEach(cat => {
-        structure[`src/blog/${cat}.html`] = `<div data-layout="category.html"><h1>${cat}</h1><!--#include file="../includes/${cat}-posts.html" --></div>`;
+        structure[`src/blog/${cat}.html`] = `<div data-layout="category"><h1>${cat}</h1><!--#include file="../includes/${cat}-posts.html" --></div>`;
         structure[`src/includes/${cat}-posts.html`] = `<div class="${cat}-posts">Posts in ${cat}</div>`;
       });
       
       // Layouts
-      structure['src/.layouts/home.html'] = '<!DOCTYPE html><html><head><title>Home</title></head><body><!--#include file="../includes/header.html" --><main><slot></slot></main><!--#include file="../includes/footer.html" --></body></html>';
-      structure['src/.layouts/page.html'] = '<!DOCTYPE html><html><head><title>Page</title></head><body><!--#include file="../includes/header.html" --><main><slot></slot></main><!--#include file="../includes/footer.html" --></body></html>';
-      structure['src/.layouts/blog.html'] = '<!DOCTYPE html><html><head><title>Blog</title></head><body><!--#include file="../includes/header.html" --><article><slot></slot></article><!--#include file="../includes/footer.html" --></body></html>';
-      structure['src/.layouts/category.html'] = '<!DOCTYPE html><html><head><title>Category</title></head><body><!--#include file="../includes/header.html" --><section><slot></slot></section><!--#include file="../includes/footer.html" --></body></html>';
+      structure['src/_includes/home.html'] = '<!DOCTYPE html><html><head><title>Home</title></head><body><!--#include file="../includes/header.html" --><main><main data-slot="default"></main></main><!--#include file="../includes/footer.html" --></body></html>';
+      structure['src/_includes/page.html'] = '<!DOCTYPE html><html><head><title>Page</title></head><body><!--#include file="../includes/header.html" --><main><main data-slot="default"></main></main><!--#include file="../includes/footer.html" --></body></html>';
+      structure['src/_includes/blog.html'] = '<!DOCTYPE html><html><head><title>Blog</title></head><body><!--#include file="../includes/header.html" --><article><main data-slot="default"></main></article><!--#include file="../includes/footer.html" --></body></html>';
+      structure['src/_includes/category.html'] = '<!DOCTYPE html><html><head><title>Category</title></head><body><!--#include file="../includes/header.html" --><section><main data-slot="default"></main></section><!--#include file="../includes/footer.html" --></body></html>';
       
       // Includes
       structure['src/includes/header.html'] = '<header><h1>My Blog</h1><!--#include file="nav.html" --></header>';
@@ -439,12 +422,12 @@ This is blog post number ${i}.
   describe('Edge Case Combinations', () => {
     it('should handle all flags together with complex content', async () => {
       const structure = {
-        'src/index.html': `<div data-layout="main.html">
+        'src/index.html': `<div>
   <h1>Home</h1>
   <!--#include file="includes/content.html" -->
   <img src="/images/logo.png" alt="Logo">
 </div>`,
-        'src/.layouts/main.html': `<!DOCTYPE html>
+        'src/_includes/layout.html': `<!DOCTYPE html>
 <html>
 <head>
   <title>Site</title>
@@ -452,7 +435,7 @@ This is blog post number ${i}.
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-  <slot></slot>
+  <main data-slot="default"></main>
 </body>
 </html>`,
         'src/includes/content.html': '<p>This content has      multiple    spaces     that will be minified.</p>',

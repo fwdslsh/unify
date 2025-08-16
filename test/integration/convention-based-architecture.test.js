@@ -27,7 +27,7 @@ describe('Convention-Based Architecture Integration', () => {
         'about.html': '<h1>About Page</h1>',
         '_includes/header.html': '<header>Site Header</header>',
         '_includes/footer.html': '<footer>Site Footer</footer>',
-        'blog/_layout.html': '<html><body><h1>Blog</h1><slot></slot></body></html>',
+        'blog/_layout.html': '<html><body><h1>Blog</h1><main data-slot="default"></main></body></html>',
         'blog/_sidebar.html': '<aside>Blog Sidebar</aside>',
         'blog/post.html': '<article>Blog Post</article>',
         'css/main.css': 'body { margin: 0; }',
@@ -108,10 +108,10 @@ describe('Convention-Based Architecture Integration', () => {
   describe('Layout Discovery', () => {
     test('should apply folder-scoped layouts correctly', async () => {
       await createTestStructure(sourceDir, {
-        '_includes/default-layout.html': '<html><body><main><slot></slot></main></body></html>',
-        'blog/_layout.html': '<html><body><h1>Blog</h1><div class="blog-content"><slot></slot></div></body></html>',
+        '_includes/default-layout.html': '<html><body><main><main data-slot="default"></main></main></body></html>',
+        'blog/_layout.html': '<html><body><h1>Blog</h1><div class="blog-content"><main data-slot="default"></main></div></body></html>',
         'blog/post.html': '<article>Post content</article>',
-        'docs/_layout.html': '<html><body><h1>Documentation</h1><div class="docs-content"><slot></slot></div></body></html>',
+        'docs/_layout.html': '<html><body><h1>Documentation</h1><div class="docs-content"><main data-slot="default"></main></div></body></html>',
         'docs/guide.html': '<section>Guide content</section>',
         'simple.html': '<div>Simple page</div>'
       });
@@ -140,8 +140,8 @@ describe('Convention-Based Architecture Integration', () => {
   describe('Markdown Processing', () => {
     test('should process markdown with convention-based layouts', async () => {
       await createTestStructure(sourceDir, {
-        '_includes/default-layout.html': '<html><body><main><slot></slot></main></body></html>',
-        'blog/_layout.html': '<html><body><h1>Blog</h1><div class="blog-content"><slot></slot></div></body></html>',
+        '_includes/default-layout.html': '<html><body><main><main data-slot="default"></main></main></body></html>',
+        'blog/_layout.html': '<html><body><h1>Blog</h1><div class="blog-content"><main data-slot="default"></main></div></body></html>',
         'blog/post.md': '# My Blog Post\n\nThis is a test post.',
         'docs/readme.md': `---
 layout: /custom-layout.html
@@ -151,7 +151,7 @@ title: Custom Layout Test
 # Documentation
 
 This uses a custom layout.`,
-        'custom-layout.html': '<html><body><h1>Custom</h1><slot></slot></body></html>'
+        'custom-layout.html': '<html><body><h1>Custom</h1><main data-slot="default"></main></body></html>'
       });
 
       const result = await build({

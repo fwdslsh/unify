@@ -82,8 +82,7 @@ describe('CLI Commands and Options', () => {
       const result = await runCLIInDir(tempDir, [
         'build',
         '-s', path.join(tempDir, 'content'),
-        '-o', outputDir,
-        '-l', path.join(tempDir, 'templates')
+        '-o', outputDir
       ]);
 
       expect(result.code).toBe(0);
@@ -414,7 +413,7 @@ describe('CLI Commands and Options', () => {
   describe('Mixed Flag Formats', () => {
     it('should handle mixed long and short flags', async () => {
       const structure = {
-        'content/index.html': '<div data-layout="base.html"><template target="content">Mixed Flags</template></div>',
+        'content/index.html': '<div data-layout="base.html"><template data-slot="content">Mixed Flags</template></div>',
         'templates/base.html': '<!DOCTYPE html><html><body><slot name="content">Default</slot></body></html>'
       };
 
@@ -424,7 +423,6 @@ describe('CLI Commands and Options', () => {
         'build',
         '-s', path.join(tempDir, 'content'),
         '--output', outputDir,
-        '-l', path.join(tempDir, 'templates'),
         '--pretty-urls',
         '-p', '3000' // This would be for serve, but testing parsing
       ]);

@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Slot Injection Example</title>
+  <style>
+    /* Basic styling for the navbar */
+    .u-nav {
+      background: #f8f9fa;
+      border-bottom: 1px solid #dee2e6;
+      padding: 1rem;
+    }
+    
+    .u-nav__inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .u-nav__section {
+      display: flex;
+      align-items: center;
+      gap: 2rem;
+    }
+    
+    .u-nav__menu {
+      display: flex;
+      gap: 3rem;
+      align-items: center;
+    }
+    
+    .u-nav__toggle {
+      display: none;
+    }
+    
+    .u-nav__section--links ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      gap: 1.5rem;
+    }
+    
+    .u-nav__section--links a {
+      text-decoration: none;
+      color: #495057;
+      font-weight: 500;
+    }
+    
+    .u-nav__section--links a:hover {
+      color: #007bff;
+    }
+    
+    .u-btn {
+      background: #007bff;
+      color: white;
+      padding: 0.5rem 1rem;
+      border-radius: 0.25rem;
+      text-decoration: none;
+      font-weight: 500;
+    }
+    
+    .u-btn:hover {
+      background: #0056b3;
+    }
+    
+    main {
+      max-width: 1200px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+    }
+    
+    .example-section {
+      margin: 3rem 0;
+    }
+    
+    .example-section h2 {
+      margin-bottom: 1rem;
+      color: #212529;
+    }
+    
+    .code-block {
+      background: #f8f9fa;
+      border: 1px solid #dee2e6;
+      border-radius: 0.25rem;
+      padding: 1rem;
+      margin: 1rem 0;
+      overflow-x: auto;
+    }
+    
+    .code-block pre {
+      margin: 0;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <!-- Example 1: Basic slot injection -->
+  <include src="/_includes/adv-nav.html">
+    <!-- Provide custom brand -->
+    <a data-slot="brand" href="/">Unify<span aria-hidden="true">·</span>Site</a>
+
+    <!-- Provide custom navigation links -->
+    <ul data-slot="links" role="list">
+      <li><a href="/docs/">Documentation</a></li>
+      <li><a href="/tutorials/">Tutorials</a></li>
+      <li><a href="/api/">API Reference</a></li>
+      <li><a href="/blog/">Blog</a></li>
+    </ul>
+
+    <!-- Provide custom actions -->
+    <div data-slot="actions">
+      <a class="u-btn" href="/get-started/">Try Unify</a>
+    </div>
+  </include>
+
+  <main>
+    <h1>Slot Injection in Include Elements</h1>
+    
+    <div class="example-section">
+      <h2>What is Slot Injection?</h2>
+      <p>
+        Slot injection allows you to pass custom content to specific slots within an included component.
+        This enables component reusability while maintaining flexibility for customization.
+      </p>
+    </div>
+
+    <div class="example-section">
+      <h2>How It Works</h2>
+      <ol>
+        <li>Define slots in your component using <code>data-slot="name"</code> attributes</li>
+        <li>Include the component using the <code>&lt;include&gt;</code> element</li>
+        <li>Provide content for slots by adding child elements with matching <code>data-slot</code> attributes</li>
+        <li>The build process replaces slot targets with the provided content</li>
+      </ol>
+    </div>
+
+    <div class="example-section">
+      <h2>Example Code</h2>
+      
+      <h3>Component Definition</h3>
+      <div class="code-block">
+        <pre>&lt;nav class="u-nav"&gt;
+  &lt;div data-slot="brand"&gt;Default Brand&lt;/div&gt;
+  &lt;ul data-slot="links"&gt;
+    &lt;li&gt;&lt;a href="/"&gt;Home&lt;/a&gt;&lt;/li&gt;
+  &lt;/ul&gt;
+  &lt;div data-slot="actions"&gt;
+    &lt;button&gt;Sign In&lt;/button&gt;
+  &lt;/div&gt;
+&lt;/nav&gt;</pre>
+      </div>
+
+      <h3>Using the Component with Slots</h3>
+      <div class="code-block">
+        <pre>&lt;include src="/_includes/nav.html"&gt;
+  &lt;a data-slot="brand" href="/"&gt;MyBrand&lt;/a&gt;
+  
+  &lt;ul data-slot="links"&gt;
+    &lt;li&gt;&lt;a href="/docs/"&gt;Docs&lt;/a&gt;&lt;/li&gt;
+    &lt;li&gt;&lt;a href="/blog/"&gt;Blog&lt;/a&gt;&lt;/li&gt;
+  &lt;/ul&gt;
+  
+  &lt;div data-slot="actions"&gt;
+    &lt;a href="/start/" class="btn"&gt;Get Started&lt;/a&gt;
+  &lt;/div&gt;
+&lt;/include&gt;</pre>
+      </div>
+    </div>
+
+    <div class="example-section">
+      <h2>Benefits</h2>
+      <ul>
+        <li><strong>Reusability:</strong> Define components once, use them everywhere with different content</li>
+        <li><strong>Flexibility:</strong> Customize specific parts of a component without modifying the original</li>
+        <li><strong>Fallback Content:</strong> Components can provide default content for unprovided slots</li>
+        <li><strong>Build-time Resolution:</strong> All slot injection happens at build time, no runtime overhead</li>
+        <li><strong>Clean Output:</strong> The <code>data-slot</code> attributes are removed from the final HTML</li>
+      </ul>
+    </div>
+
+    <div class="example-section">
+      <h2>Another Navigation Example</h2>
+      <p>Here's the same navigation component with different content:</p>
+    </div>
+  </main>
+
+  <!-- Example 2: Same component, different content -->
+  <include src="/_includes/adv-nav.html">
+    <span data-slot="brand">Product<strong>Name</strong></span>
+
+    <ul data-slot="links" role="list">
+      <li><a href="/features/">Features</a></li>
+      <li><a href="/pricing/">Pricing</a></li>
+      <li><a href="/about/">About</a></li>
+    </ul>
+
+    <div data-slot="actions">
+      <a href="/login/" style="margin-right: 1rem;">Log In</a>
+      <a class="u-btn" href="/signup/">Sign Up Free</a>
+    </div>
+  </include>
+</body>
+</html>

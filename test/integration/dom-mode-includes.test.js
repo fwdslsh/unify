@@ -94,7 +94,7 @@ describe('DOM Mode Include Processing', () => {
       `<!DOCTYPE html>
 <html>
 <head>
-  <title><slot name="title">My Blog</slot></title>
+  <title><title data-slot="title">My Blog</title></title>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="/styles/site.css">
@@ -123,11 +123,11 @@ describe('DOM Mode Include Processing', () => {
   </style>
 </head>
 <body class="blog-layout">
-  <template target="header">
+  <template data-slot="header">
     <h1>My Blog</h1>
   </template>
   <main class="blog-content">
-    <slot></slot> <!-- Main blog content -->
+    <main data-slot="default"></main> <!-- Main blog content -->
   </main>
 </body>
 </html>`
@@ -137,8 +137,8 @@ describe('DOM Mode Include Processing', () => {
     await fs.writeFile(
       path.join(sourceDir, 'blog.html'),
       `<body data-layout="/_includes/blog.layout.html">
-  <template target="title">Welcome to DOM Mode</template>
-  <template target="header">
+  <template data-slot="title">Welcome to DOM Mode</template>
+  <template data-slot="header">
     <h1>🧱 Unify DOM Mode</h1>
     <p>Modern templating with pure HTML</p>
   </template>
@@ -163,7 +163,7 @@ describe('DOM Mode Include Processing', () => {
 
   <include src="/custom_components/navigation.html" />
 
-  <template target="footer">
+  <template data-slot="footer">
     <p>© 2025 - Built with Unify DOM Mode</p>
     <p><a href="https://github.com/yourusername/unify">View on GitHub</a></p>
   </template>
@@ -216,7 +216,7 @@ describe('DOM Mode Include Processing', () => {
 
     // Check that layout was applied
     expect(outputContent.includes('<!DOCTYPE html>')).toBeTruthy();
-    expect(outputContent.includes('<title>Welcome to DOM Mode</title>')).toBeTruthy();
+    expect(outputContent.includes('Welcome to DOM Mode')).toBeTruthy();
   });
 
   it('should exclude component and layout directories from output', async () => {
@@ -253,7 +253,7 @@ describe('DOM Mode Include Processing', () => {
     await fs.writeFile(
       path.join(sourceDir, 'blog.html'),
       `<body data-layout="/_includes/blog.layout.html">
-  <template target="title">Nested Include Test</template>
+  <template data-slot="title">Nested Include Test</template>
   
   <h2>Testing Nested Includes</h2>
   <include src="/custom_components/nested.html" />

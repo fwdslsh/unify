@@ -445,16 +445,16 @@ ${"<p>This is paragraph content that repeats many times to create a large file. 
         "layouts/unusual.html": `<!DOCTYPE html>
 <html>
 <body>
-  <slot name="content">Default content</slot>
-  <slot><!-- Unnamed slot --></slot>
-  <slot name="empty"></slot>
-  <slot name="repeated">Default 1</slot>
-  <slot name="repeated">Default 2</slot>
+  <main data-slot="content">Default content</main>
+  <div data-slot="default"><!-- Unnamed slot --></div>
+  <div data-slot="empty"></div>
+  <div data-slot="repeated">Default 1</div>
+  <div data-slot="repeated">Default 2</div>
 </body>
 </html>`,
         "page.html": `<template extends="unusual.html">
-  <slot name="content">Custom content</slot>
-  <slot name="repeated">Custom repeated</slot>
+  <template data-slot="content">Custom content</template>
+  <template data-slot="repeated">Custom repeated</template>
   <div>Unnamed content goes here</div>
 </template>`,
       };
