@@ -248,17 +248,26 @@ async function processIncludesWithStringReplacement(htmlContent, filePath, sourc
   }
   
   // Recursively process DOM includes until none remain (up to max depth)
-  const domIncludeRegex = /<include\s+src="([^"]+)"[^>]*>(?:<\/include>)?/g;
+  const domIncludeRegex = /<include\s+src="([^"]+)"[^>]*>([\s\S]*?)<\/include>/g;
+  const selfClosingIncludeRegex = /<include\s+src="([^"]+)"[^>]*\/>/g;
   let depth = 0;
   const maxDepth = 10;
   let hasDomIncludes = true;
   while (hasDomIncludes && depth < maxDepth) {
     domIncludeRegex.lastIndex = 0;
+    selfClosingIncludeRegex.lastIndex = 0;
+    
+    // Process includes with children (slot injection)
     let domMatches = [...processedContent.matchAll(domIncludeRegex)];
-    hasDomIncludes = domMatches.length > 0;
+    // Process self-closing includes (no slot injection)
+    let selfClosingMatches = [...processedContent.matchAll(selfClosingIncludeRegex)];
+    
+    hasDomIncludes = domMatches.length > 0 || selfClosingMatches.length > 0;
     depth++;
+    
+    // Process includes with slot content
     for (const domMatch of domMatches) {
-      const [fullMatch, src] = domMatch;
+      const [fullMatch, src, slotContent] = domMatch;
       try {
         let resolvedPath;
         if (src.startsWith('/')) {
@@ -273,7 +282,7 @@ async function processIncludesWithStringReplacement(htmlContent, filePath, sourc
           throw new PathTraversalError(src, sourceRoot);
         }
         
-        // All includes are processed uniformly - no special component logic
+        // Read the include content
         let includeContent = await fs.readFile(resolvedPath, 'utf-8');
         
         // Extract assets from the component content for DOM includes
@@ -281,6 +290,11 @@ async function processIncludesWithStringReplacement(htmlContent, filePath, sourc
         includeContent = componentAssets.content;
         extractedAssets.styles.push(...componentAssets.assets.styles);
         extractedAssets.scripts.push(...componentAssets.assets.scripts);
+        
+        // Process slot injection if slot content is provided
+        if (slotContent && slotContent.trim()) {
+          includeContent = applySlotInjectionToInclude(includeContent, slotContent);
+        }
         
         // Recursively process nested includes
         const nestedResult = await processIncludesWithStringReplacement(includeContent, resolvedPath, sourceRoot, config, newCallStack);
@@ -295,7 +309,7 @@ async function processIncludesWithStringReplacement(htmlContent, filePath, sourc
         
         processedContent = (processedContent || '')
           .replace(fullMatch, includeContent || '');
-        logger.debug(`Processed include element: ${src} -> ${resolvedPath}`);
+        logger.debug(`Processed include element with slots: ${src} -> ${resolvedPath}`);
       } catch (error) {
         let resolvedPath;
         if (src.startsWith('/')) {
@@ -321,6 +335,76 @@ async function processIncludesWithStringReplacement(htmlContent, filePath, sourc
           throw new BuildError(msg, [{ file: errorFilePath, error: msg }]);
         }
         logger.warn(`Include element not found: ${src} in ${errorFilePath}`);
+        processedContent = (processedContent || '')
+          .replace(fullMatch, `<!-- Include not found: ${src} -->`);
+      }
+    }
+    
+    // Process self-closing includes (no slot injection)
+    for (const selfClosingMatch of selfClosingMatches) {
+      const [fullMatch, src] = selfClosingMatch;
+      try {
+        let resolvedPath;
+        if (src.startsWith('/')) {
+          // Absolute path from source root
+          resolvedPath = path.resolve(sourceRoot, src.replace(/^\/+/,''));
+        } else {
+          // Relative path from current file
+          resolvedPath = path.resolve(path.dirname(filePath), src);
+        }
+        // Security: ensure resolved path is within source root
+        if (!isPathWithinDirectory(resolvedPath, sourceRoot)) {
+          throw new PathTraversalError(src, sourceRoot);
+        }
+        
+        // Read the include content
+        let includeContent = await fs.readFile(resolvedPath, 'utf-8');
+        
+        // Extract assets from the component content for DOM includes
+        const componentAssets = extractComponentAssets(includeContent);
+        includeContent = componentAssets.content;
+        extractedAssets.styles.push(...componentAssets.assets.styles);
+        extractedAssets.scripts.push(...componentAssets.assets.scripts);
+        
+        // Recursively process nested includes
+        const nestedResult = await processIncludesWithStringReplacement(includeContent, resolvedPath, sourceRoot, config, newCallStack);
+        // If the nested result is an object (with assets), extract them
+        if (typeof nestedResult === 'object' && nestedResult.content !== undefined) {
+          includeContent = nestedResult.content;
+          extractedAssets.styles.push(...nestedResult.styles);
+          extractedAssets.scripts.push(...nestedResult.scripts);
+        } else {
+          includeContent = nestedResult;
+        }
+        
+        processedContent = (processedContent || '')
+          .replace(fullMatch, includeContent || '');
+        logger.debug(`Processed self-closing include element: ${src} -> ${resolvedPath}`);
+      } catch (error) {
+        let resolvedPath;
+        if (src.startsWith('/')) {
+          resolvedPath = path.resolve(sourceRoot, src.replace(/^\/+/,''));
+        } else {
+          resolvedPath = path.resolve(path.dirname(filePath), src);
+        }
+        const errorFilePath = resolvedPath || filePath;
+        if (error.code === 'ENOENT' && !error.formatForCLI) {
+          error = new IncludeNotFoundError(src, errorFilePath, [resolvedPath]);
+        }
+        if (shouldFailFast(config, 'error')) {
+          let msg;
+          if (error instanceof CircularDependencyError) {
+            msg = `Include circular dependency: ${src} in ${errorFilePath}`;
+          } else if (error instanceof PathTraversalError) {
+            msg = `Include path traversal: ${src} in ${errorFilePath}`;
+          } else if (error instanceof IncludeNotFoundError) {
+            msg = `Include not found: ${src} in ${errorFilePath}`;
+          } else {
+            msg = `Include element error: ${src} in ${errorFilePath}: ${error.message}`;
+          }
+          throw new BuildError(msg, [{ file: errorFilePath, error: msg }]);
+        }
+        logger.warn(`Self-closing include element not found: ${src} in ${errorFilePath}`);
         processedContent = (processedContent || '')
           .replace(fullMatch, `<!-- Include not found: ${src} -->`);
       }
@@ -353,6 +437,47 @@ async function processIncludesWithStringReplacement(htmlContent, filePath, sourc
       scripts: []
     };
   }
+}
+
+/**
+ * Apply slot injection to included component content
+ * @param {string} componentContent - The component HTML content with data-slot targets
+ * @param {string} slotContent - The slot content provided within the include element
+ * @returns {string} Component content with slots injected
+ */
+function applySlotInjectionToInclude(componentContent, slotContent) {
+  // Extract slot providers from the include element's children
+  const slotProviders = {};
+  
+  // Match elements with data-slot attributes
+  const slotElementRegex = /<(\w+)([^>]*\s+data-slot=["']([^"']+)["'][^>]*)>([\s\S]*?)<\/\1>/gi;
+  let match;
+  
+  while ((match = slotElementRegex.exec(slotContent)) !== null) {
+    const [fullElement, tagName, attributes, slotName, innerContent] = match;
+    // Store the full element content (with the wrapping element but without data-slot)
+    const cleanedElement = fullElement.replace(/\s+data-slot=["'][^"']+["']/, '');
+    slotProviders[slotName] = cleanedElement;
+  }
+  
+  // Apply slots to the component content
+  let result = componentContent;
+  
+  // For each slot provider, find and replace the corresponding slot target in the component
+  for (const [slotName, slotHtml] of Object.entries(slotProviders)) {
+    // Find elements with data-slot="slotName" in the component and replace their entire element
+    const targetSlotRegex = new RegExp(
+      `<(\\w+)([^>]*\\s+data-slot=["']${escapeRegExp(slotName)}["'][^>]*)>[\\s\\S]*?<\\/\\1>`,
+      'gi'
+    );
+    
+    result = result.replace(targetSlotRegex, slotHtml);
+  }
+  
+  // Final cleanup: Remove any remaining data-slot attributes from unused slots in the component
+  result = result.replace(/\s+data-slot=["'][^"']+["']/g, '');
+  
+  return result;
 }
 
 /**
@@ -1119,15 +1244,21 @@ function applySlots(layoutContent, slotData, config = {}) {
     if (slotName === 'default') continue;
     
     // Find elements with data-slot="slotName" and replace their content
-    const namedSlotRegex = new RegExp(`(<[^>]+data-slot=["']${escapeRegex(slotName)}["'][^>]*>)([\\s\\S]*?)(<\\/[^>]+>)`, 'gi');
+    // Use a more precise regex that matches the specific opening tag and its corresponding closing tag
+    const namedSlotRegex = new RegExp(`(<(\\w+)([^>]*\\s+data-slot=["']${escapeRegex(slotName)}["'][^>]*)>)([\\s\\S]*?)(<\\/\\2>)`, 'gi');
     
     if (namedSlotRegex.test(result)) {
       usedSlots.add(slotName);
       // Reset regex lastIndex
       namedSlotRegex.lastIndex = 0;
       
-      // Replace the content between opening and closing tags
-      result = result.replace(namedSlotRegex, `$1${content}$3`);
+      // Replace the content between opening and closing tags and remove data-slot attribute
+      result = result.replace(namedSlotRegex, (match, openingTag, tagName, attributes, oldContent, closingTag) => {
+        // Remove the data-slot attribute from the opening tag
+        const cleanedAttributes = attributes.replace(/\s+data-slot=["'][^"']+["']/, '');
+        const cleanedOpeningTag = `<${tagName}${cleanedAttributes}>`;
+        return `${cleanedOpeningTag}${content}${closingTag}`;
+      });
     }
   }
   
@@ -1137,13 +1268,18 @@ function applySlots(layoutContent, slotData, config = {}) {
     slotData.default.replace(/<!--[\s\S]*?-->/g, '').trim().length > 0;
   
   // Look for data-slot="default" first
-  const defaultSlotRegex = /(<[^>]+data-slot=["']default["'][^>]*>)([\s\S]*?)(<\/[^>]+>)/gi;
+  const defaultSlotRegex = /(<(\w+)([^>]*\s+data-slot=["']default["'][^>]*)>)([\s\S]*?)(<\/\2>)/gi;
   const hasDefaultSlot = defaultSlotRegex.test(result);
   
   if (hasDefaultSlot && hasMeaningfulDefaultContent) {
     // Page has meaningful default content, replace default slot content
     defaultSlotRegex.lastIndex = 0;
-    result = result.replace(defaultSlotRegex, `$1${slotData.default}$3`);
+    result = result.replace(defaultSlotRegex, (match, openingTag, tagName, attributes, oldContent, closingTag) => {
+      // Remove the data-slot attribute from the opening tag
+      const cleanedAttributes = attributes.replace(/\s+data-slot=["'][^"']+["']/, '');
+      const cleanedOpeningTag = `<${tagName}${cleanedAttributes}>`;
+      return `${cleanedOpeningTag}${slotData.default}${closingTag}`;
+    });
   } else if (!hasDefaultSlot && hasMeaningfulDefaultContent) {
     // No data-slot="default" found, look for first <main> element as fallback
     const mainElementRegex = /(<main[^>]*>)([\s\S]*?)(<\/main>)/i;
@@ -1160,6 +1296,9 @@ function applySlots(layoutContent, slotData, config = {}) {
     }
   }
   
+  // Final cleanup: Remove any remaining data-slot attributes from unused slots
+  // This handles fallback content slots that were not replaced
+  result = result.replace(/\s+data-slot=["'][^"']+["']/g, '');
   
   return {
     result,
@@ -1353,8 +1492,9 @@ function mergeHtmlDocumentWithLayout(pageContent, layoutContent, config) {
   // 3. HEAD: Use existing head merge algorithm
   const mergedHeadContent = mergeHeadContent(layoutParts.headContent, pageParts.headContent);
   
-  // 4. BODY: Page body content goes into layout's default slot
-  const bodySlots = { default: pageParts.bodyContent };
+  // 4. BODY: Extract slots from page body content and apply to layout
+  const pageBodySlotResult = extractSlotDataFromHTML(pageParts.bodyContent);
+  const bodySlots = { default: pageBodySlotResult.slots.default || pageParts.bodyContent, ...pageBodySlotResult.slots };
   
   // Extract layout body content and apply slots to it
   const layoutBodyMatch = layoutContent.match(/<body[^>]*>([\s\S]*)<\/body>/i);

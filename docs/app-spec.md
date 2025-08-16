@@ -467,6 +467,67 @@ Resolution:
 1. Leading `/` → from `src/` root.
 2. Else → relative to including file.
 
+##### Slot Injection in Includes
+
+The `<include>` element supports slot-based content injection, allowing you to pass content to `data-slot` targets within the included component:
+
+```html
+<!-- Component: _includes/nav.html -->
+<nav class="navbar">
+  <div data-slot="brand">Default Brand</div>
+  <ul data-slot="links">
+    <li><a href="/">Home</a></li>
+  </ul>
+  <div data-slot="actions">
+    <button>Sign In</button>
+  </div>
+</nav>
+
+<!-- Page using the component -->
+<include src="/_includes/nav.html">
+  <a data-slot="brand" href="/">MyBrand</a>
+  
+  <ul data-slot="links">
+    <li><a href="/docs/">Docs</a></li>
+    <li><a href="/blog/">Blog</a></li>
+  </ul>
+  
+  <div data-slot="actions">
+    <a href="/start/" class="btn">Get Started</a>
+  </div>
+</include>
+
+<!-- Output -->
+<nav class="navbar">
+  <a href="/">MyBrand</a>
+  
+  <ul>
+    <li><a href="/docs/">Docs</a></li>
+    <li><a href="/blog/">Blog</a></li>
+  </ul>
+  
+  <div>
+    <a href="/start/" class="btn">Get Started</a>
+  </div>
+</nav>
+```
+
+**Slot Injection Rules:**
+
+1. **Slot Matching**: Child elements with `data-slot` attributes are matched to corresponding `data-slot` targets in the included component
+2. **Content Replacement**: The entire content of the target element (with matching `data-slot`) is replaced by the provided slot content
+3. **Attribute Removal**: The `data-slot` attribute is removed from both the provider and target elements in the final output
+4. **Fallback Content**: If no slot content is provided, the original content in the component's `data-slot` element serves as fallback
+5. **Multiple Slots**: Multiple slots can be provided in any order; they will be injected into their corresponding targets
+6. **Nested Includes**: Slot injection works with nested includes - slots are resolved at each level
+
+**Important Notes:**
+
+- Slot injection only works with `<include>` elements, not with Apache SSI includes
+- The `data-slot` attribute must match exactly (case-sensitive)
+- Elements without `data-slot` attributes inside `<include>` are ignored
+- Styles and scripts from components are still extracted and relocated as usual
+
 #### Apache SSI
 
 ```html
@@ -476,6 +537,7 @@ Resolution:
 
 - `file` = relative to current file.
 - `virtual` = from `src/` root.
+- Apache SSI includes do not support slot injection
 
 ### Layout System
 
@@ -649,8 +711,37 @@ In a layout, any element with `data-slot="name"` marks an insertion point:
 </body>
 ```
 
-- `data-slot="default"` is the default insertion point.
-- If no `data-slot="default"` exists, Unify injects the page body into the first `<main>` element.
+**Slot Content Replacement Rules:**
+
+1. **Empty slots:** When a layout slot element has no content or only whitespace, page content is inserted directly
+2. **Slots with fallback content:** When a layout slot element contains content, that content serves as fallback and is **completely replaced** by matching page slot content
+3. **Default slot:** `data-slot="default"` is the default insertion point. If no `data-slot="default"` exists, Unify injects the page body into the first `<main>` element.
+
+**Example with fallback content:**
+
+```html
+<!-- Layout -->
+<header>
+  <div data-slot="header">
+    <h1>Default Title</h1>
+    <p>Default subtitle</p>
+  </div>
+</header>
+
+<!-- Page -->
+<template data-slot="header">
+  <h1>🚀 Custom Title</h1>
+  <p>Custom subtitle with emoji</p>
+</template>
+
+<!-- Result: Fallback content is completely replaced -->
+<header>
+  <div>
+    <h1>🚀 Custom Title</h1>
+    <p>Custom subtitle with emoji</p>
+  </div>
+</header>
+```
 
 #### Page Providers
 

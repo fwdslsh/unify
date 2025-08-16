@@ -7,11 +7,24 @@
 </head>
 
 <body>
+  <include src="_includes/adv-nav.html">
+    <!-- Provide your own brand/link/actions by naming slots -->
+    <a data-slot="brand" href="/">Unify<span aria-hidden="true">·</span>Site</a>
 
+    <ul data-slot="links" role="list">
+      <li><a href="/docs/">Docs</a></li>
+      <li><a href="/recipes/">Recipes3</a></li>
+      <li><a href="/blog/">Blog</a></li>
+    </ul>
+
+    <div data-slot="actions">
+      <a class="u-btn" href="/start/">Unify Rocks</a>
+    </div>
+  </include>
   <div>
 
-    <template slot="header">
-      <h1>🧱 My Blog</h1>
+    <template data-slot="header">
+      <h1>My Unify Blog</h1>
       <p>Convention-based blogging with Unify</p>
     </template>
 

@@ -206,12 +206,13 @@ describe('slot system v0.5.0', () => {
     
     const html = result.content;
     
-    // Verify fallback content is preserved (with data-slot attributes remaining in layout)
+    // Verify fallback content is preserved (with data-slot attributes removed for clean output)
     expect(html).toContain('<h1>Default Title</h1>');
     expect(html).toContain('<a href="/">Home</a>');  // Look for the link content
     expect(html).toContain('<h2>Welcome</h2>');
     expect(html).toContain('<p>This is the default content.</p>');
-    expect(html).toContain('data-slot=');
+    // Verify data-slot attributes are removed even when using fallback content
+    expect(html).not.toContain('data-slot=');
   });
   
   it('should handle multiple elements assigned to same data-slot', async () => {

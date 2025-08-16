@@ -43,7 +43,8 @@ describe('data-slot fallback edge cases', () => {
     
     const result = await processHtmlUnified(pageContent, pagePath, sourceDir, dependencyTracker, {});
     expect(result.content).toContain('Fallback content');
-    expect(result.content).toContain('data-slot="default"');
+    // Verify data-slot attributes are removed even when using fallback content
+    expect(result.content).not.toContain('data-slot="default"');
   });
   
   it('should use fallback when page has only comments', async () => {
@@ -56,7 +57,8 @@ describe('data-slot fallback edge cases', () => {
     
     const result = await processHtmlUnified(pageContent, pagePath, sourceDir, dependencyTracker, {});
     expect(result.content).toContain('Fallback content');
-    expect(result.content).toContain('data-slot="default"');
+    // Verify data-slot attributes are removed even when using fallback content
+    expect(result.content).not.toContain('data-slot="default"');
   });
   
   it('should use page content when it has meaningful content', async () => {
@@ -86,6 +88,7 @@ describe('data-slot fallback edge cases', () => {
     
     const result = await processHtmlUnified(pageContent, pagePath, sourceDir, dependencyTracker, {});
     expect(result.content).toContain('Fallback content');
-    expect(result.content).toContain('data-slot="default"');
+    // Verify data-slot attributes are removed even when using fallback content
+    expect(result.content).not.toContain('data-slot="default"');
   });
 });
