@@ -6,12 +6,10 @@
 export const BUILD_INFO = {
   "version": "0.4.1",
   "buildTime": "2025-08-01T17:41:54.565Z",
-  "gitCommit": "552efdf",
-  "runtime": "bun",
-  "bunVersion": "1.2.19"
+  "gitCommit": "552efdf"
 };
 
-export const RUNTIME_FEATURES = {
+export const FEATURES = {
   htmlRewriter: true,
   fsWatch: true,
   serve: true,
@@ -19,8 +17,8 @@ export const RUNTIME_FEATURES = {
   compile: true
 };
 
-export function getRuntimeFeatures() {
-  return RUNTIME_FEATURES;
+export function getFeatures() {
+  return FEATURES;
 }
 
 export function getBuildInfo() {

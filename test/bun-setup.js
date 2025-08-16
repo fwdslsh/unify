@@ -1,20 +1,19 @@
 /**
- * Bun Test Setup for Unify CLI
- * Configures test environment and cross-runtime compatibility
+ * Test Setup for Unify CLI
+ * Configures test environment
  */
 
 import { beforeAll, beforeEach, afterEach, afterAll } from 'bun:test';
 import fs from 'fs/promises';
 import path from 'path';
 import { logger } from '../src/utils/logger.js';
-import { hasFeature, getRuntimeInfo } from '../src/utils/runtime-detector.js';
 
 // Global test configuration
 const TEST_CONFIG = {
   timeout: 10000, // 10 seconds
   tempDir: path.join(import.meta.dir, 'temp'),
   fixturesDir: path.join(import.meta.dir, 'fixtures'),
-  verbose: Bun.env.TEST_VERBOSE === 'true'
+  verbose: process.env.TEST_VERBOSE === 'true'
 };
 
 // Track created temp directories for cleanup
@@ -25,7 +24,7 @@ const createdTempFiles = new Set();
  * Global test setup
  */
 beforeAll(async () => {
-  console.log('🧪 Setting up Bun test environment...');
+  console.log('🧪 Setting up test environment...');
   
   // Configure logger for tests
   logger.setLevel(TEST_CONFIG.verbose ? 'DEBUG' : 'ERROR');
@@ -34,9 +33,8 @@ beforeAll(async () => {
   await fs.mkdir(TEST_CONFIG.tempDir, { recursive: true });
   
   // Log runtime info
-  const runtimeInfo = getRuntimeInfo();
-  console.log(`   Runtime: ${runtimeInfo.name} (${runtimeInfo.version})`);
-  console.log(`   Features: HTMLRewriter=${hasFeature('htmlRewriter')}, fs.watch=${hasFeature('fsWatch')}`);
+  console.log(`   Runtime: ${process.release?.name || 'unknown'} (${process.version})`);
+  console.log(`   Features: HTMLRewriter=true, fs.watch=true`);
   
   console.log('✅ Test environment ready');
 });
@@ -161,59 +159,6 @@ async function copyDirectory(src, dest) {
   }
 }
 
-/**
- * Assert runtime feature availability
- * @param {string} feature - Feature name
- * @param {boolean} expected - Expected availability
- */
-export function assertRuntimeFeature(feature, expected = true) {
-  const available = hasFeature(feature);
-  if (available !== expected) {
-    throw new Error(`Runtime feature "${feature}" expected to be ${expected ? 'available' : 'unavailable'} but was ${available ? 'available' : 'unavailable'}`);
-  }
-}
-
-/**
- * Skip test if runtime feature is not available
- * @param {string} feature - Feature name
- * @param {string} reason - Skip reason
- */
-export function skipIfFeatureUnavailable(feature, reason = null) {
-  if (!hasFeature(feature)) {
-    const message = reason || `Feature "${feature}" not available in current runtime`;
-    console.log(`⏭️ Skipping test: ${message}`);
-    return true;
-  }
-  return false;
-}
-
-/**
- * Run test only on specific runtime
- * @param {string} runtimeName - Runtime name ('bun' or 'node')
- * @returns {boolean} True if test should be skipped
- */
-export function runOnlyOn(runtimeName) {
-  const runtimeInfo = getRuntimeInfo();
-  if (runtimeInfo.name !== runtimeName) {
-    console.log(`⏭️ Skipping test: Only runs on ${runtimeName}, current runtime is ${runtimeInfo.name}`);
-    return true;
-  }
-  return false;
-}
-
-/**
- * Skip test on specific runtime
- * @param {string} runtimeName - Runtime name to skip
- * @returns {boolean} True if test should be skipped
- */
-export function skipOn(runtimeName) {
-  const runtimeInfo = getRuntimeInfo();
-  if (runtimeInfo.name === runtimeName) {
-    console.log(`⏭️ Skipping test: Skipped on ${runtimeName}`);
-    return true;
-  }
-  return false;
-}
 
 /**
  * Wait for a condition to be true
@@ -266,10 +211,6 @@ export default {
   createTempDir,
   createTempFile,
   copyFixture,
-  assertRuntimeFeature,
-  skipIfFeatureUnavailable,
-  runOnlyOn,
-  skipOn,
   waitFor,
   createMockFS,
   TEST_CONFIG

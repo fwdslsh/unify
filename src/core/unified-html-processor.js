@@ -17,7 +17,6 @@ import {
   LayoutError
 } from "../utils/errors.js";
 import { isPathWithinDirectory, resolveIncludePath, resolveResourcePath } from "../utils/path-resolver.js";
-import { hasFeature } from "../utils/runtime-detector.js";
 
 /**
  * Determine if processing should fail fast based on configuration
@@ -612,11 +611,8 @@ function resolveIncludePathInternal(type, includePath, currentFile, sourceRoot) 
  * @returns {string} Optimized HTML
  */
 async function optimizeHtmlContent(html) {
-  // Check if HTMLRewriter is available
-  if (!hasFeature('htmlRewriter')) {
-    logger.debug('HTMLRewriter not available, skipping HTML optimization');
-    return html;
-  }
+  // HTMLRewriter is always available
+  // Proceed with optimization
   
   const rewriter = new HTMLRewriter();
 
@@ -1772,11 +1768,8 @@ export function shouldUseUnifiedProcessing(htmlContent) {
  * @returns {Promise<string>} Optimized HTML content
  */
 export async function optimizeHtml(htmlContent) {
-  // Check if HTMLRewriter is available
-  if (!hasFeature('htmlRewriter')) {
-    logger.debug('HTMLRewriter not available, skipping HTML optimization');
-    return htmlContent;
-  }
+  // HTMLRewriter is always available
+  // Proceed with optimization
   
   const rewriter = new HTMLRewriter();
 
@@ -1832,11 +1825,8 @@ export async function extractHtmlMetadata(htmlContent) {
     openGraph: {}
   };
 
-  // Check if HTMLRewriter is available
-  if (!hasFeature('htmlRewriter')) {
-    logger.debug('HTMLRewriter not available, skipping HTML metadata extraction');
-    return metadata;
-  }
+  // HTMLRewriter is always available
+  // Proceed with metadata extraction
 
   const rewriter = new HTMLRewriter();
 

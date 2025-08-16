@@ -97,7 +97,7 @@ export async function startDevServer(sourceDir, outputDir, options = {}) {
   
   const spawnOptions = {
     stdio: ["pipe", "pipe", "pipe"],
-    env: { ...Bun.env, DEBUG: verbose ? "1" : "0" },
+    env: { ...process.env, DEBUG: verbose ? "1" : "0" },
     signal: abortController.signal,
     cwd: workingDir || process.cwd()
   };
@@ -108,9 +108,10 @@ export async function startDevServer(sourceDir, outputDir, options = {}) {
     spawnOptions.windowsHide = true;
   }
   
-  const serverProcess = Bun.spawn(
+  const { spawn } = await import('bun');
+  const serverProcess = spawn(
     [
-      Bun.env.BUN_PATH || process.execPath,
+      process.env.BUN_PATH || process.execPath,
       cliPath,
       "serve",
       "--source",
@@ -218,7 +219,8 @@ async function findAvailablePort(startPort) {
   for (let port = startPort; port < startPort + 100; port++) {
     try {
       // Try to create a temporary server on this port
-      const testServer = Bun.serve({
+      const { serve } = await import('bun');
+      const testServer = serve({
         port,
         hostname: '127.0.0.1', // Explicit localhost binding
         fetch: () => new Response("test"),
@@ -441,7 +443,8 @@ export async function waitForBuild(outputDir, timeout = 5000) {
   
   while (Date.now() - startTime < timeout) {
     try {
-      const stats = await Bun.file(indexPath).exists();
+      const { file } = await import('bun');
+      const stats = await file(indexPath).exists();
       if (stats) {
         // File exists, wait a bit more to ensure build is complete
         await new Promise(resolve => setTimeout(resolve, 500));

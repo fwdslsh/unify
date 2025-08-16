@@ -179,7 +179,7 @@ export async function build(options = {}) {
   if (config.cache !== false) {
     buildCache = createBuildCache(config.cacheDir || ".unify-cache");
     await buildCache.initialize();
-    logger.debug("Build cache initialized with Bun native hashing");
+    logger.debug("Build cache initialized with native hashing");
   }
 
   try {
@@ -465,7 +465,8 @@ export async function build(options = {}) {
     // Fourth pass: Copy additional files from glob pattern (if specified)
     if (config.copy) {
       try {
-        const glob = new Bun.Glob(config.copy);
+        const { Glob } = await import('bun');
+        const glob = new Glob(config.copy);
         const additionalFiles = [];
         // Scan from source root
         for await (const file of glob.scan(sourceRoot)) {

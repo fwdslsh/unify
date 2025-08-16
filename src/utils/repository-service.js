@@ -51,8 +51,8 @@ export class RepositoryService {
     try {
       await fs.writeFile(tempFile, tarData);
       await fs.mkdir(targetDir, { recursive: true });
-      const Bun = (await import('bun')).default;
-      const proc = Bun.spawn(['tar', '-xzf', tempFile, '-C', targetDir, '--strip-components=1'], {
+      const { spawn } = await import('bun');
+      const proc = spawn(['tar', '-xzf', tempFile, '-C', targetDir, '--strip-components=1'], {
         stderr: 'pipe',
         stdout: 'pipe'
       });

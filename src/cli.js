@@ -87,7 +87,7 @@ async function main() {
       errorOutput = 'Error: ' + error.message;
     }
     // Show stack trace in debug mode or for unexpected errors
-    if (Bun.env.DEBUG || (!error.suggestions && !error.formatForCLI)) {
+    if (process.env.DEBUG || (!error.suggestions && !error.formatForCLI)) {
       errorOutput += '\n🔍 Stack trace:\n' + error.stack;
     }
     // Always flush error output to stderr before exiting

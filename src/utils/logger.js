@@ -13,13 +13,13 @@ const LOG_LEVELS = {
 class Logger {
   constructor() {
     // Support both UNIFY_DEBUG (spec-compliant) and DEBUG (generic) environment variables
-    const debugEnabled = Bun.env.UNIFY_DEBUG || Bun.env.DEBUG;
+    const debugEnabled = process.env.UNIFY_DEBUG || process.env.DEBUG;
     
     if (debugEnabled) {
       this.level = LOG_LEVELS.DEBUG;
     } else {
-      this.level = Bun.env.LOG_LEVEL ? 
-        LOG_LEVELS[Bun.env.LOG_LEVEL.toUpperCase()] ?? LOG_LEVELS.INFO : 
+      this.level = process.env.LOG_LEVEL ? 
+        LOG_LEVELS[process.env.LOG_LEVEL.toUpperCase()] ?? LOG_LEVELS.INFO : 
         LOG_LEVELS.INFO;
     }
   }
