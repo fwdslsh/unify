@@ -39,7 +39,15 @@ const DEFAULT_CONFIG = {
  */
 export class BuildConfig {
   constructor(options = {}) {
-    this.config = { ...DEFAULT_CONFIG, ...options };
+    // Filter out null/undefined values from options to use defaults
+    const filteredOptions = {};
+    for (const [key, value] of Object.entries(options)) {
+      if (value !== null && value !== undefined) {
+        filteredOptions[key] = value;
+      }
+    }
+    
+    this.config = { ...DEFAULT_CONFIG, ...filteredOptions };
     this._compilePatterns();
   }
 

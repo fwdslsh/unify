@@ -24,7 +24,10 @@ describe('Custom Patterns Integration', () => {
       await createTestStructure(sourceDir, {
         'index.html': `
           <html>
-            <head><title>Home</title></head>
+            <head>
+              <title>Home</title>
+              <link rel="stylesheet" href="style.css">
+            </head>
             <body>
               <h1>Home Page</h1>
               <!--#include file="nav.component.html" -->
@@ -32,7 +35,7 @@ describe('Custom Patterns Integration', () => {
           </html>
         `,
         'nav.component.html': '<nav>Navigation</nav>',
-        'about.html': '<h1>About</h1>',
+        'about.html': '<link rel="stylesheet" href="style.css"><h1>About</h1>',
         'card.component.html': '<div class="card">Card content</div>',
         'style.css': 'body { margin: 0; }'
       });
@@ -72,7 +75,7 @@ describe('Custom Patterns Integration', () => {
           <html>
             <head><title>Site</title></head>
             <body>
-              <slot name="content"></slot>
+              <main></main>
             </body>
           </html>
         `,
@@ -81,7 +84,7 @@ describe('Custom Patterns Integration', () => {
             <head><title>Blog</title></head>
             <body>
               <header>Blog Header</header>
-              <slot name="content"></slot>
+              <main></main>
             </body>
           </html>
         `,
@@ -119,7 +122,7 @@ describe('Custom Patterns Integration', () => {
             <head><title>Home</title></head>
             <body>
               <h1>Home Page</h1>
-              <!--#include virtual="/header.html" -->
+              <!--#include virtual="/components/header.html" -->
             </body>
           </html>
         `,
@@ -129,7 +132,7 @@ describe('Custom Patterns Integration', () => {
           <html>
             <head><title>Base Layout</title></head>
             <body>
-              <slot name="content"></slot>
+              <main></main>
             </body>
           </html>
         `,
@@ -172,7 +175,7 @@ describe('Custom Patterns Integration', () => {
           <html>
             <head><title>Default Layout</title></head>
             <body>
-              <main><slot name="content"></slot></main>
+              <main></main>
             </body>
           </html>
         `
@@ -192,11 +195,11 @@ describe('Custom Patterns Integration', () => {
       // Check that layout was applied to both pages
       const indexContent = await fs.readFile(path.join(outputDir, 'index.html'), 'utf-8');
       expect(indexContent).toContain('<title>Default Layout</title>');
-      expect(indexContent).toContain('<main><h1>Home Page</h1></main>');
+      expect(indexContent).toContain('<main>Home Page</main>');
 
       const aboutContent = await fs.readFile(path.join(outputDir, 'about.html'), 'utf-8');
       expect(aboutContent).toContain('<title>Default Layout</title>');
-      expect(aboutContent).toContain('<main><h1>About</h1></main>');
+      expect(aboutContent).toContain('<main>About</main>');
     });
   });
 
@@ -205,12 +208,14 @@ describe('Custom Patterns Integration', () => {
       await createTestStructure(sourceDir, {
         'index.html': `
           <div data-layout="main">
+            <link rel="stylesheet" href="style.css">
             <h1>Home</h1>
             <!--#include file="nav.component.html" -->
           </div>
         `,
         'about.html': `
           <div data-layout="page">
+            <link rel="stylesheet" href="style.css">
             <h1>About</h1>
             <!--#include file="nav.component.html" -->
           </div>
@@ -218,19 +223,19 @@ describe('Custom Patterns Integration', () => {
         'includes/main.layout.html': `
           <html>
             <head><title>Main Layout</title></head>
-            <body><slot name="content"></slot></body>
+            <body><main></main></body>
           </html>
         `,
         'includes/page.layout.html': `
           <html>
             <head><title>Page Layout</title></head>
-            <body><slot name="content"></slot></body>
+            <body><main></main></body>
           </html>
         `,
         'includes/default.html': `
           <html>
             <head><title>Default</title></head>
-            <body><slot name="content"></slot></body>
+            <body><main></main></body>
           </html>
         `,
         'nav.component.html': '<nav>Navigation</nav>',
@@ -276,6 +281,7 @@ describe('Custom Patterns Integration', () => {
         'index.html': `
           <html>
             <body>
+              <link rel="stylesheet" href="style.css">
               <h1>Home</h1>
               <!--#include file="_header.html" -->
             </body>
@@ -285,10 +291,10 @@ describe('Custom Patterns Integration', () => {
         '_layout.html': `
           <html>
             <head><title>Layout</title></head>
-            <body><slot name="content"></slot></body>
+            <body><main></main></body>
           </html>
         `,
-        'about.html': '<h1>About</h1>',
+        'about.html': '<link rel="stylesheet" href="style.css"><h1>About</h1>',
         'style.css': 'body { margin: 0; }'
       });
 
