@@ -176,6 +176,10 @@ export async function processHtmlUnified(
     ...config,
   };
 
+  // Create configured LayoutDiscovery instance
+  const { LayoutDiscovery } = await import('./layout-discovery.js');
+  const layoutDiscovery = new LayoutDiscovery(processingConfig);
+
   try {
     logger.debug(
       `Using HTMLRewriter for: ${path.relative(sourceRoot, filePath)}`
@@ -231,7 +235,8 @@ export async function processHtmlUnified(
         filePath,
         sourceRoot,
         processingConfig,
-        extractedAssets  // Pass extracted assets to DOM templating
+        extractedAssets,  // Pass extracted assets to DOM templating
+        layoutDiscovery   // Pass configured layout discovery
       );
     } else if (extractedAssets && (extractedAssets.styles?.length > 0 || extractedAssets.scripts?.length > 0)) {
       // Apply extracted assets to complete HTML documents even without layouts/templating
@@ -854,7 +859,7 @@ async function processDOMMode(pageContent, pagePath, sourceRoot, config = {}, ex
   // Fall back to layout discovery
   let layoutPath;
   try {
-    layoutPath = await detectLayoutFromHTML(pageContent, sourceRoot, domConfig, pagePath);
+    layoutPath = await detectLayoutFromHTML(pageContent, sourceRoot, domConfig, pagePath, layoutDiscovery);
     logger.debug(`Using discovered layout: ${layoutPath}`);
     
     // Use processLayoutAttribute for consistent processing
@@ -955,7 +960,13 @@ function validateDataLayoutAttributes(htmlContent, isFullDocument) {
 /**
  * Detect which layout to use for a page using regex-based HTML parsing
  */
-async function detectLayoutFromHTML(htmlContent, sourceRoot, config, pagePath) {
+async function detectLayoutFromHTML(htmlContent, sourceRoot, config, pagePath, layoutDiscovery = null) {
+  // Create layoutDiscovery if not provided
+  if (!layoutDiscovery) {
+    const { LayoutDiscovery } = await import('./layout-discovery.js');
+    layoutDiscovery = new LayoutDiscovery(config);
+  }
+  
   const htmlStructure = analyzeHtmlStructure(htmlContent);
   
   // For full HTML documents, check link rel=layout first (highest priority)
@@ -964,10 +975,7 @@ async function detectLayoutFromHTML(htmlContent, sourceRoot, config, pagePath) {
     if (linkLayoutHref) {
       logger.debug(`Found link rel=layout: ${linkLayoutHref}`);
       
-      const { LayoutDiscovery } = await import('./layout-discovery.js');
-      const discovery = new LayoutDiscovery();
-      
-      const resolvedLayoutPath = await discovery.resolveLayoutOverride(linkLayoutHref, sourceRoot, pagePath);
+      const resolvedLayoutPath = await layoutDiscovery.resolveLayoutOverride(linkLayoutHref, sourceRoot, pagePath);
       if (resolvedLayoutPath) {
         return resolvedLayoutPath;
       }
@@ -986,11 +994,7 @@ async function detectLayoutFromHTML(htmlContent, sourceRoot, config, pagePath) {
   if (layoutMatch) {
     const layoutAttr = layoutMatch[1];
     
-    // Use LayoutDiscovery system for both full paths and short names
-    const { LayoutDiscovery } = await import('./layout-discovery.js');
-    const discovery = new LayoutDiscovery();
-    
-    const resolvedLayoutPath = await discovery.resolveLayoutOverride(layoutAttr, sourceRoot, pagePath);
+    const resolvedLayoutPath = await layoutDiscovery.resolveLayoutOverride(layoutAttr, sourceRoot, pagePath);
     if (resolvedLayoutPath) {
       return resolvedLayoutPath;
     }
@@ -1004,9 +1008,7 @@ async function detectLayoutFromHTML(htmlContent, sourceRoot, config, pagePath) {
   }
   
   // Fall back to discovered layout using LayoutDiscovery
-  const { LayoutDiscovery } = await import('./layout-discovery.js');
-  const discovery = new LayoutDiscovery();
-  return await discovery.findLayoutForPage(pagePath, sourceRoot);
+  return await layoutDiscovery.findLayoutForPage(pagePath, sourceRoot);
 }
 
 /**
@@ -1450,8 +1452,14 @@ function escapeRegex(str) {
  * @param {Object} config - Processing configuration
  * @returns {Promise<string>} Processed HTML with templates applied
  */
-async function processDOMTemplating(htmlContent, filePath, sourceRoot, config, extractedAssets = { styles: [], scripts: [] }) {
+async function processDOMTemplating(htmlContent, filePath, sourceRoot, config, extractedAssets = { styles: [], scripts: [] }, layoutDiscovery = null) {
   try {
+    // Create layoutDiscovery if not provided
+    if (!layoutDiscovery) {
+      const { LayoutDiscovery } = await import('./layout-discovery.js');
+      layoutDiscovery = new LayoutDiscovery(config);
+    }
+    
     // Analyze HTML structure
     const htmlStructure = analyzeHtmlStructure(htmlContent);
     
@@ -1492,10 +1500,7 @@ async function processDOMTemplating(htmlContent, filePath, sourceRoot, config, e
 
     // Check if this is a fragment (no html tag), use layout discovery to find appropriate layout
     if (!htmlStructure.isFullDocument) {
-      // Use the layout discovery system to find the best layout for this page
-      const { LayoutDiscovery } = await import('./layout-discovery.js');
-      const discovery = new LayoutDiscovery();
-      const discoveredLayoutPath = await discovery.findLayoutForPage(filePath, sourceRoot);
+      const discoveredLayoutPath = await layoutDiscovery.findLayoutForPage(filePath, sourceRoot);
       
       if (discoveredLayoutPath) {
         try {
@@ -1714,13 +1719,16 @@ async function processLayoutAttribute(
   filePath,
   sourceRoot,
   config,
-  extractedAssets = { styles: [], scripts: [] }
+  extractedAssets = { styles: [], scripts: [] },
+  layoutDiscovery = null
 ) {
   // Use LayoutDiscovery system for both full paths and short names
-  const { LayoutDiscovery } = await import('./layout-discovery.js');
-  const discovery = new LayoutDiscovery();
+  if (!layoutDiscovery) {
+    const { LayoutDiscovery } = await import('./layout-discovery.js');
+    layoutDiscovery = new LayoutDiscovery(config);
+  }
   
-  const resolvedLayoutPath = await discovery.resolveLayoutOverride(layoutPath, sourceRoot, filePath);
+  const resolvedLayoutPath = await layoutDiscovery.resolveLayoutOverride(layoutPath, sourceRoot, filePath);
   if (!resolvedLayoutPath) {
     throw new LayoutError(
       filePath,

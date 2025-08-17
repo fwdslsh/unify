@@ -6,15 +6,39 @@
  * @param {boolean} prettyUrls - Whether to use pretty URLs
  * @returns {string} Output file path
  */
-export function getOutputPathWithPrettyUrls(sourcePath, sourceRoot, outputRoot, prettyUrls = false) {
+export function getOutputPathWithPrettyUrls(sourcePath, sourceRoot, outputRoot, prettyUrls = false, config = {}) {
   const relativePath = path.relative(sourceRoot, sourcePath);
   const ext = path.extname(sourcePath).toLowerCase();
-  // Only apply pretty URLs to HTML/Markdown files not starting with '_'
+  // Only apply pretty URLs to HTML/Markdown files not matching exclude pattern
   const fileName = path.basename(sourcePath);
-  const isPage = !fileName.startsWith('_') && (ext === '.html' || ext === '.htm' || ext === '.md');
+  const excludePattern = config.excludePattern || '_.*';
+  let excludeRegex;
+  if (excludePattern === "_.*") {
+    excludeRegex = /^_/;
+  } else if (excludePattern.endsWith('.*')) {
+    // For patterns ending with .*, treat as prefix patterns
+    const prefix = excludePattern.slice(0, -2); // Remove the .*
+    excludeRegex = new RegExp('^' + prefix.replace(/[.+?^${}()|[\]\\]/g, '\\$&'));
+  } else {
+    excludeRegex = new RegExp('^' + excludePattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$');
+  }
+  const isPage = !excludeRegex.test(fileName) && (ext === '.html' || ext === '.htm' || ext === '.md');
   if (prettyUrls && isPage) {
-    // Remove extension and create subdirectory with index.html
-    const withoutExt = relativePath.replace(/\.[^.]+$/, '');
+    // Special case: any index.html files stay as index.html
+    if (path.basename(relativePath, path.extname(relativePath)) === 'index') {
+      return path.resolve(outputRoot, relativePath);
+    }
+    // Remove all extensions for pretty URLs
+    // file.md.html -> file, guide.html -> guide
+    let withoutExt = relativePath;
+    while (path.extname(withoutExt)) {
+      withoutExt = path.basename(withoutExt, path.extname(withoutExt));
+    }
+    // Add back the directory structure
+    const dir = path.dirname(relativePath);
+    if (dir !== '.') {
+      withoutExt = path.join(dir, withoutExt);
+    }
     return path.resolve(outputRoot, withoutExt, 'index.html');
   }
   // Standard output: preserve relative path
@@ -109,17 +133,31 @@ export function isPartialFile(filePath, config = '.components') {
   const fileName = path.basename(filePath);
   
   // Handle both string and object config for backward compatibility
-  let componentsDir, layoutsDir;
+  let componentsDir, layoutsDir, excludePattern;
   if (typeof config === 'string') {
     componentsDir = config;
     layoutsDir = '.layouts'; // default
+    excludePattern = '_.*'; // default
   } else {
     componentsDir = config.components || '.components';
     layoutsDir = config.layouts || '.layouts';
+    excludePattern = config.excludePattern || '_.*';
   }
   
-  // Check if filename starts with underscore (traditional partial marker)
-  if (fileName.startsWith('_')) {
+  // Create regex from exclude pattern
+  let excludeRegex;
+  if (excludePattern === "_.*") {
+    excludeRegex = /^_/;
+  } else if (excludePattern.endsWith('.*')) {
+    // For patterns ending with .*, treat as prefix patterns
+    const prefix = excludePattern.slice(0, -2); // Remove the .*
+    excludeRegex = new RegExp('^' + prefix.replace(/[.+?^${}()|[\]\\]/g, '\\$&'));
+  } else {
+    excludeRegex = new RegExp('^' + excludePattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$');
+  }
+  
+  // Check if filename matches exclude pattern (traditional partial marker)
+  if (excludeRegex.test(fileName)) {
     return true;
   }
   

@@ -4,12 +4,16 @@ import { logger } from '../utils/logger.js';
 
 /**
  * Layout discovery system for convention-based architecture
- * Finds layouts using folder-scoped _layout.html files and fallback default layout
+ * Finds layouts using folder-scoped layout files and fallback default layout
  */
 export class LayoutDiscovery {
+  constructor(config = {}) {
+    this.defaultLayout = config.defaultLayout || "layout";
+  }
+  
   /**
    * Find layout file in a specific directory using naming convention
-   * Only looks for _layout.html or _layout.htm files for automatic discovery
+   * Only looks for configured layout files for automatic discovery
    * @param {string} directory - Directory path to search in
    * @param {string} sourceRoot - Source root for logging
    * @returns {Promise<string|null>} Path to layout file or null
@@ -18,8 +22,8 @@ export class LayoutDiscovery {
     try {
       const files = await fs.readdir(directory);
       
-      // Look for _layout.html or _layout.htm only
-      const layoutFiles = ['_layout.html', '_layout.htm'];
+      // Look for _defaultLayout.html or _defaultLayout.htm
+      const layoutFiles = [`_${this.defaultLayout}.html`, `_${this.defaultLayout}.htm`];
       
       for (const file of layoutFiles) {
         const layoutPath = path.join(directory, file);
@@ -39,12 +43,12 @@ export class LayoutDiscovery {
 
   /**
    * Check if a filename matches the auto-discovery layout naming convention
-   * Only _layout.html or _layout.htm are auto-discovered
+   * Only configured layout files are auto-discovered
    * @param {string} fileName - Name of the file to check
    * @returns {boolean} True if matches auto-discovery pattern
    */
   isLayoutFileName(fileName) {
-    return fileName === '_layout.html' || fileName === '_layout.htm';
+    return fileName === `_${this.defaultLayout}.html` || fileName === `_${this.defaultLayout}.htm`;
   }
 
   /**
@@ -60,7 +64,7 @@ export class LayoutDiscovery {
     let currentDir = path.dirname(pagePath);
     
     while (currentDir && currentDir !== path.dirname(sourceRoot)) {
-      // Look for _layout.html or _layout.htm only for auto-discovery
+      // Look for configured layout files for auto-discovery
       const layoutFile = await this.findLayoutInDirectory(currentDir, sourceRoot);
       if (layoutFile) {
         logger.debug(`Found layout: ${path.relative(sourceRoot, layoutFile)}`);
@@ -99,7 +103,7 @@ export class LayoutDiscovery {
     
     // Collect all layout files from page directory up to source root
     while (currentDir && currentDir !== path.dirname(sourceRoot)) {
-      // Look for _layout.html or _layout.htm only for auto-discovery
+      // Look for configured layout files for auto-discovery
       const layoutFile = await this.findLayoutInDirectory(currentDir, sourceRoot);
       if (layoutFile) {
         layouts.push(layoutFile);

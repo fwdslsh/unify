@@ -5,6 +5,32 @@ import path from 'path';
  * Determines file types based on naming conventions and location
  */
 export class FileClassifier {
+  constructor(config = {}) {
+    this.excludePattern = config.excludePattern || "_.*";
+    this.defaultLayout = config.defaultLayout || "layout";
+    // Convert glob pattern to regex for matching
+    // For patterns like "_.*", we want to match files starting with "_"
+    if (this.excludePattern === "_.*") {
+      this.excludeRegex = /^_/;
+    } else if (this.excludePattern.endsWith('.*')) {
+      // For patterns ending with .*, treat as prefix patterns
+      const prefix = this.excludePattern.slice(0, -2); // Remove the .*
+      this.excludeRegex = new RegExp('^' + prefix.replace(/[.+?^${}()|[\]\\]/g, '\\$&'));
+    } else {
+      // For other patterns, escape special regex characters, then replace glob * with .*
+      this.excludeRegex = new RegExp('^' + this.excludePattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$');
+    }
+  }
+
+  /**
+   * Check if a filename or path part matches the exclude pattern
+   * @param {string} name - File or directory name to check
+   * @returns {boolean} True if matches exclude pattern
+   */
+  matchesExcludePattern(name) {
+    return this.excludeRegex.test(name);
+  }
+
   /**
    * Determine if a file is a page (should be emitted to output)
    * @param {string} filePath - Absolute path to the file
@@ -21,20 +47,20 @@ export class FileClassifier {
       return false;
     }
     
-    // Files starting with underscore are partials, not pages
-    if (fileName.startsWith('_')) {
+    // Files matching exclude pattern are partials, not pages
+    if (this.matchesExcludePattern(fileName)) {
       return false;
     }
     
-    // Files in _includes or other underscore directories are not pages
+    // Files in directories matching exclude pattern are not pages
     const pathParts = relativePath.split(path.sep);
     for (const part of pathParts) {
-      if (part.startsWith('_')) {
+      if (this.matchesExcludePattern(part)) {
         return false;
       }
     }
     
-    // PATCH: Always treat markdown files as pages unless in underscore-prefixed dir
+    // PATCH: Always treat markdown files as pages unless in excluded dir
     if (extension === '.md') {
       return true;
     }
@@ -57,8 +83,8 @@ export class FileClassifier {
       return false;
     }
     
-    // Files starting with underscore are partials
-    if (fileName.startsWith('_')) {
+    // Files matching exclude pattern are partials
+    if (this.matchesExcludePattern(fileName)) {
       return true;
     }
     
@@ -66,8 +92,8 @@ export class FileClassifier {
     const relativePath = path.relative(sourceRoot, filePath);
     const pathParts = relativePath.split(path.sep);
     
-    // Files in underscore-prefixed directories are partials
-    if (pathParts.some(part => part.startsWith('_'))) {
+    // Files in directories matching exclude pattern are partials
+    if (pathParts.some(part => this.matchesExcludePattern(part))) {
       return true;
     }
     
@@ -123,18 +149,18 @@ export class FileClassifier {
    * @returns {boolean} True if matches layout pattern
    */
   isLayoutFileName(fileName) {
-    // Must start with underscore
+    // Check if matches the configured default layout pattern
+    if (fileName === `_${this.defaultLayout}.html` || fileName === `_${this.defaultLayout}.htm`) {
+      return true;
+    }
+    
+    // Must start with underscore for traditional layout patterns
     if (!fileName.startsWith('_')) {
       return false;
     }
     
     // Must end with layout.html or layout.htm
     if (fileName.endsWith('layout.html') || fileName.endsWith('layout.htm')) {
-      return true;
-    }
-    
-    // Also support the basic _layout.html and _layout.htm patterns
-    if (fileName === '_layout.html' || fileName === '_layout.htm') {
       return true;
     }
     
@@ -161,16 +187,16 @@ export class FileClassifier {
       return false;
     }
     
-    // For other files (assets), check underscore convention
-    // Files starting with underscore are non-emitting unless explicitly referenced
-    if (fileName.startsWith('_')) {
+    // For other files (assets), check exclude pattern
+    // Files matching exclude pattern are non-emitting unless explicitly referenced
+    if (this.matchesExcludePattern(fileName)) {
       return false; // Will be copied only if referenced
     }
     
-    // Files in underscore directories are non-emitting unless explicitly referenced
+    // Files in directories matching exclude pattern are non-emitting unless explicitly referenced
     const relativePath = path.relative(sourceRoot, filePath);
     const pathParts = relativePath.split(path.sep);
-    if (pathParts.some(part => part.startsWith('_'))) {
+    if (pathParts.some(part => this.matchesExcludePattern(part))) {
       return false; // Will be copied only if referenced
     }
     
@@ -201,15 +227,12 @@ export class FileClassifier {
   }
   
   /**
-   * Check if a directory is non-emitting (underscore convention)
+   * Check if a directory is non-emitting (matches exclude pattern)
    * @param {string} dirPath - Directory path relative to source
    * @returns {boolean} True if directory should not be emitted
    */
   isNonEmittingDirectory(dirPath) {
     const pathParts = dirPath.split(path.sep);
-    return pathParts.some(part => part.startsWith('_'));
+    return pathParts.some(part => this.matchesExcludePattern(part));
   }
 }
-
-// Export singleton instance
-export const fileClassifier = new FileClassifier();
