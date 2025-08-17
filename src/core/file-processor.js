@@ -35,6 +35,7 @@ import {
   getUnifiedConfig,
 } from "./unified-html-processor.js";
 import { createBuildCache } from "./build-cache.js";
+import { createBuildConfig } from "./build-config.js";
 import { FileSystemError, BuildError, UnifyError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
 import { getBaseUrlFromPackage } from "../utils/package-reader.js";
@@ -167,9 +168,13 @@ const DEFAULT_OPTIONS = {
  * });
  */
 export async function build(options = {}) {
-  const config = { ...DEFAULT_OPTIONS, ...options };
+  // Create build configuration with pattern support
+  const buildConfig = createBuildConfig(options);
+  const config = buildConfig.getConfig();
+  
   // Propagate build config globally for asset copying and output logic
   globalThis.UNIFY_BUILD_CONFIG = config;
+  globalThis.UNIFY_PATTERNS_CONFIG = buildConfig;
   const startTime = Date.now();
 
   logger.info(`Building site from ${config.source} to ${config.output}`);
@@ -218,8 +223,8 @@ export async function build(options = {}) {
     // Initialize dependency and asset trackers
     const dependencyTracker = new DependencyTracker();
     const assetTracker = new AssetTracker();
-    const fileClassifier = new FileClassifier();
-    const layoutDiscovery = new LayoutDiscovery();
+    const fileClassifier = new FileClassifier(buildConfig);
+    const layoutDiscovery = new LayoutDiscovery(buildConfig);
 
     // Scan source directory
     const sourceFiles = await scanDirectory(sourceRoot);
@@ -240,14 +245,14 @@ export async function build(options = {}) {
       return true;
     });
 
-    // Exclude directories like _includes and _layouts
-    const excludedDirs = ["_includes", "_layouts"];
+    // Exclude configured non-emitting directories
+    const excludedDirs = buildConfig.getNonEmittingDirectories();
     contentFiles = contentFiles.filter((file) => {
       return !excludedDirs.some((dir) =>
         file.startsWith(path.join(sourceRoot, dir))
       );
     });
-    // Always include markdown files (not in underscore-prefixed dirs) as pages for pretty URLs
+    // Always include markdown files (not in non-emitting dirs) as pages for pretty URLs
     if (config.prettyUrls) {
       const markdownFiles = sourceFiles.filter((file) => {
         const ext = path.extname(file).toLowerCase();
@@ -255,7 +260,7 @@ export async function build(options = {}) {
 
         return (
           ext === ".md" &&
-          !relativePath.split(path.sep).some((part) => part.startsWith("_"))
+          !buildConfig.isNonEmittingDirectory(relativePath)
         );
       });
       for (const mdFile of markdownFiles) {
@@ -266,11 +271,10 @@ export async function build(options = {}) {
     }
     const assetFiles = sourceFiles.filter((file) => {
       const fileType = fileClassifier.getFileType(file, sourceRoot);
-      // Exclude files in components or layouts directories
+      // Exclude files in non-emitting directories
       const relativePath = path.relative(sourceRoot, file);
-      const pathParts = relativePath.split(path.sep);
-      // Files in _includes and _* directories are non-emitting by convention
-      if (pathParts.some(part => part.startsWith('_'))) {
+      // Files in configured non-emitting directories are non-emitting by convention
+      if (buildConfig.isNonEmittingDirectory(relativePath)) {
         return false;
       }
       return (

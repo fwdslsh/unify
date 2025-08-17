@@ -144,6 +144,13 @@ Options:
   --help, -h        Show this help message
   --version, -v     Show version number
 
+File Pattern Options:
+  --includes-dir        Directory for includes (default: _includes)
+  --layouts-dir         Directory for layouts (default: auto-discovery)
+  --component-pattern   Pattern for non-emitting files (default: _*)
+  --layout-pattern      Pattern for layout files (default: *layout.html|*layout.htm)
+  --layout-filename     Default layout filename (default: layout.html)
+
 Examples:
   unify                                   # Build with defaults (src → dist)
   unify build                             # Explicit build command
@@ -155,9 +162,19 @@ Examples:
   unify init                              # Initialize with default starter
   unify init basic                        # Initialize with basic starter template
 
+Custom Pattern Examples:
+  unify build --component-pattern "*.component.*"          # Use .component. suffix
+  unify build --layout-pattern "*.layout.*"               # Use .layout. suffix  
+  unify build --includes-dir "components"                  # Use components/ directory
+  unify build --layout-filename "base.html"               # Use base.html as default layout
+  unify build --component-pattern "*.component.*" \\
+              --layout-pattern "*.layout.*" \\
+              --includes-dir "components"                   # Combined custom patterns
+
 Notes:
   • src/assets is automatically copied to dist/assets (if exists)
   • Files/folders starting with _ are not copied to output (use for layouts/partials)
+  • Custom patterns override the default underscore convention
 `);
 }
 

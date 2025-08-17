@@ -76,6 +76,12 @@ export function parseArgs(argv) {
     copy: null,
     layouts: null,
     template: null, // For init command - which starter template to use
+    // New pattern configuration options
+    includesDir: null, // Default handled by BuildConfig
+    layoutsDir: null, // Default handled by BuildConfig
+    componentPattern: null, // Default handled by BuildConfig
+    layoutPattern: null, // Default handled by BuildConfig
+    layoutFilename: null, // Default handled by BuildConfig
   };
 
   // Only the first non-option argument is considered a command
@@ -274,13 +280,42 @@ export function parseArgs(argv) {
       continue;
     }
 
+    // New pattern configuration options
+    if (arg === '--includes-dir' && nextArg && !nextArg.startsWith('-')) {
+      args.includesDir = nextArg;
+      i += 2;
+      continue;
+    }
+    if (arg === '--layouts-dir' && nextArg && !nextArg.startsWith('-')) {
+      args.layoutsDir = nextArg;
+      i += 2;
+      continue;
+    }
+    if (arg === '--component-pattern' && nextArg && !nextArg.startsWith('-')) {
+      args.componentPattern = nextArg;
+      i += 2;
+      continue;
+    }
+    if (arg === '--layout-pattern' && nextArg && !nextArg.startsWith('-')) {
+      args.layoutPattern = nextArg;
+      i += 2;
+      continue;
+    }
+    if (arg === '--layout-filename' && nextArg && !nextArg.startsWith('-')) {
+      args.layoutFilename = nextArg;
+      i += 2;
+      continue;
+    }
+
     // Unknown arguments
     if (arg.startsWith('-')) {
       const validOptions = [
         '--help', '-h', '--version', '-v', '--source', '-s', '--output', '-o',
         '--copy', '--port', '-p', '--host', '--layouts', '-l', '--templates',
         '--pretty-urls', '--base-url', '--clean', '--no-sitemap', 
-        '--fail-on', '--minify', '--verbose', '-u', '-m', '-V'
+        '--fail-on', '--minify', '--verbose', '-u', '-m', '-V',
+        '--includes-dir', '--layouts-dir', '--component-pattern',
+        '--layout-pattern', '--layout-filename'
       ];
       const suggestion = findClosestCommand(arg, validOptions);
       const suggestions = [];
