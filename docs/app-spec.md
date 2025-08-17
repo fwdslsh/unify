@@ -155,7 +155,13 @@ unify watch [options]
 - **Purpose:** Generate pretty URLs (about.{html,md} -> about/index.html)
 - **Default:** `false`
 - **Used by:** All commands
-- **Effect:** Creates directory structure for clean URLs
+- **Effect:** Creates directory structure for clean URLs and normalizes internal links
+- **Link Normalization:** When enabled, transforms HTML links to match the pretty URL structure:
+  - `./about.html` → `/about/`
+  - `/blog.html` → `/blog/`
+  - `../index.html` → `/`
+  - Preserves query parameters and fragments: `./contact.html?form=1#section` → `/contact/?form=1#section`
+  - External links, non-HTML links, and fragments are unchanged
 
 **`--base-url <url>`**
 
@@ -342,6 +348,56 @@ When processing full HTML documents with layouts:
 ### Markdown Files (`.md`)
 
 - Processed with frontmatter extraction and Markdown→HTML conversion
+
+### Link Normalization (Pretty URLs)
+
+When the `--pretty-urls` option is enabled, Unify automatically normalizes HTML links during the build process to match the generated directory structure.
+
+#### Link Transformation Rules
+
+**HTML Page Links**: Links pointing to `.html` or `.htm` files are transformed to pretty URLs:
+
+- `./about.html` → `/about/`
+- `/blog.html` → `/blog/`
+- `../index.html` → `/` (index.html becomes root)
+- `docs/guide.html` → `/docs/guide/`
+
+**Query Parameters and Fragments**: Preserved during transformation:
+
+- `./contact.html?form=1` → `/contact/?form=1`
+- `/blog.html#latest` → `/blog/#latest`
+- `./about.html?tab=info#section` → `/about/?tab=info#section`
+
+**Preserved Links**: The following links are NOT transformed:
+
+- External URLs: `https://example.com`
+- Email links: `mailto:test@example.com`
+- Protocol links: `tel:+1234567890`, `ftp://example.com`
+- Non-HTML files: `/assets/document.pdf`, `/styles.css`, `/script.js`
+- Fragment-only links: `#section`, `#top`
+- Data URLs: `data:image/png;base64,...`
+
+#### Link Resolution Algorithm
+
+1. **Parse href attribute** to extract path, query, and fragment components
+2. **Check if transformation applies**:
+   - Must be a relative or absolute path (not external URL)
+   - Must end with `.html` or `.htm` extension
+   - Must not be a fragment-only link
+3. **Resolve path to source file**:
+   - Relative paths resolved against current page location
+   - Absolute paths resolved against source root
+4. **Transform to pretty URL**:
+   - Remove `.html`/`.htm` extension
+   - For `index.html`: Use parent directory path or `/` for root
+   - For other files: Use filename as directory with trailing `/`
+5. **Reconstruct href** with query parameters and fragments preserved
+
+#### Design-Time vs Build-Time Behavior
+
+- **Design-Time**: Links point to actual `.html` files for easy preview and development
+- **Build-Time**: Links are normalized to pretty URLs for SEO-friendly production URLs
+- **Development Server**: Handles both `.html` and pretty URL requests for seamless development experience
 - Support YAML frontmatter with head synthesis for metadata
 - Layout discovery or override applies
 - Head content synthesized from frontmatter (no `<head>` allowed in body)

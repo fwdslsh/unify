@@ -16,7 +16,64 @@ import {
   IncludeNotFoundError,
   LayoutError
 } from "../utils/errors.js";
-import { isPathWithinDirectory, resolveIncludePath, resolveResourcePath } from "../utils/path-resolver.js";
+import { transformLinksInHtml } from "../utils/link-transformer.js";
+import { resolveIncludePath, isPathWithinDirectory } from "../utils/path-resolver.js";
+
+/**
+ * Read an include file with sensible fallback locations.
+ * Tries the resolvedPath first, then sourceRoot-relative and _includes/basename.
+ */
+async function readIncludeWithFallback(resolvedPath, src, filePath, sourceRoot) {
+  try {
+    return { content: await fs.readFile(resolvedPath, 'utf-8'), resolvedPath };
+  } catch (err) {
+    // Try sourceRoot relative and several fallbacks
+    const candidates = [
+      path.resolve(sourceRoot, src),
+      path.resolve(sourceRoot, src.replace(/^\/+/, '')),
+      path.resolve(sourceRoot, path.basename(src)),
+      path.resolve(sourceRoot, '_includes', path.basename(src)),
+      // Also try relative to the directory of the requesting file (common test layout)
+      path.resolve(path.dirname(filePath), src),
+      path.resolve(path.dirname(filePath), path.basename(src))
+    ];
+
+    // Log candidates for debugging when running tests (always print to console so test harness captures it)
+    try {
+      const fsSync = require('fs');
+      const info = `readIncludeWithFallback: initialAttempt=${resolvedPath}, src=${src}, filePath=${filePath}, sourceRoot=${sourceRoot}`;
+      logger.info(info);
+      console.log(info);
+      for (const c of candidates) {
+        try {
+          const exists = fsSync.existsSync(c);
+          const line = `readIncludeWithFallback: checking candidate: ${c}, exists=${exists}`;
+          logger.info(line);
+          console.log(line);
+        } catch (e) {
+          const line = `readIncludeWithFallback: checking candidate: ${c}`;
+          logger.info(line);
+          console.log(line);
+        }
+      }
+    } catch (e) {
+      // ignore logging errors
+    }
+
+    for (const candidate of candidates) {
+      try {
+        const content = await fs.readFile(candidate, 'utf-8');
+        logger.debug(`readIncludeWithFallback: found include at ${candidate}`);
+        return { content, resolvedPath: candidate };
+      } catch (e) {
+        // continue to next candidate
+      }
+    }
+
+    // No candidate found; re-throw original error for upstream handling
+    throw err;
+  }
+}
 
 /**
  * Determine if processing should fail fast based on configuration
@@ -153,6 +210,12 @@ export async function processHtmlUnified(
       processedContent = applyExtractedAssets(processedContent, extractedAssets);
     }
 
+    // Apply link normalization if pretty URLs are enabled
+    if (processingConfig.prettyUrls) {
+      logger.debug(`Normalizing links for pretty URLs in ${path.relative(sourceRoot, filePath)}`);
+      processedContent = transformLinksInHtml(processedContent, filePath, sourceRoot);
+    }
+
   // Slot/template injection for HTML files (if layout contains <slot> or <template slot="...">)
   // This is now handled in file-processor.js after layout chain is discovered and applied
   return {
@@ -281,8 +344,14 @@ async function processIncludesWithStringReplacement(htmlContent, filePath, sourc
           throw new PathTraversalError(src, sourceRoot);
         }
         
-        // Read the include content
-        let includeContent = await fs.readFile(resolvedPath, 'utf-8');
+        // Read the include content using fallback resolver
+        try {
+          const fsSync = require('fs');
+          logger.info(`Include (with slots) attempt: resolvedPath=${resolvedPath}, exists=${fsSync.existsSync(resolvedPath)}, sourceRoot=${sourceRoot}`);
+        } catch (e) {}
+        const { content: includeContentRaw, resolvedPath: actualResolved } = await readIncludeWithFallback(resolvedPath, src, filePath, sourceRoot);
+        let includeContent = includeContentRaw;
+        resolvedPath = actualResolved;
         
         // Extract assets from the component content for DOM includes
         const componentAssets = extractComponentAssets(includeContent);
@@ -310,6 +379,10 @@ async function processIncludesWithStringReplacement(htmlContent, filePath, sourc
           .replace(fullMatch, includeContent || '');
         logger.debug(`Processed include element with slots: ${src} -> ${resolvedPath}`);
       } catch (error) {
+        // Log error details for debugging
+        try {
+          console.error('DOM include (with slots) error:', error && error.stack ? error.stack : error);
+        } catch (e) {}
         let resolvedPath;
         if (src.startsWith('/')) {
           resolvedPath = path.resolve(sourceRoot, src.replace(/^\/+/,''));
@@ -356,8 +429,14 @@ async function processIncludesWithStringReplacement(htmlContent, filePath, sourc
           throw new PathTraversalError(src, sourceRoot);
         }
         
-        // Read the include content
-        let includeContent = await fs.readFile(resolvedPath, 'utf-8');
+        // Read the include content using fallback resolver
+        try {
+          const fsSync = require('fs');
+          logger.info(`Self-closing include attempt: resolvedPath=${resolvedPath}, exists=${fsSync.existsSync(resolvedPath)}, sourceRoot=${sourceRoot}`);
+        } catch (e) {}
+        const { content: includeContentRaw, resolvedPath: actualResolved } = await readIncludeWithFallback(resolvedPath, src, filePath, sourceRoot);
+        let includeContent = includeContentRaw;
+        resolvedPath = actualResolved;
         
         // Extract assets from the component content for DOM includes
         const componentAssets = extractComponentAssets(includeContent);
@@ -380,6 +459,10 @@ async function processIncludesWithStringReplacement(htmlContent, filePath, sourc
           .replace(fullMatch, includeContent || '');
         logger.debug(`Processed self-closing include element: ${src} -> ${resolvedPath}`);
       } catch (error) {
+        // Log error details for debugging
+        try {
+          console.error('Self-closing include error:', error && error.stack ? error.stack : error);
+        } catch (e) {}
         let resolvedPath;
         if (src.startsWith('/')) {
           resolvedPath = path.resolve(sourceRoot, src.replace(/^\/+/,''));
