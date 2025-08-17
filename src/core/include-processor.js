@@ -13,6 +13,7 @@ import {
   MaxDepthExceededError
 } from '../utils/errors.js';
 import { logger } from '../utils/logger.js';
+import { processMarkdown, isMarkdownFile } from './markdown-processor.js';
 
 // Regex to match include directives
 const INCLUDE_DIRECTIVE_REGEX = /<!--#include\s+(virtual|file)="([^"]+)"\s*-->/gi;
@@ -104,6 +105,19 @@ export async function processIncludes(
         const fsErr = new FileSystemError('read', resolvedPath, error);
         if (failFast) throw fsErr;
         throw fsErr;
+      }
+
+      // Process markdown files if detected
+      if (isMarkdownFile(resolvedPath)) {
+        try {
+          const markdownResult = processMarkdown(includeContent, resolvedPath);
+          includeContent = markdownResult.html;
+          logger.debug(`Processed markdown include: ${includePath} -> ${resolvedPath}`);
+        } catch (error) {
+          logger.error(`Failed to process markdown include ${includePath}: ${error.message}`);
+          if (failFast) throw error;
+          throw error;
+        }
       }
 
       // Track dependencies for this include file if tracker is provided

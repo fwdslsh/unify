@@ -516,12 +516,16 @@ When combining layout `<head>` + page `<head>` (or synthesized head):
 
 ```html
 <include src="/_includes/header.html"></include>
+<include src="menu.md"></include>
+<include src="/components/toc.md" />
 ```
 
 Resolution:
 
 1. Leading `/` → from `src/` root.
 2. Else → relative to including file.
+
+**Markdown Support**: When the included file has a `.md` extension, it is processed through the markdown processor and the resulting HTML is included. Frontmatter is processed but not included in the output.
 
 ##### Slot Injection in Includes
 
@@ -589,11 +593,14 @@ The `<include>` element supports slot-based content injection, allowing you to p
 ```html
 <!--#include file="relative.html" -->
 <!--#include virtual="/absolute.html" -->
+<!--#include file="toc.md" -->
+<!--#include virtual="/includes/menu.md" -->
 ```
 
 - `file` = relative to current file.
 - `virtual` = from `src/` root.
 - Apache SSI includes do not support slot injection
+- **Markdown Support**: When the included file has a `.md` extension, it is processed through the markdown processor and the resulting HTML is included. Frontmatter is processed but not included in the output.
 
 ### Layout System
 
