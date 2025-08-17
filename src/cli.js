@@ -5,6 +5,7 @@ import { build } from './core/file-processor.js';
 import { watch } from './core/file-watcher.js';
 import { DevServer } from './server/dev-server.js';
 import { init } from './cli/init.js';
+import { clearCacheOnRestart } from './core/build-cache.js';
 import { logger } from './utils/logger.js';
 import pkg from "../package.json";
 
@@ -50,10 +51,14 @@ async function main() {
         break;
       case 'watch':
         logger.info('Starting file watcher...');
+        // Clear cache for fresh start
+        await clearCacheOnRestart(args.cacheDir || '.unify-cache');
         await watch(args);
         break;
       case 'serve':
         logger.info('Starting development server with live reload...');
+        // Clear cache for fresh start  
+        await clearCacheOnRestart(args.cacheDir || '.unify-cache');
         const server = new DevServer();
         await server.start({
           port: args.port,
