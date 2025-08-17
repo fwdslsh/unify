@@ -76,6 +76,8 @@ export function parseArgs(argv) {
     copy: null,
     layouts: null,
     template: null, // For init command - which starter template to use
+    defaultLayout: "_layout", // Default layout filename (without extension)
+    excludePattern: "_.*", // Pattern for files/directories to exclude from output
   };
 
   // Only the first non-option argument is considered a command
@@ -184,6 +186,51 @@ export function parseArgs(argv) {
       error.errorType = 'UsageError';
       throw error;
     }
+    if ((arg === '--layouts' || arg === '-l') && nextArg && !nextArg.startsWith('-')) {
+      args.layouts = nextArg;
+      i += 2;
+      continue;
+    }
+    if (arg === '--default-layout' && nextArg && !nextArg.startsWith('-')) {
+      args.defaultLayout = nextArg;
+      i += 2;
+      continue;
+    }
+    // Handle --default-layout without value
+    if (arg === '--default-layout') {
+      const error = new UnifyError(
+        'The --default-layout option requires a filename value',
+        null,
+        null,
+        [
+          'Provide a layout filename like: --default-layout "layout"',
+          'Do not include file extension (.html will be tried automatically)',
+          'Example: --default-layout "base" will search for _base.html and _base.htm'
+        ]
+      );
+      error.errorType = 'UsageError';
+      throw error;
+    }
+    if (arg === '--exclude-pattern' && nextArg && !nextArg.startsWith('-')) {
+      args.excludePattern = nextArg;
+      i += 2;
+      continue;
+    }
+    // Handle --exclude-pattern without value
+    if (arg === '--exclude-pattern') {
+      const error = new UnifyError(
+        'The --exclude-pattern option requires a pattern value',
+        null,
+        null,
+        [
+          'Provide a glob pattern like: --exclude-pattern "_.*"',
+          'Use regex patterns to match files/directories to exclude',
+          'Example: --exclude-pattern "draft.*" will exclude draft files'
+        ]
+      );
+      error.errorType = 'UsageError';
+      throw error;
+    }
     if ((arg === '--port' || arg === '-p') && nextArg && !nextArg.startsWith('-')) {
       args.port = parseInt(nextArg, 10);
       if (isNaN(args.port) || args.port < 1 || args.port > 65535) {
@@ -279,6 +326,7 @@ export function parseArgs(argv) {
       const validOptions = [
         '--help', '-h', '--version', '-v', '--source', '-s', '--output', '-o',
         '--copy', '--port', '-p', '--host', '--layouts', '-l', '--templates',
+        '--default-layout', '--exclude-pattern',
         '--pretty-urls', '--base-url', '--clean', '--no-sitemap', 
         '--fail-on', '--minify', '--verbose', '-u', '-m', '-V'
       ];

@@ -6,12 +6,14 @@
  * @param {boolean} prettyUrls - Whether to use pretty URLs
  * @returns {string} Output file path
  */
-export function getOutputPathWithPrettyUrls(sourcePath, sourceRoot, outputRoot, prettyUrls = false) {
+export function getOutputPathWithPrettyUrls(sourcePath, sourceRoot, outputRoot, prettyUrls = false, config = {}) {
   const relativePath = path.relative(sourceRoot, sourcePath);
   const ext = path.extname(sourcePath).toLowerCase();
-  // Only apply pretty URLs to HTML/Markdown files not starting with '_'
+  // Only apply pretty URLs to HTML/Markdown files not matching exclude pattern
   const fileName = path.basename(sourcePath);
-  const isPage = !fileName.startsWith('_') && (ext === '.html' || ext === '.htm' || ext === '.md');
+  const excludePattern = config.excludePattern || '_.*';
+  const excludeRegex = new RegExp(excludePattern.replace('*', '.*'));
+  const isPage = !excludeRegex.test(fileName) && (ext === '.html' || ext === '.htm' || ext === '.md');
   if (prettyUrls && isPage) {
     // Remove extension and create subdirectory with index.html
     const withoutExt = relativePath.replace(/\.[^.]+$/, '');
@@ -109,17 +111,22 @@ export function isPartialFile(filePath, config = '.components') {
   const fileName = path.basename(filePath);
   
   // Handle both string and object config for backward compatibility
-  let componentsDir, layoutsDir;
+  let componentsDir, layoutsDir, excludePattern;
   if (typeof config === 'string') {
     componentsDir = config;
     layoutsDir = '.layouts'; // default
+    excludePattern = '_.*'; // default
   } else {
     componentsDir = config.components || '.components';
     layoutsDir = config.layouts || '.layouts';
+    excludePattern = config.excludePattern || '_.*';
   }
   
-  // Check if filename starts with underscore (traditional partial marker)
-  if (fileName.startsWith('_')) {
+  // Create regex from exclude pattern
+  const excludeRegex = new RegExp(excludePattern.replace('*', '.*'));
+  
+  // Check if filename matches exclude pattern (traditional partial marker)
+  if (excludeRegex.test(fileName)) {
     return true;
   }
   

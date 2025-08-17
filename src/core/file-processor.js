@@ -23,6 +23,7 @@ import {
   isPartialFile,
   getOutputPath,
   getFileExtension,
+  getOutputPathWithPrettyUrls,
 } from "../utils/path-resolver.js";
 import {
   extractPageInfo,
@@ -133,6 +134,8 @@ const DEFAULT_OPTIONS = {
   clean: true,
   prettyUrls: false,
   baseUrl: "https://example.com",
+  defaultLayout: "_layout",
+  excludePattern: "_.*",
 };
 
 /**
@@ -218,8 +221,8 @@ export async function build(options = {}) {
     // Initialize dependency and asset trackers
     const dependencyTracker = new DependencyTracker();
     const assetTracker = new AssetTracker();
-    const fileClassifier = new FileClassifier();
-    const layoutDiscovery = new LayoutDiscovery();
+    const fileClassifier = new FileClassifier(config);
+    const layoutDiscovery = new LayoutDiscovery(config);
 
     // Scan source directory
     const sourceFiles = await scanDirectory(sourceRoot);
@@ -255,7 +258,7 @@ export async function build(options = {}) {
 
         return (
           ext === ".md" &&
-          !relativePath.split(path.sep).some((part) => part.startsWith("_"))
+          !relativePath.split(path.sep).some((part) => fileClassifier.matchesExcludePattern(part))
         );
       });
       for (const mdFile of markdownFiles) {
@@ -266,11 +269,11 @@ export async function build(options = {}) {
     }
     const assetFiles = sourceFiles.filter((file) => {
       const fileType = fileClassifier.getFileType(file, sourceRoot);
-      // Exclude files in components or layouts directories
+      // Exclude files in components or layouts directories using configurable pattern
       const relativePath = path.relative(sourceRoot, file);
       const pathParts = relativePath.split(path.sep);
-      // Files in _includes and _* directories are non-emitting by convention
-      if (pathParts.some(part => part.startsWith('_'))) {
+      // Files in directories matching exclude pattern are non-emitting by convention
+      if (pathParts.some(part => fileClassifier.matchesExcludePattern(part))) {
         return false;
       }
       return (
@@ -306,7 +309,8 @@ export async function build(options = {}) {
           filePath,
           sourceRoot,
           outputRoot,
-          config.prettyUrls
+          config.prettyUrls,
+          config
         );
         const relativePath = path.relative(sourceRoot, filePath);
         const fileType = fileClassifier.getFileType(filePath, sourceRoot);
@@ -384,9 +388,9 @@ export async function build(options = {}) {
       try {
         const relativePath = path.relative(sourceRoot, filePath);
         const pathParts = relativePath.split(path.sep);
-        // Skip copying any file or directory starting with _
-        if (pathParts.some((part) => part.startsWith("_"))) {
-          logger.debug(`Skipped underscore-prefixed asset: ${relativePath}`);
+        // Skip copying any file or directory matching exclude pattern
+        if (pathParts.some((part) => fileClassifier.matchesExcludePattern(part))) {
+          logger.debug(`Skipped asset matching exclude pattern: ${relativePath}`);
           results.skipped++;
           continue;
         }
@@ -961,62 +965,6 @@ export async function initializeModificationCache(sourceRoot) {
 }
 
 /**
- * Generate output path for a file, with optional pretty URL support
- * @param {string} filePath - Source file path
- * @param {string} sourceRoot - Source root directory
- * @param {string} outputRoot - Output root directory
- * @param {boolean} prettyUrls - Whether to generate pretty URLs
- * @returns {string} Output file path
- */
-function getOutputPathWithPrettyUrls(
-  filePath,
-  sourceRoot,
-  outputRoot,
-  prettyUrls = false
-) {
-  const relativePath = path.relative(sourceRoot, filePath);
-
-  if (prettyUrls && (isMarkdownFile(filePath) || isHtmlFile(filePath))) {
-    const nameWithoutExt = path.basename(
-      relativePath,
-      path.extname(relativePath)
-    );
-    const dir = path.dirname(relativePath);
-
-    // Handle files with multiple extensions (e.g., file.md.html)
-    const finalName = nameWithoutExt.split(".")[0];
-
-    // Special case: if the file is already named index.md or index.html, don't create nested directory
-    if (finalName === "index") {
-      if (isMarkdownFile(filePath)) {
-        return path.join(outputRoot, dir, "index.html");
-      } else {
-        // For HTML files, keep as index.html in the same directory
-        return path.join(outputRoot, dir, "index.html");
-      }
-    }
-
-    // Create directory structure:
-    // about.md → about/index.html
-    // docs.html → docs/index.html
-    if (isMarkdownFile(filePath)) {
-      return path.join(outputRoot, dir, finalName, "index.html");
-    } else {
-      // For HTML files, create directory with the basename and put index.html inside
-      return path.join(outputRoot, dir, finalName, "index.html");
-    }
-  }
-
-  // For HTML files or when pretty URLs is disabled, use standard conversion
-  if (isMarkdownFile(filePath)) {
-    return path.join(outputRoot, relativePath.replace(/\.md$/i, ".html"));
-  }
-
-  // For all other files (HTML, assets), use original logic
-  return getOutputPath(filePath, sourceRoot, outputRoot);
-}
-
-/**
  * Find layout file for markdown processing
  * @param {string} sourceRoot - Source root directory
  * @returns {Promise<string|null>} Path to layout file or null if not found
@@ -1067,7 +1015,8 @@ async function processMarkdownFile(
   prettyUrls = false,
   layoutsDir = ".layouts",
   minify = false,
-  failFast = false
+  failFast = false,
+  config = {}
 ) {
   // Read markdown content
   let markdownContent;
@@ -1181,7 +1130,8 @@ async function processMarkdownFile(
     filePath,
     sourceRoot,
     outputRoot,
-    prettyUrls
+    prettyUrls,
+    config
   );
   await ensureDirectoryExists(path.dirname(outputPath));
 

@@ -132,6 +132,9 @@ Options:
   --source, -s      Source directory (default: src)
   --output, -o      Output directory (default: dist)
   --copy            Additional files glob pattern to copy recursively
+  --layouts, -l     Layouts directory (default: auto-discover)
+  --default-layout  Default layout filename (default: _layout)
+  --exclude-pattern Pattern for files/directories to exclude (default: _.*)
   --port, -p        Server port (default: 3000)
   --host            Server host (default: localhost)
   --pretty-urls     Generate pretty URLs (about.md → about/index.html)
@@ -151,6 +154,8 @@ Examples:
   unify build --pretty-urls
   unify build --base-url https://mysite.com
   unify build --copy "./assets/**/*.*"    # Copy additional files
+  unify build --default-layout "base"     # Use _base.html as default layout
+  unify build --exclude-pattern "draft.*" # Exclude files matching pattern
   unify serve --port 8080
   unify init                              # Initialize with default starter
   unify init basic                        # Initialize with basic starter template
