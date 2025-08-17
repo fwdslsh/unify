@@ -4,12 +4,31 @@ import { logger } from '../utils/logger.js';
 
 /**
  * Layout discovery system for convention-based architecture
- * Finds layouts using folder-scoped _layout.html files and fallback default layout
+ * Finds layouts using configurable patterns and directories
  */
 export class LayoutDiscovery {
+  constructor(buildConfig = null) {
+    this.buildConfig = buildConfig;
+  }
+
+  /**
+   * Set or update the build configuration
+   * @param {BuildConfig} buildConfig - Build configuration instance
+   */
+  setBuildConfig(buildConfig) {
+    this.buildConfig = buildConfig;
+  }
+
+  /**
+   * Get the build configuration, falling back to global if not set
+   * @returns {BuildConfig|null} Build configuration instance
+   */
+  getBuildConfig() {
+    return this.buildConfig || globalThis.UNIFY_PATTERNS_CONFIG || null;
+  }
   /**
    * Find layout file in a specific directory using naming convention
-   * Only looks for _layout.html or _layout.htm files for automatic discovery
+   * Looks for files matching the configured layout pattern
    * @param {string} directory - Directory path to search in
    * @param {string} sourceRoot - Source root for logging
    * @returns {Promise<string|null>} Path to layout file or null
@@ -17,17 +36,33 @@ export class LayoutDiscovery {
   async findLayoutInDirectory(directory, sourceRoot) {
     try {
       const files = await fs.readdir(directory);
+      const buildConfig = this.getBuildConfig();
       
-      // Look for _layout.html or _layout.htm only
-      const layoutFiles = ['_layout.html', '_layout.htm'];
-      
-      for (const file of layoutFiles) {
-        const layoutPath = path.join(directory, file);
-        try {
-          await fs.access(layoutPath);
-          return layoutPath;
-        } catch {
-          // File not accessible, continue
+      if (buildConfig) {
+        // Use configured layout pattern
+        for (const file of files) {
+          if (buildConfig.isLayoutFile(file)) {
+            const layoutPath = path.join(directory, file);
+            try {
+              await fs.access(layoutPath);
+              return layoutPath;
+            } catch {
+              // File not accessible, continue
+            }
+          }
+        }
+      } else {
+        // Fallback: Look for _layout.html or _layout.htm only
+        const layoutFiles = ['_layout.html', '_layout.htm'];
+        
+        for (const file of layoutFiles) {
+          const layoutPath = path.join(directory, file);
+          try {
+            await fs.access(layoutPath);
+            return layoutPath;
+          } catch {
+            // File not accessible, continue
+          }
         }
       }
     } catch {
@@ -39,11 +74,18 @@ export class LayoutDiscovery {
 
   /**
    * Check if a filename matches the auto-discovery layout naming convention
-   * Only _layout.html or _layout.htm are auto-discovered
+   * Uses configured layout pattern or fallback to _layout.html/_layout.htm
    * @param {string} fileName - Name of the file to check
    * @returns {boolean} True if matches auto-discovery pattern
    */
   isLayoutFileName(fileName) {
+    const buildConfig = this.getBuildConfig();
+    
+    if (buildConfig) {
+      return buildConfig.isLayoutFile(fileName);
+    }
+    
+    // Fallback to hardcoded pattern
     return fileName === '_layout.html' || fileName === '_layout.htm';
   }
 
@@ -126,17 +168,28 @@ export class LayoutDiscovery {
   }
   
   /**
-   * Find fallback layout in _includes directory
-   * Only looks for layout.html or layout.htm for site-wide fallback
+   * Find fallback layout in configured includes directory
+   * Looks for the configured layout filename in the includes directory
    * @param {string} sourceRoot - Absolute path to source directory
    * @returns {Promise<string|null>} Path to fallback layout or null
    */
   async findFallbackLayoutInIncludes(sourceRoot) {
-    const includesDir = path.join(sourceRoot, '_includes');
+    const buildConfig = this.getBuildConfig();
+    const includesDirName = buildConfig ? buildConfig.getIncludesDir() : '_includes';
+    const layoutFilename = buildConfig ? buildConfig.getLayoutFilename() : 'layout.html';
+    
+    const includesDir = path.join(sourceRoot, includesDirName);
     
     try {
-      // Only look for layout.html or layout.htm as site-wide fallback
-      const layoutFiles = ['layout.html', 'layout.htm'];
+      // Look for configured layout filename and alternative extensions
+      const layoutFiles = [layoutFilename];
+      
+      // Add .htm alternative if original has .html extension
+      if (layoutFilename.endsWith('.html')) {
+        layoutFiles.push(layoutFilename.replace(/\.html$/, '.htm'));
+      } else if (layoutFilename.endsWith('.htm')) {
+        layoutFiles.push(layoutFilename.replace(/\.htm$/, '.html'));
+      }
       
       for (const file of layoutFiles) {
         const layoutPath = path.join(includesDir, file);
@@ -155,14 +208,35 @@ export class LayoutDiscovery {
   }
 
   /**
-   * Check if a filename in _includes matches fallback layout naming convention
-   * Only layout.html or layout.htm serve as site-wide fallback
+   * Check if a filename in includes dir matches fallback layout naming convention
+   * Uses configured layout filename or fallback to layout.html/htm
    * @param {string} fileName - Name of the file to check
    * @returns {boolean} True if matches fallback pattern
    */
   isIncludesLayoutFileName(fileName) {
-    // In _includes, only layout.html/htm serve as site-wide fallback
-    return fileName === 'layout.html' || fileName === 'layout.htm';
+    const buildConfig = this.getBuildConfig();
+    const layoutFilename = buildConfig ? buildConfig.getLayoutFilename() : 'layout.html';
+    
+    // Check for configured layout filename
+    if (fileName === layoutFilename) {
+      return true;
+    }
+    
+    // Check for alternative extension
+    if (layoutFilename.endsWith('.html') && fileName === layoutFilename.replace(/\.html$/, '.htm')) {
+      return true;
+    }
+    
+    if (layoutFilename.endsWith('.htm') && fileName === layoutFilename.replace(/\.htm$/, '.html')) {
+      return true;
+    }
+    
+    // Fallback to hardcoded pattern if no build config
+    if (!buildConfig) {
+      return fileName === 'layout.html' || fileName === 'layout.htm';
+    }
+    
+    return false;
   }
 
   /**
@@ -220,7 +294,7 @@ export class LayoutDiscovery {
 
   /**
    * Resolve short name layout reference (e.g., "blog" -> "_blog.layout.html")
-   * Files must have .layout.htm(l) suffix to be found via short name
+   * Files must match the configured layout pattern to be found via short name
    * @param {string} shortName - Short name without prefix, .layout, or extension
    * @param {string} sourceRoot - Absolute path to source directory
    * @param {string} pagePath - Absolute path to the page file
@@ -229,24 +303,46 @@ export class LayoutDiscovery {
   async resolveShortNameLayout(shortName, sourceRoot, pagePath) {
     logger.debug(`Resolving short name layout: ${shortName}`);
     
+    const buildConfig = this.getBuildConfig();
     let currentDir = path.dirname(pagePath);
     
     // Search up the directory hierarchy
     while (currentDir && currentDir !== path.dirname(sourceRoot)) {
-      // Check for _[shortName].layout.html and _[shortName].layout.htm
-      const possibleFiles = [
-        `_${shortName}.layout.html`,
-        `_${shortName}.layout.htm`
-      ];
-      
-      for (const filename of possibleFiles) {
-        const layoutPath = path.join(currentDir, filename);
+      if (buildConfig) {
+        // Use configurable patterns - try to find files matching layout pattern with shortName
         try {
-          await fs.access(layoutPath);
-          logger.debug(`Resolved short name layout: ${path.relative(sourceRoot, layoutPath)}`);
-          return layoutPath;
+          const files = await fs.readdir(currentDir);
+          for (const file of files) {
+            if (buildConfig.isLayoutFile(file) && file.includes(shortName)) {
+              const layoutPath = path.join(currentDir, file);
+              try {
+                await fs.access(layoutPath);
+                logger.debug(`Resolved short name layout: ${path.relative(sourceRoot, layoutPath)}`);
+                return layoutPath;
+              } catch {
+                // File doesn't exist, continue
+              }
+            }
+          }
         } catch {
-          // File doesn't exist, continue
+          // Directory not readable, continue
+        }
+      } else {
+        // Fallback: Check for _[shortName].layout.html and _[shortName].layout.htm
+        const possibleFiles = [
+          `_${shortName}.layout.html`,
+          `_${shortName}.layout.htm`
+        ];
+        
+        for (const filename of possibleFiles) {
+          const layoutPath = path.join(currentDir, filename);
+          try {
+            await fs.access(layoutPath);
+            logger.debug(`Resolved short name layout: ${path.relative(sourceRoot, layoutPath)}`);
+            return layoutPath;
+          } catch {
+            // File doesn't exist, continue
+          }
         }
       }
       
@@ -258,30 +354,55 @@ export class LayoutDiscovery {
       currentDir = parentDir;
     }
     
-    // Check _includes directory (files don't need underscore prefix there)
-    const includesDir = path.join(sourceRoot, '_includes');
-    const includesOptions = [
-      `${shortName}.layout.html`,
-      `${shortName}.layout.htm`,
-      `_${shortName}.layout.html`,
-      `_${shortName}.layout.htm`,
-      `${shortName}.html`,
-      `${shortName}.htm`
-    ];
+    // Check configured includes directory
+    const includesDirName = buildConfig ? buildConfig.getIncludesDir() : '_includes';
+    const includesDir = path.join(sourceRoot, includesDirName);
     
-    for (const filename of includesOptions) {
-      const layoutPath = path.join(includesDir, filename);
+    if (buildConfig) {
+      // Look for files matching layout pattern that contain the short name
       try {
-        await fs.access(layoutPath);
-        logger.debug(`Resolved short name layout: ${path.relative(sourceRoot, layoutPath)}`);
-        return layoutPath;
+        const files = await fs.readdir(includesDir);
+        for (const file of files) {
+          if (buildConfig.isLayoutFile(file) && file.includes(shortName)) {
+            const layoutPath = path.join(includesDir, file);
+            try {
+              await fs.access(layoutPath);
+              logger.debug(`Resolved short name layout: ${path.relative(sourceRoot, layoutPath)}`);
+              return layoutPath;
+            } catch {
+              // File doesn't exist, continue
+            }
+          }
+        }
       } catch {
-        // File doesn't exist, continue
+        // Directory not readable, continue
+      }
+    } else {
+      // Fallback: files don't need underscore prefix in includes
+      const includesOptions = [
+        `${shortName}.layout.html`,
+        `${shortName}.layout.htm`,
+        `_${shortName}.layout.html`,
+        `_${shortName}.layout.htm`,
+        `${shortName}.html`,
+        `${shortName}.htm`
+      ];
+      
+      for (const filename of includesOptions) {
+        const layoutPath = path.join(includesDir, filename);
+        try {
+          await fs.access(layoutPath);
+          logger.debug(`Resolved short name layout: ${path.relative(sourceRoot, layoutPath)}`);
+          return layoutPath;
+        } catch {
+          // File doesn't exist, continue
+        }
       }
     }
     
-    // Warning: short name didn't resolve to a .layout.htm(l) file
-    logger.warn(`Layout short name '${shortName}' could not be resolved to a .layout.htm(l) file`);
+    // Warning: short name didn't resolve
+    const patternDesc = buildConfig ? 'configured layout pattern' : '.layout.htm(l) file';
+    logger.warn(`Layout short name '${shortName}' could not be resolved to a ${patternDesc}`);
     return null;
   }
   

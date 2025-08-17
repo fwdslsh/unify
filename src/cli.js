@@ -144,6 +144,13 @@ Options:
   --help, -h        Show this help message
   --version, -v     Show version number
 
+File Pattern Options:
+  --includes-dir        Directory for includes (default: _includes)
+  --layouts-dir         Directory for layouts (default: auto-discovery)
+  --component-pattern   Pattern for non-emitting files (default: _*)
+  --layout-pattern      Pattern for layout files (default: *layout.html|*layout.htm)
+  --layout-filename     Default layout filename (default: layout.html)
+
 Examples:
   unify                                   # Build with defaults (src → dist)
   unify build                             # Explicit build command
