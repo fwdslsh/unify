@@ -183,13 +183,13 @@ export class DependencyTracker {
    * @param {string} htmlContent - HTML content to analyze
    * @param {string} sourceRoot - Source root directory
    */
-  analyzePage(pagePath, htmlContent, sourceRoot) {
+  async analyzePage(pagePath, htmlContent, sourceRoot) {
     const includeDependencies = extractIncludeDependencies(htmlContent, pagePath, sourceRoot);
-    const layoutDependencies = this.extractLayoutDependencies(htmlContent, pagePath, sourceRoot);
+    const layoutDependencies = await this.extractLayoutDependencies(htmlContent, pagePath, sourceRoot);
     this.recordDependencies(pagePath, includeDependencies, layoutDependencies);
     
     // Also analyze nested dependencies for deeper tracking
-    this.analyzeNestedDependencies(pagePath, sourceRoot);
+    await this.analyzeNestedDependencies(pagePath, sourceRoot);
   }
 
   /**
@@ -197,12 +197,12 @@ export class DependencyTracker {
    * @param {string} htmlContent - HTML content to analyze
    * @param {string} pagePath - Path to the current page
    * @param {string} sourceRoot - Source root directory
-   * @returns {string[]} Array of resolved layout file paths
+   * @returns {Promise<string[]>} Array of resolved layout file paths
    */
-  extractLayoutDependencies(htmlContent, pagePath, sourceRoot) {
+  async extractLayoutDependencies(htmlContent, pagePath, sourceRoot) {
     const dependencies = [];
     
-    // Look for data-layout attribute
+    // Look for explicit data-layout attribute
     const layoutMatch = htmlContent.match(/data-layout=["']([^"']+)["']/i);
     
     if (layoutMatch) {
@@ -225,11 +225,29 @@ export class DependencyTracker {
         }
         
         dependencies.push(resolvedLayoutPath);
-        logger.debug(`Extracted layout dependency: ${layoutPath} -> ${resolvedLayoutPath}`);
+        logger.debug(`Extracted explicit layout dependency: ${layoutPath} -> ${resolvedLayoutPath}`);
       } catch (error) {
         // Log warning but continue - dependency tracking shouldn't break builds
         logger.warn(`Could not resolve layout dependency: ${layoutPath} in ${pagePath}`);
       }
+    }
+    
+    // Also discover auto-discovered layouts (folder-scoped _layout.html, fallback layouts)
+    try {
+      const { LayoutDiscovery } = await import('./layout-discovery.js');
+      const discovery = new LayoutDiscovery();
+      const autoDiscoveredLayouts = await discovery.getLayoutDependencies(pagePath, sourceRoot);
+      
+      // Add auto-discovered layouts that aren't already in dependencies
+      for (const layoutPath of autoDiscoveredLayouts) {
+        if (!dependencies.includes(layoutPath)) {
+          dependencies.push(layoutPath);
+          logger.debug(`Extracted auto-discovered layout dependency: ${layoutPath}`);
+        }
+      }
+    } catch (error) {
+      // Log warning but continue - dependency tracking shouldn't break builds
+      logger.warn(`Could not discover auto-layout dependencies for ${pagePath}: ${error.message}`);
     }
     
     return dependencies;

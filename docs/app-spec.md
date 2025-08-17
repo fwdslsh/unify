@@ -972,10 +972,42 @@ This ensures content-heavy workflows (like documentation or blogs) stay lightwei
 
 - Tracks pages ↔ partials/layouts/includes.
 - Rebuild dependents on change.
+- Automatically discovers layout dependencies:
+  - Explicit `data-layout` attribute references
+  - Auto-discovered folder-scoped `_layout.html` files
+  - Fallback layouts in `_includes/layout.html`
+- Tracks include dependencies (SSI and DOM includes)
+- Tracks asset references from HTML and CSS files
 
-## Live Reload
+## Live Reload and File Watching
 
-- Changes to `_layout.html`, underscore partials, or `src/_includes/` trigger dependent rebuilds and browser reload.
+The file watcher monitors all changes in the source directory and triggers appropriate rebuilds:
+
+### Layout Changes
+- **Explicit layouts**: When a layout file referenced via `data-layout` changes, all pages using that layout are rebuilt
+- **Auto-discovered layouts**: When folder-scoped `_layout.html` files change, all pages in that folder hierarchy are rebuilt
+- **Fallback layouts**: When `_includes/layout.html` changes, all pages without other layouts are rebuilt
+
+### Component Changes
+- When component files (includes) change, all pages that include them are rebuilt
+- Handles nested component dependencies (components that include other components)
+- Supports both SSI-style (`<!--#include -->`) and DOM-style (`<include>`) includes
+
+### New File Detection
+- New HTML/Markdown pages are automatically built when added to source directory
+- New component files trigger rebuilds of dependent pages
+- New asset files are copied to output if referenced by pages
+
+### Asset Changes
+- CSS file changes trigger copying to output directory
+- Image and other asset changes trigger copying if referenced by pages
+- Asset reference tracking ensures only used assets are copied
+
+### File Deletion Handling
+- Deleted pages are removed from output directory
+- Deleted components trigger rebuilds of dependent pages (showing "not found" messages)
+- Deleted assets are removed from output directory
+- Dependency tracking is automatically cleaned up
 
 ## Error Handling
 
