@@ -9,7 +9,13 @@ export class FileClassifier {
     this.excludePattern = config.excludePattern || "_.*";
     this.defaultLayout = config.defaultLayout || "layout";
     // Convert glob pattern to regex for matching
-    this.excludeRegex = new RegExp(this.excludePattern.replace('*', '.*'));
+    // For patterns like "_.*", we want to match files starting with "_"
+    if (this.excludePattern === "_.*") {
+      this.excludeRegex = /^_/;
+    } else {
+      // For other patterns, escape special regex characters, then replace glob * with .*
+      this.excludeRegex = new RegExp('^' + this.excludePattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$');
+    }
   }
 
   /**

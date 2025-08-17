@@ -12,11 +12,29 @@ export function getOutputPathWithPrettyUrls(sourcePath, sourceRoot, outputRoot, 
   // Only apply pretty URLs to HTML/Markdown files not matching exclude pattern
   const fileName = path.basename(sourcePath);
   const excludePattern = config.excludePattern || '_.*';
-  const excludeRegex = new RegExp(excludePattern.replace('*', '.*'));
+  let excludeRegex;
+  if (excludePattern === "_.*") {
+    excludeRegex = /^_/;
+  } else {
+    excludeRegex = new RegExp('^' + excludePattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$');
+  }
   const isPage = !excludeRegex.test(fileName) && (ext === '.html' || ext === '.htm' || ext === '.md');
   if (prettyUrls && isPage) {
-    // Remove extension and create subdirectory with index.html
-    const withoutExt = relativePath.replace(/\.[^.]+$/, '');
+    // Special case: any index.html files stay as index.html
+    if (path.basename(relativePath, path.extname(relativePath)) === 'index') {
+      return path.resolve(outputRoot, relativePath);
+    }
+    // Remove all extensions for pretty URLs
+    // file.md.html -> file, guide.html -> guide
+    let withoutExt = relativePath;
+    while (path.extname(withoutExt)) {
+      withoutExt = path.basename(withoutExt, path.extname(withoutExt));
+    }
+    // Add back the directory structure
+    const dir = path.dirname(relativePath);
+    if (dir !== '.') {
+      withoutExt = path.join(dir, withoutExt);
+    }
     return path.resolve(outputRoot, withoutExt, 'index.html');
   }
   // Standard output: preserve relative path
@@ -123,7 +141,12 @@ export function isPartialFile(filePath, config = '.components') {
   }
   
   // Create regex from exclude pattern
-  const excludeRegex = new RegExp(excludePattern.replace('*', '.*'));
+  let excludeRegex;
+  if (excludePattern === "_.*") {
+    excludeRegex = /^_/;
+  } else {
+    excludeRegex = new RegExp('^' + excludePattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$');
+  }
   
   // Check if filename matches exclude pattern (traditional partial marker)
   if (excludeRegex.test(fileName)) {
