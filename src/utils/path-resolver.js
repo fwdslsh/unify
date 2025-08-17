@@ -15,6 +15,10 @@ export function getOutputPathWithPrettyUrls(sourcePath, sourceRoot, outputRoot, 
   let excludeRegex;
   if (excludePattern === "_.*") {
     excludeRegex = /^_/;
+  } else if (excludePattern.endsWith('.*')) {
+    // For patterns ending with .*, treat as prefix patterns
+    const prefix = excludePattern.slice(0, -2); // Remove the .*
+    excludeRegex = new RegExp('^' + prefix.replace(/[.+?^${}()|[\]\\]/g, '\\$&'));
   } else {
     excludeRegex = new RegExp('^' + excludePattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$');
   }
@@ -144,6 +148,10 @@ export function isPartialFile(filePath, config = '.components') {
   let excludeRegex;
   if (excludePattern === "_.*") {
     excludeRegex = /^_/;
+  } else if (excludePattern.endsWith('.*')) {
+    // For patterns ending with .*, treat as prefix patterns
+    const prefix = excludePattern.slice(0, -2); // Remove the .*
+    excludeRegex = new RegExp('^' + prefix.replace(/[.+?^${}()|[\]\\]/g, '\\$&'));
   } else {
     excludeRegex = new RegExp('^' + excludePattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$');
   }

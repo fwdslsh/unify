@@ -12,6 +12,10 @@ export class FileClassifier {
     // For patterns like "_.*", we want to match files starting with "_"
     if (this.excludePattern === "_.*") {
       this.excludeRegex = /^_/;
+    } else if (this.excludePattern.endsWith('.*')) {
+      // For patterns ending with .*, treat as prefix patterns
+      const prefix = this.excludePattern.slice(0, -2); // Remove the .*
+      this.excludeRegex = new RegExp('^' + prefix.replace(/[.+?^${}()|[\]\\]/g, '\\$&'));
     } else {
       // For other patterns, escape special regex characters, then replace glob * with .*
       this.excludeRegex = new RegExp('^' + this.excludePattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$');
