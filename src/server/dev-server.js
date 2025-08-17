@@ -145,111 +145,106 @@ export class DevServer {
    */
   async serveStaticFile(pathname) {
   const { outputDir, fallback, cors } = this.config;
-  // Normalize path and prevent directory traversal
-    let filePath = pathname === '/' ? '/index.html' : pathname;
-    const resolvedOutputDir = path.resolve(outputDir);
+  let filePath = pathname === '/' ? '/index.html' : pathname;
+  const resolvedOutputDir = path.resolve(outputDir);
 
-    try {
-      // If path ends with a slash, always serve directory index
-      if (filePath.endsWith('/')) {
-        const dirIndexPath = path.join(outputDir, filePath, 'index.html');
-        const resolvedDirIndexPath = path.resolve(dirIndexPath);
-        if (resolvedDirIndexPath.startsWith(resolvedOutputDir)) {
-          const dirIndexFile = Bun.file(resolvedDirIndexPath);
-          if (await dirIndexFile.exists()) {
-            const headers = this.getFileHeaders(resolvedDirIndexPath, cors);
-            if (this.config.liveReload && resolvedDirIndexPath.endsWith('.html')) {
-              const content = await dirIndexFile.text();
-              const withLiveReload = this.injectLiveReloadScript(content);
-              return new Response(withLiveReload, { headers });
-            }
-            return new Response(dirIndexFile, { headers });
+  try {
+    // 1. Directory request (ends with slash): serve index.html from that directory
+    if (filePath.endsWith('/')) {
+      const dirIndexPath = path.join(outputDir, filePath, 'index.html');
+      const resolvedDirIndexPath = path.resolve(dirIndexPath);
+      if (resolvedDirIndexPath.startsWith(resolvedOutputDir)) {
+        const dirIndexFile = Bun.file(resolvedDirIndexPath);
+        if (await dirIndexFile.exists()) {
+          const headers = this.getFileHeaders(resolvedDirIndexPath, cors);
+          let content = await dirIndexFile.text();
+          if (this.config.liveReload && resolvedDirIndexPath.endsWith('.html')) {
+            content = this.injectLiveReloadScript(content);
           }
-        }
-        // If not found, fallback
-        if (fallback && !looksLikeSystemPath(filePath)) {
-          const fallbackPath = path.join(outputDir, fallback);
-          const fallbackFile = Bun.file(fallbackPath);
-          if (await fallbackFile.exists()) {
-            const headers = this.getFileHeaders(fallbackPath, cors);
-            if (this.config.liveReload && fallbackPath.endsWith('.html')) {
-              const content = await fallbackFile.text();
-              const withLiveReload = this.injectLiveReloadScript(content);
-              return new Response(withLiveReload, { headers });
-            }
-            return new Response(fallbackFile, { headers });
-          }
-        }
-        return new Response('Not Found', { status: 404 });
-      } else if (!path.extname(filePath) && !looksLikeSystemPath(filePath)) {
-        // If no trailing slash and no extension, check for exact file first
-        let exactFilePath = filePath + '.html';
-        const resolvedExactFilePath = path.resolve(path.join(outputDir, exactFilePath));
-        if (resolvedExactFilePath.startsWith(resolvedOutputDir)) {
-          const exactFile = Bun.file(resolvedExactFilePath);
-          if (await exactFile.exists()) {
-            const headers = this.getFileHeaders(resolvedExactFilePath, cors);
-            if (this.config.liveReload && resolvedExactFilePath.endsWith('.html')) {
-              const content = await exactFile.text();
-              const withLiveReload = this.injectLiveReloadScript(content);
-              return new Response(withLiveReload, { headers });
-            }
-            return new Response(exactFile, { headers });
-          }
-        }
-        // If not found, check for directory index
-        const dirIndexPath = path.join(outputDir, filePath, 'index.html');
-        const resolvedDirIndexPath = path.resolve(dirIndexPath);
-        if (resolvedDirIndexPath.startsWith(resolvedOutputDir)) {
-          const dirIndexFile = Bun.file(resolvedDirIndexPath);
-          if (await dirIndexFile.exists()) {
-            const headers = this.getFileHeaders(resolvedDirIndexPath, cors);
-            if (this.config.liveReload && resolvedDirIndexPath.endsWith('.html')) {
-              const content = await dirIndexFile.text();
-              const withLiveReload = this.injectLiveReloadScript(content);
-              return new Response(withLiveReload, { headers });
-            }
-            return new Response(dirIndexFile, { headers });
-          }
-        }
-      } else {
-        // Otherwise, treat as a direct file request
-        const resolvedPath = path.resolve(path.join(outputDir, filePath));
-        if (resolvedPath.startsWith(resolvedOutputDir)) {
-          const file = Bun.file(resolvedPath);
-          if (await file.exists()) {
-            const headers = this.getFileHeaders(resolvedPath, cors);
-            if (this.config.liveReload && resolvedPath.endsWith('.html')) {
-              const content = await file.text();
-              const withLiveReload = this.injectLiveReloadScript(content);
-              return new Response(withLiveReload, { headers });
-            }
-            return new Response(file, { headers });
-          }
+          return new Response(content, { headers, status: 200 });
         }
       }
-
-      // Fallback to fallback file (usually index.html for SPAs)
-      // Only fallback for SPA routes: no extension, not system path
-      if (fallback && !path.extname(pathname) && !looksLikeSystemPath(pathname)) {
+      // Fallback to SPA index.html if not found
+      if (fallback && !looksLikeSystemPath(filePath)) {
         const fallbackPath = path.join(outputDir, fallback);
         const fallbackFile = Bun.file(fallbackPath);
         if (await fallbackFile.exists()) {
           const headers = this.getFileHeaders(fallbackPath, cors);
+          let content = await fallbackFile.text();
           if (this.config.liveReload && fallbackPath.endsWith('.html')) {
-            const content = await fallbackFile.text();
-            const withLiveReload = this.injectLiveReloadScript(content);
-            return new Response(withLiveReload, { headers });
+            content = this.injectLiveReloadScript(content);
           }
-          return new Response(fallbackFile, { headers });
+          return new Response(content, { headers, status: 200 });
         }
       }
       return new Response('Not Found', { status: 404 });
-    } catch (error) {
-      logger.error(error.formatForCLI ? error.formatForCLI() : `Error serving static file: ${error.message}`);
-      return new Response('Internal Server Error', { status: 500 });
     }
+
+    // 2. No extension, no trailing slash: check for exact file.html, then directory index
+    if (!path.extname(filePath) && !looksLikeSystemPath(filePath)) {
+      // Prioritize exact file.html
+      let exactFilePath = filePath + '.html';
+      const resolvedExactFilePath = path.resolve(path.join(outputDir, exactFilePath));
+      if (resolvedExactFilePath.startsWith(resolvedOutputDir)) {
+        const exactFile = Bun.file(resolvedExactFilePath);
+        if (await exactFile.exists()) {
+          const headers = this.getFileHeaders(resolvedExactFilePath, cors);
+          let content = await exactFile.text();
+          if (this.config.liveReload && resolvedExactFilePath.endsWith('.html')) {
+            content = this.injectLiveReloadScript(content);
+          }
+          return new Response(content, { headers, status: 200 });
+        }
+      }
+      // Then check for directory index
+      const dirIndexPath = path.join(outputDir, filePath, 'index.html');
+      const resolvedDirIndexPath = path.resolve(dirIndexPath);
+      if (resolvedDirIndexPath.startsWith(resolvedOutputDir)) {
+        const dirIndexFile = Bun.file(resolvedDirIndexPath);
+        if (await dirIndexFile.exists()) {
+          const headers = this.getFileHeaders(resolvedDirIndexPath, cors);
+          let content = await dirIndexFile.text();
+          if (this.config.liveReload && resolvedDirIndexPath.endsWith('.html')) {
+            content = this.injectLiveReloadScript(content);
+          }
+          return new Response(content, { headers, status: 200 });
+        }
+      }
+    }
+
+    // 3. Direct file request (with extension)
+    const resolvedPath = path.resolve(path.join(outputDir, filePath));
+    if (resolvedPath.startsWith(resolvedOutputDir)) {
+      const file = Bun.file(resolvedPath);
+      if (await file.exists()) {
+        const headers = this.getFileHeaders(resolvedPath, cors);
+        let content = await file.text();
+        if (this.config.liveReload && resolvedPath.endsWith('.html')) {
+          content = this.injectLiveReloadScript(content);
+        }
+        return new Response(content, { headers, status: 200 });
+      }
+    }
+
+    // 4. SPA fallback for routes with no extension
+    if (fallback && !path.extname(pathname) && !looksLikeSystemPath(pathname)) {
+      const fallbackPath = path.join(outputDir, fallback);
+      const fallbackFile = Bun.file(fallbackPath);
+      if (await fallbackFile.exists()) {
+        const headers = this.getFileHeaders(fallbackPath, cors);
+        let content = await fallbackFile.text();
+        if (this.config.liveReload && fallbackPath.endsWith('.html')) {
+          content = this.injectLiveReloadScript(content);
+        }
+        return new Response(content, { headers, status: 200 });
+      }
+    }
+    return new Response('Not Found', { status: 404 });
+  } catch (error) {
+    logger.error(error.formatForCLI ? error.formatForCLI() : `Error serving static file: ${error.message}`);
+    return new Response('Internal Server Error', { status: 500 });
   }
+}
 
   /**
    * Get appropriate headers for file type
