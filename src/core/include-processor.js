@@ -108,7 +108,7 @@ export async function processIncludes(
 
       // Track dependencies for this include file if tracker is provided
       if (dependencyTracker) {
-        dependencyTracker.analyzePage(resolvedPath, includeContent, sourceRoot);
+        await dependencyTracker.analyzePage(resolvedPath, includeContent, sourceRoot);
       }
 
       // Recursively process nested includes

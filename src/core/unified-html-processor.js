@@ -98,7 +98,7 @@ export async function processHtmlUnified(
     
     // Track dependencies before processing
     if (dependencyTracker) {
-      dependencyTracker.analyzePage(filePath, htmlContent, sourceRoot);
+      await dependencyTracker.analyzePage(filePath, htmlContent, sourceRoot);
     }
     
     // Always process includes (SSI and DOM) first
