@@ -960,7 +960,13 @@ function validateDataLayoutAttributes(htmlContent, isFullDocument) {
 /**
  * Detect which layout to use for a page using regex-based HTML parsing
  */
-async function detectLayoutFromHTML(htmlContent, sourceRoot, config, pagePath, layoutDiscovery) {
+async function detectLayoutFromHTML(htmlContent, sourceRoot, config, pagePath, layoutDiscovery = null) {
+  // Create layoutDiscovery if not provided
+  if (!layoutDiscovery) {
+    const { LayoutDiscovery } = await import('./layout-discovery.js');
+    layoutDiscovery = new LayoutDiscovery(config);
+  }
+  
   const htmlStructure = analyzeHtmlStructure(htmlContent);
   
   // For full HTML documents, check link rel=layout first (highest priority)
@@ -1446,8 +1452,14 @@ function escapeRegex(str) {
  * @param {Object} config - Processing configuration
  * @returns {Promise<string>} Processed HTML with templates applied
  */
-async function processDOMTemplating(htmlContent, filePath, sourceRoot, config, extractedAssets = { styles: [], scripts: [] }, layoutDiscovery) {
+async function processDOMTemplating(htmlContent, filePath, sourceRoot, config, extractedAssets = { styles: [], scripts: [] }, layoutDiscovery = null) {
   try {
+    // Create layoutDiscovery if not provided
+    if (!layoutDiscovery) {
+      const { LayoutDiscovery } = await import('./layout-discovery.js');
+      layoutDiscovery = new LayoutDiscovery(config);
+    }
+    
     // Analyze HTML structure
     const htmlStructure = analyzeHtmlStructure(htmlContent);
     
@@ -1708,9 +1720,14 @@ async function processLayoutAttribute(
   sourceRoot,
   config,
   extractedAssets = { styles: [], scripts: [] },
-  layoutDiscovery
+  layoutDiscovery = null
 ) {
   // Use LayoutDiscovery system for both full paths and short names
+  if (!layoutDiscovery) {
+    const { LayoutDiscovery } = await import('./layout-discovery.js');
+    layoutDiscovery = new LayoutDiscovery(config);
+  }
+  
   const resolvedLayoutPath = await layoutDiscovery.resolveLayoutOverride(layoutPath, sourceRoot, filePath);
   if (!resolvedLayoutPath) {
     throw new LayoutError(

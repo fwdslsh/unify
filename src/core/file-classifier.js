@@ -7,7 +7,7 @@ import path from 'path';
 export class FileClassifier {
   constructor(config = {}) {
     this.excludePattern = config.excludePattern || "_.*";
-    this.defaultLayout = config.defaultLayout || "_layout";
+    this.defaultLayout = config.defaultLayout || "layout";
     // Convert glob pattern to regex for matching
     this.excludeRegex = new RegExp(this.excludePattern.replace('*', '.*'));
   }

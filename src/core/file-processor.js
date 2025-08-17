@@ -134,7 +134,7 @@ const DEFAULT_OPTIONS = {
   clean: true,
   prettyUrls: false,
   baseUrl: "https://example.com",
-  defaultLayout: "_layout",
+  defaultLayout: "layout",
   excludePattern: "_.*",
 };
 

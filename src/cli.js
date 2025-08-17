@@ -133,7 +133,7 @@ Options:
   --output, -o      Output directory (default: dist)
   --copy            Additional files glob pattern to copy recursively
   --layouts, -l     Layouts directory (default: auto-discover)
-  --default-layout  Default layout filename (default: _layout)
+  --default-layout  Default layout filename (default: layout)
   --exclude-pattern Pattern for files/directories to exclude (default: _.*)
   --port, -p        Server port (default: 3000)
   --host            Server host (default: localhost)

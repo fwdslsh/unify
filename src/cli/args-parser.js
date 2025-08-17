@@ -76,7 +76,7 @@ export function parseArgs(argv) {
     copy: null,
     layouts: null,
     template: null, // For init command - which starter template to use
-    defaultLayout: "_layout", // Default layout filename (without extension)
+    defaultLayout: "layout", // Default layout filename (without extension or underscore prefix)
     excludePattern: "_.*", // Pattern for files/directories to exclude from output
   };
 

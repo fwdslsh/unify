@@ -8,7 +8,7 @@ import { logger } from '../utils/logger.js';
  */
 export class LayoutDiscovery {
   constructor(config = {}) {
-    this.defaultLayout = config.defaultLayout || "_layout";
+    this.defaultLayout = config.defaultLayout || "layout";
   }
   
   /**
