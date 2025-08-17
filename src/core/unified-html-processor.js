@@ -16,7 +16,7 @@ import {
   IncludeNotFoundError,
   LayoutError
 } from "../utils/errors.js";
-import { isPathWithinDirectory, resolveIncludePath, resolveResourcePath } from "../utils/path-resolver.js";
+import { transformLinksInHtml } from "../utils/link-transformer.js";
 
 /**
  * Determine if processing should fail fast based on configuration
@@ -151,6 +151,12 @@ export async function processHtmlUnified(
     } else if (extractedAssets && (extractedAssets.styles?.length > 0 || extractedAssets.scripts?.length > 0)) {
       // Apply extracted assets to complete HTML documents even without layouts/templating
       processedContent = applyExtractedAssets(processedContent, extractedAssets);
+    }
+
+    // Apply link normalization if pretty URLs are enabled
+    if (processingConfig.prettyUrls) {
+      logger.debug(`Normalizing links for pretty URLs in ${path.relative(sourceRoot, filePath)}`);
+      processedContent = transformLinksInHtml(processedContent, filePath, sourceRoot);
     }
 
   // Slot/template injection for HTML files (if layout contains <slot> or <template slot="...">)
