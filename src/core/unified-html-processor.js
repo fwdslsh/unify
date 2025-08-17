@@ -18,6 +18,7 @@ import {
 } from "../utils/errors.js";
 import { transformLinksInHtml } from "../utils/link-transformer.js";
 import { resolveIncludePath, isPathWithinDirectory } from "../utils/path-resolver.js";
+import { processMarkdown, isMarkdownFile } from "./markdown-processor.js";
 
 /**
  * Read an include file with sensible fallback locations.
@@ -25,7 +26,21 @@ import { resolveIncludePath, isPathWithinDirectory } from "../utils/path-resolve
  */
 async function readIncludeWithFallback(resolvedPath, src, filePath, sourceRoot) {
   try {
-    return { content: await fs.readFile(resolvedPath, 'utf-8'), resolvedPath };
+    const content = await fs.readFile(resolvedPath, 'utf-8');
+    
+    // Process markdown files if detected
+    if (isMarkdownFile(resolvedPath)) {
+      try {
+        const markdownResult = processMarkdown(content, resolvedPath);
+        logger.debug(`Processed markdown include: ${src} -> ${resolvedPath}`);
+        return { content: markdownResult.html, resolvedPath };
+      } catch (error) {
+        logger.error(`Failed to process markdown include ${src}: ${error.message}`);
+        throw error;
+      }
+    }
+    
+    return { content, resolvedPath };
   } catch (err) {
     // Try sourceRoot relative and several fallbacks
     const candidates = [
@@ -64,6 +79,19 @@ async function readIncludeWithFallback(resolvedPath, src, filePath, sourceRoot) 
       try {
         const content = await fs.readFile(candidate, 'utf-8');
         logger.debug(`readIncludeWithFallback: found include at ${candidate}`);
+        
+        // Process markdown files if detected
+        if (isMarkdownFile(candidate)) {
+          try {
+            const markdownResult = processMarkdown(content, candidate);
+            logger.debug(`Processed markdown include: ${src} -> ${candidate}`);
+            return { content: markdownResult.html, resolvedPath: candidate };
+          } catch (error) {
+            logger.error(`Failed to process markdown include ${src}: ${error.message}`);
+            throw error;
+          }
+        }
+        
         return { content, resolvedPath: candidate };
       } catch (e) {
         // continue to next candidate
@@ -269,7 +297,19 @@ async function processIncludesWithStringReplacement(htmlContent, filePath, sourc
     
     try {
       const resolvedPath = resolveIncludePathInternal(type, includePath, filePath, sourceRoot);
-      const includeContent = await fs.readFile(resolvedPath, 'utf-8');
+      let includeContent = await fs.readFile(resolvedPath, 'utf-8');
+      
+      // Process markdown files if detected
+      if (isMarkdownFile(resolvedPath)) {
+        try {
+          const markdownResult = processMarkdown(includeContent, resolvedPath);
+          includeContent = markdownResult.html;
+          logger.debug(`Processed markdown include: ${includePath} -> ${resolvedPath}`);
+        } catch (error) {
+          logger.error(`Failed to process markdown include ${includePath}: ${error.message}`);
+          throw error;
+        }
+      }
       
       // Recursively process nested includes
       const nestedResult = await processIncludesWithStringReplacement(includeContent, resolvedPath, sourceRoot, config, newCallStack);
