@@ -297,3 +297,14 @@ export function createBuildCache(cacheDir = '.unify-cache') {
   const cache = new BuildCache(cacheDir);
   return cache;
 }
+
+/**
+ * Clear cache on restart for serve/watch commands
+ * @param {string} cacheDir - Cache directory path
+ */
+export async function clearCacheOnRestart(cacheDir = '.unify-cache') {
+  const cache = new BuildCache(cacheDir);
+  await cache.initialize();
+  await cache.clearCache();
+  logger.info('Build cache cleared for fresh start');
+}

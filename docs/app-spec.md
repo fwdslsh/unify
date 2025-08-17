@@ -1091,6 +1091,7 @@ The file watcher monitors all changes in the source directory and triggers appro
 - Selective rebuild based on dependency analysis
 - Efficient live reload via Server-Sent Events
 - Memory-efficient file watching
+- **Cache Management**: Build cache is automatically cleared when server or watch commands are restarted to ensure fresh builds
 
 ### Scalability
 
