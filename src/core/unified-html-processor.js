@@ -170,7 +170,6 @@ export async function processHtmlUnified(
   dependencyTracker,
   config = {}
 ) {
-  console.log(`[DEBUG] processHtmlUnified called for: ${filePath}`);
   const processingConfig = {
     layoutsDir: ".layouts", // Deprecated but kept for compatibility
     optimize: config.minify || config.optimize,
@@ -266,7 +265,6 @@ export async function processHtmlUnified(
  * Returns an object with processed content and extracted assets
  */
 async function processIncludesWithStringReplacement(htmlContent, filePath, sourceRoot, config = {}, callStack = new Set()) {
-  console.log(`[DEBUG] processIncludesWithStringReplacement called for: ${filePath}`);
   let processedContent = typeof htmlContent === 'string' ? htmlContent : '';
   const extractedAssets = { styles: [], scripts: [] };
 
@@ -288,15 +286,9 @@ async function processIncludesWithStringReplacement(htmlContent, filePath, sourc
   let match;
   const processedIncludes = new Set();
   
-  console.log(`[DEBUG] Processing content for SSI includes: ${htmlContent.substring(0, 200)}...`);
-  console.log(`[DEBUG] Content contains <!--#include: ${htmlContent.includes('<!--#include')}`);
-  console.log(`[DEBUG] Content type: ${typeof htmlContent}, length: ${htmlContent.length}`);
-  
   while ((match = includeRegex.exec(htmlContent)) !== null) {
     const [fullMatch, type, includePath] = match;
     const includeKey = `${type}:${includePath}`;
-    
-    console.log(`[DEBUG] Found SSI include: ${fullMatch}`);
     
     if (processedIncludes.has(includeKey)) {
       continue; // Avoid processing the same include multiple times
@@ -310,16 +302,13 @@ async function processIncludesWithStringReplacement(htmlContent, filePath, sourc
       // Process markdown files if detected
       if (isMarkdownFile(resolvedPath)) {
         try {
-          logger.debug(`Processing markdown include: ${resolvedPath}`);
           const markdownResult = processMarkdown(includeContent, resolvedPath);
           includeContent = markdownResult.html;
-          logger.debug(`Processed markdown include: ${includePath} -> ${resolvedPath}, result length: ${includeContent.length}`);
+          logger.debug(`Processed markdown include: ${includePath} -> ${resolvedPath}`);
         } catch (error) {
           logger.error(`Failed to process markdown include ${includePath}: ${error.message}`);
           throw error;
         }
-      } else {
-        logger.debug(`Not a markdown file: ${resolvedPath}`);
       }
       
       // Recursively process nested includes
