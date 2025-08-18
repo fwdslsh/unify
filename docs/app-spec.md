@@ -2,31 +2,35 @@
 
 ## Overview
 
-Unify is a modern, lightweight static site generator designed for frontend developers who want to build maintainable static sites with component-based architecture. It uses familiar Apache SSI syntax and modern HTML templating to eliminate the need to copy and paste headers, footers, and navigation across multiple pages.
+Unify is a modern, lightweight static site generator designed for frontend developers who want to build maintainable static sites with fragment-based architecture. It produces framework-free, pure HTML/CSS output and emphasizes authoring with standard HTML, CSS, and JS — no special build-time DSLs. Developers can preview layouts, fragments, and pages locally without complex tooling, while still benefiting from composition, slotting, and head merging using Cascading Imports.
 
 ## Target Users
 
-- Frontend developers familiar with HTML, CSS, and basic web development
-- Content creators who need a simple static site generator
-- Developers who want framework-free, pure HTML/CSS output
-- Teams needing component-based architecture without JavaScript frameworks
+- Frontend developers familiar with HTML/CSS/JS
+- Content creators needing a simple static site generator
+- Teams that want fragment-based architecture without a framework
+- Developers who prefer convention-over-configuration with minimal setup
 
 ## Core Functionality
 
+### Terminology
+
+- **Page**: A source file (HTML or Markdown) that generates a corresponding output file in the built site
+- **Fragment**: A reusable HTML component or layout file that is imported and composed into pages but does not generate its own output file (typically prefixed with `_`)
+
 ### Primary Purpose
 
-Transform source HTML/Markdown files with includes and layouts into a complete static website ready for deployment.
+Transform source HTML/Markdown files with intelligent imports into a complete static website ready for deployment.
 
 ### Key Features
 
-- Apache SSI-style includes (`<!--#include file="header.html" -->`)
-- Modern DOM templating with `<template>`, `data-slot` attributes, and `<include>` elements
-- Markdown processing with YAML frontmatter
+- **Cascading Imports** (`data-import`/`slot` / `data-target`): Unified mechanism for fragments composition
+- **Includes (Legacy)**: Apache SSI-style includes for backwards compatibility
+- **Markdown**: YAML frontmatter support, head synthesis, and conversion to HTML
 
 ### Additional Features
 
 - Live development server with auto-reload
-- Automatic sitemap.xml generation
 - Incremental builds with smart dependency tracking
 - Asset tracking and copying
 - Security-first design with path traversal prevention
@@ -58,13 +62,11 @@ unify            # Defaults to build command
 4. Applies layouts to HTML and Markdown pages
 5. Processes DOM templating elements
 6. Copies referenced assets to output
-7. Generates sitemap.xml (if enabled)
-8. Reports build summary
+7. Reports build summary
 
 **Expected Output:**
 
 - Complete static website in output directory
-- Sitemap.xml file at root
 - All referenced assets copied with directory structure preserved
 - Success message with file count and build time
 - Exit code 0 on success, 1 on recoverable errors, 2 on fatal errors
@@ -139,14 +141,87 @@ unify watch [options]
 - **Behavior:** Created if doesn't exist
 - **Used by:** All commands
 
-**`--copy <pattern>`**
+**`--copy <glob>` (repeatable)**
 
-- **Purpose:** Specify additional files to copy using glob patterns
-- **Default:** `null` (no additional files copied beyond automatic asset detection)
+- **Purpose:** Adds paths to the **copy** set. `assets/**` is implicitly copied unless excluded.
+- **Default:** `null` (no additional files copied beyond automatic asset detection and implicit `assets/**`)
 - **Used by:** All commands
-- **Format:** Glob pattern like `"./docs/**/*.*"` or `"./config/*.json"`
-- **Behavior:** Copies matching files to output directory preserving relative paths
+- **Format:** Ripgrep/gitignore-style glob patterns like `"./docs/**/*.*"` or `"./config/*.json"`
+- **Behavior:** Copies matching files to output directory preserving relative paths. This mirrors the familiar "public assets copied as-is" behavior seen in Astro/Vite.
 - **Note:** Use quotes around patterns with special characters. The `src/assets` directory is automatically copied if it exists.
+
+**`--ignore <glob>` (repeatable)**
+
+- **Purpose:** Ignore paths for **both rendering and copying** (ripgrep/gitignore-style globs, `!` negation support)
+- **Default:** `null` (respects `.gitignore` by default)
+- **Used by:** All commands
+- **Format:** Ripgrep/gitignore-style glob patterns like `"**/drafts/**"` or `"!important/**"`
+- **Behavior:** **Last flag wins** when multiple patterns overlap. Applies to both render and copy pipelines.
+- **Note:** Respects `.gitignore` by default for both render and copy operations.
+
+**`--ignore-render <glob>` (repeatable)**
+
+- **Purpose:** Ignore paths **only** in the render/emitting pipeline
+- **Default:** `null`
+- **Used by:** All commands
+- **Format:** Ripgrep/gitignore-style glob patterns
+- **Behavior:** Files matching this pattern will not be rendered/emitted but may still be copied if they match copy rules.
+
+**`--ignore-copy <glob>` (repeatable)**
+
+- **Purpose:** Ignore paths **only** in the copy pipeline
+- **Default:** `null`
+- **Used by:** All commands
+- **Format:** Ripgrep/gitignore-style glob patterns
+- **Behavior:** Files matching this pattern will not be copied but may still be rendered if they are renderable.
+
+**`--render <glob>` (repeatable)**
+
+- **Purpose:** Force **render/emitting** of matching files **even if** they would otherwise be ignored (by `.gitignore` or any `--ignore*` rule)
+- **Default:** `null`
+- **Used by:** All commands
+- **Format:** Ripgrep/gitignore-style glob patterns like `"experiments/**"`
+- **Behavior:** Useful for rendering "hidden" or experimental content. Precedence for a renderable file: `--render` overrides `--ignore-render`/`--ignore` → classify as **EMIT**. If a file matches both render and copy rules, **render wins** so raw templates don't leak.
+
+**`--default-layout <value>` (repeatable)**
+
+- **Purpose:** Set default layouts for files matching glob patterns or globally
+- **Default:** `null`
+- **Used by:** All commands
+- **Format:** Accepts either:
+  - **Filename** (e.g., `_layout.html`) → implicit `*` (global fallback)
+  - **Key-value** `<ripgrep-glob>=<filename>` (e.g., `blog/**=_post.html`) → applies to matches
+- **Behavior:** **Last one wins** across overlaps (glob rules applied in order, later flags take precedence).
+- **Layout Resolution Precedence:**
+  1. Page-declared layout
+  2. Last-matching `--default-layout <glob=filename>`
+  3. Last filename-only `--default-layout <filename>`
+  4. Discovery fallback: `_layout.htm`, then `_layout.html`
+  5. No layout, wrap in boilerplate DOCTYPE, html element if missing
+
+**`--dry-run`**
+
+- **Purpose:** Classify each discovered file and **explain** the decision without writing output
+- **Default:** `false`
+- **Used by:** All commands
+- **Behavior:** Shows classification for each file:
+  - `EMIT via <reason>` (e.g., "renderable(md); layout=blog/\_post.html")
+  - `COPY via <reason>` (e.g., "implicit assets/**; matched --copy 'public/**'")
+  - `SKIP via <reason>` (debug-level, e.g., "non-renderable(.db)")
+  - `IGNORED via <rule>` (debug-level, e.g., ".gitignore", "--ignore '**/drafts/**'")
+- **Output:** Also shows final layout after applying `--default-layout` rules & discovery. No actual output files are written. SKIP and IGNORED messages are only shown with `--log-level=debug`.
+
+**`--auto-ignore <boolean>`**
+
+- **Purpose:** Control automatic ignoring of referenced layouts, components, and `.gitignore` files
+- **Default:** `true`
+- **Used by:** All commands
+- **Format:** `true` or `false`
+- **Behavior:** When `true` (default), automatically ignores:
+  - Files specified as layouts (via `--default-layout`, page frontmatter, or discovery)
+  - Files referenced as includes (components, partials, fragments)
+  - Files listed in `.gitignore`
+- **When disabled (`false`):** Users must manually specify ignore rules; `.gitignore` is not respected; layout and include files may be emitted as standalone pages if not explicitly ignored.
 
 #### Build Options
 
@@ -163,20 +238,13 @@ unify watch [options]
   - Preserves query parameters and fragments: `./contact.html?form=1#section` → `/contact/?form=1#section`
   - External links, non-HTML links, and fragments are unchanged
 
-**`--base-url <url>`**
-
-- **Purpose:** Base URL for sitemap.xml generation
-- **Default:** `https://example.com`
-- **Used by:** All commands
-- **Format:** Full URL with protocol
-
 **`--clean`**
 
 - **Purpose:** Clean output directory before (initial) build
 - **Default:** `false`
 - **Used by:** All commands
 
-**`--fail-on <level>`**
+**`--fail-level <level>`**
 
 - **Purpose:** Fail entire build if errors of specified level or higher occur
 - **Default:** `null` (only fail on fatal build errors)
@@ -186,15 +254,9 @@ unify watch [options]
 
 Examples:
 
-- `--fail-on warning`: Fail on any warning or error
-- `--fail-on error`: Fail only on errors (not warnings)
+- `--fail-level warning`: Fail on any warning or error
+- `--fail-level error`: Fail only on errors (not warnings)
 - No flag: Only fail on fatal build errors (default behavior)
-
-**`--no-sitemap`**
-
-- **Purpose:** Disable sitemap.xml generation
-- **Default:** `false` (sitemap enabled by default)
-- **Used by:** All Commands
 
 **`--minify`**
 
@@ -233,9 +295,242 @@ Examples:
 - **Format:** `unify v{version}`
 - **Exit:** Code 0 after displaying version
 
-**`--verbose`**
+**`--log-level <level>`**
 
-- **Purpose:** Enable Debug level messages to be included in console output
+- **Purpose:** Set logging verbosity level
+- **Default:** `info`
+- **Valid levels:** `error`, `warn`, `info`, `debug`
+- **Used by:** All commands
+- **Behavior:** Controls logging output verbosity. Debug is chatty and should be opt-in. Keeps logging simple and aligned with common practice.
+
+## Getting Started & Common Usage Patterns
+
+### Basic Usage
+
+For most projects, Unify works with zero configuration:
+
+```bash
+# Build your site
+unify
+
+# Develop with live reload
+unify serve
+
+# Watch for changes without serving
+unify watch
+```
+
+### Common Patterns
+
+#### 1. Simple Static Site
+
+```bash
+# Basic build with default settings
+unify
+
+# Clean build (remove old files first)
+unify --clean
+
+# Pretty URLs for SEO
+unify --pretty-urls
+```
+
+#### 2. Blog or Documentation Site
+
+```bash
+# Ignore draft posts but render everything else
+unify --ignore "**/drafts/**"
+
+# Set a blog layout for all posts
+unify --default-layout "blog/**=_post.html"
+
+# Multiple layout rules (more specific last)
+unify --default-layout "_base.html" --default-layout "blog/**=_post.html"
+```
+
+#### 3. Development Workflow
+
+```bash
+# See what gets built without actually building
+unify --dry-run
+
+# Debug build issues with verbose output
+unify --dry-run --log-level=debug
+
+# Serve with clean slate
+unify serve --clean
+```
+
+#### 4. Asset Management
+
+```bash
+# Copy additional files beyond automatic asset detection
+unify --copy "docs/**/*.pdf" --copy "config/*.json"
+
+# Exclude certain assets from copying
+unify --ignore-copy "assets/raw/**" --ignore-copy "**/*.psd"
+
+# Force render experimental content that might be gitignored
+unify --render "experiments/**"
+```
+
+#### 5. CI/CD and Production
+
+```bash
+# Production build with minification and strict error handling
+unify --minify --fail-level=warning --clean
+
+# Build with custom source/output directories
+unify --source=content --output=public
+
+# Disable auto-ignore for full control
+unify --auto-ignore=false --ignore="_*" --ignore=".*"
+```
+
+### Troubleshooting Common Issues
+
+#### File Not Appearing in Output
+
+```bash
+# Check what's happening to your file
+unify --dry-run --log-level=debug | grep "your-file.html"
+
+# Common causes:
+# - File ignored by .gitignore (use --render to override)
+# - File starts with _ (rename or use --auto-ignore=false)
+# - File matched by --ignore pattern
+```
+
+#### Import Not Applied
+
+```bash
+# Check layout resolution
+unify --dry-run | grep "import"
+
+# Common causes:
+# - Import file not found in expected location
+# - Typo in data-import attribute
+# - No automatic layout discovery file found
+```
+
+#### Performance Issues
+
+```bash
+# Check for overly broad patterns
+unify --dry-run  # Look for performance warnings
+
+# Optimize patterns:
+# ❌ --copy "**/*"           (too broad)
+# ✅ --copy "assets/**/*.jpg" (specific)
+```
+
+## File Processing Semantics & Precedence
+
+### Simplified Precedence Model
+
+To reduce complexity, Unify uses a **three-tier precedence system**:
+
+#### Tier 1: Explicit Overrides (Highest Priority)
+
+- `--render <pattern>` → Forces files to be rendered even if they would normally be ignored
+- `--auto-ignore=false` → Disables all automatic ignoring (.gitignore, \_ prefixed files and directories)
+
+#### Tier 2: Ignore Rules (Medium Priority)
+
+- `--ignore <pattern>` → Ignores files for both rendering and copying
+- `--ignore-render <pattern>` → Ignores files only for rendering
+- `--ignore-copy <pattern>` → Ignores files only for copying
+- `.gitignore` patterns (when `--auto-ignore=true`)
+
+#### Tier 3: Default Behavior (Lowest Priority)
+
+- Renderables (`.html`, `.md`) are emitted as pages
+- Non-renderables matching `assets/**` or `--copy` patterns are copied
+- Files and directories starting with `_` are ignored (unless included in a `--copy` option)
+
+**Resolution Order**: Higher tiers always win. Within the same tier, **last pattern wins** (ripgrep-style).
+
+**Example**:
+
+```bash
+unify --ignore "blog/**" --render "blog/featured/**" --ignore-render "blog/featured/draft.md"
+```
+
+Result:
+
+- `blog/featured/post.md` → **EMIT** (Tier 1 `--render` wins)
+- `blog/featured/draft.md` → **IGNORED** (Tier 2 `--ignore-render` wins)
+- `blog/other/post.md` → **IGNORED** (Tier 2 `--ignore` wins)
+
+### Classification Algorithm
+
+Unify processes files through the following algorithm:
+
+1. **Determine renderability** based on file extensions and content-type (`.html`, `.md` are renderable)
+2. **Apply Tier 1 overrides**: `--render` (if renderable) forces EMIT (overrides everything else)
+3. **Apply Tier 2 ignore rules**: Check `--ignore*` patterns and `.gitignore`
+4. **Apply Tier 3 defaults**:
+   - Renderables become **EMIT**
+   - Non-renderables matching `assets/**` or any `--copy` pattern → **COPY**
+5. **Conflict resolution**: If a file is both copy-eligible and renderable, **render wins**
+
+### Glob Pattern Rules
+
+- **Format**: Ripgrep/gitignore-style patterns (`**`, `*`, `?`, negation with `!`)
+- **Precedence**: Later flags override earlier ones when patterns overlap
+- **Cross-platform**: Paths are automatically converted to POSIX-compatible format internally
+- **Validation**: The tool provides helpful error messages for invalid glob patterns
+- **Performance Warnings**: Warnings are displayed for overly broad patterns (e.g., `**/*`) that may impact performance
+- **Collision Detection**: Warnings are shown when glob patterns conflict with other rules, including potential performance ramifications
+- **Path Handling**:
+  - Symlinks are not followed for security and predictability
+  - Case sensitivity behavior is platform-specific (case-insensitive on Windows, case-sensitive on Linux/macOS)
+
+### Auto-Ignored Files
+
+Files are automatically added to the ignore list to prevent accidental emission (when `--auto-ignore=true`, which is the default):
+
+1. **Layout Files**: Any file specified as a `default-layout` or layout (via `--default-layout`, page frontmatter, or discovery) is automatically ignored for rendering and copying
+2. **Include Files**: Any file referenced as an include (components, partials, fragments) is automatically ignored for rendering and copying
+3. **Detection**: The system detects these references during classification and excludes them from emission/copying
+4. **Behavior**: This is implicit and requires no manual configuration
+5. **Override**: Use `--auto-ignore=false` to disable this behavior and `.gitignore` respect
+
+**Examples**:
+
+- If `_layout.html` is set as a default layout, it's automatically ignored even if not in `--ignore`
+- If `_includes/header.html` is referenced via `<include>` or SSI, it's automatically ignored
+- Users don't need to manually ignore every include or layout file (unless `--auto-ignore=false`)
+
+**Conflicting Rules Warning**: The tool will display warnings when conflicting ignore/copy rules are detected to help users understand rule interactions.
+
+### Implicit Behaviors
+
+- **`.gitignore` Respect**: Both render and copy operations respect `.gitignore` by default when `--auto-ignore=true` (like Eleventy)
+- **Implicit Assets Copy**: `assets/**` is copied by default unless explicitly ignored
+- **Underscore Exclusion**: Files and directories starting with `_` are excluded from output (see Underscore Prefix Exclusion Rules)
+- **Auto-ignore Override**: Use `--auto-ignore=false` to disable `.gitignore` respect and automatic layout/include ignoring
+
+### Dry Run Output Example
+
+```
+[EMIT]    src/posts/hello.md
+          reason: renderable(md);
+          layout match blog/**=_post.html (last wins)
+[EMIT]    experiments/hidden.md
+          reason: --render 'experiments/**' overrides .gitignore
+[COPY]    assets/fonts/inter.woff2
+          reason: implicit assets/** (not ignored)
+
+# Debug-level output (only shown with --log-level=debug):
+[SKIP]    src/posts/thumbs.db
+          reason: non-renderable(.db)
+          included by: --copy src/**/*.*
+[IGNORED] src/posts/drafts/wip.md
+          reason: --ignore '**/drafts/**'
+[IGNORED] assets/private/key.pem
+          reason: --ignore-copy 'assets/private/**'
+```
 
 ## File Processing Rules
 
@@ -289,9 +584,11 @@ src/
 
 ### HTML Files (`.html`, `.htm`)
 
-- Pages: `.htm(l)` files not starting with `_` are emitted as pages.
-- Partials: `.htm(l)` files starting with `_` are non-emitting partials.
-- Layouts: Only files named `_layout.html` or `_layout.htm` are automatically applied as folder-scoped layouts.
+**Note:** Unify prefers `.html` extension but supports `.htm` for compatibility. All examples in this document use `.html`.
+
+- Pages: `.html` files not starting with `_` are emitted as pages.
+- Fragments: `.html` files starting with `_` are non-emitting html files.
+- Layouts: Fragments imported by the page's root element are considered layouts. Only files named `_layout.html` are automatically applied as part of automatic layout discovery.
 
 #### HTML Page Types
 
@@ -300,14 +597,13 @@ HTML pages can be either **page fragments** or **full HTML documents**:
 **Page Fragments:**
 
 - HTML content without `<!DOCTYPE>`, `<html>`, `<head>`, or `<body>` elements
-- Content is treated as fragment and inserted into layout's default slot (`data-slot="default"`) as-is
-  - Head and template elements found in the fragment are processed as described in this document.
-- Can use `data-layout` attribute on the root element for named layout discovery
-  - Multiple elements with a data-layout attribute inside of a fragment page should result in an error.
+- Content is treated as a fragment and inserted into root fragment's unnamed slot as-is
+  - Head and template elements found in the fragment are processed as described in this document
+  - Only one top-level element with a `data-import` attribute is allowed per page
 - Example:
 
 ```html
-<div data-layout="blog">
+<div data-import="blog">
   <h1>Article Title</h1>
   <p>Article content...</p>
 </div>
@@ -319,7 +615,7 @@ HTML pages can be either **page fragments** or **full HTML documents**:
 - Document elements are merged with the layout during processing
   - Page attributes win if there is a conflict
   - Page content is appended to matching elements
-- Layout discovery can be specified via `<link rel="layout">` in the document head
+- Layout discovery uses automatic file discovery (see Layout Discovery section)
 - Example:
 
 ```html
@@ -327,7 +623,6 @@ HTML pages can be either **page fragments** or **full HTML documents**:
 <html>
   <head>
     <title>Page Title</title>
-    <link rel="layout" href="/layouts/blog.html" />
   </head>
   <body>
     <h1>Article Title</h1>
@@ -336,6 +631,10 @@ HTML pages can be either **page fragments** or **full HTML documents**:
 </html>
 ```
 
+**Note on Document Structure Flexibility:**
+
+The `<!DOCTYPE>`, `<html>`, `<head>`, and `<body>` tags are trivial in Unify and are allowed to exist or not exist in both fragments and pages. Unify will intelligently merge the ones that are found and ensure the basic boilerplate exists if neither the page nor any fragments have included them. This makes it easy to use full HTML documents for layouts, fragments, and pages, or drop them to reduce boilerplate if you prefer.
+
 #### HTML Document Merging
 
 When processing full HTML documents with layouts:
@@ -343,11 +642,13 @@ When processing full HTML documents with layouts:
 1. **DOCTYPE**: Pages's DOCTYPE is used in final output if it exists. Otherwise fallback to Layout's DOCTYPE
 2. **HTML Element**: Layout's `<html>` element and attributes are preserved. Page's html element's attributes are added and overwrite the layout's attributes when there is a conflict.
 3. **HEAD Element**: Page head content is merged with layout head using the head merge algorithm (see Head Merge Algorithm section)
-4. **BODY Element**: Page body content is inserted into the layout's default `data-slot="default"` element
+4. **BODY Element**: Page body content is inserted into the root import's unnamed slot
 
 ### Markdown Files (`.md`)
 
 - Processed with frontmatter extraction and Markdown→HTML conversion
+- Converted HTML injected into the unnamed slot of the layout
+- Head synthesized from frontmatter and merged globally
 
 ### Link Normalization (Pretty URLs)
 
@@ -397,7 +698,6 @@ When the `--pretty-urls` option is enabled, Unify automatically normalizes HTML 
 
 - **Design-Time**: Links point to actual `.html` files for easy preview and development
 - **Build-Time**: Links are normalized to pretty URLs for SEO-friendly production URLs
-- **Development Server**: Handles both `.html` and pretty URL requests for seamless development experience
 - Support YAML frontmatter with head synthesis for metadata
 - Layout discovery or override applies
 - Head content synthesized from frontmatter (no `<head>` allowed in body)
@@ -456,18 +756,23 @@ head: # Optional container for head sections
 
 #### Head Merge Algorithm
 
-When combining layout `<head>` + page `<head>` (or synthesized head):
+When combining layout `<head>` + page `<head>` (or synthesized head), Unify uses **standard DOM tree processing (top to bottom)**:
 
-1. **Base order:** Start with layout head nodes, append page head nodes
-2. **Precedence:** Page version wins when nodes represent same semantic content
-3. **Deduplication by identity keys:**
-   - `<title>`: Keep last one (page wins)
-   - `<meta>`: Dedupe by `name` or `property` attribute (last wins)
-   - `<link>`: Dedupe `rel="canonical"` (last wins); others dedupe by `(rel, href)` pair
-   - `<script>`: Dedupe by `src` (last wins); inline scripts never deduped
-   - `<style>`: External handled by `<link>` rules; inline never deduped
+**Processing Order**: Top-to-bottom tree traversal starting from root fragment, then fragments in document order, then page content.
+
+**Merge Rules**:
+
+1. **Base order:** Start with root fragment (aka layout) head nodes, then fragments (in order of import), finally page head nodes
+2. **Deterministic de-duplication:** Elements are deduplicated using identity keys:
+   - `<title>`: Last-wins for titles
+   - `<meta>`: Last-wins by `name` or `property` attribute (page wins over fragments, fragments win over layout)
+   - `<link>`: First-kept for external styles/scripts unless `data-allow-duplicate` is present; dedupe canonical links by last-wins
+   - `<script>`: First-kept for external scripts unless `data-allow-duplicate` is present; inline scripts never deduped
+   - `<style>`: First-kept for external stylesheets unless `data-allow-duplicate` is present; inline styles never deduped
    - Unknown elements: Append without deduplication
-4. **Safety:** Apply existing sanitization and path traversal prevention
+3. **Optional CSS layering hints:** Allow `data-layer="..."` on `<link>`/`<style>` elements so authors can align with `@layer`. This has no functionality but provides hints to consumers of the fragments. Also forward compatible in case we add automatic layering in the future.
+4. **Script defaults that match modern practice:** It is recommended that scripts use `defer` behavior. Their relative order will be preserved inside each tier
+5. **Safety:** Apply existing sanitization and path traversal prevention
 
 #### Synthesis Rules (Markdown → `<head>`)
 
@@ -505,67 +810,59 @@ When combining layout `<head>` + page `<head>` (or synthesized head):
 
 ### Static Assets
 
-- **Asset Reference Tracking:** Only referenced assets are copied to output
-- **Automatic `src/assets` Copying:** The `src/assets` directory is automatically copied to `dist/assets` if it exists, preserving folder structure
-- **Additional File Copying:** Use `--copy` option to copy additional files with glob patterns
+- **Implicit Assets Copy:** The `assets/**` directory is implicitly copied to output unless explicitly excluded (mirrors Astro/Vite "public" behavior)
+- **Asset Reference Tracking:** Referenced assets from HTML/CSS are automatically detected and copied to output
+- **Additional File Copying:** Use `--copy` option to specify additional files to copy using glob patterns
+- **Copy vs Render Priority:** If a file matches both copy and render rules, **render wins** to prevent raw templates from leaking
 - **Underscore Prefix Exclusion:** Files and folders starting with `_` are automatically excluded from build output (see Underscore Prefix Exclusion Rules above)
+- **Glob-based Control:** Use `--ignore-copy` to exclude specific files from copying, or `--ignore` to exclude from both rendering and copying
 
 ### Include System
 
-#### DOM Include
-
-```html
-<include src="/_includes/header.html"></include>
-<include src="menu.md"></include>
-<include src="/components/toc.md" />
-```
-
-Resolution:
-
-1. Leading `/` → from `src/` root.
-2. Else → relative to including file.
-
-**Markdown Support**: When the included file has a `.md` extension, it is processed through the markdown processor and the resulting HTML is included. Frontmatter is processed but not included in the output.
 
 ##### Slot Injection in Includes
 
-The `<include>` element supports slot-based content injection, allowing you to pass content to `data-slot` targets within the included component:
+The elements with `data-import` support slot-based content injection, allowing you to pass content to `<slot>` targets within the included component:
 
 ```html
 <!-- Component: _includes/nav.html -->
 <nav class="navbar">
-  <div data-slot="brand">Default Brand</div>
-  <ul data-slot="links">
-    <li><a href="/">Home</a></li>
-  </ul>
-  <div data-slot="actions">
-    <button>Sign In</button>
+  <slot name="brand">Default Brand</slot>
+  <slot>
+    <ul>
+      <li><a href="/">Home</a></li>
+    </ul>
+  </slot>
+  <div>
+    <slot name="actions">
+      <button>Sign In</button>
+    </slot>
   </div>
 </nav>
 
 <!-- Page using the component -->
-<include src="/_includes/nav.html">
-  <a data-slot="brand" href="/">MyBrand</a>
-  
-  <ul data-slot="links">
-    <li><a href="/docs/">Docs</a></li>
-    <li><a href="/blog/">Blog</a></li>
-  </ul>
-  
-  <div data-slot="actions">
-    <a href="/start/" class="btn">Get Started</a>
-  </div>
-</include>
+<body>
+  <template data-import="/_includes/nav.html">
+    <a href="/" data-target="brand">MyBrand</a>
+
+    <ul>
+      <li><a href="/docs/">Docs</a></li>
+      <li><a href="/blog/">Blog</a></li>
+    </ul>
+
+    <template data-target="actions">
+      <a href="/start/" class="btn">Get Started</a>
+    </template>
+  </template>
+</body>
 
 <!-- Output -->
 <nav class="navbar">
   <a href="/">MyBrand</a>
-  
   <ul>
     <li><a href="/docs/">Docs</a></li>
     <li><a href="/blog/">Blog</a></li>
   </ul>
-  
   <div>
     <a href="/start/" class="btn">Get Started</a>
   </div>
@@ -574,18 +871,18 @@ The `<include>` element supports slot-based content injection, allowing you to p
 
 **Slot Injection Rules:**
 
-1. **Slot Matching**: Child elements with `data-slot` attributes are matched to corresponding `data-slot` targets in the included component
-2. **Content Replacement**: The entire content of the target element (with matching `data-slot`) is replaced by the provided slot content
-3. **Attribute Removal**: The `data-slot` attribute is removed from both the provider and target elements in the final output
-4. **Fallback Content**: If no slot content is provided, the original content in the component's `data-slot` element serves as fallback
-5. **Multiple Slots**: Multiple slots can be provided in any order; they will be injected into their corresponding targets
+1. **Slot Matching**: Elements with `data-target="name"` are matched to corresponding `<slot name="name">` targets in the imported fragment
+2. **Content Replacement**: The entire `<slot>` element is replaced by the element with a matching `data-target=name` attribute. If the element is a template (`<template data-target="name">`) the content of the template replaces the slot element.
+3. **Element and Attribute Removal**: Both `<slot>` and `<template>` elements are removed in the final output, leaving only their content. `data-import` and `data-target` attributes are removed from element in final output
+4. **Fallback Content**: If no slot content is provided, the original content inside the `<slot>` element serves as fallback`
+5. **Multiple Slots**: Multiple slots can be provided by a fragment in any order; they will be injected into their corresponding targets. Only one unnamed slot is allowed per fragment
 6. **Nested Includes**: Slot injection works with nested includes - slots are resolved at each level
 
 **Important Notes:**
 
-- Slot injection only works with `<include>` elements, not with Apache SSI includes
-- The `data-slot` attribute must match exactly (case-sensitive)
-- Elements without `data-slot` attributes inside `<include>` are ignored
+- Slot injection only works with elements, not with Apache SSI includes
+- The `data-target` attribute value must match the `<slot>` name attribute value exactly (case-sensitive)
+- Elements without `data-target` attributes inside `data-import` elements are placed into the fragments default slot
 - Styles and scripts from components are still extracted and relocated as usual
 
 #### Apache SSI
@@ -602,246 +899,171 @@ The `<include>` element supports slot-based content injection, allowing you to p
 - Apache SSI includes do not support slot injection
 - **Markdown Support**: When the included file has a `.md` extension, it is processed through the markdown processor and the resulting HTML is included. Frontmatter is processed but not included in the output.
 
-### Layout System
+### Cascading Imports System
 
-#### Layout Discovery Process
+Unify uses **Cascading Imports** for fragment composition.
 
-Unify uses a hierarchical layout discovery system with both automatic and explicit layout selection:
+#### How Cascading Imports Work
 
-**1. Explicit Layout Override (Highest Priority)**
+Pages can import "layout" fragments using the `data-import` attribute on the root element:
 
-- HTML pages: `data-layout` attribute on root element OR `<link rel="layout">` in document head
-- Markdown pages: `layout` key in frontmatter
-- Layout files can be located anywhere in the src directory with any filename
-- Layout path resolution supports:
+```html
+<!-- Page importing a layout -->
+<div data-import="/layouts/blog.html">
+  <h1>Article Title</h1>
+  <p>Article content goes into the default slot...</p>
+</div>
+```
+
+**Markdown Support**: When the imported file has a `.md` extension, it is processed through the markdown processor and the resulting HTML is included. Frontmatter is processed but not included in the output. Markdown do not support slots.
+
+```html
+<!-- Page importing a markdown file -->
+<div data-import="/posts/post1.md"></div>
+```
+
+```text
+# Article Title
+
+Article content goes into the importing element just like an html page...
+```
+
+```html
+<!-- Output -->
+<div data-import="/layouts/blog.html">
+  <h1>Article Title</h1>
+  <p>Article content goes into the importing element just like an html page...</p>
+</div>
+```
+
+#### Fragment Path Resolution
 
 **Full Path Syntax:**
 
-- `data-layout="custom.html"` → Look relative to current page directory
-- `data-layout="/path/to/layout.html"` → Look from source root (absolute path)
-- `data-layout="../shared/layout.html"` → Look relative to current page
-
-**Link Element Layout Discovery (Full HTML Documents Only):**
-
-- `<link rel="layout" href="custom.html">` → Look relative to current page directory
-- `<link rel="layout" href="/path/to/layout.html">` → Look from source root (absolute path)
-- `<link rel="layout" href="../shared/layout.html">` → Look relative to current page
-- Uses typical layout discovery on the `href` value (same path resolution as `data-layout`)
-- Only applies to full HTML documents with `<head>` element
-- Takes precedence over `data-layout` attribute if both are present
+- `data-import="/layouts/blog.html"` → Look from source root (absolute path)
+- `data-import="../shared/fragment.html"` → Look relative to current page
+- `data-import="custom.html"` → Look relative to current page directory
 
 **Short Name Syntax (Convenience Feature):**
 
-- `data-layout="blog"` → Searches for `_blog.layout.html` or `_blog.layout.htm`
-- `<link rel="layout" href="blog">` → Same search pattern as `data-layout="blog"`
-- Short names drop the underscore prefix (`_`), layout segment (`.layout`), and file extension
+- Unify will strip `_` prefixes, `.layout` segments, and `.html` extensions from filenames when locating a fragment during import
+- `data-import="blog"` would find `_blog.layout.html` if it is in the correct folder path.
 - Search order for short names:
   1. Current directory up through parent directories to source root
   2. Then `_includes` directory
-- **Important**: Files must have `.layout.html` or `.layout.htm` suffix to be found via short name
-- If no matching file found, a warning is produced
-- Examples:
-  - `data-layout="blog"` finds `_blog.layout.html` in directory hierarchy
-  - `data-layout="docs"` finds `_docs.layout.htm` in directory hierarchy or `_includes`
-  - `data-layout="api"` finds `_api.layout.html` in directory hierarchy
+- supports both exact filenames and short name resolution (e.g., `blog` → `_blog.layout.html`, `nav` -> `_nav.html`, `footer` -> `_includes/footer.html`)
 
-**2. Automatic Layout Discovery (Default Behavior)**
+#### Automatic Layout Discovery
 
-- **Only applies to files named exactly `_layout.html` or `_layout.htm`**
-- Start in the page's directory
-- Look for `_layout.html` or `_layout.htm`
-- If not found, move up to parent directory and repeat
-- Continue climbing the directory tree until reaching source root
-- **Note**: Other layout files (e.g., `_blog.layout.html`, `_custom.html`) are NOT automatically applied
+When no `data-import` attribute is found on the root element of a page, Unify applies **automatic layout discovery**:
 
-**3. Site-wide Fallback Layout (Lowest Priority)**
+1. **Start in the page's directory** and look for `_layout.html`
+2. **If not found**, move up to parent directory and repeat
+3. **Continue climbing** the directory tree until reaching source root
+4. **Site-wide fallback**: If no `_layout.html` found, use `_includes/layout.html` if it exists
 
-- If no `_layout.htm(l)` found in directory tree, look for `src/_includes/layout.html` or `src/_includes/layout.htm`
-- Note: Files in `_includes` directory do **NOT** require underscore prefix
-- This serves as the default site layout for all pages
+#### Slots and Content Injection
 
-**4. No Layout**
+Layouts define insertion points using `<slot>` elements:
 
-- If no layout is found at any level, render page content as-is
+```html
+<!-- Layout: /layouts/blog.html -->
+<html>
+  <head>
+    <title>Blog</title>
+  </head>
+  <body>
+    <header>
+      <slot name="header">Default Header</slot>
+    </header>
+    <main>
+      <slot><!-- Default/unnamed slot for main content --></slot>
+    </main>
+    <aside>
+      <slot name="sidebar">Default Sidebar</slot>
+    </aside>
+  </body>
+</html>
+```
 
-#### Layout Naming Convention
+Pages provide content for named slots using `<template slot="name">`:
 
-**Automatic Layout Discovery:**
+```html
+<div data-import="/layouts/blog.html">
+  <!-- This content goes to the default/unnamed slot -->
+  <article>
+    <h1>Article Title</h1>
+    <p>Article content...</p>
+  </article>
 
-- Only `_layout.html` or `_layout.htm` files are automatically applied
-- These files must be named exactly as shown (with underscore prefix)
-- Automatically discovered by climbing directory hierarchy
+  <!-- Named slot content -->
+  <template slot="header">
+    <h1>Custom Blog Header</h1>
+  </template>
 
-**Named Layouts (Referenced Explicitly):**
+  <template slot="sidebar">
+    <nav>Article navigation...</nav>
+  </template>
+</div>
+```
 
-- Can be located anywhere in src directory
-- Can have any filename (e.g., `header.html`, `blog-template.html`, `_custom.html`)
-- Must be referenced explicitly via `data-layout` or frontmatter `layout`
-- For short name discovery, must follow naming pattern `_[name].layout.htm(l)`
-- Layouts in the `_includes` folder do not require the `_` prefix for short name discovery
+#### Composition Rules
 
-**For regular directories:**
-
-- Layout files should start with underscore (`_`) to be excluded from build output, unless in the `_includes` folder.
-- Including `.layout.` in the filename is **required** for short name discovery
-- Without `.layout.` suffix, layouts must be referenced by full path
-
-**Examples:**
-
-- `_layout.html` (auto-discovered default layout)
-- `_blog.layout.html` (named layout, findable via `data-layout="blog"`)
-- `_documentation.layout.html` (named layout, findable via `data-layout="documentation"`)
-- `custom-template.html` (must reference via full path like `data-layout="custom-template.html"`)
-- `_sidebar.html` (must reference via full path, not findable via short name)
-
-**For `_includes` directory:**
-
-- Layout files do NOT require underscore prefix (entire directory is excluded)
-- `layout.html` or `layout.htm` serves as site-wide fallback
-- Named layouts should follow pattern `[name].layout.htm(l)` for short name discovery
-
-**Examples in `_includes`:**
-
-- `layout.html` (site-wide fallback)
-- `blog.layout.html` (findable via `data-layout="blog"`)
-- `docs.layout.html` (findable via `data-layout="docs"`)
+1. **Import Scope**: Each `data-import` creates an independent composition scope
+2. **Root Import**: Only the root element can have `data-import` attribute
+3. **Slot Resolution**: `<template slot="name">` elements target `<slot name="name">` in the imported fragment
+4. **Default Content**: Content not in `<template>` elements goes to the unnamed `<slot>`
+5. **Fallback Content**: Content inside `<slot>` elements serves as fallback if no matching template is provided
+6. **Head Merging**: `<head>` content is merged globally using the head merge algorithm
 
 #### Example Directory Structure
 
 ```
 src/
 ├── _includes/
-│   ├── layout.html              # Site-wide fallback (no _ prefix needed)
-│   ├── blog.layout.html         # Named blog layout in _includes
-│   └── docs.layout.html         # Named docs layout in _includes
+│   └── layout.html              # Site-wide fallback layout
 ├── _layout.html                 # Root layout for all pages in src/
+├── layouts/
+│   ├── _blog.layout.html        # Named blog layout
+│   └── _docs.layout.html        # Named documentation layout
 ├── blog/
-│   ├── _blog.layout.html        # Blog-specific layout
-│   ├── post1.html               # Uses _blog.layout.html
-│   └── post2.html               # Uses _blog.layout.html
+│   ├── _layout.html             # Blog section layout (auto-discovered)
+│   ├── post1.html               # Uses blog/_layout.html
+│   └── post2.html               # Uses blog/_layout.html
 ├── docs/
-│   ├── api/
-│   │   ├── _api.layout.html     # API docs layout
-│   │   └── endpoints.html       # Uses _api.layout.html
-│   ├── _docs.layout.html        # General docs layout
-│   └── guide.html               # Uses _docs.layout.html
+│   ├── guide.html               # Uses src/_layout.html
+│   └── api.html                 # Uses src/_layout.html
 ├── about.html                   # Uses src/_layout.html
 └── index.html                   # Uses src/_layout.html
 ```
 
-**Layout Discovery Examples:**
+#### Error Handling
 
-- `blog/post1.html` uses `blog/_layout.html` if it exists (auto-discovery)
-- `docs/api/endpoints.html` uses `docs/api/_layout.html` if it exists (auto-discovery)
-- `docs/guide.html` uses `docs/_layout.html` if it exists (auto-discovery)
-- `about.html` and `index.html` use `src/_layout.html` if it exists (auto-discovery)
-- If `src/_layout.html` doesn't exist, they use `src/_includes/layout.html` (fallback)
+During build, Unify will warn if:
 
-**Short Name Reference Examples:**
+- A page references a `data-import` file that cannot be found
+- A `<template data-target="name">` targets a slot not present in the imported fragment
+- Circular import dependencies are detected
 
-- `<html data-layout="blog">` → Finds `_blog.layout.html` or `_blog.layout.htm` in directory hierarchy or `_includes`
-- `<html data-layout="docs">` → Finds `_docs.layout.html` or `_docs.layout.htm` in directory hierarchy or `_includes`
-- `<html data-layout="api">` → Finds `_api.layout.html` or `_api.layout.htm` in directory hierarchy or `_includes`
-- If short name doesn't resolve to a `.layout.htm(l)` file, a warning is produced
+## Common Error Scenarios
 
-**Full Path Reference Examples:**
+### Circular Import Dependencies
 
-- `<html data-layout="/shared/base.html">` → Uses `src/shared/base.html`
-- `<html data-layout="../layouts/blog.html">` → Uses layout relative to page
-- `<html data-layout="custom.html">` → Uses `custom.html` in same directory as page
-
-### Layouts and Slots
-
-Unify composes pages with layouts using a simple, standards-adjacent mechanism:
-
-- **Layouts** define insertion points with `data-slot` attributes.
-- **Pages** provide content for those slots using the same `data-slot` attribute.
-- Composition happens entirely at build/dev time — no runtime or shadow DOM involved.
-
-> **Tagline:** _Slots without the shadow baggage._  
-> Unify reuses the intuitive slot model, but with plain HTML `data-slot` attributes — no shadow DOM, no polyfills, no surprises.
-
-#### Layout Targets
-
-In a layout, any element with `data-slot="name"` marks an insertion point:
-
-```html
-<body>
-  <header>…</header>
-  <main data-slot="default"></main>
-  <aside data-slot="sidebar"></aside>
-  <footer>…</footer>
-</body>
+```
+Error: Circular import detected: layout.html → blog.html → layout.html
 ```
 
-**Slot Content Replacement Rules:**
+**Cause**: Fragment A imports Fragment B, which imports Fragment A.
+**Solution**: Refactor fragments to break the circular dependency.
 
-1. **Empty slots:** When a layout slot element has no content or only whitespace, page content is inserted directly
-2. **Slots with fallback content:** When a layout slot element contains content, that content serves as fallback and is **completely replaced** by matching page slot content
-3. **Default slot:** `data-slot="default"` is the default insertion point. If no `data-slot="default"` exists, Unify injects the page body into the first `<main>` element.
+### Missing Slot Targets
 
-**Example with fallback content:**
-
-```html
-<!-- Layout -->
-<header>
-  <div data-slot="header">
-    <h1>Default Title</h1>
-    <p>Default subtitle</p>
-  </div>
-</header>
-
-<!-- Page -->
-<template data-slot="header">
-  <h1>🚀 Custom Title</h1>
-  <p>Custom subtitle with emoji</p>
-</template>
-
-<!-- Result: Fallback content is completely replaced -->
-<header>
-  <div>
-    <h1>🚀 Custom Title</h1>
-    <p>Custom subtitle with emoji</p>
-  </div>
-</header>
+```
+Warning: Template slot="sidebar" has no matching <slot name="sidebar"> in imported fragment
 ```
 
-#### Page Providers
-
-Pages declare which slot their content should flow into using the same attribute:
-
-**Preferred (non-rendering):**
-
-```html
-<template data-slot="sidebar">
-  <nav>Local nav…</nav>
-</template>
-```
-
-**Visible in standalone previews (rendered, then moved at build time):**
-
-```html
-<section data-slot="sidebar">
-  <nav>Local nav…</nav>
-</section>
-```
-
-Both forms are valid. Use `<template>` when you don't want slot content to render standalone, and normal elements when you _do_.
-
-#### Head Merging
-
-When a page specifies a layout with `<link rel="layout" href="…">` or equivalent:
-
-- Unify merges the page `<head>` into the layout `<head>` using the approved merge + dedupe rules.
-- Page `<title>`, `<meta name="description">`, `<link rel="canonical">`, etc. override the layout's values with warnings for potential conflicts.
-
-#### Diagnostics
-
-During build, Unify warns if:
-
-- A page references a `data-slot` not present in the layout.
-- A declared layout cannot be found.
-- A page head entry overrides an identity key from the layout (`title`, description, canonical, etc.).
+**Cause**: Page provides content for a slot that doesn't exist in the layout.
+**Solution**: Add the slot to the layout or remove the template from the page.
 
 #### Fragment Pages and Markdown
 
@@ -862,213 +1084,178 @@ Markdown files (`.md`) are always compiled to fragments:
 
 This ensures content-heavy workflows (like documentation or blogs) stay lightweight and author-friendly, while Unify guarantees that final output is always a complete, valid HTML document.
 
-#### Example: Composing with `data-slot`
-
-**Layout (`/_layouts/base.html`):**
+#### Example Composition
 
 ```html
-<!DOCTYPE html>
-<html>
-  <head>
-    <title>Site Title</title>
-    <meta name="description" content="Default description" />
-  </head>
-  <body>
-    <header>Global Header</header>
-
-    <main data-slot="default"></main>
-    <aside data-slot="sidebar"></aside>
-
-    <footer>Global Footer</footer>
-  </body>
-</html>
+<div data-import="/layouts/base.html"></div>
 ```
 
-**Page (`/pages/about.html`):**
+- Fetches and inlines external HTML inside this element
+- The `data-import` attribute is removed
+  - **Full paths**: relative paths or absolute-from-`src` paths (e.g., `_custom.layout.html`, `/path/layout.html`)
+  - **Short names**: convenient references that resolve to framgement files (e.g., `blog` → `_blog.layout.html`)
+- The importing element becomes the composition scope
+- Only children of this scope may target slots inside the imported fragment
 
 ```html
-<!DOCTYPE html>
+<!-- base.html -->
 <html>
   <head>
-    <link rel="layout" href="/_layouts/base.html" />
-    <title>About Us</title>
-    <meta name="description" content="Learn about our company history." />
+    <meta charset="utf-8" />
+    <title>Site</title>
   </head>
   <body>
-    <h1>About</h1>
-    <p>Our company was founded in…</p>
-
-    <template data-slot="sidebar">
-      <nav>
-        <ul>
-          <li><a href="/team">Team</a></li>
-          <li><a href="/careers">Careers</a></li>
-        </ul>
-      </nav>
-    </template>
-  </body>
-</html>
-```
-
-**Final Output (after Unify build):**
-
-```html
-<!DOCTYPE html>
-<html>
-  <head>
-    <title>About Us</title>
-    <meta name="description" content="Learn about our company history." />
-  </head>
-  <body>
-    <header>Global Header</header>
-
+    <header>
+      <slot name="header"><h1>Default</h1></slot>
+    </header>
     <main>
-      <h1>About</h1>
-      <p>Our company was founded in…</p>
+      <slot><!-- unnamed default --></slot>
     </main>
-
-    <aside>
-      <nav>
-        <ul>
-          <li><a href="/team">Team</a></li>
-          <li><a href="/careers">Careers</a></li>
-        </ul>
-      </nav>
-    </aside>
-
-    <footer>Global Footer</footer>
+    <footer><slot name="footer">© Site</slot></footer>
   </body>
 </html>
 ```
 
-#### Example: Fragment Page
+- **Named slots**: `<slot name="…">` for specific content areas
+- **Unnamed slot**: One allowed per fragment, used for default body content
 
-**Layout (`/_layouts/docs.html`):**
-
-```html
-<!DOCTYPE html>
-<html>
-  <head>
-    <title>Docs – My Site</title>
-    <meta name="description" content="Documentation layout" />
-  </head>
-  <body>
-    <header>Docs Header</header>
-
-    <main data-slot="default"></main>
-    <aside data-slot="sidebar"></aside>
-
-    <footer>Docs Footer</footer>
-  </body>
-</html>
-```
-
-**Page (`/pages/docs/index.html` – fragment style):**
+#### Providing Overrides
 
 ```html
-<h1>Documentation</h1>
-<p>Welcome to the docs. Use the navigation to explore topics.</p>
-
-<template data-slot="sidebar">
-  <nav>
-    <ul>
-      <li><a href="/docs/getting-started">Getting Started</a></li>
-      <li><a href="/docs/api">API Reference</a></li>
-    </ul>
-  </nav>
-</template>
+<head>
+  <title>Home • Site</title>
+  <meta name="description" content="Homepage" />
+  <link rel="stylesheet" href="/css/home.css" />
+</head>
+<body data-import="/layouts/base.html">
+  <p>Body content (unnamed slot)</p>
+  <div data-target="header"><h1>Welcome!</h1></div>
+</body>
 ```
 
-**Final Output (after Unify build):**
+- `data-target` specifies the slot name
+- Children of the targeting element replace the slot
+- `<template>` hides override content at author time
+- Regular elements keep overrides visible for design-time preview
+- Pages/Fragments can include `html`, `head`, and `body` tags - they will be properly merged during build
+
+#### Composition Rules
+
+- Each `[data-import]` defines an independent scope; overrides do not leak
+- The top most `[data-import]` in a page will be considered the root import (or layout).
+- Process targets in document order; last writer wins
+- Slots are replaced by overrides. Exception: `<head>` contributions are merged globally
+- `html` and `body` attributes are merged globally with body class merging (merge, don't overwrite)
+- For unnamed slots: use importing element's direct children not within `data-target`
+- Unmatched `data-target`: no-op with dev warning
+- **Warnings, not surprises**: Unknown `data-target` or unfilled named slots warn in strict mode
+
+#### Global Merge
+
+**Sources**: imported fragments' `<html>` `<head>` `<body>` elements, page elements
+
+**Processing Order**: `root fragment → fragments → page`, with standard top-to-bottom DOM processing
+
+**Attribute Merging**:
+
+- **`<html>` attributes**: Layout provides base attributes, fragments can add/override, page wins final conflicts
+- **`<body>` class merging**: Merge (don't overwrite) `class` attributes on `<body>` from layout, fragments, and page
+- **Scope hook on the layout**: Allow adding a class to `<body>` (e.g., `class="layout-default"`) so fragment/page CSS can scope when needed
+
+**De-duplication keys for head element**:
+
+- `<title>`: last wins
+- `<meta>`: dedupe by `name`, else `property`, else `http-equiv`
+- `<link>`: dedupe by `(rel, href)`
+- `<script>`: dedupe by `src` (external) or exact text (inline)
+- Design-only assets: `[data-remove]` dropped or replaced at build time
+
+**Warning System**: Issue warnings about:
+
+- Unknown `data-target` attributes that don't match any slots
+- Unfilled named slots that have no corresponding `data-target` override
+
+### Includes (Legacy)
+
+Apache SSI-style includes remain supported for backwards compatibility but are marked as legacy. New projects should prefer Cascading Imports.
 
 ```html
-<!DOCTYPE html>
-<html>
-  <head>
-    <title>Docs – My Site</title>
-    <meta name="description" content="Documentation layout" />
-  </head>
-  <body>
-    <header>Docs Header</header>
-
-    <main>
-      <h1>Documentation</h1>
-      <p>Welcome to the docs. Use the navigation to explore topics.</p>
-    </main>
-
-    <aside>
-      <nav>
-        <ul>
-          <li><a href="/docs/getting-started">Getting Started</a></li>
-          <li><a href="/docs/api">API Reference</a></li>
-        </ul>
-      </nav>
-    </aside>
-
-    <footer>Docs Footer</footer>
-  </body>
-</html>
+<!--#include file="relative.html" -->
+<!--#include virtual="/absolute.html" -->
 ```
+
+- `file` = relative to current file
+- `virtual` = from `src/` root
+- Apache SSI includes do not support content overrides
 
 ### Overrides
 
-**Layout override precedence:**
+**Legacy Layout override precedence** (replaced by Cascading Imports):
 
-- For HTML files:
-  1. `<link rel="layout">` in document head (highest priority, full HTML documents only)
-  2. `data-layout` attribute on root element
-  3. Automatic layout discovery chain
-- For Markdown files: frontmatter `layout` key takes precedence over discovered layout chain.
-- If no override is found, the nearest layout is discovered by climbing the directory tree, then falling back to `_includes/layout.html` if present.
-- Both `<link rel="layout" href="...">` and `data-layout` accept:
-  - **Full paths**: relative paths or absolute-from-`src` paths (e.g., `_custom.layout.html`, `/path/layout.html`)
-  - **Short names**: convenient references that resolve to layout files (e.g., `blog` → `_blog.layout.html`)
+- For HTML files use automatic layout discovery chain if no root import is found
+- For Markdown files: frontmatter `layout` key takes precedence over discovered layout chain
+- If no override is found, the nearest layout is discovered by climbing the directory tree, then falling back to `_includes/layout.html` if present
 
-**Head override precedence:**
+**Default Layout Discovery for Cascading Imports**:
 
-- Layout `<head>` provides base metadata and styles
+When no `data-import` attribute is found on the root element of a page, Unify applies automatic layout discovery:
+
+1. **Auto-discovery chain**: Looks for `_layout.html` or `_layout.htm` files starting from the page's directory, climbing up to the source root
+2. **Fallback layout**: If no layout found in the hierarchy, checks for `_includes/layout.html` or `_includes/layout.htm`
+3. **Applied as root import**: The discovered layout is automatically applied as if it was a root-level `data-import`, enabling all Cascading Imports functionality
+4. **Short name resolution**: Layout discovery supports both exact filenames and short name resolution (e.g., `blog` → `_blog.layout.html`)
+
+**Override precedence**:
+
+- Imported fragment `<html>`, `<head>`, `<body>` provides base metadata and styles
 - Page `<head>` (HTML) or synthesized head (Markdown) takes precedence via merge algorithm
-- Deduplication ensures page-specific metadata wins over layout defaults
+- Deduplication of elements contained in head and attributes applied to `<html>` and `<body>` ensures page-specific metadata wins over imported fragments
+- Multiple inline styles and scripts from both fragements and page are preserved
+
 - Multiple inline styles and scripts from both layout and page are preserved
 
 ## Dependency Tracking
 
-- Tracks pages ↔ partials/layouts/includes.
-- Rebuild dependents on change.
-- Automatically discovers layout dependencies:
-  - Explicit `data-layout` attribute references
-  - Auto-discovered folder-scoped `_layout.html` files
-  - Fallback layouts in `_includes/layout.html`
-- Tracks include dependencies (SSI and DOM includes)
+- Tracks pages ↔ fragements
+- Rebuild dependents on change
+- Automatically discovers dependencies:
+  - **Cascading Imports**: `data-import` references and nested imports
+  - **Auto-discovered**: folder-scoped `_layout.html` files, fallback layouts in `_includes/layout.html`
+  - **Legacy includes**: SSI includes (`<!--#include -->`)
 - Tracks asset references from HTML and CSS files
+- Deletes outputs when source is removed
 
 ## Live Reload and File Watching
 
 The file watcher monitors all changes in the source directory and triggers appropriate rebuilds:
 
-### Layout Changes
-- **Explicit layouts**: When a layout file referenced via `data-layout` changes, all pages using that layout are rebuilt
-- **Auto-discovered layouts**: When folder-scoped `_layout.html` files change, all pages in that folder hierarchy are rebuilt
-- **Fallback layouts**: When `_includes/layout.html` changes, all pages without other layouts are rebuilt
+### Cascading Imports Changes
 
-### Component Changes
-- When component files (includes) change, all pages that include them are rebuilt
-- Handles nested component dependencies (components that include other components)
-- Supports both SSI-style (`<!--#include -->`) and DOM-style (`<include>`) includes
+- **Imported fragments**: When a file referenced via `data-import` changes, all pages importing that fragment are rebuilt
+- **Nested imports**: When nested imported fragments change, the dependency chain is followed to rebuild all affected pages
+
+### Legacy Includes Changes
+
+- When fragment files (legacy SSI includes) change, all pages that include them are rebuilt
+- Handles nested fragment dependencies (fragments that include other fragments)
+- Supports SSI-style (`<!--#include -->`) includes only
 
 ### New File Detection
+
 - New HTML/Markdown pages are automatically built when added to source directory
-- New component files trigger rebuilds of dependent pages
+- New fragment files trigger rebuilds of dependent pages
 - New asset files are copied to output if referenced by pages
 
 ### Asset Changes
+
 - CSS file changes trigger copying to output directory
 - Image and other asset changes trigger copying if referenced by pages
-- Asset reference tracking ensures only used assets are copied
+- Asset reference tracking ensures only used assets, or assets specified in copy option(s) are copied
 
 ### File Deletion Handling
+
 - Deleted pages are removed from output directory
-- Deleted components trigger rebuilds of dependent pages (showing "not found" messages)
+- Deleted fragments trigger rebuilds of dependent pages (showing "fragment not found" warnings)
 - Deleted assets are removed from output directory
 - Dependency tracking is automatically cleaned up
 
@@ -1123,18 +1310,84 @@ The file watcher monitors all changes in the source directory and triggers appro
 
 ## Configuration
 
-- No configuration required for layouts/components.
+- No configuration required for layouts/fragments.
 - Convention over configuration.
+
+## Known Issues & Pitfalls
+
+### 1. Order Sensitivity with Globs & Negation
+
+Mixing `--ignore`, `--ignore-render`, `--ignore-copy`, and negated patterns (`!foo/**`) is powerful but order-sensitive. Unify follows ripgrep's "last matching glob wins" behavior.
+
+**Issue**: Complex rule interactions can be hard to predict
+**Solution**: Use `--dry-run` when rules get complex to see exactly how files are classified
+
+### 2. `.gitignore` Interplay Surprises
+
+Because `.gitignore` is respected by default (like Eleventy), files can be skipped even without explicit `--ignore` flags.
+
+**Issue**: Files unexpectedly missing from output
+**Solution**: Use `--render` to force-emit specific inputs, negate patterns explicitly (`!pattern`), or use `--dry-run` to see classification reasons
+
+### 3. Implicit `assets/**` Copying
+
+Unify copies `assets/**` by default to mirror Astro/Vite "public" directory behavior.
+
+**Issue**: Easy to forget this happens, unexpected files in output
+**Solution**: Disable with `--ignore assets/**` or `--ignore-copy assets/**`. Use `--dry-run` to see what gets copied.
+
+### 4. Overlapping Layout Rules
+
+With "last wins" precedence, a broad `*=_base.html` listed after `blog/**=_post.html` will override the more specific rule.
+
+**Issue**: Unexpected layout application due to rule order
+**Solution**: Order rules from general to specific, or use `--dry-run` to see the match chain
+
+### 5. Non-renderables Hit by Layout Globs
+
+If a `--default-layout glob=...` matches images or other non-renderables, it's a no-op that might confuse users.
+
+**Issue**: Layout rules that seem to do nothing
+**Solution**: `--dry-run` shows `SKIP (non-renderable)` for clarity
+
+### 6. Render vs Copy Collisions
+
+If `--copy 'src/**'` includes renderable files, you won't get raw files because "render wins."
+
+**Issue**: Expected raw files are processed instead
+**Solution**: Use targeted globs like `--copy 'src/**/*.json'` for data files, or use `--ignore-render` for specific files
+
+### 7. Logging Noise & Performance
+
+`--log-level=debug` can be very chatty and may impact performance due to excessive I/O.
+
+**Issue**: Performance degradation or overwhelming output
+**Solution**: Keep default at `info`, only use `debug` for troubleshooting
+
+### 8. Cross-platform Path Handling
+
+**Issue**: Path separators and case sensitivity vary across platforms
+**Solution**: Unify automatically converts paths to POSIX format internally. Use forward-slash patterns (`/`) in globs on all platforms. Note that case sensitivity behavior follows platform conventions (case-insensitive on Windows, case-sensitive on Linux/macOS).
+
+### 9. Symlinks & Security
+
+**Issue**: Symlinks could potentially access files outside the source directory
+**Solution**: Unify does not follow symlinks for security and predictability. Symlinked files and directories are skipped with appropriate warnings in debug output.
+
+### 10. Layout Auto-ignore Edge Cases
+
+**Issue**: Layout files specified in `--default-layout` are auto-ignored, but this might not be obvious
+**Solution**: `--dry-run` should clearly show when files are auto-ignored due to being layouts or includes
 
 ## Success Criteria
 
 ### Functional Requirements
 
 - All three commands (build, serve, watch) work correctly
-- Include system processes Apache SSI and DOM elements
+- **Cascading Imports**: `data-import` and `slot` and `data-target` fragment composition system
+- **Legacy includes**: Apache SSI support for backwards compatibility
 - Markdown processing with frontmatter and layouts
 - Live reload functionality in development server
-- Sitemap generation for SEO
 - Security validation prevents path traversal
 - Error handling with helpful messages
 
@@ -1161,4 +1414,30 @@ The file watcher monitors all changes in the source directory and triggers appro
 
 ### Scoped Styles
 
-Unify assumes that developers will utilize the `@scope` rule and CSS nesting features to manage component style scoping themselves. These modern CSS features provide a robust way to encapsulate styles for components and layouts. For developers targeting legacy browsers that do not support `@scope`, a polyfill such as [scoped-css-polyfill](https://github.com/GoogleChromeLabs/scoped-css-polyfill) can be leveraged to ensure compatibility. This approach allows Unify to maintain a lightweight and framework-free architecture while empowering developers to adopt modern CSS practices.
+Unify assumes that developers will utilize the `@scope`, `@layer`, or CSS nesting features to manage fragment style scoping themselves. These modern CSS features provide a robust way to encapsulate styles for fragments. For developers targeting legacy browsers that do not support `@scope`, a polyfill such as [scoped-css-polyfill](https://github.com/GoogleChromeLabs/scoped-css-polyfill) can be leveraged to ensure compatibility. This approach allows Unify to maintain a lightweight and framework-free architecture while empowering developers to adopt modern CSS practices.
+
+## References & Behavioral Parity
+
+Unify's design draws inspiration from established tools and follows common patterns to meet developer expectations:
+
+### Tool Behavior References
+
+- **Eleventy**: Auto-respects `.gitignore` for file discovery and processing
+- **ripgrep**: Gitignore-style glob patterns with **later globs taking precedence** over earlier ones
+- **Astro**: `public/` directory copied untouched; clear guidance on `src/` vs `public/` asset handling
+- **Vite**: `publicDir` copied as-is; can be disabled via `build.copyPublicDir` option
+- **Next.js/Nuxt**: Automatic layout discovery and hierarchical layout systems
+
+### Standards Compliance
+
+- **HTML Standards**: Modern DOM templating with `<slot>`, `data-*` attributes, and standard element composition
+- **CSS Standards**: Support for modern CSS features like `@scope` and CSS nesting
+- **HTTP Standards**: Proper content-type handling and SEO-friendly URL structures
+- **File System Conventions**: Cross-platform path handling with POSIX normalization
+
+### Logging & Developer Experience
+
+- **Python logging**: Standard levels (`debug`, `info`, `warn`, `error`) as the pragmatic core
+- **Common CLI patterns**: Intuitive flag naming and behavior following Unix conventions
+- **Git workflow integration**: Respects `.gitignore` and common repository structures
+- **Modern web development**: Follows established patterns from contemporary static site generators
