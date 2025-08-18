@@ -30,13 +30,13 @@ describe('Issue #29: Complete File Watching Requirements', () => {
   describe('Requirement 1: Pages rebuild when layout changes', () => {
     it('should rebuild all pages that use a layout when the layout is modified', async () => {
       const structure = {
-        'src/index.html': `<div data-layout="shared.html">
+        'src/index.html': `<div data-removed="shared.html">
   <h1>Home Page</h1>
 </div>`,
-        'src/about.html': `<div data-layout="shared.html">
+        'src/about.html': `<div data-removed="shared.html">
   <h1>About Page</h1>
 </div>`,
-        'src/contact.html': `<div data-layout="shared.html">
+        'src/contact.html': `<div data-removed="shared.html">
   <h1>Contact Page</h1>
 </div>`,
         'src/shared.html': `<!DOCTYPE html>

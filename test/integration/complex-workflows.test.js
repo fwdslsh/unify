@@ -283,10 +283,10 @@ Another great post.
 
     it('should handle complex layout inheritance chains', async () => {
       const structure = {
-        'src/page.html': '<div data-layout="child"><h1>Content</h1></div>',
+        'src/page.html': '<div data-removed="child"><h1>Content</h1></div>',
         
         'src/_includes/child.html': `
-          <div data-layout="parent">
+          <div data-removed="parent">
             <div class="child-wrapper">
               <main data-slot="default"></main>
             </div>
@@ -294,7 +294,7 @@ Another great post.
         `,
         
         'src/_includes/parent.html': `
-          <div data-layout="grandparent">
+          <div data-removed="grandparent">
             <div class="parent-wrapper">
               <main data-slot="default"></main>
             </div>
@@ -339,9 +339,9 @@ Another great post.
       const structure = {};
       
       // Main pages
-      structure['src/index.html'] = '<div data-layout="home"><h1>Welcome</h1><!--#include file="includes/recent-posts.html" --></div>';
-      structure['src/about.html'] = '<div data-layout="page"><h1>About</h1></div>';
-      structure['src/contact.html'] = '<div data-layout="page"><h1>Contact</h1></div>';
+      structure['src/index.html'] = '<div data-removed="home"><h1>Welcome</h1><!--#include file="includes/recent-posts.html" --></div>';
+      structure['src/about.html'] = '<div data-removed="page"><h1>About</h1></div>';
+      structure['src/contact.html'] = '<div data-removed="page"><h1>Contact</h1></div>';
       
       // Blog posts (50 posts)
       for (let i = 1; i <= 50; i++) {
@@ -362,7 +362,7 @@ This is blog post number ${i}.
       // Category pages
       const categories = ['tech', 'design', 'news'];
       categories.forEach(cat => {
-        structure[`src/blog/${cat}.html`] = `<div data-layout="category"><h1>${cat}</h1><!--#include file="../includes/${cat}-posts.html" --></div>`;
+        structure[`src/blog/${cat}.html`] = `<div data-removed="category"><h1>${cat}</h1><!--#include file="../includes/${cat}-posts.html" --></div>`;
         structure[`src/includes/${cat}-posts.html`] = `<div class="${cat}-posts">Posts in ${cat}</div>`;
       });
       

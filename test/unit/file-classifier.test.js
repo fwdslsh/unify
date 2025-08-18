@@ -1,344 +1,237 @@
-import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
-import { createTempDirectory, cleanupTempDirectory, createTestStructure } from '../fixtures/temp-helper.js';
-import { FileClassifier } from '../../src/core/file-classifier.js';
-import path from 'path';
+/**
+ * Tests for File Classification System v0.6.0
+ * Tests the three-tier precedence system and new CLI options
+ */
 
-describe('FileClassifier', () => {
-  let tempDir;
-  let sourceDir;
-  let classifier;
+import { test, expect } from 'bun:test';
+import { FileClassifier, FileClassification, PrecedenceTier } from '../../src/core/file-classifier.js';
 
-  beforeEach(async () => {
-    tempDir = await createTempDirectory();
-    sourceDir = path.join(tempDir, 'src');
-    classifier = new FileClassifier();
+test('FileClassifier should classify renderable files as EMIT by default', async () => {
+  const classifier = new FileClassifier();
+
+  const htmlResult = await classifier.classifyFile('index.html');
+  expect(htmlResult.action).toBe(FileClassification.EMIT);
+  expect(htmlResult.reason).toBe('renderable file (.html, .htm, .md)');
+  expect(htmlResult.tier).toBe(PrecedenceTier.DEFAULT_BEHAVIOR);
+
+  const markdownResult = await classifier.classifyFile('post.md');
+  expect(markdownResult.action).toBe(FileClassification.EMIT);
+  expect(markdownResult.reason).toBe('renderable file (.html, .htm, .md)');
+
+  const htmResult = await classifier.classifyFile('page.htm');
+  expect(htmResult.action).toBe(FileClassification.EMIT);
+});
+
+test('FileClassifier should classify assets in assets/ directory as COPY', async () => {
+  const classifier = new FileClassifier();
+
+  const cssResult = await classifier.classifyFile('assets/styles.css');
+  expect(cssResult.action).toBe(FileClassification.COPY);
+  expect(cssResult.reason).toBe('asset or copy pattern match');
+  expect(cssResult.tier).toBe(PrecedenceTier.DEFAULT_BEHAVIOR);
+
+  const imageResult = await classifier.classifyFile('assets/logo.png');
+  expect(imageResult.action).toBe(FileClassification.COPY);
+
+  const jsResult = await classifier.classifyFile('assets/script.js');
+  expect(jsResult.action).toBe(FileClassification.COPY);
+});
+
+test('FileClassifier should classify non-assets as SKIP by default', async () => {
+  const classifier = new FileClassifier();
+
+  const cssResult = await classifier.classifyFile('styles.css');
+  expect(cssResult.action).toBe(FileClassification.SKIP);
+  expect(cssResult.reason).toBe('non-renderable, no copy rule');
+
+  const txtResult = await classifier.classifyFile('readme.txt');
+  expect(txtResult.action).toBe(FileClassification.SKIP);
+});
+
+test('FileClassifier should auto-ignore underscore files when enabled', async () => {
+  const classifier = new FileClassifier({ autoIgnore: true });
+
+  const underscoreFileResult = await classifier.classifyFile('_layout.html');
+  expect(underscoreFileResult.action).toBe(FileClassification.IGNORED);
+  expect(underscoreFileResult.reason).toBe('auto-ignore (underscore prefix or directory)');
+  expect(underscoreFileResult.tier).toBe(PrecedenceTier.IGNORE_RULES);
+
+  const underscoreDirResult = await classifier.classifyFile('_includes/header.html');
+  expect(underscoreDirResult.action).toBe(FileClassification.IGNORED);
+  expect(underscoreDirResult.reason).toBe('auto-ignore (underscore prefix or directory)');
+});
+
+test('FileClassifier should respect auto-ignore=false', async () => {
+  const classifier = new FileClassifier({ autoIgnore: false });
+
+  const underscoreFileResult = await classifier.classifyFile('_layout.html');
+  expect(underscoreFileResult.action).toBe(FileClassification.EMIT);
+  expect(underscoreFileResult.reason).toBe('renderable file (.html, .htm, .md)');
+});
+
+test('FileClassifier should handle three-tier precedence system', async () => {
+  const classifier = new FileClassifier({
+    ignore: ['blog/**'],
+    render: ['blog/featured/**'],
+    ignoreRender: ['blog/featured/draft.md']
   });
 
-  afterEach(async () => {
-    await cleanupTempDirectory(tempDir);
+  // Tier 1: --render wins over --ignore
+  const featuredResult = await classifier.classifyFile('blog/featured/post.md');
+  expect(featuredResult.action).toBe(FileClassification.EMIT);
+  expect(featuredResult.tier).toBe(PrecedenceTier.EXPLICIT_OVERRIDES);
+  expect(featuredResult.reason).toBe('--render pattern match');
+
+  // Tier 2: --ignore-render wins over --render
+  const draftResult = await classifier.classifyFile('blog/featured/draft.md');
+  expect(draftResult.action).toBe(FileClassification.IGNORED);
+  expect(draftResult.tier).toBe(PrecedenceTier.IGNORE_RULES);
+  expect(draftResult.reason).toBe('--ignore-render pattern match');
+
+  // Tier 2: --ignore wins
+  const regularResult = await classifier.classifyFile('blog/other/post.md');
+  expect(regularResult.action).toBe(FileClassification.IGNORED);
+  expect(regularResult.tier).toBe(PrecedenceTier.IGNORE_RULES);
+  expect(regularResult.reason).toBe('--ignore pattern match');
+});
+
+test('FileClassifier should handle copy patterns', async () => {
+  const classifier = new FileClassifier({
+    copy: ['docs/**/*.pdf', 'config/*.json']
   });
 
-  describe('isPage', () => {
-    test('should identify regular HTML files as pages', async () => {
-      await createTestStructure(sourceDir, {
-        'index.html': '<h1>Home</h1>',
-        'about.html': '<h1>About</h1>',
-        'contact.htm': '<h1>Contact</h1>'
-      });
+  const pdfResult = await classifier.classifyFile('docs/manual.pdf');
+  expect(pdfResult.action).toBe(FileClassification.COPY);
+  expect(pdfResult.reason).toBe('asset or copy pattern match');
 
-      const indexPath = path.join(sourceDir, 'index.html');
-      const aboutPath = path.join(sourceDir, 'about.html');
-      const contactPath = path.join(sourceDir, 'contact.htm');
+  const configResult = await classifier.classifyFile('config/settings.json');
+  expect(configResult.action).toBe(FileClassification.COPY);
+  expect(configResult.reason).toBe('asset or copy pattern match');
 
-      expect(classifier.isPage(indexPath, sourceDir)).toBe(true);
-      expect(classifier.isPage(aboutPath, sourceDir)).toBe(true);
-      expect(classifier.isPage(contactPath, sourceDir)).toBe(true);
-    });
+  const otherResult = await classifier.classifyFile('random.txt');
+  expect(otherResult.action).toBe(FileClassification.SKIP);
+  expect(otherResult.reason).toBe('non-renderable, no copy rule');
+});
 
-    test('should identify Markdown files as pages', async () => {
-      await createTestStructure(sourceDir, {
-        'blog.md': '# Blog Post',
-        'docs.md': '# Documentation'
-      });
-
-      const blogPath = path.join(sourceDir, 'blog.md');
-      const docsPath = path.join(sourceDir, 'docs.md');
-
-      expect(classifier.isPage(blogPath, sourceDir)).toBe(true);
-      expect(classifier.isPage(docsPath, sourceDir)).toBe(true);
-    });
-
-    test('should NOT identify underscore-prefixed files as pages', async () => {
-      await createTestStructure(sourceDir, {
-        '_layout.html': '<html><body><slot></slot></body></html>',
-        '_partial.html': '<div>Partial content</div>',
-        '_component.md': '# Component docs'
-      });
-
-      const layoutPath = path.join(sourceDir, '_layout.html');
-      const partialPath = path.join(sourceDir, '_partial.html');
-      const componentPath = path.join(sourceDir, '_component.md');
-
-      expect(classifier.isPage(layoutPath, sourceDir)).toBe(false);
-      expect(classifier.isPage(partialPath, sourceDir)).toBe(false);
-      expect(classifier.isPage(componentPath, sourceDir)).toBe(false);
-    });
-
-    test('should NOT identify files in underscore directories as pages', async () => {
-      await createTestStructure(sourceDir, {
-        '_includes/header.html': '<header>Site Header</header>',
-        '_components/button.html': '<button>Click me</button>',
-        'blog/_layout.html': '<html><body><slot></slot></body></html>',
-        'blog/_sidebar.html': '<aside>Sidebar</aside>'
-      });
-
-      const headerPath = path.join(sourceDir, '_includes', 'header.html');
-      const buttonPath = path.join(sourceDir, '_components', 'button.html');
-      const blogLayoutPath = path.join(sourceDir, 'blog', '_layout.html');
-      const sidebarPath = path.join(sourceDir, 'blog', '_sidebar.html');
-
-      expect(classifier.isPage(headerPath, sourceDir)).toBe(false);
-      expect(classifier.isPage(buttonPath, sourceDir)).toBe(false);
-      expect(classifier.isPage(blogLayoutPath, sourceDir)).toBe(false);
-      expect(classifier.isPage(sidebarPath, sourceDir)).toBe(false);
-    });
-
-    test('should NOT identify non-HTML/Markdown files as pages', async () => {
-      await createTestStructure(sourceDir, {
-        'style.css': 'body { margin: 0; }',
-        'script.js': 'console.log("hello");',
-        'image.png': 'fake-image-content'
-      });
-
-      const stylePath = path.join(sourceDir, 'style.css');
-      const scriptPath = path.join(sourceDir, 'script.js');
-      const imagePath = path.join(sourceDir, 'image.png');
-
-      expect(classifier.isPage(stylePath, sourceDir)).toBe(false);
-      expect(classifier.isPage(scriptPath, sourceDir)).toBe(false);
-      expect(classifier.isPage(imagePath, sourceDir)).toBe(false);
-    });
+test('FileClassifier should handle ignore-render and ignore-copy separately', async () => {
+  const classifier = new FileClassifier({
+    ignoreRender: ['temp/*.html'],
+    ignoreCopy: ['assets/temp/*']
   });
 
-  describe('isPartial', () => {
-    test('should identify underscore-prefixed HTML files as partials', async () => {
-      await createTestStructure(sourceDir, {
-        '_header.html': '<header>Header</header>',
-        '_footer.html': '<footer>Footer</footer>',
-        '_layout.htm': '<html><body><slot></slot></body></html>'
-      });
+  const htmlResult = await classifier.classifyFile('temp/page.html');
+  expect(htmlResult.action).toBe(FileClassification.IGNORED);
+  expect(htmlResult.reason).toBe('--ignore-render pattern match');
 
-      const headerPath = path.join(sourceDir, '_header.html');
-      const footerPath = path.join(sourceDir, '_footer.html');
-      const layoutPath = path.join(sourceDir, '_layout.htm');
+  const assetResult = await classifier.classifyFile('assets/temp/file.png');
+  expect(assetResult.action).toBe(FileClassification.IGNORED);
+  expect(assetResult.reason).toBe('--ignore-copy pattern match');
 
-      expect(classifier.isPartial(headerPath, sourceDir)).toBe(true);
-      expect(classifier.isPartial(footerPath, sourceDir)).toBe(true);
-      expect(classifier.isPartial(layoutPath, sourceDir)).toBe(true);
-    });
+  // HTML file NOT matching ignore-copy should still be processed
+  const regularHtmlResult = await classifier.classifyFile('page.html');
+  expect(regularHtmlResult.action).toBe(FileClassification.EMIT);
 
-    test('should identify HTML files in underscore directories as partials', async () => {
-      await createTestStructure(sourceDir, {
-        '_includes/nav.html': '<nav>Navigation</nav>',
-        '_components/modal.html': '<div class="modal">Modal</div>'
-      });
+  // Asset NOT matching ignore-render should still be copied
+  const regularAssetResult = await classifier.classifyFile('assets/logo.png');
+  expect(regularAssetResult.action).toBe(FileClassification.COPY);
+});
 
-      const navPath = path.join(sourceDir, '_includes', 'nav.html');
-      const modalPath = path.join(sourceDir, '_components', 'modal.html');
-
-      expect(classifier.isPartial(navPath, sourceDir)).toBe(true);
-      expect(classifier.isPartial(modalPath, sourceDir)).toBe(true);
-    });
-
-    test('should NOT identify regular HTML files as partials', async () => {
-      await createTestStructure(sourceDir, {
-        'index.html': '<h1>Home</h1>',
-        'about.html': '<h1>About</h1>'
-      });
-
-      const indexPath = path.join(sourceDir, 'index.html');
-      const aboutPath = path.join(sourceDir, 'about.html');
-
-      expect(classifier.isPartial(indexPath, sourceDir)).toBe(false);
-      expect(classifier.isPartial(aboutPath, sourceDir)).toBe(false);
-    });
-
-    test('should NOT identify non-HTML files as partials', async () => {
-      await createTestStructure(sourceDir, {
-        '_style.css': 'body { margin: 0; }',
-        '_config.json': '{"setting": true}'
-      });
-
-      const stylePath = path.join(sourceDir, '_style.css');
-      const configPath = path.join(sourceDir, '_config.json');
-
-      expect(classifier.isPartial(stylePath, sourceDir)).toBe(false);
-      expect(classifier.isPartial(configPath, sourceDir)).toBe(false);
-    });
+test('FileClassifier should handle glob patterns with negation', async () => {
+  const classifier = new FileClassifier({
+    copy: ['assets/**', '!assets/private/**']
   });
 
-  describe('isLayout', () => {
-    test('should identify _layout.html files as layouts', async () => {
-      await createTestStructure(sourceDir, {
-        '_layout.html': '<html><body><slot></slot></body></html>',
-        'blog/_layout.html': '<html><body><h1>Blog</h1><slot></slot></body></html>',
-        'docs/_layout.htm': '<html><body><h1>Docs</h1><slot></slot></body></html>'
-      });
+  const publicAssetResult = await classifier.classifyFile('assets/images/logo.png');
+  expect(publicAssetResult.action).toBe(FileClassification.COPY);
 
-      const rootLayoutPath = path.join(sourceDir, '_layout.html');
-      const blogLayoutPath = path.join(sourceDir, 'blog', '_layout.html');
-      const docsLayoutPath = path.join(sourceDir, 'docs', '_layout.htm');
+  const privateAssetResult = await classifier.classifyFile('assets/private/secret.png');
+  expect(privateAssetResult.action).toBe(FileClassification.SKIP);
+});
 
-      expect(classifier.isLayout(rootLayoutPath, sourceDir)).toBe(true);
-      expect(classifier.isLayout(blogLayoutPath, sourceDir)).toBe(true);
-      expect(classifier.isLayout(docsLayoutPath, sourceDir)).toBe(true);
-    });
-
-    test('should identify fallback layout in _includes as layout', async () => {
-      await createTestStructure(sourceDir, {
-        '_includes/_layout.html': '<html><body><slot></slot></body></html>',
-        '_includes/_layout.htm': '<html><body><slot></slot></body></html>'
-      });
-
-      const fallbackLayoutPath = path.join(sourceDir, '_includes', '_layout.html');
-      const fallbackLayoutHtmPath = path.join(sourceDir, '_includes', '_layout.htm');
-
-      expect(classifier.isLayout(fallbackLayoutPath, sourceDir)).toBe(true);
-      expect(classifier.isLayout(fallbackLayoutHtmPath, sourceDir)).toBe(true);
-    });
-
-    test('should identify extended layout patterns as layouts', async () => {
-      await createTestStructure(sourceDir, {
-        '_custom.layout.html': '<html><body><h1>Custom</h1><slot></slot></body></html>',
-        '_blog-post.layout.htm': '<html><body><h1>Blog</h1><slot></slot></body></html>',
-        '_documentation.layout.html': '<html><body><nav>Docs</nav><slot></slot></body></html>'
-      });
-
-      const customLayoutPath = path.join(sourceDir, '_custom.layout.html');
-      const blogLayoutPath = path.join(sourceDir, '_blog-post.layout.htm');
-      const docsLayoutPath = path.join(sourceDir, '_documentation.layout.html');
-
-      expect(classifier.isLayout(customLayoutPath, sourceDir)).toBe(true);
-      expect(classifier.isLayout(blogLayoutPath, sourceDir)).toBe(true);
-      expect(classifier.isLayout(docsLayoutPath, sourceDir)).toBe(true);
-    });
-
-    test('should NOT identify other underscore files as layouts', async () => {
-      await createTestStructure(sourceDir, {
-        '_header.html': '<header>Header</header>',
-        '_partial.html': '<div>Partial</div>',
-        '_includes/nav.html': '<nav>Navigation</nav>'
-      });
-
-      const headerPath = path.join(sourceDir, '_header.html');
-      const partialPath = path.join(sourceDir, '_partial.html');
-      const navPath = path.join(sourceDir, '_includes', 'nav.html');
-
-      expect(classifier.isLayout(headerPath, sourceDir)).toBe(false);
-      expect(classifier.isLayout(partialPath, sourceDir)).toBe(false);
-      expect(classifier.isLayout(navPath, sourceDir)).toBe(false);
-    });
+test('FileClassifier should use last-pattern-wins logic', async () => {
+  const classifier = new FileClassifier({
+    ignore: ['*.md'],
+    render: ['important.md']
   });
 
-  describe('isLayoutFileName', () => {
-    test('should recognize standard layout filenames', () => {
-      expect(classifier.isLayoutFileName('_layout.html')).toBe(true);
-      expect(classifier.isLayoutFileName('_layout.htm')).toBe(true);
-    });
+  const ignoredResult = await classifier.classifyFile('regular.md');
+  expect(ignoredResult.action).toBe(FileClassification.IGNORED);
+  expect(ignoredResult.reason).toBe('--ignore pattern match');
 
-    test('should recognize extended layout patterns', () => {
-      expect(classifier.isLayoutFileName('_custom.layout.html')).toBe(true);
-      expect(classifier.isLayoutFileName('_blog-post.layout.htm')).toBe(true);
-      expect(classifier.isLayoutFileName('_documentation.layout.html')).toBe(true);
-      expect(classifier.isLayoutFileName('_admin.layout.htm')).toBe(true);
-    });
+  const renderedResult = await classifier.classifyFile('important.md');
+  expect(renderedResult.action).toBe(FileClassification.EMIT);
+  expect(renderedResult.reason).toBe('--render pattern match');
+});
 
-    test('should reject non-layout files', () => {
-      expect(classifier.isLayoutFileName('layout.html')).toBe(false);
-      expect(classifier.isLayoutFileName('_component.html')).toBe(false);
-      expect(classifier.isLayoutFileName('_custom.template.html')).toBe(false);
-      expect(classifier.isLayoutFileName('custom.layout.html')).toBe(false);
-      expect(classifier.isLayoutFileName('_partial.html')).toBe(false);
-    });
+test('FileClassifier should track layout and include files', async () => {
+  const classifier = new FileClassifier({ autoIgnore: true });
+
+  classifier.addLayoutFile('_layout.html');
+  const layoutResult = await classifier.classifyFile('_layout.html');
+  expect(layoutResult.action).toBe(FileClassification.IGNORED);
+  expect(layoutResult.reason).toBe('auto-ignore (layout/include file)');
+
+  classifier.addIncludeFile('header.html');
+  const includeResult = await classifier.classifyFile('header.html');
+  expect(includeResult.action).toBe(FileClassification.IGNORED);
+  expect(includeResult.reason).toBe('auto-ignore (layout/include file)');
+});
+
+test('FileClassifier should generate dry-run reports', async () => {
+  const classifier = new FileClassifier();
+
+  const classifications = [
+    { action: FileClassification.EMIT, filePath: 'index.html', reason: 'renderable file', tier: 3 },
+    { action: FileClassification.COPY, filePath: 'assets/logo.png', reason: 'asset match', tier: 3 },
+    { action: FileClassification.IGNORED, filePath: '_layout.html', reason: 'auto-ignore', tier: 2 },
+    { action: FileClassification.SKIP, filePath: 'readme.txt', reason: 'no rules match', tier: 3 }
+  ];
+
+  const report = classifier.generateDryRunReport(classifications);
+  
+  expect(report).toContain('EMIT (1 files)');
+  expect(report).toContain('COPY (1 files)');
+  expect(report).toContain('IGNORED (1 files)');
+  expect(report).toContain('SKIP (1 files)');
+  expect(report).toContain('index.html');
+  expect(report).toContain('assets/logo.png');
+});
+
+test('FileClassifier isRenderable should identify correct file types', () => {
+  const classifier = new FileClassifier();
+
+  expect(classifier.isRenderable('page.html')).toBe(true);
+  expect(classifier.isRenderable('page.htm')).toBe(true);
+  expect(classifier.isRenderable('post.md')).toBe(true);
+  expect(classifier.isRenderable('image.png')).toBe(false);
+  expect(classifier.isRenderable('style.css')).toBe(false);
+  expect(classifier.isRenderable('script.js')).toBe(false);
+});
+
+test('FileClassifier should handle cross-platform paths', async () => {
+  const classifier = new FileClassifier({
+    ignore: ['blog/**']
   });
 
-  describe('shouldEmit', () => {
-    test('should emit pages', async () => {
-      await createTestStructure(sourceDir, {
-        'index.html': '<h1>Home</h1>',
-        'about.md': '# About'
-      });
+  const windowsPathResult = await classifier.classifyFile('blog\\\\post.md');
+  const unixPathResult = await classifier.classifyFile('blog/post.md');
 
-      const indexPath = path.join(sourceDir, 'index.html');
-      const aboutPath = path.join(sourceDir, 'about.md');
+  // Both should be ignored since we normalize to POSIX internally
+  expect(windowsPathResult.action).toBe(FileClassification.IGNORED);
+  expect(unixPathResult.action).toBe(FileClassification.IGNORED);
+});
 
-      expect(classifier.shouldEmit(indexPath, sourceDir)).toBe(true);
-      expect(classifier.shouldEmit(aboutPath, sourceDir)).toBe(true);
-    });
-
-    test('should NOT emit partials and layouts', async () => {
-      await createTestStructure(sourceDir, {
-        '_layout.html': '<html><body><slot></slot></body></html>',
-        '_header.html': '<header>Header</header>',
-        '_includes/nav.html': '<nav>Navigation</nav>'
-      });
-
-      const layoutPath = path.join(sourceDir, '_layout.html');
-      const headerPath = path.join(sourceDir, '_header.html');
-      const navPath = path.join(sourceDir, '_includes', 'nav.html');
-
-      expect(classifier.shouldEmit(layoutPath, sourceDir)).toBe(false);
-      expect(classifier.shouldEmit(headerPath, sourceDir)).toBe(false);
-      expect(classifier.shouldEmit(navPath, sourceDir)).toBe(false);
-    });
-
-    test('should emit regular assets', async () => {
-      await createTestStructure(sourceDir, {
-        'css/main.css': 'body { margin: 0; }',
-        'js/script.js': 'console.log("hello");',
-        'images/logo.png': 'fake-image-content'
-      });
-
-      const cssPath = path.join(sourceDir, 'css', 'main.css');
-      const jsPath = path.join(sourceDir, 'js', 'script.js');
-      const imagePath = path.join(sourceDir, 'images', 'logo.png');
-
-      expect(classifier.shouldEmit(cssPath, sourceDir)).toBe(true);
-      expect(classifier.shouldEmit(jsPath, sourceDir)).toBe(true);
-      expect(classifier.shouldEmit(imagePath, sourceDir)).toBe(true);
-    });
-
-    test('should NOT emit underscore-prefixed assets by default', async () => {
-      await createTestStructure(sourceDir, {
-        '_private.css': 'body { margin: 0; }',
-        'assets/_internal.js': 'console.log("internal");',
-        '_assets/image.png': 'fake-image-content'
-      });
-
-      const privateCssPath = path.join(sourceDir, '_private.css');
-      const internalJsPath = path.join(sourceDir, 'assets', '_internal.js');
-      const imagePath = path.join(sourceDir, '_assets', 'image.png');
-
-      expect(classifier.shouldEmit(privateCssPath, sourceDir)).toBe(false);
-      expect(classifier.shouldEmit(internalJsPath, sourceDir)).toBe(false);
-      expect(classifier.shouldEmit(imagePath, sourceDir)).toBe(false);
-    });
+test('FileClassifier should validate render overrides only work on renderable files', async () => {
+  const classifier = new FileClassifier({
+    render: ['**/*']
   });
 
-  describe('getFileType', () => {
-    test('should correctly classify file types', async () => {
-      await createTestStructure(sourceDir, {
-        'index.html': '<h1>Home</h1>',
-        '_layout.html': '<html><body><slot></slot></body></html>',
-        '_header.html': '<header>Header</header>',
-        'style.css': 'body { margin: 0; }'
-      });
+  const htmlResult = await classifier.classifyFile('page.html');
+  expect(htmlResult.action).toBe(FileClassification.EMIT);
+  expect(htmlResult.reason).toBe('--render pattern match');
 
-      const indexPath = path.join(sourceDir, 'index.html');
-      const layoutPath = path.join(sourceDir, '_layout.html');
-      const headerPath = path.join(sourceDir, '_header.html');
-      const stylePath = path.join(sourceDir, 'style.css');
-
-      expect(classifier.getFileType(indexPath, sourceDir)).toBe('page');
-      expect(classifier.getFileType(layoutPath, sourceDir)).toBe('layout');
-      expect(classifier.getFileType(headerPath, sourceDir)).toBe('partial');
-      expect(classifier.getFileType(stylePath, sourceDir)).toBe('asset');
-    });
-  });
-
-  describe('isNonEmittingDirectory', () => {
-    test('should identify underscore directories as non-emitting', () => {
-      expect(classifier.isNonEmittingDirectory('_includes')).toBe(true);
-      expect(classifier.isNonEmittingDirectory('_components')).toBe(true);
-      expect(classifier.isNonEmittingDirectory(path.join('blog', '_includes'))).toBe(true);
-      expect(classifier.isNonEmittingDirectory(path.join('_assets', 'images'))).toBe(true);
-    });
-
-    test('should identify regular directories as emitting', () => {
-      expect(classifier.isNonEmittingDirectory('blog')).toBe(false);
-      expect(classifier.isNonEmittingDirectory('docs')).toBe(false);
-      expect(classifier.isNonEmittingDirectory(path.join('assets', 'images'))).toBe(false);
-      expect(classifier.isNonEmittingDirectory('css')).toBe(false);
-    });
-  });
+  // Non-renderable files should not be affected by render patterns
+  const pngResult = await classifier.classifyFile('image.png');
+  expect(pngResult.action).toBe(FileClassification.SKIP);
+  expect(pngResult.reason).toBe('non-renderable, no copy rule');
 });

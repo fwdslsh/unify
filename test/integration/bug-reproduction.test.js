@@ -53,7 +53,7 @@ it('DOM Mode include processing bug reproduction', async () => {
   // Create the test page with DOM-style includes
   await fs.writeFile(
     path.join(sourceDir, 'blog.html'),
-    `<body data-layout="/site_layouts/blog.html">
+    `<body data-removed="/site_layouts/blog.html">
   <template data-slot="title">Welcome to DOM Mode</template>
 
   <h2>Hello!</h2>

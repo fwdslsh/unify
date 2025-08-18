@@ -47,7 +47,8 @@
   "homepage": "https://unify.github.io/website",
   "dependencies": {
     "gray-matter": "^4.0.3",
-    "markdown-it": "^14.1.0"
+    "markdown-it": "^14.1.0",
+    "minimatch": "^9.0.3"
   },
   "devDependencies": {
     "@types/bun": "latest"

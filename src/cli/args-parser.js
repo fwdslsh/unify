@@ -68,14 +68,27 @@ export function parseArgs(argv) {
     baseUrl: "https://example.com",
     clean: false,
     sitemap: true,
-    failOn: null, // Can be 'warning', 'error', or null (default: null = only fail on fatal errors)
+    // v0.6.0: Updated to failLevel (replaces failOn)
+    failLevel: null, // Can be 'warning', 'error', or null (default: null = only fail on fatal errors)
     minify: false,
     verbose: false,
     help: false,
     version: false,
-    copy: null,
+    // v0.6.0: New options - arrays for repeatable options
+    copy: [],
+    ignore: [],
+    ignoreRender: [],
+    ignoreCopy: [],
+    render: [],
+    defaultLayout: [],
+    dryRun: false,
+    autoIgnore: true,
+    logLevel: 'info',
+    // Legacy options
     layouts: null,
     template: null, // For init command - which starter template to use
+    // Backwards compatibility
+    failOn: null // Will be mapped to failLevel for compatibility
   };
 
   // Only the first non-option argument is considered a command
@@ -164,8 +177,9 @@ export function parseArgs(argv) {
       i += 2;
       continue;
     }
+    // Handle repeatable --copy option
     if ((arg === '--copy') && nextArg && !nextArg.startsWith('-')) {
-      args.copy = nextArg;
+      args.copy.push(nextArg);
       i += 2;
       continue;
     }
@@ -180,6 +194,145 @@ export function parseArgs(argv) {
           'Use quotes around patterns with special characters',
           'Check the documentation for glob pattern examples'
         ]
+      );
+      error.errorType = 'UsageError';
+      throw error;
+    }
+    // Handle repeatable --ignore option
+    if ((arg === '--ignore') && nextArg && !nextArg.startsWith('-')) {
+      args.ignore.push(nextArg);
+      i += 2;
+      continue;
+    }
+    if (arg === '--ignore') {
+      const error = new UnifyError(
+        'The --ignore option requires a glob pattern value',
+        null,
+        null,
+        ['Provide a glob pattern like: --ignore "**/drafts/**"']
+      );
+      error.errorType = 'UsageError';
+      throw error;
+    }
+    // Handle repeatable --ignore-render option
+    if ((arg === '--ignore-render') && nextArg && !nextArg.startsWith('-')) {
+      args.ignoreRender.push(nextArg);
+      i += 2;
+      continue;
+    }
+    if (arg === '--ignore-render') {
+      const error = new UnifyError(
+        'The --ignore-render option requires a glob pattern value',
+        null,
+        null,
+        ['Provide a glob pattern like: --ignore-render "**/drafts/**"']
+      );
+      error.errorType = 'UsageError';
+      throw error;
+    }
+    // Handle repeatable --ignore-copy option
+    if ((arg === '--ignore-copy') && nextArg && !nextArg.startsWith('-')) {
+      args.ignoreCopy.push(nextArg);
+      i += 2;
+      continue;
+    }
+    if (arg === '--ignore-copy') {
+      const error = new UnifyError(
+        'The --ignore-copy option requires a glob pattern value',
+        null,
+        null,
+        ['Provide a glob pattern like: --ignore-copy "assets/private/**"']
+      );
+      error.errorType = 'UsageError';
+      throw error;
+    }
+    // Handle repeatable --render option
+    if ((arg === '--render') && nextArg && !nextArg.startsWith('-')) {
+      args.render.push(nextArg);
+      i += 2;
+      continue;
+    }
+    if (arg === '--render') {
+      const error = new UnifyError(
+        'The --render option requires a glob pattern value',
+        null,
+        null,
+        ['Provide a glob pattern like: --render "experiments/**"']
+      );
+      error.errorType = 'UsageError';
+      throw error;
+    }
+    // Handle repeatable --default-layout option
+    if ((arg === '--default-layout') && nextArg && !nextArg.startsWith('-')) {
+      if (nextArg.includes('=')) {
+        const [pattern, layout] = nextArg.split('=', 2);
+        args.defaultLayout.push({ pattern, layout });
+      } else {
+        args.defaultLayout.push({ pattern: '*', layout: nextArg });
+      }
+      i += 2;
+      continue;
+    }
+    if (arg === '--default-layout') {
+      const error = new UnifyError(
+        'The --default-layout option requires a layout file or pattern=layout value',
+        null,
+        null,
+        [
+          'Provide a layout file: --default-layout "_layout.html"',
+          'Provide a pattern=layout: --default-layout "blog/**=_post.html"'
+        ]
+      );
+      error.errorType = 'UsageError';
+      throw error;
+    }
+    // Handle --dry-run option
+    if (arg === '--dry-run') {
+      args.dryRun = true;
+      i++;
+      continue;
+    }
+    // Handle --auto-ignore option
+    if (arg === '--auto-ignore' && nextArg && !nextArg.startsWith('-')) {
+      if (nextArg === 'true' || nextArg === 'false') {
+        args.autoIgnore = nextArg === 'true';
+        i += 2;
+        continue;
+      } else {
+        const error = new UnifyError(
+          `Invalid --auto-ignore value: ${nextArg}`,
+          null,
+          null,
+          ['Valid values are: true, false']
+        );
+        error.errorType = 'UsageError';
+        throw error;
+      }
+    }
+    // Handle --log-level option
+    if (arg === '--log-level' && nextArg && !nextArg.startsWith('-')) {
+      const validLevels = ['error', 'warn', 'info', 'debug'];
+      if (validLevels.includes(nextArg)) {
+        args.logLevel = nextArg;
+        i += 2;
+        continue;
+      } else {
+        const error = new UnifyError(
+          `Invalid --log-level value: ${nextArg}`,
+          null,
+          null,
+          ['Valid levels are: error, warn, info, debug']
+        );
+        error.errorType = 'UsageError';
+        throw error;
+      }
+    }
+    if (arg === '--log-level') {
+      const error = new UnifyError(
+        'The --log-level option requires a level value',
+        null,
+        null,
+        ['Valid levels are: error, warn, info, debug']
       );
       error.errorType = 'UsageError';
       throw error;
@@ -226,10 +379,50 @@ export function parseArgs(argv) {
       i++;
       continue;
     }
+    // Handle --fail-level option (replaces --fail-on)
+    if (arg === '--fail-level' && nextArg && !nextArg.startsWith('-')) {
+      const validLevels = ['warning', 'error'];
+      if (validLevels.includes(nextArg)) {
+        args.failLevel = nextArg;
+        i += 2;
+        continue;
+      } else {
+        const error = new UnifyError(
+          `Invalid --fail-level value: ${nextArg}`,
+          null,
+          null,
+          [
+            'Valid levels are: warning, error',
+            'Use --fail-level warning to fail on any warning or error',
+            'Use --fail-level error to fail only on errors',
+            'Omit --fail-level to only fail on fatal build errors'
+          ]
+        );
+        error.errorType = 'UsageError';
+        throw error;
+      }
+    }
+    if (arg === '--fail-level') {
+      const error = new UnifyError(
+        'The --fail-level option requires a level value',
+        null,
+        null,
+        [
+          'Valid levels are: warning, error',
+          'Use --fail-level warning to fail on any warning or error',
+          'Use --fail-level error to fail only on errors',
+          'Omit --fail-level to only fail on fatal build errors'
+        ]
+      );
+      error.errorType = 'UsageError';
+      throw error;
+    }
+    // Handle legacy --fail-on option for backwards compatibility
     if (arg === '--fail-on' && nextArg && !nextArg.startsWith('-')) {
       const validLevels = ['warning', 'error'];
       if (validLevels.includes(nextArg)) {
         args.failOn = nextArg;
+        args.failLevel = nextArg; // Map to new option
         i += 2;
         continue;
       } else {
@@ -239,9 +432,7 @@ export function parseArgs(argv) {
           null,
           [
             'Valid levels are: warning, error',
-            'Use --fail-on warning to fail on any warning or error',
-            'Use --fail-on error to fail only on errors (default behavior)',
-            'Omit --fail-on to only fail on fatal build errors'
+            'Note: --fail-on is deprecated, use --fail-level instead'
           ]
         );
         error.errorType = 'UsageError';
@@ -255,9 +446,7 @@ export function parseArgs(argv) {
         null,
         [
           'Valid levels are: warning, error',
-          'Use --fail-on warning to fail on any warning or error',
-          'Use --fail-on error to fail only on errors',
-          'Omit --fail-on to only fail on fatal build errors'
+          'Note: --fail-on is deprecated, use --fail-level instead'
         ]
       );
       error.errorType = 'UsageError';
@@ -278,9 +467,11 @@ export function parseArgs(argv) {
     if (arg.startsWith('-')) {
       const validOptions = [
         '--help', '-h', '--version', '-v', '--source', '-s', '--output', '-o',
-        '--copy', '--port', '-p', '--host', '--layouts', '-l', '--templates',
-        '--pretty-urls', '--base-url', '--clean', '--no-sitemap', 
-        '--fail-on', '--minify', '--verbose', '-u', '-m', '-V'
+        '--copy', '--ignore', '--ignore-render', '--ignore-copy', '--render',
+        '--default-layout', '--dry-run', '--auto-ignore', '--port', '-p', '--host', 
+        '--layouts', '-l', '--templates', '--pretty-urls', '--base-url', '--clean', 
+        '--no-sitemap', '--fail-level', '--fail-on', '--minify', '--verbose', 
+        '--log-level', '-u', '-m', '-V'
       ];
       const suggestion = findClosestCommand(arg, validOptions);
       const suggestions = [];

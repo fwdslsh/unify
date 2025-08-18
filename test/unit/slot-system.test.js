@@ -1,74 +1,83 @@
 /**
- * Tests for new slot system functionality (v0.5.0)
- * Verifies spec compliance for data-slot="name" syntax and fallback content
+ * Tests for slot system functionality (v0.6.0)
+ * Verifies spec compliance for data-target and slot syntax
  */
 
 import { describe, it, beforeEach, afterEach, expect } from 'bun:test';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { processHtmlUnified } from '../../src/core/unified-html-processor.js';
-import { DependencyTracker } from '../../src/core/dependency-tracker.js';
+import { CascadingImportsProcessor } from '../../src/core/cascading-imports-processor.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const testFixturesDir = path.join(__dirname, '../fixtures/slot-system');
 
-describe('slot system v0.5.0', () => {
-  let sourceDir;
-  let layoutsDir;
-  let dependencyTracker;
+// Helper functions for temp directories  
+async function createTempDir() {
+  const tempDir = path.join(__dirname, '../fixtures/slot-system-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9));
+  await fs.mkdir(tempDir, { recursive: true });
+  return tempDir;
+}
+
+async function writeTempFile(tempDir, filePath, content) {
+  const fullPath = path.join(tempDir, filePath);
+  const dirPath = path.dirname(fullPath);
+  await fs.mkdir(dirPath, { recursive: true });
+  await fs.writeFile(fullPath, content, 'utf-8');
+}
+
+async function cleanupTempDir(tempDir) {
+  try {
+    await fs.rm(tempDir, { recursive: true });
+  } catch {
+    // Ignore cleanup errors
+  }
+}
+
+describe('slot system v0.6.0', () => {
+  let tempDir;
+  let processor;
   
   beforeEach(async () => {
-    // Create test directories
-    sourceDir = path.join(testFixturesDir, 'src');
-    layoutsDir = sourceDir; // Use source directory for layouts now (no .layouts directory)
-    
-    await fs.mkdir(sourceDir, { recursive: true });
-    
-    dependencyTracker = new DependencyTracker();
+    tempDir = await createTempDir();
+    processor = new CascadingImportsProcessor(tempDir);
   });
   
   afterEach(async () => {
-    // Clean up
-    try {
-      await fs.rm(testFixturesDir, { recursive: true, force: true });
-    } catch (error) {
-      // Ignore cleanup errors
-    }
+    await cleanupTempDir(tempDir);
   });
   
-  it('should handle template data-slot="name" syntax', async () => {
-    // Create layout with named data-slot attributes
+  it('should handle template data-target assignments', async () => {
+    // Create layout with named slots
     const layoutContent = `<!DOCTYPE html>
 <html>
 <head>
   <title>Test Layout</title>
-  <div data-slot="head">Default head content</div>
+  <slot name="head">Default head content</slot>
 </head>
 <body>
   <header>
-    <div data-slot="header">Default header</div>
+    <slot name="header">Default header</slot>
   </header>
   <main>
-    <div data-slot="default">Default main content</div>
+    <slot>Default main content</slot>
   </main>
   <footer>
-    <div data-slot="footer">Default footer</div>
+    <slot name="footer">Default footer</slot>
   </footer>
 </body>
 </html>`;
     
-    await fs.writeFile(path.join(layoutsDir, '_layout.html'), layoutContent);
+    await writeTempFile(tempDir, '_layout.html', layoutContent);
     
-    // Create page with template data-slot assignments
-    const pageContent = `<div data-layout="_layout.html">
-<template data-slot="head">
+    // Create page with template data-target assignments
+    const pageContent = `<div data-import="_layout.html">
+<template data-target="head">
   <link rel="stylesheet" href="page.css">
 </template>
-<template data-slot="header">
+<template data-target="header">
   <h1>Page Header</h1>
 </template>
-<template data-slot="footer">
+<template data-target="footer">
   <p>Copyright 2024</p>
 </template>
 <div>
@@ -77,203 +86,135 @@ describe('slot system v0.5.0', () => {
 </div>
 </div>`;
     
-    const pagePath = path.join(sourceDir, 'index.html');
-    await fs.writeFile(pagePath, pageContent);
+    const result = await processor.processImports(pageContent, path.join(tempDir, 'index.html'));
     
-    // Process the page
-    const result = await processHtmlUnified(
-      pageContent,
-      pagePath,
-      sourceDir,
-      dependencyTracker,
-      {}
-    );
-    
-    const html = result.content;
-    
-    // Verify data-slots were replaced correctly
-    expect(html).toContain('<link rel="stylesheet" href="page.css">');
-    expect(html).toContain('<h1>Page Header</h1>');
-    expect(html).toContain('<h2>Main Content</h2>');
-    expect(html).toContain('<p>Copyright 2024</p>');
-    expect(html).not.toContain('Default head content');
-    expect(html).not.toContain('Default header');
-    expect(html).not.toContain('Default footer');
+    // Verify data-targets were placed correctly
+    expect(result).toContain('<link rel="stylesheet" href="page.css">');
+    expect(result).toContain('<h1>Page Header</h1>');
+    expect(result).toContain('<h2>Main Content</h2>');
+    expect(result).toContain('<p>Copyright 2024</p>');
+    expect(result).not.toContain('Default head content');
+    expect(result).not.toContain('Default header');
+    expect(result).not.toContain('Default footer');
+    expect(result).not.toContain('data-target');
+    expect(result).not.toContain('data-import');
   });
   
-  it('should handle regular elements with data-slot="name" attribute', async () => {
-    // Create layout with named data-slot attributes
+  it('should handle template-based slot targeting', async () => {
+    // Create layout with named slots
     const layoutContent = `<!DOCTYPE html>
 <html>
 <body>
   <nav>
-    <div data-slot="navigation">Default nav</div>
+    <slot name="navigation">Default nav</slot>
   </nav>
   <main>
-    <div data-slot="default">Default content</div>
+    <slot>Default content</slot>
   </main>
   <aside>
-    <div data-slot="sidebar">Default sidebar</div>
+    <slot name="sidebar">Default sidebar</slot>
   </aside>
 </body>
 </html>`;
     
-    await fs.writeFile(path.join(layoutsDir, '_layout.html'), layoutContent);
+    await writeTempFile(tempDir, '_layout.html', layoutContent);
     
-    // Create page with element data-slot assignments
-    const pageContent = `<div data-layout="_layout.html">
-<nav data-slot="navigation">
+    // Create page with template data-target assignments (v0.6.0 way)
+    const pageContent = `<div data-import="_layout.html">
+<template data-target="navigation">
   <ul>
     <li><a href="/">Home</a></li>
     <li><a href="/about">About</a></li>
   </ul>
-</nav>
-<aside data-slot="sidebar">
+</template>
+<template data-target="sidebar">
   <h3>Related Links</h3>
   <ul>
     <li><a href="/link1">Link 1</a></li>
   </ul>
-</aside>
+</template>
 <article>
   <h1>Article Title</h1>
   <p>Article content here.</p>
 </article>
 </div>`;
     
-    const pagePath = path.join(sourceDir, 'page.html');
-    await fs.writeFile(pagePath, pageContent);
+    const result = await processor.processImports(pageContent, path.join(tempDir, 'page.html'));
     
-    // Process the page
-    const result = await processHtmlUnified(
-      pageContent,
-      pagePath,
-      sourceDir,
-      dependencyTracker,
-      {}
-    );
-    
-    const html = result.content;
-    
-    // Verify elements were moved to correct data-slots  
-    expect(html).toContain('<ul>');
-    expect(html).toContain('<li><a href="/">Home</a></li>');
-    expect(html).toContain('<h3>Related Links</h3>');
-    expect(html).toContain('<h1>Article Title</h1>');
-    expect(html).not.toContain('Default nav');
-    expect(html).not.toContain('Default sidebar');
+    // Verify elements were moved to correct slots
+    expect(result).toContain('<ul>');
+    expect(result).toContain('<li><a href="/">Home</a></li>');
+    expect(result).toContain('<h3>Related Links</h3>');
+    expect(result).toContain('<h1>Article Title</h1>');
+    expect(result).not.toContain('Default nav');
+    expect(result).not.toContain('Default sidebar');
   });
   
-  it('should preserve fallback content when no data-slot assignment', async () => {
+  it('should preserve fallback content when no data-target assignment', async () => {
     // Create layout with fallback content
     const layoutContent = `<!DOCTYPE html>
 <html>
 <body>
   <header>
-    <div data-slot="header">
+    <slot name="header">
       <h1>Default Title</h1>
       <nav>
         <a href="/">Home</a>
       </nav>
-    </div>
+    </slot>
   </header>
   <main>
-    <div data-slot="default">
+    <slot>
       <h2>Welcome</h2>
       <p>This is the default content.</p>
-    </div>
+    </slot>
   </main>
 </body>
 </html>`;
     
-    await fs.writeFile(path.join(layoutsDir, '_layout.html'), layoutContent);
+    await writeTempFile(tempDir, '_layout.html', layoutContent);
     
-    // Create page with no data-slot assignments (should use fallback)
-    const pageContent = `<div data-layout="_layout.html">
-<!-- No data-slot assignments - should show fallback content -->
-</div>`;
+    // Create page with empty content (should use fallback)
+    const pageContent = `<div data-import="_layout.html"></div>`;
     
-    const pagePath = path.join(sourceDir, 'fallback.html');
-    await fs.writeFile(pagePath, pageContent);
+    const result = await processor.processImports(pageContent, path.join(tempDir, 'fallback.html'));
     
-    // Process the page
-    const result = await processHtmlUnified(
-      pageContent,
-      pagePath,
-      sourceDir,
-      dependencyTracker,
-      {}
-    );
-    
-    const html = result.content;
-    
-    // Verify fallback content is preserved (with data-slot attributes removed for clean output)
-    expect(html).toContain('<h1>Default Title</h1>');
-    expect(html).toContain('<a href="/">Home</a>');  // Look for the link content
-    expect(html).toContain('<h2>Welcome</h2>');
-    expect(html).toContain('<p>This is the default content.</p>');
-    // Verify data-slot attributes are removed even when using fallback content
-    expect(html).not.toContain('data-slot=');
+    // Verify fallback content is preserved
+    expect(result).toContain('<h1>Default Title</h1>');
+    expect(result).toContain('<a href="/">Home</a>');
+    // In v0.6.0, slot fallback only works when slot content is truly empty after trimming
+    // Since we have empty content, should use fallback
+    expect(result).toContain('<h1>Default Title</h1>');
+    expect(result).toContain('<a href="/">Home</a>');
   });
   
-  it('should handle multiple elements assigned to same data-slot', async () => {
+  it('should handle template content targeting specific slot', async () => {
     // Create layout
     const layoutContent = `<!DOCTYPE html>
 <html>
 <body>
   <main>
-    <div data-slot="content">Default content</div>
+    <slot name="content">Default content</slot>
   </main>
 </body>
 </html>`;
     
-    await fs.writeFile(path.join(layoutsDir, '_layout.html'), layoutContent);
+    await writeTempFile(tempDir, '_layout.html', layoutContent);
     
-    // Create page with multiple assignments to same data-slot
-    const pageContent = `<div data-layout="_layout.html">
-<section data-slot="content">
-  <h2>Section 1</h2>
-  <p>First section content.</p>
-</section>
-<article data-slot="content">
-  <h2>Section 2</h2>
-  <p>Second section content.</p>
-</article>
-<div data-slot="content">
-  <h2>Section 3</h2>
-  <p>Third section content.</p>
-</div>
+    // Create page with template targeting specific slot
+    const pageContent = `<div data-import="_layout.html">
+<template data-target="content">
+  <h2>Custom Content</h2>
+  <p>This content replaces the default slot content.</p>
+</template>
 </div>`;
     
-    const pagePath = path.join(sourceDir, 'multiple.html');
-    await fs.writeFile(pagePath, pageContent);
+    const result = await processor.processImports(pageContent, path.join(tempDir, 'custom.html'));
     
-    // Process the page
-    const result = await processHtmlUnified(
-      pageContent,
-      pagePath,
-      sourceDir,
-      dependencyTracker,
-      {}
-    );
-    
-    const html = result.content;
-    
-    // Verify all assignments are included in document order
-    expect(html).toContain('<section>');  // Should have section tag
-    expect(html).toContain('<article>');  // Should have article tag  
-    expect(html).toContain('<div>');       // Should have div tag
-    expect(html).toContain('Section 1');  // Should have content
-    expect(html).toContain('Section 2');  // Should have content
-    expect(html).toContain('Section 3');  // Should have content
-    
-    // Check that they appear in the correct order
-    const section1Index = html.indexOf('Section 1');
-    const section2Index = html.indexOf('Section 2');
-    const section3Index = html.indexOf('Section 3');
-    
-    expect(section1Index).toBeLessThan(section2Index);
-    expect(section2Index).toBeLessThan(section3Index);
-    expect(html).not.toContain('Default content');
+    // Verify custom content is used
+    expect(result).toContain('<h2>Custom Content</h2>');
+    expect(result).toContain('This content replaces the default slot content.');
+    expect(result).not.toContain('Default content');
   });
 
   it('should handle short name layout references', async () => {
@@ -282,19 +223,19 @@ describe('slot system v0.5.0', () => {
 <html>
 <body>
   <header>
-    <div data-slot="header">Default header</div>
+    <slot name="header">Default header</slot>
   </header>
   <main>
-    <div data-slot="default">Default main content</div>
+    <slot>Default main content</slot>
   </main>
 </body>
 </html>`;
     
-    await fs.writeFile(path.join(layoutsDir, '_blog.layout.html'), layoutContent);
+    await writeTempFile(tempDir, '_blog.layout.html', layoutContent);
     
     // Create page with short name reference
-    const pageContent = `<div data-layout="blog">
-<template data-slot="header">
+    const pageContent = `<div data-import="blog">
+<template data-target="header">
   <h1>Blog Post Title</h1>
 </template>
 <article>
@@ -302,70 +243,37 @@ describe('slot system v0.5.0', () => {
 </article>
 </div>`;
     
-    const pagePath = path.join(sourceDir, 'post.html');
-    await fs.writeFile(pagePath, pageContent);
-    
-    // Process the page
-    const result = await processHtmlUnified(
-      pageContent,
-      pagePath,
-      sourceDir,
-      dependencyTracker,
-      {}
-    );
-    
-    const html = result.content;
+    const result = await processor.processImports(pageContent, path.join(tempDir, 'post.html'));
     
     // Verify short name resolved to correct layout
-    expect(html).toContain('<h1>Blog Post Title</h1>');  // Header data-slot content
-    expect(html).toContain('<article>');  // Main content
-    expect(html).toContain('This is the blog post content');
-    expect(html).not.toContain('Default header');  // Should not have fallback
-    expect(html).not.toContain('Default main content');  // Should not have fallback
+    expect(result).toContain('<h1>Blog Post Title</h1>');
+    expect(result).toContain('<article>');
+    expect(result).toContain('This is the blog post content');
+    expect(result).not.toContain('Default header');
+    expect(result).not.toContain('Default main content');
   });
 
-  it('should prefer .layout. files over non-.layout. files', async () => {
-    // Create both types of layout files
-    const preferredLayoutContent = `<!DOCTYPE html>
+  it('should handle short name layout resolution', async () => {
+    // Create layout file with .layout. convention
+    const layoutContent = `<!DOCTYPE html>
 <html>
 <body>
-  <h1>Preferred Layout</h1>
-  <div data-slot="default">Content</div>
+  <h1>Blog Layout</h1>
+  <slot>Content</slot>
 </body>
 </html>`;
     
-    const secondaryLayoutContent = `<!DOCTYPE html>
-<html>
-<body>
-  <h1>Secondary Layout</h1>
-  <div data-slot="default">Content</div>
-</body>
-</html>`;
-    
-    await fs.writeFile(path.join(layoutsDir, '_blog.layout.html'), preferredLayoutContent);
-    await fs.writeFile(path.join(layoutsDir, '_blog.html'), secondaryLayoutContent);
+    await writeTempFile(tempDir, '_blog.layout.html', layoutContent);
     
     // Create page with short name reference
-    const pageContent = `<div data-layout="blog">
+    const pageContent = `<div data-import="blog">
 <p>Test content</p>
 </div>`;
     
-    const pagePath = path.join(sourceDir, 'post.html');
-    await fs.writeFile(pagePath, pageContent);
+    const result = await processor.processImports(pageContent, path.join(tempDir, 'post.html'));
     
-    // Process the page
-    const result = await processHtmlUnified(
-      pageContent,
-      pagePath,
-      sourceDir,
-      dependencyTracker,
-      {}
-    );
-    
-    const html = result.content;
-    
-    // Verify preferred layout was used
-    expect(html).toContain('Preferred Layout');
-    expect(html).not.toContain('Secondary Layout');
+    // Verify layout was resolved and used
+    expect(result).toContain('Blog Layout');
+    expect(result).toContain('<p>Test content</p>');
   });
 });

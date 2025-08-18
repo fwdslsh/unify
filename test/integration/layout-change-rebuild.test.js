@@ -27,10 +27,10 @@ describe('Layout Change Rebuild', () => {
     await cleanupTempDirectory(tempDir);
   });
 
-  describe('Explicit layout with data-layout attribute', () => {
+  describe('Explicit layout with data-removed attribute', () => {
     it('should rebuild page when explicit layout file changes', async () => {
       const structure = {
-        'src/index.html': `<div data-layout="layout.html">
+        'src/index.html': `<div data-removed="layout.html">
   <h1>Home Page</h1>
 </div>`,
         'src/layout.html': `<!DOCTYPE html>
@@ -80,10 +80,10 @@ describe('Layout Change Rebuild', () => {
 
     it('should rebuild multiple pages when shared layout changes', async () => {
       const structure = {
-        'src/index.html': `<div data-layout="shared.html">
+        'src/index.html': `<div data-removed="shared.html">
   <h1>Home Page</h1>
 </div>`,
-        'src/about.html': `<div data-layout="shared.html">
+        'src/about.html': `<div data-removed="shared.html">
   <h1>About Page</h1>
 </div>`,
         'src/shared.html': `<!DOCTYPE html>

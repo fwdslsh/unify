@@ -14,7 +14,7 @@ This starter project demonstrates every major feature of Unify according to the 
 
 - **🔗 Apache SSI Includes**: Component-based architecture with `<!--#include virtual="..." -->`
 - **📝 Markdown Processing**: YAML frontmatter with layout assignment
-- **🎨 Layout System**: Convention-based layouts in `.layouts/` directory
+- **🎨 Layout System**: Automatic layout discovery with `_layout.html` files
 - **🚀 Live Development Server**: Hot reload with incremental builds
 - **📁 Asset Management**: Automatic asset discovery and copying
 - **🌐 Pretty URLs**: Clean URL generation with `--pretty-urls`
@@ -26,15 +26,14 @@ This starter project demonstrates every major feature of Unify according to the 
 
 ```
 src/
-├── .layouts/                 # Layout templates
-│   ├── default.html         # Default layout
-│   ├── blog.html           # Blog-specific layout  
-│   └── products.html       # Products layout
+├── _layout.html            # Default layout (auto-discovered)
 ├── _includes/              # Reusable components & partials
 │   ├── head.html          # HTML head partial
 │   ├── header.html        # Site header
 │   ├── footer.html        # Site footer
 │   ├── card.html          # Example component
+│   ├── _blog.layout.html  # Blog-specific layout (named)
+│   ├── _products.layout.html # Products layout (named)
 │   └── components/        # Advanced components
 │       ├── _hero.html     # Hero component
 │       └── _navigation.html # Navigation component
@@ -127,7 +126,7 @@ npx @fwdslsh/unify build --minify
 npx @fwdslsh/unify build --clean
 
 # Custom asset copying
-npx @fwdslsh/unify build --assets "./static/**/*"
+npx @fwdslsh/unify build --copy "./static/**/*"
 
 # Custom base URL for sitemap
 npx @fwdslsh/unify build --base-url https://mysite.com
@@ -150,14 +149,31 @@ npx @fwdslsh/unify build --no-sitemap
 
 ### 2. Layout System
 
-Create layouts in `src/.layouts/`:
+**Automatic Layout Discovery:**
+Create `_layout.html` in your source directory for automatic layout application:
 
 ```html
-<!-- .layouts/default.html -->
+<!-- _layout.html -->
 <!DOCTYPE html>
 <html>
 <head>
-  <title>{{ title | default: "My Site" }}</title>
+  <div data-slot="head"></div>
+</head>
+<body>
+  <div data-slot="content"></div>
+</body>
+</html>
+```
+
+**Named Layouts:**
+Create named layouts in `_includes/` directory:
+
+```html
+<!-- _includes/_blog.layout.html -->
+<!DOCTYPE html>
+<html>
+<head>
+  <div data-slot="head"></div>
 </head>
 <body>
   {{ content }}
@@ -268,7 +284,7 @@ npx @fwdslsh/unify build --pretty-urls
 npx @fwdslsh/unify build --minify
 
 # Copy additional static files
-npx @fwdslsh/unify build --assets "./static/**/*"
+npx @fwdslsh/unify build --copy "./static/**/*"
 ```
 
 ### SEO Features
@@ -288,8 +304,14 @@ npx @fwdslsh/unify build --assets "./static/**/*"
 ## 🔧 Customization
 
 ### Adding New Layouts
-1. Create `src/.layouts/my-layout.html`
-2. Use `{{ content }}` where page content should appear
+
+**For automatic discovery:**
+1. Create `_layout.html` in the appropriate directory
+2. Use `<div data-slot="content"></div>` where page content should appear
+
+**For named layouts:**
+1. Create `src/_includes/_my-layout.layout.html`
+2. Use `<div data-slot="content"></div>` where page content should appear
 3. Assign via frontmatter: `layout: "my-layout"`
 
 ### Creating Components
@@ -298,9 +320,10 @@ npx @fwdslsh/unify build --assets "./static/**/*"
 3. Components can include styles and scripts inline
 
 ### Directory Structure
-- Files starting with `_` are non-emitting partials
+- Files starting with `_` are non-emitting partials  
 - `src/assets/` is automatically copied if referenced
-- `src/.layouts/` contains layout templates
+- `src/_layout.html` provides default layout (auto-discovered)
+- `src/_includes/` contains components and named layouts
 - Any directory structure is supported
 
 ## 🤝 Contributing

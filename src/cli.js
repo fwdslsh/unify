@@ -23,8 +23,10 @@ async function main() {
       await flushAndExit(0);
     }
 
-    // Set logging level based on verbose flag
-    if (args.verbose) {
+    // Set logging level based on logLevel or verbose flag (backwards compatibility)
+    if (args.logLevel) {
+      logger.setLevel(args.logLevel.toUpperCase());
+    } else if (args.verbose) {
       logger.setLevel('DEBUG');
     }
 
@@ -128,36 +130,57 @@ Commands:
   serve     Start development server with live reload
   init      Initialize new project with starter template
 
-Options:
-  --source, -s      Source directory (default: src)
-  --output, -o      Output directory (default: dist)
-  --copy            Additional files glob pattern to copy recursively
-  --port, -p        Server port (default: 3000)
-  --host            Server host (default: localhost)
-  --pretty-urls     Generate pretty URLs (about.md → about/index.html)
-  --base-url        Base URL for sitemap.xml (default: https://example.com)
-  --clean           Clean output directory before build
-  --no-sitemap      Disable sitemap.xml generation
-  --fail-on         Fail build on specified level: warning, error
-  --minify          Enable HTML minification for production builds
-  --verbose         Enable debug level messages in console output
-  --help, -h        Show this help message
-  --version, -v     Show version number
+Directory Options:
+  --source, -s <directory>        Source directory (default: src)
+  --output, -o <directory>        Output directory (default: dist)
+  --copy <glob>                   Add paths to copy set (repeatable)
+  --ignore <glob>                 Ignore paths for rendering and copying (repeatable)
+  --ignore-render <glob>          Ignore paths only for rendering (repeatable)
+  --ignore-copy <glob>            Ignore paths only for copying (repeatable)
+  --render <glob>                 Force render even if ignored (repeatable)
+  --default-layout <value>        Set default layouts (repeatable, supports glob=layout)
+  --dry-run                       Show file classification without building
+  --auto-ignore <boolean>         Auto-ignore layout/include files (default: true)
+
+Build Options:
+  --pretty-urls                   Generate pretty URLs (about.html → about/index.html)
+  --clean                         Clean output directory before build
+  --fail-level <level>            Fail build on specified level: warning, error
+  --minify                        Enable HTML minification for production builds
+
+Server Options:
+  --port, -p <number>             Server port (default: 3000)
+  --host <hostname>               Server host (default: localhost)
+
+Global Options:
+  --help, -h                      Display help information
+  --version, -v                   Display version number
+  --log-level <level>             Set logging level: error, warn, info, debug
+  --verbose                       Enable debug level messages (deprecated, use --log-level=debug)
 
 Examples:
-  unify                                   # Build with defaults (src → dist)
-  unify build                             # Explicit build command
-  unify serve                             # Serve with live reload on port 3000
-  unify build --pretty-urls
-  unify build --base-url https://mysite.com
-  unify build --copy "./assets/**/*.*"    # Copy additional files
-  unify serve --port 8080
-  unify init                              # Initialize with default starter
-  unify init basic                        # Initialize with basic starter template
+  unify                           # Build with defaults (src → dist)
+  unify build --pretty-urls       # Build with pretty URLs
+  unify serve --port 8080         # Serve on port 8080
+  unify --dry-run                 # See what would be built
+
+File Classification:
+  unify --copy "docs/**" --ignore "**/drafts/**"
+  unify --default-layout "_base.html" --default-layout "blog/**=_post.html"
+  unify --render "experiments/**" --ignore-copy "assets/raw/**"
+
+Asset Management:
+  unify --copy "config/*.json" --ignore-copy "**/*.psd"
+  unify --auto-ignore=false --ignore="_*" --ignore=".*"
+
+Production:
+  unify --minify --fail-level=warning --clean
 
 Notes:
-  • src/assets is automatically copied to dist/assets (if exists)
-  • Files/folders starting with _ are not copied to output (use for layouts/partials)
+  • assets/** is copied by default unless excluded
+  • Files/folders starting with _ are ignored by default
+  • Use --dry-run to see file classification decisions
+  • Glob patterns follow ripgrep/gitignore style
 `);
 }
 

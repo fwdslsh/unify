@@ -5,7 +5,7 @@
 
 import path from 'path';
 import { logger } from '../utils/logger.js';
-import { extractIncludeDependencies } from './include-processor.js';
+// Include processing removed
 
 /**
  * Dependency tracker for managing include relationships
@@ -184,7 +184,7 @@ export class DependencyTracker {
    * @param {string} sourceRoot - Source root directory
    */
   async analyzePage(pagePath, htmlContent, sourceRoot) {
-    const includeDependencies = extractIncludeDependencies(htmlContent, pagePath, sourceRoot);
+    const includeDependencies = []; // Include processing removed
     const layoutDependencies = await this.extractLayoutDependencies(htmlContent, pagePath, sourceRoot);
     this.recordDependencies(pagePath, includeDependencies, layoutDependencies);
     
@@ -202,35 +202,6 @@ export class DependencyTracker {
   async extractLayoutDependencies(htmlContent, pagePath, sourceRoot) {
     const dependencies = [];
     
-    // Look for explicit data-layout attribute
-    const layoutMatch = htmlContent.match(/data-layout=["']([^"']+)["']/i);
-    
-    if (layoutMatch) {
-      const layoutPath = layoutMatch[1];
-      
-      try {
-        // Resolve layout path (similar to unified-html-processor logic)
-        let resolvedLayoutPath;
-        
-        if (layoutPath.startsWith("/")) {
-          // Absolute path from source root
-          resolvedLayoutPath = path.join(sourceRoot, layoutPath.substring(1));
-        } else if (layoutPath.includes('/')) {
-          // Path with directory structure, relative to source root
-          resolvedLayoutPath = path.join(sourceRoot, layoutPath);
-        } else {
-          // Bare filename, relative to current page directory
-          const pageDir = path.dirname(pagePath);
-          resolvedLayoutPath = path.join(pageDir, layoutPath);
-        }
-        
-        dependencies.push(resolvedLayoutPath);
-        logger.debug(`Extracted explicit layout dependency: ${layoutPath} -> ${resolvedLayoutPath}`);
-      } catch (error) {
-        // Log warning but continue - dependency tracking shouldn't break builds
-        logger.warn(`Could not resolve layout dependency: ${layoutPath} in ${pagePath}`);
-      }
-    }
     
     // Also discover auto-discovered layouts (folder-scoped _layout.html, fallback layouts)
     try {
@@ -266,7 +237,7 @@ export class DependencyTracker {
         // Read the include file to find its dependencies
         const fs = await import('fs/promises');
         const includeContent = await fs.readFile(includePath, 'utf-8');
-        const nestedDependencies = extractIncludeDependencies(includeContent, includePath, sourceRoot);
+        const nestedDependencies = []; // Include processing removed
         
         if (nestedDependencies.length > 0) {
           this.recordDependencies(includePath, nestedDependencies);

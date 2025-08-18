@@ -3,42 +3,28 @@
 
 <head>
   <title>Welcome to My Blog</title>
-  <link rel="layout" href="_blog.layout.html">
 </head>
 
 <body>
-  <include src="_includes/adv-nav.html">
-    <!-- Provide your own brand/link/actions by naming slots -->
-    <a data-slot="brand" href="/">Unify<span aria-hidden="true">·</span>Site</a>
-
-    <ul data-slot="links" role="list">
-      <li><a href="/docs/">Docs</a></li>
-      <li><a href="/recipes/">Recipes3</a></li>
-      <li><a href="/blog/">Blog</a></li>
-    </ul>
-
-    <div data-slot="actions">
-      <a class="u-btn" href="/start/">Unify Rocks</a>
-    </div>
-  </include>
+  <!-- Include tags are no longer supported -->
   <div>
 
-    <template data-slot="header">
+    <header>
       <h1>My Unify Blog</h1>
       <p>Convention-based blogging with Unify</p>
-    </template>
+    </header>
 
     <h2>Hello!</h2>
     <p>This is a blog post rendered with the Unify blog layout. This content goes into the unnamed slot.</p>
 
-    <!--#include virtual="/_includes/alert.html" -->
+    <!-- SSI includes are no longer supported -->
 
     <h3>Components Example</h3>
     <p>Here are some reusable components:</p>
 
-    <!--#include virtual="/_includes/card.html" -->
+    <!-- SSI includes are no longer supported -->
 
-    <!--#include virtual="/_includes/navigation.html" -->
+    <!-- SSI includes are no longer supported -->
   </div>
 </body>
 

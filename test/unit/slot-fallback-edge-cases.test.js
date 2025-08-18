@@ -1,94 +1,99 @@
 /**
- * Tests for data-slot fallback content edge cases
+ * Tests for slot fallback content edge cases (v0.6.0 syntax)
  */
 
 import { describe, it, beforeEach, afterEach, expect } from 'bun:test';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { processHtmlUnified } from '../../src/core/unified-html-processor.js';
-import { DependencyTracker } from '../../src/core/dependency-tracker.js';
+import { CascadingImportsProcessor } from '../../src/core/cascading-imports-processor.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const testFixturesDir = path.join(__dirname, '../fixtures/slot-fallback-edge-cases');
 
-describe('data-slot fallback edge cases', () => {
-  let sourceDir;
-  let layoutsDir;
-  let dependencyTracker;
+// Helper functions for temp directories
+async function createTempDir() {
+  const tempDir = path.join(__dirname, '../fixtures/slot-fallback-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9));
+  await fs.mkdir(tempDir, { recursive: true });
+  return tempDir;
+}
+
+async function writeTempFile(tempDir, filePath, content) {
+  const fullPath = path.join(tempDir, filePath);
+  const dirPath = path.dirname(fullPath);
+  await fs.mkdir(dirPath, { recursive: true });
+  await fs.writeFile(fullPath, content, 'utf-8');
+}
+
+async function cleanupTempDir(tempDir) {
+  try {
+    await fs.rm(tempDir, { recursive: true });
+  } catch {
+    // Ignore cleanup errors
+  }
+}
+
+describe('slot fallback edge cases', () => {
+  let tempDir;
+  let processor;
   
   beforeEach(async () => {
-    sourceDir = path.join(testFixturesDir, 'src');
-    
-    await fs.mkdir(sourceDir, { recursive: true });
-    
-    dependencyTracker = new DependencyTracker();
+    tempDir = await createTempDir();
+    processor = new CascadingImportsProcessor(tempDir);
   });
   
   afterEach(async () => {
-    try {
-      await fs.rm(testFixturesDir, { recursive: true, force: true });
-    } catch (error) {
-      // Ignore cleanup errors
-    }
+    await cleanupTempDir(tempDir);
   });
   
   it('should use fallback when page has only whitespace', async () => {
-    const layoutContent = `<html><body><div data-slot="default">Fallback content</div></body></html>`;
-    await fs.writeFile(path.join(sourceDir, '_layout.html'), layoutContent);
+    const layoutContent = `<html><body><slot>Fallback content</slot></body></html>`;
+    await writeTempFile(tempDir, '_layout.html', layoutContent);
     
-    const pageContent = `<div data-layout="_layout.html">   \n\t  </div>`;
-    const pagePath = path.join(sourceDir, 'whitespace.html');
-    await fs.writeFile(pagePath, pageContent);
+    const pageContent = `<div data-import="_layout.html">   \n\t  </div>`;
+    const pagePath = path.join(tempDir, 'whitespace.html');
     
-    const result = await processHtmlUnified(pageContent, pagePath, sourceDir, dependencyTracker, {});
-    expect(result.content).toContain('Fallback content');
-    // Verify data-slot attributes are removed even when using fallback content
-    expect(result.content).not.toContain('data-slot="default"');
+    const result = await processor.processImports(pageContent, pagePath);
+    expect(result).toContain('Fallback content');
   });
   
-  it('should use fallback when page has only comments', async () => {
-    const layoutContent = `<html><body><div data-slot="default">Fallback content</div></body></html>`;
-    await fs.writeFile(path.join(sourceDir, '_layout.html'), layoutContent);
+  it('should include comments as content (v0.6.0 behavior)', async () => {
+    const layoutContent = `<html><body><slot>Fallback content</slot></body></html>`;
+    await writeTempFile(tempDir, '_layout.html', layoutContent);
     
-    const pageContent = `<div data-layout="_layout.html"><!-- just a comment --></div>`;
-    const pagePath = path.join(sourceDir, 'comment.html');
-    await fs.writeFile(pagePath, pageContent);
+    const pageContent = `<div data-import="_layout.html"><!-- just a comment --></div>`;
+    const pagePath = path.join(tempDir, 'comment.html');
     
-    const result = await processHtmlUnified(pageContent, pagePath, sourceDir, dependencyTracker, {});
-    expect(result.content).toContain('Fallback content');
-    // Verify data-slot attributes are removed even when using fallback content
-    expect(result.content).not.toContain('data-slot="default"');
+    const result = await processor.processImports(pageContent, pagePath);
+    expect(result).toContain('<!-- just a comment -->');
+    expect(result).not.toContain('Fallback content');
   });
   
   it('should use page content when it has meaningful content', async () => {
-    const layoutContent = `<html><body><div data-slot="default">Fallback content</div></body></html>`;
-    await fs.writeFile(path.join(sourceDir, '_layout.html'), layoutContent);
+    const layoutContent = `<html><body><slot>Fallback content</slot></body></html>`;
+    await writeTempFile(tempDir, '_layout.html', layoutContent);
     
-    const pageContent = `<div data-layout="_layout.html"><p>Real content</p></div>`;
-    const pagePath = path.join(sourceDir, 'meaningful.html');
-    await fs.writeFile(pagePath, pageContent);
+    const pageContent = `<div data-import="_layout.html"><p>Real content</p></div>`;
+    const pagePath = path.join(tempDir, 'meaningful.html');
     
-    const result = await processHtmlUnified(pageContent, pagePath, sourceDir, dependencyTracker, {});
-    expect(result.content).toContain('<p>Real content</p>');
-    expect(result.content).not.toContain('Fallback content');
+    const result = await processor.processImports(pageContent, pagePath);
+    expect(result).toContain('<p>Real content</p>');
+    expect(result).not.toContain('Fallback content');
   });
   
-  it('should handle mixed comments and whitespace correctly', async () => {
-    const layoutContent = `<html><body><div data-slot="default">Fallback content</div></body></html>`;
-    await fs.writeFile(path.join(sourceDir, '_layout.html'), layoutContent);
+  it('should include mixed comments and whitespace as content', async () => {
+    const layoutContent = `<html><body><slot>Fallback content</slot></body></html>`;
+    await writeTempFile(tempDir, '_layout.html', layoutContent);
     
-    const pageContent = `<div data-layout="_layout.html">
+    const pageContent = `<div data-import="_layout.html">
       <!-- comment 1 -->
       \n\t   
       <!-- comment 2 -->
     </div>`;
-    const pagePath = path.join(sourceDir, 'mixed.html');
-    await fs.writeFile(pagePath, pageContent);
+    const pagePath = path.join(tempDir, 'mixed.html');
     
-    const result = await processHtmlUnified(pageContent, pagePath, sourceDir, dependencyTracker, {});
-    expect(result.content).toContain('Fallback content');
-    // Verify data-slot attributes are removed even when using fallback content
-    expect(result.content).not.toContain('data-slot="default"');
+    const result = await processor.processImports(pageContent, pagePath);
+    expect(result).toContain('<!-- comment 1 -->');
+    expect(result).toContain('<!-- comment 2 -->');
+    expect(result).not.toContain('Fallback content');
   });
 });

@@ -6,7 +6,7 @@
  * 
  * Features tested:
  * - Apache SSI-style includes (file and virtual)
- * - Layout/slot system with data-layout attributes
+ * - Layout/slot system with data-removed attributes
  * - Markdown processing with frontmatter and layouts
  * - Layout conditional logic
  * - Asset tracking and copying
@@ -85,7 +85,7 @@ describe('Final Boss Integration Test', () => {
 </div>`,
 
         // Main pages using simplified layout system
-        'src/index.html': `<div data-layout="_includes/base.html">
+        'src/index.html': `<div data-removed="_includes/base.html">
   <template data-slot="title">Home - Final Boss Test</template>
   <template data-slot="description">Welcome to our comprehensive test site</template>
   
@@ -103,7 +103,7 @@ describe('Final Boss Integration Test', () => {
   </ul>
 </div>`,
 
-        'src/about.html': `<div data-layout="_includes/base.html">
+        'src/about.html': `<div data-removed="_includes/base.html">
   <template data-slot="title">About - Final Boss Test</template>
   <template data-slot="description">Learn about our test methodology</template>
   
@@ -113,7 +113,7 @@ describe('Final Boss Integration Test', () => {
   <!--#include virtual="/.components/card.html" -->
 </div>`,
 
-        'src/features.html': `<div data-layout="_includes/base.html">
+        'src/features.html': `<div data-removed="_includes/base.html">
   <template data-slot="title">Features - Final Boss Test</template>
   <template data-slot="description">Explore all the features we test</template>
   
@@ -225,7 +225,7 @@ This is a test blog post written in Markdown.
 </html>`,
 
         // Test with missing component (should build but show error)
-        'src/test-missing.html': `<div data-layout="default">
+        'src/test-missing.html': `<div data-removed="default">
   <template data-slot="title">Missing Component Test</template>
   <!--#include virtual="/.components/missing.html" -->
   <p>This page tries to include a missing component.</p>
@@ -247,7 +247,7 @@ This is a test blog post written in Markdown.
   <!--#include virtual="/.components/circular-a.html" -->
 </div>`,
 
-        'src/test-circular.html': `<div data-layout="default">
+        'src/test-circular.html': `<div data-removed="default">
   <template data-slot="title">Circular Test</template>
   <!--#include virtual="/.components/circular-a.html" -->
 </div>`

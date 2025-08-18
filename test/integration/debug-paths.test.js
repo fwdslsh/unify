@@ -41,7 +41,7 @@ it('Debug path resolution issue', async () => {
 </html>`
   );
 
-  // Create the test page WITHOUT data-layout (should use default layout)
+  // Create the test page WITHOUT data-removed (should use default layout)
   await fs.writeFile(
     path.join(sourceDir, 'test.html'),
     `<div>

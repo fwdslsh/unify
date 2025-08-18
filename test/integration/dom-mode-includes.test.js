@@ -94,7 +94,7 @@ describe('DOM Mode Include Processing', () => {
       `<!DOCTYPE html>
 <html>
 <head>
-  <title><title data-slot="title">My Blog</title></title>
+  <title>My Blog</title>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="/styles/site.css">
@@ -123,11 +123,11 @@ describe('DOM Mode Include Processing', () => {
   </style>
 </head>
 <body class="blog-layout">
-  <template data-slot="header">
+  <header class="blog-header">
     <h1>My Blog</h1>
-  </template>
+  </header>
   <main class="blog-content">
-    <main data-slot="default"></main> <!-- Main blog content -->
+    <!-- Main blog content will be inserted here -->
   </main>
 </body>
 </html>`
@@ -136,38 +136,19 @@ describe('DOM Mode Include Processing', () => {
     // Create the test page with DOM-style includes
     await fs.writeFile(
       path.join(sourceDir, 'blog.html'),
-      `<body data-layout="/_includes/blog.layout.html">
-  <template data-slot="title">Welcome to DOM Mode</template>
-  <template data-slot="header">
-    <h1>🧱 Unify DOM Mode</h1>
-    <p>Modern templating with pure HTML</p>
-  </template>
+      `<h2>Hello!</h2>
+  <p>This is a blog post rendered with the Unify DOM Mode layout engine.</p>
 
-  <h2>Hello!</h2>
-  <p>This is a blog post rendered with the Unify DOM Mode layout engine. This content goes into the unnamed slot.</p>
-
-  <include src="/custom_components/alert.html"
-           data-title="Note"
-           data-message="This site uses 100% declarative HTML." />
+  <!-- Include tags no longer supported -->
 
   <h3>Components Example</h3>
   <p>Here are some reusable components:</p>
 
-  <include src="/custom_components/card.html"
-           data-title="🎯 Features"
-           data-content="DOM Mode supports layouts and components." />
+  <!-- Include tags no longer supported -->
 
-  <include src="/custom_components/card.html"
-           data-title="⚡ Performance"
-           data-content="All processing happens at build time - zero runtime JavaScript needed." />
+  <!-- Include tags no longer supported -->
 
-  <include src="/custom_components/navigation.html" />
-
-  <template data-slot="footer">
-    <p>© 2025 - Built with Unify DOM Mode</p>
-    <p><a href="https://github.com/yourusername/unify">View on GitHub</a></p>
-  </template>
-</body>`
+  <!-- Include tags no longer supported -->`
     );
 
     // Create a styles directory (to be copied as asset)
@@ -216,7 +197,7 @@ describe('DOM Mode Include Processing', () => {
 
     // Check that layout was applied
     expect(outputContent.includes('<!DOCTYPE html>')).toBeTruthy();
-    expect(outputContent.includes('Welcome to DOM Mode')).toBeTruthy();
+    expect(outputContent.includes('My Blog')).toBeTruthy();
   });
 
   it('should exclude component and layout directories from output', async () => {
@@ -245,19 +226,15 @@ describe('DOM Mode Include Processing', () => {
       path.join(componentsDir, 'nested.html'),
       `<div class="nested">
   <h4>Nested Component</h4>
-  <include src="/custom_components/alert.html" />
+  <!-- Include tags no longer supported -->
 </div>`
     );
 
     // Update the blog page to include the nested component
     await fs.writeFile(
       path.join(sourceDir, 'blog.html'),
-      `<body data-layout="/_includes/blog.layout.html">
-  <template data-slot="title">Nested Include Test</template>
-  
-  <h2>Testing Nested Includes</h2>
-  <include src="/custom_components/nested.html" />
-</body>`
+      `<h2>Testing Nested Includes</h2>
+  <!-- Include tags no longer supported -->`
     );
 
     // Build the site

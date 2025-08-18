@@ -166,8 +166,8 @@ export class LayoutDiscovery {
   }
 
   /**
-   * Resolve layout path from data-layout attribute or frontmatter
-   * @param {string} layoutSpec - Layout specification from data-layout or frontmatter
+   * Resolve layout path from layout specification
+   * @param {string} layoutSpec - Layout specification
    * @param {string} sourceRoot - Absolute path to source directory
    * @param {string} pagePath - Absolute path to the page file (for relative resolution)
    * @returns {Promise<string|null>} Absolute path to layout file, or null if not found

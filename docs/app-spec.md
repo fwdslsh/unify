@@ -122,6 +122,68 @@ unify watch [options]
 - Continuous logging of file changes and rebuild events
 - Updated files in output directory on changes
 
+#### 4. `init`
+
+Initializes a new Unify project by downloading and extracting a starter template from GitHub.
+
+**Syntax:**
+
+```bash
+unify init [template]
+```
+
+**Parameters:**
+
+- `template` (optional): Name of the starter template to use. If not provided, downloads the default starter.
+
+**Workflow:**
+
+1. Validates current directory (warns if not empty but continues)
+2. Determines which repository to download based on template parameter
+3. Checks if requested template exists on GitHub
+4. Downloads tarball from GitHub API (`https://api.github.com/repos/fwdslsh/unify-starter[-template]`)
+5. Extracts template files to current directory
+6. Provides next steps guidance
+
+**Available Templates:**
+
+The following templates are known and validated:
+
+- **Default** (no template specified): Downloads `fwdslsh/unify-starter`
+- **basic**: Downloads `fwdslsh/unify-starter-basic`
+- **blog**: Downloads `fwdslsh/unify-starter-blog`
+- **docs**: Downloads `fwdslsh/unify-starter-docs`
+- **portfolio**: Downloads `fwdslsh/unify-starter-portfolio`
+
+**Expected Output:**
+
+- Directory validation warning (if not empty)
+- Download progress confirmation
+- Success message with next steps:
+  1. Review the generated files
+  2. Run `unify build` to build your site
+  3. Run `unify serve` to start the development server
+
+**Error Handling:**
+
+- **Template not found**: Provides list of available templates and suggestions
+- **Network issues**: Provides troubleshooting guidance for connection problems
+- **GitHub API issues**: Handles rate limiting and access denied scenarios
+- **Extraction failures**: Reports extraction problems with helpful context
+
+**Examples:**
+
+```bash
+# Initialize with default template
+unify init
+
+# Initialize with blog template
+unify init blog
+
+# Initialize with docs template  
+unify init docs
+```
+
 ### Command Line Options
 
 #### Directory Options
@@ -1278,6 +1340,54 @@ The file watcher monitors all changes in the source directory and triggers appro
 - Smart dependency tracking to minimize rebuilds
 - Asset copying only for referenced files
 - Streaming file operations (no full-site memory loading)
+
+#### Build Cache System
+
+Unify includes an intelligent build cache system that significantly improves build performance for large projects:
+
+**Cache Storage:**
+
+- Cache directory: `.unify-cache` (created automatically)
+- Hash cache: `hash-cache.json` (SHA-256 file hashes)
+- Dependency graph: `deps-cache.json` (file dependency mappings)
+
+**Hashing Strategy:**
+
+- Uses Bun's native `CryptoHasher` with SHA-256 algorithm
+- File-based hashing for change detection
+- Content-based hashing for string data
+- Composite hashing for file groups
+
+**Cache Features:**
+
+- **File Change Detection**: Tracks file modifications using SHA-256 hashes
+- **Dependency Tracking**: Maintains bidirectional dependency graphs for include relationships
+- **Up-to-date Checking**: Compares input/output timestamps with dependency chains
+- **Automatic Cache Management**: Cache is persisted across builds and loaded on startup
+- **Smart Invalidation**: Only rebuilds files when they or their dependencies change
+
+**Cache Lifecycle:**
+
+1. **Initialization**: Loads existing cache from disk on startup
+2. **Build Process**: Updates hashes and dependencies during processing
+3. **Persistence**: Saves cache state to disk after successful builds
+4. **Restart Clearing**: Automatically clears cache on `serve` and `watch` commands for fresh development builds
+
+**Performance Benefits:**
+
+- Skip processing for unchanged files and their outputs
+- Reduce dependency resolution overhead
+- Minimize file system operations
+- Enable efficient incremental builds for large sites (1000+ pages)
+
+**Cache Statistics:**
+
+The build cache tracks and reports:
+
+- Number of cached files
+- Dependency graph size
+- Cache directory location
+- Hashing method used (native-crypto)
 
 ### Development Server
 

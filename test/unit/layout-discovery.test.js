@@ -230,7 +230,7 @@ describe('LayoutDiscovery', () => {
     test('should resolve absolute path from source root', async () => {
       await createTestStructure(sourceDir, {
         'layouts/custom.html': '<html><body><h1>Custom</h1><slot></slot></body></html>',
-        'page.html': '<div data-layout="/layouts/custom.html">Page content</div>'
+        'page.html': '<div>Page content</div>'
       });
 
       const pagePath = path.join(sourceDir, 'page.html');
@@ -242,7 +242,7 @@ describe('LayoutDiscovery', () => {
     test('should resolve relative path from page directory', async () => {
       await createTestStructure(sourceDir, {
         'blog/layout.html': '<html><body><h1>Blog Layout</h1><slot></slot></body></html>',
-        'blog/post.html': '<div data-layout="layout.html">Post content</div>'
+        'blog/post.html': '<div>Post content</div>'
       });
 
       const postPath = path.join(sourceDir, 'blog', 'post.html');
@@ -254,7 +254,7 @@ describe('LayoutDiscovery', () => {
     test('should add .html extension when missing', async () => {
       await createTestStructure(sourceDir, {
         'layouts/custom.html': '<html><body><h1>Custom</h1><slot></slot></body></html>',
-        'page.html': '<div data-layout="/layouts/custom">Page content</div>'
+        'page.html': '<div>Page content</div>'
       });
 
       const pagePath = path.join(sourceDir, 'page.html');
@@ -266,7 +266,7 @@ describe('LayoutDiscovery', () => {
     test('should try .htm extension as fallback', async () => {
       await createTestStructure(sourceDir, {
         'layouts/custom.htm': '<html><body><h1>Custom</h1><slot></slot></body></html>',
-        'page.html': '<div data-layout="/layouts/custom">Page content</div>'
+        'page.html': '<div>Page content</div>'
       });
 
       const pagePath = path.join(sourceDir, 'page.html');
@@ -277,7 +277,7 @@ describe('LayoutDiscovery', () => {
 
     test('should return null for missing layout override', async () => {
       await createTestStructure(sourceDir, {
-        'page.html': '<div data-layout="/missing/layout.html">Page content</div>'
+        'page.html': '<div>Page content</div>'
       });
 
       const pagePath = path.join(sourceDir, 'page.html');

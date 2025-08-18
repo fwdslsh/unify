@@ -145,42 +145,4 @@ describe('layout discovery new spec', () => {
     expect(result.content).toContain('<h1>Blog Post</h1>');
   });
   
-  it('should support explicit layout override with data-layout', async () => {
-    // Create multiple layouts
-    const blogLayoutContent = `<!DOCTYPE html>
-<html>
-<head><title>Blog Layout</title></head>
-<body><main data-slot="default"></main></body>
-</html>`;
-    
-    const customLayoutContent = `<!DOCTYPE html>
-<html>
-<head><title>Custom Layout</title></head>
-<body>
-  <div class="custom">
-    <main data-slot="default"></main>
-  </div>
-</body>
-</html>`;
-    
-    await fs.writeFile(path.join(sourceDir, '_blog.layout.html'), blogLayoutContent);
-    await fs.writeFile(path.join(sourceDir, '_custom.layout.html'), customLayoutContent);
-    
-    // Create page with explicit layout override
-    const pageContent = `<div data-layout="_custom.layout.html">
-  <h1>Custom Page</h1>
-  <p>This should use the custom layout, not the blog layout.</p>
-</div>`;
-    
-    const pagePath = path.join(sourceDir, 'test.html');
-    await fs.writeFile(pagePath, pageContent);
-    
-    // Process the page
-    const result = await processHtmlUnified(pageContent, pagePath, sourceDir, dependencyTracker, {});
-    
-    // Verify custom layout was used
-    expect(result.content).toContain('<title>Custom Layout</title>');
-    expect(result.content).toContain('<div class="custom">');
-    expect(result.content).not.toContain('Blog Layout');
-  });
 });

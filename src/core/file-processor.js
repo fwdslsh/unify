@@ -8,8 +8,10 @@ import path from "path";
 // processIncludes is now handled by unified-html
 import { DependencyTracker } from "./dependency-tracker.js";
 import { AssetTracker } from "./asset-tracker.js";
-import { FileClassifier } from "./file-classifier.js";
+import { FileClassifier, FileClassification } from "./file-classifier.js";
 import { LayoutDiscovery } from "./layout-discovery.js";
+import { CascadingImportsProcessor } from "./cascading-imports-processor.js";
+import { HeadMergeProcessor } from "./head-merge-processor.js";
 import {
   processMarkdown,
   isMarkdownFile,
@@ -218,65 +220,102 @@ export async function build(options = {}) {
     // Initialize dependency and asset trackers
     const dependencyTracker = new DependencyTracker();
     const assetTracker = new AssetTracker();
-    const fileClassifier = new FileClassifier();
+    
+    // Initialize new v0.6.0 FileClassifier with CLI options
+    const fileClassifierOptions = {
+      sourceRoot,
+      copy: config.copy || [],
+      ignore: config.ignore || [],
+      ignoreRender: config.ignoreRender || [],
+      ignoreCopy: config.ignoreCopy || [],
+      render: config.render || [],
+      autoIgnore: config.autoIgnore !== false // Default true
+    };
+    const fileClassifier = new FileClassifier(fileClassifierOptions);
+    
+    // Initialize other processors
     const layoutDiscovery = new LayoutDiscovery();
+    const cascadingImports = new CascadingImportsProcessor(sourceRoot, {
+      failFast: shouldFailBuild(config, 'error')
+    });
+    const headMerge = new HeadMergeProcessor();
 
     // Scan source directory
     const sourceFiles = await scanDirectory(sourceRoot);
     logger.info(`Found ${sourceFiles.length} source files`);
 
-    // Categorize files using convention-based classification
-    let contentFiles = sourceFiles.filter((file) => {
-      // First check if it's a basic page type
-      if (!fileClassifier.isPage(file, sourceRoot)) {
-        return false;
-      }
+    // Handle dry-run mode - classify all files and generate report
+    if (config.dryRun) {
+      logger.info("Running in dry-run mode - analyzing file classification only");
       
-      // Then check if it's a partial file (should not be processed as page)
-      if (isPartialFile(file, config)) {
-        return false;
-      }
-      
-      return true;
-    });
-
-    // Exclude directories like _includes and _layouts
-    const excludedDirs = ["_includes", "_layouts"];
-    contentFiles = contentFiles.filter((file) => {
-      return !excludedDirs.some((dir) =>
-        file.startsWith(path.join(sourceRoot, dir))
-      );
-    });
-    // Always include markdown files (not in underscore-prefixed dirs) as pages for pretty URLs
-    if (config.prettyUrls) {
-      const markdownFiles = sourceFiles.filter((file) => {
-        const ext = path.extname(file).toLowerCase();
-        const relativePath = path.relative(sourceRoot, file);
-
-        return (
-          ext === ".md" &&
-          !relativePath.split(path.sep).some((part) => part.startsWith("_"))
-        );
-      });
-      for (const mdFile of markdownFiles) {
-        if (!contentFiles.includes(mdFile)) {
-          contentFiles.push(mdFile);
+      const classifications = [];
+      for (const filePath of sourceFiles) {
+        try {
+          const classification = await fileClassifier.classifyFile(
+            path.relative(sourceRoot, filePath)
+          );
+          classifications.push({
+            ...classification,
+            filePath: path.relative(sourceRoot, filePath)
+          });
+        } catch (error) {
+          logger.warn(`Error classifying ${path.relative(sourceRoot, filePath)}: ${error.message}`);
         }
       }
+      
+      // Generate and display dry-run report
+      const report = fileClassifier.generateDryRunReport(classifications);
+      logger.info("\n" + report);
+      
+      const duration = Date.now() - startTime;
+      logger.success(`Dry-run completed in ${duration}ms`);
+      
+      return {
+        processed: 0,
+        copied: 0,
+        skipped: 0,
+        errors: [],
+        duration,
+        dependencyTracker,
+        assetTracker,
+        buildCache: null,
+        dryRun: true,
+        classifications
+      };
     }
-    const assetFiles = sourceFiles.filter((file) => {
-      const fileType = fileClassifier.getFileType(file, sourceRoot);
-      // Exclude files in components or layouts directories
-      const relativePath = path.relative(sourceRoot, file);
-      const pathParts = relativePath.split(path.sep);
-      // Files in _includes and _* directories are non-emitting by convention
-      if (pathParts.some(part => part.startsWith('_'))) {
-        return false;
+
+    // Categorize files using new v0.6.0 classification system
+    const contentFiles = [];
+    const assetFiles = [];
+    const ignoredFiles = [];
+    
+    for (const filePath of sourceFiles) {
+      try {
+        const classification = await fileClassifier.classifyFile(
+          path.relative(sourceRoot, filePath)
+        );
+        
+        if (classification.action === FileClassification.EMIT) {
+          contentFiles.push(filePath);
+        } else if (classification.action === FileClassification.COPY) {
+          assetFiles.push(filePath);
+        } else if (classification.action === FileClassification.IGNORED) {
+          ignoredFiles.push(filePath);
+          // Track layout and include files for auto-ignore system
+          if (classification.reason.includes('layout') || classification.reason.includes('include')) {
+            const relativePath = path.relative(sourceRoot, filePath);
+            if (relativePath.includes('layout')) {
+              fileClassifier.addLayoutFile(relativePath);
+            } else {
+              fileClassifier.addIncludeFile(relativePath);
+            }
+          }
+        }
+        // SKIP files are not processed or tracked
+      } catch (error) {
+        logger.warn(`Error classifying ${path.relative(sourceRoot, filePath)}: ${error.message}`);
       }
-      return (
-        fileType === "asset" && fileClassifier.shouldEmit(file, sourceRoot)
-      );
-    });
+    }
 
     const results = {
       processed: 0,
@@ -289,15 +328,8 @@ export async function build(options = {}) {
     const processedFiles = [];
     const frontmatterData = new Map();
 
-    // First, classify ALL HTML/Markdown files for statistics (before filtering)
-    for (const filePath of sourceFiles.filter(file => isHtmlFile(file) || isMarkdownFile(file))) {
-      const fileType = fileClassifier.getFileType(filePath, sourceRoot);
-      if (fileType === "partial" || fileType === "layout") {
-        const relativePath = path.relative(sourceRoot, filePath);
-        logger.debug(`Classifying ${fileType} file: ${relativePath}`);
-        results.skipped++;
-      }
-    }
+    // Count ignored files as skipped for statistics
+    results.skipped = ignoredFiles.length;
 
     // Process content files (HTML and Markdown) first to discover asset dependencies
     for (const filePath of contentFiles) {
@@ -309,49 +341,42 @@ export async function build(options = {}) {
           config.prettyUrls
         );
         const relativePath = path.relative(sourceRoot, filePath);
-        const fileType = fileClassifier.getFileType(filePath, sourceRoot);
 
-        if (fileType === "page") {
-          if (isHtmlFile(filePath)) {
-            // Process HTML file with new convention-based system
-            await processHtmlFileWithConventions(
-              filePath,
-              sourceRoot,
-              outputRoot,
-              dependencyTracker,
-              assetTracker,
-              fileClassifier,
-              layoutDiscovery,
-              config,
-              buildCache,
-              outputPath // enforce output path
-            );
-            processedFiles.push(filePath);
-            results.processed++;
-            logger.debug(`Processed HTML: ${relativePath} → ${outputPath}`);
-          } else if (isMarkdownFile(filePath)) {
-            // Process Markdown file with new convention-based layouts
-            const frontmatter = await processMarkdownFileWithConventions(
-              filePath,
-              sourceRoot,
-              outputRoot,
-              layoutDiscovery,
-              assetTracker,
-              config.prettyUrls,
-              config.minify,
-              shouldFailBuild(config), // propagate fail mode
-              outputPath // enforce output path
-            );
-            processedFiles.push(filePath);
-            if (frontmatter) {
-              frontmatterData.set(filePath, frontmatter);
-            }
-            results.processed++;
-            logger.debug(`Processed Markdown: ${relativePath} → ${outputPath}`);
+        if (isHtmlFile(filePath)) {
+          // Process HTML file with new v0.6.0 system
+          await processHtmlFileV6(
+            filePath,
+            sourceRoot,
+            outputRoot,
+            dependencyTracker,
+            assetTracker,
+            cascadingImports,
+            headMerge,
+            layoutDiscovery,
+            config,
+            buildCache
+          );
+          processedFiles.push(filePath);
+          results.processed++;
+          logger.debug(`Processed HTML: ${relativePath} → ${outputPath}`);
+        } else if (isMarkdownFile(filePath)) {
+          // Process Markdown file with new v0.6.0 system
+          const frontmatter = await processMarkdownFileV6(
+            filePath,
+            sourceRoot,
+            outputRoot,
+            layoutDiscovery,
+            cascadingImports,
+            headMerge,
+            assetTracker,
+            config
+          );
+          processedFiles.push(filePath);
+          if (frontmatter) {
+            frontmatterData.set(filePath, frontmatter);
           }
-        } else if (fileType === "partial" || fileType === "layout") {
-          // Skip partial and layout files in output (already counted above)
-          logger.debug(`Skipping ${fileType} file: ${relativePath}`);
+          results.processed++;
+          logger.debug(`Processed Markdown: ${relativePath} → ${outputPath}`);
         }
       } catch (error) {
         const relativePath = path.relative(sourceRoot, filePath);
@@ -462,19 +487,26 @@ export async function build(options = {}) {
       }
     }
 
-    // Fourth pass: Copy additional files from glob pattern (if specified)
-    if (config.copy) {
+    // Fourth pass: Copy additional files from glob patterns (if specified)
+    if (config.copy && config.copy.length > 0) {
       try {
-        const { Glob } = await import('bun');
-        const glob = new Glob(config.copy);
         const additionalFiles = [];
-        // Scan from source root
-        for await (const file of glob.scan(sourceRoot)) {
-          const fullPath = path.resolve(sourceRoot, file);
-          additionalFiles.push(fullPath);
+        const { Glob } = await import('bun');
+        
+        // Process each copy pattern
+        for (const copyPattern of config.copy) {
+          if (copyPattern && typeof copyPattern === 'string') {
+            const glob = new Glob(copyPattern);
+            // Scan from source root
+            for await (const file of glob.scan(sourceRoot)) {
+              const fullPath = path.resolve(sourceRoot, file);
+              additionalFiles.push(fullPath);
+            }
+          }
         }
+        
         logger.info(
-          `Found ${additionalFiles.length} additional files matching pattern: ${config.copy}`
+          `Found ${additionalFiles.length} additional files matching ${config.copy.length} copy pattern(s)`
         );
         for (const filePath of additionalFiles) {
           try {
@@ -537,6 +569,47 @@ export async function build(options = {}) {
             `Build failed due to copy glob error: ${error.message}`,
             results.errors
           );
+        }
+      }
+    }
+
+    // Copy all referenced assets
+    const referencedAssets = assetTracker.getAllReferencedAssets();
+    logger.debug(`Found ${referencedAssets.length} referenced assets to copy`);
+    
+    for (const assetPath of referencedAssets) {
+      try {
+        await copyAsset(assetPath, sourceRoot, outputRoot);
+        results.copied++;
+        logger.debug(`Copied referenced asset: ${path.relative(sourceRoot, assetPath)}`);
+      } catch (error) {
+        const relativePath = path.relative(sourceRoot, assetPath);
+        // For missing referenced assets, log a warning instead of failing the build
+        const isNotFound = error.code === 'ENOENT' || 
+                          (error.originalError && error.originalError.code === 'ENOENT');
+        if (isNotFound) {
+          logger.warn(`Referenced asset not found: ${relativePath}`);
+        } else {
+          // For other errors (permissions, etc), treat as errors
+          if (error.formatForCLI) {
+            logger.error(error.formatForCLI());
+          } else {
+            logger.error(`Error copying referenced asset ${relativePath}: ${error.message}`);
+          }
+          results.errors.push({
+            file: assetPath,
+            relativePath,
+            error: error.message,
+            errorType: error.constructor.name,
+            suggestions: error.suggestions || [],
+          });
+          // If fail-on mode is enabled, fail fast on any error
+          if (shouldFailBuild(config, 'error', error)) {
+            throw new BuildError(
+              `Build failed due to error copying referenced asset ${relativePath}: ${error.message}`,
+              results.errors
+            );
+          }
         }
       }
     }
@@ -1770,4 +1843,302 @@ async function processIncludesRecursively(filePath, content, sourceRoot, depth =
         }
       },
     });  return rewriter.transform(content).toString();
+}
+
+/**
+ * Process HTML file with v0.6.0 systems (Cascading Imports + Head Merge)
+ * @param {string} filePath - Path to HTML file  
+ * @param {string} sourceRoot - Source root directory
+ * @param {string} outputRoot - Output root directory
+ * @param {DependencyTracker} dependencyTracker - Dependency tracker instance
+ * @param {AssetTracker} assetTracker - Asset tracker instance
+ * @param {CascadingImportsProcessor} cascadingImports - Cascading imports processor
+ * @param {HeadMergeProcessor} headMerge - Head merge processor
+ * @param {LayoutDiscovery} layoutDiscovery - Layout discovery instance
+ * @param {Object} config - Build configuration
+ * @param {Object} buildCache - Build cache instance
+ */
+async function processHtmlFileV6(
+  filePath,
+  sourceRoot,
+  outputRoot,
+  dependencyTracker,
+  assetTracker,
+  cascadingImports,
+  headMerge,
+  layoutDiscovery,
+  config = {},
+  buildCache = null
+) {
+  const outputPath = getOutputPathWithPrettyUrls(
+    filePath,
+    sourceRoot,
+    outputRoot,
+    config.prettyUrls
+  );
+
+  // Check cache if available
+  if (buildCache && (await buildCache.isUpToDate(filePath, outputPath))) {
+    logger.debug(`Skipping unchanged file: ${path.relative(sourceRoot, filePath)}`);
+    return;
+  }
+
+  // Read HTML content
+  let htmlContent;
+  try {
+    htmlContent = await fs.readFile(filePath, "utf-8");
+  } catch (error) {
+    throw new FileSystemError("read", filePath, error);
+  }
+
+  logger.debug(`Processing HTML with v0.6.0 systems: ${path.relative(sourceRoot, filePath)}`);
+
+  // Step 1: Process cascading imports (replaces SSI includes)
+  let processedContent = await cascadingImports.processImports(htmlContent, filePath);
+
+  // Step 1.5: Process legacy SSI includes (backwards compatibility)
+  const { processIncludes } = await import("./include-processor.js");
+  // Determine if we should fail fast based on config (missing includes are errors that can be downgraded to warnings)
+  const failFast = shouldFailBuild(config, 'error');
+  processedContent = await processIncludes(
+    processedContent, 
+    filePath, 
+    sourceRoot, 
+    new Set(), 
+    0, 
+    dependencyTracker,
+    failFast
+  );
+
+
+  // Step 2: Extract head content for merging
+  const headContent = HeadMergeProcessor.extractHeadContent(processedContent);
+  
+  // Step 3: Process head merge if we have head content
+  if (headContent) {
+    const fragments = [{ source: filePath, headHtml: headContent }];
+    const mergedHead = headMerge.mergeHeadContent(fragments);
+    processedContent = HeadMergeProcessor.injectHeadContent(processedContent, mergedHead);
+  }
+
+  // Step 4: Track asset references
+  if (assetTracker) {
+    await assetTracker.recordAssetReferences(filePath, processedContent, sourceRoot);
+  }
+
+  // Step 5: Transform links for pretty URLs (if enabled)
+  if (config.prettyUrls) {
+    const { transformLinksInHtml } = await import("../utils/link-transformer.js");
+    processedContent = transformLinksInHtml(processedContent, filePath, sourceRoot);
+  }
+
+  // Step 6: Write to output
+  await ensureDirectoryExists(path.dirname(outputPath));
+
+  // Apply minification if enabled
+  if (config.minify) {
+    processedContent = minifyHtml(processedContent);
+  }
+
+  try {
+    await fs.writeFile(outputPath, processedContent, "utf-8");
+
+    // Update cache after successful write
+    if (buildCache) {
+      await buildCache.updateFileHash(filePath);
+      // Update dependencies from cascading imports
+      // TODO: Add dependency tracking to cascading imports processor
+    }
+  } catch (error) {
+    throw new FileSystemError("write", outputPath, error);
+  }
+}
+
+/**
+ * Process Markdown file with v0.6.0 systems  
+ * @param {string} filePath - Path to Markdown file
+ * @param {string} sourceRoot - Source root directory
+ * @param {string} outputRoot - Output root directory
+ * @param {LayoutDiscovery} layoutDiscovery - Layout discovery instance
+ * @param {CascadingImportsProcessor} cascadingImports - Cascading imports processor
+ * @param {HeadMergeProcessor} headMerge - Head merge processor
+ * @param {AssetTracker} assetTracker - Asset tracker instance
+ * @param {Object} config - Build configuration
+ * @returns {Promise<Object|null>} Frontmatter data or null
+ */
+async function processMarkdownFileV6(
+  filePath,
+  sourceRoot,
+  outputRoot,
+  layoutDiscovery,
+  cascadingImports,
+  headMerge,
+  assetTracker,
+  config = {}
+) {
+  try {
+    const content = await fs.readFile(filePath, "utf-8");
+    
+    // Step 1: Process markdown to HTML
+    const { html, frontmatter, title, excerpt } = processMarkdown(content, filePath);
+    const htmlWithAnchors = addAnchorLinks(html);
+    const tableOfContents = generateTableOfContents(htmlWithAnchors);
+    const metadata = { frontmatter, title, excerpt, tableOfContents };
+    let finalContent = htmlWithAnchors;
+
+    // Step 2: Apply layout using layout discovery
+    let layoutPath = null;
+
+    // Check for layout override in frontmatter  
+    if (frontmatter?.layout) {
+      layoutPath = await layoutDiscovery.resolveLayoutOverride(
+        frontmatter.layout,
+        sourceRoot,
+        filePath
+      );
+      if (!layoutPath) {
+        if (config.failLevel === 'error' || config.failLevel === 'warning') {
+          throw new BuildError(
+            `Build failed due to missing layout: ${frontmatter.layout}`,
+            [{ file: filePath, error: `Layout not found: ${frontmatter.layout}` }]
+          );
+        }
+        logger.warn(`Layout specified in frontmatter not found: ${frontmatter.layout}`);
+      }
+    }
+
+    // Fall back to automatic layout discovery
+    if (!layoutPath) {
+      layoutPath = await layoutDiscovery.findLayoutForPage(filePath, sourceRoot);
+    }
+
+    // Step 3: Apply layout if found
+    if (layoutPath) {
+      logger.debug(`Applying layout to Markdown: ${path.relative(sourceRoot, layoutPath)}`);
+      const layoutContent = await fs.readFile(layoutPath, "utf-8");
+      if (!layoutDiscovery.hasCompleteHtmlStructure(htmlWithAnchors)) {
+        finalContent = wrapInLayout(htmlWithAnchors, metadata, layoutContent);
+      }
+    } else {
+      // Create basic HTML wrapper if no layout found
+      if (!layoutDiscovery.hasCompleteHtmlStructure(htmlWithAnchors)) {
+        finalContent = wrapInLayout(htmlWithAnchors, metadata);
+      }
+    }
+
+    // Step 4: Process cascading imports in the final content
+    finalContent = await cascadingImports.processImports(finalContent, filePath);
+
+    // Step 5: Synthesize and merge head content from frontmatter
+    const fragments = [];
+    
+    // Add existing head content from layout/content
+    const existingHead = HeadMergeProcessor.extractHeadContent(finalContent);
+    if (existingHead) {
+      fragments.push({ source: 'layout', headHtml: existingHead });
+    }
+
+    // Synthesize head content from frontmatter
+    const frontmatterHead = synthesizeHeadFromFrontmatter(frontmatter, title, excerpt);
+    if (frontmatterHead) {
+      fragments.push({ source: 'frontmatter', headHtml: frontmatterHead });
+    }
+
+    // Merge head content if we have fragments
+    if (fragments.length > 0) {
+      const mergedHead = headMerge.mergeHeadContent(fragments);
+      finalContent = HeadMergeProcessor.injectHeadContent(finalContent, mergedHead);
+    }
+
+    // Step 6: Generate output path
+    const outputPath = getOutputPathWithPrettyUrls(
+      filePath,
+      sourceRoot,
+      outputRoot,
+      config.prettyUrls
+    );
+
+    // Step 7: Track asset references
+    if (assetTracker) {
+      await assetTracker.recordAssetReferences(filePath, finalContent, sourceRoot);
+    }
+
+    // Step 8: Write output
+    await ensureDirectoryExists(path.dirname(outputPath));
+
+    if (config.minify) {
+      finalContent = minifyHtml(finalContent);
+    }
+
+    await fs.writeFile(outputPath, finalContent, "utf-8");
+    logger.debug(`Wrote Markdown output: ${outputPath}`);
+
+    return frontmatter;
+  } catch (error) {
+    throw new FileSystemError("process", filePath, error);
+  }
+}
+
+/**
+ * Synthesize head content from frontmatter data
+ * @param {Object} frontmatter - Frontmatter data
+ * @param {string} title - Page title
+ * @param {string} excerpt - Page excerpt  
+ * @returns {string} - Synthesized head HTML
+ */
+function synthesizeHeadFromFrontmatter(frontmatter = {}, title = '', excerpt = '') {
+  const headElements = [];
+
+  // Title from frontmatter or processed title
+  const pageTitle = frontmatter.title || title;
+  if (pageTitle) {
+    headElements.push(`<title>${pageTitle}</title>`);
+  }
+
+  // Meta description from excerpt or frontmatter
+  const description = frontmatter.description || excerpt;
+  if (description) {
+    headElements.push(`<meta name="description" content="${description.replace(/"/g, '&quot;')}">`);
+  }
+
+  // Meta keywords
+  if (frontmatter.keywords) {
+    const keywords = Array.isArray(frontmatter.keywords) 
+      ? frontmatter.keywords.join(', ') 
+      : frontmatter.keywords;
+    headElements.push(`<meta name="keywords" content="${keywords}">`);
+  }
+
+  // Author
+  if (frontmatter.author) {
+    headElements.push(`<meta name="author" content="${frontmatter.author}">`);
+  }
+
+  // Open Graph tags
+  if (frontmatter.og || pageTitle) {
+    if (frontmatter.og?.title || pageTitle) {
+      headElements.push(`<meta property="og:title" content="${frontmatter.og?.title || pageTitle}">`);
+    }
+    if (frontmatter.og?.description || description) {
+      headElements.push(`<meta property="og:description" content="${(frontmatter.og?.description || description).replace(/"/g, '&quot;')}">`);
+    }
+    if (frontmatter.og?.image) {
+      headElements.push(`<meta property="og:image" content="${frontmatter.og.image}">`);
+    }
+    if (frontmatter.og?.type) {
+      headElements.push(`<meta property="og:type" content="${frontmatter.og.type}">`);
+    }
+  }
+
+  // Twitter Card tags
+  if (frontmatter.twitter) {
+    if (frontmatter.twitter.card) {
+      headElements.push(`<meta name="twitter:card" content="${frontmatter.twitter.card}">`);
+    }
+    if (frontmatter.twitter.site) {
+      headElements.push(`<meta name="twitter:site" content="${frontmatter.twitter.site}">`);
+    }
+  }
+
+  return headElements.join('\n');
 }
