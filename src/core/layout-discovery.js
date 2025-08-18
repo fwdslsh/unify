@@ -127,7 +127,7 @@ export class LayoutDiscovery {
   
   /**
    * Find fallback layout in _includes directory
-   * Only looks for layout.html or layout.htm for site-wide fallback
+   * Looks for layout.html first, then _layout.html as site-wide fallback
    * @param {string} sourceRoot - Absolute path to source directory
    * @returns {Promise<string|null>} Path to fallback layout or null
    */
@@ -135,8 +135,8 @@ export class LayoutDiscovery {
     const includesDir = path.join(sourceRoot, '_includes');
     
     try {
-      // Only look for layout.html or layout.htm as site-wide fallback
-      const layoutFiles = ['layout.html', 'layout.htm'];
+      // Look for layout.html first (standard convention), then _layout.html
+      const layoutFiles = ['layout.html', 'layout.htm', '_layout.html', '_layout.htm'];
       
       for (const file of layoutFiles) {
         const layoutPath = path.join(includesDir, file);
@@ -156,13 +156,14 @@ export class LayoutDiscovery {
 
   /**
    * Check if a filename in _includes matches fallback layout naming convention
-   * Only layout.html or layout.htm serve as site-wide fallback
+   * Both layout.html and _layout.html serve as site-wide fallback
    * @param {string} fileName - Name of the file to check
    * @returns {boolean} True if matches fallback pattern
    */
   isIncludesLayoutFileName(fileName) {
-    // In _includes, only layout.html/htm serve as site-wide fallback
-    return fileName === 'layout.html' || fileName === 'layout.htm';
+    // In _includes, both layout.html/htm and _layout.html/htm serve as site-wide fallback
+    return fileName === 'layout.html' || fileName === 'layout.htm' || 
+           fileName === '_layout.html' || fileName === '_layout.htm';
   }
 
   /**

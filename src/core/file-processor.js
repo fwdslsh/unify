@@ -1756,18 +1756,41 @@ async function processHtmlFileV6(
     processedContent = HeadMergeProcessor.injectHeadContent(processedContent, mergedHead);
   }
 
-  // Step 4: Track asset references
+  // Step 4: Apply layout discovery and processing (applies to all pages per user requirement)
+  const discoveredLayoutPath = await layoutDiscovery.findLayoutForPage(filePath, sourceRoot);
+  if (discoveredLayoutPath) {
+    try {
+      logger.debug(`Applying layout for ${path.relative(sourceRoot, filePath)} using ${path.relative(sourceRoot, discoveredLayoutPath)}`);
+      
+      // Read layout content
+      const layoutContent = await fs.readFile(discoveredLayoutPath, 'utf-8');
+      
+      // Apply layout by replacing data-slot="default" with processed content
+      if (layoutContent.includes('data-slot="default"')) {
+        processedContent = layoutContent.replace(
+          /<main[^>]*data-slot="default"[^>]*>.*?<\/main>/s,
+          `<main data-slot="default">${processedContent}</main>`
+        );
+      } else {
+        logger.warn(`Layout ${path.relative(sourceRoot, discoveredLayoutPath)} does not contain data-slot="default"`);
+      }
+    } catch (error) {
+      logger.warn(`Layout processing failed for ${path.relative(sourceRoot, filePath)}: ${error.message}`);
+    }
+  }
+
+  // Step 5: Track asset references
   if (assetTracker) {
     await assetTracker.recordAssetReferences(filePath, processedContent, sourceRoot);
   }
 
-  // Step 5: Transform links for pretty URLs (if enabled)
+  // Step 6: Transform links for pretty URLs (if enabled)
   if (config.prettyUrls) {
     const { transformLinksInHtml } = await import("../utils/link-transformer.js");
     processedContent = transformLinksInHtml(processedContent, filePath, sourceRoot);
   }
 
-  // Step 6: Write to output
+  // Step 7: Write to output
   await ensureDirectoryExists(path.dirname(outputPath));
 
   // Apply minification if enabled

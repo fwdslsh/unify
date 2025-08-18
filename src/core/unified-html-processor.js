@@ -173,19 +173,15 @@ export async function processHtmlUnified(
       logger.debug(`Skipping HTML optimization, optimize=${processingConfig.optimize}`);
     }
 
-    // Handle layouts and slots if needed (after includes and optimization)
-    if (!processedContent.includes("<html")) {
-      processedContent = await processDOMTemplating(
-        processedContent,
-        filePath,
-        sourceRoot,
-        processingConfig,
-        extractedAssets  // Pass extracted assets to DOM templating
-      );
-    } else if (extractedAssets && (extractedAssets.styles?.length > 0 || extractedAssets.scripts?.length > 0)) {
-      // Apply extracted assets to complete HTML documents even without layouts/templating
-      processedContent = applyExtractedAssets(processedContent, extractedAssets);
-    }
+    // Handle layouts and slots for ALL pages (per user requirement)
+    // Apply layout discovery to all pages, not just fragments
+    processedContent = await processDOMTemplating(
+      processedContent,
+      filePath,
+      sourceRoot,
+      processingConfig,
+      extractedAssets  // Pass extracted assets to DOM templating
+    );
 
     // Apply link normalization if pretty URLs are enabled
     if (processingConfig.prettyUrls) {
@@ -424,33 +420,33 @@ async function processDOMTemplating(htmlContent, filePath, sourceRoot, config, e
     // Analyze HTML structure
     const htmlStructure = analyzeHtmlStructure(htmlContent);
     
-
-    // Check if this is a fragment (no html tag), use layout discovery to find appropriate layout
-    if (!htmlStructure.isFullDocument) {
-      // Use the layout discovery system to find the best layout for this page
-      const { LayoutDiscovery } = await import('./layout-discovery.js');
-      const discovery = new LayoutDiscovery();
-      const discoveredLayoutPath = await discovery.findLayoutForPage(filePath, sourceRoot);
-      
-      if (discoveredLayoutPath) {
-        try {
-          // Get the relative layout path from the discovered absolute path
-          const relativeLayoutPath = path.relative(path.dirname(filePath), discoveredLayoutPath);
-          return await processLayoutAttribute(
-            htmlContent,
-            relativeLayoutPath,
-            filePath,
-            sourceRoot,
-            config,
-            extractedAssets
-          );
-        } catch (error) {
-          logger.warn(`Layout processing failed for ${path.relative(sourceRoot, filePath)}: ${error.message}`);
-          // Fall through to basic HTML wrapper
-        }
+    // Use layout discovery for ALL pages (not just fragments)
+    const { LayoutDiscovery } = await import('./layout-discovery.js');
+    const discovery = new LayoutDiscovery();
+    const discoveredLayoutPath = await discovery.findLayoutForPage(filePath, sourceRoot);
+    
+    if (discoveredLayoutPath) {
+      try {
+        // Get the relative layout path from the discovered absolute path
+        const relativeLayoutPath = path.relative(path.dirname(filePath), discoveredLayoutPath);
+        return await processLayoutAttribute(
+          htmlContent,
+          relativeLayoutPath,
+          filePath,
+          sourceRoot,
+          config,
+          extractedAssets
+        );
+      } catch (error) {
+        logger.warn(`Layout processing failed for ${path.relative(sourceRoot, filePath)}: ${error.message}`);
+        // Fall through - continue with original content or basic wrapper
       }
-      
-      // No layout found, wrap in basic HTML structure and inject assets
+    }
+    
+    // No layout found - handle based on document type
+    if (!htmlStructure.isFullDocument) {
+      // Wrap fragments in basic HTML structure and inject assets
+      logger.debug(`No layout found for fragment: ${path.relative(sourceRoot, filePath)}, wrapping in basic HTML structure`);
       
       // Inject assets into basic HTML structure
       let stylesHTML = '';
@@ -475,11 +471,16 @@ async function processDOMTemplating(htmlContent, filePath, sourceRoot, config, e
 ${htmlContent}${scriptsHTML}
 </body>
 </html>`;
+    } else {
+      // Full document without layout - inject assets if needed
+      logger.debug(`No layout found for full document: ${path.relative(sourceRoot, filePath)}, using as-is`);
+      
+      if (extractedAssets?.styles?.length > 0 || extractedAssets?.scripts?.length > 0) {
+        return applyExtractedAssets(htmlContent, extractedAssets);
+      }
+      
+      return htmlContent;
     }
-
-    // No layout processing needed - data-slot functionality removed
-
-    return htmlContent;
   } catch (error) {
     throw new ComponentError(
       filePath,
