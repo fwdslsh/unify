@@ -147,7 +147,6 @@ export async function processHtmlUnified(
   config = {}
 ) {
   const processingConfig = {
-    layoutsDir: ".layouts", // Deprecated but kept for compatibility
     optimize: config.minify || config.optimize,
     ...config,
   };
@@ -175,18 +174,7 @@ export async function processHtmlUnified(
     }
 
     // Handle layouts and slots if needed (after includes and optimization)
-    if (shouldUseDOMMode(processedContent)) {
-      processedContent = await processDOMMode(
-        processedContent,
-        filePath,
-        sourceRoot,
-        processingConfig,
-        extractedAssets
-      );
-    } else if (
-      hasDOMTemplating(processedContent) ||
-      !processedContent.includes("<html")
-    ) {
+    if (!processedContent.includes("<html")) {
       processedContent = await processDOMTemplating(
         processedContent,
         filePath,
@@ -342,75 +330,7 @@ async function optimizeHtmlContent(html) {
   return await transformedResponse.text();
 }
 
-/**
- * Check if content should use DOM mode processing
- * @param {string} content - HTML content to check
- * @returns {boolean} True if content has DOM mode features
- */
-function shouldUseDOMMode(content) {
-  return false; // Include functionality removed
-}
 
-/**
- * Integrated DOM mode processing - handles <include> elements, layouts, and slots
- * @param {string} pageContent - Raw HTML content of the page
- * @param {string} pagePath - Path to the page file
- * @param {string} sourceRoot - Source root directory
- * @param {Object} config - DOM processor configuration
- * @returns {Promise<string>} Processed HTML content
- */
-async function processDOMMode(pageContent, pagePath, sourceRoot, config = {}, extractedAssets = null) {
-  const domConfig = { 
-    layoutsDir: '.layouts', // Deprecated but kept for compatibility
-    componentsDir: '.components', 
-    sourceRoot, 
-    ...config 
-  };
-
-  // Analyze HTML structure
-  const htmlStructure = analyzeHtmlStructure(pageContent);
-  
-  // For complete HTML documents, don't apply any layout (no explicit layout support)
-  if (htmlStructure.isFullDocument) {
-    logger.debug(`Skipping layout for complete HTML document: ${path.relative(sourceRoot, pagePath)}`);
-    return pageContent;
-  }
-
-  // Use layout discovery (no explicit layout support)
-  let layoutPath;
-  try {
-    layoutPath = await detectLayoutFromHTML(pageContent, sourceRoot, domConfig, pagePath);
-    logger.debug(`Using discovered layout: ${layoutPath}`);
-    
-    // Use processLayoutAttribute for consistent processing
-    const relativeLayoutPath = path.relative(path.dirname(pagePath), layoutPath);
-    return await processLayoutAttribute(
-      pageContent,
-      relativeLayoutPath,
-      pagePath,
-      sourceRoot,
-      domConfig,
-      extractedAssets
-    );
-    
-  } catch (error) {
-    // Use shouldFailFast to determine whether to throw or warn
-    if (shouldFailFast(domConfig, 'error')) {
-      throw new Error(`Layout not found for ${path.relative(sourceRoot, pagePath)}: ${error.message}`);
-    }
-    
-    logger.warn(`Layout not found for ${path.relative(sourceRoot, pagePath)}: ${error.message}`);
-    return `<!DOCTYPE html>
-<html>
-<head>
-  <title>Page</title>
-</head>
-<body>
-${pageContent}
-</body>
-</html>`;
-  }
-}
 
 /**
  * Detect if HTML content is a full document or page fragment
@@ -454,36 +374,6 @@ async function processIncludesInHTML(htmlContent, layoutPath, sourceRoot, config
   return htmlContent;
 }
 
-/**
- * Load and process a component
- */
-async function loadAndProcessComponent(src, unused, sourceRoot, config) {
-  // Resolve component path
-  const componentPath = resolveResourcePath(src, sourceRoot, config.componentsDir, 'component');
-  
-  // Load component
-  const componentContent = await fs.readFile(componentPath, 'utf-8');
-  
-  // Just return the component content as-is, without token replacement
-  let processedContent = componentContent;
-  
-  // Extract and remove styles and scripts
-  const styleRegex = /<style[^>]*>[\s\S]*?<\/style>/gi;
-  const scriptRegex = /<script[^>]*>[\s\S]*?<\/script>/gi;
-  
-  const styles = [...processedContent.matchAll(styleRegex)].map(match => match[0]);
-  const scripts = [...processedContent.matchAll(scriptRegex)].map(match => match[0]);
-  
-  // Remove styles and scripts from component content
-  processedContent = processedContent.replace(styleRegex, '');
-  processedContent = processedContent.replace(scriptRegex, '');
-  
-  return {
-    content: processedContent,
-    styles,
-    scripts
-  };
-}
 
 /**
  * Clean up DOM output by removing stray tags and artifacts
@@ -509,15 +399,6 @@ function cleanupDOMOutput(html) {
   return result;
 }
 
-/**
- * Check if content contains DOM templating syntax
- * @param {string} content - HTML content to check
- * @returns {boolean} True if content has DOM templating
- */
-function hasDOMTemplating(content) {
-  // Check for template elements
-  return content.includes("<template");
-}
 
 
 
@@ -794,7 +675,7 @@ async function processLayoutAttribute(
       throw new LayoutError(
         resolvedLayoutPath,
         `Layout file not found: ${layoutPath}`,
-        [path.join(sourceRoot, config.layoutsDir)]
+        [sourceRoot]
       );
     }
     throw new FileSystemError("read", resolvedLayoutPath, error);
@@ -893,17 +774,8 @@ async function processLayoutAttribute(
  */
 export function getUnifiedConfig(userConfig = {}) {
   let config = {
-    layoutsDir: userConfig.layouts || ".layouts", // Deprecated but kept for compatibility
     ...userConfig,
   };
-  
-  if (config.layoutsDir && !path.isAbsolute(config.layoutsDir) && !config.layoutsDir.startsWith('.')) {
-    config.layoutsDir = path.resolve(config.layoutsDir);
-  }
-  
-  // Also set components and layouts for compatibility with isPartialFile
-  config.components = config.componentsDir;
-  config.layouts = config.layoutsDir;
   
   return config;
 }

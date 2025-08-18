@@ -65,13 +65,10 @@ export function parseArgs(argv) {
     port: 3000,
     host: "localhost",
     prettyUrls: false,
-    baseUrl: "https://example.com",
     clean: false,
-    sitemap: true,
     // v0.6.0: Updated to failLevel (replaces failOn)
     failLevel: null, // Can be 'warning', 'error', or null (default: null = only fail on fatal errors)
     minify: false,
-    verbose: false,
     help: false,
     version: false,
     // v0.6.0: New options - arrays for repeatable options
@@ -86,9 +83,7 @@ export function parseArgs(argv) {
     logLevel: 'info',
     // Legacy options
     layouts: null,
-    template: null, // For init command - which starter template to use
-    // Backwards compatibility
-    failOn: null // Will be mapped to failLevel for compatibility
+    template: null // For init command - which starter template to use
   };
 
   // Only the first non-option argument is considered a command
@@ -364,18 +359,8 @@ export function parseArgs(argv) {
       i++;
       continue;
     }
-    if (arg === '--base-url' && nextArg && !nextArg.startsWith('-')) {
-      args.baseUrl = nextArg;
-      i += 2;
-      continue;
-    }
     if (arg === '--clean') {
       args.clean = true;
-      i++;
-      continue;
-    }
-    if (arg === '--no-sitemap') {
-      args.sitemap = false;
       i++;
       continue;
     }
@@ -417,48 +402,8 @@ export function parseArgs(argv) {
       error.errorType = 'UsageError';
       throw error;
     }
-    // Handle legacy --fail-on option for backwards compatibility
-    if (arg === '--fail-on' && nextArg && !nextArg.startsWith('-')) {
-      const validLevels = ['warning', 'error'];
-      if (validLevels.includes(nextArg)) {
-        args.failOn = nextArg;
-        args.failLevel = nextArg; // Map to new option
-        i += 2;
-        continue;
-      } else {
-        const error = new UnifyError(
-          `Invalid --fail-on level: ${nextArg}`,
-          null,
-          null,
-          [
-            'Valid levels are: warning, error',
-            'Note: --fail-on is deprecated, use --fail-level instead'
-          ]
-        );
-        error.errorType = 'UsageError';
-        throw error;
-      }
-    }
-    if (arg === '--fail-on') {
-      const error = new UnifyError(
-        'The --fail-on option requires a level value',
-        null,
-        null,
-        [
-          'Valid levels are: warning, error',
-          'Note: --fail-on is deprecated, use --fail-level instead'
-        ]
-      );
-      error.errorType = 'UsageError';
-      throw error;
-    }
     if (arg === '--minify' || arg === '-m') {
       args.minify = true;
-      i++;
-      continue;
-    }
-    if (arg === '--verbose' || arg === '-V') {
-      args.verbose = true;
       i++;
       continue;
     }
@@ -469,9 +414,9 @@ export function parseArgs(argv) {
         '--help', '-h', '--version', '-v', '--source', '-s', '--output', '-o',
         '--copy', '--ignore', '--ignore-render', '--ignore-copy', '--render',
         '--default-layout', '--dry-run', '--auto-ignore', '--port', '-p', '--host', 
-        '--layouts', '-l', '--templates', '--pretty-urls', '--base-url', '--clean', 
-        '--no-sitemap', '--fail-level', '--fail-on', '--minify', '--verbose', 
-        '--log-level', '-u', '-m', '-V'
+        '--layouts', '-l', '--templates', '--pretty-urls', '--clean', 
+        '--fail-level', '--minify', 
+        '--log-level', '-u', '-m'
       ];
       const suggestion = findClosestCommand(arg, validOptions);
       const suggestions = [];

@@ -28,9 +28,6 @@ import {
 } from "../utils/path-resolver.js";
 import {
   extractPageInfo,
-  enhanceWithFrontmatter,
-  writeSitemap,
-  generateSitemap,
 } from "./sitemap-generator.js";
 import {
   processHtmlUnified,
@@ -324,9 +321,6 @@ export async function build(options = {}) {
       errors: [],
     };
 
-    // Track processed content files for sitemap generation
-    const processedFiles = [];
-    const frontmatterData = new Map();
 
     // Count ignored files as skipped for statistics
     results.skipped = ignoredFiles.length;
@@ -356,7 +350,6 @@ export async function build(options = {}) {
             config,
             buildCache
           );
-          processedFiles.push(filePath);
           results.processed++;
           logger.debug(`Processed HTML: ${relativePath} → ${outputPath}`);
         } else if (isMarkdownFile(filePath)) {
@@ -371,10 +364,6 @@ export async function build(options = {}) {
             assetTracker,
             config
           );
-          processedFiles.push(filePath);
-          if (frontmatter) {
-            frontmatterData.set(filePath, frontmatter);
-          }
           results.processed++;
           logger.debug(`Processed Markdown: ${relativePath} → ${outputPath}`);
         }
@@ -614,45 +603,6 @@ export async function build(options = {}) {
       }
     }
 
-    // Generate sitemap.xml (if enabled)
-    if (config.sitemap !== false) {
-      try {
-        // Resolve baseUrl: CLI arg → package.json homepage → default
-        const baseUrl =
-          config.baseUrl !== "https://example.com"
-            ? config.baseUrl
-            : await getBaseUrlFromPackage(sourceRoot, config.baseUrl);
-
-        const pageInfo = extractPageInfo(
-          processedFiles,
-          sourceRoot,
-          outputRoot,
-          config.prettyUrls
-        );
-        const enhancedPageInfo = enhanceWithFrontmatter(
-          pageInfo,
-          frontmatterData
-        );
-        const sitemapContent = generateSitemap(enhancedPageInfo, baseUrl);
-        await writeSitemap(sitemapContent, outputRoot);
-      } catch (error) {
-        // Use enhanced error formatting if available
-        if (error.formatForCLI) {
-          logger.error(error.formatForCLI());
-        } else {
-          logger.error(`Error generating sitemap: ${error.message}`);
-        }
-        results.errors.push({ file: "sitemap.xml", error: error.message });
-
-        // If fail-on mode is enabled, fail fast on any error
-        if (shouldFailBuild(config, 'error', error)) {
-          throw new BuildError(
-            `Build failed due to sitemap generation error: ${error.message}`,
-            results.errors
-          );
-        }
-      }
-    }
 
     // Build summary
     const duration = Date.now() - startTime;
@@ -1150,21 +1100,9 @@ async function processMarkdownFile(
     throw new FileSystemError("read", filePath, error);
   }
 
-  // Process includes in markdown content first (before converting to HTML)
-  const { processIncludes } = await import("./include-processor.js");
-  const processedMarkdown = await processIncludes(
-    markdownContent,
-    filePath,
-    sourceRoot,
-    new Set(),
-    0,
-    null,
-    failFast
-  );
-
-  // Process markdown to HTML
+  // Process markdown to HTML (includes are now handled by unified-html processor)
   const { html, frontmatter, title, excerpt } = processMarkdown(
-    processedMarkdown,
+    markdownContent,
     filePath
   );
   const htmlWithAnchors = addAnchorLinks(html);
@@ -1183,17 +1121,8 @@ async function processMarkdownFile(
       : path.join(sourceRoot, layoutsDir, frontmatter.layout);
     try {
       const frontmatterLayoutContent = await fs.readFile(layoutPath, "utf-8");
-      const { processIncludes } = await import("./include-processor.js");
-      const processedLayout = await processIncludes(
-        frontmatterLayoutContent,
-        layoutPath,
-        sourceRoot,
-        new Set(),
-        0,
-        null,
-        failFast
-      );
-      let layoutWithContent = processedLayout.replace(
+      // Layout includes are now handled by unified-html processor
+      let layoutWithContent = frontmatterLayoutContent.replace(
         /<slot[^>]*><\/slot>/g,
         htmlWithAnchors
       );
@@ -1713,9 +1642,7 @@ async function processMarkdownFileWithConventions(
       }
     }
 
-    // Process includes in the final content AFTER layout application
-    const { processIncludes } = await import("./include-processor.js");
-    finalContent = await processIncludes(finalContent, filePath, sourceRoot);
+    // Includes are now handled by unified-html processor
 
     // Determine output path and ensure .html extension
     let outputPath;
@@ -1764,86 +1691,6 @@ async function processMarkdownFileWithConventions(
   }
 }
 
-/**
- * Process includes recursively
- * @param {string} filePath - Path to the file containing includes
- * @param {string} content - File content
- * @param {string} sourceRoot - Source root directory
- * @param {number} [depth=0] - Current recursion depth
- * @returns {Promise<string>} Processed content with includes replaced
- * @throws {CircularDependencyError} If circular dependency is detected
- */
-async function processIncludesRecursively(filePath, content, sourceRoot, depth = 0) {
-  if (depth > 10) {
-    throw new CircularDependencyError(
-      `Max include depth exceeded for file: ${filePath}`
-    );
-  }
-
-  const rewriter = new HTMLRewriter();
-  // Add detailed debug logs for include processing
-  logger.debug(`Content before processing: ${content.substring(0, 200)}...`);
-  logger.debug(`Content contains <!--#include: ${content.includes('<!--#include')}`);
-  logger.debug(`Starting include processing for file: ${filePath}, depth: ${depth}`);
-
-  rewriter.on('include', {
-    element(element) {
-      const src = element.getAttribute('src');
-      logger.debug(`Found <include> element with src: ${src}`);
-      if (src) {
-        const includePath = src.startsWith('/')
-          ? path.resolve(sourceRoot, `.${src}`)
-          : path.resolve(path.dirname(filePath), src);
-        logger.debug(`Resolved include path: ${includePath}`);
-
-        try {
-          const includeContent = fs.readFileSync(includePath, 'utf-8');
-          logger.debug(`Read content from include path: ${includePath}`);
-          const processedContent = processIncludesRecursively(
-            includePath,
-            includeContent,
-            sourceRoot,
-            depth + 1
-          );
-          element.replace(processedContent);
-        } catch (error) {
-          logger.error(`Error processing include at path: ${includePath}`, error);
-        }
-      }
-    },
-  });
-
-    rewriter.on('comment', {
-      text(comment) {
-        logger.debug(`Found comment: ${comment.text}`);
-        const match = comment.text.match(/#include (file|virtual)="([^"]+)"/);
-        logger.debug(`Found <!--#include--> comment with match: ${JSON.stringify(match)}`);
-        if (match) {
-          const [, type, includePath] = match;
-          const resolvedPath =
-            type === 'virtual'
-              ? path.resolve(sourceRoot, includePath)
-              : path.resolve(path.dirname(filePath), includePath);
-          logger.debug(`Resolved include path for comment: ${resolvedPath}`);
-
-          try {
-            const includeContent = fs.readFileSync(resolvedPath, 'utf-8');
-            logger.debug(`Read content from include path: ${resolvedPath}`);
-            const processedContent = processIncludesRecursively(
-              resolvedPath,
-              includeContent,
-              sourceRoot,
-              depth + 1
-            );
-            comment.replace(processedContent);
-            logger.debug(`Replaced comment with processed content`);
-          } catch (error) {
-            logger.error(`Error processing include comment at path: ${resolvedPath}`, error);
-          }
-        }
-      },
-    });  return rewriter.transform(content).toString();
-}
 
 /**
  * Process HTML file with v0.6.0 systems (Cascading Imports + Head Merge)
@@ -1896,19 +1743,7 @@ async function processHtmlFileV6(
   // Step 1: Process cascading imports (replaces SSI includes)
   let processedContent = await cascadingImports.processImports(htmlContent, filePath);
 
-  // Step 1.5: Process legacy SSI includes (backwards compatibility)
-  const { processIncludes } = await import("./include-processor.js");
-  // Determine if we should fail fast based on config (missing includes are errors that can be downgraded to warnings)
-  const failFast = shouldFailBuild(config, 'error');
-  processedContent = await processIncludes(
-    processedContent, 
-    filePath, 
-    sourceRoot, 
-    new Set(), 
-    0, 
-    dependencyTracker,
-    failFast
-  );
+  // Legacy SSI includes are now handled by unified-html processor
 
 
   // Step 2: Extract head content for merging

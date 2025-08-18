@@ -23,11 +23,9 @@ async function main() {
       await flushAndExit(0);
     }
 
-    // Set logging level based on logLevel or verbose flag (backwards compatibility)
+    // Set logging level based on logLevel
     if (args.logLevel) {
       logger.setLevel(args.logLevel.toUpperCase());
-    } else if (args.verbose) {
-      logger.setLevel('DEBUG');
     }
 
     // Default to build command if none specified and not help/version
@@ -68,8 +66,7 @@ async function main() {
           outputDir: args.output,
           fallback: 'index.html',
           cors: true,
-          liveReload: true,
-          verbose: args.verbose
+          liveReload: true
         });
         const watchConfig = {
           ...args,
@@ -156,7 +153,6 @@ Global Options:
   --help, -h                      Display help information
   --version, -v                   Display version number
   --log-level <level>             Set logging level: error, warn, info, debug
-  --verbose                       Enable debug level messages (deprecated, use --log-level=debug)
 
 Examples:
   unify                           # Build with defaults (src → dist)

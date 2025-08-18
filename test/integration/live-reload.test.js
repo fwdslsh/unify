@@ -96,10 +96,10 @@ describe('Live Reload Functionality', () => {
       }
     });
 
-    it('should serve include-processed content correctly', async () => {
+    it('should serve fragment-imported content correctly', async () => {
       const structure = {
-        'src/index.html': '<!--#include virtual="/includes/header.html" --><p>Main content</p>',
-        'src/includes/header.html': '<h1>Test Header</h1>'
+        'src/index.html': '<div data-import="header"></div><p>Main content</p>',
+        'src/header.html': '<h1>Test Header</h1>'
       };
 
       await createTestStructure(tempDir, structure);
@@ -107,7 +107,7 @@ describe('Live Reload Functionality', () => {
       const server = await startDevServer(sourceDir, outputDir, { workingDir: tempDir });
       
       try {
-        // Check that includes are processed correctly
+        // Check that fragments are imported correctly
         const response = await fetch(`http://localhost:${server.port}/`);
         expect(response.ok).toBeTruthy();
         const content = await response.text();
@@ -119,10 +119,14 @@ describe('Live Reload Functionality', () => {
       }
     });
 
-    it('should serve layout-processed content correctly', async () => {
+    it('should serve markdown content correctly', async () => {
       const structure = {
-        'src/page.html': '<div><h1>Content</h1></div>',
-        'src/_includes/layout.html': '<!DOCTYPE html><html><body>Layout: <main data-slot="default"></main></body></html>'
+        'src/page.md': `---
+title: Test Page
+---
+# Content Header
+This is markdown content.
+`
       };
 
       await createTestStructure(tempDir, structure);
@@ -130,12 +134,16 @@ describe('Live Reload Functionality', () => {
       const server = await startDevServer(sourceDir, outputDir, { workingDir: tempDir });
       
       try {
-        // Check that layouts are processed correctly
-        const response = await fetch(`http://localhost:${server.port}/page.html`);
+        // Check that markdown is processed correctly
+        // Try both pretty URLs and standard URLs
+        let response = await fetch(`http://localhost:${server.port}/page/`);
+        if (!response.ok) {
+          response = await fetch(`http://localhost:${server.port}/page.html`);
+        }
         expect(response.ok).toBeTruthy();
         const content = await response.text();
-        expect(content).toContain('Layout:');
-        expect(content).toContain('Content');
+        expect(content).toContain('Content Header');
+        expect(content).toContain('markdown content');
         
       } finally {
         await stopDevServer(server);

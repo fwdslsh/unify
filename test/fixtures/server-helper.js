@@ -119,8 +119,7 @@ export async function startDevServer(sourceDir, outputDir, options = {}) {
       "--output", 
       outputDir,
       "--port",
-      port.toString(),
-      ...(verbose ? ["--verbose"] : [])
+      port.toString()
     ],
     spawnOptions
   );

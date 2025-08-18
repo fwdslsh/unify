@@ -45,10 +45,15 @@ describe('Exit Code Validation', () => {
              result.stdout.includes('Build completed')).toBeTruthy();
     });
 
-    it('should return 0 for successful build with warnings (missing includes)', async () => {
+    it('should return 0 for successful build with warnings (missing layouts)', async () => {
       const structure = {
         'src/index.html': '<h1>Home</h1>',
-        'src/page-with-missing-include.html': '<!--#include file="missing.html" --><p>Content</p>'
+        'src/page-with-missing-layout.md': `---
+layout: nonexistent-layout
+title: Test
+---
+# Test Page
+`
       };
 
       await createTestStructure(tempDir, structure);
@@ -57,10 +62,10 @@ describe('Exit Code Validation', () => {
         'build',
         '--source', sourceDir,
         '--output', outputDir
-        // No --fail-on flag, so should continue with defaults
+        // No --fail-level flag, so should continue with defaults
       ]);
 
-      // Should succeed despite missing includes (recoverable error)
+      // Should succeed despite missing layout (recoverable error)
       expect(result.code).toBe(0);
       
       // Should still output the good files
@@ -142,10 +147,15 @@ describe('Exit Code Validation', () => {
       expect(result.code).toBe(2); // Exit code 2 for CLI argument errors
     });
 
-    it('should return 1 when --fail-on error flag encounters errors', async () => {
+    it('should return 1 when --fail-level error flag encounters errors', async () => {
       const structure = {
         'src/index.html': '<h1>Home</h1>',
-        'src/broken.html': '<!--#include file="missing.html" --><p>Content</p>'
+        'src/broken.md': `---
+layout: nonexistent-layout
+title: Test
+---
+# Broken Page
+`
       };
 
       await createTestStructure(tempDir, structure);
@@ -154,10 +164,10 @@ describe('Exit Code Validation', () => {
         'build',
         '--source', sourceDir,
         '--output', outputDir,
-        '--fail-on', 'error'
+        '--fail-level', 'error'
       ]);
 
-      expect(result.code).toBe(1); // Exit code 1 for build errors in fail-on error mode
+      expect(result.code).toBe(1); // Exit code 1 for build errors in fail-level error mode
     });
 
     it('should return 1 for validation errors', async () => {
@@ -246,7 +256,7 @@ describe('Exit Code Validation', () => {
 
       await createTestStructure(tempDir, structure);
 
-      // Recoverable error: missing include (should continue)
+      // Recoverable error: missing layout (should continue)
       const recoverableResult = await runCLIInDir(tempDir, [
         'build',
         '--source', sourceDir,

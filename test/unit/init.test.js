@@ -43,10 +43,10 @@ describe('Init Command Argument Parsing', () => {
   test('should handle init command with flags', async () => {
     const { parseArgs } = await import('../../src/cli/args-parser.js');
     
-    const args = parseArgs(['init', 'basic', '--verbose']);
+    const args = parseArgs(['init', 'basic', '--clean']);
     expect(args.command).toBe('init');
     expect(args.template).toBe('basic');
-    expect(args.verbose).toBe(true);
+    expect(args.clean).toBe(true);
   });
 
   test('should handle init command with version flag', async () => {

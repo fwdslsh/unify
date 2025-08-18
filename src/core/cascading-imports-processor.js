@@ -8,7 +8,6 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { logger } from '../utils/logger.js';
-import { resolveIncludePath } from '../utils/path-resolver.js';
 import { processMarkdown, isMarkdownFile } from './markdown-processor.js';
 
 /**

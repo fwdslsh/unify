@@ -1,5 +1,5 @@
 /**
- * Tests for missing CLI options: --host and --verbose
+ * Tests for missing CLI options: --host
  * Completes CLI option test coverage per spec requirements
  */
 
@@ -88,108 +88,6 @@ describe('Complete CLI Options Coverage', () => {
     });
   });
 
-  describe('--verbose Option', () => {
-    it('should parse --verbose option correctly', () => {
-      const args = parseArgs(['build', '--verbose']);
-      expect(args.verbose).toBe(true);
-    });
-
-    it('should default to false when --verbose not specified', () => {
-      const args = parseArgs(['build']);
-      expect(args.verbose).toBe(false);
-    });
-
-    it('should work with all commands', () => {
-      const buildArgs = parseArgs(['build', '--verbose']);
-      expect(buildArgs.verbose).toBe(true);
-
-      const serveArgs = parseArgs(['serve', '--verbose']);
-      expect(serveArgs.verbose).toBe(true);
-
-      const watchArgs = parseArgs(['watch', '--verbose']);
-      expect(watchArgs.verbose).toBe(true);
-    });
-
-    it('should enable debug logging when --verbose is used', async () => {
-      const structure = {
-        'src/index.html': '<h1>Verbose Test</h1>',
-        'src/about.html': '<!--#include file="../includes/header.html" --><p>Content</p>',
-        'src/includes/header.html': '<header>Header</header>'
-      };
-
-      await createTestStructure(tempDir, structure);
-
-      // Build with verbose
-      const verboseResult = await runCLIInDir(tempDir, [
-        'build',
-        '--source', sourceDir,
-        '--output', outputDir,
-        '--verbose'
-      ]);
-
-      // Build without verbose
-      await fs.rm(outputDir, { recursive: true, force: true });
-      
-      const normalResult = await runCLIInDir(tempDir, [
-        'build',
-        '--source', sourceDir,
-        '--output', outputDir
-      ]);
-
-      expect(verboseResult.code).toBe(0);
-      expect(normalResult.code).toBe(0);
-
-      // Verbose output should contain build information (v0.6.0 may have different debug messages)
-      const verboseOutput = verboseResult.stdout + verboseResult.stderr;
-      const normalOutput = normalResult.stdout + normalResult.stderr;
-
-      // Both modes should produce successful build output
-      expect(verboseOutput.length > 0).toBeTruthy();
-      expect(normalOutput.length > 0).toBeTruthy();
-      expect(verboseOutput).toMatch(/Build completed/);
-      expect(normalOutput).toMatch(/Build completed/);
-    });
-
-    it('should combine with other options correctly', () => {
-      const args = parseArgs([
-        'build', 
-        '--verbose', 
-        '--source', 'custom-src',
-        '--output', 'custom-dist',
-        '--clean',
-        '--minify'
-      ]);
-
-      expect(args.verbose).toBe(true);
-      expect(args.source).toBe('custom-src');
-      expect(args.output).toBe('custom-dist');
-      expect(args.clean).toBe(true);
-      expect(args.minify).toBe(true);
-    });
-
-    it('should work with fail-on error flag', async () => {
-      const structure = {
-        'src/index.html': '<h1>Verbose + Fail on Error</h1>',
-        'src/broken.html': '<!--#include file="missing.html" --><p>Content</p>'
-      };
-
-      await createTestStructure(tempDir, structure);
-
-      const result = await runCLIInDir(tempDir, [
-        'build',
-        '--source', sourceDir,
-        '--output', outputDir,
-        '--verbose',
-        '--fail-on', 'error'
-      ]);
-
-      expect(result.code).toBe(1); // Should fail due to missing include
-      
-      // Should have verbose error output
-      const output = result.stdout + result.stderr;
-      expect(output.length > 0).toBeTruthy();
-    });
-  });
 
   describe('Complete CLI Option Integration', () => {
     it('should handle all major options together', () => {
@@ -199,8 +97,6 @@ describe('Complete CLI Options Coverage', () => {
         '--output', 'public',
         '--port', '3000',
         '--host', '0.0.0.0',
-        '--base-url', 'https://example.com',
-        '--verbose',
         '--clean',
         '--minify',
         '--pretty-urls'
@@ -211,8 +107,6 @@ describe('Complete CLI Options Coverage', () => {
       expect(args.output).toBe('public');
       expect(args.port).toBe(3000);
       expect(args.host).toBe('0.0.0.0');
-      expect(args.baseUrl).toBe('https://example.com');
-      expect(args.verbose).toBe(true);
       expect(args.clean).toBe(true);
       expect(args.minify).toBe(true);
       expect(args.prettyUrls).toBe(true);
@@ -227,12 +121,9 @@ describe('Complete CLI Options Coverage', () => {
         '--port', '3000',
         '--host', 'localhost',
         '--pretty-urls',
-        '--base-url', 'https://example.com',
         '--clean',
-        '--no-sitemap',
-        '--fail-on', 'error',
-        '--minify',
-        '--verbose'
+        '--fail-level', 'error',
+        '--minify'
       ]);
 
       // Verify all spec options are parsed
@@ -241,12 +132,9 @@ describe('Complete CLI Options Coverage', () => {
       expect(allOptionsArgs.port).toBe(3000);
       expect(allOptionsArgs.host).toBe('localhost');
       expect(allOptionsArgs.prettyUrls).toBe(true);
-      expect(allOptionsArgs.baseUrl).toBe('https://example.com');
       expect(allOptionsArgs.clean).toBe(true);
-      expect(allOptionsArgs.sitemap).toBe(false); // --no-sitemap
-      expect(allOptionsArgs.failOn).toBe('error');
+      expect(allOptionsArgs.failLevel).toBe('error');
       expect(allOptionsArgs.minify).toBe(true);
-      expect(allOptionsArgs.verbose).toBe(true);
     });
 
     it('should handle short flags for new options', () => {
@@ -256,15 +144,13 @@ describe('Complete CLI Options Coverage', () => {
         '-s', 'src',
         '-o', 'dist',
         '-p', '8080',
-        '--host', '0.0.0.0', // No short flag for host
-        '--verbose' // No short flag for verbose
+        '--host', '0.0.0.0' // No short flag for host
       ]);
 
       expect(args.source).toBe('src');
       expect(args.output).toBe('dist');
       expect(args.port).toBe(8080);
       expect(args.host).toBe('0.0.0.0');
-      expect(args.verbose).toBe(true);
     });
   });
 
@@ -290,21 +176,6 @@ describe('Complete CLI Options Coverage', () => {
       expect(result.code === 0 || result.code === 1).toBeTruthy();
     });
 
-    it('should handle verbose flag with errors', async () => {
-      const result = await runCLIInDir(tempDir, [
-        'build',
-        '--source', '/nonexistent',
-        '--verbose'
-      ]);
-
-      expect(result.code).toBe(2); // Exit code 2 for CLI argument errors (nonexistent source)
-      
-      // Should have error output even with verbose
-      const output = result.stdout + result.stderr;
-      expect(output.includes('not found') || 
-             output.includes('ENOENT') ||
-             output.includes('directory')).toBeTruthy();
-    });
   });
 });
 
