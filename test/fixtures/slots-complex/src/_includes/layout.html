@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title><slot name="title">Default Site Title</slot></title>
+  <meta name="description" content="<slot name="description">Default site description</slot>">
+  <link rel="stylesheet" href="/assets/global.css">
+  <slot name="head">
+    <!-- Default head content -->
+  </slot>
+</head>
+<body class="layout-base">
+  <header>
+    <nav>
+      <h1><slot name="site-title">My Website</slot></h1>
+      <slot name="navigation">
+        <ul>
+          <li><a href="/">Home</a></li>
+          <li><a href="/about.html">About</a></li>
+        </ul>
+      </slot>
+    </nav>
+  </header>
+  
+  <main>
+    <aside class="sidebar">
+      <slot name="sidebar">
+        <div class="default-sidebar">
+          <h3>Default Sidebar</h3>
+          <p>Default sidebar content</p>
+        </div>
+      </slot>
+    </aside>
+    
+    <article class="content">
+      <slot>
+        <p>Default main content</p>
+      </slot>
+    </article>
+  </main>
+  
+  <footer>
+    <slot name="footer">
+      <p>&copy; 2025 Default Footer</p>
+    </slot>
+  </footer>
+</body>
+</html>

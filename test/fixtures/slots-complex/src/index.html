@@ -1,0 +1,52 @@
+<div data-import="/_includes/layout.html">
+  <template data-target="title">Welcome Home</template>
+  <template data-target="description">Homepage of our test site</template>
+  
+  <template data-target="head">
+    <meta property="og:type" content="website">
+    <link rel="preload" href="/assets/hero-image.jpg" as="image">
+  </template>
+  
+  <template data-target="sidebar">
+    <div class="home-sidebar">
+      <h3>Quick Links</h3>
+      <ul>
+        <li><a href="/blog/">Blog</a></li>
+        <li><a href="/portfolio/">Portfolio</a></li>
+        <li><a href="/contact.html">Contact</a></li>
+      </ul>
+      
+      <div class="featured-content">
+        <h4>Featured</h4>
+        <p>Check out our latest blog post!</p>
+      </div>
+    </div>
+  </template>
+  
+  <section class="hero">
+    <h1>Welcome to Our Test Site</h1>
+    <p>This is a test page for validating complex slot injection and template composition.</p>
+  </section>
+  
+  <section class="features">
+    <h2>Site Features</h2>
+    <div class="feature-grid">
+      <div class="feature">
+        <h3>Cascading Imports</h3>
+        <p>Test data-import functionality</p>
+      </div>
+      <div class="feature">
+        <h3>Slot Injection</h3>
+        <p>Test slot targeting with data-target</p>
+      </div>
+      <div class="feature">
+        <h3>Head Merging</h3>
+        <p>Test head element composition</p>
+      </div>
+    </div>
+  </section>
+  
+  <template data-target="footer">
+    <p>&copy; 2025 Test Site | <a href="/privacy.html">Privacy</a> | <a href="/terms.html">Terms</a></p>
+  </template>
+</div>

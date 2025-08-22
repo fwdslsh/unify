@@ -1,217 +1,94 @@
 /**
- * Test Setup for Unify CLI
- * Configures test environment
+ * Bun test setup and configuration
+ * Global test environment setup, mocks, and utilities
  */
 
-import { beforeAll, beforeEach, afterEach, afterAll } from 'bun:test';
-import fs from 'fs/promises';
-import path from 'path';
-import { logger } from '../src/utils/logger.js';
+import { beforeAll, afterAll, beforeEach, afterEach } from 'bun:test';
 
-// Global test configuration
-const TEST_CONFIG = {
-  timeout: 10000, // 10 seconds
-  tempDir: path.join(import.meta.dir, 'temp'),
-  fixturesDir: path.join(import.meta.dir, 'fixtures'),
-  verbose: process.env.TEST_VERBOSE === 'true'
-};
+// Track temporary directories created during tests for cleanup
+const tempDirs = new Set();
 
-// Track created temp directories for cleanup
-const createdTempDirs = new Set();
-const createdTempFiles = new Set();
-
-/**
- * Global test setup
- */
+// Global test setup
 beforeAll(async () => {
-  console.log('🧪 Setting up test environment...');
+  // Set test environment
+  process.env.NODE_ENV = 'test';
+  process.env.LOG_LEVEL = 'error'; // Reduce log noise during tests
   
-  // Configure logger for tests
-  logger.setLevel(TEST_CONFIG.verbose ? 'DEBUG' : 'ERROR');
-  
-  // Ensure temp directory exists
-  await fs.mkdir(TEST_CONFIG.tempDir, { recursive: true });
-  
-  // Log runtime info
-  console.log(`   Runtime: ${process.release?.name || 'unknown'} (${process.version})`);
-  console.log(`   Features: HTMLRewriter=true, fs.watch=true`);
-  
-  console.log('✅ Test environment ready');
+  // Disable colors in output for consistent test assertions
+  process.env.NO_COLOR = '1';
 });
 
-/**
- * Test cleanup
- */
+// Global test cleanup
 afterAll(async () => {
-  console.log('🧹 Cleaning up test environment...');
-  
-  // Clean up temp files and directories
-  await cleanupTempResources();
-  
-  console.log('✅ Test cleanup complete');
+  // Final cleanup of any remaining temp directories
+  await cleanupTempDirs();
 });
 
-/**
- * Per-test setup
- */
-beforeEach(async () => {
-  // Reset logger level
-  logger.setLevel(TEST_CONFIG.verbose ? 'DEBUG' : 'ERROR');
+// Per-test setup
+beforeEach(() => {
+  // Reset any global state if needed
 });
 
-/**
- * Per-test cleanup
- */
+// Per-test cleanup
 afterEach(async () => {
-  // Clean up any resources created during the test
-  await cleanupTempResources();
+  // Clean up temp directories created during this test
+  await cleanupTempDirs();
 });
 
 /**
- * Create a temporary directory for testing
- * @param {string} prefix - Directory name prefix
- * @returns {Promise<string>} Path to created directory
+ * Register a temporary directory for cleanup
+ * @param {string} path - Path to temporary directory
  */
-export async function createTempDir(prefix = 'test') {
-  const timestamp = Date.now();
-  const random = Math.random().toString(36).substring(2, 8);
-  const dirName = `${prefix}-${timestamp}-${random}`;
-  const dirPath = path.join(TEST_CONFIG.tempDir, dirName);
-  
-  await fs.mkdir(dirPath, { recursive: true });
-  createdTempDirs.add(dirPath);
-  
-  return dirPath;
+export function registerTempDir(path) {
+  // Only register valid string paths
+  if (typeof path === 'string' && path.length > 0) {
+    tempDirs.add(path);
+  }
 }
 
 /**
- * Create a temporary file for testing
- * @param {string} filename - File name
- * @param {string} content - File content
- * @param {string} dir - Directory (optional, uses temp dir)
- * @returns {Promise<string>} Path to created file
+ * Cleanup all registered temporary directories
  */
-export async function createTempFile(filename, content, dir = null) {
-  const targetDir = dir || await createTempDir('file');
-  const filePath = path.join(targetDir, filename);
+async function cleanupTempDirs() {
+  const { rm } = await import('fs/promises');
   
-  await fs.writeFile(filePath, content, 'utf-8');
-  createdTempFiles.add(filePath);
-  
-  return filePath;
-}
-
-/**
- * Copy fixture files to temp directory
- * @param {string} fixtureName - Name of fixture directory
- * @returns {Promise<string>} Path to copied fixture
- */
-export async function copyFixture(fixtureName) {
-  const sourcePath = path.join(TEST_CONFIG.fixturesDir, fixtureName);
-  const destPath = await createTempDir(`fixture-${fixtureName}`);
-  
-  await copyDirectory(sourcePath, destPath);
-  return destPath;
-}
-
-/**
- * Clean up temporary resources
- */
-async function cleanupTempResources() {
-  // Clean up temp files
-  for (const filePath of createdTempFiles) {
+  for (const dir of tempDirs) {
     try {
-      await fs.unlink(filePath);
+      // Only attempt cleanup if dir is a valid string path
+      if (typeof dir === 'string' && dir.length > 0) {
+        await rm(dir, { recursive: true, force: true });
+      }
     } catch (error) {
-      // File might already be deleted
+      // Ignore cleanup errors, but safely convert dir to string for logging
+      const dirStr = typeof dir === 'string' ? dir : String(dir);
+      console.warn(`Failed to cleanup temp dir: ${dirStr}`, error.message);
     }
   }
-  createdTempFiles.clear();
   
-  // Clean up temp directories
-  for (const dirPath of createdTempDirs) {
-    try {
-      await fs.rm(dirPath, { recursive: true, force: true });
-    } catch (error) {
-      // Directory might already be deleted
-    }
-  }
-  createdTempDirs.clear();
+  tempDirs.clear();
 }
 
 /**
- * Copy directory recursively
+ * Test timeout configuration
  */
-async function copyDirectory(src, dest) {
-  await fs.mkdir(dest, { recursive: true });
-  
-  const entries = await fs.readdir(src, { withFileTypes: true });
-  
-  for (const entry of entries) {
-    const srcPath = path.join(src, entry.name);
-    const destPath = path.join(dest, entry.name);
-    
-    if (entry.isDirectory()) {
-      await copyDirectory(srcPath, destPath);
-    } else {
-      await fs.copyFile(srcPath, destPath);
-    }
-  }
-}
-
-
-/**
- * Wait for a condition to be true
- * @param {Function} condition - Condition function
- * @param {number} timeout - Timeout in milliseconds
- * @param {number} interval - Check interval in milliseconds
- */
-export async function waitFor(condition, timeout = 5000, interval = 100) {
-  const start = Date.now();
-  
-  while (Date.now() - start < timeout) {
-    if (await condition()) {
-      return true;
-    }
-    await new Promise(resolve => setTimeout(resolve, interval));
-  }
-  
-  throw new Error(`Condition not met within ${timeout}ms`);
-}
-
-/**
- * Create a mock file system structure
- * @param {Object} structure - File system structure
- * @param {string} basePath - Base path for structure
- */
-export async function createMockFS(structure, basePath = null) {
-  const base = basePath || await createTempDir('mockfs');
-  
-  for (const [name, content] of Object.entries(structure)) {
-    const fullPath = path.join(base, name);
-    
-    if (typeof content === 'object' && content !== null) {
-      // Directory
-      await fs.mkdir(fullPath, { recursive: true });
-      await createMockFS(content, fullPath);
-    } else {
-      // File
-      await fs.mkdir(path.dirname(fullPath), { recursive: true });
-      await fs.writeFile(fullPath, content.toString(), 'utf-8');
-      createdTempFiles.add(fullPath);
-    }
-  }
-  
-  return base;
-}
-
-// Export test configuration and utilities
-export { TEST_CONFIG };
-export default {
-  createTempDir,
-  createTempFile,
-  copyFixture,
-  waitFor,
-  createMockFS,
-  TEST_CONFIG
+export const TEST_TIMEOUTS = {
+  unit: 5000,      // 5 seconds for unit tests
+  integration: 15000, // 15 seconds for integration tests
+  performance: 30000, // 30 seconds for performance tests
+  server: 10000    // 10 seconds for server tests
 };
+
+/**
+ * Test data constants
+ */
+export const TEST_CONSTANTS = {
+  TEMP_DIR_PREFIX: 'unify-test-',
+  DEFAULT_TIMEOUT: 5000,
+  PERFORMANCE_MEMORY_LIMIT: 100 * 1024 * 1024, // 100MB
+  PERFORMANCE_TIME_LIMIT: 5000, // 5 seconds
+};
+
+// Make utilities available globally for tests
+globalThis.TEST_TIMEOUTS = TEST_TIMEOUTS;
+globalThis.TEST_CONSTANTS = TEST_CONSTANTS;
+globalThis.registerTempDir = registerTempDir;

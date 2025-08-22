@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title><slot name="title">Default Title</slot></title>
+  <meta name="description" content="<slot name="description">Default description</slot>">
+  <link rel="stylesheet" href="/assets/style.css">
+</head>
+<body class="layout-basic">
+  <header>
+    <nav>
+      <h1><slot name="site-title">Test Site</slot></h1>
+      <ul>
+        <li><a href="/">Home</a></li>
+        <li><a href="/about.html">About</a></li>
+        <li><a href="/blog.html">Blog</a></li>
+      </ul>
+    </nav>
+  </header>
+  
+  <main>
+    <slot>
+      <p>Default main content</p>
+    </slot>
+  </main>
+  
+  <footer>
+    <slot name="footer">
+      <p>&copy; 2025 Test Site</p>
+    </slot>
+  </footer>
+</body>
+</html>

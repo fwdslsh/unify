@@ -24,11 +24,7 @@ import {
   isHtmlFile,
   isPartialFile,
   getOutputPath,
-  getFileExtension,
 } from "../utils/path-resolver.js";
-import {
-  extractPageInfo,
-} from "./sitemap-generator.js";
 import {
   processHtmlUnified,
   getUnifiedConfig,
@@ -36,7 +32,6 @@ import {
 import { createBuildCache } from "./build-cache.js";
 import { FileSystemError, BuildError, UnifyError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
-import { getBaseUrlFromPackage } from "../utils/package-reader.js";
 
 /**
  * Determine if build should fail based on configuration and error type
@@ -1101,7 +1096,7 @@ async function processMarkdownFile(
   }
 
   // Process markdown to HTML (includes are now handled by unified-html processor)
-  const { html, frontmatter, title, excerpt } = processMarkdown(
+  const { html, frontmatter, title, excerpt } = await processMarkdown(
     markdownContent,
     filePath
   );
@@ -1564,7 +1559,7 @@ async function processMarkdownFileWithConventions(
     // Don't process includes yet - do it after layout application
     logger.debug(`Original markdown content length: ${content.length}`);
     
-    const { html, frontmatter, title, excerpt } = processMarkdown(
+    const { html, frontmatter, title, excerpt } = await processMarkdown(
       content,
       filePath
     );
@@ -1738,6 +1733,14 @@ async function processHtmlFileV6(
     throw new FileSystemError("read", filePath, error);
   }
 
+  // Validate that HTML files don't have frontmatter
+  if (htmlContent.trim().startsWith('---')) {
+    const frontmatterMatch = htmlContent.match(/^---\s*\n([\s\S]*?)\n---\s*\n/);
+    if (frontmatterMatch) {
+      throw new Error(`Frontmatter is not allowed in HTML file: ${filePath}`);
+    }
+  }
+
   logger.debug(`Processing HTML with v0.6.0 systems: ${path.relative(sourceRoot, filePath)}`);
 
   // Step 1: Process cascading imports (replaces SSI includes)
@@ -1756,28 +1759,8 @@ async function processHtmlFileV6(
     processedContent = HeadMergeProcessor.injectHeadContent(processedContent, mergedHead);
   }
 
-  // Step 4: Apply layout discovery and processing (applies to all pages per user requirement)
-  const discoveredLayoutPath = await layoutDiscovery.findLayoutForPage(filePath, sourceRoot);
-  if (discoveredLayoutPath) {
-    try {
-      logger.debug(`Applying layout for ${path.relative(sourceRoot, filePath)} using ${path.relative(sourceRoot, discoveredLayoutPath)}`);
-      
-      // Read layout content
-      const layoutContent = await fs.readFile(discoveredLayoutPath, 'utf-8');
-      
-      // Apply layout by replacing data-slot="default" with processed content
-      if (layoutContent.includes('data-slot="default"')) {
-        processedContent = layoutContent.replace(
-          /<main[^>]*data-slot="default"[^>]*>.*?<\/main>/s,
-          `<main data-slot="default">${processedContent}</main>`
-        );
-      } else {
-        logger.warn(`Layout ${path.relative(sourceRoot, discoveredLayoutPath)} does not contain data-slot="default"`);
-      }
-    } catch (error) {
-      logger.warn(`Layout processing failed for ${path.relative(sourceRoot, filePath)}: ${error.message}`);
-    }
-  }
+  // Step 4: Layout processing is now handled entirely by CascadingImportsProcessor
+  // Skip legacy layout discovery to prevent duplicate layout application
 
   // Step 5: Track asset references
   if (assetTracker) {
@@ -1838,7 +1821,7 @@ async function processMarkdownFileV6(
     const content = await fs.readFile(filePath, "utf-8");
     
     // Step 1: Process markdown to HTML
-    const { html, frontmatter, title, excerpt } = processMarkdown(content, filePath);
+  const { html, frontmatter, title, excerpt, headHtml } = await processMarkdown(content, filePath);
     const htmlWithAnchors = addAnchorLinks(html);
     const tableOfContents = generateTableOfContents(htmlWithAnchors);
     const metadata = { frontmatter, title, excerpt, tableOfContents };
@@ -1884,8 +1867,7 @@ async function processMarkdownFileV6(
       }
     }
 
-    // Step 4: Process cascading imports in the final content
-    finalContent = await cascadingImports.processImports(finalContent, filePath);
+    // Step 4: Cascading imports already processed in Step 1 - skip redundant processing
 
     // Step 5: Synthesize and merge head content from frontmatter
     const fragments = [];
@@ -1995,6 +1977,52 @@ function synthesizeHeadFromFrontmatter(frontmatter = {}, title = '', excerpt = '
     }
     if (frontmatter.twitter.site) {
       headElements.push(`<meta name="twitter:site" content="${frontmatter.twitter.site}">`);
+    }
+  }
+
+  // Custom head elements from head array
+  if (frontmatter.head && Array.isArray(frontmatter.head)) {
+    for (const headItem of frontmatter.head) {
+      if (typeof headItem === 'object' && headItem !== null) {
+        // Normalize tag name by removing quotes and converting to lowercase
+        const tagName = (headItem.tag || '').toString().replace(/['"]/g, '').toLowerCase().trim();
+        
+        // If tag is script and content exists, output as <script ...>...</script>
+        if (tagName === 'script' && headItem.content !== undefined && headItem.content !== null) {
+          const attributes = Object.entries(headItem)
+            .filter(([key]) => key !== 'content' && key !== 'tag')
+            .map(([key, value]) => `${key}="${value}"`)
+            .join(' ');
+          let minified = headItem.content;
+          try {
+            // Try to minify JSON content
+            minified = JSON.stringify(JSON.parse(headItem.content));
+          } catch (e) {
+            // If not valid JSON, use as-is
+            minified = headItem.content;
+          }
+          headElements.push(`<script ${attributes}>${minified}</script>`);
+        } else if (tagName && tagName !== 'script') {
+          // Handle other HTML tags (not script or meta)
+          const attributes = Object.entries(headItem)
+            .filter(([key]) => key !== 'content' && key !== 'tag')
+            .map(([key, value]) => `${key}="${value}"`)
+            .join(' ');
+          const content = headItem.content || '';
+          headElements.push(`<${tagName} ${attributes}>${content}</${tagName}>`);
+        } else {
+          // Otherwise, output as <meta ...> (exclude only tag property)
+          const attributes = [];
+          for (const [key, value] of Object.entries(headItem)) {
+            if (key !== 'tag' && value !== undefined && value !== null) {
+              attributes.push(`${key}="${value}"`);
+            }
+          }
+          if (attributes.length > 0) {
+            headElements.push(`<meta ${attributes.join(' ')}>`);
+          }
+        }
+      }
     }
   }
 

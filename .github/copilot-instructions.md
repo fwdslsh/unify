@@ -150,6 +150,14 @@ if (relativePath.startsWith('../')) {
 
 ## Testing Guidelines
 
+### Test Validation Process
+**CRITICAL - Always reference `docs/app-spec.md` for failing tests:**
+- When a newly created test fails, **first check `docs/app-spec.md`** to determine the expected behavior
+- **If the code behavior does not match the spec**: Update the code implementation to comply with the specification
+- **If the test assertions are incorrect**: Update the test assertions to match the documented specification
+- The application specification in `docs/app-spec.md` is the authoritative source of truth for expected behavior
+- Never modify both code and tests simultaneously without first confirming against the spec
+
 ### Test Naming
 - Integration tests: `component-assets.test.js`, `live-reload.test.js`
 - Unit tests: `include-processor.test.js`, `asset-tracker.test.js`

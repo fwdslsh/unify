@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <title>Site Layout</title>
+    <!-- Site-layer CSS (second in cascade) -->
+    <style>
+        .hero {
+            padding: 4rem 0;
+            background: #0ea5e9;
+            color: white;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1rem;
+        }
+
+        .cta {
+            background: #111827;
+            color: #f9fafb;
+            padding: 2rem;
+            border-radius: .75rem;
+        }
+
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1rem;
+        }
+
+        .card {
+            border: 1px solid #e5e7eb;
+            border-radius: .5rem;
+            padding: 1rem;
+        }
+    </style>
+
+    <!-- Contract: public areas for site layout -->
+    <style data-unify-docs>
+        .unify-hero {}
+
+        /* Above-the-fold hero section */
+        .unify-features {}
+
+        /* Feature section under hero */
+        .unify-cta {}
+
+        /* Global call-to-action section */
+    </style>
+</head>
+
+<body data-unify="_includes/layouts/root.html">
+    <main>
+        <section class="unify-hero hero">
+            <div class="container">
+                <h1>Default Site Hero</h1>
+                <p>Site-level default hero copy.</p>
+            </div>
+        </section>
+
+        <section class="unify-features features">
+            <div class="container">
+                <h2>Default Features</h2>
+                <div class="cards">
+                    <article class="card">
+                        <h3>Default Card A</h3>
+                        <p>Placeholder content A</p>
+                    </article>
+                    <article class="card">
+                        <h3>Default Card B</h3>
+                        <p>Placeholder content B</p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section class="unify-cta cta">
+            <div class="container">
+                <h2>Default CTA</h2>
+                <p>Default call-to-action content.</p>
+            </div>
+        </section>
+    </main>
+</body>
+
+</html>

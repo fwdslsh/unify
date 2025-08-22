@@ -11,6 +11,66 @@ Unify is a modern, lightweight static site generator designed for frontend devel
 - Teams that want fragment-based architecture without a framework
 - Developers who prefer convention-over-configuration with minimal setup
 
+## Special HTML Attributes & Elements
+
+Unify processes specific data attributes and HTML elements during build to enable its fragment-based architecture:
+
+### Data Attributes
+
+- **`data-import`** - Imports and composes fragments/layouts into the current element
+  - Used on any element to import external HTML/Markdown files
+  - Supports path resolution: absolute (`/layouts/base.html`), relative (`../shared/nav.html`), or short names (`blog` → `_blog.layout.html`)
+  - Only one `data-import` allowed per page on the root element
+  - Removed from final output
+
+- **`data-target`** - Targets content to named slots within imported fragments
+  - Used on elements inside `data-import` containers to specify slot destinations
+  - Value must match `<slot name="...">` attribute exactly (case-sensitive)
+  - Elements without `data-target` go to the unnamed/default slot
+  - Removed from final output
+
+- **`data-layer`** - CSS layering hints for stylesheets (optional, future-compatible)
+  - Used on `<link>` and `<style>` elements to align with CSS `@layer`
+  - Provides hints to fragment consumers for CSS layer organization
+  - No current functionality but forward-compatible for future features
+
+### HTML Elements
+
+- **`<slot>`** - Defines content insertion points in fragments/layouts
+  - `<slot name="header">` creates named slots for targeted content injection
+  - `<slot>` (unnamed) serves as default slot for untargeted content
+  - Content inside slots serves as fallback if no matching `data-target` is provided
+  - Removed from final output, replaced by targeted content
+
+- **`<template>`** - Containers for slot-targeted content
+  - `<template data-target="name">` targets content to named slots
+  - `<template data-import="...">` imports fragments with slot content
+  - Content inside templates is extracted and injected into matching slots
+  - Templates themselves are removed from final output
+
+- **`<head>`** - Document metadata merged globally across fragments
+  - Content from layout `<head>` + page `<head>` is intelligently merged
+  - Deduplication by element type: `<title>` (last wins), `<meta>` (by name/property), `<link>` (by rel+href)
+  - Page head content takes precedence over layout/fragment head content
+
+- **`<body>`** - Document body with class merging and content injection
+  - `class` attributes are merged (not overwritten) across layout/fragments/page
+  - Body content is injected into layout slots during composition
+  - Can have `data-import` on root page element for layout application
+
+- **`<meta>`** - Metadata elements with smart deduplication
+  - Deduplicated by `name`, `property`, or `http-equiv` attributes during head merge
+  - Can be synthesized from Markdown frontmatter (`description` → `<meta name="description">`)
+  - Page meta wins over fragment meta when conflicts occur
+
+### Special Processing Rules
+
+- **Attribute Removal**: `data-import`, `data-target`, and `data-layer` attributes are stripped from final output
+- **Element Removal**: `<slot>` and `<template>` elements are removed, leaving only their processed content
+- **Path Resolution**: All `data-import` paths support both absolute/relative file paths and short name resolution
+- **Nested Composition**: Slots and imports work recursively - imported fragments can import other fragments
+- **Fallback Content**: Default content in slots is preserved when no matching `data-target` is provided
+
 ## Core Functionality
 
 ### Terminology
@@ -34,6 +94,80 @@ Transform source HTML/Markdown files with intelligent imports into a complete st
 - Incremental builds with smart dependency tracking
 - Asset tracking and copying
 - Security-first design with path traversal prevention
+
+## Security & Build Safety
+
+Unify prioritizes security and provides mechanisms to prevent deployment of potentially unsafe content, especially important for CI/CD pipelines and production deployments.
+
+### Security Warnings
+
+During the build process, Unify performs security scans of all processed HTML content and displays clear warnings for potential security vulnerabilities. These warnings include:
+
+**Warning Format:**
+
+```text
+[SECURITY] XSS Risk: Event handler detected in <meta> tag (src/page.html:15)
+[SECURITY] JavaScript URL: Potential XSS vector in href attribute (src/components/nav.html:8)
+[SECURITY] Content Injection: Unescaped content in <title> tag (src/blog/post.html:3)
+```
+
+**Security Tags:**
+
+- All security-related warnings are prefixed with `[SECURITY]` for easy filtering in CI/CD systems
+- Specific vulnerability types are identified (XSS Risk, JavaScript URL, Content Injection, etc.)
+- File paths and line numbers are provided for quick remediation
+
+### Build Failure on Security Issues
+
+To prevent insecure applications from being deployed via automated pipelines, Unify provides build failure options:
+
+**`--fail-on security`**
+
+- Fails the build (exit code 1) when any security warnings are detected
+- Essential for CI/CD pipelines that must not deploy potentially vulnerable sites
+- Recommended for production deployments
+
+**`--fail-on <level>`**
+
+- Can be combined with security checks (e.g., `--fail-on warning` includes security warnings)
+- Provides granular control over which issues should block deployment
+
+### CI/CD Integration
+
+**Example CI/CD Pipeline:**
+
+```bash
+# Development build (warnings only)
+unify build --source src --output dist
+
+# Production build (fail on security issues)
+unify build --source src --output dist --fail-on security --minify
+```
+
+**Log Filtering:**
+
+```bash
+# Extract only security warnings for security team review
+unify build 2>&1 | grep "\[SECURITY\]"
+
+# Count security issues
+unify build 2>&1 | grep -c "\[SECURITY\]"
+```
+
+### Security Best Practices
+
+1. **Always use `--fail-on security` in production CI/CD pipelines**
+2. **Review security warnings in development builds before deployment**
+3. **Monitor security logs and address issues promptly**
+4. **Use content security policies (CSP) as an additional layer of protection**
+5. **Regularly audit and update content to maintain security standards**
+
+### Supported Security Checks
+
+- **Path Traversal**: Prevention of file access outside the source directory
+- **XSS Prevention**: Detection of potentially dangerous event handlers and JavaScript URLs
+- **Content Injection**: Identification of unescaped content in sensitive HTML elements
+- **HTML Injection**: Detection of potential HTML injection vectors in processed content
 
 ## Command Line Interface
 
@@ -314,10 +448,25 @@ unify init docs
 - **Used by:** `build` command, `watch` and `serve` ignore this option
 - **Behavior:** Controls when the build process should exit with error code 1
 
+**`--fail-on <types>`**
+
+- **Purpose:** Fail build on specific issue types (comma-separated)
+- **Default:** `null` (only fail on fatal build errors)
+- **Valid types:** `security`, `warning`, `error`
+- **Used by:** `build` command, `watch` and `serve` ignore this option
+- **Behavior:**
+  - `security`: Fails build when any security warnings are detected
+  - `warning`: Includes all warning-level issues
+  - `error`: Includes all error-level issues
+  - Can be combined: `--fail-on security,warning`
+- **Security Integration:** Essential for CI/CD pipelines to prevent deployment of potentially vulnerable sites
+
 Examples:
 
 - `--fail-level warning`: Fail on any warning or error
 - `--fail-level error`: Fail only on errors (not warnings)
+- `--fail-on security`: Fail only on security issues
+- `--fail-on security,warning`: Fail on security issues and warnings
 - No flag: Only fail on fatal build errors (default behavior)
 
 **`--minify`**
@@ -439,8 +588,11 @@ unify --render "experiments/**"
 #### 5. CI/CD and Production
 
 ```bash
-# Production build with minification and strict error handling
-unify --minify --fail-level=warning --clean
+# Production build with minification and security checks
+unify --minify --fail-on security --clean
+
+# Strict production build (fail on any warnings or security issues)
+unify --minify --fail-on security,warning --clean
 
 # Build with custom source/output directories
 unify --source=content --output=public
@@ -828,9 +980,9 @@ When combining layout `<head>` + page `<head>` (or synthesized head), Unify uses
 2. **Deterministic de-duplication:** Elements are deduplicated using identity keys:
    - `<title>`: Last-wins for titles
    - `<meta>`: Last-wins by `name` or `property` attribute (page wins over fragments, fragments win over layout)
-   - `<link>`: First-kept for external styles/scripts unless `data-allow-duplicate` is present; dedupe canonical links by last-wins
-   - `<script>`: First-kept for external scripts unless `data-allow-duplicate` is present; inline scripts never deduped
-   - `<style>`: First-kept for external stylesheets unless `data-allow-duplicate` is present; inline styles never deduped
+   - `<link>`: First-kept for external styles/scripts; dedupe canonical links by last-wins
+   - `<script>`: First-kept for external scripts; inline scripts never deduped
+   - `<style>`: First-kept for external stylesheets; inline styles never deduped
    - Unknown elements: Append without deduplication
 3. **Optional CSS layering hints:** Allow `data-layer="..."` on `<link>`/`<style>` elements so authors can align with `@layer`. This has no functionality but provides hints to consumers of the fragments. Also forward compatible in case we add automatic layering in the future.
 4. **Script defaults that match modern practice:** It is recommended that scripts use `defer` behavior. Their relative order will be preserved inside each tier
@@ -1127,22 +1279,14 @@ Warning: Template slot="sidebar" has no matching <slot name="sidebar"> in import
 **Cause**: Page provides content for a slot that doesn't exist in the layout.
 **Solution**: Add the slot to the layout or remove the template from the page.
 
-#### Fragment Pages and Markdown
-
-Unify supports **fragment pages** — pages that omit `<html>`, `<head>`, and `<body>` wrappers and only contain content.
-
-- When a file has no `<html>` root, Unify treats it as a fragment.
-- The fragment is injected into the layout's `data-slot="default"`.
-- Any `<template data-slot="name">` or elements with `data-slot="name"` inside the fragment are moved into the corresponding layout slot.
-- The dev server automatically wraps fragment pages in their layout for accurate previews.
+#### Fragment Markdown
 
 **Markdown Defaults:**
 
 Markdown files (`.md`) are always compiled to fragments:
 
-- The converted HTML body is injected into `data-slot="default"`.
+- The converted HTML body is injected into the default `<slot>`.
 - Frontmatter in Markdown provides head metadata (title, description, etc.) that is merged into the layout `<head>` using the same merge + dedupe rules as full HTML pages.
-- Authors don't need to add `<html>` or `<head>` in Markdown — only content and optional `data-slot` templates.
 
 This ensures content-heavy workflows (like documentation or blogs) stay lightweight and author-friendly, while Unify guarantees that final output is always a complete, valid HTML document.
 

@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <title>Product X — ACME</title>
+    <!-- Page-layer CSS (last in cascade) -->
+    <style>
+        .hero .kicker {
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            opacity: .9;
+        }
+
+        .hero .actions {
+            margin-top: 1rem;
+        }
+
+        .unify-cta .btn {
+            background: #22c55e;
+        }
+    </style>
+</head>
+
+<body data-unify="_includes/layouts/site.html">
+
+    <!-- Override the root header area; children replace the root header's children -->
+    <header class="unify-header">
+        <div class="container">
+            <div class="brand">ACME • Product X</div>
+            <!-- Override nav by providing a replacement .unify-main-nav subtree -->
+            <div class="unify-main-nav">
+                <button class="nav-toggle" aria-controls="primary-nav" aria-expanded="false" x-data="{ open:false }"
+                    @click="open=!open; $el.setAttribute('aria-expanded', open)">
+                    <i class="bi bi-list"></i>
+                </button>
+                <nav id="primary-nav" class="nav" aria-expanded="false">
+                    <a href="/">Home</a>
+                    <a href="/product" aria-current="page">Product</a>
+                    <a href="/pricing">Pricing</a>
+                    <a href="/contact">Contact</a>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <!-- Replace site layout hero -->
+        <section class="unify-hero hero">
+            <div class="container">
+                <p class="kicker">Now available</p>
+                <h1>Meet Product X</h1>
+                <p>Fast, friendly, and framework‑free by default.</p>
+                <div class="actions">
+                    <a class="btn" href="/pricing"><i class="bi bi-lightning"></i> Get Started</a>
+                    <a class="btn" href="/docs"><i class="bi bi-journal-text"></i> Read Docs</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- Replace site layout features and import multiple cards with multiple replacements -->
+        <section class="unify-features features">
+            <div class="container">
+                <h2>Why you’ll love it</h2>
+                <div class="cards">
+                    <!-- Card 1 -->
+                    <div data-unify="_includes/components/card.html">
+                        <h3 class="unify-title">Zero DSL</h3>
+                        <p class="unify-body">Author with plain HTML/CSS. No new language.</p>
+                        <div class="unify-actions actions">
+                            <a class="btn" href="/docs"><i class="bi bi-book"></i> Learn more</a>
+                        </div>
+                    </div>
+
+                    <!-- Card 2 -->
+                    <div data-unify="_includes/components/card.html">
+                        <h3 class="unify-title">Cascades like CSS</h3>
+                        <p class="unify-body">Layouts → components → page, with safe scoping.</p>
+                        <div class="unify-actions actions">
+                            <a class="btn" href="/blog"><i class="bi bi-rss"></i> See it in action</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Replace site layout CTA -->
+        <section class="unify-cta cta">
+            <div class="container">
+                <h2>Ready to ship?</h2>
+                <p>Start building in minutes. Bring your own HTML.</p>
+                <a class="btn" href="/signup"><i class="bi bi-rocket"></i> Sign up free</a>
+            </div>
+        </section>
+    </main>
+
+    <!-- Override the root footer area -->
+    <footer class="unify-footer">
+        <div class="container">
+            <small>© 2025 ACME • <a href="/legal">Legal</a> • <a href="/privacy">Privacy</a></small>
+        </div>
+    </footer>
+
+</body>
+
+</html>

@@ -359,7 +359,7 @@ export class FileClassifier {
   async classifyAllFiles(sourceDir) {
     const classifications = [];
     
-    async function walkDir(dir, relativePath = '') {
+    const walkDir = async (dir, relativePath = '') => {
       const entries = await fs.readdir(dir, { withFileTypes: true });
       
       for (const entry of entries) {
@@ -373,7 +373,7 @@ export class FileClassifier {
           classifications.push(classification);
         }
       }
-    }
+    };
     
     await walkDir(sourceDir);
     return classifications;

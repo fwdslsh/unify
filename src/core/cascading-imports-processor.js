@@ -9,6 +9,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { logger } from '../utils/logger.js';
 import { processMarkdown, isMarkdownFile } from './markdown-processor.js';
+import { HeadMergeProcessor } from './head-merge-processor.js';
 
 /**
  * Error thrown when circular imports are detected
@@ -101,7 +102,9 @@ export class CascadingImportsProcessor {
               const processedFragment = await this.processImports(fragmentContent, importPath);
               
               // Compose the fragment with slot content
-              const composedContent = this.composeFragments(processedFragment, importInfo.slotContent);
+              // Final composition happens when we're back at the root level (depth 1)
+              const isFinalComposition = (this.depth === 1);
+              const composedContent = this.composeFragments(processedFragment, importInfo.slotContent, isFinalComposition);
               
               // Replace the import element with the composed content
               processedHtml = this.replaceImport(processedHtml, importInfo, composedContent);
@@ -158,13 +161,12 @@ export class CascadingImportsProcessor {
       const startIndex = match.index;
       const tagName = tagContent.split(/\s+/)[0];
       
-      // Find the closing tag
-      const closingTagPattern = new RegExp(`</${tagName}>`);
-      const closingMatch = closingTagPattern.exec(html.slice(startIndex + fullMatch.length));
+      // Find the balanced closing tag (handles nested elements correctly)
+      const closingTagIndex = this.findBalancedClosingTag(html, startIndex + fullMatch.length, tagName);
       
-      if (closingMatch) {
-        const endIndex = startIndex + fullMatch.length + closingMatch.index + closingMatch[0].length;
-        const elementContent = html.slice(startIndex + fullMatch.length, startIndex + fullMatch.length + closingMatch.index);
+      if (closingTagIndex !== -1) {
+        const endIndex = closingTagIndex + `</${tagName}>`.length;
+        const elementContent = html.slice(startIndex + fullMatch.length, closingTagIndex);
         
         imports.push({
           src,
@@ -190,6 +192,61 @@ export class CascadingImportsProcessor {
   }
 
   /**
+   * Find the balanced closing tag for a given tag name, handling nested elements
+   * @param {string} html - HTML content to search
+   * @param {number} startIndex - Index to start searching from
+   * @param {string} tagName - Tag name to find closing tag for
+   * @returns {number} - Index of the closing tag, or -1 if not found
+   */
+  findBalancedClosingTag(html, startIndex, tagName) {
+    let depth = 1; // We're already inside one opening tag
+    let index = startIndex;
+    
+    const openTagPattern = new RegExp(`<${tagName}(?:\\s+[^>]*)?>`, 'gi');
+    const closeTagPattern = new RegExp(`</${tagName}>`, 'gi');
+    
+    while (index < html.length && depth > 0) {
+      // Find next opening or closing tag
+      openTagPattern.lastIndex = index;
+      closeTagPattern.lastIndex = index;
+      
+      const nextOpen = openTagPattern.exec(html);
+      const nextClose = closeTagPattern.exec(html);
+      
+      // Determine which comes first
+      if (!nextOpen && !nextClose) {
+        // No more tags found
+        break;
+      } else if (!nextOpen) {
+        // Only closing tag found
+        depth--;
+        if (depth === 0) {
+          return nextClose.index;
+        }
+        index = nextClose.index + nextClose[0].length;
+      } else if (!nextClose) {
+        // Only opening tag found
+        depth++;
+        index = nextOpen.index + nextOpen[0].length;
+      } else {
+        // Both found, take the earlier one
+        if (nextOpen.index < nextClose.index) {
+          depth++;
+          index = nextOpen.index + nextOpen[0].length;
+        } else {
+          depth--;
+          if (depth === 0) {
+            return nextClose.index;
+          }
+          index = nextClose.index + nextClose[0].length;
+        }
+      }
+    }
+    
+    return -1; // No balanced closing tag found
+  }
+
+  /**
    * Extract slot content from element content
    * @param {string} content - Content inside the data-import element
    * @returns {Object} - Object with default and named slot content
@@ -200,17 +257,70 @@ export class CascadingImportsProcessor {
       named: {}
     };
 
-    // Extract template elements with data-target attributes (named slots)
-    const templatePattern = /<template\s+data-target=["']([^"']+)["'][^>]*>([\s\S]*?)<\/template>/gi;
-    
-    let match;
+    logger.debug(`Extracting slot content from: ${content.substring(0, 200)}...`);
     let processedContent = content;
     
+    // First, extract any element with data-target attributes (including <template>)
+    const templatePattern = /<(\w+)\s+[^>]*data-target=["']([^"']+)["'][^>]*>([\s\S]*?)<\/\1>/gi;
+    let match;
     while ((match = templatePattern.exec(content)) !== null) {
-      const [fullMatch, targetName, templateContent] = match;
+      const [fullMatch, tagName, targetName, templateContent] = match;
+      // For templates, last writer wins so we overwrite
       slotContent.named[targetName] = templateContent.trim();
+      logger.debug(`Found template slot: ${targetName} with content: ${templateContent.trim().substring(0, 100)}...`);
       
       // Remove the template element from the content
+      processedContent = processedContent.replace(fullMatch, '');
+    }
+    
+    // Then, extract regular elements with data-target attributes
+    // This captures any element (not just template) with data-target
+    const elementPattern = /<(\w+)([^>]*)\s+data-target=["']([^"']+)["']([^>]*)>([\s\S]*?)<\/\1>/gi;
+    
+    // Reset regex for new search
+    let elementMatches = [];
+    while ((match = elementPattern.exec(content)) !== null) {
+      const [fullMatch, tagName, beforeAttr, targetName, afterAttr, elementContent] = match;
+      
+      // Skip template elements (already handled above)
+      if (tagName.toLowerCase() === 'template') {
+        continue;
+      }
+      
+      elementMatches.push({
+        fullMatch,
+        tagName,
+        beforeAttr,
+        targetName,
+        afterAttr,
+        elementContent
+      });
+    }
+    
+    // Process regular elements with data-target
+    for (const elem of elementMatches) {
+      // For regular elements, we include the element itself (without data-target attribute)
+      const cleanedElement = `<${elem.tagName}${elem.beforeAttr}${elem.afterAttr}>${elem.elementContent}</${elem.tagName}>`;
+      
+      // Last writer wins
+      slotContent.named[elem.targetName] = cleanedElement.trim();
+      
+      // Remove the element from the default content
+      processedContent = processedContent.replace(elem.fullMatch, '');
+    }
+    
+    // Also handle self-closing elements with data-target
+    const selfClosingPattern = /<(\w+)([^>]*)\s+data-target=["']([^"']+)["']([^>]*)\s*\/>/gi;
+    while ((match = selfClosingPattern.exec(content)) !== null) {
+      const [fullMatch, tagName, beforeAttr, targetName, afterAttr] = match;
+      
+      // For self-closing elements, include the element itself (without data-target attribute)
+      const cleanedElement = `<${tagName}${beforeAttr}${afterAttr} />`;
+      
+      // Last writer wins
+      slotContent.named[targetName] = cleanedElement.trim();
+      
+      // Remove from default content
       processedContent = processedContent.replace(fullMatch, '');
     }
     
@@ -323,7 +433,7 @@ export class CascadingImportsProcessor {
     // Process markdown files
     if (isMarkdownFile(fragmentPath)) {
       try {
-        const markdownResult = processMarkdown(content, fragmentPath);
+  const markdownResult = await processMarkdown(content, fragmentPath);
         logger.debug(`Processed markdown fragment: ${fragmentPath}`);
         return markdownResult.html;
       } catch (error) {
@@ -339,14 +449,49 @@ export class CascadingImportsProcessor {
    * Compose fragment content with slot injections
    * @param {string} fragmentHtml - HTML content of the fragment
    * @param {Object} slotContent - Slot content to inject
+   * @param {boolean} isFinalComposition - Whether this is the final composition level
    * @returns {string} - Composed HTML
    */
-  composeFragments(fragmentHtml, slotContent) {
+  composeFragments(fragmentHtml, slotContent, isFinalComposition = false) {
     let composed = fragmentHtml;
     
     logger.debug(`Composing fragments with slot content:`, slotContent);
     
-    // Process named slots first
+    // Special handling for head slot - merge instead of replace
+    if (slotContent.named && slotContent.named.head) {
+      const headContent = slotContent.named.head;
+      logger.info(`Processing special head slot with content: ${headContent}`);
+      
+      // Extract existing head content
+      const headMatch = composed.match(/<head[^>]*>([\s\S]*?)<\/head>/i);
+      if (headMatch) {
+        const existingHead = headMatch[1];
+        
+        // Use HeadMergeProcessor to merge head content
+        const headMerger = new HeadMergeProcessor();
+        
+        // Create fragments for merging (layout first, then page)
+        const fragments = [
+          { source: 'layout', headHtml: existingHead },
+          { source: 'page', headHtml: headContent }
+        ];
+        
+        const mergedHead = headMerger.mergeHeadContent(fragments);
+        
+        // Replace the entire head section with merged content
+        composed = composed.replace(
+          /<head[^>]*>[\s\S]*?<\/head>/i,
+          `<head>\n${mergedHead}\n</head>`
+        );
+        
+        logger.debug(`Merged head content successfully`);
+      }
+      
+      // Remove head from named slots so it's not processed as a regular slot
+      delete slotContent.named.head;
+    }
+    
+    // Process other named slots
     for (const [slotName, content] of Object.entries(slotContent.named || {})) {
       const slotPattern = new RegExp(
         `<slot\\s+name=["']${slotName}["'][^>]*>(.*?)</slot>`,
@@ -358,7 +503,7 @@ export class CascadingImportsProcessor {
         composed = composed.replace(slotPattern, content);
         logger.debug(`Injected named slot: ${slotName}`);
       } else {
-        logger.debug(`No slot found for: ${slotName}`);
+        logger.warn(`No slot found for data-target="${slotName}". Check that the layout has <slot name="${slotName}">.`);
       }
     }
     
@@ -374,6 +519,16 @@ export class CascadingImportsProcessor {
       } else {
         logger.debug(`No default slot found`);
       }
+    }
+    
+    // Replace any remaining unfilled slots with their fallback content
+    // but only if this is the final composition level
+    if (isFinalComposition) {
+      const remainingSlotPattern = /<slot(?:\s+name=["']([^"']+)["'])?[^>]*>(.*?)<\/slot>/gis;
+      composed = composed.replace(remainingSlotPattern, (match, slotName, fallbackContent) => {
+        logger.debug(`Replacing unfilled slot ${slotName || 'default'} with fallback: ${fallbackContent.trim().substring(0, 50)}...`);
+        return fallbackContent;
+      });
     }
     
     return composed;

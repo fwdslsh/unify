@@ -1,0 +1,4 @@
+source: .
+output: dist
+clean: true
+verbose: false

@@ -174,7 +174,7 @@ export class LayoutDiscovery {
    * @returns {Promise<string|null>} Absolute path to layout file, or null if not found
    */
   async resolveLayoutOverride(layoutSpec, sourceRoot, pagePath) {
-    if (!layoutSpec) {
+    if (!layoutSpec || typeof layoutSpec !== 'string') {
       return null;
     }
     

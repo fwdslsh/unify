@@ -164,13 +164,10 @@ export class HeadMergeProcessor {
         element
       );
       
-      if (replacement === null) {
-        // Keep both elements (data-allow-duplicate)
-        mergedElements.push(element);
-        logger.debug(`Kept both elements due to data-allow-duplicate: ${element.tagName}`);
-      } else if (replacement) {
+      if (replacement) {
         // Replace existing element
         mergedElements[existingIndex] = replacement;
+        logger.warn(`Replaced duplicate ${element.tagName} element (${key})`);
         logger.debug(`Replaced element: ${element.tagName} (key: ${key})`);
       }
       // If replacement is undefined/false, keep existing (do nothing)
@@ -195,7 +192,11 @@ export class HeadMergeProcessor {
         return metaKey ? `meta:${metaKey}` : null;
         
       case 'link':
-        // Deduplicate by rel and href combination
+        // Special handling for canonical links - only one should exist
+        if (attributes.rel === 'canonical') {
+          return 'link:canonical';
+        }
+        // Deduplicate by rel and href combination for other links
         if (attributes.rel && attributes.href) {
           return `link:${attributes.rel}:${attributes.href}`;
         }
@@ -232,31 +233,43 @@ export class HeadMergeProcessor {
   applyDeduplicationRule(existing, incoming) {
     const { tagName } = incoming;
     
-    // Check for data-allow-duplicate attribute
-    if (incoming.attributes['data-allow-duplicate'] !== undefined) {
-      logger.debug(`Element has data-allow-duplicate: ${tagName}`);
-      return null; // Keep both elements
-    }
-    
     switch (tagName) {
       case 'title':
         // Last wins (page beats layout)
         return incoming;
-        
+
       case 'meta':
         // Last wins (page beats layout)
         return incoming;
-        
+
       case 'link':
-      case 'script':
-      case 'style':
-        // First wins (layout beats page) unless data-allow-duplicate
+        // Canonical links: last wins (page beats layout)
+        if (incoming.attributes.rel === 'canonical') {
+          return incoming;
+        }
+        // Other links: first wins (layout beats page)
         return undefined; // Keep existing
-        
+
+      case 'script':
+        // Only deduplicate scripts with src attribute
+        if (incoming.attributes.src) {
+          return undefined; // Keep existing src script
+        }
+        // For inline scripts (including JSON-LD), keep both
+        return null;
+
+      case 'style':
+        // Only deduplicate stylesheets with href
+        if (incoming.attributes.href) {
+          return undefined; // Keep existing href style
+        }
+        // For inline styles, keep both
+        return null;
+
       case 'base':
         // Last wins (only one base tag should exist)
         return incoming;
-        
+
       default:
         // Last wins for unknown elements
         return incoming;

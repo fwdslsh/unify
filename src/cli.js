@@ -2,7 +2,7 @@
 
 import { parseArgs } from './cli/args-parser.js';
 import { build } from './core/file-processor.js';
-import { watch } from './core/file-watcher.js';
+import { watch, FileWatcher, __setTestMockWatcher } from './core/file-watcher.js';
 import { DevServer } from './server/dev-server.js';
 import { init } from './cli/init.js';
 import { clearCacheOnRestart } from './core/build-cache.js';
@@ -53,7 +53,28 @@ async function main() {
         logger.info('Starting file watcher...');
         // Clear cache for fresh start
         await clearCacheOnRestart(args.cacheDir || '.unify-cache');
-        await watch(args);
+          // Inject flexible mock watcher in test mode
+          if (process.env.NODE_ENV === 'test' && process.env.UNIFY_TEST_MOCK_WATCHER === '1') {
+            // Accept events as JSON array: [{event, file, delay}]
+            let events = [];
+            try {
+              if (process.env.UNIFY_TEST_MOCK_WATCHER_EVENTS) {
+                events = JSON.parse(process.env.UNIFY_TEST_MOCK_WATCHER_EVENTS);
+              }
+            } catch {}
+            const mockWatcher = {
+              close: () => {},
+              on: (event, cb) => {
+                // Emit all matching events in order
+                events.filter(e => e.event === event).forEach(e => {
+                  setTimeout(() => cb(e.file), e.delay || 100);
+                });
+              }
+            };
+            __setTestMockWatcher(mockWatcher);
+          }
+          const watcher = new FileWatcher();
+          await watcher.startWatching(args);
         break;
       case 'serve':
         logger.info('Starting development server with live reload...');

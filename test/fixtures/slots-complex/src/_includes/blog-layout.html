@@ -1,0 +1,53 @@
+<div data-import="/_includes/layout.html">
+  <template data-target="title">Blog - <slot name="post-title">Untitled Post</slot></template>
+  <template data-target="description">Blog post: <slot name="post-summary">No summary</slot></template>
+  
+  <template data-target="head">
+    <meta property="og:type" content="article">
+    <meta property="og:title" content="<slot name="post-title">Untitled</slot>">
+    <link rel="canonical" href="<slot name="canonical-url">/blog/</slot>">
+  </template>
+  
+  <template data-target="sidebar">
+    <div class="blog-sidebar">
+      <h3>Blog Navigation</h3>
+      <slot name="blog-nav">
+        <ul>
+          <li><a href="/blog/">All Posts</a></li>
+          <li><a href="/blog/categories/">Categories</a></li>
+        </ul>
+      </slot>
+      
+      <div class="recent-posts">
+        <h4>Recent Posts</h4>
+        <slot name="recent-posts">
+          <p>No recent posts</p>
+        </slot>
+      </div>
+    </div>
+  </template>
+  
+  <article class="blog-post">
+    <header class="post-header">
+      <h1><slot name="post-title">Untitled Post</slot></h1>
+      <div class="post-meta">
+        <time><slot name="post-date">Unknown date</slot></time>
+        <span class="author">by <slot name="post-author">Unknown author</slot></span>
+      </div>
+    </header>
+    
+    <div class="post-content">
+      <slot>
+        <p>No post content provided</p>
+      </slot>
+    </div>
+    
+    <footer class="post-footer">
+      <slot name="post-footer">
+        <div class="tags">
+          <slot name="post-tags">No tags</slot>
+        </div>
+      </slot>
+    </footer>
+  </article>
+</div>

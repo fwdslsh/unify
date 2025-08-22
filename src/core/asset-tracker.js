@@ -161,6 +161,12 @@ export class AssetTracker {
   resolveAssetPath(assetPath, pagePath, sourceRoot) {
     
     try {
+      // First, validate the input for security
+      if (!this.validateAssetPath(assetPath, sourceRoot)) {
+        logger.debug(`Asset path failed security validation: ${assetPath}`);
+        return null;
+      }
+
       let resolvedPath;
       
       if (assetPath.startsWith('/')) {
@@ -172,17 +178,117 @@ export class AssetTracker {
         resolvedPath = path.resolve(pageDir, assetPath);
       }
       
-      // Ensure the resolved path is within source root
-      const relativePath = path.relative(sourceRoot, resolvedPath);
-      if (relativePath.startsWith('../')) {
-        logger.debug(`Asset path outside source root: ${assetPath}`);
+      // Normalize the path to handle platform differences
+      resolvedPath = path.normalize(resolvedPath);
+      
+      // Ensure the resolved path is within source root using robust containment check
+      if (!this.isPathWithinDirectory(resolvedPath, sourceRoot)) {
+        logger.debug(`Asset path outside source root: ${assetPath} -> ${resolvedPath}`);
         return null;
       }
       
       return resolvedPath;
     } catch (error) {
-      logger.debug(`Could not resolve asset path: ${assetPath} from ${pagePath}`);
+      logger.debug(`Could not resolve asset path: ${assetPath} from ${pagePath}: ${error.message}`);
       return null;
+    }
+  }
+
+  /**
+   * Validate asset path for security issues
+   * @param {string} assetPath - Asset path to validate
+   * @param {string} sourceRoot - Source root directory
+   * @returns {boolean} True if path is safe
+   */
+  validateAssetPath(assetPath, sourceRoot) {
+    if (!assetPath || typeof assetPath !== 'string') {
+      return false;
+    }
+
+    // Block URL schemes (including javascript:, data:, etc.)
+    if (assetPath.includes('://') || assetPath.includes('javascript:') || assetPath.includes('vbscript:')) {
+      return false;
+    }
+
+    // Block UNC paths (Windows network shares)
+    if (assetPath.startsWith('\\\\') || assetPath.startsWith('//')) {
+      return false;
+    }
+
+    // Block drive letters (Windows absolute paths)
+    if (/^[a-zA-Z]:/.test(assetPath)) {
+      return false;
+    }
+
+    // Block encoded path traversal sequences
+    const decodedPath = decodeURIComponent(assetPath);
+    if (decodedPath.includes('../') || decodedPath.includes('..\\')) {
+      return false;
+    }
+
+    // Block various path traversal patterns
+    const dangerousPatterns = [
+      /\.\./,           // Any ../ or ..\
+      /\/\.\./,         // /../
+      /\\\.\./,         // \..\
+      /\.\.\//,         // ../
+      /\.\.\\/,         // ..\
+      /\.\.$/,          // Ending with ..
+      /\/\.\.$/,        // Ending with /..
+      /\\\.\.$/,        // Ending with \..
+      /^\.\.$/,         // Just ..
+      /^\.\.\/$/,       // Just ../
+      /^\.\.\\$/        // Just ..\
+    ];
+
+    for (const pattern of dangerousPatterns) {
+      if (pattern.test(assetPath)) {
+        return false;
+      }
+    }
+
+    // Block dangerous absolute paths
+    if (assetPath.startsWith('/')) {
+      // Block system paths
+      const dangerousAbsolutePaths = [
+        '/etc/', '/var/', '/usr/', '/bin/', '/sbin/', '/root/', '/home/',
+        '/proc/', '/sys/', '/dev/', '/tmp/', '/opt/', '/mnt/', '/media/',
+        '/boot/', '/lib/', '/srv/', '/run/', '/lost+found'
+      ];
+      
+      for (const dangerousPath of dangerousAbsolutePaths) {
+        if (assetPath.startsWith(dangerousPath)) {
+          return false;
+        }
+      }
+      
+      // For other absolute paths, check if they try to escape source root
+      const testPath = path.join(sourceRoot, assetPath.slice(1));
+      if (!this.isPathWithinDirectory(testPath, sourceRoot)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * Check if a path is within a directory using robust containment check
+   * @param {string} filePath - Path to check
+   * @param {string} directory - Directory that should contain the path
+   * @returns {boolean} True if path is within directory
+   */
+  isPathWithinDirectory(filePath, directory) {
+    try {
+      const normalizedFile = path.resolve(path.normalize(filePath));
+      const normalizedDir = path.resolve(path.normalize(directory));
+      
+      const relativePath = path.relative(normalizedDir, normalizedFile);
+      
+      // Path is within directory if relative path doesn't start with .. or is empty
+      return !relativePath.startsWith('..') && !path.isAbsolute(relativePath);
+    } catch (error) {
+      return false;
     }
   }
 

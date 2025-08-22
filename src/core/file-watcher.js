@@ -1,9 +1,15 @@
+// Test environment: allow mock watcher injection for unit tests
+let _testMockWatcher = null;
+export function __setTestMockWatcher(mockWatcher) {
+  _testMockWatcher = mockWatcher;
+}
 /**
  * File watching system for unify
  * Uses native fs.watch for high-performance file monitoring
  */
 
 import fs from 'fs/promises';
+import fsSync from 'fs';
 import path from 'path';
 import { build, incrementalBuild, initializeModificationCache } from './file-processor.js';
 import { getOutputPath } from '../utils/path-resolver.js';
@@ -103,19 +109,29 @@ export class FileWatcher {
     const sourcePath = path.resolve(config.source);
     
     try {
-      // Watch the entire source directory recursively
-      const watcher = fs.watch(sourcePath, { 
+      // Use mock watcher in test environment
+      if (_testMockWatcher) {
+        this.watchers.set(sourcePath, _testMockWatcher);
+        logger.debug(`[TEST] Using mock watcher for: ${sourcePath}`);
+        return;
+      }
+      // Watch the entire source directory recursively using synchronous fs.watch
+      const watcher = fsSync.watch(sourcePath, { 
         recursive: true,
         persistent: true,
         encoding: 'utf8'
+      }, (eventType, filename) => {
+        if (!this.isWatching) {
+          return;
+        }
+        // Handle file change event
+        const event = { eventType, filename };
+        this.handleFileChange(event, config).catch(error => {
+          logger.error(error.formatForCLI ? error.formatForCLI() : `Error handling file change: ${error.message}`);
+        });
       });
-      
       this.watchers.set(sourcePath, watcher);
       logger.debug(`Started fs.watch on: ${sourcePath}`);
-
-      // Process file change events asynchronously
-      this.processWatchEvents(watcher, config);
-      
     } catch (error) {
       if (error.formatForCLI) {
         logger.error(error.formatForCLI());
@@ -123,32 +139,6 @@ export class FileWatcher {
         logger.error(`Failed to watch directory ${sourcePath}:`, error.message);
       }
       throw error;
-    }
-  }
-
-  /**
-   * Process watch events from fs.watch iterator
-   */
-  async processWatchEvents(watcher, config) {
-    try {
-      for await (const event of watcher) {
-        if (!this.isWatching) {
-          break;
-        }
-        
-        await this.handleFileChange(event, config);
-      }
-    } catch (error) {
-      if (this.isWatching) {
-        logger.error(error.formatForCLI ? error.formatForCLI() : `Error processing watch events: ${error.message}`);
-        // Attempt to restart watcher
-        setTimeout(() => {
-          if (this.isWatching) {
-            logger.info('Attempting to restart file watcher...');
-            this.setupWatcher(config);
-          }
-        }, 1000);
-      }
     }
   }
 
@@ -170,7 +160,7 @@ export class FileWatcher {
     // Map events to standard events for compatibility, now with proper file existence checking
     const mappedEvent = await this.mapEventType(eventType, filename, fullPath);
 
-    logger.debug(`File ${mappedEvent} (${eventType}): ${filename}`);
+    logger.info(`File ${mappedEvent} detected: ${filename}`);
 
     // Emit event for compatibility
     this.emit(mappedEvent, fullPath);
@@ -438,6 +428,21 @@ export async function watch(options = {}) {
   logger.info('Using native file watcher');
   const watcher = new FileWatcher();
   await watcher.startWatching(options);
-  return watcher;
+  
+  // Keep the process alive for watch mode
+  // This will be interrupted by SIGINT/SIGTERM or test timeouts
+  return new Promise((resolve) => {
+    process.on('SIGINT', async () => {
+      logger.info('Received SIGINT, stopping watcher...');
+      await watcher.stopWatching();
+      resolve(watcher);
+    });
+    
+    process.on('SIGTERM', async () => {
+      logger.info('Received SIGTERM, stopping watcher...');
+      await watcher.stopWatching();
+      resolve(watcher);
+    });
+  });
 }
 

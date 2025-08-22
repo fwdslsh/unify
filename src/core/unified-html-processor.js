@@ -1,6 +1,30 @@
 /**
+ * Unified HTML processor using CascadingImportsProcessor
+ * Replaces the old processLayoutAttribute approach
+ */
+export async function processHtmlUnified(
+  pageContent,
+  filePath,
+  sourceRoot,
+  dependencyTracker,
+  config = {}
+) {
+  try {
+    // Process cascading imports and slots using CascadingImportsProcessor
+    const cascadingProcessor = new CascadingImportsProcessor(sourceRoot);
+    let processed = await cascadingProcessor.processImports(pageContent, filePath);
+    // Always run optimizeHtml to remove slot/template and strip attributes
+    processed = await optimizeHtml(processed);
+    return processed;
+  } catch (error) {
+    logger.warn(`CascadingImportsProcessor failed for ${path.relative(sourceRoot, filePath)}: ${error.message}`);
+    return pageContent; // Fallback to original content
+  }
+}
+// Removed jsdom import; using Bun HTMLRewriter instead
+/**
  * Unified HTML Processor for unify
- * Handles both SSI-style includes (<!--#include -->) and DOM templating (<template>, <slot>)
+ * Handles both SSI-style includes (<!--#include -->) and DOM templating (data-import="some.html", <slot>)
  * using HTMLRewriter for high-performance processing.
  */
 
@@ -9,29 +33,23 @@ import path from "path";
 // Include functionality removed - import removed
 import { logger } from "../utils/logger.js";
 import { 
-  BuildError,
-  FileSystemError,
-  CircularDependencyError,
-  PathTraversalError,
-  IncludeNotFoundError,
   LayoutError
 } from "../utils/errors.js";
-import { transformLinksInHtml } from "../utils/link-transformer.js";
-import { isPathWithinDirectory } from "../utils/path-resolver.js";
 import { processMarkdown, isMarkdownFile } from "./markdown-processor.js";
+import { CascadingImportsProcessor } from "./cascading-imports-processor.js";
 
 /**
  * Read an include file with sensible fallback locations.
  * Tries the resolvedPath first, then sourceRoot-relative and _includes/basename.
  */
-async function readIncludeWithFallback(resolvedPath, src, filePath, sourceRoot) {
+export async function readIncludeWithFallback(resolvedPath, src, filePath, sourceRoot) {
   try {
     const content = await fs.readFile(resolvedPath, 'utf-8');
     
     // Process markdown files if detected
     if (isMarkdownFile(resolvedPath)) {
       try {
-        const markdownResult = processMarkdown(content, resolvedPath);
+  const markdownResult = await processMarkdown(content, resolvedPath);
         logger.debug(`Processed markdown include: ${src} -> ${resolvedPath}`);
         return { content: markdownResult.html, resolvedPath };
       } catch (error) {
@@ -83,7 +101,7 @@ async function readIncludeWithFallback(resolvedPath, src, filePath, sourceRoot) 
         // Process markdown files if detected
         if (isMarkdownFile(candidate)) {
           try {
-            const markdownResult = processMarkdown(content, candidate);
+            const markdownResult = await processMarkdown(content, candidate);
             logger.debug(`Processed markdown include: ${src} -> ${candidate}`);
             return { content: markdownResult.html, resolvedPath: candidate };
           } catch (error) {
@@ -98,9 +116,10 @@ async function readIncludeWithFallback(resolvedPath, src, filePath, sourceRoot) 
       }
     }
 
-    // No candidate found; re-throw original error for upstream handling
-    throw err;
+  // No candidate found; re-throw original error for upstream handling
+  throw err;
   }
+// End of asset injection logic
 }
 
 /**
@@ -127,92 +146,7 @@ function shouldFailFast(config, errorType = 'error') {
   }
   
   return false;
-}
 
-/**
- * Process HTML content with unified support for both SSI includes and DOM templating
- * Uses HTMLRewriter for high-performance processing
- * @param {string} htmlContent - Raw HTML content to process
- * @param {string} filePath - Path to the HTML file being processed
- * @param {string} sourceRoot - Source root directory
- * @param {DependencyTracker} dependencyTracker - Dependency tracker instance
- * @param {Object} config - Processing configuration
- * @returns {Promise<string>} Processed HTML content
- */
-export async function processHtmlUnified(
-  htmlContent,
-  filePath,
-  sourceRoot,
-  dependencyTracker,
-  config = {}
-) {
-  const processingConfig = {
-    optimize: config.minify || config.optimize,
-    ...config,
-  };
-
-  try {
-    logger.debug(
-      `Using HTMLRewriter for: ${path.relative(sourceRoot, filePath)}`
-    );
-    
-    // Track dependencies before processing
-    if (dependencyTracker) {
-      await dependencyTracker.analyzePage(filePath, htmlContent, sourceRoot);
-    }
-    
-    // Include processing removed - use content as-is
-    let processedContent = htmlContent;
-    let extractedAssets = { styles: [], scripts: [] };
-    
-    // Apply HTML optimization only after all includes are processed
-    if (processingConfig.optimize !== false) {
-      logger.debug(`Optimizing HTML content, optimize=${processingConfig.optimize}`);
-      processedContent = await optimizeHtmlContent(processedContent);
-    } else {
-      logger.debug(`Skipping HTML optimization, optimize=${processingConfig.optimize}`);
-    }
-
-    // Handle layouts and slots for ALL pages (per user requirement)
-    // Apply layout discovery to all pages, not just fragments
-    processedContent = await processDOMTemplating(
-      processedContent,
-      filePath,
-      sourceRoot,
-      processingConfig,
-      extractedAssets  // Pass extracted assets to DOM templating
-    );
-
-    // Apply link normalization if pretty URLs are enabled
-    if (processingConfig.prettyUrls) {
-      logger.debug(`Normalizing links for pretty URLs in ${path.relative(sourceRoot, filePath)}`);
-      processedContent = transformLinksInHtml(processedContent, filePath, sourceRoot);
-    }
-
-  // Slot/template injection for HTML files (if layout contains <slot> or <template slot="...">)
-  // This is now handled in file-processor.js after layout chain is discovered and applied
-  return {
-    content: processedContent,
-    extractedAssets: extractedAssets
-  };
-  } catch (error) {
-    logger.error(
-      `Unified HTML processing failed for ${path.relative(
-        sourceRoot,
-        filePath
-      )}: ${error.message}`
-    );
-    throw error; // Re-throw with original error details
-  }
-
-// Include processing functionality completely removed - this entire function and all references removed
-
-
-/**
- * Escape special regex characters
- */
-function escapeRegExp(string) {
-  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 /**
@@ -229,13 +163,28 @@ function applyExtractedAssets(htmlContent, extractedAssets) {
     const stylesHTML = dedupedStyles.join('\n');
     processedContent = processedContent.replace(headEndRegex, `${stylesHTML}\n</head>`);
   }
-  
-  // Add scripts to end of body (before </body>)
+
+  // Separate JSON-LD scripts from other scripts
+  let jsonLdScripts = [];
+  let otherScripts = [];
   if (extractedAssets.scripts && extractedAssets.scripts.length > 0) {
+    for (const script of extractedAssets.scripts) {
+      if (/type=["']application\/ld\+json["']/i.test(script)) {
+        jsonLdScripts.push(script);
+      } else {
+        otherScripts.push(script);
+      }
+    }
+  }
+  // Inject JSON-LD scripts into <head>
+  if (jsonLdScripts.length > 0) {
+    const headEndRegex = /<\/head>/i;
+    processedContent = processedContent.replace(headEndRegex, `${jsonLdScripts.join('\n')}\n</head>`);
+  }
+  // Inject other scripts into <body>
+  if (otherScripts.length > 0) {
     const bodyEndRegex = /<\/body>/i;
-    const dedupedScripts = [...new Set(extractedAssets.scripts)]; // Remove duplicates
-    const scriptsHTML = dedupedScripts.join('\n');
-    processedContent = processedContent.replace(bodyEndRegex, `${scriptsHTML}\n</body>`);
+    processedContent = processedContent.replace(bodyEndRegex, `${otherScripts.join('\n')}\n</body>`);
   }
   
   return processedContent;
@@ -257,17 +206,22 @@ function extractComponentAssets(htmlContent) {
     assets.styles.push(styleMatch[0]);
   }
 
-  // Extract script tags
+  // Extract script tags except JSON-LD
   const scriptRegex = /<script(?:\s[^>]*)?>[\s\S]*?<\/script>/gi;
   let scriptMatch;
+  let scriptLdRegex = /<script[^>]*type=["']application\/ld\+json["'][^>]*>[\s\S]*?<\/script>/gi;
   while ((scriptMatch = scriptRegex.exec(htmlContent)) !== null) {
-    assets.scripts.push(scriptMatch[0]);
+    if (!/type=["']application\/ld\+json["']/i.test(scriptMatch[0])) {
+      assets.scripts.push(scriptMatch[0]);
+    }
   }
 
-  // Remove extracted assets from content
+  // Remove extracted assets from content, but keep JSON-LD scripts
   let cleanContent = htmlContent;
   cleanContent = cleanContent.replace(styleRegex, '');
-  cleanContent = cleanContent.replace(scriptRegex, '');
+  cleanContent = cleanContent.replace(scriptRegex, (match) => {
+    return /type=["']application\/ld\+json["']/i.test(match) ? match : '';
+  });
 
   return {
     content: cleanContent,
@@ -439,54 +393,15 @@ async function processDOMTemplating(htmlContent, filePath, sourceRoot, config, e
         );
       } catch (error) {
         logger.warn(`Layout processing failed for ${path.relative(sourceRoot, filePath)}: ${error.message}`);
-        // Fall through - continue with original content or basic wrapper
       }
     }
-    
-    // No layout found - handle based on document type
-    if (!htmlStructure.isFullDocument) {
-      // Wrap fragments in basic HTML structure and inject assets
-      logger.debug(`No layout found for fragment: ${path.relative(sourceRoot, filePath)}, wrapping in basic HTML structure`);
-      
-      // Inject assets into basic HTML structure
-      let stylesHTML = '';
-      let scriptsHTML = '';
-      
-      if (extractedAssets?.styles?.length > 0) {
-        const dedupedStyles = [...new Set(extractedAssets.styles)];
-        stylesHTML = '\n' + dedupedStyles.join('\n');
-      }
-      
-      if (extractedAssets?.scripts?.length > 0) {
-        const dedupedScripts = [...new Set(extractedAssets.scripts)];
-        scriptsHTML = '\n' + dedupedScripts.join('\n');
-      }
-      
-      return `<!DOCTYPE html>
-<html>
-<head>
-  <title>Page</title>${stylesHTML}
-</head>
-<body>
-${htmlContent}${scriptsHTML}
-</body>
-</html>`;
-    } else {
-      // Full document without layout - inject assets if needed
-      logger.debug(`No layout found for full document: ${path.relative(sourceRoot, filePath)}, using as-is`);
-      
-      if (extractedAssets?.styles?.length > 0 || extractedAssets?.scripts?.length > 0) {
-        return applyExtractedAssets(htmlContent, extractedAssets);
-      }
-      
-      return htmlContent;
+    // If assets need to be injected
+    if (extractedAssets?.styles?.length > 0 || extractedAssets?.scripts?.length > 0) {
+      return applyExtractedAssets(htmlContent, extractedAssets);
     }
+    return htmlContent;
   } catch (error) {
-    throw new ComponentError(
-      filePath,
-      `DOM templating processing failed: ${error.message}`,
-      filePath
-    );
+    throw new Error(`DOM templating processing failed: ${error.message}`);
   }
 }
 
@@ -646,7 +561,7 @@ function mergeHeadContent(layoutHead, pageHead) {
  * @param {Object} config - Processing configuration
  * @returns {Promise<string>} Processed HTML with layout applied
  */
-async function processLayoutAttribute(
+export async function processLayoutAttribute(
   pageContent,
   layoutPath,
   filePath,
@@ -666,106 +581,42 @@ async function processLayoutAttribute(
       [sourceRoot]
     );
   }
-
-  // Load layout content
-  let layoutContent;
+  // Use CascadingImportsProcessor for slot/template processing
+  let processed = pageContent;
   try {
-    layoutContent = await fs.readFile(resolvedLayoutPath, "utf-8");
+    // Process cascading imports and slots using CascadingImportsProcessor
+    const cascadingProcessor = new CascadingImportsProcessor(sourceRoot);
+    processed = await cascadingProcessor.processImports(pageContent, filePath);
   } catch (error) {
-    if (error.code === "ENOENT") {
-      throw new LayoutError(
-        resolvedLayoutPath,
-        `Layout file not found: ${layoutPath}`,
-        [sourceRoot]
-      );
-    }
-    throw new FileSystemError("read", resolvedLayoutPath, error);
+    logger.warn(`CascadingImportsProcessor failed for ${path.relative(sourceRoot, filePath)}: ${error.message}`);
   }
 
-  // Include processing removed - use layout content as-is
-  const layoutIncludeResult = { content: layoutContent, styles: [], scripts: [] };
-  
-  // Extract layout content and any additional assets
-  if (typeof layoutIncludeResult === 'object' && layoutIncludeResult.content !== undefined) {
-    layoutContent = layoutIncludeResult.content;
-    extractedAssets.styles.push(...layoutIncludeResult.styles);
-    extractedAssets.scripts.push(...layoutIncludeResult.scripts);
-  } else {
-    layoutContent = layoutIncludeResult;
-  }
-
-  // Check if page is a full HTML document
-  const pageStructure = analyzeHtmlStructure(pageContent);
-  
-  
-  if (pageStructure.isFullDocument) {
-    // Use HTML document merging for full documents
-    const mergeResult = mergeHtmlDocumentWithLayout(pageContent, layoutContent, config);
-    
-    // Log any warnings
-    if (mergeResult.warnings.length > 0) {
-      mergeResult.warnings.forEach(warning => {
-        logger.warn(`HTML document merge: ${warning.message}`);
-      });
+  // CascadingImportsProcessor handles all layout and slot processing
+  const htmlStructure = analyzeHtmlStructure(processed);
+  if (!htmlStructure.isFullDocument) {
+    logger.debug(`No layout found for fragment: ${path.relative(sourceRoot, filePath)}, wrapping in basic HTML structure`);
+    let stylesHTML = '';
+    let scriptsHTML = '';
+    if (extractedAssets?.styles?.length > 0) {
+      const dedupedStyles = [...new Set(extractedAssets.styles)];
+      stylesHTML = '\n' + dedupedStyles.join('\n');
     }
-    
-    // Apply extracted assets
-    let finalResult = mergeResult.result;
-    if (extractedAssets && (extractedAssets.styles?.length > 0 || extractedAssets.scripts?.length > 0)) {
-      finalResult = applyExtractedAssets(finalResult, extractedAssets);
+    if (extractedAssets?.scripts?.length > 0) {
+      const dedupedScripts = [...new Set(extractedAssets.scripts)];
+      scriptsHTML = '\n' + dedupedScripts.join('\n');
     }
-    
-    return finalResult;
-  }
-
-  // Fragment processing (existing logic)
-
-  // Data-slot functionality removed - simple layout insertion
-  
-  // Combine extracted assets from component (no page slot extraction)
-  const allExtractedAssets = {
-    styles: [...(extractedAssets?.styles || [])],
-    scripts: [...(extractedAssets?.scripts || [])]
-  };
-  
-  // Inject extracted assets into layout 
-  let finalLayout = layoutContent;
-  if (allExtractedAssets.styles.length > 0 || allExtractedAssets.scripts.length > 0) {
-    // Inject styles into head (before </head>)
-    if (allExtractedAssets.styles.length > 0) {
-      const headEndRegex = /<\/head>/i;
-      const dedupedStyles = [...new Set(allExtractedAssets.styles)]; // Remove duplicates
-      const stylesHTML = dedupedStyles.join('\n');
-      finalLayout = finalLayout.replace(headEndRegex, `${stylesHTML}\n</head>`);
-    }
-    
-    // Inject scripts into end of body (before </body>)
-    if (allExtractedAssets.scripts.length > 0) {
-      const bodyEndRegex = /<\/body>/i;
-      const dedupedScripts = [...new Set(allExtractedAssets.scripts)]; // Remove duplicates
-      const scriptsHTML = dedupedScripts.join('\n');
-      finalLayout = finalLayout.replace(bodyEndRegex, `${scriptsHTML}\n</body>`);
-    }
+    // Asset injection for fragments
+    let html = '<!DOCTYPE html>\n<html>\n<head>\n<title>Page</title>';
+    if (stylesHTML) html += stylesHTML;
+    html += '\n</head>\n<body>\n';
+    html += processed;
+    if (scriptsHTML) html += scriptsHTML;
+    html += '\n</body>\n</html>';
+    return html;
   }
   
-  // Simple insertion: replace <main> element with page content or append to body
-  const mainElementRegex = /(<main[^>]*>)([\s\S]*?)(<\/main>)/i;
-  if (mainElementRegex.test(finalLayout)) {
-    finalLayout = finalLayout.replace(mainElementRegex, `$1${pageContent}$3`);
-  } else {
-    // No main element found, append page content to layout body content
-    const bodyMatch = finalLayout.match(/(<body[^>]*>)([\s\S]*?)(<\/body>)/i);
-    if (bodyMatch) {
-      finalLayout = finalLayout.replace(bodyMatch[0], `${bodyMatch[1]}${bodyMatch[2]}\n${pageContent}${bodyMatch[3]}`);
-    } else {
-      // Fallback: just add content
-      finalLayout += '\n' + pageContent;
-    }
-  }
-  
-  return finalLayout;
-}
-
+  // Return the processed layout content for full documents
+  return processed;
 }
 
 /**
@@ -799,7 +650,6 @@ export function shouldUseUnifiedProcessing(htmlContent) {
 export async function optimizeHtml(htmlContent) {
   // HTMLRewriter is always available
   // Proceed with optimization
-  
   const rewriter = new HTMLRewriter();
 
   // Remove unnecessary whitespace (basic optimization)
@@ -823,12 +673,51 @@ export async function optimizeHtml(htmlContent) {
       if (classAttr === '') {
         element.removeAttribute('class');
       }
-      
       // Remove empty id attributes
       const idAttr = element.getAttribute('id');
       if (idAttr === '') {
         element.removeAttribute('id');
       }
+    }
+  });
+
+  // Slot/template injection logic per app-spec
+  // Collect <template target="..."> content
+  const slotTemplates = {};
+  const templateRewriter = new HTMLRewriter();
+  templateRewriter.on('template', {
+    element(element) {
+      const target = element.getAttribute('target') || element.getAttribute('data-target') || '';
+      if (target) {
+        slotTemplates[target] = '';
+        element.on('text', (text) => {
+          slotTemplates[target] += text.text;
+        });
+      }
+    }
+  });
+  await templateRewriter.transform(new Response(htmlContent)).text();
+
+  // Replace <slot name="..."> with template content or fallback
+  rewriter.on('slot', {
+    element(element) {
+      const name = element.getAttribute('name');
+      if (name && slotTemplates[name]) {
+        element.replace(slotTemplates[name]);
+      } else {
+        // Use fallback slot content if present
+        let fallback = '';
+        element.on('text', (text) => {
+          fallback += text.text;
+        });
+        element.replace(fallback);
+      }
+    }
+  });
+  // Remove <template> elements after slot injection
+  rewriter.on('template', {
+    element(element) {
+      element.remove();
     }
   });
 
@@ -856,7 +745,6 @@ export async function extractHtmlMetadata(htmlContent) {
 
   // HTMLRewriter is always available
   // Proceed with metadata extraction
-
   const rewriter = new HTMLRewriter();
 
   // Extract title
@@ -888,76 +776,6 @@ export async function extractHtmlMetadata(htmlContent) {
   const response = new Response(htmlContent, {
     headers: { 'Content-Type': 'text/html' }
   });
-  rewriter.transform(response);
-  
+  await rewriter.transform(response).text();
   return metadata;
-}
-
-/**
- * Extract component assets (styles and scripts) and relocate them appropriately
- * Styles go to head, scripts go to end of body
- * @param {string} htmlContent - HTML content to process
- * @param {Object} extractedAssets - Assets extracted during include processing
- * @returns {string} HTML content with assets relocated
- */
-async function extractAndRelocateComponentAssets(htmlContent, extractedAssets = { styles: [], scripts: [] }) {
-  // Check if this is a complete HTML document or just a fragment
-  const hasHtmlStructure = htmlContent.includes('<html') && htmlContent.includes('<head') && htmlContent.includes('<body');
-  
-  if (!hasHtmlStructure) {
-    // Fragment - just return as-is (layouts will handle asset relocation)
-    return htmlContent;
-  }
-
-  // Only extract content assets if we have extracted assets from DOM includes
-  // This preserves SSI behavior (inline assets) while supporting DOM include asset relocation
-  let contentStyles = [];
-  let contentScripts = [];
-  
-  if (extractedAssets.styles.length > 0 || extractedAssets.scripts.length > 0) {
-    // We have DOM include assets, so also extract content assets
-    const styleRegex = /<style[^>]*>[\s\S]*?<\/style>/gi;
-    const scriptRegex = /<script[^>]*>[\s\S]*?<\/script>/gi;
-    
-    contentStyles = [...htmlContent.matchAll(styleRegex)].map(match => match[0]);
-    contentScripts = [...htmlContent.matchAll(scriptRegex)].map(match => match[0]);
-  }
-  
-  // Combine content assets with extracted assets from includes
-  const allStyles = [...extractedAssets.styles, ...contentStyles];
-  const allScripts = [...extractedAssets.scripts, ...contentScripts];
-  
-  // If no styles or scripts to relocate, return as-is
-  if (allStyles.length === 0 && allScripts.length === 0) {
-    return htmlContent;
-  }
-  
-  // Remove styles and scripts from their current locations in content (only if we extracted them)
-  let processedContent = htmlContent;
-  if (contentStyles.length > 0) {
-    const styleRegex = /<style[^>]*>[\s\S]*?<\/style>/gi;
-    processedContent = processedContent.replace(styleRegex, '');
-  }
-  if (contentScripts.length > 0) {
-    const scriptRegex = /<script[^>]*>[\s\S]*?<\/script>/gi;
-    processedContent = processedContent.replace(scriptRegex, '');
-  }
-  
-  // Add styles to head (before </head>)
-  if (allStyles.length > 0) {
-    const headEndRegex = /<\/head>/i;
-    const dedupedStyles = [...new Set(allStyles)]; // Remove duplicates
-    const stylesHTML = dedupedStyles.join('\n');
-    processedContent = processedContent.replace(headEndRegex, `${stylesHTML}\n</head>`);
-  }
-  
-  // Add scripts to end of body (before </body>)
-  if (allScripts.length > 0) {
-    const bodyEndRegex = /<\/body>/i;
-    const dedupedScripts = [...new Set(allScripts)]; // Remove duplicates  
-    const scriptsHTML = dedupedScripts.join('\n');
-    processedContent = processedContent.replace(bodyEndRegex, `${scriptsHTML}\n</body>`);
-  }
-  
-  return processedContent;
 }

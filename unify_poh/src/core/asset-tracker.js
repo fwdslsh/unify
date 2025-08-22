@@ -1,0 +1,452 @@
+/**
+ * Asset Reference Tracker for Unify
+ * Implements US-009: Asset Copying and Management
+ * 
+ * Tracks which assets are referenced in HTML/CSS content and provides
+ * secure path resolution and reference management functionality.
+ */
+
+import { join, resolve, relative, normalize, dirname, isAbsolute } from 'path';
+import { PathValidator } from './path-validator.js';
+
+/**
+ * AssetTracker class for managing asset references and dependencies
+ */
+export class AssetTracker {
+  constructor() {
+    // Maps asset file path to array of pages that reference it
+    this.assetReferences = new Map();
+    
+    // Set of all referenced assets for quick lookup
+    this.referencedAssets = new Set();
+    
+    // Cache of parsed asset references from HTML content
+    this.htmlAssetCache = new Map();
+    
+    // Path validator for security
+    this.pathValidator = new PathValidator();
+  }
+
+  /**
+   * Extract asset references from HTML content
+   * @param {string} htmlContent - HTML content to analyze
+   * @param {string} pagePath - Path to the page file
+   * @param {string} sourceRoot - Source root directory
+   * @returns {string[]} Array of referenced asset paths
+   */
+  extractAssetReferences(htmlContent, pagePath, sourceRoot) {
+    if (!htmlContent || typeof htmlContent !== 'string') {
+      return [];
+    }
+
+    const references = new Set();
+    
+    // Patterns to match asset references
+    const patterns = [
+      // CSS files in link tags
+      /<link[^>]+href=["']([^"']+\.css)["']/gi,
+      // JavaScript files
+      /<script[^>]+src=["']([^"']+\.js)["']/gi,
+      // Images in img tags
+      /<img[^>]+src=["']([^"']+\.(png|jpg|jpeg|gif|svg|webp|ico))["']/gi,
+      // Link icons (favicon, apple-icon, etc.)
+      /<link[^>]+rel=["'](?:icon|apple-touch-icon|shortcut icon)["'][^>]*href=["']([^"']+)["']/gi,
+      /<link[^>]+href=["']([^"']+)["'][^>]*rel=["'](?:icon|apple-touch-icon|shortcut icon)["']/gi,
+      // Background images in style attributes
+      /style=["'][^"']*background-image:\s*url\(["']?([^"')]+)["']?\)/gi,
+      // Fonts in link tags
+      /<link[^>]+href=["']([^"']+\.(woff2?|ttf|eot|otf))["']/gi,
+      // Video/audio sources
+      /<(?:video|audio)[^>]+src=["']([^"']+\.(mp4|webm|ogg|mp3|wav))["']/gi,
+      // Source elements
+      /<source[^>]+src=["']([^"']+)["']/gi,
+      // Object data attributes
+      /<object[^>]+data=["']([^"']+)["']/gi,
+      // Generic href/src attributes for other files
+      /(?:href|src)=["']([^"']+\.(pdf|zip|doc|docx|txt|json))["']/gi
+    ];
+
+    for (const pattern of patterns) {
+      let match;
+      while ((match = pattern.exec(htmlContent)) !== null) {
+        // Handle different capture groups - some patterns have multiple groups
+        let assetPath = match[1] || match[2];
+        
+        if (!assetPath) continue;
+        
+        // Skip external URLs
+        if (this._isExternalUrl(assetPath)) {
+          continue;
+        }
+        
+        // Skip data URLs
+        if (assetPath.startsWith('data:')) {
+          continue;
+        }
+        
+        // Resolve relative paths
+        const resolvedPath = this.resolveAssetPath(assetPath, pagePath, sourceRoot);
+        if (resolvedPath) {
+          references.add(resolvedPath);
+        }
+      }
+    }
+
+    return Array.from(references);
+  }
+
+  /**
+   * Extract asset references from CSS content
+   * @param {string} cssContent - CSS content to analyze
+   * @param {string} cssPath - Path to the CSS file
+   * @param {string} sourceRoot - Source root directory
+   * @returns {string[]} Array of referenced asset paths
+   */
+  extractCssAssetReferences(cssContent, cssPath, sourceRoot) {
+    if (!cssContent || typeof cssContent !== 'string') {
+      return [];
+    }
+
+    const references = new Set();
+    
+    // Match all url() references (background, src, etc.)
+    const urlPattern = /url\(\s*["']?([^"')]+)["']?\s*\)/gi;
+    let match;
+    while ((match = urlPattern.exec(cssContent)) !== null) {
+      const assetPath = match[1];
+      if (!assetPath) continue;
+      if (this._isExternalUrl(assetPath)) continue;
+      if (assetPath.startsWith('data:')) continue;
+      if (assetPath.startsWith('#')) continue;
+      
+      const resolvedPath = this.resolveAssetPath(assetPath, cssPath, sourceRoot);
+      if (resolvedPath) {
+        references.add(resolvedPath);
+      }
+    }
+
+    // Match all @font-face src URLs (multiple URLs per src)
+    const fontFacePattern = /@font-face[^}]*src\s*:\s*([^;}]*)/gi;
+    while ((match = fontFacePattern.exec(cssContent)) !== null) {
+      const srcValue = match[1];
+      // Find all url() inside src
+      const srcUrlPattern = /url\(\s*["']?([^"')]+)["']?\s*\)/gi;
+      let srcMatch;
+      while ((srcMatch = srcUrlPattern.exec(srcValue)) !== null) {
+        const assetPath = srcMatch[1];
+        if (!assetPath) continue;
+        if (this._isExternalUrl(assetPath)) continue;
+        if (assetPath.startsWith('data:')) continue;
+        if (assetPath.startsWith('#')) continue;
+        
+        const resolvedPath = this.resolveAssetPath(assetPath, cssPath, sourceRoot);
+        if (resolvedPath) {
+          references.add(resolvedPath);
+        }
+      }
+    }
+
+    // Match all @import statements
+    const importPattern = /@import\s+(?:url\()?\s*["']([^"']+)["']?\s*\)?/gi;
+    while ((match = importPattern.exec(cssContent)) !== null) {
+      const assetPath = match[1];
+      if (!assetPath) continue;
+      if (this._isExternalUrl(assetPath)) continue;
+      if (assetPath.startsWith('data:')) continue;
+      if (assetPath.startsWith('#')) continue;
+      
+      const resolvedPath = this.resolveAssetPath(assetPath, cssPath, sourceRoot);
+      if (resolvedPath) {
+        references.add(resolvedPath);
+      }
+    }
+
+    return Array.from(references);
+  }
+
+  /**
+   * Resolve asset path relative to page and source root
+   * @param {string} assetPath - Asset path from HTML
+   * @param {string} pagePath - Path to the page file
+   * @param {string} sourceRoot - Source root directory
+   * @returns {string|null} Resolved asset path or null if invalid
+   */
+  resolveAssetPath(assetPath, pagePath, sourceRoot) {
+    if (!assetPath || typeof assetPath !== 'string') {
+      return null;
+    }
+
+    try {
+      // First, validate the input for security
+      if (!this._validateAssetPath(assetPath)) {
+        return null;
+      }
+
+      let resolvedPath;
+      
+      if (assetPath.startsWith('/')) {
+        // Absolute path from source root
+        resolvedPath = join(sourceRoot, assetPath.slice(1));
+      } else {
+        // Relative path from current page  
+        const pageDir = dirname(pagePath);
+        // Normalize asset path separators first
+        const normalizedAssetPath = assetPath.replace(/\\/g, '/');
+        resolvedPath = resolve(pageDir, normalizedAssetPath);
+      }
+      
+      // Normalize the path to handle platform differences
+      resolvedPath = normalize(resolvedPath);
+      
+      // Ensure the resolved path is within source root using path validator
+      try {
+        this.pathValidator.validatePath(resolvedPath, sourceRoot);
+        return resolvedPath;
+      } catch (error) {
+        return null;
+      }
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
+   * Record asset references for a page
+   * @param {string} pagePath - Path to the page file
+   * @param {string} htmlContent - HTML content to analyze
+   * @param {string} sourceRoot - Source root directory
+   */
+  async recordAssetReferences(pagePath, htmlContent, sourceRoot) {
+    // Clear existing references for this page
+    this.clearPageAssetReferences(pagePath);
+    
+    // Extract new references from HTML
+    const assets = this.extractAssetReferences(htmlContent, pagePath, sourceRoot);
+    
+    // Process CSS files recursively to handle @import chains
+    const cssAssets = new Set();
+    const processedCssFiles = new Set(); // Prevent infinite loops
+    
+    const processCssFile = async (cssPath) => {
+      if (processedCssFiles.has(cssPath)) {
+        return; // Already processed this CSS file
+      }
+      processedCssFiles.add(cssPath);
+
+      try {
+        const cssContent = await Bun.file(cssPath).text();
+        const cssReferences = this.extractCssAssetReferences(cssContent, cssPath, sourceRoot);
+
+        for (const cssRef of cssReferences) {
+          cssAssets.add(cssRef);
+
+          // If this reference is another CSS file, process it recursively
+          if (cssRef.endsWith('.css')) {
+            await processCssFile(cssRef);
+          }
+        }
+      } catch (error) {
+        // CSS file might not exist or be readable, continue without error
+      }
+    };
+    
+    // Process all CSS files found in HTML
+    for (const assetPath of assets) {
+      if (assetPath.endsWith('.css')) {
+        await processCssFile(assetPath);
+      }
+    }
+    
+    // Combine HTML and CSS asset references
+    const allAssets = [...assets, ...Array.from(cssAssets)];
+    
+    // Record new references
+    for (const assetPath of allAssets) {
+      if (!this.assetReferences.has(assetPath)) {
+        this.assetReferences.set(assetPath, []);
+      }
+      this.assetReferences.get(assetPath).push(pagePath);
+      this.referencedAssets.add(assetPath);
+    }
+    
+    // Cache for this page (include both HTML and CSS references)
+    this.htmlAssetCache.set(pagePath, allAssets);
+  }
+
+  /**
+   * Clear asset references for a specific page
+   * @param {string} pagePath - Path to the page file
+   */
+  clearPageAssetReferences(pagePath) {
+    const cachedAssets = this.htmlAssetCache.get(pagePath);
+    
+    if (cachedAssets) {
+      for (const assetPath of cachedAssets) {
+        const pages = this.assetReferences.get(assetPath);
+        if (pages) {
+          const index = pages.indexOf(pagePath);
+          if (index > -1) {
+            pages.splice(index, 1);
+          }
+          
+          // Clean up empty arrays
+          if (pages.length === 0) {
+            this.assetReferences.delete(assetPath);
+            this.referencedAssets.delete(assetPath);
+          }
+        }
+      }
+      
+      this.htmlAssetCache.delete(pagePath);
+    }
+  }
+
+  /**
+   * Check if an asset is referenced by any page
+   * @param {string} assetPath - Path to the asset file
+   * @returns {boolean} True if asset is referenced
+   */
+  isAssetReferenced(assetPath) {
+    return this.referencedAssets.has(assetPath);
+  }
+
+  /**
+   * Get all pages that reference a specific asset
+   * @param {string} assetPath - Path to the asset file
+   * @returns {string[]} Array of page paths that reference the asset
+   */
+  getPagesThatReference(assetPath) {
+    return this.assetReferences.get(assetPath) || [];
+  }
+
+  /**
+   * Get all referenced assets
+   * @returns {string[]} Array of all referenced asset paths
+   */
+  getAllReferencedAssets() {
+    return Array.from(this.referencedAssets);
+  }
+
+  /**
+   * Get all assets referenced by a specific page
+   * @param {string} pagePath - Path to the page file
+   * @returns {string[]} Array of asset paths referenced by the page
+   */
+  getPageAssets(pagePath) {
+    return this.htmlAssetCache.get(pagePath) || [];
+  }
+
+  /**
+   * Remove all records of a page (when page is deleted)
+   * @param {string} pagePath - Path to the deleted page
+   */
+  removePage(pagePath) {
+    this.clearPageAssetReferences(pagePath);
+  }
+
+  /**
+   * Get asset reference statistics for debugging
+   * @returns {Object} Statistics about tracked asset references
+   */
+  getStats() {
+    return {
+      totalReferencedAssets: this.referencedAssets.size,
+      totalAssetReferences: Array.from(this.assetReferences.values())
+        .reduce((sum, pages) => sum + pages.length, 0),
+      pagesWithAssets: this.htmlAssetCache.size
+    };
+  }
+
+  /**
+   * Clear all asset reference data
+   */
+  clear() {
+    this.assetReferences.clear();
+    this.referencedAssets.clear();
+    this.htmlAssetCache.clear();
+  }
+
+  /**
+   * Check if URL is external
+   * @private
+   * @param {string} url - URL to check
+   * @returns {boolean} True if external
+   */
+  _isExternalUrl(url) {
+    return url.startsWith('http://') || 
+           url.startsWith('https://') || 
+           url.startsWith('//');
+  }
+
+  /**
+   * Validate asset path for basic security issues
+   * @private
+   * @param {string} assetPath - Asset path to validate
+   * @returns {boolean} True if path is safe
+   */
+  _validateAssetPath(assetPath) {
+    if (!assetPath || typeof assetPath !== 'string') {
+      return false;
+    }
+
+    // Block URL schemes (including javascript:, data:, etc.)
+    if (assetPath.includes('://') || assetPath.includes('javascript:') || assetPath.includes('vbscript:')) {
+      return false;
+    }
+
+    // Block UNC paths (Windows network shares)
+    if (assetPath.startsWith('\\\\') || assetPath.startsWith('//')) {
+      return false;
+    }
+
+    // Block drive letters (Windows absolute paths)
+    if (/^[a-zA-Z]:/.test(assetPath)) {
+      return false;
+    }
+
+    // Block dangerous encoded sequences (but allow normal relative paths)
+    try {
+      const decodedPath = decodeURIComponent(assetPath);
+      // Only block encoded path traversal that might be malicious
+      if (decodedPath.includes('%2e%2e') || decodedPath.includes('%2E%2E')) {
+        return false;
+      }
+      // Allow normal relative paths like ../icons/check.svg - final validation
+      // will be done by pathValidator.validatePath() after resolution
+    } catch (error) {
+      // If decoding fails, continue with original path
+    }
+
+    // Block only the most dangerous path patterns while allowing normal relative navigation
+    const dangerousPatterns = [
+      /^\.\.$/,         // Just ".." alone
+      /\.\.\.+/,        // Multiple dots like "..." or "...."  
+      /\/\.\.$/,        // Ending with "/.."
+      /\\\.\.$/,        // Ending with "\.."
+    ];
+
+    for (const pattern of dangerousPatterns) {
+      if (pattern.test(assetPath)) {
+        return false;
+      }
+    }
+
+    // Block dangerous absolute paths
+    if (assetPath.startsWith('/')) {
+      // Block system paths
+      const dangerousAbsolutePaths = [
+        '/etc/', '/var/', '/usr/', '/bin/', '/sbin/', '/root/', '/home/',
+        '/proc/', '/sys/', '/dev/', '/tmp/', '/opt/', '/mnt/', '/media/',
+        '/boot/', '/lib/', '/srv/', '/run/', '/lost+found'
+      ];
+      
+      for (const dangerousPath of dangerousAbsolutePaths) {
+        if (assetPath.startsWith(dangerousPath)) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  }
+}

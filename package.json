@@ -15,7 +15,7 @@
     "bun": ">=1.2.0"
   },
   "scripts": {
-    "test": "bun test",
+    "test": "CLAUDECODE=1 bun test --coverage --coverage-dir=.coverage --coverage-reporter=lcov",
     "watch": "bun run src/cli.js watch --source example/src --output example/dist",
     "serve": "bun run src/cli.js serve --source example/src --port 3000",
     "example": "bun run build && bun run serve --pretty-urls",
