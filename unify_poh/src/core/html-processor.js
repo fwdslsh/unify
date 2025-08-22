@@ -66,10 +66,14 @@ export class HtmlProcessor {
       layoutsProcessed: 0,
       compositionApplied: false,
       securityWarnings: [],
-      dependencies: [] // Track all dependencies including SSI includes
+      dependencies: [], // Track all dependencies including SSI includes
+      recoverableErrors: [] // Track recoverable errors (e.g., missing layouts)
     };
 
     const startTime = Date.now();
+    
+    // Initialize recoverable errors collection for this file
+    this.recoverableErrorsForCurrentFile = [];
 
     try {
       // Check for circular imports
@@ -139,20 +143,35 @@ export class HtmlProcessor {
         }
 
         // Process with layout composition (using SSI-processed HTML)
-        const layoutResult = await this._processWithLayout(
-          filePath, 
-          processedHtml, 
-          dataUnifyAttr, 
-          fileSystem, 
-          sourceRoot,
-          options
-        );
-        
-        // CRITICAL FIX: Remove ALL data-unify attributes from final result
-        result.html = this._removeDataUnifyAttributes(layoutResult.html);
-        result.compositionApplied = true;
-        result.layoutsProcessed = layoutResult.layoutsProcessed;
-        result.ssiIncludesProcessed = ssiResult.includesProcessed;
+        try {
+          const layoutResult = await this._processWithLayout(
+            filePath, 
+            processedHtml, 
+            dataUnifyAttr, 
+            fileSystem, 
+            sourceRoot,
+            options
+          );
+          
+          // CRITICAL FIX: Remove ALL data-unify attributes from final result
+          result.html = this._removeDataUnifyAttributes(layoutResult.html);
+          result.compositionApplied = true;
+          result.layoutsProcessed = layoutResult.layoutsProcessed;
+          result.ssiIncludesProcessed = ssiResult.includesProcessed;
+        } catch (error) {
+          if (error.name === 'RecoverableError' && error.isRecoverable) {
+            // Handle recoverable error with fallback
+            result.html = error.fallbackHtml;
+            result.compositionApplied = false;
+            result.layoutsProcessed = 0;
+            result.ssiIncludesProcessed = ssiResult.includesProcessed;
+            result.recoverableErrors.push(error.message);
+            // Don't re-throw - continue processing with fallback
+          } else {
+            // Re-throw non-recoverable errors
+            throw error;
+          }
+        }
       } else {
         // Process standalone HTML (no layout, but with SSI processing)
         result.html = this._processStandalone(processedHtml);
@@ -172,6 +191,9 @@ export class HtmlProcessor {
       if (options.minify) {
         result.html = this.htmlMinifier.minify(result.html);
       }
+      
+      // Transfer recoverable errors to result
+      result.recoverableErrors = this.recoverableErrorsForCurrentFile || [];
 
       result.success = true;
       
@@ -253,12 +275,19 @@ export class HtmlProcessor {
         }
         this.stats.layoutMissing++;
         
-        // Return original page content with data-unify attributes removed
+        // Add this as a recoverable error (per specification: "recoverable error + fallback")
+        if (!this.recoverableErrorsForCurrentFile) {
+          this.recoverableErrorsForCurrentFile = [];
+        }
+        this.recoverableErrorsForCurrentFile.push(`Layout file not found: ${layoutPath}`);
+        
+        // Create a RecoverableError to signal to the build system
         const fallbackHtml = this._removeDataUnifyAttributes(pageHtml);
-        return {
-          html: fallbackHtml,
-          layoutsProcessed: 0 // No layouts processed when layout is missing
-        };
+        const recoverableError = new Error(`Layout file not found: ${layoutPath}. Falling back to standalone processing.`);
+        recoverableError.name = 'RecoverableError';
+        recoverableError.fallbackHtml = fallbackHtml;
+        recoverableError.isRecoverable = true;
+        throw recoverableError;
       }
       
       // Process SSI includes in layout files (layouts can also contain SSI directives)

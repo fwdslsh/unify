@@ -33,8 +33,10 @@ import path from "path";
 // Include functionality removed - import removed
 import { logger } from "../utils/logger.js";
 import { 
-  LayoutError
+  LayoutError,
+  PathTraversalError
 } from "../utils/errors.js";
+import { isPathWithinDirectory } from "../utils/path-resolver.js";
 import { processMarkdown, isMarkdownFile } from "./markdown-processor.js";
 import { CascadingImportsProcessor } from "./cascading-imports-processor.js";
 
@@ -43,6 +45,20 @@ import { CascadingImportsProcessor } from "./cascading-imports-processor.js";
  * Tries the resolvedPath first, then sourceRoot-relative and _includes/basename.
  */
 export async function readIncludeWithFallback(resolvedPath, src, filePath, sourceRoot) {
+  // Handle undefined or null paths
+  if (!resolvedPath || !sourceRoot) {
+    throw new Error(`Invalid path parameters: resolvedPath=${resolvedPath}, sourceRoot=${sourceRoot}`);
+  }
+  
+  // Security validation: ensure resolvedPath is within sourceRoot
+  const normalizedPath = path.resolve(resolvedPath);
+  const normalizedSourceRoot = path.resolve(sourceRoot);
+  
+  if (!isPathWithinDirectory(normalizedPath, normalizedSourceRoot)) {
+    logger.error(`[SECURITY] Path traversal attempt blocked: ${src} -> ${normalizedPath}`);
+    throw new PathTraversalError(`Include path outside source directory: ${src}`);
+  }
+  
   try {
     const content = await fs.readFile(resolvedPath, 'utf-8');
     
@@ -94,6 +110,13 @@ export async function readIncludeWithFallback(resolvedPath, src, filePath, sourc
     }
 
     for (const candidate of candidates) {
+      // Security validation for each candidate path
+      const normalizedCandidate = path.resolve(candidate);
+      if (!isPathWithinDirectory(normalizedCandidate, normalizedSourceRoot)) {
+        logger.debug(`[SECURITY] Skipping candidate outside source directory: ${candidate}`);
+        continue;
+      }
+      
       try {
         const content = await fs.readFile(candidate, 'utf-8');
         logger.debug(`readIncludeWithFallback: found include at ${candidate}`);
@@ -665,7 +688,7 @@ export async function optimizeHtml(htmlContent) {
     }
   });
 
-  // Optimize attributes (remove empty ones)
+  // Optimize attributes (remove empty ones and unify-specific attributes)
   rewriter.on('*', {
     element(element) {
       // Remove empty class attributes
@@ -678,49 +701,91 @@ export async function optimizeHtml(htmlContent) {
       if (idAttr === '') {
         element.removeAttribute('id');
       }
+      
+      // Remove unify-specific attributes per app-spec
+      element.removeAttribute('data-import');
+      element.removeAttribute('data-target');
+      element.removeAttribute('data-layer');
     }
   });
 
   // Slot/template injection logic per app-spec
-  // Collect <template target="..."> content
+  // First pass: collect <template target="..."> content
   const slotTemplates = {};
+  let currentTemplateTarget = null;
+  let templateContent = '';
+  
   const templateRewriter = new HTMLRewriter();
   templateRewriter.on('template', {
     element(element) {
       const target = element.getAttribute('target') || element.getAttribute('data-target') || '';
       if (target) {
-        slotTemplates[target] = '';
-        element.on('text', (text) => {
-          slotTemplates[target] += text.text;
-        });
+        currentTemplateTarget = target;
+        templateContent = '';
+        // Remove the template element from output
+        element.remove();
+      }
+    },
+    text(text) {
+      if (currentTemplateTarget) {
+        templateContent += text.text;
+        if (text.lastInTextNode) {
+          // End of this template's content
+          slotTemplates[currentTemplateTarget] = templateContent;
+          currentTemplateTarget = null;
+          templateContent = '';
+        }
       }
     }
   });
-  await templateRewriter.transform(new Response(htmlContent)).text();
-
-  // Replace <slot name="..."> with template content or fallback
-  rewriter.on('slot', {
+  
+  // Process templates first
+  const afterTemplates = await templateRewriter.transform(new Response(htmlContent)).text();
+  
+  // Second pass: replace slots with template content or fallback
+  let currentSlotName = null;
+  let slotFallback = '';
+  
+  const slotRewriter = new HTMLRewriter();
+  slotRewriter.on('slot', {
     element(element) {
       const name = element.getAttribute('name');
+      currentSlotName = name;
+      slotFallback = '';
+      
       if (name && slotTemplates[name]) {
-        element.replace(slotTemplates[name]);
+        // Replace with template content
+        element.replace(slotTemplates[name], { html: true });
       } else {
-        // Use fallback slot content if present
-        let fallback = '';
-        element.on('text', (text) => {
-          fallback += text.text;
-        });
-        element.replace(fallback);
+        // Will use fallback content if present
+        element.setInnerContent('', { html: true });
+      }
+    },
+    text(text) {
+      if (currentSlotName && !slotTemplates[currentSlotName]) {
+        // Collect fallback content
+        slotFallback += text.text;
+        if (text.lastInTextNode) {
+          // Replace with fallback
+          text.replace(slotFallback);
+          currentSlotName = null;
+          slotFallback = '';
+        }
       }
     }
   });
-  // Remove <template> elements after slot injection
+  
+  // Apply slot replacements
+  htmlContent = await slotRewriter.transform(new Response(afterTemplates)).text();
+  
+  // Remove <template> elements (should already be removed, but ensure cleanup)
   rewriter.on('template', {
     element(element) {
       element.remove();
     }
   });
 
+  // Apply final optimizations
   try {
     const optimized = await rewriter.transform(new Response(htmlContent)).text();
     return optimized;

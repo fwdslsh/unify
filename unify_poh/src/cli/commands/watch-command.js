@@ -151,15 +151,30 @@ export class WatchCommand {
           throw new Error('Operation aborted');
         }
 
-        const result = await this.incrementalBuilder.performIncrementalBuild(
-          event.filePath,
-          options.source,
-          options.output
-        );
+        try {
+          const result = await this.incrementalBuilder.performIncrementalBuild(
+            event.filePath,
+            options.source,
+            options.output
+          );
 
-        if (result.success) {
-          totalRebuiltFiles += result.rebuiltFiles || 0;
-          allAffectedPages.push(...(result.affectedPages || []));
+          if (result.success) {
+            totalRebuiltFiles += result.rebuiltFiles || 0;
+            allAffectedPages.push(...(result.affectedPages || []));
+          }
+        } catch (error) {
+          if (error.name === 'RecoverableError' && error.isRecoverable) {
+            // Report recoverable error to error callback but continue processing
+            console.log('[DEBUG] Caught recoverable error:', error.message);
+            if (options.onError) {
+              console.log('[DEBUG] Reporting error to onError callback');
+              options.onError(error);
+            }
+            // Continue processing other files
+          } else {
+            // Re-throw non-recoverable errors
+            throw error;
+          }
         }
       }
 

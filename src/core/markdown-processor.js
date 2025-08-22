@@ -159,6 +159,8 @@ export function synthesizeHeadFromFrontmatter(frontmatter) {
  * Process markdown content and return HTML with metadata
  * @param {string} markdownContent - Raw markdown content
  * @param {string} filePath - Path to the markdown file
+ * @param {Set} processedPaths - Set of already processed file paths to prevent infinite recursion
+ * @param {number} maxDepth - Maximum recursion depth
  * @returns {Object} Processed content with metadata
  * @returns {string} returns.html - Generated HTML content
  * @returns {Object} returns.frontmatter - Frontmatter data
@@ -166,7 +168,7 @@ export function synthesizeHeadFromFrontmatter(frontmatter) {
  * @returns {string} returns.excerpt - Document excerpt (from frontmatter or first paragraph)
  * @returns {string} returns.headHtml - Synthesized head HTML from frontmatter
  */
-export async function processMarkdown(markdownContent, filePath) {
+export async function processMarkdown(markdownContent, filePath, processedPaths = new Set(), maxDepth = 10) {
   // Validate frontmatter schema
   function validateFrontmatter(frontmatter, filePath) {
     if (filePath.endsWith('.html') && frontmatter && Object.keys(frontmatter).length > 0) {
@@ -181,6 +183,20 @@ export async function processMarkdown(markdownContent, filePath) {
     // Add more schema checks as needed
   }
   try {
+    // Check for recursion depth limit
+    if (processedPaths.size >= maxDepth) {
+      throw new Error(`Maximum include depth exceeded (${maxDepth}) when processing ${filePath}`);
+    }
+    
+    // Check for circular references
+    const normalizedPath = path.resolve(filePath);
+    if (processedPaths.has(normalizedPath)) {
+      throw new Error(`Circular include detected: ${filePath} is already being processed`);
+    }
+    
+    // Add current path to processed set
+    processedPaths.add(normalizedPath);
+    
     // Parse frontmatter
     const { data: frontmatter, content: rawContent } = matter(markdownContent);
     validateFrontmatter(frontmatter, filePath);
@@ -199,8 +215,8 @@ export async function processMarkdown(markdownContent, filePath) {
       const resolvedIncludePath = path.resolve(path.dirname(filePath), includePath.replace(/^\//, ''));
       if (fsSync.existsSync(resolvedIncludePath)) {
         const includeContent = fsSync.readFileSync(resolvedIncludePath, 'utf-8');
-        // Recursively process included markdown
-        const included = await processMarkdown(includeContent, resolvedIncludePath);
+        // Recursively process included markdown with current processed paths
+        const included = await processMarkdown(includeContent, resolvedIncludePath, new Set(processedPaths), maxDepth);
         // Replace include directive with rendered HTML
         content = content.replace(includeMatch[0], included.html);
       }

@@ -671,6 +671,20 @@ export class IncrementalBuilder {
           if (result.success) {
             processedContent = result.html;
             
+            // Check for recoverable errors and report them
+            if (result.recoverableErrors && result.recoverableErrors.length > 0) {
+              console.log('[DEBUG] Found recoverable errors:', result.recoverableErrors);
+              for (const recoverableError of result.recoverableErrors) {
+                // Create an error to be thrown so it can be caught by the watch command
+                const error = new Error(recoverableError);
+                error.name = 'RecoverableError';
+                error.isRecoverable = true;
+                error.sourcePath = sourcePath;
+                console.log('[DEBUG] Throwing recoverable error:', error.message);
+                throw error;
+              }
+            }
+            
             // Track asset references in the processed HTML
             await this.assetTracker.recordAssetReferences(sourcePath, processedContent, sourceRoot);
           } else {
