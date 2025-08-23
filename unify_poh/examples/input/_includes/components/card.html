@@ -3,16 +3,21 @@
 
 <head>
     <!-- Contract: public areas inside a card component -->
-    <style data-unify-docs>
-        .unify-title {}
+    <style data-unify-docs="v1">
+        /* Public areas: add these classes in a page to override content.
+           Keep selectors low-specificity and unique per scope. */
 
-        /* Card title */
-        .unify-body {}
+        /* Card title heading */
+        .unify-title {
+        }
 
-        /* Card body text */
-        .unify-actions {}
+        /* Card body text content */
+        .unify-body {
+        }
 
-        /* Card actions (links/buttons) */
+        /* Card actions container with links/buttons */
+        .unify-actions {
+        }
     </style>
 
     <style>

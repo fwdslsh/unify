@@ -5,8 +5,7 @@
 
 import { readFileSync, existsSync } from 'fs';
 import { join, dirname, resolve } from 'path';
-// Simple YAML parser for basic configuration
-// For now, supports only the simple structure we need
+import yaml from 'js-yaml';
 
 /**
  * ConfigLoader handles loading and validating configuration files
@@ -112,10 +111,21 @@ export class ConfigLoader {
    */
   _parseYaml(content, filePath) {
     try {
-      // Simple YAML parser for our specific configuration structure
-      const config = this._parseSimpleYaml(content);
+      // Use js-yaml for full YAML parsing support
+      const config = yaml.load(content, {
+        filename: filePath,
+        schema: yaml.JSON_SCHEMA, // Use JSON schema for safety
+        onWarning: (warning) => {
+          console.warn(`YAML warning in ${filePath}: ${warning}`);
+        }
+      });
       
-      if (!config || typeof config !== 'object') {
+      // Handle empty YAML files gracefully (zero-configuration support)
+      if (!config) {
+        return {};
+      }
+      
+      if (typeof config !== 'object') {
         throw new Error('Configuration must be a YAML object');
       }
 
@@ -134,6 +144,10 @@ export class ConfigLoader {
       // If neither format is detected, treat as empty (use defaults)
       return {};
     } catch (error) {
+      // Enhance YAML parsing errors with line information
+      if (error.mark) {
+        throw new Error(`Failed to parse configuration file ${filePath} at line ${error.mark.line + 1}: ${error.reason || error.message}`);
+      }
       throw new Error(`Failed to parse configuration file ${filePath}: ${error.message}`);
     }
   }
@@ -150,12 +164,16 @@ export class ConfigLoader {
   }
 
   /**
-   * Simple YAML parser for basic configuration
+   * Legacy simple YAML parser - kept for backward compatibility testing
    * @private
+   * @deprecated Use js-yaml instead
    * @param {string} content - YAML content
    * @returns {Object} Parsed object
    */
-  _parseSimpleYaml(content) {
+  _parseSimpleYamlLegacy(content) {
+    // This method is kept only for testing backward compatibility
+    // Production code now uses js-yaml for full YAML support
+    console.warn('Using legacy YAML parser - this should only happen in tests');
     const lines = content.split('\n');
     const result = {};
     let currentPath = [];

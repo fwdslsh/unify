@@ -7,7 +7,9 @@
  */
 
 import { join, resolve, relative, normalize, dirname, isAbsolute } from 'path';
+import { existsSync } from 'fs';
 import { PathValidator } from './path-validator.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * AssetTracker class for managing asset references and dependencies
@@ -227,26 +229,51 @@ export class AssetTracker {
     const cssAssets = new Set();
     const processedCssFiles = new Set(); // Prevent infinite loops
     
-    const processCssFile = async (cssPath) => {
+    const processCssFile = async (cssPath, depth = 0) => {
+      // Prevent infinite recursion with max depth
+      const MAX_CSS_IMPORT_DEPTH = 10;
+      if (depth > MAX_CSS_IMPORT_DEPTH) {
+        logger.warn(`Maximum CSS import depth (${MAX_CSS_IMPORT_DEPTH}) exceeded at ${cssPath}`);
+        return;
+      }
+      
       if (processedCssFiles.has(cssPath)) {
+        logger.debug(`Skipping already processed CSS file: ${cssPath}`);
         return; // Already processed this CSS file
       }
       processedCssFiles.add(cssPath);
+      
+      // Validate CSS file exists before processing
+      if (!existsSync(cssPath)) {
+        logger.debug(`CSS file not found, skipping: ${cssPath}`);
+        return;
+      }
 
       try {
         const cssContent = await Bun.file(cssPath).text();
         const cssReferences = this.extractCssAssetReferences(cssContent, cssPath, sourceRoot);
+        
+        logger.debug(`Found ${cssReferences.length} asset references in CSS file: ${cssPath}`);
 
         for (const cssRef of cssReferences) {
           cssAssets.add(cssRef);
 
           // If this reference is another CSS file, process it recursively
           if (cssRef.endsWith('.css')) {
-            await processCssFile(cssRef);
+            // Check for circular import before recursing
+            if (processedCssFiles.has(cssRef)) {
+              logger.warn(`Circular CSS import detected: ${cssPath} -> ${cssRef}`);
+              continue;
+            }
+            await processCssFile(cssRef, depth + 1);
           }
         }
       } catch (error) {
-        // CSS file might not exist or be readable, continue without error
+        // Log the error with context
+        logger.error(`Failed to process CSS file ${cssPath}: ${error.message}`);
+        
+        // Continue processing other files
+        // CSS processing errors shouldn't break the build
       }
     };
     
@@ -389,8 +416,23 @@ export class AssetTracker {
       return false;
     }
 
-    // Block URL schemes (including javascript:, data:, etc.)
-    if (assetPath.includes('://') || assetPath.includes('javascript:') || assetPath.includes('vbscript:')) {
+    // Enhanced protocol blocking with comprehensive dangerous schemes
+    const dangerousProtocols = [
+      'javascript:', 'vbscript:', 'data:', 'file:', 'about:', 'blob:',
+      'chrome:', 'chrome-extension:', 'ms-', 'moz-', 'opera-', 'safari-',
+      'jar:', 'gopher:', 'telnet:', 'ssh:', 'ftp:', 'ldap:', 'mailto:'
+    ];
+    
+    const lowerPath = assetPath.toLowerCase();
+    for (const protocol of dangerousProtocols) {
+      if (lowerPath.includes(protocol)) {
+        logger.warn(`Blocked dangerous protocol in asset path: ${assetPath}`);
+        return false;
+      }
+    }
+
+    // Block protocol-relative URLs
+    if (assetPath.includes('://')) {
       return false;
     }
 
@@ -404,29 +446,78 @@ export class AssetTracker {
       return false;
     }
 
-    // Block dangerous encoded sequences (but allow normal relative paths)
+    // Enhanced encoded sequence detection with multiple encoding levels
     try {
-      const decodedPath = decodeURIComponent(assetPath);
-      // Only block encoded path traversal that might be malicious
-      if (decodedPath.includes('%2e%2e') || decodedPath.includes('%2E%2E')) {
+      let decodedPath = assetPath;
+      let previousDecoded = '';
+      let decodeDepth = 0;
+      const MAX_DECODE_DEPTH = 3;
+      
+      // Decode multiple levels to catch double/triple encoding
+      while (previousDecoded !== decodedPath && decodeDepth < MAX_DECODE_DEPTH) {
+        previousDecoded = decodedPath;
+        decodedPath = decodeURIComponent(decodedPath);
+        decodeDepth++;
+      }
+      
+      // Check for null bytes (path truncation attacks)
+      if (decodedPath.includes('\0') || decodedPath.includes('%00')) {
+        logger.warn(`Blocked null byte in asset path: ${assetPath}`);
         return false;
       }
-      // Allow normal relative paths like ../icons/check.svg - final validation
-      // will be done by pathValidator.validatePath() after resolution
+      
+      // Check for various encoded traversal patterns
+      const encodedPatterns = [
+        '%2e%2e', '%2E%2E', // encoded ..
+        '%252e%252e', '%252E%252E', // double encoded ..
+        '..%2f', '..%2F', '%2e%2e/', '%2E%2E/', // encoded ../
+        '..%5c', '..%5C', '%2e%2e\\', '%2E%2E\\', // encoded ..\\
+        '%c0%ae', '%c1%9c' // Unicode encoding tricks
+      ];
+      
+      for (const pattern of encodedPatterns) {
+        if (lowerPath.includes(pattern) || decodedPath.toLowerCase().includes(pattern)) {
+          logger.warn(`Blocked encoded traversal pattern in asset path: ${assetPath}`);
+          return false;
+        }
+      }
     } catch (error) {
-      // If decoding fails, continue with original path
+      // If decoding fails, path might be corrupted - be cautious
+      logger.debug(`Failed to decode asset path, treating as suspicious: ${assetPath}`);
+      return false;
     }
 
-    // Block only the most dangerous path patterns while allowing normal relative navigation
+    // Enhanced dangerous pattern detection
     const dangerousPatterns = [
       /^\.\.$/,         // Just ".." alone
       /\.\.\.+/,        // Multiple dots like "..." or "...."  
       /\/\.\.$/,        // Ending with "/.."
       /\\\.\.$/,        // Ending with "\.."
+      /\.\.\x00/,       // Null byte after ..
+      /\.\.%00/,        // Encoded null byte after ..
+      /[<>:"|?*]/       // Windows forbidden characters (when not in query string)
     ];
 
+    // Check for forbidden patterns (but allow Windows chars in query strings)
+    const pathWithoutQuery = assetPath.split('?')[0];
     for (const pattern of dangerousPatterns) {
-      if (pattern.test(assetPath)) {
+      if (pattern.test(pathWithoutQuery)) {
+        logger.debug(`Blocked dangerous pattern in asset path: ${assetPath}`);
+        return false;
+      }
+    }
+    
+    // Check for suspicious file extensions (potential web shells or executables)
+    const suspiciousExtensions = [
+      '.exe', '.bat', '.cmd', '.com', '.scr', '.vbs', '.vbe', '.jar',
+      '.app', '.dmg', '.pkg', '.deb', '.rpm', '.msi', '.dll', '.so',
+      '.php.jpg', '.asp.gif', '.jsp.png', '.aspx.jpeg' // Double extension attacks
+    ];
+    
+    const pathLower = assetPath.toLowerCase();
+    for (const ext of suspiciousExtensions) {
+      if (pathLower.endsWith(ext) || pathLower.includes(ext + '?')) {
+        logger.warn(`Blocked suspicious file extension in asset path: ${assetPath}`);
         return false;
       }
     }
@@ -442,6 +533,7 @@ export class AssetTracker {
       
       for (const dangerousPath of dangerousAbsolutePaths) {
         if (assetPath.startsWith(dangerousPath)) {
+          logger.warn(`Blocked system path access: ${assetPath}`);
           return false;
         }
       }

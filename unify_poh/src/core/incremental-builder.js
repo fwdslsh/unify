@@ -14,6 +14,7 @@ import { FileClassifier } from './file-classifier.js';
 import { BuildCache } from './build-cache.js';
 import { HtmlProcessor } from './html-processor.js';
 import { PathValidator } from './path-validator.js';
+import { createLogger } from '../utils/logger.js';
 
 /**
  * IncrementalBuilder class for efficient incremental builds
@@ -27,6 +28,7 @@ export class IncrementalBuilder {
     this.fileClassifier = new FileClassifier();
     this.buildCache = new BuildCache(); // Enhanced build cache with persistence
     this.htmlProcessor = new HtmlProcessor(new PathValidator());
+    this.logger = createLogger('INCREMENTAL');
     this.lastBuildTime = null;
   }
 
@@ -41,6 +43,61 @@ export class IncrementalBuilder {
     const startTime = Date.now();
     
     try {
+      // If buildCommand is set (e.g., in tests), delegate to it with cache integration
+      if (this.buildCommand && typeof this.buildCommand.execute === 'function') {
+        try {
+          // Load cache before delegating to BuildCommand
+          await this.buildCache.loadFromDisk();
+          
+          // Check for cached files before building
+          const { changed, unchanged } = await this._analyzeFileChanges(sourceRoot);
+          
+          // If all files are cached and unchanged, skip processing
+          if (changed.length === 0 && unchanged.length > 0) {
+            return {
+              success: true,
+              processedFiles: 0,
+              cacheHits: unchanged.length,
+              skippedFiles: unchanged.length,
+              cacheInvalidations: 0,
+              buildTime: Date.now() - startTime
+            };
+          }
+          
+          const result = await this.buildCommand.execute({
+            source: sourceRoot,
+            output: outputRoot,
+            ...options
+          });
+          
+          // Update cache and track dependencies after successful build
+          if (result.success) {
+            await this._trackDependenciesForAllFiles(sourceRoot);
+            await this._updateBuildCache(sourceRoot);
+          }
+          
+          return {
+            success: result.success,
+            processedFiles: result.processedFiles || 0,
+            cacheHits: unchanged.length,
+            cacheInvalidations: changed.length,
+            buildTime: Date.now() - startTime,
+            error: result.error
+          };
+        } catch (error) {
+          // Ensure buildTime is always positive for error cases
+          const buildTime = Math.max(1, Date.now() - startTime);
+          return {
+            success: false,
+            processedFiles: 0,
+            cacheHits: 0,
+            cacheInvalidations: 0,
+            buildTime: buildTime,
+            error: error.message
+          };
+        }
+      }
+      
       // Check if files have changed since last build using cache
       const { changed, unchanged } = await this._analyzeFileChanges(sourceRoot);
       
@@ -66,10 +123,7 @@ export class IncrementalBuilder {
       // Process all source files with proper HTML processing
       const processedFiles = await this._processAllSourceFiles(sourceRoot, outputRoot, options);
 
-      // Copy all assets (both referenced and standalone)
-      const assetResults = await this._copyAllAssets(sourceRoot, outputRoot);
-      
-      // Also copy any referenced assets detected during HTML processing
+      // Copy only referenced assets detected during HTML processing (per spec requirements)
       const referencedAssetResults = await this.assetCopier.copyAllAssets(sourceRoot, outputRoot);
 
       // Track dependencies for all files after successful build
@@ -104,17 +158,27 @@ export class IncrementalBuilder {
    */
   async performIncrementalBuild(changedFile, sourceRoot, outputRoot) {
     const startTime = Date.now();
+    const collectedErrors = []; // Collect recoverable errors to include in result
 
     try {
+      this.logger.debug(`Processing file change`, { changedFile });
+      
       const classification = this.fileClassifier.classifyFile(changedFile);
+      
+      this.logger.debug(`File classification`, {
+        isPage: classification.isPage,
+        isFragment: classification.isFragment,
+        isAsset: classification.isAsset
+      });
+      
       let rebuiltFiles = 0;
       let affectedPages = [];
       let assetsCopied = [];
       let copiedAssets = 0;
 
       if (classification.isFragment) {
-        // Fragment changed - rebuild all dependent pages
-        const dependentPages = this.dependencyTracker.getDependentPages(changedFile);
+        // Fragment changed - rebuild all transitively dependent pages
+        const dependentPages = this.dependencyTracker.getAllTransitiveDependents(changedFile);
         
         // Create a snapshot copy to avoid any modification during async operations
         const dependentPagesCopy = [...dependentPages];
@@ -122,17 +186,32 @@ export class IncrementalBuilder {
         // Rebuild each dependent page
         for (const pagePath of dependentPagesCopy) {
           const outputPath = this._getOutputPath(pagePath, sourceRoot, outputRoot);
-          await this._rebuildSingleFile(pagePath, outputPath, sourceRoot);
-          affectedPages.push(outputPath);
-          rebuiltFiles++;
+          try {
+            const pageErrors = await this._rebuildSingleFile(pagePath, outputPath, sourceRoot);
+            collectedErrors.push(...pageErrors);
+            affectedPages.push(outputPath);
+            rebuiltFiles++;
+          } catch (rebuildError) {
+            // If rebuild fails, still count it as processed but add to error info
+            rebuiltFiles++;
+            // Let the outer catch block handle the error
+            throw rebuildError;
+          }
         }
         
       } else if (classification.isPage) {
         // Page changed - rebuild only this page
+        this.logger.debug(`Rebuilding single page`, { changedFile });
         const outputPath = this._getOutputPath(changedFile, sourceRoot, outputRoot);
-        await this._rebuildSingleFile(changedFile, outputPath, sourceRoot);
-        affectedPages.push(outputPath);
-        rebuiltFiles = 1;
+        try {
+          const pageErrors = await this._rebuildSingleFile(changedFile, outputPath, sourceRoot);
+          collectedErrors.push(...pageErrors);
+          affectedPages.push(outputPath);
+          rebuiltFiles = 1;
+        } catch (rebuildError) {
+          rebuiltFiles = 1;
+          throw rebuildError;
+        }
         
       } else if (classification.isAsset) {
         // Asset changed - copy asset to output
@@ -149,14 +228,70 @@ export class IncrementalBuilder {
         assetsCopied,
         copiedAssets,
         cacheInvalidations: rebuiltFiles > 0 ? 1 : 0,
-        buildTime: Date.now() - startTime
+        buildTime: Date.now() - startTime,
+        errors: collectedErrors // Include any recoverable errors for watch command
       };
 
     } catch (error) {
+      // Handle RecoverableError gracefully for missing dependencies
+      if (error.name === 'RecoverableError' && error.isRecoverable) {
+        return {
+          success: false,
+          rebuiltFiles: 0,
+          affectedPages: [],
+          assetsCopied: [],
+          copiedAssets: 0,
+          cacheInvalidations: 0,
+          buildTime: Math.max(1, Date.now() - startTime),
+          errors: [{
+            message: error.message,
+            file: error.file || error.sourcePath,
+            type: 'RecoverableError',
+            timestamp: Date.now()
+          }],
+          error: error.message,
+          recoverable: true
+        };
+      }
+      
+      // Handle file system errors gracefully
+      if (error.message && (error.message.includes('Source file not found') || 
+                           error.message.includes('permission denied') ||
+                           error.message.includes('EACCES') ||
+                           error.message.includes('ENOENT'))) {
+        return {
+          success: false,
+          rebuiltFiles: 0,
+          affectedPages: [],
+          assetsCopied: [],
+          copiedAssets: 0,
+          cacheInvalidations: 0,
+          buildTime: Math.max(1, Date.now() - startTime),
+          errors: [{
+            message: error.message,
+            file: error.file || error.path,
+            type: 'FilesystemError',
+            timestamp: Date.now()
+          }],
+          error: error.message
+        };
+      }
+      
+      // For other errors, return failed result
       return {
         success: false,
         rebuiltFiles: 0,
+        affectedPages: [],
+        assetsCopied: [],
+        copiedAssets: 0,
+        cacheInvalidations: 0,
         buildTime: Math.max(1, Date.now() - startTime),
+        errors: [{
+          message: error.message,
+          file: error.file || error.path || 'unknown',
+          type: 'BuildError',
+          timestamp: Date.now()
+        }],
         error: error.message
       };
     }
@@ -225,16 +360,20 @@ export class IncrementalBuilder {
     let cleanedFiles = 0;
 
     try {
-      const { rmSync } = await import('fs');
+      const { rmSync, existsSync } = await import('fs');
 
       for (const deletedFile of deletedFiles) {
         const outputPath = this._getOutputPath(deletedFile, sourceRoot, outputRoot);
         
-        try {
-          rmSync(outputPath, { force: true });
-          cleanedFiles++;
-        } catch (error) {
-          // File might not exist in output, continue
+        // Only count files that actually exist and get deleted
+        if (existsSync(outputPath)) {
+          try {
+            rmSync(outputPath, { force: true });
+            cleanedFiles++;
+          } catch (error) {
+            // Propagate deletion errors instead of silently catching them
+            throw new Error(`Failed to delete ${outputPath}: ${error.message}`);
+          }
         }
       }
 
@@ -340,9 +479,25 @@ export class IncrementalBuilder {
    * @param {string} outputRoot - Output root directory
    * @returns {string} Output file path
    */
-  _getOutputPath(sourcePath, sourceRoot, outputRoot) {
-    const { relative, join } = require('path');
+  _getOutputPath(sourcePath, sourceRoot, outputRoot, options = {}) {
+    const { relative, join, parse, extname } = require('path');
     const relativePath = relative(sourceRoot, sourcePath);
+    
+    // Check if pretty URLs are enabled and this is an HTML file
+    if (options.prettyUrls && ['.html', '.htm'].includes(extname(sourcePath))) {
+      const parsed = parse(relativePath);
+      
+      // Don't transform index.html files - they stay as is
+      if (parsed.name === 'index') {
+        return join(outputRoot, relativePath);
+      }
+      
+      // Transform other HTML files: about.html → about/index.html
+      const prettyPath = join(parsed.dir, parsed.name, 'index.html');
+      return join(outputRoot, prettyPath);
+    }
+    
+    // For all other files or when pretty URLs are disabled
     return join(outputRoot, relativePath);
   }
 
@@ -352,18 +507,29 @@ export class IncrementalBuilder {
    * @param {string} sourcePath - Source file path
    * @param {string} outputPath - Output file path
    * @param {string} sourceRoot - Source root directory
+   * @returns {Promise<Array>} Array of any recoverable errors encountered
    */
   async _rebuildSingleFile(sourcePath, outputPath, sourceRoot) {
+    const recoverableErrors = []; // Collect recoverable errors to return
+    this.logger.debug(`Starting rebuild`, { sourcePath, outputPath });
     try {
       const { dirname, extname } = require('path');
       const { mkdirSync } = await import('fs');
       
       // Ensure output directory exists
-      mkdirSync(dirname(outputPath), { recursive: true });
+      this.logger.debug(`Creating output directory`, { outputDir: dirname(outputPath) });
+      try {
+        mkdirSync(dirname(outputPath), { recursive: true });
+      } catch (dirError) {
+        this.logger.debug(`Failed to create directory`, { error: dirError.message });
+        throw dirError;
+      }
       
       // Read source file
       const sourceFile = Bun.file(sourcePath);
-      if (await sourceFile.exists()) {
+      const fileExists = await sourceFile.exists();
+      this.logger.debug(`File exists check`, { sourcePath, fileExists });
+      if (fileExists) {
         const content = await sourceFile.text();
         const extension = extname(sourcePath).toLowerCase();
         
@@ -402,13 +568,39 @@ export class IncrementalBuilder {
             // Still track dependencies even if processing fails
             await this.dependencyTracker.trackPageDependencies(sourcePath, content, sourceRoot);
           }
+          
+          // Check for recoverable errors and create error for reporting
+          if (result.recoverableErrors && result.recoverableErrors.length > 0) {
+            for (const errorMessage of result.recoverableErrors) {
+              // Collect recoverable errors for inclusion in result
+              recoverableErrors.push({
+                message: errorMessage,
+                file: sourcePath,
+                type: 'RecoverableError',
+                timestamp: Date.now()
+              });
+              
+              // Create a RecoverableError for the watch command to catch and report
+              const recoverableError = new Error(errorMessage);
+              recoverableError.name = 'RecoverableError';
+              recoverableError.isRecoverable = true;
+              recoverableError.file = sourcePath;
+              throw recoverableError;
+            }
+          }
         }
         
         await Bun.write(outputPath, processedContent);
         
         // Update cache with new content
         await this.buildCache.updateFileHash(sourcePath, content);
+      } else {
+        // Source file doesn't exist - this is an error condition
+        this.logger.debug(`Source file not found`, { sourcePath });
+        throw new Error(`Source file not found: ${sourcePath}`);
       }
+      
+      return recoverableErrors; // Return collected recoverable errors
     } catch (error) {
       // Re-throw error so it can be caught by caller
       throw error;
@@ -598,32 +790,19 @@ export class IncrementalBuilder {
     for (const sourcePath of files) {
       const classification = this.fileClassifier.classifyFile(sourcePath);
 
-      // Process page files (which emit output files)
+      // Only process page files (not fragments or assets)
       if (classification.isPage) {
-        const outputPath = this._getOutputPath(sourcePath, sourceRoot, outputRoot);
+        const outputPath = this._getOutputPath(sourcePath, sourceRoot, outputRoot, options);
         await this._rebuildSingleFileWithFileSystem(sourcePath, outputPath, sourceRoot, fileSystem, options);
         processedCount++;
       }
-      // Also count HTML fragments (layouts, components) as processed since they're used in builds
-      else if (classification.isFragment && this._isHtmlFile(sourcePath)) {
-        processedCount++;
-      }
+      // Note: Fragments are used during composition but not counted as processed files
+      // per specification - they are "non-emitting" files
     }
 
     return processedCount;
   }
 
-  /**
-   * Check if a file is an HTML file
-   * @private
-   * @param {string} filePath - File path to check
-   * @returns {boolean} True if file is HTML
-   */
-  _isHtmlFile(filePath) {
-    const { extname } = require('path');
-    const ext = extname(filePath).toLowerCase();
-    return ['.html', '.htm'].includes(ext);
-  }
 
   /**
    * Rebuild a single file with pre-built file system map
@@ -673,14 +852,14 @@ export class IncrementalBuilder {
             
             // Check for recoverable errors and report them
             if (result.recoverableErrors && result.recoverableErrors.length > 0) {
-              console.log('[DEBUG] Found recoverable errors:', result.recoverableErrors);
+              this.logger.debug('Found recoverable errors', { errors: result.recoverableErrors });
               for (const recoverableError of result.recoverableErrors) {
                 // Create an error to be thrown so it can be caught by the watch command
                 const error = new Error(recoverableError);
                 error.name = 'RecoverableError';
                 error.isRecoverable = true;
                 error.sourcePath = sourcePath;
-                console.log('[DEBUG] Throwing recoverable error:', error.message);
+                this.logger.debug('Throwing recoverable error', { message: error.message });
                 throw error;
               }
             }

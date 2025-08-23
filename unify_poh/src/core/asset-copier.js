@@ -10,6 +10,7 @@ import { join, resolve, relative, normalize, dirname, basename } from 'path';
 import { existsSync, statSync, mkdirSync, copyFileSync, readdirSync } from 'fs';
 import { PathValidator } from './path-validator.js';
 import { FileSystemError } from './errors.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * AssetCopier class for secure and efficient asset copying
@@ -28,6 +29,9 @@ export class AssetCopier {
       startTime: 0,
       duration: 0
     };
+    
+    // Track processed CSS files to prevent circular imports
+    this.processedCssFiles = new Set();
   }
 
   /**
@@ -75,13 +79,8 @@ export class AssetCopier {
         return result;
       }
 
-      // Check if asset is referenced
-      if (!this.assetTracker.isAssetReferenced(assetPath)) {
-        result.success = true;
-        result.skipped = true;
-        result.reason = 'Asset not referenced by any page';
-        return result;
-      }
+      // NOTE: No longer check if asset is referenced here since copyAllAssets 
+      // only passes referenced assets to this method per spec requirements
 
       // Check if source file exists
       if (!existsSync(assetPath)) {
@@ -134,20 +133,15 @@ export class AssetCopier {
     this.resetStats();
     this.stats.startTime = Date.now();
 
-    // Get only referenced assets to copy
+    // Get only referenced assets to copy (per spec: only referenced assets should be copied)
     const allAssets = new Set();
     
     // Add all referenced assets
     const referencedAssets = this.assetTracker.getAllReferencedAssets();
     referencedAssets.forEach(asset => allAssets.add(asset));
     
-    // Also add any source assets for testing scenarios where assets exist but aren't referenced
-    // This allows the "skip" logic to work properly in tests
-    try {
-      this._addSourceAssetsForSkipTesting(sourceRoot, allAssets);
-    } catch (error) {
-      // Ignore errors in source scanning
-    }
+    // NOTE: Removed _addSourceAssetsForSkipTesting as it violates the spec requirement
+    // that "Asset reference tracking ensures only used assets are copied"
 
     this.stats.totalAssets = allAssets.size;
 
@@ -356,6 +350,20 @@ export class AssetCopier {
    * @param {string} sourceRoot - Source root directory
    */
   async _processCssForAssetReferences(cssPath, sourceRoot) {
+    // Check if CSS file exists before processing
+    if (!existsSync(cssPath)) {
+      logger.warn(`CSS file not found for processing: ${cssPath}`);
+      return;
+    }
+    
+    // Prevent circular CSS @import processing
+    const normalizedPath = normalize(cssPath);
+    if (this.processedCssFiles.has(normalizedPath)) {
+      logger.debug(`Skipping already processed CSS file: ${cssPath}`);
+      return;
+    }
+    this.processedCssFiles.add(normalizedPath);
+    
     try {
       // Read the CSS file content
       const cssContent = await Bun.file(cssPath).text();
@@ -363,8 +371,18 @@ export class AssetCopier {
       // Extract asset references from CSS
       const cssReferences = this.assetTracker.extractCssAssetReferences(cssContent, cssPath, sourceRoot);
       
+      // Detect potential circular imports
+      const circularImports = [];
+      
       // Add these references to the tracker
       for (const cssRef of cssReferences) {
+        // Check for circular import
+        if (cssRef.endsWith('.css') && this.processedCssFiles.has(normalize(cssRef))) {
+          circularImports.push(cssRef);
+          logger.warn(`Circular CSS import detected: ${cssPath} -> ${cssRef}`);
+          continue; // Skip circular imports
+        }
+        
         this.assetTracker.referencedAssets.add(cssRef);
         
         // Also add to the asset references mapping
@@ -377,8 +395,25 @@ export class AssetCopier {
           referrers.push(cssPath);
         }
       }
+      
+      // Log summary if there were issues
+      if (circularImports.length > 0) {
+        logger.warn(`Found ${circularImports.length} circular CSS imports in ${cssPath}`);
+      }
+      
+      logger.debug(`Processed CSS file ${cssPath}: found ${cssReferences.length} asset references`);
+      
     } catch (error) {
-      // Silently handle errors reading CSS files
+      // Log errors instead of silently failing
+      logger.error(`Failed to process CSS file ${cssPath}: ${error.message}`);
+      
+      // Report to build system but don't stop the build
+      this.stats.failureCount++;
+      
+      // Re-throw if it's a critical error
+      if (error.code === 'EACCES' || error.code === 'EPERM') {
+        throw new FileSystemError('read', cssPath, `Permission denied: ${error.message}`);
+      }
     }
   }
 }

@@ -12,13 +12,27 @@
  * - AND error messages should be user-friendly
  */
 
-import { describe, it, expect } from "bun:test";
+import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { BuildCommand } from "../../../src/cli/commands/build-command.js";
 import { ArgsParser } from "../../../src/cli/args-parser.js";
 import { PathValidator } from "../../../src/core/path-validator.js";
 import { TempProject } from "../../../test/helpers/temp-project.js";
 
 describe("CLI Build Command (US-005)", () => {
+  let tempProject;
+  
+  beforeEach(async () => {
+    tempProject = new TempProject();
+    // Create a minimal test file
+    await tempProject.addFile('index.html', '<html><body>Test</body></html>');
+  });
+  
+  afterEach(async () => {
+    if (tempProject) {
+      tempProject.cleanup();
+    }
+  });
+
   function setup() {
     return {
       buildCommand: new BuildCommand(),
@@ -79,7 +93,7 @@ describe("CLI Build Command (US-005)", () => {
       };
       
       expect(() => buildCommand.validateOptions(options, pathValidator))
-        .toThrow(/Path traversal attempt detected/);
+        .toThrow(/Path traversal to system directories not allowed/);
     });
   });
 
@@ -88,8 +102,8 @@ describe("CLI Build Command (US-005)", () => {
       const { buildCommand } = setup();
       
       const options = {
-        source: '.',
-        output: 'test-output',
+        source: tempProject.path(),
+        output: tempProject.path('dist'),
         clean: false
       };
       
@@ -104,8 +118,8 @@ describe("CLI Build Command (US-005)", () => {
       const { buildCommand } = setup();
       
       const options = {
-        source: '.',
-        output: 'test-output',
+        source: tempProject.path(),
+        output: tempProject.path('dist'),
         clean: true
       };
       
@@ -120,7 +134,7 @@ describe("CLI Build Command (US-005)", () => {
       
       const options = {
         source: '/invalid/source',
-        output: 'test-output'
+        output: tempProject.path('dist')
       };
       
       const result = await buildCommand.execute(options);
@@ -135,7 +149,7 @@ describe("CLI Build Command (US-005)", () => {
       
       const options = {
         source: '../../../etc',
-        output: 'test-output'
+        output: tempProject.path('dist')
       };
       
       const result = await buildCommand.execute(options);
@@ -157,8 +171,8 @@ describe("CLI Build Command (US-005)", () => {
       };
       
       const options = {
-        source: '.',
-        output: 'test-output',
+        source: tempProject.path(),
+        output: tempProject.path('dist'),
         mockFiles, // For testing
         enableAreaMatching: true // Enable composition
       };
@@ -174,8 +188,8 @@ describe("CLI Build Command (US-005)", () => {
       const { buildCommand } = setup();
       
       const options = {
-        source: '.',
-        output: 'test-output',
+        source: tempProject.path(),
+        output: tempProject.path('dist'),
         enableAreaMatching: true
       };
       
@@ -188,8 +202,8 @@ describe("CLI Build Command (US-005)", () => {
       const { buildCommand } = setup();
       
       const options = {
-        source: '.',
-        output: 'test-output',
+        source: tempProject.path(),
+        output: tempProject.path('dist'),
         enableAttributeMerging: true
       };
       
@@ -204,8 +218,8 @@ describe("CLI Build Command (US-005)", () => {
       const { buildCommand } = setup();
       
       const options = {
-        source: '.',
-        output: 'test-output'
+        source: tempProject.path(),
+        output: tempProject.path('dist')
       };
       
       const result = await buildCommand.execute(options);
@@ -314,8 +328,8 @@ console.log('App loaded');
       const { buildCommand } = setup();
       
       const options = {
-        source: '.',
-        output: 'test-output'
+        source: tempProject.path(),
+        output: tempProject.path('dist')
       };
       
       const result = await buildCommand.execute(options);
@@ -329,8 +343,8 @@ console.log('App loaded');
       const { buildCommand } = setup();
       
       const options = {
-        source: '.',
-        output: 'test-output'
+        source: tempProject.path(),
+        output: tempProject.path('dist')
       };
       
       const result = await buildCommand.execute(options);
@@ -343,7 +357,7 @@ console.log('App loaded');
       
       const options = {
         source: '/nonexistent',
-        output: 'test-output'
+        output: tempProject.path('dist')
       };
       
       const result = await buildCommand.execute(options);
@@ -356,7 +370,7 @@ console.log('App loaded');
       
       const options = {
         source: '../../../danger',
-        output: 'test-output'
+        output: tempProject.path('dist')
       };
       
       const result = await buildCommand.execute(options);
@@ -369,7 +383,7 @@ console.log('App loaded');
       
       const options = {
         source: '/invalid/path',
-        output: 'test-output'
+        output: tempProject.path('dist')
       };
       
       const result = await buildCommand.execute(options);
@@ -385,8 +399,8 @@ console.log('App loaded');
       const { buildCommand } = setup();
       
       const options = {
-        source: '.',
-        output: 'test-output'
+        source: tempProject.path(),
+        output: tempProject.path('dist')
       };
       
       const result = await buildCommand.execute(options);
@@ -399,8 +413,8 @@ console.log('App loaded');
       const { buildCommand } = setup();
       
       const options = {
-        source: '.',
-        output: 'test-output',
+        source: tempProject.path(),
+        output: tempProject.path('dist'),
         verbose: true
       };
       
@@ -413,8 +427,8 @@ console.log('App loaded');
       const { buildCommand } = setup();
       
       const options = {
-        source: '.',
-        output: 'test-output'
+        source: tempProject.path(),
+        output: tempProject.path('dist')
       };
       
       const result = await buildCommand.execute(options);

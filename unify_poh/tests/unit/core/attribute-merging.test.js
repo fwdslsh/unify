@@ -342,7 +342,7 @@ describe("DOM Cascade Attribute Merging (US-002)", () => {
       const result = merger.mergeAttributes(layoutElement, pageElement);
       
       expect(result['id']).toBe('stable'); // ID preserved
-      expect(result['class']).toBe('layout page'); // Classes merged (unify-hero deduplicated)
+      expect(result['class']).toBe('layout unify-hero page'); // Classes merged (union with deduplication)
       expect(result['data-layout']).toBe('value'); // Layout data preserved
       expect(result['data-page']).toBe('value'); // Page data added
     });

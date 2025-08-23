@@ -11,8 +11,10 @@ import { DOMParser } from "../io/dom-parser.js";
 import { SecurityScanner } from "./security-scanner.js";
 import { SSIProcessor } from "./ssi-processor.js";
 import { HTMLMinifier } from "./html-minifier.js";
+import { LayoutResolver } from "./layout-resolver.js";
 import { PathTraversalError, FileSystemError } from "./errors.js";
 import { join } from "path";
+import { createLogger } from '../utils/logger.js';
 
 /**
  * Maximum nesting depth for layout composition to prevent infinite recursion
@@ -31,6 +33,8 @@ export class HtmlProcessor {
     this.domParser = new DOMParser();
     this.securityScanner = new SecurityScanner();
     this.htmlMinifier = new HTMLMinifier();
+    this.layoutResolver = new LayoutResolver(pathValidator);
+    this.logger = createLogger('HTML-PROCESSOR');
     this.ssiProcessor = null; // Initialize when needed with source root
     this.layoutCache = new Map();
     this.processingStack = new Set(); // Circular import detection
@@ -95,15 +99,15 @@ export class HtmlProcessor {
       const ssiResult = await this.ssiProcessor.processIncludes(htmlContent, filePath);
       
       // DEBUG: Log SSI processing results
-      if (process.env.DEBUG) {
-        console.log(`[SSI DEBUG] Processing ${filePath}`);
-        console.log(`[SSI DEBUG] Source root: ${sourceRoot}`);
-        console.log(`[SSI DEBUG] SSI success: ${ssiResult.success}`);
-        console.log(`[SSI DEBUG] SSI includes processed: ${ssiResult.includesProcessed}`);
-        console.log(`[SSI DEBUG] SSI error: ${ssiResult.error}`);
-        console.log(`[SSI DEBUG] Content length before: ${htmlContent.length}`);
-        console.log(`[SSI DEBUG] Content length after: ${ssiResult.content.length}`);
-      }
+      this.logger.debug('SSI processing result', {
+        filePath,
+        sourceRoot,
+        success: ssiResult.success,
+        includesProcessed: ssiResult.includesProcessed,
+        error: ssiResult.error,
+        contentLengthBefore: htmlContent.length,
+        contentLengthAfter: ssiResult.content.length
+      });
       
       if (ssiResult.success) {
         processedHtml = ssiResult.content;
@@ -129,12 +133,15 @@ export class HtmlProcessor {
       
       // Check for data-unify attribute
       const dataUnifyAttr = this._extractDataUnifyAttribute(processedHtml);
+      this.logger.debug('Extracted data-unify attribute', { dataUnify: dataUnifyAttr, filePath });
       if (dataUnifyAttr) {
         // Validate path security
         try {
           this.pathValidator.validatePath(dataUnifyAttr, sourceRoot);
         } catch (error) {
           if (error instanceof PathTraversalError) {
+            // Even on path traversal error, clean up data-unify attributes from the original content
+            result.html = this._removeDataUnifyAttributes(processedHtml);
             result.error = error.message;
             result.exitCode = 2;
             return result;
@@ -144,14 +151,49 @@ export class HtmlProcessor {
 
         // Process with layout composition (using SSI-processed HTML)
         try {
+          // CRITICAL FIX: For mock files (testing), use original path; for filesystem, resolve path
+          let layoutPathToUse = dataUnifyAttr;
+          
+          // Only resolve path if we're not using mock files (fileSystem is empty or doesn't contain the key)
+          if (Object.keys(fileSystem).length === 0 || !fileSystem[dataUnifyAttr]) {
+            layoutPathToUse = this.layoutResolver._resolveLayoutPath(dataUnifyAttr, filePath, sourceRoot);
+            this.logger.debug('Resolved layout path', { original: dataUnifyAttr, resolved: layoutPathToUse });
+          } else {
+            this.logger.debug('Using mock layout path', { mockPath: dataUnifyAttr });
+          }
+          
+          // CRITICAL FIX: Process components in PAGE HTML first before layout composition
+          // Components are imported in page HTML, not layout HTML
+          this.logger.debug('Processing page components before layout composition', { 
+            filePath, 
+            htmlLength: processedHtml.length 
+          });
+          
+          const pageWithComponents = await this._processNestedComponents(
+            processedHtml,
+            fileSystem, 
+            sourceRoot, 
+            options, 
+            0 // depth 0 for page-level processing
+          );
+          
           const layoutResult = await this._processWithLayout(
             filePath, 
-            processedHtml, 
-            dataUnifyAttr, 
+            pageWithComponents,  // Use processed page HTML with components resolved
+            layoutPathToUse, 
             fileSystem, 
             sourceRoot,
             options
           );
+          
+          // DEBUG: Log layout processing results
+          this.logger.debug('Layout processing completed', {
+            originalHtmlLength: processedHtml.length,
+            processedHtmlLength: layoutResult.html.length,
+            layoutsProcessed: layoutResult.layoutsProcessed,
+            htmlChanged: processedHtml !== layoutResult.html,
+            contentPreview: layoutResult.html.substring(0, 200)
+          });
           
           // CRITICAL FIX: Remove ALL data-unify attributes from final result
           result.html = this._removeDataUnifyAttributes(layoutResult.html);
@@ -214,10 +256,10 @@ export class HtmlProcessor {
       }
       
       // Debug logging for failures
-      if (process.env.DEBUG || process.env.CLAUDECODE) {
-        console.error('[HtmlProcessor] Error:', error.message);
-        console.error('[HtmlProcessor] Stack:', error.stack);
-      }
+      this.logger.debug('HTML processing error', {
+        message: error.message,
+        stack: error.stack
+      });
     } finally {
       this.processingStack.delete(filePath);
       result.processingTime = Date.now() - startTime;
@@ -264,7 +306,23 @@ export class HtmlProcessor {
       layoutHtml = this.layoutCache.get(layoutPath);
       this.stats.layoutCacheHits++;
     } else {
+      // Try multiple path formats to find the layout file
       layoutHtml = fileSystem[layoutPath];
+      
+      if (!layoutHtml) {
+        // Try relative path from source root
+        const { relative } = require('path');
+        const relativePath = relative(sourceRoot, layoutPath);
+        layoutHtml = fileSystem[relativePath];
+      }
+      
+      if (!layoutHtml) {
+        // Try just the filename for files in source root
+        const { basename } = require('path');
+        const filename = basename(layoutPath);
+        layoutHtml = fileSystem[filename];
+      }
+      
       if (!layoutHtml) {
         // Graceful fallback for missing layout files
         // Only warn once per missing file to avoid repetitive messages during builds
@@ -321,124 +379,342 @@ export class HtmlProcessor {
         }
       }
       
+      // CRITICAL FIX: For mock files (testing), use original path; for filesystem, resolve path
+      let nestedLayoutPathToUse = layoutDataUnify;
+      
+      // Only resolve path if we're not using mock files (fileSystem is empty or doesn't contain the key)
+      if (Object.keys(fileSystem).length === 0 || !fileSystem[layoutDataUnify]) {
+        nestedLayoutPathToUse = this.layoutResolver._resolveLayoutPath(layoutDataUnify, layoutPath, sourceRoot);
+        this.logger.debug('Nested layout resolved', {
+          original: layoutDataUnify,
+          resolved: nestedLayoutPathToUse,
+          fromLayout: layoutPath
+        });
+      } else {
+        this.logger.debug('Using nested mock layout path', {
+          mockPath: layoutDataUnify,
+          fromLayout: layoutPath
+        });
+      }
+      
       // Recursively process layout-level import (with incremented depth)
-      const nestedLayoutResult = await this._processWithLayout(
-        layoutPath,
-        layoutHtml,
-        layoutDataUnify,
-        fileSystem,
-        sourceRoot,
-        options,
-        depth + 1
-      );
-      layoutHtml = nestedLayoutResult.html;
-      // Accumulate layout count from recursive processing
-      layoutsProcessedCount += nestedLayoutResult.layoutsProcessed;
+      try {
+        const nestedLayoutResult = await this._processWithLayout(
+          layoutPath,
+          layoutHtml,
+          nestedLayoutPathToUse,
+          fileSystem,
+          sourceRoot,
+          options,
+          depth + 1
+        );
+        layoutHtml = nestedLayoutResult.html;
+        // Accumulate layout count from recursive processing
+        layoutsProcessedCount += nestedLayoutResult.layoutsProcessed;
+      } catch (error) {
+        if (error.name === 'RecoverableError' && error.isRecoverable) {
+          // Handle missing nested layout gracefully - continue with current layout
+          // The nested layout is missing, but we can still use this layout
+          this.logger.debug('Nested layout missing, continuing', { layoutPath });
+          // layoutHtml remains unchanged (current layout without nested layout applied)
+        } else {
+          // Re-throw non-recoverable errors (like circular imports, etc.)
+          throw error;
+        }
+      }
     }
 
-    // Simple composition approach - HTML string matching
-    // TODO: Integrate full DOM cascade components when DOM parser supports nested elements
-    let composedHtml = layoutHtml;
+    // FIXED: Use proper DOM cascade components per DOM Cascade v1 specification
+    let composedHtml = layoutHtml; // Initialize with layout as fallback
     
-    
-    // Area class matching - look for any elements with unify- prefix classes
-    const unifyClassRegex = /<(\w+)[^>]*class="[^"]*unify-([^"\s]*)[^"]*"[^>]*>/g;
-    let match;
-    const processedAreas = new Set();
-    
-    // Find all unify-* areas in layout and match with page
-    while ((match = unifyClassRegex.exec(layoutHtml)) !== null) {
-      const [fullMatch, tagName, areaName] = match;
-      const areaClass = `unify-${areaName}`;
+    try {
+      // Parse documents for proper DOM manipulation
+      const layoutDoc = this.domParser.parse(layoutHtml);
+      const pageDoc = this.domParser.parse(pageHtml);
       
-      if (processedAreas.has(areaClass)) continue;
-      processedAreas.add(areaClass);
+      // Use proper AreaMatcher component for DOM Cascade v1 compliance
+      const areaMatchResult = this.areaMatcher.matchAreas(layoutDoc, pageDoc);
       
-      // Look for matching page element with same unify- class (any tag name)
-      const pageAreaMatch = pageHtml.match(
-        new RegExp(`<(\\w+)[^>]*class="[^"]*${areaClass}[^"]*"[^>]*>(.*?)<\\/\\1>`, 's')
-      );
+      this.logger.debug('Area match results', {
+        matchCount: areaMatchResult.matches.length,
+        warningCount: areaMatchResult.warnings.length,
+        errorCount: areaMatchResult.errors.length
+      });
       
-      if (pageAreaMatch) {
-        const [, pageTagName, pageContent] = pageAreaMatch;
-        const pageElementMatch = pageHtml.match(
-          new RegExp(`(<${pageTagName}[^>]*class="[^"]*${areaClass}[^"]*"[^>]*>)`)
+      // Apply area matches by string replacement (working with current DOM parser limitations)
+      composedHtml = layoutHtml;
+      for (const match of areaMatchResult.matches) {
+        if (match.matchType === 'area-class') {
+          // Extract the actual class name from the match
+          const targetClass = match.targetClass;
+          
+          this.logger.debug('Processing area match', {
+            targetClass,
+            pageElementCount: match.pageElements.length,
+            contentPreview: match.combinedContent.substring(0, 100)
+          });
+          
+          // Use AttributeMerger for proper DOM Cascade v1 attribute merging
+          const mergedAttributes = this.attributeMerger.mergeAttributes(
+            match.layoutElement,
+            match.pageElements[0] // Take first matching page element for now
+          );
+          
+          // Replace layout area with page content using proper attribute merging
+          const layoutElement = match.layoutElement;
+          const layoutTagName = layoutElement.tagName;
+          
+          // Build merged attribute string
+          const attrString = Object.entries(mergedAttributes)
+            .map(([key, value]) => `${key}="${value}"`)
+            .join(' ');
+          
+          // DEBUG: Log attribute merging for ID retention verification
+          this.logger.debug('Attribute merging result', {
+            targetClass,
+            layoutId: match.layoutElement.attributes?.id,
+            pageId: match.pageElements[0]?.attributes?.id,
+            mergedId: mergedAttributes.id,
+            attrString
+          });
+          
+          
+          // Replace in HTML string with proper attribute merging and content replacement
+          const layoutElementRegex = new RegExp(
+            `<${layoutTagName}[^>]*class="[^"]*${targetClass}[^"]*"[^>]*>.*?<\\/${layoutTagName}>`, 
+            's'
+          );
+          
+          this.logger.debug('Area replacement debug', {
+            targetClass,
+            layoutTagName,
+            regexPattern: layoutElementRegex.toString(),
+            attrString,
+            combinedContent: match.combinedContent.substring(0, 100),
+            composedHtmlBefore: composedHtml.substring(0, 500),
+            regexMatches: layoutElementRegex.test(composedHtml)
+          });
+          
+          const beforeReplacement = composedHtml;
+          composedHtml = composedHtml.replace(
+            layoutElementRegex,
+            `<${layoutTagName} ${attrString}>${match.combinedContent}</${layoutTagName}>`
+          );
+          
+          this.logger.debug('Area replacement result', {
+            changed: beforeReplacement !== composedHtml,
+            composedHtmlAfter: composedHtml.substring(0, 500)
+          });
+        }
+      }
+      
+      // Fallback to landmark matching if no area matches found
+      if (areaMatchResult.matches.length === 0) {
+        this.logger.debug('No area matches found, trying landmark matching');
+        
+        const landmarkResult = this.areaMatcher.landmarkMatcher.matchLandmarks(layoutDoc, pageDoc);
+        
+        // Apply landmark matches
+        for (const match of landmarkResult.matches) {
+          if (match.matchType === 'landmark') {
+            const tagName = match.layoutElement.tagName;
+            composedHtml = composedHtml.replace(
+              new RegExp(`<${tagName}[^>]*>.*?<\\/${tagName}>`, 's'),
+              `<${tagName}>${match.pageContent}</${tagName}>`
+            );
+          }
+        }
+      }
+      
+      // CRITICAL FIX: Only skip landmarks that were ACTUALLY matched by area classes
+      // Build set of landmarks that were specifically handled by area matching
+      const areaMatchedElements = new Set();
+      for (const match of areaMatchResult.matches) {
+        if (match.layoutElement && match.layoutElement.tagName) {
+          const tagName = match.layoutElement.tagName.toLowerCase();
+          if (['header', 'nav', 'main', 'aside', 'footer'].includes(tagName)) {
+            areaMatchedElements.add(tagName);
+            this.logger.debug('Area match handled landmark, skipping landmark fallback', { tagName, targetClass: match.targetClass });
+          }
+        }
+      }
+      
+      // IMPROVED FIX: Use intelligent landmark replacement that preserves unmatched areas
+      // Apply landmark fallback strategically:
+      // 1. Always allow for layout-to-layout composition (depth > 0)
+      // 2. For page-level composition (depth = 0), be selective about which landmarks to replace
+      const hasAreaMatches = areaMatchResult.matches.length > 0;
+      const isPageLevelComposition = depth === 0; // Page is processed at depth 0
+      
+      if (hasAreaMatches && isPageLevelComposition) {
+        // When page uses area matching, only allow specific landmark fallbacks that don't destroy unmatched areas
+        // Allow header/footer/nav/aside but skip main which would destroy unmatched sections
+        this.logger.debug('Using selective landmark fallback for page-level composition with area matching', {
+          areaMatchCount: areaMatchResult.matches.length,
+          depth
+        });
+        
+        const selectiveLandmarks = ['header', 'nav', 'aside', 'footer'];
+        for (const landmark of selectiveLandmarks) {
+          // Skip if this landmark was already handled by area matching
+          if (areaMatchedElements.has(landmark)) {
+            this.logger.debug('Skipping landmark fallback for already area-matched element', { landmark });
+            continue;
+          }
+          
+          const pageMatch = pageHtml.match(new RegExp(`<${landmark}[^>]*>(.*?)<\\/${landmark}>`, 's'));
+          if (pageMatch) {
+            const pageContent = pageMatch[1];
+            composedHtml = composedHtml.replace(
+              new RegExp(`<${landmark}[^>]*>.*?<\\/${landmark}>`, 's'),
+              `<${landmark}>${pageContent}</${landmark}>`
+            );
+            this.logger.debug('Applied selective landmark fallback replacement', { landmark });
+          }
+        }
+      } else {
+        // Apply landmark fallback for layout-to-layout composition or when no area matching
+        // CRITICAL FIX: Exclude 'body' from landmark fallback to prevent destroying unmatched areas
+        // Body replacement is too aggressive and destroys header/footer when intermediate layouts don't have them
+        const landmarks = ['header', 'nav', 'main', 'aside', 'footer'];
+        for (const landmark of landmarks) {
+          // Skip if this landmark was already handled by area matching
+          if (areaMatchedElements.has(landmark)) {
+            this.logger.debug('Skipping landmark fallback for already area-matched element', { landmark });
+            continue;
+          }
+          
+          const pageMatch = pageHtml.match(new RegExp(`<${landmark}[^>]*>(.*?)<\\/${landmark}>`, 's'));
+          if (pageMatch) {
+            const pageContent = pageMatch[1];
+            composedHtml = composedHtml.replace(
+              new RegExp(`<${landmark}[^>]*>.*?<\\/${landmark}>`, 's'),
+              `<${landmark}>${pageContent}</${landmark}>`
+            );
+            this.logger.debug('Applied landmark fallback replacement', { landmark });
+          }
+        }
+      }
+      
+    } catch (error) {
+      // Fallback to simple string-based composition if DOM parsing fails
+      console.warn(`[HtmlProcessor] DOM cascade composition failed, falling back to simple composition: ${error.message}`);
+      composedHtml = layoutHtml;
+      
+      // Basic fallback area matching
+      const unifyClassRegex = /<(\w+)[^>]*class="[^"]*unify-([^"\s]*)[^"]*"[^>]*>/g;
+      let match;
+      const processedAreas = new Set();
+      
+      while ((match = unifyClassRegex.exec(layoutHtml)) !== null) {
+        const [fullMatch, tagName, areaName] = match;
+        const areaClass = `unify-${areaName}`;
+        
+        if (processedAreas.has(areaClass)) continue;
+        processedAreas.add(areaClass);
+        
+        const pageAreaMatch = pageHtml.match(
+          new RegExp(`<(\\w+)[^>]*class="[^"]*${areaClass}[^"]*"[^>]*>(.*?)<\\/\\1>`, 's')
         );
         
-        if (pageElementMatch) {
-          const pageElementTag = pageElementMatch[1];
-          const pageAttrs = this._extractAttributes(pageElementTag);
-          
-          // Replace matching layout area
+        if (pageAreaMatch) {
+          const [, pageTagName, pageContent] = pageAreaMatch;
           composedHtml = composedHtml.replace(
             new RegExp(`<${tagName}[^>]*class="[^"]*${areaClass}[^"]*"[^>]*>.*?<\\/${tagName}>`, 's'),
-            (layoutMatch) => {
-              const layoutAttrs = this._extractAttributes(layoutMatch);
-              const mergedAttrs = this._mergeElementAttributes(layoutAttrs, pageAttrs);
-              
-              const attrString = Object.entries(mergedAttrs)
-                .map(([key, value]) => `${key}="${value}"`)
-                .join(' ');
-              
-              return `<${tagName} ${attrString}>${pageContent}</${tagName}>`;
-            }
+            `<${tagName} class="${areaClass}">${pageContent}</${tagName}>`
           );
         }
       }
     }
 
-    // Simple landmark replacement for fallback
-    const landmarks = ['header', 'nav', 'main', 'aside', 'footer'];
-    for (const landmark of landmarks) {
-      const pageMatch = pageHtml.match(new RegExp(`<${landmark}[^>]*>(.*?)<\\/${landmark}>`, 's'));
-      if (pageMatch) {
-        const pageContent = pageMatch[1];
+    // FIXED: Use proper HeadMerger component for DOM Cascade v1 compliance
+    try {
+      const pageHeadMatch = pageHtml.match(/<head[^>]*>(.*?)<\/head>/s);
+      const layoutHeadMatch = composedHtml.match(/<head[^>]*>(.*?)<\/head>/s);
+      
+      if (pageHeadMatch && layoutHeadMatch) {
+        const pageHeadContent = pageHeadMatch[1];
+        const layoutHeadContent = layoutHeadMatch[1];
+        
+        // Extract head elements using HeadMerger
+        const layoutDoc = this.domParser.parse(`<html><head>${layoutHeadContent}</head><body></body></html>`);
+        const pageDoc = this.domParser.parse(`<html><head>${pageHeadContent}</head><body></body></html>`);
+        
+        const layoutHead = this.headMerger.extractHead(layoutDoc);
+        const pageHead = this.headMerger.extractHead(pageDoc);
+        
+        // Use proper HeadMerger for specification-compliant head merging
+        const mergedHead = this.headMerger.merge(layoutHead, pageHead);
+        
+        this.logger.debug('Head merge operation', {
+          layoutHeadElements: layoutHead,
+          pageHeadElements: pageHead,
+          mergedHeadElements: mergedHead
+        });
+        
+        // Generate merged head HTML
+        const mergedHeadHtml = this.headMerger.generateHeadHtml(mergedHead);
+        
+        // Replace head content with properly merged result
         composedHtml = composedHtml.replace(
-          new RegExp(`<${landmark}[^>]*>.*?<\\/${landmark}>`, 's'),
-          `<${landmark}>${pageContent}</${landmark}>`
+          /<head[^>]*>.*?<\/head>/s,
+          `<head>${mergedHeadHtml}</head>`
         );
       }
-    }
-
-    // Simple head merging for now (TODO: integrate proper HeadMerger)
-    const pageHeadMatch = pageHtml.match(/<head[^>]*>(.*?)<\/head>/s);
-    const layoutHeadMatch = composedHtml.match(/<head[^>]*>(.*?)<\/head>/s);
-    
-    if (pageHeadMatch && layoutHeadMatch) {
-      const pageHeadContent = pageHeadMatch[1];
-      const layoutHeadContent = layoutHeadMatch[1];
+    } catch (error) {
+      console.warn(`[HtmlProcessor] Head merging failed, using simple fallback: ${error.message}`);
       
-      // Simple head merging - add page meta to layout head
-      const pageMetaMatches = pageHeadContent.match(/<meta[^>]*>/g) || [];
-      const pageLinkMatches = pageHeadContent.match(/<link[^>]*>/g) || [];
+      // Fallback to simple head merging
+      const pageHeadMatch = pageHtml.match(/<head[^>]*>(.*?)<\/head>/s);
+      const layoutHeadMatch = composedHtml.match(/<head[^>]*>(.*?)<\/head>/s);
       
-      let mergedHeadContent = layoutHeadContent;
-      
-      // Add page meta tags
-      for (const meta of pageMetaMatches) {
-        if (!mergedHeadContent.includes(meta)) {
-          mergedHeadContent += '\n' + meta;
+      if (pageHeadMatch && layoutHeadMatch) {
+        const pageHeadContent = pageHeadMatch[1];
+        const layoutHeadContent = layoutHeadMatch[1];
+        
+        // Simple head merging fallback
+        let mergedHeadContent = layoutHeadContent;
+        const pageMetaMatches = pageHeadContent.match(/<meta[^>]*>/g) || [];
+        const pageLinkMatches = pageHeadContent.match(/<link[^>]*>/g) || [];
+        const pageStyleMatches = pageHeadContent.match(/<style[^>]*>.*?<\/style>/gs) || [];
+        const pageScriptMatches = pageHeadContent.match(/<script[^>]*>.*?<\/script>/gs) || [];
+        
+        for (const meta of pageMetaMatches) {
+          if (!mergedHeadContent.includes(meta)) {
+            mergedHeadContent += '\n' + meta;
+          }
         }
+        
+        for (const link of pageLinkMatches) {
+          if (!mergedHeadContent.includes(link)) {
+            mergedHeadContent += '\n' + link;
+          }
+        }
+        
+        for (const style of pageStyleMatches) {
+          if (!mergedHeadContent.includes(style)) {
+            mergedHeadContent += '\n' + style;
+          }
+        }
+        
+        for (const script of pageScriptMatches) {
+          if (!mergedHeadContent.includes(script)) {
+            mergedHeadContent += '\n' + script;
+          }
+        }
+        
+        composedHtml = composedHtml.replace(
+          /<head[^>]*>.*?<\/head>/s,
+          `<head>${mergedHeadContent}</head>`
+        );
       }
       
-      // Add page link tags  
-      for (const link of pageLinkMatches) {
-        if (!mergedHeadContent.includes(link)) {
-          mergedHeadContent += '\n' + link;
-        }
-      }
-      
-      composedHtml = composedHtml.replace(
-        /<head[^>]*>.*?<\/head>/s,
-        `<head>${mergedHeadContent}</head>`
-      );
-    }
-
       // Handle page title override
       const pageTitleMatch = pageHtml.match(/<title[^>]*>(.*?)<\/title>/i);
       if (pageTitleMatch) {
         composedHtml = composedHtml.replace(/<title[^>]*>.*?<\/title>/i, `<title>${pageTitleMatch[1]}</title>`);
       }
+    }
 
       // Remove data-unify attributes
       composedHtml = this._removeDataUnifyAttributes(composedHtml);
@@ -497,9 +773,24 @@ export class HtmlProcessor {
     // Find all elements with data-unify that are NOT html or body
     const componentRegex = /<(?!html|body)(\w+)([^>]*data-unify=["']([^"']+)["'][^>]*)>(.*?)<\/\1>/gs;
     
+    this.logger.debug('Processing nested components', {
+      htmlLength: html.length,
+      depth,
+      htmlPreview: html.substring(0, 200)
+    });
+    
     let match;
+    let componentCount = 0;
     while ((match = componentRegex.exec(html)) !== null) {
       const [fullMatch, tagName, attributes, componentPath, content] = match;
+      componentCount++;
+      
+      this.logger.debug('Found component to process', {
+        componentCount,
+        tagName,
+        componentPath,
+        contentPreview: content.substring(0, 100)
+      });
       
       try {
         // Validate component path
@@ -517,8 +808,93 @@ export class HtmlProcessor {
             depth + 1
           );
           
-          // Replace the element with the processed component
-          processedHtml = processedHtml.replace(fullMatch, processedComponent);
+          // CRITICAL FIX: Apply DOM Cascade composition between page content and component
+          // Page content should compose INTO component areas (unify-title, unify-body, etc.)
+          this.logger.debug('Applying component-level DOM Cascade composition', {
+            componentPath,
+            pageContentPreview: content.substring(0, 100),
+            componentContentLength: processedComponent.length
+          });
+          
+          try {
+            // Parse component and page content for area matching
+            const componentDoc = this.domParser.parse(processedComponent);
+            
+            // Create a minimal HTML document containing the page element content
+            const pageElementHtml = `<html><body>${content}</body></html>`;
+            const pageDoc = this.domParser.parse(pageElementHtml);
+            
+            // Apply area matching between page content and component
+            const areaMatchResult = this.areaMatcher.matchAreas(componentDoc, pageDoc);
+            
+            this.logger.debug('Component area matching result', {
+              matchCount: areaMatchResult.matches.length,
+              warningCount: areaMatchResult.warnings.length
+            });
+            
+            // Apply area replacements to component HTML
+            let composedComponent = processedComponent;
+            for (const match of areaMatchResult.matches) {
+              if (match.matchType === 'area-class') {
+                const targetClass = match.targetClass;
+                
+                // Use AttributeMerger for proper attribute merging
+                const mergedAttributes = this.attributeMerger.mergeAttributes(
+                  match.layoutElement,
+                  match.pageElements[0]
+                );
+                
+                // Build merged attribute string
+                const attrString = Object.entries(mergedAttributes)
+                  .map(([key, value]) => `${key}="${value}"`)
+                  .join(' ');
+                
+                // Replace component area with page content
+                const layoutTagName = match.layoutElement.tagName;
+                const areaRegex = new RegExp(
+                  `<${layoutTagName}[^>]*class="[^"]*${targetClass}[^"]*"[^>]*>.*?<\\/${layoutTagName}>`, 
+                  's'
+                );
+                
+                composedComponent = composedComponent.replace(
+                  areaRegex,
+                  `<${layoutTagName} ${attrString}>${match.combinedContent}</${layoutTagName}>`
+                );
+                
+                this.logger.debug('Applied component area replacement', {
+                  targetClass,
+                  layoutTagName
+                });
+              }
+            }
+            
+            // Extract body content from composed component
+            const componentBodyContent = this._extractBodyContent(composedComponent);
+            
+            // Extract and merge component head content (CSS, scripts, etc.)
+            const componentHeadContent = this._extractHeadContent(composedComponent);
+            if (componentHeadContent.trim()) {
+              // Inject component head content into the main document head
+              processedHtml = this._injectHeadContent(processedHtml, componentHeadContent);
+            }
+            
+            // Replace the element with the composed component body content
+            processedHtml = processedHtml.replace(fullMatch, componentBodyContent);
+            
+          } catch (error) {
+            // Fallback to simple replacement if component composition fails
+            this.logger.warn('Component composition failed, using simple replacement', {
+              error: error.message,
+              componentPath
+            });
+            
+            const componentBodyContent = this._extractBodyContent(processedComponent);
+            const componentHeadContent = this._extractHeadContent(processedComponent);
+            if (componentHeadContent.trim()) {
+              processedHtml = this._injectHeadContent(processedHtml, componentHeadContent);
+            }
+            processedHtml = processedHtml.replace(fullMatch, componentBodyContent);
+          }
         } else {
           // Component not found, warn and remove data-unify attribute
           if (!this.warnedMissingFiles.has(componentPath)) {
@@ -557,16 +933,60 @@ export class HtmlProcessor {
 
   /**
    * Remove data-unify and data-layer attributes from HTML
+   * Per DOM Cascade v1 Specification Section 2.2: All data-unify attributes MUST be removed from final output
    * @private
    */
   _removeDataUnifyAttributes(html) {
-    // Remove data-unify attributes with any quote style and surrounding whitespace
-    return html
-      .replace(/\s+data-unify="[^"]*"/g, '')
-      .replace(/\s+data-unify='[^']*'/g, '')
-      .replace(/data-unify="[^"]*"\s*/g, '')
-      .replace(/data-unify='[^']*'\s*/g, '')
-      .replace(/\s*data-layer=[^\s>]*/g, '');
+    // CRITICAL FIX: Comprehensive data-unify attribute removal
+    // Must handle all possible HTML formatting variations
+    const originalHtml = html;
+    let result = html;
+    
+    // Check if there are actually data-unify attributes to remove
+    const hasDataUnifyAttributes = /data-unify\s*=/.test(html) || /data-layer\s*=/.test(html);
+    
+    if (hasDataUnifyAttributes) {
+      // Remove data-unify attributes with any quote style and surrounding whitespace
+      // Pattern explanation: \s* = optional whitespace, [^"'/\s>]* = value without quotes/spaces/closing bracket
+      result = result
+        // Remove data-unify with double quotes (most common case)
+        .replace(/\s*data-unify\s*=\s*"[^"]*"/g, '')
+        // Remove data-unify with single quotes
+        .replace(/\s*data-unify\s*=\s*'[^']*'/g, '')
+        // Remove data-unify without quotes (edge case)
+        .replace(/\s*data-unify\s*=\s*[^"'\s>]+/g, '')
+        // Remove data-layer attributes (legacy support)
+        .replace(/\s*data-layer\s*=\s*"[^"]*"/g, '')
+        .replace(/\s*data-layer\s*=\s*'[^']*'/g, '')
+        .replace(/\s*data-layer\s*=\s*[^"'\s>]+/g, '');
+      
+      // Only apply whitespace cleanup if we actually modified the HTML
+      if (result !== originalHtml) {
+        // Clean up specific whitespace issues that may have been introduced by attribute removal
+        result = result
+          // Fix space before closing bracket (only where attributes were removed)
+          .replace(/\s+>/g, '>')
+          // Fix opening tags with only whitespace (only where attributes were removed)
+          .replace(/<(\w+)\s+>/g, '<$1>');
+      }
+    }
+    
+    // Log attribute removal for verification
+    const hadDataUnify = originalHtml.includes('data-unify') || originalHtml.includes('data-layer');
+    const stillHasDataUnify = result.includes('data-unify') || result.includes('data-layer');
+    if (hadDataUnify) {
+      this.logger.debug('Data-unify attribute removal', {
+        hadDataUnify,
+        stillHasDataUnify,
+        beforePreview: originalHtml.substring(0, 200),
+        afterPreview: result.substring(0, 200)
+      });
+      if (stillHasDataUnify) {
+        this.logger.warn('Failed to remove all data-unify attributes');
+      }
+    }
+    
+    return result;
   }
 
   /**
@@ -731,6 +1151,56 @@ export class HtmlProcessor {
       const normalizedHref = linkNormalizer.transformLink(href);
       return `<a ${beforeHref}href=${quote}${normalizedHref}${quote}${afterHref}>`;
     });
+  }
+
+  /**
+   * Extract body content from a component HTML document
+   * Components are full HTML documents but we only want the body content for composition
+   * @private
+   * @param {string} componentHtml - Full HTML document from component file
+   * @returns {string} Extracted body content
+   */
+  _extractBodyContent(componentHtml) {
+    // Extract content within <body> tags
+    const bodyMatch = componentHtml.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+    if (bodyMatch) {
+      return bodyMatch[1].trim();
+    }
+    
+    // If no body tag found, return the component as-is (might be a fragment)
+    // Remove any standalone head elements that might be at the root
+    return componentHtml
+      .replace(/<head[^>]*>[\s\S]*?<\/head>/gi, '')
+      .replace(/^\s*<!doctype[^>]*>/i, '')
+      .replace(/^\s*<html[^>]*>/i, '')
+      .replace(/<\/html>\s*$/i, '')
+      .trim();
+  }
+
+  /**
+   * Extract head content from a component HTML document
+   * @private
+   * @param {string} componentHtml - Full HTML document from component file
+   * @returns {string} Extracted head content
+   */
+  _extractHeadContent(componentHtml) {
+    const headMatch = componentHtml.match(/<head[^>]*>([\s\S]*)<\/head>/i);
+    if (headMatch) {
+      return headMatch[1].trim();
+    }
+    return '';
+  }
+
+  /**
+   * Inject head content into the main document
+   * @private
+   * @param {string} mainHtml - Main HTML document
+   * @param {string} headContent - Head content to inject
+   * @returns {string} HTML with injected head content
+   */
+  _injectHeadContent(mainHtml, headContent) {
+    // Find the closing </head> tag and insert content before it
+    return mainHtml.replace(/<\/head>/i, `${headContent}\n</head>`);
   }
 
   /**

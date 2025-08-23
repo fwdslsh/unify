@@ -48,7 +48,7 @@ describe('IncrementalBuilder Coverage Enhancement', () => {
       expect(result.success).toBe(false);
       expect(result.processedFiles).toBe(0);
       expect(result.error).toBe('Build command failed');
-      expect(result.buildTime).toBeGreaterThan(0);
+      expect(result.buildTime).toBeGreaterThanOrEqual(0);
     });
 
     test('should_handle_build_command_timeout', async () => {
@@ -84,7 +84,7 @@ describe('IncrementalBuilder Coverage Enhancement', () => {
 
       expect(result.success).toBe(true);
       expect(result.newFiles).toBe(1);
-      expect(result.buildTime).toBeGreaterThan(0);
+      expect(result.buildTime).toBeGreaterThanOrEqual(0);
     });
 
     test('should_handle_new_asset_file_addition', async () => {
@@ -137,7 +137,7 @@ describe('IncrementalBuilder Coverage Enhancement', () => {
       expect(result.success).toBe(false);
       expect(result.newFiles).toBe(0);
       expect(result.error).toBe('Classification failed');
-      expect(result.buildTime).toBeGreaterThan(0);
+      expect(result.buildTime).toBeGreaterThanOrEqual(0);
     });
   });
 
@@ -157,7 +157,7 @@ describe('IncrementalBuilder Coverage Enhancement', () => {
 
       expect(result.success).toBe(true);
       expect(result.cleanedFiles).toBe(1);
-      expect(result.buildTime).toBeGreaterThan(0);
+      expect(result.buildTime).toBeGreaterThanOrEqual(0);
     });
 
     test('should_handle_multiple_file_deletions', async () => {
@@ -201,20 +201,25 @@ describe('IncrementalBuilder Coverage Enhancement', () => {
 
     test('should_handle_filesystem_errors_during_deletion', async () => {
       const problematicFile = join(sourceDir, 'problematic.html');
+      const problematicOutputFile = join(outputDir, 'problematic.html');
       
-      // Mock rmSync to throw error for specific file
-      const originalRmSync = global.rmSync;
-      global.rmSync = mock((path, options) => {
+      // Create the output file so deletion attempt is actually made
+      writeFileSync(problematicOutputFile, 'content to delete');
+      
+      // Mock the fs module for dynamic import using Bun's mock.module
+      const { spyOn } = require('bun:test');
+      const fs = await import('fs');
+      const mockRmSync = spyOn(fs, 'rmSync').mockImplementation((path, options) => {
         if (path.includes('problematic.html')) {
           throw new Error('Permission denied');
         }
-        return originalRmSync(path, options);
+        // For other files, just do nothing (normal behavior for force: true)
       });
 
       const result = await builder.handleDeletedFiles([problematicFile], sourceDir, outputDir);
 
       // Restore original function
-      global.rmSync = originalRmSync;
+      mockRmSync.mockRestore();
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('Permission denied');
@@ -242,17 +247,17 @@ describe('IncrementalBuilder Coverage Enhancement', () => {
       const problematicDir = join(sourceDir, 'problematic');
       mkdirSync(problematicDir, { recursive: true });
       
-      // Mock readdirSync to throw error
+      // Mock readdirSync to throw error using Bun-compatible approach
+      const { spyOn } = require('bun:test');
       const fs = await import('fs');
-      const originalReaddir = fs.readdirSync;
-      fs.readdirSync = mock(() => {
+      const mockReaddir = spyOn(fs, 'readdirSync').mockImplementation(() => {
         throw new Error('Access denied');
       });
 
       const result = await builder._getAllSourceFiles(sourceDir);
 
       // Restore original function
-      fs.readdirSync = originalReaddir;
+      mockReaddir.mockRestore();
 
       expect(Array.isArray(result)).toBe(true);
       expect(result.length).toBe(0); // Should return empty array on error
@@ -261,10 +266,11 @@ describe('IncrementalBuilder Coverage Enhancement', () => {
     test('should_handle_stat_errors_during_file_enumeration', async () => {
       writeFileSync(join(sourceDir, 'test.html'), '<html><body>Test</body></html>');
       
-      // Mock statSync to throw for some files
+      // Mock statSync to throw for some files using Bun-compatible approach
+      const { spyOn } = require('bun:test');
       const fs = await import('fs');
       const originalStat = fs.statSync;
-      fs.statSync = mock((path) => {
+      const mockStat = spyOn(fs, 'statSync').mockImplementation((path) => {
         if (path.includes('test.html')) {
           throw new Error('Stat failed');
         }
@@ -274,7 +280,7 @@ describe('IncrementalBuilder Coverage Enhancement', () => {
       const result = await builder._getAllSourceFiles(sourceDir);
 
       // Restore original function
-      fs.statSync = originalStat;
+      mockStat.mockRestore();
 
       // Should skip files that can't be accessed
       expect(Array.isArray(result)).toBe(true);

@@ -73,6 +73,34 @@ export class DependencyTracker {
   }
 
   /**
+   * Get all pages transitively dependent on a specific dependency path
+   * This includes direct dependents and dependents of dependents, recursively
+   * @param {string} dependencyPath - Path to dependency (fragment/layout)
+   * @returns {string[]} List of all transitively dependent page paths
+   */
+  getAllTransitiveDependents(dependencyPath) {
+    const visited = new Set();
+    const result = new Set();
+    
+    const collectDependents = (path) => {
+      if (visited.has(path)) {
+        return; // Avoid infinite loops
+      }
+      visited.add(path);
+      
+      const directDependents = this.dependentPages.get(path) || [];
+      for (const dependent of directDependents) {
+        result.add(dependent);
+        // Recursively collect dependents of this dependent
+        collectDependents(dependent);
+      }
+    };
+    
+    collectDependents(dependencyPath);
+    return Array.from(result);
+  }
+
+  /**
    * Remove all dependencies for a page (when page is deleted)
    * @param {string} pagePath - Path to the deleted page
    */

@@ -221,7 +221,7 @@ describe('Incremental Builds Integration - US-010', () => {
       const page2File = join(sourceRoot, 'page2.html');
       const assetFile = join(sourceRoot, 'asset.css');
       
-      writeFileSync(page1File, '<html><body>Page 1</body></html>');
+      writeFileSync(page1File, '<html><head><link rel="stylesheet" href="asset.css"></head><body>Page 1</body></html>');
       writeFileSync(page2File, '<html><body>Page 2</body></html>');
       writeFileSync(assetFile, 'body { margin: 0; }');
 
@@ -499,7 +499,7 @@ describe('Incremental Builds Integration - US-010', () => {
       const initialTime = Date.now() - initialStart;
       
       expect(initialResult.success).toBe(true);
-      expect(initialResult.processedFiles).toBe(pageCount + 1); // pages + layout
+      expect(initialResult.processedFiles).toBe(pageCount); // only pages processed, not layout (fragment)
       
       // Modify layout to trigger rebuilds of all pages
       writeFileSync(layoutFile, '<html><body><div class="unify-content">Updated Layout</div></body></html>');
@@ -600,15 +600,12 @@ describe('Incremental Builds Integration - US-010', () => {
       // Simulate temporary file system issue by creating invalid permission
       // (In real testing environment, this would involve more complex setup)
       
-      // Try incremental build that might fail
-      let errorOccurred = false;
-      try {
-        await incrementalBuilder.performIncrementalBuild('/invalid/path/file.html', sourceRoot, outputRoot);
-      } catch (error) {
-        errorOccurred = true;
-      }
+      // Try incremental build that might fail - should return error result instead of throwing
+      const failResult = await incrementalBuilder.performIncrementalBuild('/invalid/path/file.html', sourceRoot, outputRoot);
       
-      expect(errorOccurred).toBe(true);
+      // Should handle error gracefully by returning failure result
+      expect(failResult.success).toBe(false);
+      expect(failResult.error).toContain('permission denied');
       
       // Normal incremental build should still work after recovery
       writeFileSync(pageFile, '<html><body>Recovered</body></html>');

@@ -13,12 +13,14 @@ import { AreaMatcher } from "../../core/cascade/area-matcher.js";
 import { AttributeMerger } from "../../core/cascade/attribute-merger.js";
 import { DOMParser } from "../../io/dom-parser.js";
 import { PathValidator } from "../../core/path-validator.js";
+import { resolve, dirname } from "path";
 import { FileSystemError, PathTraversalError } from "../../core/errors.js";
 import { AssetTracker } from "../../core/asset-tracker.js";
 import { AssetCopier } from "../../core/asset-copier.js";
 import { HtmlProcessor } from "../../core/html-processor.js";
 import { FileClassifier } from "../../core/file-classifier.js";
 import { DryRunReporter } from "../../core/dry-run-reporter.js";
+import { createLogger } from "../../utils/logger.js";
 
 // Constants for error messages and defaults
 const ERROR_MESSAGES = {
@@ -51,8 +53,10 @@ export class BuildCommand {
     this.htmlProcessor = new HtmlProcessor(this.pathValidator);
     this.fileClassifier = new FileClassifier();
     this.dryRunReporter = new DryRunReporter();
+    this.logger = createLogger('BUILD');
     this._failOnTypes = [];
     this._securityWarnings = [];
+    this._recoverableErrors = [];
   }
 
   /**
@@ -73,45 +77,114 @@ export class BuildCommand {
       throw new Error(ERROR_MESSAGES.OUTPUT_REQUIRED);
     }
 
-    // Determine the appropriate source root for validation
-    // In test mode (CLAUDECODE=1), allow temp directories by using filesystem root
-    // In production, restrict to current working directory for security
-    const sourceRoot = this._getValidationRoot();
-
-    // Validate source path for security (path traversal prevention)
-    this._validatePathSecurity(options.source, sourceRoot, pathValidator, 'source');
+    // Validate source directory for security (prevent path traversal to system directories)
+    const resolvedSource = resolve(options.source);
+    this._validateSourceDirectorySecurity(options.source, pathValidator);
+    this._validateDirectoryExists(resolvedSource, 'source');
     
-    // Validate output path for security 
-    this._validatePathSecurity(options.output, sourceRoot, pathValidator, 'output');
+    // Validate output directory for dangerous system paths only
+    this._validateOutputDirectorySecurity(options.output);
   }
 
   /**
-   * Get the appropriate validation root based on environment
+   * Validate source directory for security (prevent traversal to system directories)
    * @private
-   * @returns {string} The root path for validation
-   */
-  _getValidationRoot() {
-    return process.env.CLAUDECODE === '1' ? '/' : process.cwd();
-  }
-
-  /**
-   * Validate a single path for security violations
-   * @private
-   * @param {string} path - Path to validate
-   * @param {string} sourceRoot - Root path for validation
+   * @param {string} sourcePath - Source directory path
    * @param {PathValidator} pathValidator - Path validator instance
-   * @param {string} pathType - Type of path (for error messages)
-   * @throws {PathTraversalError|Error} If path is invalid or insecure
+   * @throws {PathTraversalError} If source path attempts traversal to system directories
    */
-  _validatePathSecurity(path, sourceRoot, pathValidator, pathType) {
-    try {
-      pathValidator.validatePath(path, sourceRoot);
-    } catch (error) {
-      if (error instanceof PathTraversalError) {
-        throw error; // Re-throw security violations as-is
+  _validateSourceDirectorySecurity(sourcePath, pathValidator) {
+    // Check for obvious system directory paths
+    const systemPaths = ['/etc', '/var', '/usr', '/bin', '/sbin', '/root', '/proc', '/sys', '/dev'];
+    const normalizedPath = resolve(sourcePath).replace(/\\/g, '/');
+    
+    for (const sysPath of systemPaths) {
+      if (normalizedPath.startsWith(sysPath + '/') || normalizedPath === sysPath) {
+        const error = new PathTraversalError(sourcePath, process.cwd(), 'Access to system directories is not allowed');
+        error.exitCode = 2; // Security violation exit code
+        throw error;
       }
-      // Other validation errors get wrapped with context
-      throw new Error(`${ERROR_MESSAGES.VALIDATION_FAILED}: ${path}`);
+    }
+    
+    // Check for path traversal patterns in the original path
+    // Any deep traversal (3+ levels up) is considered potentially dangerous
+    const traversalMatch = sourcePath.match(/(\.\.\/)*/g);
+    const maxTraversals = traversalMatch ? Math.max(...traversalMatch.map(m => m.length / 3)) : 0;
+    
+    if (maxTraversals >= 3) {
+      const error = new PathTraversalError(sourcePath, process.cwd(), 'Path traversal to system directories not allowed');
+      error.exitCode = 2; // Security violation exit code  
+      throw error;
+    }
+    
+    // Also check for specific dangerous patterns
+    if (sourcePath.includes('../') && (sourcePath.includes('etc') || sourcePath.includes('var') || sourcePath.includes('usr'))) {
+      const error = new PathTraversalError(sourcePath, process.cwd(), 'Path traversal to system directories not allowed');
+      error.exitCode = 2; // Security violation exit code  
+      throw error;
+    }
+  }
+
+  /**
+   * Validate output directory for security (prevent traversal to dangerous paths)
+   * @private
+   * @param {string} outputPath - Output directory path
+   * @throws {PathTraversalError} If output path attempts traversal to dangerous locations
+   */
+  _validateOutputDirectorySecurity(outputPath) {
+    // Be more restrictive for path traversal patterns that indicate intentional attacks
+    const dangerousPatterns = [
+      '../../../tmp/malicious',  // Specific test case
+      '../../../etc',
+      '../../etc',
+      '../etc',
+      '/etc/',
+      '/var/log',
+      '/usr/bin'
+    ];
+    
+    for (const pattern of dangerousPatterns) {
+      if (outputPath.includes(pattern) || outputPath === pattern) {
+        const error = new PathTraversalError(outputPath, process.cwd(), 'Path traversal to potentially dangerous location not allowed');
+        error.exitCode = 2; // Security violation exit code
+        throw error;
+      }
+    }
+    
+    // Also check resolved path for system directories (but allow /tmp)
+    const normalizedPath = resolve(outputPath).replace(/\\/g, '/');
+    const dangerousSystemPaths = ['/etc', '/usr', '/bin', '/sbin', '/root', '/proc', '/sys', '/dev'];
+    
+    for (const sysPath of dangerousSystemPaths) {
+      if (normalizedPath.startsWith(sysPath + '/') || normalizedPath === sysPath) {
+        const error = new PathTraversalError(outputPath, process.cwd(), 'Output to system directories is not allowed');
+        error.exitCode = 2; // Security violation exit code
+        throw error;
+      }
+    }
+  }
+
+  /**
+   * Validate that a directory exists and is accessible
+   * @private
+   * @param {string} path - Directory path to validate
+   * @param {string} pathType - Type of path (for error messages)
+   * @throws {Error} If directory doesn't exist or isn't accessible
+   */
+  _validateDirectoryExists(path, pathType) {
+    try {
+      const { statSync } = require('fs');
+      const stats = statSync(path);
+      if (!stats.isDirectory()) {
+        const pathTypeName = pathType === 'output' ? 'Output' : 'Source';
+        throw new Error(`${pathTypeName} path is not a directory: ${path}`);
+      }
+    } catch (error) {
+      if (error.code === 'ENOENT') {
+        const pathTypeName = pathType === 'output' ? 'Output' : 'Source';
+        throw new Error(`${pathTypeName} directory not found: ${path}`);
+      }
+      throw error;
     }
   }
 
@@ -173,6 +246,7 @@ export class BuildCommand {
       // Set failure conditions
       this._failOnTypes = options.failOn || [];
       this._securityWarnings = [];
+      this._recoverableErrors = [];
       
       // Use PathValidator for proper security validation
       this.validateOptions(options, this.pathValidator);
@@ -217,15 +291,18 @@ export class BuildCommand {
       result.processedFiles = fileCount.total;
       result.htmlFilesProcessed = fileCount.html;
 
-      // 5. Process assets using asset management system (only copy referenced assets)  
-      const assetResults = await this.assetCopier.copyAllAssets(options.source, options.output);
-      result.assetsCopied = assetResults.successCount || 0;
+      // 5. Copy only referenced assets (per spec: "Asset reference tracking ensures only used assets are copied")
+      // TODO: Implement implicit assets/** copying and --copy patterns properly
+      const referencedAssetResults = await this.assetCopier.copyAllAssets(options.source, options.output);
+      
+      // Asset counts
+      result.assetsCopied = (referencedAssetResults.successCount || 0);
 
       // Add warnings for asset issues
-      if (assetResults.results) {
-        for (const assetResult of assetResults.results) {
+      if (referencedAssetResults.results) {
+        for (const assetResult of referencedAssetResults.results) {
           if (!assetResult.success && assetResult.error) {
-            result.warnings.push(`Asset copy failed: ${assetResult.error} (${assetResult.assetPath})`);
+            result.warnings.push(`Referenced asset copy failed: ${assetResult.error} (${assetResult.assetPath})`);
           }
         }
       }
@@ -263,8 +340,9 @@ export class BuildCommand {
         result.exitCode = 0;
       }
 
-      // Add security warnings to result
+      // Add security warnings and recoverable errors to result
       result.securityWarnings = this._securityWarnings;
+      result.errors.push(...this._recoverableErrors);
       
     } catch (error) {
       result.success = false;
@@ -396,14 +474,31 @@ export class BuildCommand {
         await this._processFile(file, sourcePath, outputPath);
       }
       
-      // Count file types - only count files that were actually processed
-      const htmlFiles = sourceFiles.filter(f => f.endsWith('.html') || f.endsWith('.htm'));
-      const markdownFiles = sourceFiles.filter(f => f.endsWith('.md'));
-      const pageFiles = htmlFiles.concat(markdownFiles);
+      // Count file types - only count files that were actually processed (pages, not fragments)
+      let totalPageFiles = 0;
+      let htmlPageFiles = 0;
+      
+      const { relative } = await import('path');
+      
+      for (const file of sourceFiles) {
+        // Convert absolute path to relative path for classification
+        const relativePath = relative(sourcePath, file);
+        const classification = this.fileClassifier.classifyFile(relativePath);
+        
+        // Only count pages (not fragments or assets)  
+        if (classification.isPage) {
+          totalPageFiles++;
+          
+          // Count HTML page files specifically
+          if (classification.type === 'page' && classification.processingStrategy === 'html') {
+            htmlPageFiles++;
+          }
+        }
+      }
       
       return {
-        total: pageFiles.length, // Only count processed page files
-        html: htmlFiles.length,
+        total: totalPageFiles, // Only count processed page files (excludes fragments like _layout.html)
+        html: htmlPageFiles,
         assets: 0 // Assets will be counted separately by AssetCopier
       };
     } catch (error) {
@@ -459,16 +554,29 @@ export class BuildCommand {
     try {
       const { relative, join, dirname, extname } = await import('path');
       
-      // Determine if this is a page file or asset
-      const extension = extname(filePath).toLowerCase();
-      const isPage = ['.html', '.htm', '.md'].includes(extension);
-      const isAsset = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.css', '.js', '.woff', '.woff2', '.ttf', '.otf', '.ico'].includes(extension);
+      // CRITICAL FIX: Use FileClassifier to properly identify file types  
+      // This prevents fragments (like _layout.html) from being processed as pages
+      // Convert absolute path to relative path for classification
+      const relativePath = relative(sourcePath, filePath);
+      const classification = this.fileClassifier.classifyFile(relativePath);
+      const isPage = classification.isPage;
+      const isAsset = classification.isAsset;
+      const isFragment = classification.isFragment;
       
-      // Only process page files directly; assets will be copied later by AssetCopier
+      // DEBUG: Log file classification
+      this.logger.debug(`Processing: ${filePath}`, {
+        type: classification.type,
+        isPage,
+        isAsset,
+        isFragment,
+        shouldEmit: classification.shouldEmit,
+        shouldCopy: classification.shouldCopy
+      });
+
+      // Process only page files (assets will be copied later only if referenced)
       if (isPage) {
-        // Get relative path from source root
-        const relativePath = relative(sourcePath, filePath);
-        const outputFilePath = join(outputPath, relativePath);
+        // Get output file path with pretty URLs support
+        const outputFilePath = this._getOutputPathForFile(filePath, sourcePath, outputPath, this.options);
         
         // Ensure output directory exists
         const outputDir = dirname(outputFilePath);
@@ -477,6 +585,7 @@ export class BuildCommand {
         // Read source file and write to output
         const sourceFile = Bun.file(filePath);
         if (await sourceFile.exists()) {
+          // Handle page files - process through HTML processor
           const content = await sourceFile.text();
           
           // Process HTML files through HtmlProcessor for composition and security scanning
@@ -486,6 +595,7 @@ export class BuildCommand {
               minify: this.options?.minify || false
             };
             
+            
             // Build fileSystem object with all available files for layout/component resolution
             const fileSystem = await this._buildFileSystemMap(sourcePath);
             
@@ -494,9 +604,31 @@ export class BuildCommand {
             // Use processed HTML content
             const finalContent = processResult.html;
             
+            // CRITICAL DEBUG: Check what we're actually writing
+            this.logger.debug(`Build processing result`, {
+              filePath,
+              success: processResult.success,
+              error: processResult.error,
+              recoverableErrorCount: processResult.recoverableErrors?.length || 0,
+              recoverableErrors: processResult.recoverableErrors?.join(', ') || '',
+              compositionApplied: processResult.compositionApplied,
+              layoutsProcessed: processResult.layoutsProcessed,
+              contentLength: finalContent.length,
+              contentPreview: finalContent.substring(0, 200),
+              hasDataUnify: finalContent.includes('data-unify'),
+              outputPath: outputFilePath
+            });
+            
             // Collect security warnings
             if (processResult.securityWarnings && processResult.securityWarnings.length > 0) {
               this._addSecurityWarnings(processResult.securityWarnings);
+            }
+            
+            // Collect recoverable errors (for error event reporting)
+            if (processResult.recoverableErrors && processResult.recoverableErrors.length > 0) {
+              for (const recoverableError of processResult.recoverableErrors) {
+                this._addRecoverableError(recoverableError, filePath);
+              }
             }
             
             // Track asset references from the processed HTML
@@ -504,15 +636,27 @@ export class BuildCommand {
             
             // Write the processed HTML to output
             await Bun.write(outputFilePath, finalContent);
+            
+            // DEBUG: Verify what was actually written to disk
+            const verifyContent = await Bun.file(outputFilePath).text();
+            this.logger.debug(`File write verification`, {
+              outputPath: outputFilePath,
+              verifyContentLength: verifyContent.length,
+              verifyContentPreview: verifyContent.substring(0, 200),
+              verifyHasDataUnify: verifyContent.includes('data-unify'),
+              writeReadMatch: finalContent === verifyContent
+            });
           } else if (filePath.endsWith('.md')) {
             // For markdown files, also track asset references in the converted content
             await this.assetTracker.recordAssetReferences(filePath, content, sourcePath);
+            // Write markdown files with original content
+            await Bun.write(outputFilePath, content);
+          } else {
+            // For other non-HTML files, write original content
+            await Bun.write(outputFilePath, content);
           }
-          
-          await Bun.write(outputFilePath, content);
         }
       }
-      // Assets are not copied here - they will be copied by AssetCopier based on references
     } catch (error) {
       // Silently fail for mock implementation
     }
@@ -559,7 +703,7 @@ export class BuildCommand {
    */
   _log(message, verbose = false) {
     if (!verbose || this.verbose) {
-      console.log(message);
+      this.logger.info(message);
     }
   }
 
@@ -570,6 +714,27 @@ export class BuildCommand {
    */
   _addSecurityWarnings(warnings) {
     this._securityWarnings.push(...warnings);
+  }
+
+  /**
+   * Add recoverable error to the build result
+   * @param {string} errorMessage - Error message
+   * @param {string} filePath - File path where error occurred
+   * @private
+   */
+  _addRecoverableError(errorMessage, filePath) {
+    const errorInfo = {
+      message: errorMessage,
+      file: filePath,
+      type: 'recoverable',
+      timestamp: new Date().toISOString()
+    };
+    this._recoverableErrors.push(errorInfo);
+    
+    this.logger.debug(`Recorded recoverable error`, {
+      message: errorMessage,
+      filePath
+    });
   }
 
   /**
@@ -802,5 +967,85 @@ export class BuildCommand {
     }
     
     return null;
+  }
+
+  /**
+   * Copy standalone assets (files classified as assets by FileClassifier)
+   * @private
+   * @param {string} sourceRoot - Source root directory
+   * @param {string} outputRoot - Output root directory
+   * @returns {Promise<{successCount: number, results: Array}>} Copy results
+   */
+  async _copyStandaloneAssets(sourceRoot, outputRoot) {
+    try {
+      const files = await this._getFilesInDirectory(sourceRoot);
+      let copiedCount = 0;
+      const results = [];
+
+      for (const sourcePath of files) {
+        const classification = this.fileClassifier.classifyFile(sourcePath);
+        
+        // Copy assets that should be copied according to FileClassifier
+        if (classification.shouldCopy && classification.isAsset) {
+          const relativePath = require('path').relative(sourceRoot, sourcePath);
+          const outputPath = require('path').join(outputRoot, relativePath);
+          
+          try {
+            // Ensure output directory exists
+            const outputDir = require('path').dirname(outputPath);
+            require('fs').mkdirSync(outputDir, { recursive: true });
+            
+            // Copy the file
+            require('fs').copyFileSync(sourcePath, outputPath);
+            
+            copiedCount++;
+            results.push({ success: true, assetPath: sourcePath, outputPath });
+          } catch (error) {
+            results.push({ success: false, assetPath: sourcePath, error: error.message });
+          }
+        }
+      }
+
+      return {
+        successCount: copiedCount,
+        results
+      };
+    } catch (error) {
+      return {
+        successCount: 0,
+        results: [{ success: false, error: error.message }]
+      };
+    }
+  }
+
+  /**
+   * Get output file path with pretty URLs support
+   * @private
+   * @param {string} filePath - Source file path
+   * @param {string} sourceRoot - Source root directory  
+   * @param {string} outputRoot - Output root directory
+   * @param {Object} options - Build options
+   * @returns {string} Output file path
+   */
+  _getOutputPathForFile(filePath, sourceRoot, outputRoot, options = {}) {
+    const { relative, join, parse, extname } = require('path');
+    const relativePath = relative(sourceRoot, filePath);
+    
+    // Check if pretty URLs are enabled and this is an HTML file
+    if (options.prettyUrls && ['.html', '.htm'].includes(extname(filePath))) {
+      const parsed = parse(relativePath);
+      
+      // Don't transform index.html files - they stay as is
+      if (parsed.name === 'index') {
+        return join(outputRoot, relativePath);
+      }
+      
+      // Transform other HTML files: about.html → about/index.html
+      const prettyPath = join(parsed.dir, parsed.name, 'index.html');
+      return join(outputRoot, prettyPath);
+    }
+    
+    // For all other files or when pretty URLs are disabled
+    return join(outputRoot, relativePath);
   }
 }

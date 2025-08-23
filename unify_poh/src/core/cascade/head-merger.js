@@ -220,9 +220,16 @@ export class HeadMerger {
    */
   _getLinkKey(link) {
     if (link.rel && link.href) {
+      // For canonical and icon links, deduplicate by rel only (page wins)
+      // Per DOM Cascade v1: "link[rel=canonical], link[rel=icon]: page overrides matching entries"
+      if (link.rel === 'canonical' || link.rel === 'icon') {
+        return link.rel;
+      }
+      
+      // For other link types (stylesheet, alternate, etc.), use rel:href for deduplication
       return `${link.rel}:${link.href}`;
     }
-    return null; // No deduplication key
+    return null; // No deduplication key for links without both rel and href
   }
 
   /**
@@ -282,11 +289,28 @@ export class HeadMerger {
     const attrs = {};
     if (!attributeString) return attrs;
 
-    const attrRegex = /(\w+(?:-\w+)*)=["']?([^"'\s]*)["']?/g;
+    // First, parse attributes with values (quoted and unquoted)
+    const attrWithValueRegex = /(\w+(?:-\w+)*)=["']([^"']*?)["']|(\w+(?:-\w+)*)=([^"'\s]+)/g;
     let match;
 
-    while ((match = attrRegex.exec(attributeString)) !== null) {
-      attrs[match[1]] = match[2];
+    while ((match = attrWithValueRegex.exec(attributeString)) !== null) {
+      const name = match[1] || match[3];
+      const value = match[2] !== undefined ? match[2] : match[4];
+      attrs[name] = value;
+    }
+
+    // Then, find boolean attributes (standalone attribute names)
+    // Remove all matched attributes with values first
+    let remaining = attributeString.replace(attrWithValueRegex, '');
+
+    // Match standalone attribute names
+    const booleanAttrRegex = /\b(\w+(?:-\w+)*)\b/g;
+    while ((match = booleanAttrRegex.exec(remaining)) !== null) {
+      const attrName = match[1];
+      // Only add if it's not already present and looks like an attribute
+      if (!(attrName in attrs) && attrName.length > 1) {
+        attrs[attrName] = '';
+      }
     }
 
     return attrs;

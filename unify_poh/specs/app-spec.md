@@ -558,9 +558,9 @@ Examples:
 
 - **Purpose:** Set logging verbosity level
 - **Default:** `info`
-- **Valid levels:** `error`, `warn`, `info`, `debug`
+- **Valid levels:** `error`, `warn`, `info`, `debug`, `trace`
 - **Used by:** All commands
-- **Behavior:** Controls logging output verbosity. Debug is chatty and should be opt-in. Keeps logging simple and aligned with common practice.
+- **Behavior:** Controls logging output verbosity. Debug is chatty and should be opt-in. Trace is extremely verbose for deep troubleshooting. Keeps logging simple and aligned with common practice.
 
 ## Getting Started & Common Usage Patterns
 

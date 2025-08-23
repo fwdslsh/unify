@@ -6,18 +6,28 @@
  * by testing edge cases and error scenarios not covered by integration tests
  */
 
-import { describe, it, expect, beforeEach } from "bun:test";
+import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { BuildCommand } from "../../../src/cli/commands/build-command.js";
 import { PathValidator } from "../../../src/core/path-validator.js";
 import { PathTraversalError, ValidationError } from "../../../src/core/errors.js";
+import { TempProject } from "../../../test/helpers/temp-project.js";
 
 describe("Build Command Validation (US-006)", () => {
   let buildCommand;
   let pathValidator;
+  let tempProject;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     buildCommand = new BuildCommand();
     pathValidator = new PathValidator();
+    tempProject = new TempProject();
+    await tempProject.addFile('index.html', '<html><body>Test</body></html>');
+  });
+
+  afterEach(async () => {
+    if (tempProject) {
+      await tempProject.cleanup();
+    }
   });
 
   describe("Options validation edge cases", () => {
@@ -103,7 +113,7 @@ describe("Build Command Validation (US-006)", () => {
 
       expect(() => {
         buildCommand.validateOptions(options, mockValidator);
-      }).toThrow('Source directory validation failed: src');
+      }).toThrow('Output directory validation failed: dist');
     });
 
     it("should_rethrow_path_traversal_errors_unchanged", () => {
@@ -147,45 +157,8 @@ describe("Build Command Validation (US-006)", () => {
     });
   });
 
-  describe("Environment-specific validation", () => {
-    it("should_use_filesystem_root_in_test_mode", () => {
-      // Save original environment
-      const originalClaudeCode = process.env.CLAUDECODE;
-      
-      try {
-        process.env.CLAUDECODE = '1';
-        
-        const validationRoot = buildCommand._getValidationRoot();
-        expect(validationRoot).toBe('/');
-        
-      } finally {
-        // Restore original environment
-        if (originalClaudeCode !== undefined) {
-          process.env.CLAUDECODE = originalClaudeCode;
-        } else {
-          delete process.env.CLAUDECODE;
-        }
-      }
-    });
-
-    it("should_use_current_directory_in_production_mode", () => {
-      // Save original environment
-      const originalClaudeCode = process.env.CLAUDECODE;
-      
-      try {
-        delete process.env.CLAUDECODE; // Ensure test mode is off
-        
-        const validationRoot = buildCommand._getValidationRoot();
-        expect(validationRoot).toBe(process.cwd());
-        
-      } finally {
-        // Restore original environment
-        if (originalClaudeCode !== undefined) {
-          process.env.CLAUDECODE = originalClaudeCode;
-        }
-      }
-    });
-  });
+  // Note: Environment-specific validation tests removed as CLAUDECODE functionality was eliminated
+  // Path validation now works consistently regardless of environment
 
   describe("Error message generation", () => {
     it("should_generate_user_friendly_message_for_not_found_errors", () => {
@@ -269,8 +242,8 @@ describe("Build Command Validation (US-006)", () => {
   describe("Integration with PathValidator", () => {
     it("should_integrate_with_real_path_validator", () => {
       const options = {
-        source: '.',
-        output: 'test-output'
+        source: tempProject.path(),
+        output: tempProject.path('dist')
       };
 
       // This should work with the real PathValidator
@@ -281,11 +254,11 @@ describe("Build Command Validation (US-006)", () => {
 
     it("should_pass_through_path_validator_security_checks", () => {
       const options = {
-        source: '../../../etc/passwd',
-        output: 'dist'
+        source: 'src',
+        output: '../../../etc/passwd'
       };
 
-      // This should throw a PathTraversalError from the real PathValidator
+      // This should throw a PathTraversalError from the real PathValidator for malicious output paths
       expect(() => {
         buildCommand.validateOptions(options, pathValidator);
       }).toThrow(PathTraversalError);
@@ -295,8 +268,8 @@ describe("Build Command Validation (US-006)", () => {
   describe("DOM Cascade options and verbose logging", () => {
     it("should_enable_area_matching_when_option_set", async () => {
       const options = {
-        source: '.',
-        output: 'test-output',
+        source: tempProject.path(),
+        output: tempProject.path('dist'),
         enableAreaMatching: true
       };
 
@@ -309,8 +282,8 @@ describe("Build Command Validation (US-006)", () => {
 
     it("should_enable_attribute_merging_when_option_set", async () => {
       const options = {
-        source: '.',
-        output: 'test-output',
+        source: tempProject.path(),
+        output: tempProject.path('dist'),
         enableAttributeMerging: true
       };
 
@@ -322,8 +295,8 @@ describe("Build Command Validation (US-006)", () => {
 
     it("should_enable_both_dom_cascade_features", async () => {
       const options = {
-        source: '.',
-        output: 'test-output',
+        source: tempProject.path(),
+        output: tempProject.path('dist'),
         enableAreaMatching: true,
         enableAttributeMerging: true
       };
@@ -338,8 +311,8 @@ describe("Build Command Validation (US-006)", () => {
 
     it("should_enable_verbose_logging_when_option_set", async () => {
       const options = {
-        source: '.',
-        output: 'test-output',
+        source: tempProject.path(),
+        output: tempProject.path('dist'),
         verbose: true
       };
 
@@ -351,8 +324,8 @@ describe("Build Command Validation (US-006)", () => {
 
     it("should_process_mock_files_when_provided", async () => {
       const options = {
-        source: '.',
-        output: 'test-output',
+        source: tempProject.path(),
+        output: tempProject.path('dist'),
         mockFiles: {
           'layout.html': '<div class="unify-content">Default</div>',
           'page.html': '<div class="unify-content">Page content</div>'

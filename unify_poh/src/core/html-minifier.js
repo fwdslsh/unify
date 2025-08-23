@@ -89,20 +89,24 @@ export class HTMLMinifier {
 
     let result = html;
 
-    // First, preserve conditional comments and SSI
+    // First, preserve conditional comments and SSI, but minify whitespace inside them
     const preservedComments = [];
     
-    // Preserve conditional comments
+    // Preserve conditional comments, but minify whitespace inside them
     result = result.replace(/<!--\[if[\s\S]*?\[endif\]-->/g, (match) => {
       const placeholder = `__PRESERVE_${preservedComments.length}__`;
-      preservedComments.push(match);
+      // Minify whitespace inside the conditional comment
+      const minifiedComment = match.replace(/\s+/g, ' ').replace(/>\s+</g, '><');
+      preservedComments.push(minifiedComment);
       return placeholder;
     });
     
-    // Preserve SSI comments
+    // Preserve SSI comments, but minify whitespace inside them  
     result = result.replace(/<!--#[^>]*-->/g, (match) => {
       const placeholder = `__PRESERVE_${preservedComments.length}__`;
-      preservedComments.push(match);
+      // Minify whitespace inside the SSI comment
+      const minifiedComment = match.replace(/\s+/g, ' ');
+      preservedComments.push(minifiedComment);
       return placeholder;
     });
 
@@ -115,6 +119,12 @@ export class HTMLMinifier {
       result = result.replace(placeholder, comment);
     });
 
+    // Final cleanup: remove any remaining spaces between consecutive comments
+    result = result.replace(/-->\s+<!--/g, '--><!--');
+    
+    // Also remove spaces between comments and adjacent content
+    result = result.replace(/-->\s+([^<\s])/g, '-->$1');
+
     return result;
   }
 
@@ -126,44 +136,54 @@ export class HTMLMinifier {
    */
   _removeRegularComments(html) {
     let result = html;
-    let changed = true;
     
-    // Keep processing until no more comments are found
-    while (changed) {
-      changed = false;
+    // Handle nested comments by finding proper comment boundaries
+    while (true) {
+      const startMatch = result.match(/<!--/);
+      if (!startMatch) {
+        break; // No more comments
+      }
       
-      // Look for comment patterns
-      const commentMatch = result.match(/<!--[\s\S]*?-->/);
-      if (commentMatch) {
-        const match = commentMatch[0];
-        const startIndex = commentMatch.index;
+      const startIndex = startMatch.index;
+      
+      // Find all --> sequences after this start
+      const afterStart = result.substring(startIndex + 4);
+      const endMatches = [...afterStart.matchAll(/-->/g)];
+      
+      if (endMatches.length === 0) {
+        // Malformed comment - remove from start to end
+        result = result.substring(0, startIndex);
+        break;
+      }
+      
+      // For proper nested comment handling, we need the last --> that closes this comment
+      // Count comment starts and ends to find the matching close
+      let depth = 1;
+      let endIndex = -1;
+      
+      for (const endMatch of endMatches) {
+        const currentEndPos = startIndex + 4 + endMatch.index;
+        const betweenText = result.substring(startIndex + 4, currentEndPos);
+        const innerStarts = (betweenText.match(/<!--/g) || []).length;
         
-        // Check if this looks like it might be part of a larger nested comment
-        // by looking ahead to see if there's content followed by --> after this match
-        const afterMatch = result.substring(startIndex + match.length);
-        const nextCommentEnd = afterMatch.indexOf('-->');
-        const hasTrailingContent = nextCommentEnd !== -1 && 
-                                  afterMatch.substring(0, nextCommentEnd).trim().length > 0;
+        // This end closes (innerStarts + 1) comments
+        depth = innerStarts + 1;
         
-        const hasInnerComments = hasTrailingContent;
-        
-        if (hasInnerComments) {
-          // This is a nested comment structure - find the actual end
-          const fullStartIndex = startIndex;
-          const afterStart = result.substring(fullStartIndex + 4);
-          const lastEndIndex = afterStart.lastIndexOf('-->');
-          
-          if (lastEndIndex !== -1) {
-            const fullEndIndex = fullStartIndex + 4 + lastEndIndex + 3;
-            result = result.substring(0, fullStartIndex) + result.substring(fullEndIndex);
-            changed = true;
-          }
-        } else {
-          // Regular comment - remove it normally
-          result = result.replace(match, '');
-          changed = true;
+        // If depth is 1, this is our matching end
+        if (depth === 1) {
+          endIndex = currentEndPos + 3;
+          break;
         }
       }
+      
+      if (endIndex === -1) {
+        // Use the last --> as fallback
+        const lastEnd = endMatches[endMatches.length - 1];
+        endIndex = startIndex + 4 + lastEnd.index + 3;
+      }
+      
+      // Remove the comment
+      result = result.substring(0, startIndex) + result.substring(endIndex);
     }
     
     return result;
@@ -213,24 +233,22 @@ export class HTMLMinifier {
    * @returns {string} HTML with properly minified whitespace
    */
   _processWhitespaceAdvanced(html) {
-    // Split on tags to process text and tags separately
-    const parts = html.split(/(<[^>]*>)/);
-    let result = '';
-    let isAfterBlockElement = false;
-    let isBeforeBlockElement = false;
+    let result = html;
+    
+    // First, minify whitespace inside HTML tags (attributes)
+    result = result.replace(/(<[^>]*>)/g, (tag) => {
+      return tag.replace(/\s+/g, ' ').replace(/\s*=\s*/g, '=').trim();
+    });
+    
+    // Then process text content and whitespace between elements
+    const parts = result.split(/(<[^>]*>)/);
+    result = '';
 
     for (let i = 0; i < parts.length; i++) {
       const part = parts[i];
       
       if (part.startsWith('<') && part.endsWith('>')) {
-        // This is an HTML tag
-        const nextPart = parts[i + 1];
-        const prevPart = parts[i - 1];
-        
-        // Remove whitespace around tags
-        isAfterBlockElement = this._isBlockElement(part);
-        isBeforeBlockElement = nextPart && nextPart.startsWith('<') && this._isBlockElement(nextPart);
-        
+        // This is an HTML tag - already processed above
         result += part;
       } else if (part) {
         // This is text content
@@ -268,7 +286,8 @@ export class HTMLMinifier {
     const blockElements = [
       'address', 'article', 'aside', 'blockquote', 'body', 'div', 'footer', 'form',
       'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'html', 'main', 'nav', 'p',
-      'section', 'table', 'tbody', 'thead', 'tr', 'ul', 'ol', 'li', 'dl', 'dt', 'dd'
+      'section', 'table', 'tbody', 'thead', 'tr', 'ul', 'ol', 'li', 'dl', 'dt', 'dd',
+      'head', 'title'
     ];
     
     const tagMatch = tag.match(/^<\/?(\w+)/);

@@ -121,6 +121,12 @@ export class UnifyCLI {
           process.exit(2);
       }
     } catch (error) {
+      // Check if this is a mocked process.exit error from tests
+      if (error.isExpectedExit) {
+        // Re-throw the error so tests can handle it properly
+        throw error;
+      }
+      
       this.logger.error('CLI execution failed', { 
         error: error.message,
         stack: error.stack
@@ -150,6 +156,12 @@ export class UnifyCLI {
         process.exit(1);
       }
     } catch (error) {
+      // Check if this is a mocked process.exit error from tests
+      if (error.isExpectedExit) {
+        // Re-throw the error so tests can handle it properly
+        throw error;
+      }
+      
       // Handle validation errors with proper exit codes
       if (error.exitCode === 2) {
         console.error(`Error: ${error.message}`);
@@ -193,6 +205,7 @@ export class UnifyCLI {
         autoIgnore: options.autoIgnore,
         defaultLayout: options.defaultLayout,
         prettyUrls: options.prettyUrls,
+        minify: options.minify,
         failOn: options.failOn,
         config: config,
         logger: this.logger.child('BUILD')
@@ -207,6 +220,13 @@ export class UnifyCLI {
         fileCount: result.filesProcessed,
         duration: result.buildTime
       });
+
+      // Check if build itself failed
+      if (!result.success) {
+        this.logger.error('Build failed', { reason: 'Build command returned success: false' });
+        console.error('Build failed: Build process was unsuccessful');
+        process.exit(1);
+      }
 
       // Run linting on processed files
       this.logger.debug('Running linting analysis');

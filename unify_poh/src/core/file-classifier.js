@@ -80,8 +80,11 @@ export class FileClassifier {
       processingStrategy: null
     };
 
-    // Check if it's a fragment (starts with underscore)
-    if (filename.startsWith('_')) {
+    // Check if it's a fragment (starts with underscore or in fragment directory)
+    const pathParts = filePath.split('/');
+    const isInFragmentDirectory = pathParts.some(part => part.startsWith('_'));
+    
+    if (filename.startsWith('_') || isInFragmentDirectory) {
       result.isFragment = true;
       result.type = 'fragment';
       result.shouldEmit = false; // Fragments are not directly emitted

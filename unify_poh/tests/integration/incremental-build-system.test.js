@@ -154,7 +154,7 @@ describe('Incremental Build System Integration', () => {
       const page1Path = join(sourceDir, 'page1.html');
       const page2Path = join(sourceDir, 'page2.html');
       
-      writeFileSync(layoutPath, '<html><body><div class="unify-content">Layout v1</div></body></html>');
+      writeFileSync(layoutPath, '<html><head><title>Site v1</title></head><body><header>Header v1</header><div class="unify-content">Default Content</div><footer>Footer v1</footer></body></html>');
       writeFileSync(page1Path, '<body data-unify="_layout.html"><div class="unify-content">Page 1</div></body>');
       writeFileSync(page2Path, '<body data-unify="_layout.html"><div class="unify-content">Page 2</div></body>');
 
@@ -172,7 +172,7 @@ describe('Incremental Build System Integration', () => {
       const page2Initial = readFileSync(page2OutputPath, 'utf8');
 
       // Act - Modify layout (should affect both pages)
-      writeFileSync(layoutPath, '<html><body><div class="unify-content">Layout v2</div></body></html>');
+      writeFileSync(layoutPath, '<html><head><title>Site v2</title></head><body><header>Header v2</header><div class="unify-content">Default Content</div><footer>Footer v2</footer></body></html>');
       
       // Track dependencies first
       await builder.dependencyTracker.trackPageDependencies(
@@ -194,6 +194,10 @@ describe('Incremental Build System Integration', () => {
       // Both should include the updated layout content
       expect(page1Final).toContain('Page 1'); // Page content preserved
       expect(page2Final).toContain('Page 2'); // Page content preserved
+      expect(page1Final).toContain('Header v2'); // Layout header updated
+      expect(page2Final).toContain('Header v2'); // Layout header updated
+      expect(page1Final).toContain('Footer v2'); // Layout footer updated
+      expect(page2Final).toContain('Footer v2'); // Layout footer updated
     });
   });
 
@@ -241,15 +245,15 @@ describe('Incremental Build System Integration', () => {
       }
 
       const builder = new IncrementalBuilder();
-      const tracker = new DependencyTracker();
 
-      // Track dependencies
+      // Track dependencies using the builder's internal tracker
       for (const post of posts) {
-        await tracker.trackPageDependencies(post, readFileSync(post, 'utf8'), sourceDir);
+        await builder.dependencyTracker.trackPageDependencies(post, readFileSync(post, 'utf8'), sourceDir);
       }
       
       // Track layout dependencies
-      await tracker.trackPageDependencies(blogLayoutPath, readFileSync(blogLayoutPath, 'utf8'), sourceDir);
+      await builder.dependencyTracker.trackPageDependencies(blogLayoutPath, readFileSync(blogLayoutPath, 'utf8'), sourceDir);
+      await builder.dependencyTracker.trackPageDependencies(baseLayoutPath, readFileSync(baseLayoutPath, 'utf8'), sourceDir);
 
       // Perform initial build
       await builder.performInitialBuild(sourceDir, outputDir);

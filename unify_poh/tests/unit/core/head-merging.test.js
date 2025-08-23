@@ -260,9 +260,11 @@ describe("DOM Cascade Head Merging (US-011)", () => {
       
       const result = headMerger.merge(layoutHead, pageHead);
       
-      expect(result.links).toHaveLength(2); // Different canonical URLs
-      expect(result.links[0].href).toBe('https://site.com/default'); // Layout canonical
-      expect(result.links[1].href).toBe('https://site.com/page'); // Page canonical
+      // Per DOM Cascade v1 spec: "link[rel=canonical]: page overrides matching entries"
+      // There should only be ONE canonical link, and it should be the page one
+      expect(result.links).toHaveLength(1); // Only one canonical link
+      expect(result.links[0].href).toBe('https://site.com/page'); // Page canonical wins
+      expect(result.links[0].rel).toBe('canonical');
     });
   });
 

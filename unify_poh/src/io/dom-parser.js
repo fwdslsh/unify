@@ -155,10 +155,12 @@ class Element {
    * @returns {Set<string>} Set of class names
    */
   _parseClasses(attributes) {
-    const classMatch = attributes.match(/class=["']([^"']*)["']/);
+    const classMatch = attributes.match(/class=(?:"([^"]*)"|'([^']*)'|([^\s]+))/);
     if (!classMatch) return new Set();
     
-    return new Set(classMatch[1].split(/\s+/).filter(cls => cls.length > 0));
+    // Get the class value from whichever quote type was used
+    const classValue = classMatch[1] || classMatch[2] || classMatch[3] || '';
+    return new Set(classValue.split(/\s+/).filter(cls => cls.length > 0));
   }
 
   /**
@@ -171,12 +173,14 @@ class Element {
     const attrs = {};
     if (!attributes) return attrs;
     
-    // Handle both quoted and unquoted attributes
-    const attrRegex = /(\w+(?:-\w+)*)=["']?([^"'\s]*)["']?/g;
+    // Handle both quoted and unquoted attributes properly
+    const attrRegex = /(\w+(?:-\w+)*)=(?:"([^"]*)"|'([^']*)'|([^\s]+))/g;
     let match;
 
     while ((match = attrRegex.exec(attributes)) !== null) {
-      attrs[match[1]] = match[2];
+      // match[2] = double-quoted value, match[3] = single-quoted value, match[4] = unquoted value
+      const value = match[2] || match[3] || match[4] || '';
+      attrs[match[1]] = value;
     }
 
     return attrs;

@@ -8,6 +8,7 @@
 
 import { FileWatcher } from '../../core/file-watcher.js';
 import { IncrementalBuilder } from '../../core/incremental-builder.js';
+import { createLogger } from '../../utils/logger.js';
 
 /**
  * WatchCommand implements the `unify watch` command
@@ -16,6 +17,7 @@ export class WatchCommand {
   constructor() {
     this.fileWatcher = new FileWatcher();
     this.incrementalBuilder = new IncrementalBuilder();
+    this.logger = createLogger('WATCH');
     this.isWatching = false;
     this.buildResults = [];
   }
@@ -33,6 +35,7 @@ export class WatchCommand {
    */
   async execute(options) {
     const startTime = Date.now();
+    let initialBuildCompleted = false;
 
     try {
       // Perform initial build
@@ -50,14 +53,21 @@ export class WatchCommand {
         };
       }
 
+      initialBuildCompleted = true;
+
       // Report initial build
       if (options.onBuild) {
-        options.onBuild({
-          type: 'initial',
-          processedFiles: initialBuildResult.processedFiles,
-          buildTime: initialBuildResult.buildTime,
-          timestamp: Date.now()
-        });
+        try {
+          options.onBuild({
+            type: 'initial',
+            processedFiles: initialBuildResult.processedFiles,
+            buildTime: initialBuildResult.buildTime,
+            timestamp: Date.now()
+          });
+        } catch (callbackError) {
+          // Log callback error but continue watching
+          console.warn('Build callback error:', callbackError.message);
+        }
       }
 
       // Start watching for changes
@@ -94,7 +104,7 @@ export class WatchCommand {
       return {
         success: false,
         error: error.message,
-        initialBuildCompleted: false,
+        initialBuildCompleted,
         watchingStarted: false,
         buildTime: Date.now() - startTime
       };
@@ -152,22 +162,37 @@ export class WatchCommand {
         }
 
         try {
+          this.logger.debug('Processing file change', { filePath: event.filePath });
           const result = await this.incrementalBuilder.performIncrementalBuild(
             event.filePath,
             options.source,
             options.output
           );
+          this.logger.debug('Build result', { success: result.success, rebuiltFiles: result.rebuiltFiles });
 
           if (result.success) {
             totalRebuiltFiles += result.rebuiltFiles || 0;
             allAffectedPages.push(...(result.affectedPages || []));
           }
+          
+          // Report any errors (including recoverable ones) from the build result
+          if (result.errors && result.errors.length > 0 && options.onError) {
+            for (const errorInfo of result.errors) {
+              this.logger.debug('Reporting result error to callback', { message: errorInfo.message, file: errorInfo.file });
+              // Create error object compatible with existing error handling
+              const error = new Error(errorInfo.message);
+              error.file = errorInfo.file;
+              error.type = errorInfo.type;
+              error.timestamp = errorInfo.timestamp;
+              options.onError(error);
+            }
+          }
         } catch (error) {
           if (error.name === 'RecoverableError' && error.isRecoverable) {
             // Report recoverable error to error callback but continue processing
-            console.log('[DEBUG] Caught recoverable error:', error.message);
+            this.logger.debug('Caught recoverable error', { message: error.message, file: error.file });
             if (options.onError) {
-              console.log('[DEBUG] Reporting error to onError callback');
+              this.logger.debug('Reporting error to callback');
               options.onError(error);
             }
             // Continue processing other files
@@ -180,14 +205,19 @@ export class WatchCommand {
 
       // Report incremental build
       if (options.onBuild) {
-        options.onBuild({
-          type: 'incremental',
-          changedFiles,
-          rebuiltFiles: totalRebuiltFiles,
-          affectedPages: allAffectedPages,
-          buildTime: Date.now() - Date.now(), // Will be calculated properly
-          timestamp: Date.now()
-        });
+        try {
+          options.onBuild({
+            type: 'incremental',
+            changedFiles,
+            rebuiltFiles: totalRebuiltFiles,
+            affectedPages: allAffectedPages,
+            buildTime: Date.now() - Date.now(), // Will be calculated properly
+            timestamp: Date.now()
+          });
+        } catch (callbackError) {
+          // Log callback error but continue watching
+          console.warn('Build callback error:', callbackError.message);
+        }
       }
 
     } catch (error) {

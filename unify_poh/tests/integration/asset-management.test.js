@@ -284,6 +284,18 @@ describe('Asset Management Integration', () => {
       const { FileWatcher } = await import('../../src/core/file-watcher.js');
       const fileWatcher = new FileWatcher();
       
+      // Set up dependency tracking by analyzing page content
+      await fileWatcher.dependencyTracker.trackPageDependencies(
+        join(sourceRoot, 'page1.html'), 
+        htmlContent, 
+        sourceRoot
+      );
+      await fileWatcher.dependencyTracker.trackPageDependencies(
+        join(sourceRoot, 'page2.html'), 
+        htmlContent, 
+        sourceRoot
+      );
+      
       // Track which pages reference the shared asset
       const dependentPages = await fileWatcher.findPagesDependingOnAsset(
         join(sourceRoot, 'shared.png'),

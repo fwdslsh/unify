@@ -418,10 +418,36 @@ describe("DOM Cascade Composition Integration", () => {
 </body>
 </html>`;
 
-      const mockFiles = {
-        'layout.html': layoutHtml,
-        'page.html': pageHtml
-      };
+      // Create mockFiles that mimic the real _buildFileSystemMap behavior
+      // Files are stored under multiple keys: absolute path, relative path, and filename
+      const { resolve, relative, basename } = require('path');
+      const sourceRoot = resolve('.');
+      const mockFiles = {};
+      
+      // Add layout.html under multiple keys like the real file system
+      const layoutPath = resolve(sourceRoot, 'layout.html');
+      const layoutRelativePath = relative(sourceRoot, layoutPath);
+      const layoutFilename = basename(layoutPath);
+      mockFiles[layoutPath] = layoutHtml;           // Absolute path
+      mockFiles[layoutRelativePath] = layoutHtml;   // Relative path 
+      mockFiles[layoutFilename] = layoutHtml;       // Filename only
+      
+      // Add page.html under multiple keys
+      const pagePath = resolve(sourceRoot, 'page.html');
+      const pageRelativePath = relative(sourceRoot, pagePath);
+      const pageFilename = basename(pagePath);
+      mockFiles[pagePath] = pageHtml;               // Absolute path
+      mockFiles[pageRelativePath] = pageHtml;       // Relative path
+      mockFiles[pageFilename] = pageHtml;           // Filename only
+      
+      // WORKAROUND: Also add _layout.html to handle short name resolution fallback
+      // When layout.html doesn't exist on real filesystem, ShortNameResolver tries _layout.html
+      const fallbackLayoutPath = resolve(sourceRoot, '_layout.html');
+      const fallbackLayoutRelativePath = relative(sourceRoot, fallbackLayoutPath);
+      const fallbackLayoutFilename = basename(fallbackLayoutPath);
+      mockFiles[fallbackLayoutPath] = layoutHtml;           // Absolute path
+      mockFiles[fallbackLayoutRelativePath] = layoutHtml;   // Relative path
+      mockFiles[fallbackLayoutFilename] = layoutHtml;       // Filename only
 
       const result = await processor.processFile('page.html', pageHtml, mockFiles, '.');
 

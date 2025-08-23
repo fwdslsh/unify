@@ -22,11 +22,15 @@ describe('Enhanced DependencyTracker', () => {
   });
 
   afterEach(() => {
-    tracker.clear();
-    try {
-      rmSync(tempDir, { recursive: true, force: true });
-    } catch (error) {
-      // Ignore cleanup errors
+    if (tracker) {
+      tracker.clear();
+    }
+    if (tempDir) {
+      try {
+        rmSync(tempDir, { recursive: true, force: true });
+      } catch (error) {
+        // Ignore cleanup errors
+      }
     }
   });
 

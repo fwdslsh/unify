@@ -78,17 +78,20 @@ describe('AssetCopier', () => {
       expect(readFileSync(expectedOutputPath, 'utf-8')).toBe(assetContent);
     });
 
-    test('should_skip_copy_when_asset_not_referenced', async () => {
-      const assetPath = join(sourceRoot, 'unreferenced.png');
+    test('should_copy_asset_when_directly_called', async () => {
+      // Per spec: copyAsset trusts the caller to only pass assets that should be copied
+      // Reference checking is done at the copyAllAssets level
+      const assetPath = join(sourceRoot, 'direct-copy.png');
       
-      // Create source asset but don't mark as referenced
-      writeFileSync(assetPath, 'unreferenced-content');
+      // Create source asset
+      writeFileSync(assetPath, 'direct-copy-content');
 
       const result = await assetCopier.copyAsset(assetPath, sourceRoot, outputRoot);
       
       expect(result.success).toBe(true);
-      expect(result.skipped).toBe(true);
-      expect(result.reason).toBe('Asset not referenced by any page');
+      expect(result.skipped).toBe(false);
+      expect(result.error).toBe(null);
+      expect(existsSync(join(outputRoot, 'direct-copy.png'))).toBe(true);
     });
 
     test('should_create_output_directories_when_they_dont_exist', async () => {
@@ -276,9 +279,9 @@ describe('AssetCopier', () => {
       expect(results).toHaveProperty('duration');
       
       expect(results.successCount).toBe(1);
-      expect(results.skippedCount).toBe(1);
+      expect(results.skippedCount).toBe(0); // Per spec: only referenced assets are processed
       expect(results.failureCount).toBe(0);
-      expect(results.totalAssets).toBe(2);
+      expect(results.totalAssets).toBe(1); // Only the referenced asset is processed
     });
   });
 
@@ -297,7 +300,9 @@ describe('AssetCopier', () => {
       const results = await assetCopier.copyAllAssets(sourceRoot, outputRoot);
       
       expect(results.successCount).toBe(1);
-      expect(results.skippedCount).toBe(1);
+      expect(results.skippedCount).toBe(0); // Per spec: only referenced assets are processed, unreferenced assets are not seen
+      expect(results.failureCount).toBe(0);
+      expect(results.totalAssets).toBe(1); // Only the referenced asset is processed
       expect(existsSync(join(outputRoot, 'referenced.png'))).toBe(true);
       expect(existsSync(join(outputRoot, 'unreferenced.png'))).toBe(false);
     });

@@ -10,6 +10,7 @@
 import { watch as fsWatch } from 'fs';
 import { DependencyTracker } from './dependency-tracker.js';
 import { FileClassifier } from './file-classifier.js';
+import { createLogger } from '../utils/logger.js';
 
 /**
  * Enhanced FileWatcher class for monitoring file changes and managing incremental rebuilds
@@ -18,6 +19,7 @@ export class FileWatcher {
   constructor() {
     this.dependencyTracker = new DependencyTracker();
     this.fileClassifier = new FileClassifier();
+    this.logger = createLogger('FILE-WATCHER');
     this.watchHandlers = new Map();
     this.isWatching = false;
     this.usesBunFsWatch = true; // Flag to indicate Bun fs.watch usage
@@ -25,6 +27,17 @@ export class FileWatcher {
     this.debounceTimers = new Map(); // Track debounce timers per directory
     this.currentAbortController = null; // Current operation abort controller
     this.pendingChanges = new Map(); // Track pending changes for batching
+    
+    // Allow injection of custom watch function for testing
+    this._watchFunction = fsWatch;
+  }
+
+  /**
+   * Set custom watch function for testing
+   * @param {Function} watchFunction - Custom watch function
+   */
+  setWatchFunction(watchFunction) {
+    this._watchFunction = watchFunction;
   }
 
   /**
@@ -75,7 +88,8 @@ export class FileWatcher {
 
     try {
       // Use Bun's native fs.watch API
-      const watcher = fsWatch(sourcePath, { recursive: watchOptions.recursive }, (eventType, filename) => {
+      const watcher = this._watchFunction(sourcePath, { recursive: watchOptions.recursive }, (eventType, filename) => {
+        this.logger.debug('File watcher event', { eventType, filename });
         if (filename) {
           const { join } = require('path');
           const fullPath = join(sourcePath, filename);
@@ -182,6 +196,8 @@ export class FileWatcher {
    */
   _handleFileChange(eventType, filePath, watchOptions) {
     try {
+      this.logger.debug('Handling file change', { eventType, filePath });
+      
       const { statSync, existsSync } = require('fs');
       
       // Determine if this is an addition, deletion, or modification
@@ -217,6 +233,7 @@ export class FileWatcher {
       }
 
       const debounceTimer = setTimeout(async () => {
+        this.logger.debug('Processing pending changes', { count: this.pendingChanges.size });
         await this._processPendingChanges(watchOptions);
         this.debounceTimers.delete(debounceKey);
       }, watchOptions.debounceMs || 100);
@@ -290,13 +307,24 @@ export class FileWatcher {
 
       if (changes.length === 0) return;
 
-      // Call onChange with batch of changes (always as array for consistency)
+      // Call onChange callback
       if (watchOptions.onChange) {
-        // Always send as array to ensure consistent handling of batched changes
-        if (watchOptions.onChange.length >= 2) {
-          await watchOptions.onChange(changes, abortSignal);
+        // For single changes, call with individual event object
+        // For multiple changes (batched), call with array
+        if (changes.length === 1) {
+          // Single change - send as individual event object
+          if (watchOptions.onChange.length >= 2) {
+            await watchOptions.onChange(changes[0], abortSignal);
+          } else {
+            await watchOptions.onChange(changes[0]);
+          }
         } else {
-          await watchOptions.onChange(changes);
+          // Multiple changes - send as array for batch processing
+          if (watchOptions.onChange.length >= 2) {
+            await watchOptions.onChange(changes, abortSignal);
+          } else {
+            await watchOptions.onChange(changes);
+          }
         }
       }
     } catch (error) {

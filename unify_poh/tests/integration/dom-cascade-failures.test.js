@@ -44,14 +44,6 @@ describe("DOM Cascade Implementation Failures", () => {
 
       const result = await processor.processFile('page.html', pageHtml, mockFiles, '.');
 
-      console.log('\n=== BASIC COMPOSITION FAILURE ===');
-      console.log('Expected: Full HTML document with composed content');
-      console.log('Actual result success:', result.success);
-      console.log('Actual HTML length:', result.html.length);
-      console.log('Actual HTML content:', result.html);
-      console.log('Expected to contain "Page Header":', result.html.includes('Page Header'));
-      console.log('Expected to contain "<!doctype html>":', result.html.includes('<!doctype html>'));
-
       // THESE SHOULD FAIL - demonstrating the core issue
       expect(result.html).toContain('<!doctype html>'); // Should have full document
       expect(result.html).toContain('<html'); // Should have html tag
@@ -101,11 +93,6 @@ describe("DOM Cascade Implementation Failures", () => {
       };
 
       const result = await processor.processFile('page.html', pageHtml, mockFiles, '.');
-
-      console.log('\n=== NESTED DATA-UNIFY FAILURE ===');
-      console.log('Result HTML:', result.html);
-      console.log('Contains data-unify in nav:', result.html.includes('data-unify="_includes/components/nav.html"'));
-      console.log('Contains any data-unify:', /data-unify/.test(result.html));
 
       // THIS SHOULD FAIL - nested data-unify should be removed
       expect(result.html).not.toContain('data-unify="_includes/components/nav.html"');
@@ -158,15 +145,6 @@ describe("DOM Cascade Implementation Failures", () => {
 
       const result = await processor.processFile('page.html', pageHtml, mockFiles, '.');
 
-      console.log('\n=== LAYOUT HIERARCHY FAILURE ===');
-      console.log('Result success:', result.success);
-      console.log('Result layouts processed:', result.layoutsProcessed);
-      console.log('Result HTML length:', result.html.length);
-      console.log('Result HTML preview:', result.html.substring(0, 200) + '...');
-      console.log('Contains Page Title:', result.html.includes('Page Title'));
-      console.log('Contains Page Header:', result.html.includes('Page Header'));
-      console.log('Contains Page Hero:', result.html.includes('Page Hero'));
-
       // THESE SHOULD FAIL - demonstrating hierarchy processing issues
       expect(result.success).toBe(true);
       expect(result.layoutsProcessed).toBeGreaterThan(1); // Should process multiple layouts
@@ -210,13 +188,6 @@ describe("DOM Cascade Implementation Failures", () => {
 
       const result = await processor.processFile('page.html', pageHtml, mockFiles, '.');
 
-      console.log('\n=== AREA MATCHING FAILURE ===');
-      console.log('Result HTML:', result.html);
-      console.log('Contains Page Primary:', result.html.includes('Page Primary Content'));
-      console.log('Contains Page Secondary:', result.html.includes('Page Secondary Content'));
-      console.log('Contains Page Tertiary:', result.html.includes('Page Tertiary Content'));
-      console.log('Contains Layout Primary:', result.html.includes('Layout Primary'));
-
       // THESE SHOULD FAIL - demonstrating area matching issues
       expect(result.html).toContain('Page Primary Content');
       expect(result.html).toContain('Page Secondary Content');
@@ -253,14 +224,8 @@ describe("DOM Cascade Implementation Failures", () => {
 
       const result = await processor.processFile('page.html', pageHtml, mockFiles, '.');
 
-      console.log('\n=== VALIDATION FAILURE ===');
-      console.log('Result success:', result.success);
-      console.log('Result error:', result.error);
-      console.log('Result HTML:', result.html);
-
       // Try validation
       const validation = processor.validateComposition(result.html);
-      console.log('Validation result:', validation);
 
       // DOM Cascade composition is working correctly - missing layouts fall back gracefully
       if (result.success) {
@@ -290,15 +255,6 @@ describe("DOM Cascade Implementation Failures", () => {
 
       // Remove extra whitespace for comparison
       const normalizedExpected = expectedOutput.replace(/\s+/g, ' ').trim();
-
-      console.log('\n=== EXPECTED COMPOSITION OUTPUT ===');
-      console.log('Expected structure:');
-      console.log('- Full HTML document with doctype');
-      console.log('- Page title wins over layout title');
-      console.log('- Page content replaces layout content in matching unify-* areas');
-      console.log('- No data-unify attributes remain');
-      console.log('- Valid HTML structure maintained');
-      console.log('\nExpected HTML:', normalizedExpected);
 
       expect(normalizedExpected).toContain('<!doctype html>');
       expect(normalizedExpected).toContain('Page Header');

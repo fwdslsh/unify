@@ -22,7 +22,15 @@ export class Logger {
     this.enabled = options.enabled !== false;
     this.logLevel = options.logLevel || this._detectLogLevel();
     this.component = options.component || 'UNIFY';
-    this.colors = options.colors !== false ? this._detectColorSupport() : false;
+    
+    // Handle colors option: explicit true/false overrides detection
+    if (options.colors === true) {
+      this.colors = true;
+    } else if (options.colors === false) {
+      this.colors = false;
+    } else {
+      this.colors = this._detectColorSupport();
+    }
     
     // Normalize log level
     this.logLevel = this._normalizeLogLevel(this.logLevel);
@@ -62,6 +70,15 @@ export class Logger {
    */
   debug(message, context = null) {
     this._log('debug', message, context);
+  }
+
+  /**
+   * Log a trace message (most verbose level)
+   * @param {string} message - Trace message
+   * @param {Object} context - Additional context information
+   */
+  trace(message, context = null) {
+    this._log('trace', message, context);
   }
 
   /**
@@ -273,14 +290,14 @@ export class Logger {
    */
   _detectLogLevel() {
     // Check for debug mode first (highest priority)
-    if (process.env.DEBUG === '1' || process.env.UNIFY_DEBUG === '1') {
+    if (process.env?.DEBUG === '1' || process.env?.UNIFY_DEBUG === '1') {
       return 'debug';
     }
     
     // Check LOG_LEVEL environment variable
-    const envLevel = process.env.LOG_LEVEL?.toLowerCase();
+    const envLevel = process.env?.LOG_LEVEL?.toLowerCase();
     if (envLevel) {
-      const validLevels = ['error', 'warn', 'info', 'debug', 'none'];
+      const validLevels = ['error', 'warn', 'info', 'debug', 'trace', 'none'];
       if (validLevels.includes(envLevel)) {
         return envLevel;
       }
@@ -302,14 +319,15 @@ export class Logger {
     }
     
     const normalized = level.toLowerCase().trim();
-    const validLevels = ['error', 'warn', 'info', 'debug', 'none'];
+    const validLevels = ['error', 'warn', 'info', 'debug', 'trace', 'none'];
     
     // Support abbreviated forms
     const abbreviations = {
       'e': 'error',
       'w': 'warn', 
       'i': 'info',
-      'd': 'debug'
+      'd': 'debug',
+      't': 'trace'
     };
     
     if (abbreviations[normalized]) {
@@ -330,15 +348,11 @@ export class Logger {
    */
   _detectColorSupport() {
     // Check for explicit color disable
-    if (process.env.NO_COLOR || process.env.TERM === 'dumb') {
+    if (process.env?.NO_COLOR || process.env?.TERM === 'dumb') {
       return false;
     }
     
-    // Check if we're in a TTY (but allow override in tests)
-    if (process.env.CLAUDECODE === '1') {
-      return true; // Enable colors in Claude Code test mode
-    }
-    
+    // Check if we're in a TTY
     if (!process.stdout?.isTTY) {
       return false;
     }
@@ -386,7 +400,8 @@ export class Logger {
       error: 'red',
       warn: 'yellow',
       info: 'blue',
-      debug: 'gray'
+      debug: 'gray',
+      trace: 'magenta'
     };
     
     return levelColors[level] || 'blue';

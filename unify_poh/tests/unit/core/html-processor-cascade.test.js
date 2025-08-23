@@ -7,17 +7,33 @@
  * integration tests.
  */
 
-import { describe, it, expect, beforeEach } from "bun:test";
+import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { HtmlProcessor } from "../../../src/core/html-processor.js";
 import { PathValidator } from "../../../src/core/path-validator.js";
+import { join } from 'path';
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'fs';
+import { tmpdir } from 'os';
 
 describe("HTML Processor DOM Cascade Unit Tests", () => {
   let processor;
   let pathValidator;
+  let testDir;
+  let sourceRoot;
 
   beforeEach(() => {
+    // Create proper test directory structure
+    testDir = mkdtempSync(join(tmpdir(), 'html-processor-cascade-test-'));
+    sourceRoot = join(testDir, 'src');
+    mkdirSync(sourceRoot, { recursive: true });
+    
     pathValidator = new PathValidator();
     processor = new HtmlProcessor(pathValidator);
+  });
+
+  afterEach(() => {
+    if (testDir) {
+      rmSync(testDir, { recursive: true, force: true });
+    }
   });
 
   describe("Data-unify attribute extraction and removal", () => {
@@ -101,15 +117,21 @@ describe("HTML Processor DOM Cascade Unit Tests", () => {
       `;
       
       const pageHtml = `
-        <html data-unify="layout.html">
+        <html data-unify="_layout.html">
           <body>
             <div class="unify-content">Page content</div>
           </body>
         </html>
       `;
       
-      const mockFiles = { 'layout.html': layoutHtml };
-      const result = await processor.processFile('page.html', pageHtml, mockFiles, '.');
+      // Write test files to proper directory structure with underscore prefix (valid pattern)
+      const layoutPath = join(sourceRoot, '_layout.html');
+      const pagePath = join(sourceRoot, 'page.html');
+      writeFileSync(layoutPath, layoutHtml);
+      writeFileSync(pagePath, pageHtml);
+      
+      const mockFiles = { '_layout.html': layoutHtml };
+      const result = await processor.processFile('page.html', pageHtml, mockFiles, sourceRoot);
       
       expect(result.success).toBe(true);
       expect(result.html).toContain('Page content');

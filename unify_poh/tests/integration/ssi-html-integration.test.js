@@ -79,7 +79,7 @@ describe('SSI-HTML Integration', () => {
       expect(result.html).toContain('<title>Page Title</title>');
       expect(result.html).not.toContain('<!--#include file="header.html" -->');
       // DOM Cascade composition should have the main element (the class attribute may be merged differently)
-      expect(result.html).toContain('<main>');
+      expect(result.html).toMatch(/<main[^>]*>/);
       
       // Verify SSI statistics
       const stats = processor.getCacheStats();
@@ -124,7 +124,7 @@ describe('SSI-HTML Integration', () => {
       // Assert
       expect(result.success).toBe(true);
       expect(result.html).toContain(navContent);
-      expect(result.html).toContain('<main>Page content</main>');
+      expect(result.html).toMatch(/<main[^>]*>Page content<\/main>/);
       expect(result.html).not.toContain('<!--#include file="nav.html" -->');
     });
 

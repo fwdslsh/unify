@@ -3,7 +3,7 @@
  * Comprehensive coverage for DOM Cascade v1 head element merging
  */
 
-import { describe, test, expect } from 'bun:test';
+import { describe, test, expect, beforeEach } from 'bun:test';
 import { HeadMerger } from '../../../src/core/cascade/head-merger.js';
 
 describe('HeadMerger Coverage Enhancement', () => {

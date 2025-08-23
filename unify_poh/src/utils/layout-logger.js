@@ -190,8 +190,8 @@ export class LayoutLogger {
    * @returns {number} Log level (0=none, 1=errors/warnings, 2=info, 3=debug)
    */
   _getLogLevel() {
-    const envLevel = process.env.LOG_LEVEL?.toLowerCase();
-    const debugMode = process.env.DEBUG === '1' || process.env.UNIFY_DEBUG === '1';
+    const envLevel = process.env?.LOG_LEVEL?.toLowerCase();
+    const debugMode = process.env?.DEBUG === '1' || process.env?.UNIFY_DEBUG === '1';
     
     if (debugMode) return 3;
     
@@ -211,9 +211,9 @@ export class LayoutLogger {
    * @returns {boolean} True if debug is enabled
    */
   _isDebugEnabled() {
-    return process.env.DEBUG === '1' || 
-           process.env.UNIFY_DEBUG === '1' || 
-           process.env.LOG_LEVEL?.toLowerCase() === 'debug';
+    return process.env?.DEBUG === '1' || 
+           process.env?.UNIFY_DEBUG === '1' || 
+           process.env?.LOG_LEVEL?.toLowerCase() === 'debug';
   }
 
   /**

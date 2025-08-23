@@ -11,16 +11,21 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
 
     <!-- Contract: public areas for the root layout -->
-    <style data-unify-docs>
-        /* unify:contract v1
-     Public areas exposed by root layout
-  */
-        .unify-header {}
+    <style data-unify-docs="v1">
+        /* Public areas: add these classes in a page to override content.
+           Keep selectors low-specificity and unique per scope. */
 
-        /* Global header (contains brand + nav) */
-        .unify-footer {}
+        /* Global header containing brand and navigation */
+        .unify-header {
+        }
 
-        /* Global footer */
+        /* Primary navigation container with menu items */
+        .unify-main-nav {
+        }
+
+        /* Global footer with copyright and links */
+        .unify-footer {
+        }
     </style>
 
     <!-- Basic root styling (illustrative) -->
@@ -44,6 +49,39 @@
             margin-top: 3rem;
             padding-top: 1.5rem;
         }
+
+        .nav {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .nav a {
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .nav-toggle {
+            display: none;
+            background: none;
+            border: none;
+            cursor: pointer;
+        }
+
+        @media (max-width: 640px) {
+            .nav {
+                display: none;
+            }
+
+            .nav[aria-expanded="true"] {
+                display: flex;
+                flex-direction: column;
+            }
+
+            .nav-toggle {
+                display: inline-flex;
+            }
+        }
     </style>
 
     <!-- External JS lib (available to all layers) -->
@@ -54,8 +92,19 @@
     <header class="unify-header">
         <div class="container">
             <div class="brand">ACME</div>
-            <!-- Import the nav component into the header area -->
-            <nav data-unify="_includes/components/nav.html"></nav>
+            <!-- Nav area will be replaced by page content -->
+            <div class="unify-main-nav" x-data="{ navOpen: false }">
+                <button class="nav-toggle" aria-controls="primary-nav" 
+                    :aria-expanded="navOpen" 
+                    @click="navOpen = !navOpen">
+                    <i class="bi bi-list"></i>
+                </button>
+                <nav id="primary-nav" class="nav" :aria-expanded="navOpen">
+                    <a href="/">Home</a>
+                    <a href="/docs">Docs</a>
+                    <a href="/blog">Blog</a>
+                </nav>
+            </div>
         </div>
     </header>
 

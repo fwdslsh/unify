@@ -377,7 +377,7 @@ Basic Options:
   -h, --help             Show this help
   -V, --version          Show version
   --config <file>        Configuration file path (unify.config.yaml)
-  --log-level <level>    Set logging verbosity level (error|warn|info|debug, default: info)
+  --log-level <level>    Set logging verbosity level (error|warn|info|debug|trace, default: info)
   --pretty-urls          Transform HTML links to pretty URL structure
   --minify               Enable HTML minification for production builds
 
@@ -577,13 +577,13 @@ For more information, visit: https://github.com/fwdslsh/unify
    */
   _applyEnvironmentVariables(result) {
     // Handle log level environment variables
-    const debugMode = process.env.DEBUG === '1' || process.env.UNIFY_DEBUG === '1';
+    const debugMode = process.env?.DEBUG === '1' || process.env?.UNIFY_DEBUG === '1';
     if (debugMode) {
       result.logLevel = 'debug';
-    } else if (process.env.LOG_LEVEL) {
-      const originalValue = process.env.LOG_LEVEL;
+    } else if (process.env?.LOG_LEVEL) {
+      const originalValue = process.env?.LOG_LEVEL;
       const envLogLevel = this._normalizeLogLevel(originalValue);
-      const validLevels = ['error', 'warn', 'info', 'debug'];
+      const validLevels = ['error', 'warn', 'info', 'debug', 'trace'];
       
       // Check if normalization actually found a valid level
       if (envLogLevel && validLevels.includes(envLogLevel)) {
@@ -627,7 +627,7 @@ For more information, visit: https://github.com/fwdslsh/unify
     }
     
     const normalized = level.toLowerCase().trim();
-    const validLevels = ['error', 'warn', 'info', 'debug'];
+    const validLevels = ['error', 'warn', 'info', 'debug', 'trace'];
     
     // Support abbreviated forms
     const abbreviations = {
