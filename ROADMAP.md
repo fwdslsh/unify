@@ -72,7 +72,6 @@ This document outlines the development roadmap for unify, showing completed feat
 - **Enhanced SEO features** including Open Graph and JSON-LD structured data
 - **Performance optimization** with asset minification and compression
 - **Dead link detection** with broken link reporting and validation
-- **Image optimization** with automatic resizing and format conversion
 
 ### Advanced Templating
 
