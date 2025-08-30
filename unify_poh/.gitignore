@@ -1,5 +1,0 @@
-test-*
-*.backup
-*_results.log
-*-output.log
-test-temp-*/

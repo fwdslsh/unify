@@ -1,11 +1,16 @@
-<template slot="title">Welcome to Unify</template>
-<template slot="header">
+<html data-import="/_includes/layout.html">
+<head>
+  <title data-target="title">Welcome to Unify</title>
+</head>
+<body>
+
+<template data-target="header">
   <h1>🧱 Unify</h1>
   <p>Convention-based static site generator</p>
 </template>
 
-<!-- This notice box uses element slot - visible in raw view -->
-<div slot="notice" style="background: #f0f8ff; padding: 1rem; margin: 1rem 0; border: 1px solid #0066cc; border-radius: 4px;">
+<!-- This notice box uses data-target - visible in raw view -->
+<div data-target="notice" style="background: #f0f8ff; padding: 1rem; margin: 1rem 0; border: 1px solid #0066cc; border-radius: 4px;">
   <strong>Welcome!</strong> This notice is visible even when viewing the source file directly.
 </div>
 
@@ -21,7 +26,10 @@
 
 <!--#include virtual="/_includes/navigation.html" -->
 
-<template slot="footer">
+<template data-target="footer">
   <p>© 2025 - Built with Unify</p>
   <p><a href="https://github.com/fwdslsh/unify">View on GitHub</a></p>
 </template>
+
+</body>
+</html>

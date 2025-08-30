@@ -1,0 +1,68 @@
+<!-- Reusable card component with multiple slots -->
+<article class="card-component">
+  <header class="card-header">
+    <slot name="card-title">
+      <h3>Default Card Title</h3>
+    </slot>
+  </header>
+  
+  <div class="card-body">
+    <slot name="card-body">
+      <!-- Default slot for card body content -->
+      <slot>
+        <p>Default card content. Provide content via data-target="card-body" or as default content.</p>
+      </slot>
+    </slot>
+  </div>
+  
+  <footer class="card-footer">
+    <slot name="card-footer">
+      <span class="card-meta">No footer content provided</span>
+    </slot>
+  </footer>
+</article>
+
+<style>
+  .card-component {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+  
+  .card-header {
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #e0e0e0;
+    background: #f8f9fa;
+  }
+  
+  .card-header h3 {
+    margin: 0;
+    color: #333;
+  }
+  
+  .card-body {
+    padding: 1.5rem;
+    flex: 1;
+  }
+  
+  .card-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid #e0e0e0;
+    background: #f8f9fa;
+  }
+  
+  .card-footer .btn {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    background: #007bff;
+    color: white;
+    text-decoration: none;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+  }
+  
+  .card-footer .btn:hover {
+    background: #0056b3;
+  }
+</style>

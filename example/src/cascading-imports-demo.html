@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html data-import="/_includes/layout.html">
+<head>
+  <title data-target="title">Cascading Imports Demo - Unify</title>
+  <meta name="description" content="Demonstration of Unify's Cascading Imports system">
+  <style>
+    .demo-section {
+      background: #f5f5f5;
+      padding: 2rem;
+      margin: 2rem 0;
+      border-radius: 8px;
+    }
+    .feature-card {
+      background: white;
+      padding: 1.5rem;
+      margin: 1rem 0;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Main content for the default slot -->
+<section class="hero">
+  <h1>Cascading Imports Demonstration</h1>
+  <p>This page demonstrates the proper use of Unify's Cascading Imports system with <code>data-import</code>, <code>slot</code>, and <code>data-target</code> attributes.</p>
+</section>
+
+<section class="demo-section">
+  <h2>How It Works</h2>
+  
+  <div class="feature-card">
+    <h3>1. Layout Import</h3>
+    <p>This page imports the layout using <code>data-import="/_includes/layout.html"</code> on the root <code>&lt;html&gt;</code> element.</p>
+  </div>
+  
+  <div class="feature-card">
+    <h3>2. Slot Targeting</h3>
+    <p>The <code>&lt;title&gt;</code> element uses <code>data-target="title"</code> to replace the title slot in the layout.</p>
+  </div>
+  
+  <div class="feature-card">
+    <h3>3. Default Slot</h3>
+    <p>All content not specifically targeted goes into the unnamed/default slot in the layout's <code>&lt;main&gt;</code> element.</p>
+  </div>
+  
+  <div class="feature-card">
+    <h3>4. Head Merging</h3>
+    <p>The <code>&lt;head&gt;</code> content from this page is intelligently merged with the layout's head, with page content taking precedence.</p>
+  </div>
+</section>
+
+<section class="demo-section">
+  <h2>Key Features</h2>
+  <ul>
+    <li><strong>Clean HTML Syntax:</strong> No special DSL, just standard HTML with data attributes</li>
+    <li><strong>Predictable Cascade:</strong> Layout → Components → Page (like CSS layers)</li>
+    <li><strong>Smart Deduplication:</strong> Automatic handling of duplicate meta tags and assets</li>
+    <li><strong>Fallback Content:</strong> Slots can have default content when not overridden</li>
+    <li><strong>Nested Composition:</strong> Layouts can import other layouts, components can have slots</li>
+  </ul>
+</section>
+
+<section class="demo-section">
+  <h2>Example Code</h2>
+  <pre style="background: #1a1a1a; color: #fff; padding: 1rem; border-radius: 4px; overflow-x: auto;">
+&lt;!-- Layout file with slots --&gt;
+&lt;html&gt;
+  &lt;head&gt;
+    &lt;slot name="title"&gt;&lt;title&gt;Default Title&lt;/title&gt;&lt;/slot&gt;
+  &lt;/head&gt;
+  &lt;body&gt;
+    &lt;header&gt;
+      &lt;slot name="header"&gt;Default Header&lt;/slot&gt;
+    &lt;/header&gt;
+    &lt;main&gt;
+      &lt;slot&gt;&lt;!-- Default content slot --&gt;&lt;/slot&gt;
+    &lt;/main&gt;
+  &lt;/body&gt;
+&lt;/html&gt;
+
+&lt;!-- Page using the layout --&gt;
+&lt;html data-import="/layouts/base.html"&gt;
+  &lt;head&gt;
+    &lt;title data-target="title"&gt;My Page&lt;/title&gt;
+  &lt;/head&gt;
+  &lt;body&gt;
+    &lt;div data-target="header"&gt;Custom Header&lt;/div&gt;
+    &lt;!-- This content goes to default slot --&gt;
+    &lt;p&gt;Page content here...&lt;/p&gt;
+  &lt;/body&gt;
+&lt;/html&gt;
+  </pre>
+</section>
+
+</body>
+</html>

@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html data-import="/_includes/layout.html">
+<head>
+  <title data-target="title">Component Slots Demo - Unify</title>
+  <meta name="description" content="Demonstration of component imports with slot-based content injection">
+  <style>
+    .components-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 2rem;
+      margin: 2rem 0;
+    }
+    .card-demo {
+      background: white;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+
+<section class="hero">
+  <h1>Component Slots Demonstration</h1>
+  <p>This page shows how to use <code>data-import</code> with components and pass content to their slots using <code>data-target</code>.</p>
+</section>
+
+<section class="container">
+  <h2>Card Components with Slots</h2>
+  <p>Each card below is imported as a component and receives custom content via slots:</p>
+  
+  <div class="components-grid">
+    <!-- Card 1: Using template for slot content -->
+    <div class="card-demo" data-import="/_includes/card-with-slots.html">
+      <template data-target="card-title">
+        <h3>Feature One</h3>
+      </template>
+      <template data-target="card-body">
+        <p>This content is injected into the card's body slot using a template element with data-target.</p>
+      </template>
+      <template data-target="card-footer">
+        <a href="/learn-more" class="btn">Learn More</a>
+      </template>
+    </div>
+    
+    <!-- Card 2: Using regular elements for slot content -->
+    <div class="card-demo" data-import="/_includes/card-with-slots.html">
+      <div data-target="card-title">
+        <h3>Feature Two</h3>
+      </div>
+      <div data-target="card-body">
+        <p>Regular div elements can also target slots when using data-target attribute.</p>
+        <ul>
+          <li>No template wrapper needed</li>
+          <li>Content remains visible in source</li>
+          <li>Great for progressive enhancement</li>
+        </ul>
+      </div>
+      <div data-target="card-footer">
+        <button class="btn">Get Started</button>
+      </div>
+    </div>
+    
+    <!-- Card 3: Mixed content with default slot -->
+    <div class="card-demo" data-import="/_includes/card-with-slots.html">
+      <h3 data-target="card-title">Feature Three</h3>
+      <!-- Content without data-target goes to the default slot -->
+      <p>This paragraph has no data-target, so it goes to the card's default slot.</p>
+      <p>Multiple elements without data-target all go to the same default slot.</p>
+      <template data-target="card-footer">
+        <span>Status: Active</span>
+      </template>
+    </div>
+  </div>
+</section>
+
+<section class="container">
+  <h2>Navigation Component with Multiple Slots</h2>
+  
+  <nav data-import="/_includes/nav-with-slots.html">
+    <a href="/" data-target="brand">
+      <strong>MyBrand</strong>
+    </a>
+    
+    <template data-target="nav-links">
+      <a href="/">Home</a>
+      <a href="/products">Products</a>
+      <a href="/about">About</a>
+      <a href="/contact">Contact</a>
+    </template>
+    
+    <template data-target="nav-actions">
+      <button class="btn-search">Search</button>
+      <button class="btn-account">Account</button>
+    </template>
+  </nav>
+</section>
+
+<section class="container">
+  <h2>Important Notes</h2>
+  
+  <div class="card">
+    <h3>Template vs Regular Elements</h3>
+    <ul>
+      <li><code>&lt;template data-target="..."&gt;</code> - Content is hidden until processed, good for progressive enhancement</li>
+      <li><code>&lt;div data-target="..."&gt;</code> - Content is visible in source, maintains semantic HTML</li>
+      <li>Both approaches work equally well for slot injection</li>
+    </ul>
+  </div>
+  
+  <div class="card">
+    <h3>Processing Rules</h3>
+    <ul>
+      <li>The <code>data-import</code> and <code>data-target</code> attributes are removed from final output</li>
+      <li><code>&lt;slot&gt;</code> and <code>&lt;template&gt;</code> elements are replaced with their content</li>
+      <li>Content without <code>data-target</code> goes to the unnamed/default slot</li>
+      <li>If no content is provided for a slot, the slot's default content is used</li>
+    </ul>
+  </div>
+</section>
+
+</body>
+</html>

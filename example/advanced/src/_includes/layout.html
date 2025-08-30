@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title data-slot="title">Untitled</title>
+    <slot name="title"><title>Untitled</title></slot>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="/styles/site.css">
@@ -10,24 +10,24 @@
     <!--#include virtual="/_includes/header.html" -->
     
     <!-- Notice slot for visible content -->
-    <div data-slot="notice"></div>
+    <slot name="notice"></slot>
     
     <!-- Alert slot for demo -->
-    <div data-slot="alert"></div>
+    <slot name="alert"></slot>
     
     <!-- Sidebar slot for navigation -->
     <aside class="sidebar">
-      <div data-slot="sidebar">
+      <slot name="sidebar">
         <h3>Default Sidebar</h3>
         <p>No custom sidebar content provided.</p>
-      </div>
+      </slot>
     </aside>
     
-    <main class="default-layout" data-slot="default">
-      <!-- default slot receives default content -->
+    <main class="default-layout">
+      <slot><!-- default slot receives default content --></slot>
     </main>
     <footer>
-      <div data-slot="footer">&copy; 2025</div>
+      <slot name="footer">&copy; 2025</slot>
     </footer>
   </body>
 </html>

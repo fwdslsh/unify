@@ -91,3 +91,4 @@ test/fixtures/*-test-*/
 .unify-cache/
 .vendor/
 .coverage/
+test-*

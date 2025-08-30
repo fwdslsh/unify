@@ -1,0 +1,80 @@
+<!-- Navigation component with multiple slots for brand, links, and actions -->
+<nav class="navbar-component">
+  <div class="navbar-brand">
+    <slot name="brand">
+      <a href="/">DefaultBrand</a>
+    </slot>
+  </div>
+  
+  <div class="navbar-links">
+    <slot name="nav-links">
+      <!-- Default navigation links -->
+      <a href="/">Home</a>
+      <a href="/about">About</a>
+      <a href="/contact">Contact</a>
+    </slot>
+  </div>
+  
+  <div class="navbar-actions">
+    <slot name="nav-actions">
+      <!-- Default actions -->
+      <button class="btn-signin">Sign In</button>
+    </slot>
+  </div>
+</nav>
+
+<style>
+  .navbar-component {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 2rem;
+    background: #2c3e50;
+    color: white;
+  }
+  
+  .navbar-brand a {
+    color: white;
+    text-decoration: none;
+    font-size: 1.25rem;
+    font-weight: bold;
+  }
+  
+  .navbar-links {
+    display: flex;
+    gap: 2rem;
+    flex: 1;
+    justify-content: center;
+  }
+  
+  .navbar-links a {
+    color: white;
+    text-decoration: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    transition: background 0.2s;
+  }
+  
+  .navbar-links a:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+  
+  .navbar-actions {
+    display: flex;
+    gap: 1rem;
+  }
+  
+  .navbar-actions button {
+    padding: 0.5rem 1rem;
+    background: white;
+    color: #2c3e50;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+  }
+  
+  .navbar-actions button:hover {
+    background: #ecf0f1;
+  }
+</style>
