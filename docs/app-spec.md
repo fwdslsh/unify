@@ -1,8 +1,25 @@
 # Unify Static Site Generator - Complete Application Specification (Updated)
 
+**Status**: v0 - References DOM Cascade v1
+
+## Spec Roles
+
+- **DOM Cascade (v1)** — _Normative_ definition of composition behavior: layers, scopes, matching, replacement, attribute/head merge, and linter rules.
+- **App Spec (v0)** — _Normative_ definition of CLI, build pipeline, file layout, config, plugin points, design-time runner, and tooling UX.
+
+**Single-source rule:** Any behavior that affects DOM merging MUST conform to **DOM Cascade v1**.
+
+## Normative Reference
+
+This document is a companion to **Unify DOM Cascade v1**. All DOM composition behavior is **normatively defined** in the DOM Cascade. This document references those rules and defines CLI, configuration, tooling, and UX around them.
+
 ## Overview
 
-Unify is a modern, lightweight static site generator designed for frontend developers who want to build maintainable static sites with fragment-based architecture. It produces framework-free, pure HTML/CSS output and emphasizes authoring with standard HTML, CSS, and JS — no special build-time DSLs. Developers can preview layouts, fragments, and pages locally without complex tooling, while still benefiting from composition, slotting, and head merging using Cascading Imports.
+Unify is a modern, lightweight static site generator designed for frontend developers who want to build maintainable static sites with fragment-based architecture. It produces framework-free, pure HTML/CSS output and emphasizes authoring with standard HTML, CSS, and JS — no special build-time DSLs. Developers can preview layouts, fragments, and pages locally without complex tooling, while still benefiting from area-based composition and head merging using DOM Cascade.
+
+## Conformance to DOM Cascade
+
+The Unify compiler and design-time runner **MUST** implement the algorithm and semantics defined in **DOM Cascade v1** (sections: Layers & Scopes, Matching & Replacement, Head & Assets, Accessibility & IDs). In case of conflict, the DOM Cascade is the source of truth for DOM behavior.
 
 ## Target Users
 
@@ -10,6 +27,81 @@ Unify is a modern, lightweight static site generator designed for frontend devel
 - Content creators needing a simple static site generator
 - Teams that want fragment-based architecture without a framework
 - Developers who prefer convention-over-configuration with minimal setup
+
+## Terminology
+
+**Core Terms (imported from DOM Cascade v1):**
+
+- **Area**: Public regions exposed by class selectors (e.g., `.unify-hero`)
+- **Scope/Boundary**: Each layout body or imported component root
+- **Layer order**: `layout → components → page`
+- **Public contract**: Documented set of public selectors
+- **Ordered fill**: Fallback matching mechanism
+- **Landmark fallback**: Matching by unique semantic elements
+- **Contract block**: `<style data-unify-docs>` documentation
+
+App-spec reuses these terms by reference; definitions are normative in DOM Cascade v1.
+
+## Composition Surface (Authoring Model)
+
+**Normative Surface (see DOM Cascade v1):**
+
+- `data-unify` (on `<html>`/`<body>` for layouts, any element for components)
+- Public areas exposed via class selectors (e.g., `.unify-hero`) and documented in `<style data-unify-docs>` blocks
+
+See **DOM Cascade v1 § Minimal Attribute Surface, Public Areas & Docs** for complete semantics.
+
+## Special HTML Attributes & Elements
+
+Unify processes specific data attributes and HTML elements during build to enable its fragment-based architecture:
+
+### Data Attributes
+
+- **`data-unify`** - Imports and composes layouts/components
+
+  - On `<html>` or `<body>`: triggers layout mode with layout chaining
+  - On any other element: triggers component mode with inline composition
+  - Supports path resolution: absolute (`/layouts/base.html`), relative (`../shared/nav.html`), or short names (`blog` → `_blog.layout.html`)
+  - Removed from final output
+
+- **`data-layer`** - CSS layering hints for stylesheets (optional, future-compatible)
+  - Used on `<link>` and `<style>` elements to align with CSS `@layer`
+  - Provides hints to fragment consumers for CSS layer organization
+  - No current functionality but forward-compatible for future features
+
+### HTML Elements
+
+**Public Areas** - Content regions exposed via class selectors (see DOM Cascade v1 § Public Areas)
+
+- Layout/component authors expose areas using classes like `.unify-hero`, `.unify-nav`
+- Page authors target these areas by using matching class names
+- Area matching follows DOM Cascade v1 precedence: Area → Landmark → Ordered fill
+- Class names must be unique per scope and use `unify-` prefix
+
+- **`<head>`** - Document metadata merged globally across fragments
+
+  - Content from layout `<head>` + page `<head>` is intelligently merged
+  - Deduplication by element type: `<title>` (last wins), `<meta>` (by name/property), `<link>` (by rel+href)
+  - Page head content takes precedence over layout/fragment head content
+
+- **`<body>`** - Document body with class merging and content composition
+
+  - `class` attributes are merged (not overwritten) across layout/fragments/page
+  - Body content follows DOM Cascade v1 composition rules
+  - Can have `data-unify` on `<body>` element for layout application
+
+- **`<meta>`** - Metadata elements with smart deduplication
+  - Deduplicated by `name`, `property`, or `http-equiv` attributes during head merge
+  - Can be synthesized from Markdown frontmatter (`description` → `<meta name="description">`)
+  - Page meta wins over fragment meta when conflicts occur
+
+### Special Processing Rules
+
+- **Attribute Removal**: `data-unify` and `data-layer` attributes are stripped from final output
+- **Path Resolution**: All `data-unify` paths support both absolute/relative file paths and short name resolution
+- **Nested Composition**: Layout and component imports work recursively
+- **Area Matching**: Content replaces areas per DOM Cascade v1 matching precedence
+- **Attribute Merging**: Host element attributes merge with page content per DOM Cascade v1 rules
 
 ## Core Functionality
 
@@ -22,9 +114,20 @@ Unify is a modern, lightweight static site generator designed for frontend devel
 
 Transform source HTML/Markdown files with intelligent imports into a complete static website ready for deployment.
 
+### Composition Engine
+
+**Normative Incorporation**
+The Unify composition engine **MUST** execute the **DOM Cascade v1** algorithm exactly (matching precedence, replacement semantics, attribute merge, scoping).
+
+- Matching order: **Area** → **Landmark** → **Ordered fill**
+- Replacement: keep host element; replace children; merge attributes (page wins; class union; host `id` stability with reference rewrite)
+- Head merge and asset ordering per DOM Cascade v1
+
+The app-spec does not restate these rules.
+
 ### Key Features
 
-- **Cascading Imports** (`data-import`/`slot` / `data-target`): Unified mechanism for fragments composition
+- **Area-based Composition** (`data-unify` + area classes): Unified mechanism for layout/component composition per DOM Cascade v1
 - **Includes (Legacy)**: Apache SSI-style includes for backwards compatibility
 - **Markdown**: YAML frontmatter support, head synthesis, and conversion to HTML
 
@@ -34,6 +137,86 @@ Transform source HTML/Markdown files with intelligent imports into a complete st
 - Incremental builds with smart dependency tracking
 - Asset tracking and copying
 - Security-first design with path traversal prevention
+
+## Inter-Spec Versioning
+
+- App-spec v0 targets **DOM Cascade v1.x**
+- App-spec **MUST NOT** redefine cascade behavior; updates to cascade require bumping `dom_cascade.version`
+- Patch/minor of DOM Cascade **MUST NOT** change normative behavior; major indicates breaking changes
+
+## Security & Build Safety
+
+Unify prioritizes security and provides mechanisms to prevent deployment of potentially unsafe content, especially important for CI/CD pipelines and production deployments.
+
+### Security Warnings
+
+During the build process, Unify performs security scans of all processed HTML content and displays clear warnings for potential security vulnerabilities. These warnings include:
+
+**Warning Format:**
+
+```text
+[SECURITY] XSS Risk: Event handler detected in <meta> tag (src/page.html:15)
+[SECURITY] JavaScript URL: Potential XSS vector in href attribute (src/components/nav.html:8)
+[SECURITY] Content Injection: Unescaped content in <title> tag (src/blog/post.html:3)
+```
+
+**Security Tags:**
+
+- All security-related warnings are prefixed with `[SECURITY]` for easy filtering in CI/CD systems
+- Specific vulnerability types are identified (XSS Risk, JavaScript URL, Content Injection, etc.)
+- File paths and line numbers are provided for quick remediation
+
+### Build Failure on Security Issues
+
+To prevent insecure applications from being deployed via automated pipelines, Unify provides build failure options:
+
+**`--fail-on security`**
+
+- Fails the build (exit code 1) when any security warnings are detected
+- Essential for CI/CD pipelines that must not deploy potentially vulnerable sites
+- Recommended for production deployments
+
+**`--fail-on <level>`**
+
+- Can be combined with security checks (e.g., `--fail-on warning` includes security warnings)
+- Provides granular control over which issues should block deployment
+
+### CI/CD Integration
+
+**Example CI/CD Pipeline:**
+
+```bash
+# Development build (warnings only)
+unify build --source src --output dist
+
+# Production build (fail on security issues)
+unify build --source src --output dist --fail-on security --minify
+```
+
+**Log Filtering:**
+
+```bash
+# Extract only security warnings for security team review
+unify build 2>&1 | grep "\[SECURITY\]"
+
+# Count security issues
+unify build 2>&1 | grep -c "\[SECURITY\]"
+```
+
+### Security Best Practices
+
+1. **Always use `--fail-on security` in production CI/CD pipelines**
+2. **Review security warnings in development builds before deployment**
+3. **Monitor security logs and address issues promptly**
+4. **Use content security policies (CSP) as an additional layer of protection**
+5. **Regularly audit and update content to maintain security standards**
+
+### Supported Security Checks
+
+- **Path Traversal**: Prevention of file access outside the source directory
+- **XSS Prevention**: Detection of potentially dangerous event handlers and JavaScript URLs
+- **Content Injection**: Identification of unescaped content in sensitive HTML elements
+- **HTML Injection**: Detection of potential HTML injection vectors in processed content
 
 ## Command Line Interface
 
@@ -45,7 +228,7 @@ Transform source HTML/Markdown files with intelligent imports into a complete st
 
 #### 1. `build` (Default Command)
 
-Builds the static site from source files to output directory.
+Builds the static site from source files to output directory. **MUST** run DOM Cascade v1.
 
 **Syntax:**
 
@@ -75,6 +258,9 @@ unify            # Defaults to build command
 
 Starts development server with live reload functionality.
 
+**Design-Time Parity**
+The browser runner **MUST** produce DOM identical to the build output by executing **DOM Cascade v1**. Hot reload, dependency tracking, and error surfacing are app-spec concerns; DOM differences are not allowed.
+
 **Syntax:**
 
 ```bash
@@ -100,7 +286,7 @@ unify serve [options]
 
 #### 3. `watch`
 
-Watches files and rebuilds on changes without serving.
+Watches files and rebuilds on changes without serving. **MUST** run DOM Cascade v1 for each rebuild.
 
 **Syntax:**
 
@@ -180,7 +366,7 @@ unify init
 # Initialize with blog template
 unify init blog
 
-# Initialize with docs template  
+# Initialize with docs template
 unify init docs
 ```
 
@@ -243,7 +429,7 @@ unify init docs
 - **Default:** `null`
 - **Used by:** All commands
 - **Format:** Ripgrep/gitignore-style glob patterns like `"experiments/**"`
-- **Behavior:** Useful for rendering "hidden" or experimental content. Precedence for a renderable file: `--render` overrides `--ignore-render`/`--ignore` → classify as **EMIT**. If a file matches both render and copy rules, **render wins** so raw templates don't leak.
+- **Behavior:** Useful for rendering "hidden" or experimental content. Precedence for a renderable file: `--render` overrides `--ignore-render`/`--ignore` → classify as **EMIT**. If a file matches both render and copy rules, **render wins** so raw source files don't leak.
 
 **`--default-layout <value>` (repeatable)**
 
@@ -314,10 +500,27 @@ unify init docs
 - **Used by:** `build` command, `watch` and `serve` ignore this option
 - **Behavior:** Controls when the build process should exit with error code 1
 
+**`--fail-on <types>`**
+
+- **Purpose:** Fail build on specific issue types (comma-separated)
+- **Default:** `null` (only fail on fatal build errors)
+- **Valid types:** `security`, `warning`, `error`, `U001`, `U002`, `U003`, `U004`, `U005`, `U006`, `U008`
+- **Used by:** `build` command, `watch` and `serve` ignore this option
+- **Behavior:**
+  - `security`: Fails build when any security warnings are detected
+  - `warning`: Includes all warning-level issues
+  - `error`: Includes all error-level issues
+  - `U001-U008`: DOM Cascade linter rules (see DOM Cascade v1 § Linter Rule Set)
+  - Can be combined: `--fail-on security,warning,U002`
+- **Security Integration:** Essential for CI/CD pipelines to prevent deployment of potentially vulnerable sites
+- **Linting Integration:** The linter **MUST** implement DOM Cascade rules **U001, U002, U003, U004, U005, U006, U008** with the default severities specified in DOM Cascade v1
+
 Examples:
 
 - `--fail-level warning`: Fail on any warning or error
 - `--fail-level error`: Fail only on errors (not warnings)
+- `--fail-on security`: Fail only on security issues
+- `--fail-on security,warning`: Fail on security issues and warnings
 - No flag: Only fail on fatal build errors (default behavior)
 
 **`--minify`**
@@ -361,9 +564,9 @@ Examples:
 
 - **Purpose:** Set logging verbosity level
 - **Default:** `info`
-- **Valid levels:** `error`, `warn`, `info`, `debug`
+- **Valid levels:** `error`, `warn`, `info`, `debug`, `trace`
 - **Used by:** All commands
-- **Behavior:** Controls logging output verbosity. Debug is chatty and should be opt-in. Keeps logging simple and aligned with common practice.
+- **Behavior:** Controls logging output verbosity. Debug is chatty and should be opt-in. Trace is extremely verbose for deep troubleshooting. Keeps logging simple and aligned with common practice.
 
 ## Getting Started & Common Usage Patterns
 
@@ -439,8 +642,11 @@ unify --render "experiments/**"
 #### 5. CI/CD and Production
 
 ```bash
-# Production build with minification and strict error handling
-unify --minify --fail-level=warning --clean
+# Production build with minification and security checks
+unify --minify --fail-on security --clean
+
+# Strict production build (fail on any warnings or security issues)
+unify --minify --fail-on security,warning --clean
 
 # Build with custom source/output directories
 unify --source=content --output=public
@@ -463,16 +669,17 @@ unify --dry-run --log-level=debug | grep "your-file.html"
 # - File matched by --ignore pattern
 ```
 
-#### Import Not Applied
+#### Layout/Component Not Applied
 
 ```bash
 # Check layout resolution
-unify --dry-run | grep "import"
+unify --dry-run | grep "layout\|component"
 
 # Common causes:
-# - Import file not found in expected location
-# - Typo in data-import attribute
+# - Layout/component file not found in expected location
+# - Typo in data-unify attribute
 # - No automatic layout discovery file found
+# - Area class mismatch between page and layout/component
 ```
 
 #### Performance Issues
@@ -646,70 +853,12 @@ src/
 
 ### HTML Files (`.html`, `.htm`)
 
-**Note:** Unify prefers `.html` extension but supports `.htm` for compatibility. All examples in this document use `.html`.
-
-- Pages: `.html` files not starting with `_` are emitted as pages.
-- Fragments: `.html` files starting with `_` are non-emitting html files.
-- Layouts: Fragments imported by the page's root element are considered layouts. Only files named `_layout.html` are automatically applied as part of automatic layout discovery.
-
-#### HTML Page Types
-
-HTML pages can be either **page fragments** or **full HTML documents**:
-
-**Page Fragments:**
-
-- HTML content without `<!DOCTYPE>`, `<html>`, `<head>`, or `<body>` elements
-- Content is treated as a fragment and inserted into root fragment's unnamed slot as-is
-  - Head and template elements found in the fragment are processed as described in this document
-  - Only one top-level element with a `data-import` attribute is allowed per page
-- Example:
-
-```html
-<div data-import="blog">
-  <h1>Article Title</h1>
-  <p>Article content...</p>
-</div>
-```
-
-**Full HTML Documents:**
-
-- Complete HTML documents with `<!DOCTYPE html>`, `<html>`, `<head>`, and `<body>` elements
-- Document elements are merged with the layout during processing
-  - Page attributes win if there is a conflict
-  - Page content is appended to matching elements
-- Layout discovery uses automatic file discovery (see Layout Discovery section)
-- Example:
-
-```html
-<!DOCTYPE html>
-<html>
-  <head>
-    <title>Page Title</title>
-  </head>
-  <body>
-    <h1>Article Title</h1>
-    <p>Article content...</p>
-  </body>
-</html>
-```
-
-**Note on Document Structure Flexibility:**
-
-The `<!DOCTYPE>`, `<html>`, `<head>`, and `<body>` tags are trivial in Unify and are allowed to exist or not exist in both fragments and pages. Unify will intelligently merge the ones that are found and ensure the basic boilerplate exists if neither the page nor any fragments have included them. This makes it easy to use full HTML documents for layouts, fragments, and pages, or drop them to reduce boilerplate if you prefer.
-
-#### HTML Document Merging
-
-When processing full HTML documents with layouts:
-
-1. **DOCTYPE**: Pages's DOCTYPE is used in final output if it exists. Otherwise fallback to Layout's DOCTYPE
-2. **HTML Element**: Layout's `<html>` element and attributes are preserved. Page's html element's attributes are added and overwrite the layout's attributes when there is a conflict.
-3. **HEAD Element**: Page head content is merged with layout head using the head merge algorithm (see Head Merge Algorithm section)
-4. **BODY Element**: Page body content is inserted into the root import's unnamed slot
+See **DOM Cascade v1** for all DOM cascade, area/landmark/ordered fill, and merge rules. The app-spec only describes CLI, build, and implementation details. The build process **MUST** conform to DOM Cascade v1 specifications.
 
 ### Markdown Files (`.md`)
 
 - Processed with frontmatter extraction and Markdown→HTML conversion
-- Converted HTML injected into the unnamed slot of the layout
+- Converted HTML follows DOM Cascade v1 composition rules with the layout
 - Head synthesized from frontmatter and merged globally
 
 ### Link Normalization (Pretty URLs)
@@ -828,9 +977,9 @@ When combining layout `<head>` + page `<head>` (or synthesized head), Unify uses
 2. **Deterministic de-duplication:** Elements are deduplicated using identity keys:
    - `<title>`: Last-wins for titles
    - `<meta>`: Last-wins by `name` or `property` attribute (page wins over fragments, fragments win over layout)
-   - `<link>`: First-kept for external styles/scripts unless `data-allow-duplicate` is present; dedupe canonical links by last-wins
-   - `<script>`: First-kept for external scripts unless `data-allow-duplicate` is present; inline scripts never deduped
-   - `<style>`: First-kept for external stylesheets unless `data-allow-duplicate` is present; inline styles never deduped
+   - `<link>`: First-kept for external styles/scripts; dedupe canonical links by last-wins
+   - `<script>`: First-kept for external scripts; deduped by content hash
+   - `<style>`: First-kept for external stylesheets; deduped by content hash
    - Unknown elements: Append without deduplication
 3. **Optional CSS layering hints:** Allow `data-layer="..."` on `<link>`/`<style>` elements so authors can align with `@layer`. This has no functionality but provides hints to consumers of the fragments. Also forward compatible in case we add automatic layering in the future.
 4. **Script defaults that match modern practice:** It is recommended that scripts use `defer` behavior. Their relative order will be preserved inside each tier
@@ -875,77 +1024,77 @@ When combining layout `<head>` + page `<head>` (or synthesized head), Unify uses
 - **Implicit Assets Copy:** The `assets/**` directory is implicitly copied to output unless explicitly excluded (mirrors Astro/Vite "public" behavior)
 - **Asset Reference Tracking:** Referenced assets from HTML/CSS are automatically detected and copied to output
 - **Additional File Copying:** Use `--copy` option to specify additional files to copy using glob patterns
-- **Copy vs Render Priority:** If a file matches both copy and render rules, **render wins** to prevent raw templates from leaking
+- **Copy vs Render Priority:** If a file matches both copy and render rules, **render wins** to prevent raw source files from leaking
 - **Underscore Prefix Exclusion:** Files and folders starting with `_` are automatically excluded from build output (see Underscore Prefix Exclusion Rules above)
 - **Glob-based Control:** Use `--ignore-copy` to exclude specific files from copying, or `--ignore` to exclude from both rendering and copying
 
 ### Include System
 
+##### Area-based Component Composition
 
-##### Slot Injection in Includes
-
-The elements with `data-import` support slot-based content injection, allowing you to pass content to `<slot>` targets within the included component:
+Components use area-based composition following DOM Cascade v1 rules:
 
 ```html
 <!-- Component: _includes/nav.html -->
 <nav class="navbar">
-  <slot name="brand">Default Brand</slot>
-  <slot>
+  <div class="unify-brand">Default Brand</div>
+  <div class="unify-menu">
     <ul>
       <li><a href="/">Home</a></li>
     </ul>
-  </slot>
-  <div>
-    <slot name="actions">
-      <button>Sign In</button>
-    </slot>
+  </div>
+  <div class="unify-actions">
+    <button>Sign In</button>
   </div>
 </nav>
 
 <!-- Page using the component -->
 <body>
-  <template data-import="/_includes/nav.html">
-    <a href="/" data-target="brand">MyBrand</a>
-
-    <ul>
-      <li><a href="/docs/">Docs</a></li>
-      <li><a href="/blog/">Blog</a></li>
-    </ul>
-
-    <template data-target="actions">
+  <div data-unify="/_includes/nav.html">
+    <div class="unify-brand">
+      <a href="/">MyBrand</a>
+    </div>
+    <div class="unify-menu">
+      <ul>
+        <li><a href="/docs/">Docs</a></li>
+        <li><a href="/blog/">Blog</a></li>
+      </ul>
+    </div>
+    <div class="unify-actions">
       <a href="/start/" class="btn">Get Started</a>
-    </template>
-  </template>
+    </div>
+  </div>
 </body>
 
 <!-- Output -->
 <nav class="navbar">
-  <a href="/">MyBrand</a>
-  <ul>
-    <li><a href="/docs/">Docs</a></li>
-    <li><a href="/blog/">Blog</a></li>
-  </ul>
-  <div>
+  <div class="unify-brand">
+    <a href="/">MyBrand</a>
+  </div>
+  <div class="unify-menu">
+    <ul>
+      <li><a href="/docs/">Docs</a></li>
+      <li><a href="/blog/">Blog</a></li>
+    </ul>
+  </div>
+  <div class="unify-actions">
     <a href="/start/" class="btn">Get Started</a>
   </div>
 </nav>
 ```
 
-**Slot Injection Rules:**
+**Composition Rules (see DOM Cascade v1 for complete specification):**
 
-1. **Slot Matching**: Elements with `data-target="name"` are matched to corresponding `<slot name="name">` targets in the imported fragment
-2. **Content Replacement**: The entire `<slot>` element is replaced by the element with a matching `data-target=name` attribute. If the element is a template (`<template data-target="name">`) the content of the template replaces the slot element.
-3. **Element and Attribute Removal**: Both `<slot>` and `<template>` elements are removed in the final output, leaving only their content. `data-import` and `data-target` attributes are removed from element in final output
-4. **Fallback Content**: If no slot content is provided, the original content inside the `<slot>` element serves as fallback`
-5. **Multiple Slots**: Multiple slots can be provided by a fragment in any order; they will be injected into their corresponding targets. Only one unnamed slot is allowed per fragment
-6. **Nested Includes**: Slot injection works with nested includes - slots are resolved at each level
+1. **Area Matching**: Elements with area classes (e.g., `.unify-brand`) target matching areas in the component
+2. **Content Replacement**: Host element keeps its tag/position; children are replaced; attributes merge
+3. **Attribute Merging**: Page attributes override host attributes (except `id` which stays stable)
+4. **Fallback Behavior**: If no area classes used, falls back to landmark or ordered fill matching
 
 **Important Notes:**
 
-- Slot injection only works with elements, not with Apache SSI includes
-- The `data-target` attribute value must match the `<slot>` name attribute value exactly (case-sensitive)
-- Elements without `data-target` attributes inside `data-import` elements are placed into the fragments default slot
-- Styles and scripts from components are still extracted and relocated as usual
+- All composition behavior follows DOM Cascade v1 specification exactly
+- Area classes must be unique per scope and use `unify-` prefix
+- Components should document public areas in `<style data-unify-docs>` blocks
 
 #### Apache SSI
 
@@ -958,58 +1107,54 @@ The elements with `data-import` support slot-based content injection, allowing y
 
 - `file` = relative to current file.
 - `virtual` = from `src/` root.
-- Apache SSI includes do not support slot injection
+- Apache SSI includes do not support area-based composition
 - **Markdown Support**: When the included file has a `.md` extension, it is processed through the markdown processor and the resulting HTML is included. Frontmatter is processed but not included in the output.
 
-### Cascading Imports System
+### DOM Cascade Composition System
 
-Unify uses **Cascading Imports** for fragment composition.
+Unify uses **DOM Cascade v1** for layout and component composition. The composition behavior is **normatively defined** in DOM Cascade v1.
 
-#### How Cascading Imports Work
+#### How DOM Cascade Composition Works
 
-Pages can import "layout" fragments using the `data-import` attribute on the root element:
+Layouts are applied using `data-unify` on `<html>` or `<body>` elements:
 
 ```html
-<!-- Page importing a layout -->
-<div data-import="/layouts/blog.html">
-  <h1>Article Title</h1>
-  <p>Article content goes into the default slot...</p>
+<!-- Page with layout -->
+<body data-unify="/layouts/blog.html">
+  <section class="unify-hero">
+    <h1>Article Title</h1>
+    <p>Custom hero content...</p>
+  </section>
+  <main>
+    <p>Article content goes into main area...</p>
+  </main>
+</body>
+```
+
+Components are imported using `data-unify` on any other element:
+
+```html
+<!-- Page importing a component -->
+<div data-unify="/components/card.html">
+  <h3 class="unify-title">Product Name</h3>
+  <p class="unify-body">Product description...</p>
 </div>
 ```
 
-**Markdown Support**: When the imported file has a `.md` extension, it is processed through the markdown processor and the resulting HTML is included. Frontmatter is processed but not included in the output. Markdown do not support slots.
+**Markdown Support**: When the imported file has a `.md` extension, it is processed through the markdown processor and the resulting HTML is included. Frontmatter is processed but not included in the output.
 
-```html
-<!-- Page importing a markdown file -->
-<div data-import="/posts/post1.md"></div>
-```
-
-```text
-# Article Title
-
-Article content goes into the importing element just like an html page...
-```
-
-```html
-<!-- Output -->
-<div data-import="/layouts/blog.html">
-  <h1>Article Title</h1>
-  <p>Article content goes into the importing element just like an html page...</p>
-</div>
-```
-
-#### Fragment Path Resolution
+#### Layout/Component Path Resolution
 
 **Full Path Syntax:**
 
-- `data-import="/layouts/blog.html"` → Look from source root (absolute path)
-- `data-import="../shared/fragment.html"` → Look relative to current page
-- `data-import="custom.html"` → Look relative to current page directory
+- `data-unify="/layouts/blog.html"` → Look from source root (absolute path)
+- `data-unify="../shared/fragment.html"` → Look relative to current page
+- `data-unify="custom.html"` → Look relative to current page directory
 
 **Short Name Syntax (Convenience Feature):**
 
-- Unify will strip `_` prefixes, `.layout` segments, and `.html` extensions from filenames when locating a fragment during import
-- `data-import="blog"` would find `_blog.layout.html` if it is in the correct folder path.
+- Unify will strip `_` prefixes, `.layout` segments, and `.html` extensions from filenames when locating a layout/component
+- `data-unify="blog"` would find `_blog.layout.html` if it is in the correct folder path.
 - Search order for short names:
   1. Current directory up through parent directories to source root
   2. Then `_includes` directory
@@ -1017,68 +1162,84 @@ Article content goes into the importing element just like an html page...
 
 #### Automatic Layout Discovery
 
-When no `data-import` attribute is found on the root element of a page, Unify applies **automatic layout discovery**:
+When no `data-unify` attribute is found on `<html>` or `<body>` elements, Unify applies **automatic layout discovery**:
 
 1. **Start in the page's directory** and look for `_layout.html`
 2. **If not found**, move up to parent directory and repeat
 3. **Continue climbing** the directory tree until reaching source root
 4. **Site-wide fallback**: If no `_layout.html` found, use `_includes/layout.html` if it exists
 
-#### Slots and Content Injection
+#### Area-based Content Composition
 
-Layouts define insertion points using `<slot>` elements:
+Layouts define public areas using class selectors and document them:
 
 ```html
 <!-- Layout: /layouts/blog.html -->
 <html>
   <head>
+    <style data-unify-docs="v1">
+      /* Public areas */
+      .unify-hero {
+        /* Hero section */
+      }
+      .unify-content {
+        /* Main content area */
+      }
+      .unify-sidebar {
+        /* Sidebar area */
+      }
+    </style>
     <title>Blog</title>
   </head>
   <body>
-    <header>
-      <slot name="header">Default Header</slot>
+    <header class="unify-hero">
+      <h1>Default Header</h1>
     </header>
-    <main>
-      <slot><!-- Default/unnamed slot for main content --></slot>
+    <main class="unify-content">
+      <p>Default content...</p>
     </main>
-    <aside>
-      <slot name="sidebar">Default Sidebar</slot>
+    <aside class="unify-sidebar">
+      <p>Default sidebar...</p>
     </aside>
   </body>
 </html>
 ```
 
-Pages provide content for named slots using `<template slot="name">`:
+Pages provide content using matching area classes:
 
 ```html
-<div data-import="/layouts/blog.html">
-  <!-- This content goes to the default/unnamed slot -->
-  <article>
+<body data-unify="/layouts/blog.html">
+  <section class="unify-hero">
+    <h1>Custom Blog Header</h1>
+    <p>Blog subtitle...</p>
+  </section>
+
+  <article class="unify-content">
     <h1>Article Title</h1>
     <p>Article content...</p>
   </article>
 
-  <!-- Named slot content -->
-  <template slot="header">
-    <h1>Custom Blog Header</h1>
-  </template>
-
-  <template slot="sidebar">
-    <nav>Article navigation...</nav>
-  </template>
-</div>
+  <nav class="unify-sidebar">
+    <h3>Navigation</h3>
+    <ul>
+      ...
+    </ul>
+  </nav>
+</body>
 ```
 
-#### Composition Rules
+#### Composition Rules (see DOM Cascade v1 for complete specification)
 
-1. **Import Scope**: Each `data-import` creates an independent composition scope
-2. **Root Import**: Only the root element can have `data-import` attribute
-3. **Slot Resolution**: `<template slot="name">` elements target `<slot name="name">` in the imported fragment
-4. **Default Content**: Content not in `<template>` elements goes to the unnamed `<slot>`
-5. **Fallback Content**: Content inside `<slot>` elements serves as fallback if no matching template is provided
-6. **Head Merging**: `<head>` content is merged globally using the head merge algorithm
+1. **Scoping**: Each layout or component import creates an independent composition scope
+2. **Layout Mode**: `data-unify` on `<html>` or `<body>` triggers layout chaining
+3. **Component Mode**: `data-unify` on other elements triggers inline component composition
+4. **Area Matching**: Content with area classes (`.unify-*`) replaces matching areas in host
+5. **Fallback Behavior**: Without area classes, falls back to landmark or ordered fill matching
+6. **Head Merging**: `<head>` content is merged globally using DOM Cascade v1 rules
 
 #### Example Directory Structure
+
+_Note: Examples illustrate usage patterns; they don't define behavior. See DOM Cascade v1 for normative composition rules._
 
 ```
 src/
@@ -1103,9 +1264,9 @@ src/
 
 During build, Unify will warn if:
 
-- A page references a `data-import` file that cannot be found
-- A `<template data-target="name">` targets a slot not present in the imported fragment
-- Circular import dependencies are detected
+- A page references a `data-unify` file that cannot be found
+- Area classes are used that don't exist in the layout/component (see DOM Cascade v1 linter rules)
+- Circular layout/component dependencies are detected
 
 ## Common Error Scenarios
 
@@ -1118,70 +1279,82 @@ Error: Circular import detected: layout.html → blog.html → layout.html
 **Cause**: Fragment A imports Fragment B, which imports Fragment A.
 **Solution**: Refactor fragments to break the circular dependency.
 
-### Missing Slot Targets
+### Missing Area Targets
 
 ```
-Warning: Template slot="sidebar" has no matching <slot name="sidebar"> in imported fragment
+Warning: Area class "unify-sidebar" not found in imported layout/component
 ```
 
-**Cause**: Page provides content for a slot that doesn't exist in the layout.
-**Solution**: Add the slot to the layout or remove the template from the page.
+**Cause**: Page provides content for an area that doesn't exist in the layout/component.
+**Solution**: Add the area to the layout/component or remove the area class from the page.
 
-#### Fragment Pages and Markdown
+#### Markdown Processing
 
-Unify supports **fragment pages** — pages that omit `<html>`, `<head>`, and `<body>` wrappers and only contain content.
+**Markdown Layout Application:**
 
-- When a file has no `<html>` root, Unify treats it as a fragment.
-- The fragment is injected into the layout's `data-slot="default"`.
-- Any `<template data-slot="name">` or elements with `data-slot="name"` inside the fragment are moved into the corresponding layout slot.
-- The dev server automatically wraps fragment pages in their layout for accurate previews.
+Markdown files (`.md`) are processed and composed with layouts:
 
-**Markdown Defaults:**
+- The converted HTML body follows DOM Cascade v1 composition rules (area matching, landmark fallback, etc.)
+- Frontmatter in Markdown provides head metadata (title, description, etc.) that is merged into the layout `<head>` using DOM Cascade v1 head merge rules
+- Layout discovery applies the same way as HTML pages
 
-Markdown files (`.md`) are always compiled to fragments:
-
-- The converted HTML body is injected into `data-slot="default"`.
-- Frontmatter in Markdown provides head metadata (title, description, etc.) that is merged into the layout `<head>` using the same merge + dedupe rules as full HTML pages.
-- Authors don't need to add `<html>` or `<head>` in Markdown — only content and optional `data-slot` templates.
-
-This ensures content-heavy workflows (like documentation or blogs) stay lightweight and author-friendly, while Unify guarantees that final output is always a complete, valid HTML document.
+This ensures content-heavy workflows (like documentation or blogs) stay lightweight and author-friendly, while Unify guarantees that final output follows DOM Cascade v1 composition semantics.
 
 #### Example Composition
 
+_Note: This example illustrates app-level behavior; composition semantics are defined in DOM Cascade v1._
+
 ```html
-<div data-import="/layouts/base.html"></div>
+<body data-unify="/layouts/base.html">
+  <section class="unify-hero">
+    <h1>Welcome</h1>
+  </section>
+  <main>
+    <p>Page content...</p>
+  </main>
+</body>
 ```
 
-- Fetches and inlines external HTML inside this element
-- The `data-import` attribute is removed
+- Triggers layout composition per DOM Cascade v1
+- The `data-unify` attribute is removed after processing
   - **Full paths**: relative paths or absolute-from-`src` paths (e.g., `_custom.layout.html`, `/path/layout.html`)
-  - **Short names**: convenient references that resolve to framgement files (e.g., `blog` → `_blog.layout.html`)
-- The importing element becomes the composition scope
-- Only children of this scope may target slots inside the imported fragment
+  - **Short names**: convenient references that resolve to layout files (e.g., `blog` → `_blog.layout.html`)
+- Composition behavior follows DOM Cascade v1 rules
 
 ```html
 <!-- base.html -->
 <html>
   <head>
+    <style data-unify-docs="v1">
+      .unify-hero {
+        /* Hero area */
+      }
+      .unify-footer {
+        /* Footer area */
+      }
+    </style>
     <meta charset="utf-8" />
     <title>Site</title>
   </head>
   <body>
-    <header>
-      <slot name="header"><h1>Default</h1></slot>
+    <header class="unify-hero">
+      <h1>Default</h1>
     </header>
     <main>
-      <slot><!-- unnamed default --></slot>
+      <p>Default main content...</p>
     </main>
-    <footer><slot name="footer">© Site</slot></footer>
+    <footer class="unify-footer">
+      <p>© Site</p>
+    </footer>
   </body>
 </html>
 ```
 
-- **Named slots**: `<slot name="…">` for specific content areas
-- **Unnamed slot**: One allowed per fragment, used for default body content
+- **Public areas**: Documented via `.unify-*` classes in `<style data-unify-docs>` block
+- **Area matching**: Page content with matching classes replaces corresponding layout areas
+- **Fallback behavior**: Content without area classes uses landmark or ordered fill matching
 
-#### Providing Overrides
+#### Providing Content
 
 ```html
 <head>
@@ -1189,53 +1362,54 @@ This ensures content-heavy workflows (like documentation or blogs) stay lightwei
   <meta name="description" content="Homepage" />
   <link rel="stylesheet" href="/css/home.css" />
 </head>
-<body data-import="/layouts/base.html">
-  <p>Body content (unnamed slot)</p>
-  <div data-target="header"><h1>Welcome!</h1></div>
+<body data-unify="/layouts/base.html">
+  <section class="unify-hero">
+    <h1>Welcome!</h1>
+    <p>Custom hero content</p>
+  </section>
+  <main>
+    <p>Page main content...</p>
+  </main>
 </body>
 ```
 
-- `data-target` specifies the slot name
-- Children of the targeting element replace the slot
-- `<template>` hides override content at author time
-- Regular elements keep overrides visible for design-time preview
-- Pages/Fragments can include `html`, `head`, and `body` tags - they will be properly merged during build
+- Area classes (`.unify-*`) target specific layout areas
+- Host element keeps its tag/position; children are replaced; attributes merge
+- Content without area classes uses fallback matching (landmark or ordered fill)
+- Pages/Fragments can include `html`, `head`, and `body` tags - they will be properly merged during build per DOM Cascade v1
 
-#### Composition Rules
+#### Composition Rules (see DOM Cascade v1 for complete specification)
 
-- Each `[data-import]` defines an independent scope; overrides do not leak
-- The top most `[data-import]` in a page will be considered the root import (or layout).
-- Process targets in document order; last writer wins
-- Slots are replaced by overrides. Exception: `<head>` contributions are merged globally
-- `html` and `body` attributes are merged globally with body class merging (merge, don't overwrite)
-- For unnamed slots: use importing element's direct children not within `data-target`
-- Unmatched `data-target`: no-op with dev warning
-- **Warnings, not surprises**: Unknown `data-target` or unfilled named slots warn in strict mode
+- Each `data-unify` import defines an independent composition scope
+- Layout imports (`data-unify` on `<html>`/`<body>`) can chain multiple layouts
+- Area matching follows DOM Cascade v1 precedence: Area → Landmark → Ordered fill
+- Host elements keep their tag/position; children replaced; attributes merge per DOM Cascade v1
+- `html` and `body` attributes are merged globally with class union (merge, don't overwrite)
+- `<head>` content is merged globally using DOM Cascade v1 head merge rules
+- **Warnings**: Unknown area classes or composition errors warn during build
 
-#### Global Merge
+#### Global Merge (see DOM Cascade v1 for complete specification)
 
-**Sources**: imported fragments' `<html>` `<head>` `<body>` elements, page elements
+**Sources**: imported layouts/components' `<html>` `<head>` `<body>` elements, page elements
 
-**Processing Order**: `root fragment → fragments → page`, with standard top-to-bottom DOM processing
+**Processing Order**: DOM Cascade v1 layer order: `layout → components → page`
 
-**Attribute Merging**:
+**Attribute Merging (per DOM Cascade v1)**:
 
-- **`<html>` attributes**: Layout provides base attributes, fragments can add/override, page wins final conflicts
-- **`<body>` class merging**: Merge (don't overwrite) `class` attributes on `<body>` from layout, fragments, and page
-- **Scope hook on the layout**: Allow adding a class to `<body>` (e.g., `class="layout-default"`) so fragment/page CSS can scope when needed
+- **`<html>` attributes**: Layout provides base attributes, page wins conflicts
+- **`<body>` class merging**: Union of classes (merge, don't overwrite) from layout and page
+- **ID stability**: Host element IDs are retained; page references are rewritten
 
-**De-duplication keys for head element**:
+**Head Merging (per DOM Cascade v1)**:
 
-- `<title>`: last wins
-- `<meta>`: dedupe by `name`, else `property`, else `http-equiv`
-- `<link>`: dedupe by `(rel, href)`
-- `<script>`: dedupe by `src` (external) or exact text (inline)
-- Design-only assets: `[data-remove]` dropped or replaced at build time
+- **Processing order**: layout → components → page
+- **Deduplication**: by element type and key attributes
+- **CSS/JS order**: layout → components → page (mirrors CSS cascade)
 
 **Warning System**: Issue warnings about:
 
-- Unknown `data-target` attributes that don't match any slots
-- Unfilled named slots that have no corresponding `data-target` override
+- Unknown area classes that don't match documented areas
+- Composition conflicts per DOM Cascade v1 linter rules
 
 ### Includes (Legacy)
 
@@ -1258,13 +1432,13 @@ Apache SSI-style includes remain supported for backwards compatibility but are m
 - For Markdown files: frontmatter `layout` key takes precedence over discovered layout chain
 - If no override is found, the nearest layout is discovered by climbing the directory tree, then falling back to `_includes/layout.html` if present
 
-**Default Layout Discovery for Cascading Imports**:
+**Default Layout Discovery for DOM Cascade Composition**:
 
-When no `data-import` attribute is found on the root element of a page, Unify applies automatic layout discovery:
+When no `data-unify` attribute is found on `<html>` or `<body>` elements, Unify applies automatic layout discovery:
 
 1. **Auto-discovery chain**: Looks for `_layout.html` or `_layout.htm` files starting from the page's directory, climbing up to the source root
 2. **Fallback layout**: If no layout found in the hierarchy, checks for `_includes/layout.html` or `_includes/layout.htm`
-3. **Applied as root import**: The discovered layout is automatically applied as if it was a root-level `data-import`, enabling all Cascading Imports functionality
+3. **Applied as layout**: The discovered layout is automatically applied as if it had `data-unify` on the `<body>`, enabling all DOM Cascade v1 functionality
 4. **Short name resolution**: Layout discovery supports both exact filenames and short name resolution (e.g., `blog` → `_blog.layout.html`)
 
 **Override precedence**:
@@ -1272,16 +1446,15 @@ When no `data-import` attribute is found on the root element of a page, Unify ap
 - Imported fragment `<html>`, `<head>`, `<body>` provides base metadata and styles
 - Page `<head>` (HTML) or synthesized head (Markdown) takes precedence via merge algorithm
 - Deduplication of elements contained in head and attributes applied to `<html>` and `<body>` ensures page-specific metadata wins over imported fragments
-- Multiple inline styles and scripts from both fragements and page are preserved
-
-- Multiple inline styles and scripts from both layout and page are preserved
+- Multiple inline styles and scripts from both fragements and page are preserved unless duplicate of existing element based on hash
+- Multiple inline styles and scripts from both layout and page are preserved, unless duplicate of existing element based on hash
 
 ## Dependency Tracking
 
-- Tracks pages ↔ fragements
+- Tracks pages ↔ layouts/components
 - Rebuild dependents on change
 - Automatically discovers dependencies:
-  - **Cascading Imports**: `data-import` references and nested imports
+  - **DOM Cascade imports**: `data-unify` references and nested imports
   - **Auto-discovered**: folder-scoped `_layout.html` files, fallback layouts in `_includes/layout.html`
   - **Legacy includes**: SSI includes (`<!--#include -->`)
 - Tracks asset references from HTML and CSS files
@@ -1291,10 +1464,10 @@ When no `data-import` attribute is found on the root element of a page, Unify ap
 
 The file watcher monitors all changes in the source directory and triggers appropriate rebuilds:
 
-### Cascading Imports Changes
+### DOM Cascade Import Changes
 
-- **Imported fragments**: When a file referenced via `data-import` changes, all pages importing that fragment are rebuilt
-- **Nested imports**: When nested imported fragments change, the dependency chain is followed to rebuild all affected pages
+- **Imported layouts/components**: When a file referenced via `data-unify` changes, all pages importing that layout/component are rebuilt
+- **Nested imports**: When nested imported layouts/components change, the dependency chain is followed to rebuild all affected pages
 
 ### Legacy Includes Changes
 
@@ -1423,6 +1596,35 @@ The build cache tracks and reports:
 - No configuration required for layouts/fragments.
 - Convention over configuration.
 
+## Linting & Diagnostics
+
+**Rule Set**
+The linter **MUST** implement DOM Cascade rules **U001, U002, U003, U004, U005, U006, U008** with the default severities specified in DOM Cascade v1. The app-spec defines CLI behavior, configuration keys, and CI exit codes; rule semantics are owned by DOM Cascade.
+
+**CLI Exit Codes:**
+
+- `error` level rules → non-zero exit code
+- `warn`/`info` level rules → zero exit code
+
+**Rule Summary (see DOM Cascade v1 for complete definitions):**
+
+- **U001**: `docs-present` - warn
+- **U002**: `area-unique-in-scope` - error
+- **U003**: `area-low-specificity` - warn
+- **U004**: `area-documented` - warn
+- **U005**: `docs-drift` - info
+- **U006**: `landmark-ambiguous` - warn
+- **U008**: `ordered-fill-collision` - warn
+
+## Plugin & Extensibility
+
+- App-spec owns **hooks** (pre/post build, asset pipeline, import resolvers)
+- Plugins **MUST NOT** alter DOM merge semantics; they may only **supply inputs** (HTML) or **post-process outputs** (HTML/CSS/JS) outside the merge core
+
+## Accessibility Requirements
+
+Point to DOM Cascade's **ID stability & reference rewrite** as normative (see DOM Cascade v1 § Accessibility & ID Handling). App-spec can add additional a11y checks (e.g., multiple `main` detection UX), but must not contradict DOM Cascade.
+
 ## Known Issues & Pitfalls
 
 ### 1. Order Sensitivity with Globs & Negation
@@ -1493,8 +1695,9 @@ If `--copy 'src/**'` includes renderable files, you won't get raw files because 
 
 ### Functional Requirements
 
-- All three commands (build, serve, watch) work correctly
-- **Cascading Imports**: `data-import` and `slot` and `data-target` fragment composition system
+- All three commands (build, serve, watch) work correctly and execute DOM Cascade v1
+- App conformance tests **MUST** pass DOM Cascade v1 test checklist
+- **DOM Cascade Composition**: `data-unify` and area-based layout/component composition system per DOM Cascade v1
 - **Legacy includes**: Apache SSI support for backwards compatibility
 - Markdown processing with frontmatter and layouts
 - Live reload functionality in development server
@@ -1540,7 +1743,8 @@ Unify's design draws inspiration from established tools and follows common patte
 
 ### Standards Compliance
 
-- **HTML Standards**: Modern DOM templating with `<slot>`, `data-*` attributes, and standard element composition
+- **DOM Cascade v1**: Full conformance to normative DOM composition specification
+- **HTML Standards**: Area-based composition with `data-unify` attributes and class-based targeting
 - **CSS Standards**: Support for modern CSS features like `@scope` and CSS nesting
 - **HTTP Standards**: Proper content-type handling and SEO-friendly URL structures
 - **File System Conventions**: Cross-platform path handling with POSIX normalization

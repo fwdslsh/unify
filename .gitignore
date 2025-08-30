@@ -91,3 +91,4 @@ test/fixtures/*-test-*/
 .unify-cache/
 .vendor/
 .remove
+tts_output.wav
