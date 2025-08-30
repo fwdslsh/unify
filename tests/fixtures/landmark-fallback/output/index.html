@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Page with Landmark Fallback</title>
+    <link rel="stylesheet" href="/layout.css">
+    <link rel="stylesheet" href="/page.css">
+</head>
+<body>
+    <header id="site-header" class="main-header">
+        <h1>Custom Page Title</h1>
+        <p>Custom page tagline from the page</p>
+        <p>Additional header content</p>
+    </header>
+    
+    <nav class="primary-nav" data-theme="dark">
+        <ul>
+            <li><a href="/">Home</a></li>
+            <li><a href="/about">About</a></li>
+            <li><a href="/contact">Contact</a></li>
+            <li><a href="/blog">Blog</a></li>
+        </ul>
+    </nav>
+    
+    <main role="main" class="main-content">
+        <article>
+            <h2>Page Article Title</h2>
+            <p>This is the main page content that replaces the layout's main content.</p>
+            <p>Multiple paragraphs are supported.</p>
+        </article>
+    </main>
+    
+    <aside class="sidebar" data-widget="related">
+        <h3>Page Sidebar</h3>
+        <ul>
+            <li><a href="/related-1">Related Page 1</a></li>
+            <li><a href="/related-2">Related Page 2</a></li>
+            <li><a href="/related-3">Related Page 3</a></li>
+        </ul>
+        <p>Additional sidebar content from page.</p>
+    </aside>
+    
+    <footer class="site-footer">
+        <p>Custom footer from the page</p>
+        <p>&copy; 2024 Page Footer</p>
+        <nav>
+            <a href="/privacy">Privacy</a>
+            <a href="/terms">Terms</a>
+        </nav>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Product X — ACME</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/normalize.css@8.0.1/normalize.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    
+    <!-- Root layer CSS -->
+    <style>
+        body {
+            font-family: system-ui, sans-serif;
+        }
+
+        .brand {
+            font-weight: 700;
+        }
+
+        .container {
+            max-width: 72rem;
+            margin: 0 auto;
+            padding: 1rem;
+        }
+
+        footer {
+            border-top: 1px solid #e5e7eb;
+            margin-top: 3rem;
+            padding-top: 1.5rem;
+        }
+
+        .nav {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .nav a {
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .nav-toggle {
+            display: none;
+            background: none;
+            border: none;
+            cursor: pointer;
+        }
+
+        @media (max-width: 640px) {
+            .nav {
+                display: none;
+            }
+
+            .nav[aria-expanded="true"] {
+                display: flex;
+                flex-direction: column;
+            }
+
+            .nav-toggle {
+                display: inline-flex;
+            }
+        }
+    </style>
+    
+    <!-- Site layer CSS -->
+    <style>
+        .hero {
+            padding: 4rem 0;
+            background: #0ea5e9;
+            color: white;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1rem;
+        }
+
+        .cta {
+            background: #111827;
+            color: #f9fafb;
+            padding: 2rem;
+            border-radius: .75rem;
+        }
+
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1rem;
+        }
+
+        .card {
+            border: 1px solid #e5e7eb;
+            border-radius: .5rem;
+            padding: 1rem;
+        }
+    </style>
+    
+    <!-- Component CSS (deduplicated) -->
+    <style>
+        .actions {
+            margin-top: .75rem;
+            display: flex;
+            gap: .5rem;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: .5rem;
+            padding: .5rem .75rem;
+            border-radius: .375rem;
+            background: #0ea5e9;
+            color: #fff;
+            text-decoration: none;
+        }
+    </style>
+    
+    <!-- Page layer CSS -->
+    <style>
+        .hero .kicker {
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            opacity: .9;
+        }
+
+        .hero .actions {
+            margin-top: 1rem;
+        }
+
+        .unify-cta .btn {
+            background: #22c55e;
+        }
+    </style>
+</head>
+
+<body>
+    <header class="unify-header">
+        <div class="container">
+            <div class="brand">ACME • Product X</div>
+            <div class="unify-main-nav" x-data="{ navOpen: false }">
+                <button class="nav-toggle" aria-controls="primary-nav" 
+                    :aria-expanded="navOpen" 
+                    @click="navOpen = !navOpen">
+                    <i class="bi bi-list"></i>
+                </button>
+                <nav id="primary-nav" class="nav" :aria-expanded="navOpen">
+                    <a href="/">Home</a>
+                    <a href="/product" aria-current="page">Product</a>
+                    <a href="/pricing">Pricing</a>
+                    <a href="/contact">Contact</a>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <section class="unify-hero hero">
+            <div class="container">
+                <p class="kicker">Now available</p>
+                <h1>Meet Product X</h1>
+                <p>Fast, friendly, and framework‑free by default.</p>
+                <div class="actions">
+                    <a class="btn" href="/pricing"><i class="bi bi-lightning"></i> Get Started</a>
+                    <a class="btn" href="/docs"><i class="bi bi-journal-text"></i> Read Docs</a>
+                </div>
+            </div>
+        </section>
+
+        <section class="unify-features features">
+            <div class="container">
+                <h2>Why you'll love it</h2>
+                <div class="cards">
+                    <!-- Card 1 -->
+                    <article class="card">
+                        <h3 class="unify-title">Zero DSL</h3>
+                        <p class="unify-body">Author with plain HTML/CSS. No new language.</p>
+                        <div class="unify-actions actions">
+                            <a class="btn" href="/docs"><i class="bi bi-book"></i> Learn more</a>
+                        </div>
+                    </article>
+
+                    <!-- Card 2 -->
+                    <article class="card">
+                        <h3 class="unify-title">Cascades like CSS</h3>
+                        <p class="unify-body">Layouts → components → page, with safe scoping.</p>
+                        <div class="unify-actions actions">
+                            <a class="btn" href="/blog"><i class="bi bi-rss"></i> See it in action</a>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section class="unify-cta cta">
+            <div class="container">
+                <h2>Ready to ship?</h2>
+                <p>Start building in minutes. Bring your own HTML.</p>
+                <a class="btn" href="/signup"><i class="bi bi-rocket"></i> Sign up free</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="unify-footer">
+        <div class="container">
+            <small>© 2025 ACME • <a href="/legal">Legal</a> • <a href="/privacy">Privacy</a></small>
+        </div>
+    </footer>
+</body>
+
+</html>

@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Component Scoping Layout</title>
+</head>
+<body>
+    <header>
+        <nav class="unify-navigation">
+            <ul>
+                <li><a href="/">Home</a></li>
+                <li><a href="/about">About</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        <section class="unify-hero">
+            <h1>Default Layout Hero</h1>
+        </section>
+        
+        <!-- This component import creates a new scope -->
+        <div data-unify="_components/card-grid.html" class="grid-container">
+            <div class="unify-card-title">Layout's Card Title</div>
+            <div class="unify-card-content">Layout's card content - should NOT match inside component</div>
+        </div>
+        
+        <section class="unify-footer-content">
+            <p>Default footer content</p>
+        </section>
+    </main>
+</body>
+</html>

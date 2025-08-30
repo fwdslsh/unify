@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Getting Started with giv - AI-Powered Git Assistant</title>
+    <meta name="description" content="Learn how to get started with giv, the AI-powered Git history assistant. Installation, configuration, and first steps.">
+    <meta name="keywords" content="giv, getting started, AI Git assistant, installation, fwdslsh">
+    <meta property="og:title" content="Getting Started with giv - AI-Powered Git Assistant">
+    <meta property="og:description" content="Learn how to get started with giv, the AI-powered Git history assistant. Installation, configuration, and first steps.">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Getting Started with giv - AI-Powered Git Assistant">
+    <meta name="twitter:description" content="Learn how to get started with giv, the AI-powered Git history assistant. Installation, configuration, and first steps.">
+    <style>
+        /* Page-specific styles */
+        .getting-started-hero {
+            background: linear-gradient(135deg, rgba(255, 107, 53, 0.05) 0%, transparent 50%);
+            min-height: 60vh;
+        }
+
+        .step-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .step-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .step-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+        }
+
+        .step-number {
+            position: absolute;
+            top: -15px;
+            left: 2rem;
+            background: var(--gradient-primary);
+            color: var(--bg-dark);
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-family: var(--font-mono);
+        }
+
+        .step-card h3 {
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+            margin-top: 0.5rem;
+        }
+
+        .config-section {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+
+        .config-tabs {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .config-tab {
+            padding: 0.5rem 1rem;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .config-tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        .config-content {
+            display: none;
+        }
+
+        .config-content.active {
+            display: block;
+        }
+
+        .command-showcase {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .command-demo {
+            background: var(--bg-darker);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .command-demo-header {
+            background: var(--border);
+            padding: 0.5rem 1rem;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .command-demo-content {
+            padding: 1.5rem;
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+        }
+
+        .command-line {
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .command-output {
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+            padding-left: 1rem;
+        }
+
+        .next-steps {
+            background: linear-gradient(135deg, rgba(0, 255, 65, 0.05) 0%, rgba(59, 130, 246, 0.05) 100%);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem;
+            margin-top: 3rem;
+        }
+
+        .troubleshooting {
+            background: rgba(245, 158, 11, 0.05);
+            border: 1px solid rgba(245, 158, 11, 0.2);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .troubleshooting h4 {
+            color: var(--warning);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+    </style>
+</head>
+
+<body data-layout="/_includes/tool-page.layout.html">
+
+<div>
+    <section class="tool-hero getting-started-hero">
+        <div class="tool-hero-content">
+            <h1>Getting Started with giv</h1>
+            <p class="tagline">Your first steps to AI-powered Git workflows</p>
+            <p class="description">
+                Get giv installed and configured in under 5 minutes. Transform your Git history into professional
+                documentation with zero friction.
+            </p>
+        </div>
+    </section>
+
+    <section class="tool-nav">
+        <div class="tool-nav-container">
+            <ul class="tool-nav-links">
+                <li><a href="/giv/">Overview</a></li>
+                <li><a href="/giv/getting-started" class="active">Getting Started</a></li>
+                <li><a href="/giv/docs">Documentation</a></li>
+                <li><a href="/giv/examples">Examples</a></li>
+            </ul>
+        </div>
+    </section>
+
+    <section class="tool-section">
+        <div class="section-header">
+            <h2>Quick Start Guide</h2>
+            <p>From zero to AI-powered commits in 3 steps</p>
+        </div>
+
+        <div class="step-grid">
+            <div class="step-card">
+                <div class="step-number">1</div>
+                <h3>Install giv</h3>
+                <div class="code-block">
+                    <pre># One-line install script (recommended)
+curl -fsSL https://raw.githubusercontent.com/fwdslsh/giv/main/install.sh | sh
+
+# Or install via pip
+pip install giv
+
+# Or use Docker
+docker pull fwdslsh/giv:latest</pre>
+                </div>
+                <p>The install script automatically detects your platform and downloads the appropriate binary. No
+                    dependencies required.</p>
+            </div>
+
+            <div class="step-card">
+                <div class="step-number">2</div>
+                <h3>Configure AI Provider</h3>
+                <div class="code-block">
+                    <pre># Set up OpenAI (most common)
+export OPENAI_API_KEY="your-api-key"
+export GIV_API_MODEL="gpt-4"
+
+# Or configure via giv
+giv config set api.url "https://api.openai.com/v1/chat/completions"
+giv config set api.model "gpt-4"</pre>
+                </div>
+                <p>Support for OpenAI, Anthropic, Ollama, and custom endpoints. Environment variables are the quickest
+                    way to get started.</p>
+            </div>
+
+            <div class="step-card">
+                <div class="step-number">3</div>
+                <h3>Generate Your First Commit</h3>
+                <div class="code-block">
+                    <pre># Initialize giv in your project
+giv init
+
+# Make some changes and stage them
+git add .
+
+# Generate AI-powered commit message
+giv message</pre>
+                </div>
+                <p>giv analyzes your staged changes and generates a professional commit message following best
+                    practices.</p>
+            </div>
+        </div>
+    </section>
+
+    <section id="configuration" class="tool-section alt-bg">
+        <div class="section-header">
+            <h2>AI Provider Configuration</h2>
+            <p>Choose your preferred AI service</p>
+        </div>
+
+        <div class="config-section">
+            <div class="config-tabs">
+                <button class="config-tab active" onclick="showConfigTab('openai')">OpenAI</button>
+                <button class="config-tab" onclick="showConfigTab('anthropic')">Anthropic</button>
+                <button class="config-tab" onclick="showConfigTab('ollama')">Ollama (Local)</button>
+                <button class="config-tab" onclick="showConfigTab('custom')">Custom API</button>
+            </div>
+
+            <div id="openai-config" class="config-content active">
+                <h4>OpenAI Configuration</h4>
+                <div class="code-block">
+                    <pre># Environment variables (recommended)
+export OPENAI_API_KEY="sk-your-api-key-here"
+export GIV_API_MODEL="gpt-4"
+
+# Or use giv config
+giv config set api.url "https://api.openai.com/v1/chat/completions"
+giv config set api.model "gpt-4"
+giv config set api.key "sk-your-api-key-here"</pre>
+                </div>
+                <p><strong>Recommended models:</strong> gpt-4, gpt-4-turbo, gpt-3.5-turbo</p>
+                <p>Get your API key from <a href="https://platform.openai.com/api-keys" target="_blank">OpenAI
+                        Platform</a></p>
+            </div>
+
+            <div id="anthropic-config" class="config-content">
+                <h4>Anthropic Claude Configuration</h4>
+                <div class="code-block">
+                    <pre># Environment variables
+export ANTHROPIC_API_KEY="your-anthropic-key"
+export GIV_API_MODEL="claude-3-5-sonnet-20241022"
+
+# Or use giv config
+giv config set api.url "https://api.anthropic.com/v1/messages"
+giv config set api.model "claude-3-5-sonnet-20241022"
+giv config set api.key "your-anthropic-key"</pre>
+                </div>
+                <p><strong>Recommended models:</strong> claude-3-5-sonnet-20241022, claude-3-opus-20240229</p>
+                <p>Get your API key from <a href="https://console.anthropic.com/" target="_blank">Anthropic
+                        Console</a></p>
+            </div>
+
+            <div id="ollama-config" class="config-content">
+                <h4>Ollama (Local) Configuration</h4>
+                <div class="code-block">
+                    <pre># Install Ollama first
+curl -fsSL https://ollama.ai/install.sh | sh
+
+# Pull a model
+ollama pull llama3.2
+
+# Configure giv
+giv config set api.url "http://localhost:11434/v1/chat/completions"
+giv config set api.model "llama3.2"
+giv config set api.key "not-needed"</pre>
+                </div>
+                <p><strong>Recommended models:</strong> llama3.2, codellama, mistral</p>
+                <p>Completely private and offline after initial model download</p>
+            </div>
+
+            <div id="custom-config" class="config-content">
+                <h4>Custom API Configuration</h4>
+                <div class="code-block">
+                    <pre># Any OpenAI-compatible endpoint
+giv config set api.url "https://your-custom-endpoint.com/v1/chat/completions"
+giv config set api.model "your-model-name"
+giv config set api.key "your-api-key"
+
+# Optional: custom headers
+giv config set api.headers.Authorization "Bearer your-token"
+giv config set api.headers.Custom-Header "custom-value"</pre>
+                </div>
+                <p>Works with any service that implements the OpenAI chat completions API</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="tool-section">
+        <div class="section-header">
+            <h2>Essential Commands</h2>
+            <p>Core giv commands you'll use every day</p>
+        </div>
+
+        <div class="command-showcase">
+            <div class="command-demo">
+                <div class="command-demo-header">Commit Messages</div>
+                <div class="command-demo-content">
+                    <div class="command-line">$ giv message</div>
+                    <div class="command-output">✓ Generated commit: "feat: add user authentication with JWT tokens"</div>
+
+                    <div class="command-line">$ giv message --format conventional</div>
+                    <div class="command-output">✓ Generated conventional commit with proper scope</div>
+                </div>
+            </div>
+
+            <div class="command-demo">
+                <div class="command-demo-header">Changelogs</div>
+                <div class="command-demo-content">
+                    <div class="command-line">$ giv changelog v1.0.0..HEAD</div>
+                    <div class="command-output">✓ Generated changelog with 12 commits</div>
+
+                    <div class="command-line">$ giv changelog --update CHANGELOG.md</div>
+                    <div class="command-output">✓ Updated CHANGELOG.md with new entries</div>
+                </div>
+            </div>
+
+            <div class="command-demo">
+                <div class="command-demo-header">Release Notes</div>
+                <div class="command-demo-content">
+                    <div class="command-line">$ giv release-notes v1.2.0..HEAD</div>
+                    <div class="command-output">✓ Generated release notes for version 1.2.0</div>
+
+                    <div class="command-line">$ giv release-notes --format markdown</div>
+                    <div class="command-output">✓ Formatted release notes in Markdown</div>
+                </div>
+            </div>
+
+            <div class="command-demo">
+                <div class="command-demo-header">Project Summaries</div>
+                <div class="command-demo-content">
+                    <div class="command-line">$ giv summary --since="1 week ago"</div>
+                    <div class="command-output">✓ Generated weekly development summary</div>
+
+                    <div class="command-line">$ giv summary --author="jane@example.com"</div>
+                    <div class="command-output">✓ Generated summary for specific author</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="tool-section alt-bg">
+        <div class="section-header">
+            <h2>Workflow Integration</h2>
+            <p>Integrate giv into your development process</p>
+        </div>
+
+        <div class="feature-grid">
+            <div class="feature-card">
+                <div class="feature-icon">🔄</div>
+                <h3>Git Hooks</h3>
+                <div class="code-block">
+                    <pre># Add to .git/hooks/prepare-commit-msg
+#!/bin/sh
+if [ -z "$2" ]; then
+    giv message> "$1"
+fi</pre>
+                </div>
+                <p>Automatically generate commit messages during git commit</p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">🤖</div>
+                <h3>CI/CD Integration</h3>
+                <div class="code-block">
+                    <pre># GitHub Actions example
+- name: Generate Release Notes
+  run: |
+    giv release-notes ${{ github.event.release.tag_name }} \
+      --output release-notes.md</pre>
+                </div>
+                <p>Automate documentation generation in your CI/CD pipeline</p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">📝</div>
+                <h3>Custom Templates</h3>
+                <div class="code-block">
+                    <pre># Initialize project templates
+giv init
+
+# Edit custom prompts
+nano .giv/templates/commit_message_prompt.md</pre>
+                </div>
+                <p>Customize AI prompts for your project's specific needs</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="tool-section">
+        <div class="troubleshooting">
+            <h4>⚠️ Common Issues & Solutions</h4>
+            <div class="feature-grid">
+                <div>
+                    <h5>GLIBC Version Error (Linux)</h5>
+                    <div class="code-block">
+                        <pre># Use pip installation instead
+pip install giv
+
+# Or check compatibility
+ldd --version</pre>
+                    </div>
+                    <p>Binary requires GLIBC 2.31+ (Ubuntu 20.04+)</p>
+                </div>
+
+                <div>
+                    <h5>API Rate Limits</h5>
+                    <div class="code-block">
+                        <pre># Add delays between requests
+giv config set api.delay 1000
+
+# Or use a different model
+giv config set api.model "gpt-3.5-turbo"</pre>
+                    </div>
+                    <p>Configure rate limiting for your API tier</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="next-steps">
+            <h3>🎉 You're Ready to Go!</h3>
+            <p>giv is now configured and ready to transform your Git workflow. Here's what to explore next:</p>
+
+            <div class="quick-links">
+                <a href="/giv/examples" class="quick-link">
+                    <span class="quick-link-icon">📚</span>
+                    <div class="quick-link-content">
+                        <h4>View Examples</h4>
+                        <p>See real-world usage patterns and workflows</p>
+                    </div>
+                </a>
+
+                <a href="/giv/docs" class="quick-link">
+                    <span class="quick-link-icon">📖</span>
+                    <div class="quick-link-content">
+                        <h4>Full Documentation</h4>
+                        <p>Complete reference for all commands and options</p>
+                    </div>
+                </a>
+
+                <a href="https://github.com/fwdslsh/giv/discussions" class="quick-link">
+                    <span class="quick-link-icon">💬</span>
+                    <div class="quick-link-content">
+                        <h4>Community Support</h4>
+                        <p>Get help and share your experiences</p>
+                    </div>
+                </a>
+            </div>
+        </div>
+    </section>
+</div>
+
+<script>
+    function showConfigTab(provider) {
+        // Hide all config content
+        document.querySelectorAll('.config-content').forEach(content => {
+            content.classList.remove('active');
+        });
+
+        // Remove active class from all tabs
+        document.querySelectorAll('.config-tab').forEach(tab => {
+            tab.classList.remove('active');
+        });
+
+        // Show selected content and activate tab
+        document.getElementById(provider + '-config').classList.add('active');
+        event.target.classList.add('active');
+    }
+
+    // Copy to clipboard for code blocks
+    document.querySelectorAll('.code-block').forEach(block => {
+        block.addEventListener('click', function() {
+            const text = this.textContent.trim();
+            navigator.clipboard.writeText(text).then(() => {
+                // Visual feedback
+                const original = this.style.background;
+                this.style.background = 'rgba(0, 255, 65, 0.1)';
+                setTimeout(() => {
+                    this.style.background = original;
+                }, 300);
+            });
+        });
+    });
+
+    // Animate step cards on scroll
+    const stepObserver = new IntersectionObserver((entries) => {
+        entries.forEach((entry, index) => {
+            if (entry.isIntersecting) {
+                setTimeout(() => {
+                    entry.target.style.animation = 'fadeInUp 0.6s ease-out forwards';
+                }, index * 200);
+            }
+        });
+    });
+
+    document.querySelectorAll('.step-card').forEach(card => {
+        card.style.opacity = '0';
+        stepObserver.observe(card);
+    });
+</script>
+
+</body>
+</html>

@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>inform Documentation - Complete Reference Guide</title>
+    <meta name="description" content="Complete documentation for inform - the high-performance web content crawler. CLI reference, advanced features, and integration guides.">
+    <meta name="keywords" content="inform, documentation, web crawler, CLI reference, fwdslsh">
+    <meta property="og:title" content="inform Documentation - Complete Reference Guide">
+    <meta property="og:description" content="Complete documentation for inform - the high-performance web content crawler. CLI reference, advanced features, and integration guides.">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="inform Documentation - Complete Reference Guide">
+    <meta name="twitter:description" content="Complete documentation for inform - the high-performance web content crawler. CLI reference, advanced features, and integration guides.">
+    <style>
+        /* Page-specific styles for inform docs */
+        .section-grid {
+            display: grid;
+            gap: 3rem;
+            margin-top: 3rem;
+        }
+
+        .docs-section {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem;
+        }
+
+        .docs-section h3 {
+            color: var(--text-primary);
+            margin-bottom: 1.5rem;
+            font-size: 1.4rem;
+        }
+
+        .option-list {
+            display: grid;
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        .option-item {
+            background: var(--bg-darker);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+        }
+
+        .option-item h4 {
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+            font-family: var(--font-mono);
+            font-size: 1rem;
+        }
+
+        .option-item p {
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+            line-height: 1.6;
+        }
+
+        .code-block {
+            background: var(--bg-dark);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 1rem;
+            margin: 0.5rem 0;
+            font-family: var(--font-mono);
+            overflow-x: auto;
+        }
+
+        .code-block code {
+            color: var(--primary);
+            font-size: 0.85rem;
+            line-height: 1.4;
+            white-space: pre;
+        }
+
+        .next-steps-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .next-step-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .next-step-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--primary);
+        }
+
+        .next-step-card .card-icon {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+        }
+
+        .next-step-card h3 {
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+        }
+
+        .next-step-card p {
+            color: var(--text-secondary);
+            line-height: 1.6;
+            flex: 1;
+        }
+
+        .next-step-card .card-arrow {
+            color: var(--primary);
+            font-size: 1.5rem;
+            margin-top: 1rem;
+            align-self: flex-end;
+        }
+    </style>
+</head>
+
+<body data-layout="/_includes/tool-page.layout.html">
+
+<section class="tool-hero">
+    <div class="tool-hero-content">
+        <h1>inform Documentation</h1>
+        <div class="tagline">Complete reference guide for high-performance web content extraction</div>
+        <div class="description">Master inform's features, from basic crawling to advanced workflows and integrations. Everything you need to extract, convert, and organize web content efficiently.</div>
+        
+        <div class="hero-buttons">
+            <a href="#cli-reference" class="btn btn-primary">
+                <span class="btn-icon">📋</span>
+                CLI Reference
+            </a>
+            <a href="#advanced-features" class="btn btn-secondary">Advanced Features</a>
+        </div>
+    </div>
+</section>
+
+<section class="tool-nav">
+    <div class="tool-nav-container">
+        <ul class="tool-nav-links">
+            <li><a href="/inform/">Overview</a></li>
+            <li><a href="/inform/getting-started">Getting Started</a></li>
+            <li><a href="/inform/docs" class="active">Documentation</a></li>
+            <li><a href="/inform/examples">Examples</a></li>
+        </ul>
+    </div>
+</section>
+
+<section id="cli-reference" class="tool-section">
+    <div class="section-header">
+        <h2>Command Line Reference</h2>
+        <p>Complete guide to all inform command-line options and parameters</p>
+    </div>
+
+    <div class="section-grid">
+        <div class="docs-section">
+            <h3>Basic Syntax</h3>
+            <div class="code-block">
+                <code>inform &lt;URL&gt; [OPTIONS]</code>
+            </div>
+            <p>Extract content from a website starting at the specified URL.</p>
+
+            <h4>Essential Options</h4>
+            <div class="option-list">
+                <div class="option-item">
+                    <h4>--output-dir &lt;directory&gt;</h4>
+                    <p>Specify the output directory for extracted content. Creates directory if it doesn't exist.</p>
+                    <div class="code-block">
+                        <code>inform https://docs.example.com --output-dir ./content</code>
+                    </div>
+                </div>
+
+                <div class="option-item">
+                    <h4>--max-pages &lt;number&gt;</h4>
+                    <p>Limit the maximum number of pages to crawl. Useful for large sites or testing.</p>
+                    <div class="code-block">
+                        <code>inform https://blog.example.com --max-pages 50</code>
+                    </div>
+                </div>
+
+                <div class="option-item">
+                    <h4>--delay &lt;milliseconds&gt;</h4>
+                    <p>Add delay between requests to be respectful to target servers.</p>
+                    <div class="code-block">
+                        <code>inform https://api-docs.com --delay 1000</code>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="docs-section">
+            <h3>Content Processing Options</h3>
+            <div class="option-list">
+                <div class="option-item">
+                    <h4>--selector &lt;css-selector&gt;</h4>
+                    <p>Target specific content using CSS selectors. Perfect for extracting main content areas.</p>
+                    <div class="code-block">
+                        <code>inform https://news.site --selector "article.main-content"</code>
+                    </div>
+                </div>
+
+                <div class="option-item">
+                    <h4>--include-links</h4>
+                    <p>Preserve internal links in the extracted Markdown content.</p>
+                    <div class="code-block">
+                        <code>inform https://wiki.example.com --include-links</code>
+                    </div>
+                </div>
+
+                <div class="option-item">
+                    <h4>--follow-external</h4>
+                    <p>Follow links to external domains (use with caution).</p>
+                    <div class="code-block">
+                        <code>inform https://linkfarm.site --follow-external --max-pages 10</code>
+                    </div>
+                </div>
+
+                <div class="option-item">
+                    <h4>--exclude-patterns &lt;patterns&gt;</h4>
+                    <p>Exclude URLs matching specified patterns (comma-separated).</p>
+                    <div class="code-block">
+                        <code>inform https://docs.site --exclude-patterns "/admin,/login,*.pdf"</code>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="docs-section">
+            <h3>Performance and Rate Limiting</h3>
+            <div class="option-list">
+                <div class="option-item">
+                    <h4>--concurrent &lt;number&gt;</h4>
+                    <p>Number of concurrent requests (default: 3). Higher values for faster crawling.</p>
+                    <div class="code-block">
+                        <code>inform https://fast-site.com --concurrent 10</code>
+                    </div>
+                </div>
+
+                <div class="option-item">
+                    <h4>--timeout &lt;seconds&gt;</h4>
+                    <p>Request timeout in seconds. Useful for slow or unreliable sites.</p>
+                    <div class="code-block">
+                        <code>inform https://slow-site.com --timeout 30</code>
+                    </div>
+                </div>
+
+                <div class="option-item">
+                    <h4>--user-agent &lt;string&gt;</h4>
+                    <p>Custom User-Agent string for requests.</p>
+                    <div class="code-block">
+                        <code>inform https://api.site --user-agent "MyBot/1.0"</code>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section id="advanced-features" class="tool-section alt-bg">
+    <div class="section-header">
+        <h2>Advanced Features</h2>
+        <p>Powerful capabilities for complex content extraction workflows</p>
+    </div>
+
+    <div class="section-grid">
+        <div class="docs-section">
+            <h3>🎯 Content Quality Enhancement</h3>
+            <p>inform automatically cleans and processes content for optimal readability and consistency.</p>
+
+            <div class="option-list">
+                <div class="option-item">
+                    <h4>Smart Content Detection</h4>
+                    <p>Automatically identifies main content areas, removing navigation, ads, and boilerplate.</p>
+                </div>
+
+                <div class="option-item">
+                    <h4>Markdown Conversion</h4>
+                    <p>Converts HTML to clean, standards-compliant Markdown with proper formatting.</p>
+                </div>
+
+                <div class="option-item">
+                    <h4>Link Processing</h4>
+                    <p>Intelligently handles internal and external links, with options for link preservation.</p>
+                </div>
+
+                <div class="option-item">
+                    <h4>Image Handling</h4>
+                    <p>Downloads images and updates references in Markdown output (optional).</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="docs-section">
+            <h3>🏗️ Site Structure Analysis</h3>
+            <p>Advanced crawling strategies that understand website architecture.</p>
+
+            <div class="option-list">
+                <div class="option-item">
+                    <h4>Sitemap Detection</h4>
+                    <p>Automatically discovers and uses XML sitemaps for comprehensive coverage.</p>
+                </div>
+
+                <div class="option-item">
+                    <h4>Robots.txt Compliance</h4>
+                    <p>Respects robots.txt rules and crawl-delay directives.</p>
+                </div>
+
+                <div class="option-item">
+                    <h4>URL Pattern Recognition</h4>
+                    <p>Intelligently follows URL patterns to discover content systematically.</p>
+                </div>
+
+                <div class="option-item">
+                    <h4>Duplicate Detection</h4>
+                    <p>Avoids crawling duplicate content and similar pages.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="tool-section">
+    <div class="section-header">
+        <h2>Integration and Workflows</h2>
+        <p>Connect inform with other tools and systems for powerful content workflows</p>
+    </div>
+
+    <div class="feature-grid">
+        <div class="feature-card">
+            <div class="feature-icon">🔄</div>
+            <h3>fwdslsh Ecosystem</h3>
+            <p>Seamlessly integrates with catalog, unify, and giv for complete documentation workflows from extraction to publication.</p>
+            <div class="code-block">
+                <code>inform https://docs.site --output-dir content/
+catalog --input content/ --output indexed/
+unify build --input indexed/ --output site/</code>
+            </div>
+        </div>
+
+        <div class="feature-card">
+            <div class="feature-icon">⚡</div>
+            <h3>Performance Optimization</h3>
+            <p>Optimize crawling for large sites with concurrent requests, rate limiting, and intelligent content targeting.</p>
+            <div class="code-block">
+                <code>inform https://large-site.com \
+  --max-pages 1000 \
+  --concurrent 5 \
+  --delay 500</code>
+            </div>
+        </div>
+
+        <div class="feature-card">
+            <div class="feature-icon">🛠️</div>
+            <h3>Troubleshooting</h3>
+            <p>Handle JavaScript-heavy sites, rate limiting, and authentication with advanced configuration options.</p>
+            <div class="code-block">
+                <code>inform https://spa-site.com \
+  --selector "main, .content" \
+  --timeout 30</code>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="tool-section">
+    <div class="section-header">
+        <h2>Continue Learning</h2>
+        <p>Explore more inform capabilities and related tools</p>
+    </div>
+
+    <div class="next-steps-grid">
+        <a href="/inform/examples" class="next-step-card">
+            <div class="card-icon">🎯</div>
+            <h3>Real-World Examples</h3>
+            <p>See inform in action with practical use cases, migration patterns, and integration workflows</p>
+            <span class="card-arrow">→</span>
+        </a>
+
+        <a href="/ecosystem/" class="next-step-card">
+            <div class="card-icon">🔄</div>
+            <h3>Ecosystem Integration</h3>
+            <p>Learn how inform works with catalog, unify, and giv for complete documentation workflows</p>
+            <span class="card-arrow">→</span>
+        </a>
+
+        <a href="https://github.com/fwdslsh/inform" class="next-step-card">
+            <div class="card-icon">📂</div>
+            <h3>Source Code</h3>
+            <p>View the source code, contribute improvements, or report issues on GitHub</p>
+            <span class="card-arrow">→</span>
+        </a>
+    </div>
+</section>
+
+</body>
+</html>

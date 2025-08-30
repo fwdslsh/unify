@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Scoping Test Page</title>
+</head>
+<body>
+    <header>
+        <nav class="unify-navigation">
+            <ul>
+                <li><a href="/">Home</a></li>
+                <li><a href="/about">About</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        <section class="unify-hero">
+            <h1>Page Hero Title</h1>
+            <p>This content replaces the layout's hero section.</p>
+        </section>
+        
+        <!-- Card-grid component with its content replaced by page content -->
+        <div class="grid-container">
+            <div class="card-grid">
+                <h2 class="unify-section-title">
+                    <h2>Custom Grid Section Title</h2>
+                    <p>This replaces the card-grid's section title.</p>
+                </h2>
+                
+                <!-- First card component - uses default content (scoping prevents page targeting) -->
+                <article class="card-wrapper">
+                    <div class="card">
+                        <header class="card-header">
+                            <h4 class="unify-card-title">Default Card Title</h4>
+                        </header>
+                        <div class="card-body">
+                            <div class="unify-card-content">
+                                <p>Default card content goes here.</p>
+                            </div>
+                        </div>
+                        <footer class="card-footer">
+                            <div class="unify-card-actions">
+                                <button>Default Action</button>
+                            </div>
+                        </footer>
+                    </div>
+                </article>
+                
+                <!-- Second card component - also uses default content -->
+                <article class="card-wrapper">
+                    <div class="card">
+                        <header class="card-header">
+                            <h4 class="unify-card-title">Default Card Title</h4>
+                        </header>
+                        <div class="card-body">
+                            <div class="unify-card-content">
+                                <p>Default card content goes here.</p>
+                            </div>
+                        </div>
+                        <footer class="card-footer">
+                            <div class="unify-card-actions">
+                                <button>Default Action</button>
+                            </div>
+                        </footer>
+                    </div>
+                </article>
+                
+                <!-- Grid footer replaced by page content -->
+                <div class="unify-grid-footer">
+                    <p>Custom grid footer from page</p>
+                    <small>Added by the page, not layout</small>
+                </div>
+            </div>
+        </div>
+        
+        <section class="unify-footer-content">
+            <p>Custom footer content from page</p>
+            <p>Multiple paragraphs allowed</p>
+        </section>
+    </main>
+</body>
+</html>

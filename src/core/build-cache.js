@@ -1,173 +1,199 @@
 /**
- * Build Cache for Unify CLI
- * Provides efficient file tracking and build caching
+ * Build Cache for Unify
+ * Implements US-014: Incremental Build System with Dependency Tracking
+ * 
+ * Provides persistent build cache with fast change detection using SHA-256 hashes.
+ * Enables <1 second incremental builds by avoiding unnecessary file processing.
  */
 
-import fs from 'fs/promises';
-import path from 'path';
-import { logger } from '../utils/logger.js';
+import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'fs';
+import { join, dirname } from 'path';
 
+/**
+ * BuildCache class for persistent file change detection
+ */
 export class BuildCache {
   constructor(cacheDir = '.unify-cache') {
     this.cacheDir = cacheDir;
-    this.hashCache = new Map();
-    this.dependencyGraph = new Map();
-    this.isInitialized = false;
+    this.cacheFile = join(cacheDir, 'hash-cache.json');
+    this.cache = new Map(); // In-memory cache for fast access
+    this.stats = {
+      totalFiles: 0,
+      cacheHits: 0,
+      cacheMisses: 0,
+      hashCalculations: 0
+    };
   }
 
   /**
-   * Initialize the build cache
+   * Store file hash in cache
+   * @param {string} filePath - Path to file
+   * @param {string} content - File content (optional, will read if not provided)
+   * @returns {Promise<string>} The calculated hash
    */
-  async initialize() {
-    if (this.isInitialized) return;
-
-    try {
-      // Ensure cache directory exists
-      await fs.mkdir(this.cacheDir, { recursive: true });
-      
-      // Load existing cache if available
-      await this.loadCache();
-      
-      this.isInitialized = true;
-      logger.debug(`Build cache initialized at ${this.cacheDir}`);
-    } catch (error) {
-      logger.warn('Failed to initialize build cache:', error.message);
-    }
-  }
-
-  /**
-   * Generate hash for file using Bun's native hashing
-   * @param {string} filePath - Path to the file
-   * @returns {Promise<string>} File hash
-   */
-  async hashFile(filePath) {
-    try {
+  async storeFileHash(filePath, content = null) {
+    let hash;
+    
+    if (content !== null) {
+      hash = await this.calculateHash(content);
+    } else {
+      // Read file and calculate hash
       const file = Bun.file(filePath);
-      const arrayBuffer = await file.arrayBuffer();
-      
-      // Use Bun's native hash function (SHA-256 by default)
-      const hasher = new Bun.CryptoHasher('sha256');
-      hasher.update(arrayBuffer);
-      return hasher.digest('hex');
-    } catch (error) {
-      logger.warn(`Failed to hash file ${filePath}:`, error.message);
-      return 'error';
+      if (await file.exists()) {
+        content = await file.text();
+        hash = await this.calculateHash(content);
+      } else {
+        return null;
+      }
     }
+    
+    this.cache.set(filePath, hash);
+    this.stats.totalFiles = this.cache.size;
+    return hash;
   }
 
   /**
-   * Generate hash for string content using Bun's native hashing
-   * @param {string} content - Content to hash
-   * @returns {string} Content hash
+   * Get cached hash for file
+   * @param {string} filePath - Path to file
+   * @returns {Promise<string|null>} Cached hash or null if not found
    */
-  hashContent(content) {
-    try {
-      const hasher = new Bun.CryptoHasher('sha256');
-      hasher.update(content);
-      return hasher.digest('hex');
-    } catch (error) {
-      logger.warn('Failed to hash content:', error.message);
-      return 'error';
+  async getFileHash(filePath) {
+    const hash = this.cache.get(filePath);
+    if (hash) {
+      this.stats.cacheHits++;
+      return hash;
     }
+    
+    this.stats.cacheMisses++;
+    return null;
   }
 
   /**
-   * Check if a file has changed since last build
-   * @param {string} filePath - Path to the file
-   * @returns {Promise<boolean>} True if file has changed
+   * Check if file has changed since last cache
+   * @param {string} filePath - Path to file
+   * @returns {Promise<boolean>} True if file has changed or is new
    */
   async hasFileChanged(filePath) {
-    const currentHash = await this.hashFile(filePath);
-    const cachedHash = this.hashCache.get(filePath);
-    
-    const hasChanged = currentHash !== cachedHash;
-    
-    if (hasChanged) {
-      logger.debug(`File changed: ${filePath}`);
-      this.hashCache.set(filePath, currentHash);
-    }
-    
-    return hasChanged;
-  }
-
-  /**
-   * Update hash cache for a file
-   * @param {string} filePath - Path to the file
-   * @param {string} [hash] - Pre-computed hash (optional)
-   */
-  async updateFileHash(filePath, hash = null) {
-    const fileHash = hash || await this.hashFile(filePath);
-    this.hashCache.set(filePath, fileHash);
-  }
-
-  /**
-   * Check if any dependencies of a file have changed
-   * @param {string} filePath - Path to the main file
-   * @returns {Promise<boolean>} True if any dependency has changed
-   */
-  async haveDependenciesChanged(filePath) {
-    const dependencies = this.dependencyGraph.get(filePath) || [];
-    
-    for (const depPath of dependencies) {
-      if (await this.hasFileChanged(depPath)) {
-        logger.debug(`Dependency changed: ${depPath} affects ${filePath}`);
+    try {
+      const file = Bun.file(filePath);
+      if (!(await file.exists())) {
+        // File doesn't exist, consider it changed
         return true;
       }
-    }
-    
-    return false;
-  }
 
-  /**
-   * Set dependencies for a file
-   * @param {string} filePath - Path to the main file
-   * @param {string[]} dependencies - Array of dependency paths
-   */
-  setDependencies(filePath, dependencies) {
-    this.dependencyGraph.set(filePath, [...dependencies]);
-  }
-
-  /**
-   * Add a dependency to a file
-   * @param {string} filePath - Path to the main file
-   * @param {string} dependencyPath - Path to the dependency
-   */
-  addDependency(filePath, dependencyPath) {
-    if (!this.dependencyGraph.has(filePath)) {
-      this.dependencyGraph.set(filePath, []);
-    }
-    
-    const dependencies = this.dependencyGraph.get(filePath);
-    if (!dependencies.includes(dependencyPath)) {
-      dependencies.push(dependencyPath);
-    }
-  }
-
-  /**
-   * Check if a build output is up-to-date
-   * @param {string} inputPath - Path to the input file
-   * @param {string} outputPath - Path to the output file
-   * @returns {Promise<boolean>} True if output is up-to-date
-   */
-  async isUpToDate(inputPath, outputPath) {
-    try {
-      // Check if output file exists
-      await fs.access(outputPath);
-      
-      // Check if input file has changed
-      if (await this.hasFileChanged(inputPath)) {
-        return false;
+      const cachedHash = await this.getFileHash(filePath);
+      if (!cachedHash) {
+        // No cache entry, consider it changed (new file)
+        return true;
       }
+
+      const currentContent = await file.text();
+      const currentHash = await this.calculateHash(currentContent);
       
-      // Check if any dependencies have changed
-      if (await this.haveDependenciesChanged(inputPath)) {
-        return false;
-      }
-      
-      return true;
+      return currentHash !== cachedHash;
     } catch (error) {
-      // Output file doesn't exist or can't be accessed
-      return false;
+      // If we can't check, assume it changed
+      return true;
+    }
+  }
+
+  /**
+   * Check multiple files efficiently
+   * @param {string[]} filePaths - Array of file paths
+   * @returns {Promise<{changed: string[], unchanged: string[]}>} Results
+   */
+  async checkMultipleFiles(filePaths) {
+    const changed = [];
+    const unchanged = [];
+
+    const checkPromises = filePaths.map(async (filePath) => {
+      const hasChanged = await this.hasFileChanged(filePath);
+      if (hasChanged) {
+        changed.push(filePath);
+      } else {
+        unchanged.push(filePath);
+      }
+    });
+
+    await Promise.all(checkPromises);
+    
+    return { changed, unchanged };
+  }
+
+  /**
+   * Calculate hash of content using Bun's native crypto
+   * @param {string} content - Content to hash
+   * @returns {Promise<string>} SHA-256 hash
+   */
+  async calculateHash(content) {
+    this.stats.hashCalculations++;
+    
+    // Use Bun's native crypto hasher for performance
+    const hasher = new Bun.CryptoHasher('sha256');
+    hasher.update(content);
+    return hasher.digest('hex');
+  }
+
+  /**
+   * Persist cache to disk
+   * @returns {Promise<void>}
+   */
+  async persistToDisk() {
+    try {
+      // Ensure cache directory exists
+      mkdirSync(this.cacheDir, { recursive: true });
+      
+      // Convert Map to object for JSON serialization
+      const cacheObject = Object.fromEntries(this.cache);
+      
+      // Write cache file
+      writeFileSync(this.cacheFile, JSON.stringify(cacheObject, null, 2));
+    } catch (error) {
+      // Silently fail - cache is optional
+      console.warn('Failed to persist build cache:', error.message);
+    }
+  }
+
+  /**
+   * Load cache from disk
+   * @returns {Promise<void>}
+   */
+  async loadFromDisk() {
+    try {
+      if (existsSync(this.cacheFile)) {
+        const content = readFileSync(this.cacheFile, 'utf8');
+        const cacheObject = JSON.parse(content);
+        
+        // Convert object back to Map
+        this.cache = new Map(Object.entries(cacheObject));
+        this.stats.totalFiles = this.cache.size;
+      }
+    } catch (error) {
+      // If cache is corrupt or unreadable, start fresh
+      this.cache = new Map();
+      this.stats.totalFiles = 0;
+    }
+  }
+
+  /**
+   * Clear all cache data
+   */
+  clear() {
+    this.cache.clear();
+    this.stats.totalFiles = 0;
+    this.stats.cacheHits = 0;
+    this.stats.cacheMisses = 0;
+    this.stats.hashCalculations = 0;
+  }
+
+  /**
+   * Remove specific file from cache
+   * @param {string} filePath - File path to remove
+   */
+  removeFile(filePath) {
+    const deleted = this.cache.delete(filePath);
+    if (deleted) {
+      this.stats.totalFiles = this.cache.size;
     }
   }
 
@@ -177,134 +203,81 @@ export class BuildCache {
    */
   getStats() {
     return {
-      cachedFiles: this.hashCache.size,
-      dependencyGraphSize: this.dependencyGraph.size,
-      cacheDir: this.cacheDir,
-      hashingMethod: 'native-crypto'
+      totalFiles: this.stats.totalFiles,
+      cacheSize: this.cache.size,
+      cacheHits: this.stats.cacheHits,
+      cacheMisses: this.stats.cacheMisses,
+      hashCalculations: this.stats.hashCalculations,
+      hitRatio: this.stats.cacheHits + this.stats.cacheMisses > 0 ? 
+        this.stats.cacheHits / (this.stats.cacheHits + this.stats.cacheMisses) : 0,
+      hashMethod: 'native-crypto',
+      cacheDirectory: this.cacheDir
     };
   }
 
   /**
-   * Load cache from disk
+   * Update file hash after processing
+   * @param {string} filePath - File path
+   * @param {string} content - New content (optional)
+   * @returns {Promise<void>}
    */
-  async loadCache() {
-    const cacheFilePath = path.join(this.cacheDir, 'hash-cache.json');
-    const depsFilePath = path.join(this.cacheDir, 'deps-cache.json');
-    
-    try {
-      // Load hash cache
-      const hashCacheData = await fs.readFile(cacheFilePath, 'utf-8');
-      const hashData = JSON.parse(hashCacheData);
-      this.hashCache = new Map(Object.entries(hashData));
-      
-      // Load dependency graph
-      const depsCacheData = await fs.readFile(depsFilePath, 'utf-8');
-      const depsData = JSON.parse(depsCacheData);
-      this.dependencyGraph = new Map(Object.entries(depsData));
-      
-      logger.debug(`Loaded cache: ${this.hashCache.size} files, ${this.dependencyGraph.size} dependency entries`);
-    } catch (error) {
-      // Cache files don't exist or are corrupted, start fresh
-      logger.debug('No existing cache found, starting fresh');
-    }
+  async updateFileHash(filePath, content = null) {
+    await this.storeFileHash(filePath, content);
   }
 
   /**
-   * Save cache to disk
+   * Check cache integrity and repair if needed
+   * @returns {Promise<{repaired: number, removed: number}>} Repair results
    */
-  async saveCache() {
-    if (!this.isInitialized) return;
+  async repairCache() {
+    let repaired = 0;
+    let removed = 0;
     
-    const cacheFilePath = path.join(this.cacheDir, 'hash-cache.json');
-    const depsFilePath = path.join(this.cacheDir, 'deps-cache.json');
+    const entries = Array.from(this.cache.entries());
     
-    try {
-      // Save hash cache
-      const hashData = Object.fromEntries(this.hashCache);
-      await fs.writeFile(cacheFilePath, JSON.stringify(hashData, null, 2));
-      
-      // Save dependency graph
-      const depsData = Object.fromEntries(this.dependencyGraph);
-      await fs.writeFile(depsFilePath, JSON.stringify(depsData, null, 2));
-      
-      logger.debug('Build cache saved to disk');
-    } catch (error) {
-      logger.warn('Failed to save cache:', error.message);
+    for (const [filePath, hash] of entries) {
+      try {
+        const file = Bun.file(filePath);
+        if (!(await file.exists())) {
+          // File no longer exists, remove from cache
+          this.cache.delete(filePath);
+          removed++;
+        } else {
+          // Verify hash is still valid format
+          if (typeof hash !== 'string' || hash.length !== 64) {
+            // Invalid hash, recalculate
+            const content = await file.text();
+            const newHash = await this.calculateHash(content);
+            this.cache.set(filePath, newHash);
+            repaired++;
+          }
+        }
+      } catch (error) {
+        // If we can't verify, remove from cache
+        this.cache.delete(filePath);
+        removed++;
+      }
     }
+    
+    this.stats.totalFiles = this.cache.size;
+    
+    return { repaired, removed };
   }
 
   /**
-   * Clear the entire cache
+   * Get cache efficiency metrics
+   * @returns {Object} Efficiency metrics
    */
-  async clearCache() {
-    this.hashCache.clear();
-    this.dependencyGraph.clear();
+  getEfficiencyMetrics() {
+    const total = this.stats.cacheHits + this.stats.cacheMisses;
     
-    try {
-      // Remove cache files
-      const cacheFilePath = path.join(this.cacheDir, 'hash-cache.json');
-      const depsFilePath = path.join(this.cacheDir, 'deps-cache.json');
-      
-      await fs.unlink(cacheFilePath).catch(() => {});
-      await fs.unlink(depsFilePath).catch(() => {});
-      
-      logger.info('Build cache cleared');
-    } catch (error) {
-      logger.warn('Error clearing cache files:', error.message);
-    }
+    return {
+      hitRatio: total > 0 ? this.stats.cacheHits / total : 0,
+      missRatio: total > 0 ? this.stats.cacheMisses / total : 0,
+      totalQueries: total,
+      avgHashCalculationsPerFile: this.stats.totalFiles > 0 ? 
+        this.stats.hashCalculations / this.stats.totalFiles : 0,
+      cacheUtilization: this.cache.size > 0 ? this.cache.size / this.stats.totalFiles : 0
+    };
   }
-
-  /**
-   * Generate a composite hash for multiple files
-   * @param {string[]} filePaths - Array of file paths
-   * @returns {Promise<string>} Composite hash
-   */
-  async hashFiles(filePaths) {
-    const hashes = await Promise.all(
-      filePaths.map(filePath => this.hashFile(filePath))
-    );
-    
-    const combinedHash = hashes.join('|');
-    return await this.hashContent(combinedHash);
-  }
-
-  /**
-   * Check if any file in a group has changed
-   * @param {string[]} filePaths - Array of file paths
-   * @param {string} cacheKey - Cache key for the group
-   * @returns {Promise<boolean>} True if any file has changed
-   */
-  async hasGroupChanged(filePaths, cacheKey) {
-    const currentHash = await this.hashFiles(filePaths);
-    const cachedHash = this.hashCache.get(cacheKey);
-    
-    const hasChanged = currentHash !== cachedHash;
-    
-    if (hasChanged) {
-      this.hashCache.set(cacheKey, currentHash);
-    }
-    
-    return hasChanged;
-  }
-}
-
-/**
- * Factory function to create build cache instance
- * @param {string} cacheDir - Cache directory path
- * @returns {BuildCache} Cache instance
- */
-export function createBuildCache(cacheDir = '.unify-cache') {
-  const cache = new BuildCache(cacheDir);
-  return cache;
-}
-
-/**
- * Clear cache on restart for serve/watch commands
- * @param {string} cacheDir - Cache directory path
- */
-export async function clearCacheOnRestart(cacheDir = '.unify-cache') {
-  const cache = new BuildCache(cacheDir);
-  await cache.initialize();
-  await cache.clearCache();
-  logger.info('Build cache cleared for fresh start');
 }

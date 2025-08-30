@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head><link rel="stylesheet" href="/assets/styles.css">
+    <link rel="stylesheet" href="/assets/components.css">
+    <link rel="stylesheet" href="/assets/layouts.css">
+    <link rel="stylesheet" href="/assets/utilities.css">
+    <link rel="stylesheet" href="/assets/nav.css">
+    <style data-unify-docs="v1">
+        /* Public areas: add these classes in a page to override content.
+         Keep selectors low-specificity and unique per scope. */
+        
+        /* Tool-specific navigation links */
+        .unify-nav-links { /* Tool-specific navigation links */ }
+        
+        /* Main page content area */
+        .unify-content { /* Primary content area for tool pages */ }
+    </style>
+    
+    <div data-unify="base/head.html"></div>
+</head>
+
+<body>
+    <div class="page-bg"></div>
+
+    <header class="unify-header">
+        <div data-unify="base/nav.html">
+            <!-- Tool-specific navigation replaces main nav-links -->
+            <ul class="unify-nav-links">
+                <li><a href="index.html">Overview</a></li>
+                <li><a href="getting-started.html">Getting Started</a></li>                
+                <li><a href="docs.html">Documentation</a></li>
+                <li><a href="examples.html">Examples</a></li>
+            </ul>
+        </div>
+    </header>
+
+    <main class="unify-content">
+        <!-- Page content goes here -->
+    </main>
+
+    <footer class="unify-footer">
+        <div data-unify="base/footer.html"></div>
+    </footer>
+    
+    <div data-unify="base/scripts.html"></div>
+</body>
+
+</html>

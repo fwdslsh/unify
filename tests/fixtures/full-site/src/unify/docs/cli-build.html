@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>unify build Command - unify Documentation</title>
+    <meta name="description" content="Complete reference for the unify build command including all options, flags, examples, and advanced usage patterns for building static sites.">
+    <link rel="stylesheet" href="/assets/styles.css">
+    <style>
+        .docs-layout { display: flex; min-height: 100vh; }
+        .sidebar { width: 280px; background: var(--bg-darker); border-right: 1px solid var(--border); padding: 2rem 0; position: fixed; height: calc(100vh - 80px); overflow-y: auto; z-index: 100; }
+        .sidebar-content { padding: 0 2rem; }
+        .sidebar-section { margin-bottom: 2rem; }
+        .sidebar-title { font-size: 0.9rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 0.05em; font-family: var(--font-mono); }
+        .sidebar-nav { list-style: none; }
+        .sidebar-nav li { margin-bottom: 0.5rem; }
+        .sidebar-nav a { color: var(--text-dim); text-decoration: none; font-size: 0.9rem; display: block; padding: 0.5rem 1rem; border-radius: 6px; transition: all 0.3s ease; font-family: var(--font-mono); }
+        .sidebar-nav a:hover { color: var(--text-primary); background: var(--bg-card); }
+        .sidebar-nav a.active { color: var(--primary); background: rgba(0, 255, 65, 0.1); border-left: 3px solid var(--primary); }
+        .main-content { flex: 1; margin-left: 280px; padding: 2rem 4rem; max-width: calc(100vw - 280px); }
+        .content-wrapper { max-width: 800px; }
+        .content h1 { font-size: 2.5rem; font-weight: 800; margin-bottom: 1rem; color: var(--text-primary); line-height: 1.2; }
+        .content p { margin-bottom: 1.5rem; color: var(--text-secondary); line-height: 1.7; }
+        @media (max-width: 1024px) {
+            .sidebar { transform: translateX(-100%); transition: transform 0.3s ease; }
+            .sidebar.open { transform: translateX(0); }
+            .main-content { margin-left: 0; max-width: 100vw; padding: 2rem; }
+        }
+    </style>
+</head>
+<body data-unify="/_includes/tool-page.html">
+    <ul class="unify-nav-links">
+        <li><a href="/unify/">Overview</a></li>
+        <li><a href="/unify/getting-started.html">Getting Started</a></li>
+        <li><a href="/unify/docs.html">Documentation</a></li>
+        <li><a href="/unify/examples.html">Examples</a></li>
+    </ul>
+    <div class="unify-content docs-layout">
+        <aside class="sidebar">
+            <div class="sidebar-content">
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Getting Started</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs">Quick Start</a></li>
+                        <li><a href="/unify/docs/installation">Installation</a></li>
+                        <li><a href="/unify/docs/project-structure">Project Structure</a></li>
+                        <li><a href="/unify/docs/first-site">Your First Site</a></li>
+                    </ul>
+                </div>
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Core Concepts</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs/includes">Server-Side Includes</a></li>
+                        <li><a href="/unify/docs/components">Components</a></li>
+                        <li><a href="/unify/docs/markdown">Markdown</a></li>
+                        <li><a href="/unify/docs/assets">Static Assets</a></li>
+                    </ul>
+                </div>
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">CLI Reference</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs/cli-build" class="active">unify build</a></li>
+                        <li><a href="/unify/docs/cli-serve">unify serve</a></li>
+                        <li><a href="/unify/docs/cli-watch">unify watch</a></li>
+                        <li><a href="/unify/docs/configuration">Configuration</a></li>
+                    </ul>
+                </div>
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Deployment</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs/deployment">Static Hosting</a></li>
+                        <li><a href="/unify/docs/docker">Docker</a></li>
+                        <li><a href="/unify/docs/ci-cd">CI/CD</a></li>
+                    </ul>
+                </div>
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Advanced</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs/performance">Performance</a></li>
+                        <li><a href="/unify/docs/security">Security</a></li>
+                        <li><a href="/unify/docs/migration">Migration Guide</a></li>
+                        <li><a href="/unify/docs/troubleshooting">Troubleshooting</a></li>
+                    </ul>
+                </div>
+            </div>
+        </aside>
+        <main class="main-content">
+            <div class="content-wrapper">
+                <div class="content">
+                    <h1><code>unify build</code> Command</h1>
+                    
+                    <p>The <code>unify build</code> command transforms your source files into a production-ready static website. It processes HTML and Markdown files, applies layouts and components using DOM Cascade, handles assets, and outputs a complete site ready for deployment.</p>
+
+                    <div class="callout callout-info">
+                        <h3>📋 Command Overview</h3>
+                        <p><code>build</code> is the default command - you can run <code>unify</code> without any arguments to build your site.</p>
+                    </div>
+
+                    <h2>Basic Usage</h2>
+                    
+                    <pre><code># Default build (source: src/, output: dist/)
+unify build
+unify              # Same as 'unify build'
+
+# Custom directories
+unify build --source content --output public
+unify build -s src -o dist
+
+# Clean build
+unify build --clean</code></pre>
+
+                    <h2>Command Syntax</h2>
+                    
+                    <pre><code>unify [build] [options]</code></pre>
+
+                    <h3>Default Behavior</h3>
+                    <ul>
+                        <li><strong>Source directory:</strong> <code>src/</code> (or current directory if no src/ exists)</li>
+                        <li><strong>Output directory:</strong> <code>dist/</code></li>
+                        <li><strong>File discovery:</strong> Processes all HTML and Markdown files</li>
+                        <li><strong>Asset copying:</strong> Copies <code>assets/**</code> automatically</li>
+                        <li><strong>Layout discovery:</strong> Automatically applies layouts</li>
+                    </ul>
+
+                    <h2>Directory Options</h2>
+                    
+                    <h3><code>--source, -s &lt;directory&gt;</code></h3>
+                    <p>Specify the source directory containing your site files.</p>
+                    
+                    <pre><code># Use different source directory
+unify build --source content
+unify build -s website
+
+# Absolute path
+unify build --source /home/user/mysite/src</code></pre>
+                    
+                    <div class="callout callout-warning">
+                        <h3>⚠️ Directory Validation</h3>
+                        <p>The source directory must exist and be readable. Unify will exit with an error if the directory is not found.</p>
+                    </div>
+
+                    <h3><code>--output, -o &lt;directory&gt;</code></h3>
+                    <p>Specify the output directory for generated files.</p>
+                    
+                    <pre><code># Custom output directory
+unify build --output public
+unify build -o build
+
+# Multiple builds to different outputs
+unify build -o dist/staging
+unify build -o dist/production --minify</code></pre>
+
+                    <h2>File Processing Options</h2>
+                    
+                    <h3><code>--copy &lt;glob&gt;</code> (repeatable)</h3>
+                    <p>Add files to the copy set using glob patterns. Use this for additional files beyond automatic asset detection.</p>
+                    
+                    <pre><code># Copy specific file types
+unify build --copy "docs/**/*.pdf" --copy "config/*.json"
+
+# Copy entire directories
+unify build --copy "public/**" --copy "downloads/**"
+
+# Complex patterns
+unify build --copy "**/*.{txt,xml,ico}"</code></pre>
+
+                    <h3><code>--ignore &lt;glob&gt;</code> (repeatable)</h3>
+                    <p>Ignore paths for both rendering and copying using ripgrep-style glob patterns.</p>
+                    
+                    <pre><code># Ignore draft content
+unify build --ignore "**/drafts/**" --ignore "**/*.draft.md"
+
+# Ignore by file type
+unify build --ignore "**/*.{tmp,log,cache}"
+
+# Negation patterns (include exceptions)
+unify build --ignore "temp/**" --ignore "!temp/keep/**"</code></pre>
+
+                    <h3><code>--ignore-render &lt;glob&gt;</code> (repeatable)</h3>
+                    <p>Ignore paths only in the rendering pipeline - files may still be copied if they match copy rules.</p>
+                    
+                    <pre><code># Don't render raw data files, but allow copying
+unify build --ignore-render "data/**/*.json" --copy "data/**/*.json"</code></pre>
+
+                    <h3><code>--ignore-copy &lt;glob&gt;</code> (repeatable)</h3>
+                    <p>Ignore paths only in the copy pipeline - files may still be rendered if they're renderable.</p>
+                    
+                    <pre><code># Render source files but don't copy them
+unify build --ignore-copy "src/**/*.md"</code></pre>
+
+                    <h3><code>--render &lt;glob&gt;</code> (repeatable)</h3>
+                    <p>Force rendering of matching files even if they're normally ignored.</p>
+                    
+                    <pre><code># Render experimental content
+unify build --render "experiments/**"
+
+# Override .gitignore for specific files
+unify build --render "hidden/**/*.html"</code></pre>
+
+                    <h2>Layout Options</h2>
+                    
+                    <h3><code>--default-layout &lt;value&gt;</code> (repeatable)</h3>
+                    <p>Set default layouts for files matching glob patterns or globally.</p>
+                    
+                    <h4>Global Layout</h4>
+                    <pre><code># Set global fallback layout
+unify build --default-layout "_base.html"
+unify build --default-layout "layouts/site.html"</code></pre>
+                    
+                    <h4>Pattern-Based Layouts</h4>
+                    <pre><code># Blog posts use blog layout
+unify build --default-layout "blog/**=_post.html"
+
+# Docs use docs layout
+unify build --default-layout "docs/**=_docs.html"
+
+# Multiple patterns (later takes precedence)
+unify build \
+  --default-layout "_base.html" \
+  --default-layout "blog/**=_post.html" \
+  --default-layout "docs/**=_docs.html"</code></pre>
+
+                    <h3>Layout Resolution Order</h3>
+                    <ol>
+                        <li><strong>Page-declared layout</strong> (frontmatter <code>layout</code> or <code>data-unify</code>)</li>
+                        <li><strong>Last matching <code>--default-layout</code> pattern</strong></li>
+                        <li><strong>Global <code>--default-layout</code> filename</strong></li>
+                        <li><strong>Auto-discovery:</strong> <code>_layout.html</code> in directory tree</li>
+                        <li><strong>Fallback:</strong> <code>_includes/layout.html</code></li>
+                        <li><strong>No layout:</strong> Basic HTML5 wrapper</li>
+                    </ol>
+
+                    <h2>Build Behavior Options</h2>
+                    
+                    <h3><code>--clean</code></h3>
+                    <p>Clean the output directory before building.</p>
+                    
+                    <pre><code># Remove existing output files
+unify build --clean
+
+# Useful for CI/CD to ensure clean builds
+unify build --clean --minify</code></pre>
+
+                    <h3><code>--pretty-urls</code></h3>
+                    <p>Generate pretty URLs by creating directory structures.</p>
+                    
+                    <pre><code># Enable pretty URLs
+unify build --pretty-urls
+
+# about.html becomes about/index.html
+# blog.html becomes blog/index.html</code></pre>
+                    
+                    <h4>Pretty URL Transformations</h4>
+                    <ul>
+                        <li><code>about.html</code> → <code>about/index.html</code></li>
+                        <li><code>contact.html</code> → <code>contact/index.html</code></li>
+                        <li><code>index.html</code> → <code>index.html</code> (unchanged)</li>
+                        <li>Links are automatically normalized: <code>./about.html</code> → <code>/about/</code></li>
+                    </ul>
+
+                    <h3><code>--minify</code></h3>
+                    <p>Enable HTML minification for production builds.</p>
+                    
+                    <pre><code># Production build with minification
+unify build --minify
+
+# Combined with other production flags
+unify build --clean --minify --pretty-urls</code></pre>
+
+                    <h2>Quality Control Options</h2>
+                    
+                    <h3><code>--fail-level &lt;level&gt;</code></h3>
+                    <p>Fail the build if errors of the specified level or higher occur.</p>
+                    
+                    <pre><code># Fail on any warning or error
+unify build --fail-level warning
+
+# Fail only on errors (not warnings)
+unify build --fail-level error</code></pre>
+                    
+                    <h4>Available Levels</h4>
+                    <ul>
+                        <li><strong><code>warning</code>:</strong> Fail on warnings and errors</li>
+                        <li><strong><code>error</code>:</strong> Fail only on errors</li>
+                    </ul>
+
+                    <h3><code>--fail-on &lt;types&gt;</code></h3>
+                    <p>Fail build on specific issue types (comma-separated).</p>
+                    
+                    <pre><code># Fail on security issues
+unify build --fail-on security
+
+# Fail on specific linter rules
+unify build --fail-on U001,U002,U004
+
+# Fail on multiple issue types
+unify build --fail-on security,warning,U002</code></pre>
+                    
+                    <h4>Available Issue Types</h4>
+                    <ul>
+                        <li><strong><code>security</code>:</strong> Security warnings (XSS, content injection, etc.)</li>
+                        <li><strong><code>warning</code>:</strong> All warning-level issues</li>
+                        <li><strong><code>error</code>:</strong> All error-level issues</li>
+                        <li><strong>DOM Cascade linter rules:</strong> <code>U001</code>, <code>U002</code>, <code>U003</code>, <code>U004</code>, <code>U005</code>, <code>U006</code>, <code>U008</code></li>
+                    </ul>
+
+                    <div class="callout callout-tip">
+                        <h3>🔒 CI/CD Security</h3>
+                        <p>Always use <code>--fail-on security</code> in production CI/CD pipelines to prevent deployment of potentially vulnerable sites.</p>
+                    </div>
+
+                    <h2>Control Options</h2>
+                    
+                    <h3><code>--auto-ignore &lt;boolean&gt;</code></h3>
+                    <p>Control automatic ignoring of referenced layouts, components, and <code>.gitignore</code> files.</p>
+                    
+                    <pre><code># Disable automatic ignoring
+unify build --auto-ignore=false
+
+# Manual control (when auto-ignore is false)
+unify build --auto-ignore=false --ignore="_*" --ignore=".*"</code></pre>
+                    
+                    <h4>When <code>auto-ignore=true</code> (default)</h4>
+                    <ul>
+                        <li>Files referenced as layouts are ignored</li>
+                        <li>Files referenced as components/includes are ignored</li>
+                        <li><code>.gitignore</code> patterns are respected</li>
+                    </ul>
+
+                    <h3><code>--dry-run</code></h3>
+                    <p>Show what would be built without actually building.</p>
+                    
+                    <pre><code># Preview build decisions
+unify build --dry-run
+
+# Debug file classification
+unify build --dry-run --log-level debug</code></pre>
+                    
+                    <h4>Dry Run Output Example</h4>
+                    <pre><code>[EMIT]    src/index.html
+          reason: renderable(html); layout=_layout.html
+[EMIT]    src/blog/post.md  
+          reason: renderable(md); layout=blog/_post.html
+[COPY]    assets/images/hero.jpg
+          reason: referenced in src/index.html
+[COPY]    assets/css/styles.css
+          reason: implicit assets/**
+
+# Debug-level output (with --log-level debug)
+[SKIP]    src/.DS_Store
+          reason: non-renderable(.DS_Store)
+[IGNORED] src/_layout.html
+          reason: auto-ignore (used as layout)</code></pre>
+
+                    <h2>Global Options</h2>
+                    
+                    <h3><code>--log-level &lt;level&gt;</code></h3>
+                    <p>Set logging verbosity for build output.</p>
+                    
+                    <pre><code># Quiet build (errors only)
+unify build --log-level error
+
+# Verbose build details
+unify build --log-level debug
+
+# Trace every operation (very verbose)
+unify build --log-level trace</code></pre>
+                    
+                    <h4>Available Levels</h4>
+                    <ul>
+                        <li><strong><code>error</code>:</strong> Only errors</li>
+                        <li><strong><code>warn</code>:</strong> Warnings and errors</li>
+                        <li><strong><code>info</code>:</strong> General information (default)</li>
+                        <li><strong><code>debug</code>:</strong> Detailed debugging information</li>
+                        <li><strong><code>trace</code>:</strong> Extremely verbose tracing</li>
+                    </ul>
+
+                    <h2>Common Usage Patterns</h2>
+                    
+                    <h3>Development Builds</h3>
+                    <pre><code># Quick development build
+unify build
+
+# Development with clean slate
+unify build --clean
+
+# Debug build issues
+unify build --dry-run --log-level debug</code></pre>
+
+                    <h3>Production Builds</h3>
+                    <pre><code># Basic production build
+unify build --clean --minify --pretty-urls
+
+# Secure production build for CI/CD
+unify build --clean --minify --pretty-urls --fail-on security
+
+# Strict production build
+unify build \
+  --clean \
+  --minify \
+  --pretty-urls \
+  --fail-on security,warning</code></pre>
+
+                    <h3>Content Management Workflows</h3>
+                    <pre><code># Blog build with drafts excluded
+unify build --ignore "**/drafts/**" --default-layout "blog/**=_post.html"
+
+# Documentation build
+unify build \
+  --default-layout "_docs.html" \
+  --default-layout "api/**=_api.html" \
+  --copy "docs/**/*.{pdf,zip}"
+
+# Multi-site build
+unify build --source sites/main --output dist/main
+unify build --source sites/blog --output dist/blog</code></pre>
+
+                    <h3>Asset Management</h3>
+                    <pre><code># Copy additional assets
+unify build --copy "public/**" --copy "downloads/**/*.pdf"
+
+# Exclude development assets
+unify build --ignore-copy "assets/src/**" --copy "assets/dist/**"
+
+# Force include hidden files
+unify build --render "experiments/**" --copy "config/.env.example"</code></pre>
+
+                    <h2>Build Process Details</h2>
+                    
+                    <h3>Build Workflow</h3>
+                    <ol>
+                        <li><strong>Directory validation:</strong> Verify source and output directories</li>
+                        <li><strong>File discovery:</strong> Scan source directory for all files</li>
+                        <li><strong>Classification:</strong> Determine render vs copy for each file</li>
+                        <li><strong>Dependency tracking:</strong> Build layout and component dependency graph</li>
+                        <li><strong>Processing:</strong> Render HTML/Markdown files with DOM Cascade</li>
+                        <li><strong>Asset copying:</strong> Copy referenced and specified assets</li>
+                        <li><strong>Output generation:</strong> Write processed files to output directory</li>
+                        <li><strong>Summary reporting:</strong> Display build statistics and timing</li>
+                    </ol>
+
+                    <h3>File Classification Logic</h3>
+                    <ol>
+                        <li><strong>Check renderability:</strong> <code>.html</code>, <code>.md</code> files are renderable</li>
+                        <li><strong>Apply explicit overrides:</strong> <code>--render</code> forces EMIT</li>
+                        <li><strong>Apply ignore rules:</strong> Check <code>--ignore*</code> patterns and <code>.gitignore</code></li>
+                        <li><strong>Apply defaults:</strong> Renderables → EMIT, assets → COPY</li>
+                        <li><strong>Resolve conflicts:</strong> If both renderable and copyable, render wins</li>
+                    </ol>
+
+                    <h2>Performance Considerations</h2>
+                    
+                    <h3>Build Cache</h3>
+                    <p>Unify uses an intelligent build cache to speed up subsequent builds:</p>
+                    <ul>
+                        <li><strong>Cache location:</strong> <code>.unify-cache/</code> directory</li>
+                        <li><strong>Hash-based:</strong> SHA-256 file hashes for change detection</li>
+                        <li><strong>Dependency tracking:</strong> Rebuilds dependents when includes change</li>
+                        <li><strong>Automatic management:</strong> Cache is updated during builds</li>
+                    </ul>
+
+                    <h3>Optimization Tips</h3>
+                    <ul>
+                        <li><strong>Use specific glob patterns:</strong> Avoid overly broad patterns like <code>**/*</code></li>
+                        <li><strong>Leverage the cache:</strong> Don't clean unnecessarily during development</li>
+                        <li><strong>Minimize ignored files:</strong> Large ignore lists can slow file discovery</li>
+                        <li><strong>Profile with debug logging:</strong> Use <code>--log-level debug</code> to identify bottlenecks</li>
+                    </ul>
+
+                    <h2>Exit Codes</h2>
+                    
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Code</th>
+                                <th>Meaning</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>0</code></td>
+                                <td>Success</td>
+                                <td>Build completed successfully</td>
+                            </tr>
+                            <tr>
+                                <td><code>1</code></td>
+                                <td>Build Error</td>
+                                <td>Recoverable errors or failed quality checks</td>
+                            </tr>
+                            <tr>
+                                <td><code>2</code></td>
+                                <td>Usage Error</td>
+                                <td>Invalid command line arguments or configuration</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <h2>Error Handling</h2>
+                    
+                    <h3>Common Build Errors</h3>
+                    
+                    <h4>Missing Source Directory</h4>
+                    <pre><code>Error: Source directory 'src' does not exist
+Solution: Create the directory or specify --source with existing directory</code></pre>
+                    
+                    <h4>Layout Not Found</h4>
+                    <pre><code>Warning: Layout '_blog.html' not found for 'post.md'
+Solution: Create the layout file or adjust layout references</code></pre>
+                    
+                    <h4>Circular Dependencies</h4>
+                    <pre><code>Error: Circular import detected: layout.html → blog.html → layout.html
+Solution: Refactor layouts to break the circular dependency</code></pre>
+
+                    <h3>Security Warnings</h3>
+                    <pre><code>[SECURITY] XSS Risk: Event handler detected in &lt;meta&gt; tag (src/page.html:15)
+[SECURITY] JavaScript URL: Potential XSS vector in href attribute (src/nav.html:8)</code></pre>
+
+                    <h2>Environment Variables</h2>
+                    
+                    <ul>
+                        <li><strong><code>DEBUG=1</code>:</strong> Show stack traces for errors</li>
+                        <li><strong><code>CLAUDECODE=1</code>:</strong> Claude Code environment flag</li>
+                        <li><strong><code>LOG_LEVEL=debug</code>:</strong> Override log level via environment</li>
+                    </ul>
+
+                    <div class="callout callout-warning">
+                        <h3>⚠️ Common Pitfalls</h3>
+                        <ul>
+                            <li><strong>Overly broad patterns:</strong> <code>--copy "**/*"</code> can cause performance issues</li>
+                            <li><strong>Pattern order matters:</strong> Later flags override earlier ones</li>
+                            <li><strong>Missing quotation marks:</strong> Always quote glob patterns with special characters</li>
+                            <li><strong>Path separators:</strong> Use forward slashes in patterns on all platforms</li>
+                            <li><strong>Case sensitivity:</strong> Patterns are case-sensitive on Linux/macOS</li>
+                        </ul>
+                    </div>
+
+                    <h2>Integration Examples</h2>
+                    
+                    <h3>npm Scripts</h3>
+                    <pre><code>{
+  "scripts": {
+    "build": "unify build",
+    "build:prod": "unify build --clean --minify --pretty-urls --fail-on security",
+    "build:staging": "unify build --clean --pretty-urls",
+    "preview": "unify build --dry-run",
+    "debug": "unify build --log-level debug"
+  }
+}</code></pre>
+
+                    <h3>Make/Makefile</h3>
+                    <pre><code>.PHONY: build clean production
+
+build:
+	unify build
+
+clean:
+	rm -rf dist/
+	unify build --clean
+
+production: clean
+	unify build --clean --minify --pretty-urls --fail-on security</code></pre>
+
+                    <h3>CI/CD Pipeline (GitHub Actions)</h3>
+                    <pre><code>- name: Build site
+  run: unify build --clean --minify --pretty-urls --fail-on security
+  
+- name: Check build output
+  run: |
+    if [ ! -f "dist/index.html" ]; then
+      echo "Build failed: index.html not found"
+      exit 1
+    fi</code></pre>
+
+                    <h2>Advanced Configuration</h2>
+                    
+                    <h3>Complex Multi-Pattern Example</h3>
+                    <pre><code># Comprehensive build with multiple rules
+unify build \
+  --source website \
+  --output public \
+  --clean \
+  --pretty-urls \
+  --minify \
+  --default-layout "_base.html" \
+  --default-layout "blog/**=_post.html" \
+  --default-layout "docs/**=_docs.html" \
+  --copy "assets/**" \
+  --copy "downloads/**/*.{pdf,zip}" \
+  --copy "public/**/*.{txt,xml,json}" \
+  --ignore "**/drafts/**" \
+  --ignore "**/*.{tmp,log,cache}" \
+  --ignore-copy "assets/src/**" \
+  --render "experiments/**/*.html" \
+  --fail-on security,U001,U002 \
+  --log-level info</code></pre>
+
+                    <div class="callout callout-success">
+                        <h3>✅ Best Practices</h3>
+                        <ul>
+                            <li><strong>Use <code>--dry-run</code></strong> to preview complex build configurations</li>
+                            <li><strong>Start simple</strong> and add options as needed</li>
+                            <li><strong>Test builds locally</strong> before deploying to CI/CD</li>
+                            <li><strong>Use <code>--fail-on security</code></strong> in production pipelines</li>
+                            <li><strong>Document build scripts</strong> for team collaboration</li>
+                            <li><strong>Monitor build times</strong> and optimize bottlenecks</li>
+                        </ul>
+                    </div>
+
+                    <h2>Next Steps</h2>
+                    
+                    <p>Now that you understand the build command:</p>
+                    <ul>
+                        <li><a href="/unify/docs/cli-serve">Learn about the development server</a></li>
+                        <li><a href="/unify/docs/cli-watch">Explore watch mode for continuous builds</a></li>
+                        <li><a href="/unify/docs/configuration">Set up configuration files</a></li>
+                        <li><a href="/unify/docs/deployment">Deploy your built site</a></li>
+                    </ul>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

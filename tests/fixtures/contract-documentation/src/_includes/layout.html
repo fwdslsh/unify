@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Contract Documentation Layout</title>
+    
+    <!-- This style block documents the layout's public areas and should be removed in build -->
+    <style data-unify-docs="v1">
+        /* Public areas: add these classes in a page to override content.
+           Keep selectors low-specificity and unique per scope.
+        */
+        
+        /* Main hero section above the fold */
+        .unify-hero {
+            /* Use this area for primary page messaging */
+        }
+        
+        /* Primary content area */
+        .unify-content {
+            /* Main page content goes here */
+        }
+        
+        /* Call-to-action section */
+        .unify-cta {
+            /* Important actions and conversions */
+        }
+        
+        /* Optional layout variants */
+        .is-dark-theme {
+            /* Apply dark theme styling */
+        }
+        .is-centered {
+            /* Center-align content */
+        }
+    </style>
+    
+    <!-- Regular CSS that should be preserved -->
+    <style>
+        .hero { background: linear-gradient(45deg, blue, purple); }
+        .content { padding: 2rem; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Site Layout</h1>
+    </header>
+    <main>
+        <section class="unify-hero hero">
+            <h2>Default Hero Title</h2>
+            <p>Default hero content</p>
+        </section>
+        
+        <div data-unify="_components/feature-card.html" class="card-container">
+            <!-- Component with its own contract -->
+        </div>
+        
+        <section class="unify-content content">
+            <h3>Default Content</h3>
+            <p>Default main content area</p>
+        </section>
+        
+        <section class="unify-cta">
+            <h3>Default CTA</h3>
+            <button>Default Action</button>
+        </section>
+    </main>
+</body>
+</html>

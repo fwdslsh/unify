@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Getting Started with inform - High-Performance Web Content Crawler</title>
+    <meta name="description" content="Learn how to install and use inform to crawl websites, extract main content, and convert to clean Markdown. Complete setup guide for web content extraction.">
+    <meta name="keywords" content="inform, getting started, web crawler, content extraction, fwdslsh">
+    <meta property="og:title" content="Getting Started with inform - High-Performance Web Content Crawler">
+    <meta property="og:description" content="Learn how to install and use inform to crawl websites, extract main content, and convert to clean Markdown. Complete setup guide for web content extraction.">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Getting Started with inform - High-Performance Web Content Crawler">
+    <meta name="twitter:description" content="Learn how to install and use inform to crawl websites, extract main content, and convert to clean Markdown. Complete setup guide for web content extraction.">
+    <style>
+        /* Page-specific styles for getting started */
+        .installation-tabs {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            margin-top: 2rem;
+        }
+
+        .tab-buttons {
+            display: flex;
+            background: var(--bg-darker);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .tab-button {
+            flex: 1;
+            padding: 1rem;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .tab-button.active {
+            color: var(--primary);
+            background: var(--bg-card);
+        }
+
+        .tab-content {
+            padding: 2rem;
+        }
+
+        .tab-panel {
+            display: none;
+        }
+
+        .tab-panel.active {
+            display: block;
+        }
+
+        .install-option {
+            text-align: center;
+        }
+
+        .install-icon {
+            width: 60px;
+            height: 60px;
+            margin: 0 auto 1rem;
+            background: var(--gradient-primary);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            color: var(--bg-dark);
+        }
+
+        .pattern-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .pattern-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem;
+        }
+
+        .pattern-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .pattern-icon {
+            font-size: 1.5rem;
+        }
+
+        .time-badge {
+            background: var(--gradient-primary);
+            color: var(--bg-dark);
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-left: auto;
+        }
+
+        .integration-workflow {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 3rem 0;
+            position: relative;
+        }
+
+        .workflow-step {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            text-align: center;
+            position: relative;
+        }
+
+        .workflow-step::after {
+            content: '→';
+            position: absolute;
+            right: -1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--primary);
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        .workflow-step:last-child::after {
+            display: none;
+        }
+
+        .step-icon {
+            width: 40px;
+            height: 40px;
+            margin: 0 auto 1rem;
+            background: var(--gradient-primary);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-mono);
+            font-weight: bold;
+            color: var(--bg-dark);
+            font-size: 1rem;
+        }
+
+        .step-code {
+            background: var(--bg-darker);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.8rem;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            color: var(--primary);
+            margin-top: 1rem;
+        }
+
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 1rem;
+            align-items: center;
+            margin: 2rem 0;
+        }
+
+        .comparison-arrow {
+            color: var(--primary);
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        @media (max-width: 768px) {
+            .tab-buttons {
+                flex-direction: column;
+            }
+
+            .workflow-step::after {
+                content: '↓';
+                right: 50%;
+                top: 100%;
+                transform: translateX(50%);
+                bottom: -1rem;
+            }
+
+            .comparison {
+                grid-template-columns: 1fr;
+            }
+
+            .comparison-arrow {
+                text-align: center;
+                transform: rotate(90deg);
+            }
+        }
+
+        /* Page-specific button styling - tone down bright colors */
+        .btn-primary {
+            background: linear-gradient(135deg, #00cc33 0%, #009926 100%);
+            box-shadow: 0 4px 15px rgba(0, 204, 51, 0.2);
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #00ff41 0%, #00cc33 100%);
+            box-shadow: 0 6px 20px rgba(0, 255, 65, 0.3);
+            transform: translateY(-2px);
+        }
+
+        /* Quick link styling */
+        .quick-link {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem;
+            text-decoration: none;
+            color: var(--text-secondary);
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            opacity: 1;
+            animation: fadeInUp 0.6s ease-out forwards;
+        }
+
+        .quick-link:hover {
+            color: var(--primary);
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 255, 65, 0.1);
+        }
+
+        .quick-link .link-icon {
+            font-size: 1.2rem;
+            opacity: 0.8;
+        }
+
+        .quick-link strong {
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            margin-bottom: 0.25rem;
+            display: block;
+        }
+
+        .quick-link span:not(.link-icon) {
+            color: var(--text-dim);
+            font-size: 0.8rem;
+        }
+
+        /* Animation keyframes */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .pattern-links, .integration-links {
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+
+<body data-layout="/_includes/tool-page.layout.html">
+
+<section class="tool-hero">
+    <div class="tool-hero-content">
+        <h1>Getting Started with inform</h1>
+        <div class="tagline">From installation to your first content extraction in minutes</div>
+        <div class="description">Learn how to extract and convert web content to documentation-ready Markdown with inform, the powerful web crawler designed for content teams and developers.</div>
+        
+        <div class="hero-buttons">
+            <a href="#installation" class="btn btn-primary">
+                <span class="btn-icon">⚡</span>
+                Quick Install
+            </a>
+            <a href="#first-extraction" class="btn btn-secondary">Your First Crawl</a>
+        </div>
+    </div>
+</section>
+
+<section class="tool-nav">
+    <div class="tool-nav-container">
+        <ul class="tool-nav-links">
+            <li><a href="/inform/">Overview</a></li>
+            <li><a href="/inform/getting-started" class="active">Getting Started</a></li>
+            <li><a href="/inform/docs">Documentation</a></li>
+            <li><a href="/inform/examples">Examples</a></li>
+        </ul>
+    </div>
+</section>
+
+<section id="installation" class="tool-section">
+                <div class="section-header">
+                    <h2>Installation Options</h2>
+                    <p>Choose the installation method that works best for your environment</p>
+                </div>
+
+                <div class="installation-tabs">
+                    <div class="tab-buttons">
+                        <button class="tab-button active" data-tab="quick-install">Quick Install</button>
+                        <button class="tab-button" data-tab="bun-package">Bun Package</button>
+                        <button class="tab-button" data-tab="docker">Docker</button>
+                        <button class="tab-button" data-tab="manual">Manual Download</button>
+                    </div>
+                    
+                    <div class="tab-content">
+                        <div class="tab-panel active" data-tab="quick-install">
+                            <div class="install-option">
+                                <div class="install-icon">⚡</div>
+                                <h3>One-Line Install Script</h3>
+                                <div class="code-block">
+                                    <pre><code># Automatically detects your platform and installs the binary
+curl -fsSL https://raw.githubusercontent.com/fwdslsh/inform/main/install.sh | sh
+
+# Verify installation
+inform --version
+
+# Start crawling immediately
+inform https://docs.example.com</code></pre>
+                                </div>
+                                <p>The install script automatically detects your platform (Linux, macOS, Windows) and downloads the appropriate binary. No dependencies required!</p>
+                            </div>
+                        </div>
+
+                        <div class="tab-panel" data-tab="bun-package">
+                            <div class="install-option">
+                                <div class="install-icon">📦</div>
+                                <h3>Install with Bun</h3>
+                                <div class="code-block">
+                                    <pre><code># Install globally with Bun
+bun install -g @fwdslsh/inform
+
+# Or add to project
+bun add @fwdslsh/inform
+
+# Run inform
+inform --help</code></pre>
+                                </div>
+                                <p>Use with Bun's superior performance and built-in features. Requires Bun v1.0.0 or higher.</p>
+                            </div>
+                        </div>
+
+                        <div class="tab-panel" data-tab="docker">
+                            <div class="install-option">
+                                <div class="install-icon">🐳</div>
+                                <h3>Docker Container</h3>
+                                <div class="code-block">
+                                    <pre><code># Pull latest image
+docker pull fwdslsh/inform:latest
+
+# Run crawler with mounted output directory
+docker run --rm -v $(pwd)/output:/output fwdslsh/inform https://docs.example.com --output-dir /output
+
+# Or use interactive shell
+docker run -it fwdslsh/inform bash</code></pre>
+                                </div>
+                                <p>Containerized for consistent environments and CI/CD pipelines. Perfect for automated content extraction workflows.</p>
+                            </div>
+                        </div>
+
+                        <div class="tab-panel" data-tab="manual">
+                            <div class="install-option">
+                                <div class="install-icon">📥</div>
+                                <h3>Manual Download</h3>
+                                <div class="code-block">
+                                    <pre><code># Download from GitHub Releases
+# Visit: https://github.com/fwdslsh/inform/releases
+
+# Linux
+wget https://github.com/fwdslsh/inform/releases/latest/download/inform-linux
+chmod +x inform-linux
+./inform-linux --help
+
+# macOS  
+curl -L -o inform-mac https://github.com/fwdslsh/inform/releases/latest/download/inform-mac
+chmod +x inform-mac
+./inform-mac --help
+
+# Windows
+# Download inform-win.exe and run from command prompt</code></pre>
+                                </div>
+                                <p>Download pre-built binaries directly. Each release includes binaries for Linux, macOS, and Windows.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+<section id="first-extraction" class="tool-section">
+                <div class="section-header">
+                    <h2>Your First Content Extraction</h2>
+                    <p>Learn the basics with hands-on examples</p>
+                </div>
+
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">🎯</div>
+                        <h3>Single Page Extraction</h3>
+                        <p>Extract one page to see how inform works</p>
+                        <div class="code-block">
+                            <pre><code># Extract a single page
+inform https://docs.example.com/getting-started
+
+# Output: Creates getting-started.md in current directory</code></pre>
+                        </div>
+                        <p><strong>Result:</strong> Clean Markdown file with just the main content, navigation and ads removed.</p>
+                    </div>
+
+                    <div class="feature-card">
+                        <div class="feature-icon">🌐</div>
+                        <h3>Full Site Extraction</h3>
+                        <p>Crawl an entire documentation site with structure preservation</p>
+                        <div class="code-block">
+                            <pre><code># Extract up to 50 pages from a documentation site
+inform https://docs.example.com \
+  --output-dir extracted-docs \
+  --max-pages 50 \
+  --delay 1000</code></pre>
+                        </div>
+                        <p><strong>Result:</strong> Complete site structure with organized folders and properly formatted Markdown files.</p>
+                    </div>
+
+                    <div class="feature-card">
+                        <div class="feature-icon">🚀</div>
+                        <h3>Performance Optimized</h3>
+                        <p>High-speed extraction with concurrent processing</p>
+                        <div class="code-block">
+                            <pre><code># High-performance extraction
+inform https://large-site.com \
+  --concurrency 5 \
+  --delay 500 \
+  --max-pages 200</code></pre>
+                        </div>
+                        <p><strong>Result:</strong> Fast parallel processing while respecting server limits and rate limiting.</p>
+                    </div>
+
+                    <div class="feature-card">
+                        <div class="feature-icon">🎛️</div>
+                        <h3>Content Filtering</h3>
+                        <p>Extract only specific content with pattern matching</p>
+                        <div class="code-block">
+                            <pre><code># Extract only documentation pages
+inform https://mixed-site.com \
+  --include "*/docs/*" \
+  --exclude "*/blog/*" \
+  --output-dir docs-only</code></pre>
+                        </div>
+                        <p><strong>Result:</strong> Precisely filtered content matching your inclusion and exclusion patterns.</p>
+                    </div>
+                </div>
+            </section>
+
+<section id="understanding-output" class="tool-section alt-bg">
+                <div class="section-header">
+                    <h2>Understanding Output</h2>
+                    <p>How inform structures and formats extracted content</p>
+                </div>
+
+                <div class="output-examples">
+                    <div class="output-section">
+                        <h3>📁 File Structure Preservation</h3>
+                        <p>Inform maintains the original site's URL structure for easy navigation:</p>
+                        
+                        <div class="comparison">
+                            <div class="comparison-side">
+                                <h4>Original URLs</h4>
+                                <div class="code-block">
+                                    <code>https://docs.example.com/
+https://docs.example.com/guide/setup
+https://docs.example.com/api/auth
+https://docs.example.com/tutorials/basics</code>
+                                </div>
+                            </div>
+                            <div class="comparison-arrow">→</div>
+                            <div class="comparison-side">
+                                <h4>Generated Files</h4>
+                                <div class="code-block">
+                                    <code>extracted-docs/
+├── index.md
+├── guide/
+│   └── setup.md
+├── api/
+│   └── auth.md
+└── tutorials/
+    └── basics.md</code>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="output-section">
+                        <h3>📝 Markdown Format</h3>
+                        <p>Each extracted file includes metadata and clean formatting:</p>
+                        
+                        <div class="code-block">
+                            <code>---
+title: "Getting Started Guide"
+url: "https://docs.example.com/getting-started"
+extracted_at: "2024-01-15T10:30:00Z"
+---
+
+# Getting Started Guide
+
+Clean content with proper formatting, links, and images preserved.
+
+## Features and Benefits
+
+- Lists are properly formatted
+- **Bold** and *italic* text preserved  
+- [Links](https://example.com) work correctly
+- Images ![alt text](image-url) are included> Blockquotes and code blocks are maintained
+
+```javascript
+// Code examples become proper code blocks
+function example() {
+    return "formatted correctly";
+}
+```</code>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+<section id="common-patterns" class="tool-section">
+                <div class="section-header">
+                    <h2>Common Usage Patterns</h2>
+                    <p>Real-world workflows for different use cases</p>
+                </div>
+
+                <div class="pattern-cards">
+                    <div class="pattern-card">
+                        <div class="pattern-header">
+                            <span class="pattern-icon">📚</span>
+                            <h3>Documentation Migration</h3>
+                            <span class="time-badge">5 minutes</span>
+                        </div>
+                        <p>Moving from an old documentation platform to a new one</p>
+                        <div class="code-block">
+                            <pre><code># Step 1: Extract all content
+inform https://old-docs.company.com \
+  --output-dir migrated-content \
+  --max-pages 200 \
+  --delay 2000
+
+# Step 2: Review and organize
+ls migrated-content/
+# Edit files as needed, organize structure
+
+# Step 3: Import to new platform
+# Use with unify for static site generation</code></pre>
+                        </div>
+                        <div class="pattern-links">
+                            <a href="/inform/examples#migration" class="quick-link">
+                                <span class="link-icon">📖</span>
+                                <div>
+                                    <strong>Migration Examples</strong>
+                                    <span>Complete migration patterns</span>
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="pattern-card">
+                        <div class="pattern-header">
+                            <span class="pattern-icon">🔍</span>
+                            <h3>Content Research</h3>
+                            <span class="time-badge">3 minutes</span>
+                        </div>
+                        <p>Analyze competitor documentation and content strategies</p>
+                        <div class="code-block">
+                            <pre><code># Extract competitor docs for analysis
+inform https://competitor.com/docs \
+  --output-dir research/competitor-analysis \
+  --max-pages 30 \
+  --delay 3000
+
+# Create structured analysis
+inform https://competitor.com/docs \
+  --output-dir research/summaries</code></pre>
+                        </div>
+                        <div class="pattern-links">
+                            <a href="/inform/examples#research" class="quick-link">
+                                <span class="link-icon">🔬</span>
+                                <div>
+                                    <strong>Research Workflows</strong>
+                                    <span>Content analysis patterns</span>
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="pattern-card">
+                        <div class="pattern-header">
+                            <span class="pattern-icon">🗃️</span>
+                            <h3>Content Backup</h3>
+                            <span class="time-badge">2 minutes</span>
+                        </div>
+                        <p>Preserve important web content for archival purposes</p>
+                        <div class="code-block">
+                            <pre><code># Create complete backup with date
+inform https://important-site.com \
+  --output-dir "backups/important-site-$(date +%Y-%m-%d)" \
+  --max-pages 100 \
+  --delay 1500
+
+# Include images and preserve structure  
+inform https://site.com \
+  --output-dir backup \
+  --max-pages 50</code></pre>
+                        </div>
+                        <div class="pattern-links">
+                            <a href="/inform/examples#backup" class="quick-link">
+                                <span class="link-icon">💾</span>
+                                <div>
+                                    <strong>Backup Strategies</strong>
+                                    <span>Content preservation methods</span>
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+<section id="integration" class="tool-section alt-bg">
+                <div class="section-header">
+                    <h2>Integration with fwdslsh Ecosystem</h2>
+                    <p>Combine inform with other tools for powerful workflows</p>
+                </div>
+
+                <div class="integration-workflow">
+                    <div class="workflow-step">
+                        <div class="step-icon">i</div>
+                        <div class="step-content">
+                            <h3>inform</h3>
+                            <p>Crawl and extract content</p>
+                            <div class="step-code">inform https://docs.site.com --output-dir content</div>
+                        </div>
+                        <div class="step-arrow">→</div>
+                    </div>
+                    
+                    <div class="workflow-step">
+                        <div class="step-icon">c</div>
+                        <div class="step-content">
+                            <h3>catalog</h3>
+                            <p>Generate llms.txt indexes</p>
+                            <div class="step-code">catalog --input content --output indexed</div>
+                        </div>
+                        <div class="step-arrow">→</div>
+                    </div>
+                    
+                    <div class="workflow-step">
+                        <div class="step-icon">u</div>
+                        <div class="step-content">
+                            <h3>unify</h3>
+                            <p>Build static sites</p>
+                            <div class="step-code">unify build --input indexed --output dist</div>
+                        </div>
+                        <div class="step-arrow">→</div>
+                    </div>
+                    
+                    <div class="workflow-step">
+                        <div class="step-icon">g</div>
+                        <div class="step-content">
+                            <h3>giv</h3>
+                            <p>Generate commit messages</p>
+                            <div class="step-code">giv message</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="integration-examples">
+                    <h3>🔄 Complete Documentation Pipeline</h3>
+                    <div class="code-block">
+                        <pre><code># Extract content from multiple sources
+inform https://docs.example.com --output-dir docs
+inform https://api.example.com --output-dir api --include "*/reference/*"
+
+# Generate AI-ready indexes  
+catalog --input docs --input api --output build --sitemap --base-url https://newdocs.com
+
+# Build beautiful static site
+unify build --input build --output dist
+
+# Professional commit with AI
+giv message
+# "docs: migrate complete documentation with API references"</code></pre>
+                    </div>
+                </div>
+
+                <div class="integration-links">
+                    <a href="/ecosystem/" class="quick-link">
+                        <span class="link-icon">🔄</span>
+                        <div>
+                            <strong>Complete Ecosystem</strong>
+                            <span>See how all tools work together</span>
+                        </div>
+                    </a>
+                    <a href="/inform/examples#integration" class="quick-link">
+                        <span class="link-icon">🛠️</span>
+                        <div>
+                            <strong>Integration Examples</strong>
+                            <span>Real-world workflow patterns</span>
+                        </div>
+                    </a>
+                </div>
+            </section>
+
+<section id="next-steps" class="tool-section">
+                <div class="section-header">
+                    <h2>What's Next?</h2>
+                    <p>Continue your inform journey</p>
+                </div>
+
+                <div class="next-steps-grid">
+                    <a href="/inform/docs" class="next-step-card">
+                        <div class="card-icon">📚</div>
+                        <h3>Complete Documentation</h3>
+                        <p>Master all inform features with comprehensive guides and CLI reference</p>
+                        <span class="card-arrow">→</span>
+                    </a>
+
+                    <a href="/inform/examples" class="next-step-card">
+                        <div class="card-icon">🎯</div>
+                        <h3>Real-World Examples</h3>
+                        <p>Common crawling patterns, migration workflows, and integration scenarios</p>
+                        <span class="card-arrow">→</span>
+                    </a>
+
+                    <a href="https://github.com/fwdslsh/inform/releases" class="next-step-card">
+                        <div class="card-icon">📥</div>
+                        <h3>Download Binary</h3>
+                        <p>Get the latest release with pre-built binaries for all platforms</p>
+                        <span class="card-arrow">→</span>
+                    </a>
+                </div>
+            </section>
+</section>
+
+<script>
+    // Tab functionality
+    document.querySelectorAll('.tab-button').forEach(button => {
+        button.addEventListener('click', () => {
+            const tabName = button.dataset.tab;
+            
+            // Update active tab button
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            button.classList.add('active');
+            
+            // Update active tab panel
+            document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
+            document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+        });
+    });
+</script>
+
+</body>
+</html>

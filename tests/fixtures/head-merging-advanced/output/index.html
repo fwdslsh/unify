@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Page Title Wins</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Page description overrides layout">
+    <meta name="author" content="Page Author">
+    <meta name="analytics-version" content="2.1.0">
+    <meta property="og:title" content="Page OG Title">
+    <meta property="og:type" content="article">
+    <meta property="og:description" content="Page OG Description">
+    <link rel="canonical" href="https://example.com/page">
+    <link rel="icon" href="/page-favicon.ico">
+    <link rel="stylesheet" href="/layout.css">
+    <link rel="stylesheet" href="/shared.css">
+    <link rel="stylesheet" href="/analytics.css">
+    <link rel="stylesheet" href="/page.css">
+    <script src="/layout.js"></script>
+    <script src="/analytics.js"></script>
+    <script src="/page.js"></script>
+    <script>
+        console.log('Layout inline script');
+        window.layoutLoaded = true;
+    </script>
+    <script>
+        console.log('Analytics component loaded');
+        window.analyticsReady = true;
+    </script>
+    <script>
+        console.log('Page inline script');
+        window.pageLoaded = true;
+    </script>
+</head>
+<body>
+    <header>
+        <h1>Site Header</h1>
+    </header>
+    <main>
+        <div class="analytics-wrapper">
+            <div class="unify-tracking-content">
+                <p>Custom tracking content from page</p>
+            </div>
+        </div>
+        <section class="unify-content">
+            <h2>Page Content</h2>
+            <p>This replaces the default layout content.</p>
+        </section>
+    </main>
+</body>
+</html>

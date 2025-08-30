@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Installation - unify Documentation</title>
+    <meta name="description" content="Complete installation guide for unify static site generator. Multiple installation methods including npm, bun, and pre-built binaries.">
+    <link rel="stylesheet" href="/assets/styles.css">
+    <style>
+
+        /* Documentation Layout - Page specific */
+     
+        .docs-layout {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar - Page specific */
+        .sidebar {
+            width: 280px;
+            background: var(--bg-darker);
+            border-right: 1px solid var(--border);
+            padding: 2rem 0;
+            position: fixed;
+            height: calc(100vh - 80px);
+            overflow-y: auto;
+            z-index: 100;
+        }
+
+        .sidebar-content {
+            padding: 0 2rem;
+        }
+
+        .sidebar-section {
+            margin-bottom: 2rem;
+        }
+
+        .sidebar-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-family: var(--font-mono);
+        }
+
+        .sidebar-nav {
+            list-style: none;
+        }
+
+        .sidebar-nav li {
+            margin-bottom: 0.5rem;
+        }
+
+        .sidebar-nav a {
+            color: var(--text-dim);
+            text-decoration: none;
+            font-size: 0.9rem;
+            display: block;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+            font-family: var(--font-mono);
+        }
+
+        .sidebar-nav a:hover {
+            color: var(--text-primary);
+            background: var(--bg-card);
+        }
+
+        .sidebar-nav a.active {
+            color: var(--primary);
+            background: rgba(0, 255, 65, 0.1);
+            border-left: 3px solid var(--primary);
+        }
+
+        /* Main Content - Page specific */
+        .main-content {
+            flex: 1;
+            margin-left: 280px;
+            padding: 2rem 4rem;
+            max-width: calc(100vw - 280px);
+        }
+
+        .content-wrapper {
+            max-width: 800px;
+        }
+
+        /* Typography - Page specific */
+        .content h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+            line-height: 1.2;
+        }
+
+        .content h2 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin: 3rem 0 1.5rem 0;
+            color: var(--text-primary);
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 0.5rem;
+        }
+
+        .content h3 {
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin: 2rem 0 1rem 0;
+            color: var(--text-primary);
+        }
+
+        .content h4 {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin: 1.5rem 0 0.75rem 0;
+            color: var(--text-secondary);
+        }
+
+        .content p {
+            margin-bottom: 1.5rem;
+            color: var(--text-secondary);
+            line-height: 1.7;
+        }
+
+        .content ul,
+        .content ol {
+            margin-bottom: 1.5rem;
+            padding-left: 2rem;
+        }
+
+        .content li {
+            margin-bottom: 0.5rem;
+            color: var(--text-secondary);
+        }
+
+        .content li strong {
+            color: var(--text-primary);
+        }
+
+        /* Navigation buttons - Page specific */
+        .page-nav {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 4rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .nav-btn {
+            display: flex;
+            flex-direction: column;
+            text-decoration: none;
+            color: var(--text-secondary);
+            transition: all 0.3s ease;
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--bg-card);
+        }
+
+        .nav-btn:hover {
+            color: var(--primary);
+            border-color: var(--primary);
+            transform: translateY(-2px);
+        }
+
+        .nav-btn-label {
+            font-size: 0.8rem;
+            font-family: var(--font-mono);
+            margin-bottom: 0.25rem;
+        }
+
+        .nav-btn-title {
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        /* Responsive - Page specific */
+        @media (max-width: 1024px) {
+            .sidebar {
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+
+            .main-content {
+                margin-left: 0;
+                max-width: 100vw;
+                padding: 2rem;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                padding: 1rem;
+            }
+
+            .content h1 {
+                font-size: 2rem;
+            }
+
+            .content h2 {
+                font-size: 1.5rem;
+            }
+
+            .page-nav {
+                flex-direction: column;
+                gap: 1rem;
+            }
+        }
+    </style>
+</head>
+
+<body data-unify="/_includes/tool-page.html">
+   
+    <!-- Tool-specific navigation links -->
+    <ul class="unify-nav-links">
+        <li><a href="/unify/">Overview</a></li>
+        <li><a href="/unify/getting-started.html">Getting Started</a></li>
+        <li><a href="/unify/docs.html">Documentation</a></li>
+        <li><a href="/unify/examples.html">Examples</a></li>
+    </ul>
+
+    <div class="unify-content docs-layout">
+        <aside class="sidebar">
+            <div class="sidebar-content">
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Getting Started</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs">Quick Start</a></li>
+                        <li><a href="/unify/docs/installation" class="active">Installation</a></li>
+                        <li><a href="/unify/docs/project-structure">Project Structure</a></li>
+                        <li><a href="/unify/docs/first-site">Your First Site</a></li>
+                    </ul>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Core Concepts</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs/includes">Server-Side Includes</a></li>
+                        <li><a href="/unify/docs/components">Components</a></li>
+                        <li><a href="/unify/docs/markdown">Markdown</a></li>
+                        <li><a href="/unify/docs/assets">Static Assets</a></li>
+                    </ul>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">CLI Reference</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs/cli-build">unify build</a></li>
+                        <li><a href="/unify/docs/cli-serve">unify serve</a></li>
+                        <li><a href="/unify/docs/cli-watch">unify watch</a></li>
+                        <li><a href="/unify/docs/configuration">Configuration</a></li>
+                    </ul>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Deployment</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs/deployment">Static Hosting</a></li>
+                        <li><a href="/unify/docs/docker">Docker</a></li>
+                        <li><a href="/unify/docs/ci-cd">CI/CD</a></li>
+                    </ul>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Advanced</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs/performance">Performance</a></li>
+                        <li><a href="/unify/docs/security">Security</a></li>
+                        <li><a href="/unify/docs/migration">Migration Guide</a></li>
+                        <li><a href="/unify/docs/troubleshooting">Troubleshooting</a></li>
+                    </ul>
+                </div>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <div class="content-wrapper">
+                <div class="content">
+                    <h1>Installation</h1>
+
+                    <p>Multiple installation methods are available for unify, from global package installation to standalone binaries. Choose the method that best fits your development workflow.</p>
+
+                    <div class="callout callout-info">
+                        <div class="callout-title">📋 Requirements</div>
+                        <p><strong>Recommended:</strong> Bun 1.2.0+ for optimal performance<br>
+                        <strong>Alternative:</strong> Node.js 18+ or Deno 1.30+</p>
+                    </div>
+
+                    <h2>Recommended: Bun Installation</h2>
+
+                    <p>Unify is built with Bun's native APIs for maximum performance. Install Bun first if you haven't already:</p>
+
+                    <div class="code-block">
+                        <div class="language-label">bash</div>
+                        <pre># Install Bun (Unix/Linux/macOS)
+curl -fsSL https://bun.sh/install | bash
+
+# Or on Windows (PowerShell)
+powershell -c "irm bun.sh/install.ps1 | iex"
+
+# Verify Bun installation
+bun --version</pre>
+                    </div>
+
+                    <h3>Global Installation with Bun</h3>
+
+                    <div class="code-block">
+                        <div class="language-label">bash</div>
+                        <pre># Install unify globally
+bun add -g @fwdslsh/unify
+
+# Verify installation
+unify --version
+
+# Check available commands
+unify --help</pre>
+                    </div>
+
+                    <h3>Project-Level Installation</h3>
+
+                    <div class="code-block">
+                        <div class="language-label">bash</div>
+                        <pre># Add to existing project
+bun add -d @fwdslsh/unify
+
+# Run via bun
+bunx unify build
+
+# Or add npm script in package.json
+{
+  "scripts": {
+    "build": "unify build",
+    "dev": "unify serve",
+    "watch": "unify watch"
+  }
+}</pre>
+                    </div>
+
+                    <h2>NPX Usage (No Installation)</h2>
+
+                    <p>Run unify without installing it globally using npx:</p>
+
+                    <div class="code-block">
+                        <div class="language-label">bash</div>
+                        <pre># Run directly with npx
+npx @fwdslsh/unify build
+
+# Start development server
+npx @fwdslsh/unify serve
+
+# Watch for changes
+npx @fwdslsh/unify watch</pre>
+                    </div>
+
+                    <h2>Alternative Runtimes</h2>
+
+                    <h3>Node.js Installation</h3>
+
+                    <div class="code-block">
+                        <div class="language-label">bash</div>
+                        <pre># Global installation with npm
+npm install -g @fwdslsh/unify
+
+# Or with Yarn
+yarn global add @fwdslsh/unify
+
+# Project-level with npm
+npm install --save-dev @fwdslsh/unify</pre>
+                    </div>
+
+                    <div class="callout callout-warning">
+                        <div class="callout-title">⚠️ Performance Note</div>
+                        <p>While unify works with Node.js, Bun provides significantly better performance with native HTMLRewriter, built-in bundling, and faster I/O operations.</p>
+                    </div>
+
+                    <h3>Deno Usage</h3>
+
+                    <div class="code-block">
+                        <div class="language-label">bash</div>
+                        <pre># Run directly from registry
+deno run -A npm:@fwdslsh/unify build
+
+# Install globally (Deno 1.30+)
+deno install -gA npm:@fwdslsh/unify</pre>
+                    </div>
+
+                    <h2>Pre-built Binaries</h2>
+
+                    <p>Standalone executables are available for major platforms, with no runtime dependencies:</p>
+
+                    <h3>Download Pre-built Binaries</h3>
+
+                    <div class="code-block">
+                        <div class="language-label">bash</div>
+                        <pre># Linux x64
+curl -L https://github.com/fwdslsh/unify/releases/latest/download/unify-linux -o unify
+chmod +x unify
+
+# macOS (ARM64)
+curl -L https://github.com/fwdslsh/unify/releases/latest/download/unify-macos -o unify
+chmod +x unify
+
+# Windows x64
+curl -L https://github.com/fwdslsh/unify/releases/latest/download/unify-windows.exe -o unify.exe</pre>
+                    </div>
+
+                    <h3>Install Script (Unix-like systems)</h3>
+
+                    <div class="code-block">
+                        <div class="language-label">bash</div>
+                        <pre># Automatic installation to /usr/local/bin
+curl -fsSL https://raw.githubusercontent.com/fwdslsh/unify/main/install.sh | bash
+
+# Or specify custom directory
+curl -fsSL https://raw.githubusercontent.com/fwdslsh/unify/main/install.sh | bash -s -- ~/.local/bin</pre>
+                    </div>
+
+                    <h2>Docker Installation</h2>
+
+                    <p>Use the official Docker image for containerized environments:</p>
+
+                    <div class="code-block">
+                        <div class="language-label">bash</div>
+                        <pre># Pull latest image
+docker pull fwdslsh/unify:latest
+
+# Build current directory
+docker run --rm -v $(pwd):/workspace fwdslsh/unify build
+
+# Start development server (with port mapping)
+docker run --rm -v $(pwd):/workspace -p 3000:3000 fwdslsh/unify serve --host 0.0.0.0</pre>
+                    </div>
+
+                    <h2>Development Installation</h2>
+
+                    <p>To contribute to unify or run the latest development version:</p>
+
+                    <div class="code-block">
+                        <div class="language-label">bash</div>
+                        <pre># Clone repository
+git clone https://github.com/fwdslsh/unify.git
+cd unify
+
+# Install dependencies
+bun install
+
+# Run development version
+bun src/cli.js build
+
+# Run tests
+bun test
+
+# Build cross-platform binaries
+bun run build:linux
+bun run build:macos
+bun run build:windows</pre>
+                    </div>
+
+                    <h2>Verification</h2>
+
+                    <p>After installation, verify unify is working correctly:</p>
+
+                    <div class="code-block">
+                        <div class="language-label">bash</div>
+                        <pre># Check version
+unify --version
+
+# View help
+unify --help
+
+# Test basic functionality
+mkdir test-site && cd test-site
+echo "<h1>Hello, unify!</h1>" > index.html
+unify build
+cat dist/index.html</pre>
+                    </div>
+
+                    <h2>Updating unify</h2>
+
+                    <h3>Package Manager Updates</h3>
+
+                    <div class="code-block">
+                        <div class="language-label">bash</div>
+                        <pre># Update via Bun
+bun update @fwdslsh/unify
+
+# Update via npm
+npm update @fwdslsh/unify -g
+
+# Update via Yarn
+yarn global upgrade @fwdslsh/unify</pre>
+                    </div>
+
+                    <h3>Binary Updates</h3>
+
+                    <div class="code-block">
+                        <div class="language-label">bash</div>
+                        <pre># Re-run install script (Unix-like systems)
+curl -fsSL https://raw.githubusercontent.com/fwdslsh/unify/main/install.sh | bash
+
+# Or download manually from releases page
+# https://github.com/fwdslsh/unify/releases</pre>
+                    </div>
+
+                    <h2>Troubleshooting Installation</h2>
+
+                    <h3>Common Issues</h3>
+
+                    <div class="code-block">
+                        <div class="language-label">bash</div>
+                        <pre># Permission denied (Unix-like systems)
+sudo bun add -g @fwdslsh/unify
+# or use a version manager like nvm
+
+# Command not found after global install
+echo $PATH  # Ensure global bin directory is in PATH
+which unify  # Check if binary is installed
+
+# Version conflicts
+bun remove -g @fwdslsh/unify && bun add -g @fwdslsh/unify</pre>
+                    </div>
+
+                    <h3>Environment Debugging</h3>
+
+                    <div class="code-block">
+                        <div class="language-label">bash</div>
+                        <pre># Check runtime information
+unify --version --verbose
+
+# Debug mode for detailed output
+DEBUG=1 unify build --verbose
+
+# Check system requirements
+bun --version  # Should be 1.2.0+
+node --version # Should be 18+ (if using Node.js)</pre>
+                    </div>
+
+                    <div class="callout callout-success">
+                        <div class="callout-title">🚀 Ready to Build</div>
+                        <p>Installation complete! Continue with the <a href="/unify/docs/project-structure" style="color: var(--primary);">Project Structure</a> guide to learn how to organize your unify project.</p>
+                    </div>
+
+                    <div class="page-nav">
+                        <a href="/unify/docs" class="nav-btn">
+                            <span class="nav-btn-label">← Previous</span>
+                            <span class="nav-btn-title">Quick Start</span>
+                        </a>
+                        <a href="/unify/docs/project-structure" class="nav-btn">
+                            <span class="nav-btn-label">Next →</span>
+                            <span class="nav-btn-title">Project Structure</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Mobile sidebar toggle
+        const sidebarToggle = document.createElement('button');
+        sidebarToggle.innerHTML = '☰';
+        sidebarToggle.style.cssText = `
+            display: none;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 0.5rem;
+            border-radius: 4px;
+            font-size: 1.2rem;
+            cursor: pointer;
+        `;
+
+        // Add toggle button on mobile
+        if (window.innerWidth <= 1024) {
+            sidebarToggle.style.display = 'block';
+            document.querySelector('.nav-links').prepend(sidebarToggle);
+        }
+
+        sidebarToggle.addEventListener('click', () => {
+            document.querySelector('.sidebar').classList.toggle('open');
+        });
+
+        // Close sidebar when clicking outside on mobile
+        document.addEventListener('click', (e) => {
+            const sidebar = document.querySelector('.sidebar');
+            const toggle = sidebarToggle;
+
+            if (!sidebar.contains(e.target) && !toggle.contains(e.target)) {
+                sidebar.classList.remove('open');
+            }
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            if (window.innerWidth <= 1024) {
+                sidebarToggle.style.display = 'block';
+            } else {
+                sidebarToggle.style.display = 'none';
+                document.querySelector('.sidebar').classList.remove('open');
+            }
+        });
+
+        // Smooth scrolling for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+
+</html>

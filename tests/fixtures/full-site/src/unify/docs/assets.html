@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Static Assets - unify Documentation</title>
+    <meta name="description" content="Learn how unify handles static assets including automatic copying, reference tracking, optimization strategies, and advanced asset management techniques.">
+    <link rel="stylesheet" href="/assets/styles.css">
+    <style>
+        .docs-layout { display: flex; min-height: 100vh; }
+        .sidebar { width: 280px; background: var(--bg-darker); border-right: 1px solid var(--border); padding: 2rem 0; position: fixed; height: calc(100vh - 80px); overflow-y: auto; z-index: 100; }
+        .sidebar-content { padding: 0 2rem; }
+        .sidebar-section { margin-bottom: 2rem; }
+        .sidebar-title { font-size: 0.9rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 0.05em; font-family: var(--font-mono); }
+        .sidebar-nav { list-style: none; }
+        .sidebar-nav li { margin-bottom: 0.5rem; }
+        .sidebar-nav a { color: var(--text-dim); text-decoration: none; font-size: 0.9rem; display: block; padding: 0.5rem 1rem; border-radius: 6px; transition: all 0.3s ease; font-family: var(--font-mono); }
+        .sidebar-nav a:hover { color: var(--text-primary); background: var(--bg-card); }
+        .sidebar-nav a.active { color: var(--primary); background: rgba(0, 255, 65, 0.1); border-left: 3px solid var(--primary); }
+        .main-content { flex: 1; margin-left: 280px; padding: 2rem 4rem; max-width: calc(100vw - 280px); }
+        .content-wrapper { max-width: 800px; }
+        .content h1 { font-size: 2.5rem; font-weight: 800; margin-bottom: 1rem; color: var(--text-primary); line-height: 1.2; }
+        .content p { margin-bottom: 1.5rem; color: var(--text-secondary); line-height: 1.7; }
+        @media (max-width: 1024px) {
+            .sidebar { transform: translateX(-100%); transition: transform 0.3s ease; }
+            .sidebar.open { transform: translateX(0); }
+            .main-content { margin-left: 0; max-width: 100vw; padding: 2rem; }
+        }
+    </style>
+</head>
+<body data-unify="/_includes/tool-page.html">
+    <ul class="unify-nav-links">
+        <li><a href="/unify/">Overview</a></li>
+        <li><a href="/unify/getting-started.html">Getting Started</a></li>
+        <li><a href="/unify/docs.html">Documentation</a></li>
+        <li><a href="/unify/examples.html">Examples</a></li>
+    </ul>
+    <div class="unify-content docs-layout">
+        <aside class="sidebar">
+            <div class="sidebar-content">
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Getting Started</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs">Quick Start</a></li>
+                        <li><a href="/unify/docs/installation">Installation</a></li>
+                        <li><a href="/unify/docs/project-structure">Project Structure</a></li>
+                        <li><a href="/unify/docs/first-site">Your First Site</a></li>
+                    </ul>
+                </div>
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Core Concepts</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs/includes">Server-Side Includes</a></li>
+                        <li><a href="/unify/docs/components">Components</a></li>
+                        <li><a href="/unify/docs/markdown">Markdown</a></li>
+                        <li><a href="/unify/docs/assets" class="active">Static Assets</a></li>
+                    </ul>
+                </div>
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">CLI Reference</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs/cli-build">unify build</a></li>
+                        <li><a href="/unify/docs/cli-serve">unify serve</a></li>
+                        <li><a href="/unify/docs/cli-watch">unify watch</a></li>
+                        <li><a href="/unify/docs/configuration">Configuration</a></li>
+                    </ul>
+                </div>
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Deployment</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs/deployment">Static Hosting</a></li>
+                        <li><a href="/unify/docs/docker">Docker</a></li>
+                        <li><a href="/unify/docs/ci-cd">CI/CD</a></li>
+                    </ul>
+                </div>
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Advanced</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs/performance">Performance</a></li>
+                        <li><a href="/unify/docs/security">Security</a></li>
+                        <li><a href="/unify/docs/migration">Migration Guide</a></li>
+                        <li><a href="/unify/docs/troubleshooting">Troubleshooting</a></li>
+                    </ul>
+                </div>
+            </div>
+        </aside>
+        <main class="main-content">
+            <div class="content-wrapper">
+                <div class="content">
+                    <h1>Static Assets</h1>
+                    
+                    <p>Unify provides intelligent static asset handling with automatic copying, reference tracking, and flexible configuration options. Assets are processed efficiently while maintaining directory structure and optimizing for web delivery.</p>
+
+                    <div class="callout callout-info">
+                        <h3>📋 What You'll Learn</h3>
+                        <p>This guide covers asset processing, automatic copying, reference tracking, optimization strategies, and advanced asset management techniques.</p>
+                    </div>
+
+                    <h2>Asset Processing Overview</h2>
+                    
+                    <h3>How Unify Handles Assets</h3>
+                    <p>Unify processes assets through multiple mechanisms:</p>
+                    <ul>
+                        <li><strong>Automatic reference tracking:</strong> Assets referenced in HTML/CSS are copied automatically</li>
+                        <li><strong>Implicit assets directory:</strong> <code>assets/**</code> is copied by default</li>
+                        <li><strong>Explicit copy patterns:</strong> Use <code>--copy</code> for additional files</li>
+                        <li><strong>Smart filtering:</strong> Use ignore patterns to exclude unwanted files</li>
+                    </ul>
+
+                    <h3>Asset Processing Priority</h3>
+                    <p>When files match multiple rules, unify follows this precedence:</p>
+                    <ol>
+                        <li><strong>Render wins over copy:</strong> Renderable files are processed, not copied raw</li>
+                        <li><strong>Explicit overrides implicit:</strong> CLI flags override default behavior</li>
+                        <li><strong>Last pattern wins:</strong> Later glob patterns take precedence</li>
+                    </ol>
+
+                    <h2>Asset Organization</h2>
+                    
+                    <h3>Recommended Directory Structure</h3>
+                    <pre><code>src/
+├── assets/                     # Auto-copied asset directory
+│   ├── css/
+│   │   ├── styles.css
+│   │   ├── components.css
+│   │   └── themes/
+│   │       ├── light.css
+│   │       └── dark.css
+│   ├── js/
+│   │   ├── main.js
+│   │   ├── components/
+│   │   └── vendor/
+│   ├── images/
+│   │   ├── hero.jpg
+│   │   ├── thumbnails/
+│   │   └── icons/
+│   │       ├── favicon.ico
+│   │       └── logo.svg
+│   └── fonts/
+│       ├── inter.woff2
+│       └── mono.woff2
+│
+├── public/                    # Additional public files
+│   ├── robots.txt
+│   ├── sitemap.xml
+│   └── .well-known/
+│       └── security.txt
+│
+└── downloads/                 # Large files, documents
+    ├── whitepaper.pdf
+    └── user-manual.pdf</code></pre>
+
+                    <h3>Asset Naming Conventions</h3>
+                    <ul>
+                        <li><strong>Use descriptive names:</strong> <code>hero-image.jpg</code> not <code>img1.jpg</code></li>
+                        <li><strong>Include dimensions for images:</strong> <code>logo-200x50.png</code></li>
+                        <li><strong>Version critical assets:</strong> <code>main-v2.css</code> for cache busting</li>
+                        <li><strong>Group by type:</strong> Keep similar assets in dedicated folders</li>
+                    </ul>
+
+                    <h2>Automatic Asset Copying</h2>
+                    
+                    <h3>Implicit Assets Directory</h3>
+                    <p>Unify automatically copies the <code>assets/**</code> directory to maintain compatibility with common static site patterns:</p>
+
+                    <pre><code># This happens automatically
+src/assets/css/styles.css → dist/assets/css/styles.css
+src/assets/images/logo.png → dist/assets/images/logo.png</code></pre>
+
+                    <div class="callout callout-tip">
+                        <h3>💡 Pro Tip</h3>
+                        <p>The <code>assets/**</code> behavior mirrors Astro's <code>public/</code> directory and Vite's <code>publicDir</code> for familiar workflow patterns.</p>
+                    </div>
+
+                    <h3>Reference-Based Copying</h3>
+                    <p>Assets referenced in HTML, CSS, or Markdown are automatically tracked and copied:</p>
+
+                    <pre><code>&lt;!-- HTML references --&gt;
+&lt;img src="/images/hero.jpg" alt="Hero image" /&gt;
+&lt;link rel="stylesheet" href="/css/components.css" /&gt;
+&lt;script src="/js/analytics.js"&gt;&lt;/script&gt;
+
+/* CSS references */
+.hero {
+  background-image: url('/images/backgrounds/gradient.png');
+}
+
+@font-face {
+  font-family: 'CustomFont';
+  src: url('/fonts/custom.woff2') format('woff2');
+}</code></pre>
+
+                    <h3>Disabling Automatic Copying</h3>
+                    <p>Disable implicit <code>assets/**</code> copying if needed:</p>
+
+                    <pre><code># Disable automatic assets copying
+unify build --ignore "assets/**"
+
+# Copy only specific asset types
+unify build --ignore "assets/**" --copy "assets/**/*.{css,js,woff2}"</code></pre>
+
+                    <h2>Manual Asset Management</h2>
+                    
+                    <h3>Copy Patterns</h3>
+                    <p>Use <code>--copy</code> to explicitly copy additional files:</p>
+
+                    <pre><code># Copy specific file types
+unify build --copy "public/**/*.{txt,xml,json}"
+
+# Copy entire directories
+unify build --copy "downloads/**"
+
+# Multiple copy patterns
+unify build --copy "docs/**/*.pdf" --copy "config/*.json"</code></pre>
+
+                    <h3>Complex Copy Rules</h3>
+                    <p>Combine copy and ignore patterns for precise control:</p>
+
+                    <pre><code># Copy all images except raw/source files
+unify build \
+  --copy "assets/images/**" \
+  --ignore-copy "assets/images/raw/**" \
+  --ignore-copy "**/*.{psd,ai,sketch}"
+
+# Copy processed assets only
+unify build \
+  --copy "assets/dist/**" \
+  --ignore "assets/src/**"</code></pre>
+
+                    <h3>Selective Asset Processing</h3>
+                    <p>Fine-tune which assets are processed vs copied:</p>
+
+                    <pre><code># Render some assets, copy others
+unify build \
+  --copy "assets/images/**" \
+  --copy "assets/fonts/**" \
+  --ignore-copy "assets/css/**"    # Let CSS be reference-tracked instead</code></pre>
+
+                    <h2>Asset Optimization</h2>
+                    
+                    <h3>Image Optimization Strategy</h3>
+                    <p>Optimize images before adding to your unify project:</p>
+
+                    <h4>Modern Image Formats</h4>
+                    <ul>
+                        <li><strong>WebP:</strong> Excellent compression, wide browser support</li>
+                        <li><strong>AVIF:</strong> Better compression than WebP, newer format</li>
+                        <li><strong>JPEG XL:</strong> Future-focused, emerging support</li>
+                    </ul>
+
+                    <h4>Responsive Images</h4>
+                    <p>Provide multiple sizes for different contexts:</p>
+
+                    <pre><code>&lt;!-- Responsive image with multiple sources --&gt;
+&lt;picture&gt;
+  &lt;source 
+    srcset="/images/hero-800.avif 800w, /images/hero-1200.avif 1200w, /images/hero-1600.avif 1600w"
+    sizes="(max-width: 768px) 800px, (max-width: 1200px) 1200px, 1600px"
+    type="image/avif" /&gt;
+  &lt;source 
+    srcset="/images/hero-800.webp 800w, /images/hero-1200.webp 1200w, /images/hero-1600.webp 1600w"
+    sizes="(max-width: 768px) 800px, (max-width: 1200px) 1200px, 1600px"
+    type="image/webp" /&gt;
+  &lt;img 
+    src="/images/hero-1200.jpg" 
+    srcset="/images/hero-800.jpg 800w, /images/hero-1200.jpg 1200w, /images/hero-1600.jpg 1600w"
+    sizes="(max-width: 768px) 800px, (max-width: 1200px) 1200px, 1600px"
+    alt="Hero image" 
+    loading="lazy" /&gt;
+&lt;/picture&gt;</code></pre>
+
+                    <h3>CSS Optimization</h3>
+                    <p>Organize CSS for optimal loading and maintenance:</p>
+
+                    <pre><code>&lt;!-- Critical CSS inline --&gt;
+&lt;style&gt;
+  /* Above-the-fold styles */
+  body { margin: 0; font-family: system-ui; }
+  .hero { height: 100vh; display: flex; align-items: center; }
+&lt;/style&gt;
+
+&lt;!-- Non-critical CSS with media queries --&gt;
+&lt;link rel="stylesheet" href="/assets/css/components.css" media="print" onload="this.media='all'" /&gt;
+&lt;link rel="stylesheet" href="/assets/css/utilities.css" media="print" onload="this.media='all'" /&gt;</code></pre>
+
+                    <h3>JavaScript Optimization</h3>
+                    <p>Load JavaScript efficiently:</p>
+
+                    <pre><code>&lt;!-- Essential scripts --&gt;
+&lt;script src="/assets/js/critical.js"&gt;&lt;/script&gt;
+
+&lt;!-- Deferred non-critical scripts --&gt;
+&lt;script src="/assets/js/analytics.js" defer&gt;&lt;/script&gt;
+&lt;script src="/assets/js/interactions.js" defer&gt;&lt;/script&gt;
+
+&lt;!-- Module scripts for modern browsers --&gt;
+&lt;script type="module" src="/assets/js/main.mjs"&gt;&lt;/script&gt;
+&lt;script nomodule src="/assets/js/main.legacy.js"&gt;&lt;/script&gt;</code></pre>
+
+                    <h2>Advanced Asset Patterns</h2>
+                    
+                    <h3>Content Delivery Network (CDN)</h3>
+                    <p>Mix local and CDN assets effectively:</p>
+
+                    <pre><code>&lt;!-- CDN for common libraries --&gt;
+&lt;script src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js" defer&gt;&lt;/script&gt;
+
+&lt;!-- Local assets for custom code --&gt;
+&lt;script src="/assets/js/app.js" defer&gt;&lt;/script&gt;
+
+&lt;!-- Fallback for CDN failures --&gt;
+&lt;script&gt;
+  window.Alpine || document.write('&lt;script src="/assets/js/alpine.min.js" defer&gt;&lt;\/script&gt;');
+&lt;/script&gt;</code></pre>
+
+                    <h3>Asset Versioning</h3>
+                    <p>Implement cache busting for updated assets:</p>
+
+                    <pre><code>&lt;!-- Version in filename --&gt;
+&lt;link rel="stylesheet" href="/assets/css/main-v2.3.1.css" /&gt;
+
+&lt;!-- Query parameter versioning --&gt;
+&lt;script src="/assets/js/app.js?v=2.3.1"&gt;&lt;/script&gt;
+
+&lt;!-- Hash-based versioning (ideal) --&gt;
+&lt;link rel="stylesheet" href="/assets/css/main.a1b2c3d4.css" /&gt;</code></pre>
+
+                    <h3>Progressive Enhancement Assets</h3>
+                    <p>Layer assets for progressive enhancement:</p>
+
+                    <pre><code>&lt;!-- Base experience --&gt;
+&lt;link rel="stylesheet" href="/assets/css/base.css" /&gt;
+
+&lt;!-- Enhanced features --&gt;
+&lt;link rel="stylesheet" href="/assets/css/enhanced.css" media="(min-width: 768px)" /&gt;
+
+&lt;!-- Advanced interactions --&gt;
+&lt;script&gt;
+  if ('IntersectionObserver' in window) {
+    import('/assets/js/scroll-effects.js');
+  }
+&lt;/script&gt;</code></pre>
+
+                    <h2>Asset Security</h2>
+                    
+                    <h3>Content Security Policy (CSP)</h3>
+                    <p>Configure CSP headers for asset security:</p>
+
+                    <pre><code>&lt;!-- CSP meta tag --&gt;
+&lt;meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net;
+  style-src 'self' 'unsafe-inline';
+  img-src 'self' data: https:;
+  font-src 'self' https://fonts.gstatic.com;
+  connect-src 'self' https://api.example.com;
+" /&gt;</code></pre>
+
+                    <h3>Subresource Integrity (SRI)</h3>
+                    <p>Use SRI for external assets:</p>
+
+                    <pre><code>&lt;!-- SRI for CDN assets --&gt;
+&lt;script 
+  src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"
+  integrity="sha384-example-hash-here"
+  crossorigin="anonymous"
+  defer&gt;&lt;/script&gt;
+
+&lt;link 
+  rel="stylesheet"
+  href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"
+  integrity="sha384-example-hash-here"
+  crossorigin="anonymous" /&gt;</code></pre>
+
+                    <h2>Performance Monitoring</h2>
+                    
+                    <h3>Asset Loading Analytics</h3>
+                    <p>Monitor asset performance:</p>
+
+                    <pre><code>&lt;script&gt;
+  // Monitor largest contentful paint
+  new PerformanceObserver((list) => {
+    for (const entry of list.getEntries()) {
+      console.log('LCP:', entry.startTime);
+      // Send to analytics
+    }
+  }).observe({type: 'largest-contentful-paint', buffered: true});
+  
+  // Monitor resource loading
+  window.addEventListener('load', () => {
+    const resources = performance.getEntriesByType('resource');
+    resources.forEach(resource => {
+      if (resource.duration > 1000) {
+        console.warn('Slow asset:', resource.name, resource.duration);
+      }
+    });
+  });
+&lt;/script&gt;</code></pre>
+
+                    <h3>Bundle Analysis</h3>
+                    <p>Analyze asset sizes and usage:</p>
+
+                    <pre><code># Use tools to analyze asset usage
+# Example with webpack-bundle-analyzer for bundled assets
+npx webpack-bundle-analyzer dist/assets/js/*.js
+
+# Check asset sizes
+du -sh dist/assets/*
+
+# Find large files
+find dist -type f -size +100k -exec ls -lh {} \;</code></pre>
+
+                    <h2>Build Integration</h2>
+                    
+                    <h3>Asset Pipeline Integration</h3>
+                    <p>Integrate with build tools:</p>
+
+                    <pre><code># package.json scripts
+{
+  "scripts": {
+    "build:assets": "npm run build:css && npm run build:js && npm run optimize:images",
+    "build:css": "postcss src/assets/css/main.css -o dist/assets/css/main.css",
+    "build:js": "esbuild src/assets/js/main.js --bundle --outfile=dist/assets/js/main.js",
+    "optimize:images": "imagemin src/assets/images/* --out-dir=dist/assets/images",
+    "build": "npm run build:assets && unify build --source src --output dist"
+  }
+}</code></pre>
+
+                    <h3>Watch Mode Integration</h3>
+                    <p>Set up asset watching during development:</p>
+
+                    <pre><code># Watch assets and unify files simultaneously
+npm run watch:assets &amp; unify serve --source src --port 3000
+
+# Or use a tool like concurrently
+npx concurrently "npm run watch:assets" "unify serve"</code></pre>
+
+                    <h2>Common Patterns</h2>
+                    
+                    <h3>Multi-environment Assets</h3>
+                    <pre><code># Development build (unoptimized)
+unify build --copy "assets/dev/**"
+
+# Production build (optimized)
+unify build --copy "assets/dist/**" --ignore "assets/dev/**"
+
+# Staging build (mixed)
+unify build --copy "assets/dist/**" --copy "assets/debug.js"</code></pre>
+
+                    <h3>Theme-based Assets</h3>
+                    <pre><code>&lt;!-- Dynamic theme loading --&gt;
+&lt;link id="theme-css" rel="stylesheet" href="/assets/css/themes/light.css" /&gt;
+
+&lt;script&gt;
+  function switchTheme(theme) {
+    document.getElementById('theme-css').href = `/assets/css/themes/${theme}.css`;
+    localStorage.setItem('theme', theme);
+  }
+  
+  // Load saved theme
+  const savedTheme = localStorage.getItem('theme') || 'light';
+  switchTheme(savedTheme);
+&lt;/script&gt;</code></pre>
+
+                    <h3>Lazy Loading Assets</h3>
+                    <pre><code>&lt;!-- Intersection Observer for images --&gt;
+&lt;img 
+  data-src="/assets/images/heavy-image.jpg" 
+  src="/assets/images/placeholder.svg"
+  alt="Description"
+  loading="lazy"
+  class="lazy-image" /&gt;
+
+&lt;script&gt;
+  // Lazy load images
+  const imageObserver = new IntersectionObserver((entries, observer) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const img = entry.target;
+        img.src = img.dataset.src;
+        img.classList.remove('lazy-image');
+        observer.unobserve(img);
+      }
+    });
+  });
+  
+  document.querySelectorAll('.lazy-image').forEach(img => {
+    imageObserver.observe(img);
+  });
+&lt;/script&gt;</code></pre>
+
+                    <div class="callout callout-warning">
+                        <h3>⚠️ Common Pitfalls</h3>
+                        <ul>
+                            <li><strong>Overly broad copy patterns:</strong> <code>--copy "**/*"</code> can impact performance</li>
+                            <li><strong>Missing asset references:</strong> Unreferenced assets won't be copied automatically</li>
+                            <li><strong>Wrong path formats:</strong> Use forward slashes in paths on all platforms</li>
+                            <li><strong>Large unoptimized assets:</strong> Always optimize images and compress files</li>
+                            <li><strong>Missing fallbacks:</strong> Provide fallbacks for modern asset formats</li>
+                        </ul>
+                    </div>
+
+                    <h2>Troubleshooting</h2>
+                    
+                    <h3>Assets Not Copying</h3>
+                    <ol>
+                        <li><strong>Check file paths:</strong> Verify assets exist at expected locations</li>
+                        <li><strong>Review ignore patterns:</strong> Ensure assets aren't being excluded</li>
+                        <li><strong>Validate copy patterns:</strong> Test glob patterns with <code>--dry-run</code></li>
+                        <li><strong>Check precedence rules:</strong> Later patterns may override earlier ones</li>
+                    </ol>
+
+                    <h3>Reference Tracking Issues</h3>
+                    <ol>
+                        <li><strong>Verify paths:</strong> Ensure referenced paths are correct</li>
+                        <li><strong>Check CSS imports:</strong> CSS <code>@import</code> and <code>url()</code> paths</li>
+                        <li><strong>Review HTML attributes:</strong> <code>src</code>, <code>href</code>, and other asset references</li>
+                        <li><strong>Debug with verbose logging:</strong> Use <code>--log-level debug</code></li>
+                    </ol>
+
+                    <h3>Performance Issues</h3>
+                    <ol>
+                        <li><strong>Profile asset loading:</strong> Use browser dev tools Network tab</li>
+                        <li><strong>Check asset sizes:</strong> Identify and optimize large files</li>
+                        <li><strong>Review copy patterns:</strong> Avoid overly broad patterns</li>
+                        <li><strong>Monitor build times:</strong> Track asset processing performance</li>
+                    </ol>
+
+                    <div class="callout callout-success">
+                        <h3>✅ Best Practices Summary</h3>
+                        <ul>
+                            <li><strong>Organize assets logically</strong> by type and usage</li>
+                            <li><strong>Use modern formats</strong> with proper fallbacks</li>
+                            <li><strong>Implement responsive images</strong> for different screen sizes</li>
+                            <li><strong>Optimize asset loading</strong> with defer, async, and lazy loading</li>
+                            <li><strong>Monitor performance</strong> and optimize bottlenecks</li>
+                            <li><strong>Secure assets</strong> with CSP and SRI where appropriate</li>
+                        </ul>
+                    </div>
+
+                    <h2>Next Steps</h2>
+                    
+                    <p>Now that you understand asset management in unify:</p>
+                    <ul>
+                        <li><a href="/unify/docs/performance">Learn about performance optimization</a></li>
+                        <li><a href="/unify/docs/security">Explore security best practices</a></li>
+                        <li><a href="/unify/docs/deployment">Deploy your asset-rich site</a></li>
+                        <li><a href="/unify/docs/cli-build">Master build command options</a></li>
+                    </ul>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

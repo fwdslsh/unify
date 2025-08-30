@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>unify serve Command - unify Documentation</title>
+    <meta name="description" content="Complete reference for the unify serve command including development server options, live reload, proxy configuration, and hot reloading features for efficient development workflow.">
+    <link rel="stylesheet" href="/assets/styles.css">
+    <style>
+        .docs-layout { display: flex; min-height: 100vh; }
+        .sidebar { width: 280px; background: var(--bg-darker); border-right: 1px solid var(--border); padding: 2rem 0; position: fixed; height: calc(100vh - 80px); overflow-y: auto; z-index: 100; }
+        .sidebar-content { padding: 0 2rem; }
+        .sidebar-section { margin-bottom: 2rem; }
+        .sidebar-title { font-size: 0.9rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 0.05em; font-family: var(--font-mono); }
+        .sidebar-nav { list-style: none; }
+        .sidebar-nav li { margin-bottom: 0.5rem; }
+        .sidebar-nav a { color: var(--text-dim); text-decoration: none; font-size: 0.9rem; display: block; padding: 0.5rem 1rem; border-radius: 6px; transition: all 0.3s ease; font-family: var(--font-mono); }
+        .sidebar-nav a:hover { color: var(--text-primary); background: var(--bg-card); }
+        .sidebar-nav a.active { color: var(--primary); background: rgba(0, 255, 65, 0.1); border-left: 3px solid var(--primary); }
+        .main-content { flex: 1; margin-left: 280px; padding: 2rem 4rem; max-width: calc(100vw - 280px); }
+        .content-wrapper { max-width: 800px; }
+        .content h1 { font-size: 2.5rem; font-weight: 800; margin-bottom: 1rem; color: var(--text-primary); line-height: 1.2; }
+        .content p { margin-bottom: 1.5rem; color: var(--text-secondary); line-height: 1.7; }
+        @media (max-width: 1024px) {
+            .sidebar { transform: translateX(-100%); transition: transform 0.3s ease; }
+            .sidebar.open { transform: translateX(0); }
+            .main-content { margin-left: 0; max-width: 100vw; padding: 2rem; }
+        }
+    </style>
+</head>
+<body data-unify="/_includes/tool-page.html">
+    <ul class="unify-nav-links">
+        <li><a href="/unify/">Overview</a></li>
+        <li><a href="/unify/getting-started.html">Getting Started</a></li>
+        <li><a href="/unify/docs.html">Documentation</a></li>
+        <li><a href="/unify/examples.html">Examples</a></li>
+    </ul>
+    <div class="unify-content docs-layout">
+        <aside class="sidebar">
+            <div class="sidebar-content">
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Getting Started</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs">Quick Start</a></li>
+                        <li><a href="/unify/docs/installation">Installation</a></li>
+                        <li><a href="/unify/docs/project-structure">Project Structure</a></li>
+                        <li><a href="/unify/docs/first-site">Your First Site</a></li>
+                    </ul>
+                </div>
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Core Concepts</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs/includes">Server-Side Includes</a></li>
+                        <li><a href="/unify/docs/components">Components</a></li>
+                        <li><a href="/unify/docs/markdown">Markdown</a></li>
+                        <li><a href="/unify/docs/assets">Static Assets</a></li>
+                    </ul>
+                </div>
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">CLI Reference</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs/cli-build">unify build</a></li>
+                        <li><a href="/unify/docs/cli-serve" class="active">unify serve</a></li>
+                        <li><a href="/unify/docs/cli-watch">unify watch</a></li>
+                        <li><a href="/unify/docs/configuration">Configuration</a></li>
+                    </ul>
+                </div>
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Deployment</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs/deployment">Static Hosting</a></li>
+                        <li><a href="/unify/docs/docker">Docker</a></li>
+                        <li><a href="/unify/docs/ci-cd">CI/CD</a></li>
+                    </ul>
+                </div>
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Advanced</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs/performance">Performance</a></li>
+                        <li><a href="/unify/docs/security">Security</a></li>
+                        <li><a href="/unify/docs/migration">Migration Guide</a></li>
+                        <li><a href="/unify/docs/troubleshooting">Troubleshooting</a></li>
+                    </ul>
+                </div>
+            </div>
+        </aside>
+        <main class="main-content">
+            <div class="content-wrapper">
+                <div class="content">
+                    <h1><code>unify serve</code> Command</h1>
+                    
+                    <p>The <code>unify serve</code> command starts a development server with live reload capabilities. It builds your site in memory, serves it on a local port, and automatically rebuilds when source files change, making development fast and efficient.</p>
+
+                    <div class="callout callout-info">
+                        <h3>🚀 Development Workflow</h3>
+                        <p>The serve command is your primary development tool, providing instant feedback as you edit your site's content and layout.</p>
+                    </div>
+
+                    <h2>Basic Usage</h2>
+                    
+                    <pre><code># Start development server (default: localhost:3000)
+unify serve
+
+# Custom port
+unify serve --port 8080
+
+# Custom source directory
+unify serve --source content --port 3000</code></pre>
+
+                    <h2>Command Syntax</h2>
+                    
+                    <pre><code>unify serve [options]</code></pre>
+
+                    <h3>Default Behavior</h3>
+                    <ul>
+                        <li><strong>Source directory:</strong> <code>src/</code> (or current directory if no src/ exists)</li>
+                        <li><strong>Server port:</strong> <code>3000</code></li>
+                        <li><strong>Server host:</strong> <code>localhost</code></li>
+                        <li><strong>Live reload:</strong> Enabled via WebSocket</li>
+                        <li><strong>Hot rebuilding:</strong> Automatic rebuild on file changes</li>
+                        <li><strong>Pretty URLs:</strong> Automatically enabled for development</li>
+                    </ul>
+
+                    <h2>Server Options</h2>
+                    
+                    <h3><code>--port, -p &lt;number&gt;</code></h3>
+                    <p>Specify the port for the development server.</p>
+                    
+                    <pre><code># Common development ports
+unify serve --port 3000
+unify serve -p 8080
+unify serve -p 4000
+
+# System will find available port if specified port is busy</code></pre>
+
+                    <h3><code>--host &lt;hostname&gt;</code></h3>
+                    <p>Specify the hostname or IP address to bind the server.</p>
+                    
+                    <pre><code># Allow connections from any IP (useful for mobile testing)
+unify serve --host 0.0.0.0
+
+# Specific IP address
+unify serve --host 192.168.1.100
+
+# Custom hostname
+unify serve --host dev.local</code></pre>
+                    
+                    <div class="callout callout-warning">
+                        <h3>⚠️ Security Note</h3>
+                        <p>Using <code>--host 0.0.0.0</code> makes your development server accessible from other devices on your network. Only use this in trusted environments.</p>
+                    </div>
+
+                    <h3><code>--source, -s &lt;directory&gt;</code></h3>
+                    <p>Specify the source directory to serve from.</p>
+                    
+                    <pre><code># Different source directories
+unify serve --source content
+unify serve -s website
+unify serve -s ../shared-content</code></pre>
+
+                    <h2>Development Features</h2>
+                    
+                    <h3>Live Reload</h3>
+                    <p>The development server includes WebSocket-based live reload:</p>
+                    <ul>
+                        <li><strong>Automatic page refresh:</strong> Browser refreshes when files change</li>
+                        <li><strong>Smart detection:</strong> Only reloads when necessary</li>
+                        <li><strong>Error overlay:</strong> Shows build errors in browser</li>
+                        <li><strong>Connection status:</strong> Visual indicator of WebSocket connection</li>
+                    </ul>
+
+                    <h3>Hot Rebuilding</h3>
+                    <p>Files are automatically rebuilt when changed:</p>
+                    
+                    <pre><code># These file changes trigger rebuilds:
+src/index.html              # Direct file changes
+src/_includes/header.html    # Layout and component changes
+src/blog/post.md            # Content changes
+assets/css/styles.css       # Referenced asset changes</code></pre>
+
+                    <h3>In-Memory Build</h3>
+                    <p>The development server builds your site in memory for speed:</p>
+                    <ul>
+                        <li><strong>Faster builds:</strong> No file system writes during development</li>
+                        <li><strong>Automatic cleanup:</strong> Memory is managed automatically</li>
+                        <li><strong>Live reflection:</strong> Changes appear immediately without disk I/O</li>
+                    </ul>
+
+                    <h2>URL Structure</h2>
+                    
+                    <h3>Pretty URLs (Default)</h3>
+                    <p>The development server automatically enables pretty URLs:</p>
+                    
+                    <pre><code># Source files → Server URLs
+src/index.html        → http://localhost:3000/
+src/about.html        → http://localhost:3000/about/
+src/blog/index.html   → http://localhost:3000/blog/
+src/blog/post.html    → http://localhost:3000/blog/post/</code></pre>
+
+                    <h3>Asset URLs</h3>
+                    <pre><code># Asset paths in development
+src/assets/css/styles.css → http://localhost:3000/assets/css/styles.css
+src/images/logo.png       → http://localhost:3000/images/logo.png
+public/robots.txt         → http://localhost:3000/robots.txt</code></pre>
+
+                    <h2>File Watching</h2>
+                    
+                    <h3>Watched File Types</h3>
+                    <p>The server watches and rebuilds for these changes:</p>
+                    <ul>
+                        <li><strong>Content files:</strong> <code>*.html</code>, <code>*.md</code></li>
+                        <li><strong>Layout files:</strong> <code>_*.html</code>, layout directories</li>
+                        <li><strong>Component files:</strong> <code>_includes/**</code>, <code>_components/**</code></li>
+                        <li><strong>Referenced assets:</strong> CSS, JS, images linked from HTML</li>
+                        <li><strong>Configuration:</strong> <code>unify.config.*</code> files</li>
+                    </ul>
+
+                    <h3>Watch Behavior</h3>
+                    <ul>
+                        <li><strong>Smart rebuilds:</strong> Only affected pages are rebuilt</li>
+                        <li><strong>Dependency tracking:</strong> Layout changes rebuild dependents</li>
+                        <li><strong>Debouncing:</strong> Multiple rapid changes trigger single rebuild</li>
+                        <li><strong>Error recovery:</strong> Fixes in files clear previous errors</li>
+                    </ul>
+
+                    <h2>Error Handling</h2>
+                    
+                    <h3>Build Error Overlay</h3>
+                    <p>When build errors occur, they're displayed in the browser:</p>
+                    
+                    <pre><code>┌─ Build Error ─────────────────────────────────────┐
+│                                                   │
+│  Layout not found: '_blog.html'                  │
+│  in: src/blog/post.md                            │
+│                                                   │
+│  Stack trace:                                     │
+│    at processMarkdown (line 45)                  │
+│    at buildPage (line 123)                       │
+│                                                   │
+│  Fix the error and the page will reload          │
+│  automatically.                                   │
+│                                                   │
+└───────────────────────────────────────────────────┘</code></pre>
+
+                    <h3>Error Recovery</h3>
+                    <ul>
+                        <li><strong>Automatic recovery:</strong> Fixing errors automatically rebuilds</li>
+                        <li><strong>Error persistence:</strong> Errors remain visible until fixed</li>
+                        <li><strong>Stack traces:</strong> Full error information for debugging</li>
+                        <li><strong>File context:</strong> Shows which files caused errors</li>
+                    </ul>
+
+                    <h2>Advanced Options</h2>
+                    
+                    <h3><code>--log-level &lt;level&gt;</code></h3>
+                    <p>Control logging verbosity during development.</p>
+                    
+                    <pre><code># Quiet mode (errors only)
+unify serve --log-level error
+
+# Verbose development info
+unify serve --log-level debug
+
+# See every file operation
+unify serve --log-level trace</code></pre>
+
+                    <h3><code>--open</code></h3>
+                    <p>Automatically open the site in your default browser.</p>
+                    
+                    <pre><code># Open browser automatically
+unify serve --open
+
+# Combine with custom port
+unify serve --port 8080 --open</code></pre>
+
+                    <h3><code>--no-watch</code></h3>
+                    <p>Disable file watching and live reload.</p>
+                    
+                    <pre><code># Static serving without rebuilds
+unify serve --no-watch
+
+# Useful for testing production-like behavior</code></pre>
+
+                    <h2>Development Workflow</h2>
+                    
+                    <h3>Typical Development Session</h3>
+                    <pre><code># 1. Start development server
+unify serve
+
+# 2. Open browser to http://localhost:3000
+
+# 3. Edit files in your editor:
+#    - Edit src/index.html
+#    - Browser automatically refreshes
+#    - See changes immediately
+
+# 4. View build output in terminal:
+#    [REBUILD] src/index.html (23ms)
+#    [RELOAD] Browser refreshed
+
+# 5. Continue editing with instant feedback</code></pre>
+
+                    <h3>Multi-Device Development</h3>
+                    <pre><code># 1. Start server accessible from network
+unify serve --host 0.0.0.0 --port 3000
+
+# 2. Access from other devices:
+#    Desktop: http://localhost:3000
+#    Phone:   http://192.168.1.100:3000 (your computer's IP)
+#    Tablet:  http://dev.local:3000 (if using mDNS)
+
+# 3. Test responsive design across devices with live reload</code></pre>
+
+                    <h2>Common Usage Patterns</h2>
+                    
+                    <h3>Basic Development</h3>
+                    <pre><code># Standard development workflow
+unify serve
+
+# With custom port
+unify serve --port 8080</code></pre>
+
+                    <h3>Mobile Testing</h3>
+                    <pre><code># Network-accessible development
+unify serve --host 0.0.0.0 --port 3000
+
+# With browser auto-open
+unify serve --host 0.0.0.0 --port 3000 --open</code></pre>
+
+                    <h3>Content-Heavy Sites</h3>
+                    <pre><code># Large sites with specific source directory
+unify serve --source content --port 4000
+
+# Quiet output for large builds
+unify serve --log-level warn</code></pre>
+
+                    <h3>Debugging Development</h3>
+                    <pre><code># Debug file watching and rebuilds
+unify serve --log-level debug
+
+# Trace all operations
+unify serve --log-level trace
+
+# Static serving for troubleshooting
+unify serve --no-watch</code></pre>
+
+                    <h2>Performance Considerations</h2>
+                    
+                    <h3>Build Performance</h3>
+                    <ul>
+                        <li><strong>Incremental builds:</strong> Only changed files are rebuilt</li>
+                        <li><strong>Dependency caching:</strong> Layout dependencies are cached</li>
+                        <li><strong>Memory builds:</strong> No file system writes during development</li>
+                        <li><strong>Smart watching:</strong> Efficient file system monitoring</li>
+                    </ul>
+
+                    <h3>Large Site Optimization</h3>
+                    <pre><code># For sites with many pages, consider:
+# 1. Reduce log verbosity
+unify serve --log-level warn
+
+# 2. Use specific source directories
+unify serve --source src/blog   # Only serve blog section
+
+# 3. Disable watching if editing externally
+unify serve --no-watch</code></pre>
+
+                    <h2>Browser Integration</h2>
+                    
+                    <h3>WebSocket Connection</h3>
+                    <p>Live reload uses WebSocket for communication:</p>
+                    
+                    <pre><code>// WebSocket connection at /__ws
+// Handles these events:
+// - 'reload' - Full page refresh
+// - 'error' - Show error overlay
+// - 'connected' - Update connection status</code></pre>
+
+                    <h3>Error Overlay Styling</h3>
+                    <p>The error overlay can be customized with CSS:</p>
+                    
+                    <pre><code>/* Override error overlay styles */
+.unify-error-overlay {
+  font-family: 'Monaco', 'Menlo', monospace;
+  background: rgba(0, 0, 0, 0.95);
+  color: #ff6b6b;
+}
+
+.unify-error-content {
+  max-width: 800px;
+  margin: 2rem auto;
+  padding: 2rem;
+}</code></pre>
+
+                    <h2>Integration Examples</h2>
+                    
+                    <h3>npm Scripts</h3>
+                    <pre><code>{
+  "scripts": {
+    "dev": "unify serve",
+    "dev:open": "unify serve --open",
+    "dev:network": "unify serve --host 0.0.0.0",
+    "dev:debug": "unify serve --log-level debug",
+    "dev:port": "unify serve --port 8080"
+  }
+}</code></pre>
+
+                    <h3>VS Code Tasks</h3>
+                    <pre><code>// .vscode/tasks.json
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Start Dev Server",
+      "type": "shell",
+      "command": "unify",
+      "args": ["serve", "--open"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      }
+    }
+  ]
+}</code></pre>
+
+                    <h3>Docker Development</h3>
+                    <pre><code># Dockerfile.dev
+FROM oven/bun:1.2
+WORKDIR /app
+COPY . .
+RUN bun install
+EXPOSE 3000
+CMD ["bun", "run", "unify", "serve", "--host", "0.0.0.0"]
+
+# docker-compose.yml
+version: '3.8'
+services:
+  unify-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./src:/app/src:ro
+      - ./assets:/app/assets:ro</code></pre>
+
+                    <h2>Troubleshooting</h2>
+                    
+                    <h3>Common Issues</h3>
+                    
+                    <h4>Port Already in Use</h4>
+                    <pre><code>Error: Port 3000 is already in use
+Solution: Use --port with different port number</code></pre>
+                    
+                    <h4>Live Reload Not Working</h4>
+                    <ol>
+                        <li>Check browser console for WebSocket errors</li>
+                        <li>Verify firewall isn't blocking WebSocket connections</li>
+                        <li>Try refreshing the page to reconnect</li>
+                        <li>Use <code>--log-level debug</code> to see file watching activity</li>
+                    </ol>
+                    
+                    <h4>Files Not Updating</h4>
+                    <ol>
+                        <li>Verify files are in the source directory</li>
+                        <li>Check file permissions for read access</li>
+                        <li>Look for error messages in terminal</li>
+                        <li>Try restarting the server</li>
+                    </ol>
+
+                    <h4>Cannot Access from Mobile Device</h4>
+                    <ol>
+                        <li>Ensure <code>--host 0.0.0.0</code> is used</li>
+                        <li>Check firewall settings on development machine</li>
+                        <li>Verify devices are on same network</li>
+                        <li>Use your computer's IP address, not localhost</li>
+                    </ol>
+
+                    <div class="callout callout-warning">
+                        <h3>⚠️ Development vs Production</h3>
+                        <ul>
+                            <li><strong>Development server is not production-ready:</strong> Use proper web server for production</li>
+                            <li><strong>Pretty URLs require server configuration:</strong> Set up URL rewriting in production</li>
+                            <li><strong>Live reload is development-only:</strong> Build command generates production files</li>
+                            <li><strong>Error overlays are for development:</strong> Production should handle errors gracefully</li>
+                        </ul>
+                    </div>
+
+                    <h2>Environment Variables</h2>
+                    
+                    <ul>
+                        <li><strong><code>DEBUG=1</code>:</strong> Show stack traces for server errors</li>
+                        <li><strong><code>PORT</code>:</strong> Default port (overridden by <code>--port</code>)</li>
+                        <li><strong><code>HOST</code>:</strong> Default host (overridden by <code>--host</code>)</li>
+                    </ul>
+
+                    <div class="callout callout-success">
+                        <h3>✅ Best Practices</h3>
+                        <ul>
+                            <li><strong>Use default port 3000</strong> for consistency across projects</li>
+                            <li><strong>Keep source files organized</strong> for efficient watching</li>
+                            <li><strong>Use <code>--host 0.0.0.0</code></strong> when testing on multiple devices</li>
+                            <li><strong>Monitor server logs</strong> for build errors and warnings</li>
+                            <li><strong>Use <code>--open</code></strong> for convenient browser launching</li>
+                            <li><strong>Test pretty URLs</strong> in development to match production behavior</li>
+                        </ul>
+                    </div>
+
+                    <h2>Next Steps</h2>
+                    
+                    <p>Now that you understand the serve command:</p>
+                    <ul>
+                        <li><a href="/unify/docs/cli-watch">Learn about watch mode for production builds</a></li>
+                        <li><a href="/unify/docs/cli-build">Master the build command for deployment</a></li>
+                        <li><a href="/unify/docs/configuration">Set up configuration files</a></li>
+                        <li><a href="/unify/docs/deployment">Deploy your development work</a></li>
+                    </ul>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

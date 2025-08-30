@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Server-Side Includes & DOM Cascade - unify Documentation</title>
+    <meta name="description" content="Learn about unify's powerful DOM Cascade composition system and legacy Server-Side Includes support for building maintainable static sites.">
+    <link rel="stylesheet" href="/assets/styles.css">
+    <style>
+        .docs-layout { display: flex; min-height: 100vh; }
+        .sidebar { width: 280px; background: var(--bg-darker); border-right: 1px solid var(--border); padding: 2rem 0; position: fixed; height: calc(100vh - 80px); overflow-y: auto; z-index: 100; }
+        .sidebar-content { padding: 0 2rem; }
+        .sidebar-section { margin-bottom: 2rem; }
+        .sidebar-title { font-size: 0.9rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 0.05em; font-family: var(--font-mono); }
+        .sidebar-nav { list-style: none; }
+        .sidebar-nav li { margin-bottom: 0.5rem; }
+        .sidebar-nav a { color: var(--text-dim); text-decoration: none; font-size: 0.9rem; display: block; padding: 0.5rem 1rem; border-radius: 6px; transition: all 0.3s ease; font-family: var(--font-mono); }
+        .sidebar-nav a:hover { color: var(--text-primary); background: var(--bg-card); }
+        .sidebar-nav a.active { color: var(--primary); background: rgba(0, 255, 65, 0.1); border-left: 3px solid var(--primary); }
+        .main-content { flex: 1; margin-left: 280px; padding: 2rem 4rem; max-width: calc(100vw - 280px); }
+        .content-wrapper { max-width: 800px; }
+        .content h1 { font-size: 2.5rem; font-weight: 800; margin-bottom: 1rem; color: var(--text-primary); line-height: 1.2; }
+        .content p { margin-bottom: 1.5rem; color: var(--text-secondary); line-height: 1.7; }
+        @media (max-width: 1024px) {
+            .sidebar { transform: translateX(-100%); transition: transform 0.3s ease; }
+            .sidebar.open { transform: translateX(0); }
+            .main-content { margin-left: 0; max-width: 100vw; padding: 2rem; }
+        }
+    </style>
+</head>
+<body data-unify="/_includes/tool-page.html">
+    <ul class="unify-nav-links">
+        <li><a href="/unify/">Overview</a></li>
+        <li><a href="/unify/getting-started.html">Getting Started</a></li>
+        <li><a href="/unify/docs.html">Documentation</a></li>
+        <li><a href="/unify/examples.html">Examples</a></li>
+    </ul>
+    <div class="unify-content docs-layout">
+        <aside class="sidebar">
+            <div class="sidebar-content">
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Getting Started</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs">Quick Start</a></li>
+                        <li><a href="/unify/docs/installation">Installation</a></li>
+                        <li><a href="/unify/docs/project-structure">Project Structure</a></li>
+                        <li><a href="/unify/docs/first-site">Your First Site</a></li>
+                    </ul>
+                </div>
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Core Concepts</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs/includes" class="active">Server-Side Includes</a></li>
+                        <li><a href="/unify/docs/components">Components</a></li>
+                        <li><a href="/unify/docs/markdown">Markdown</a></li>
+                        <li><a href="/unify/docs/assets">Static Assets</a></li>
+                    </ul>
+                </div>
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">CLI Reference</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs/cli-build">unify build</a></li>
+                        <li><a href="/unify/docs/cli-serve">unify serve</a></li>
+                        <li><a href="/unify/docs/cli-watch">unify watch</a></li>
+                        <li><a href="/unify/docs/configuration">Configuration</a></li>
+                    </ul>
+                </div>
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Deployment</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs/deployment">Static Hosting</a></li>
+                        <li><a href="/unify/docs/docker">Docker</a></li>
+                        <li><a href="/unify/docs/ci-cd">CI/CD</a></li>
+                    </ul>
+                </div>
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Advanced</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs/performance">Performance</a></li>
+                        <li><a href="/unify/docs/security">Security</a></li>
+                        <li><a href="/unify/docs/migration">Migration Guide</a></li>
+                        <li><a href="/unify/docs/troubleshooting">Troubleshooting</a></li>
+                    </ul>
+                </div>
+            </div>
+        </aside>
+        <main class="main-content">
+            <div class="content-wrapper">
+                <div class="content">
+                    <h1>Server-Side Includes & DOM Cascade</h1>
+                    
+                    <p>Unify provides two complementary systems for including and composing HTML content: the modern <strong>DOM Cascade</strong> composition system and legacy <strong>Server-Side Includes (SSI)</strong> for backward compatibility.</p>
+
+                    <div class="callout callout-tip">
+                        <h3>💡 Recommendation</h3>
+                        <p><strong>New projects should use DOM Cascade</strong> for area-based composition. Server-Side Includes are provided for migration from legacy systems and simple content inclusion.</p>
+                    </div>
+
+                    <h2>DOM Cascade Composition System</h2>
+                    
+                    <p>DOM Cascade is unify's primary composition system, providing area-based layout and component composition with predictable semantics. It follows a familiar CSS-like mental model with layers, scopes, and cascade behavior.</p>
+
+                    <h3>Core Concepts</h3>
+                    
+                    <h4>Layers & Precedence</h4>
+                    <p>Content is composed in layers, with later layers overriding earlier ones:</p>
+                    <ul>
+                        <li><strong>Layout layer</strong> - Base structure and default content</li>
+                        <li><strong>Component layer</strong> - Imported components and fragments</li>
+                        <li><strong>Page layer</strong> - Page-specific content (highest precedence)</li>
+                    </ul>
+
+                    <h4>Scopes & Boundaries</h4>
+                    <p>Each layout body or imported component creates an independent composition scope. Matching never crosses scope boundaries, ensuring predictable behavior.</p>
+
+                    <h4>Areas & Targeting</h4>
+                    <p>Layouts and components expose <strong>public areas</strong> using CSS classes with the <code>unify-</code> prefix. Pages target these areas using matching class names:</p>
+
+                    <pre><code>&lt;!-- Layout defines areas --&gt;
+&lt;section class="unify-hero"&gt;
+    &lt;h1&gt;Default Hero&lt;/h1&gt;
+&lt;/section&gt;
+
+&lt;!-- Page provides content --&gt;
+&lt;section class="unify-hero"&gt;
+    &lt;h1&gt;Custom Hero Title&lt;/h1&gt;
+    &lt;p&gt;Custom subtitle content&lt;/p&gt;
+&lt;/section&gt;</code></pre>
+
+                    <h3>Layout Composition</h3>
+                    
+                    <p>Apply layouts using <code>data-unify</code> on <code>&lt;html&gt;</code> or <code>&lt;body&gt;</code> elements:</p>
+
+                    <pre><code>&lt;!-- Applying a layout --&gt;
+&lt;body data-unify="/layouts/blog.html"&gt;
+    &lt;section class="unify-hero"&gt;
+        &lt;h1&gt;Blog Post Title&lt;/h1&gt;
+        &lt;p&gt;Post excerpt and meta information&lt;/p&gt;
+    &lt;/section&gt;
+    &lt;article class="unify-content"&gt;
+        &lt;p&gt;Your blog post content goes here...&lt;/p&gt;
+    &lt;/article&gt;
+&lt;/body&gt;</code></pre>
+
+                    <h4>Layout Path Resolution</h4>
+                    <p>Layouts can be referenced using several path formats:</p>
+                    <ul>
+                        <li><strong>Absolute paths:</strong> <code>data-unify="/layouts/blog.html"</code></li>
+                        <li><strong>Relative paths:</strong> <code>data-unify="../shared/layout.html"</code></li>
+                        <li><strong>Short names:</strong> <code>data-unify="blog"</code> → finds <code>_blog.layout.html</code></li>
+                    </ul>
+
+                    <h4>Automatic Layout Discovery</h4>
+                    <p>When no <code>data-unify</code> is specified, unify automatically discovers layouts:</p>
+                    <ol>
+                        <li>Look for <code>_layout.html</code> in the page's directory</li>
+                        <li>Climb up parent directories to source root</li>
+                        <li>Fall back to <code>_includes/layout.html</code> if found</li>
+                    </ol>
+
+                    <h3>Component Composition</h3>
+                    
+                    <p>Import components using <code>data-unify</code> on any non-layout element:</p>
+
+                    <pre><code>&lt;!-- Component: _includes/card.html --&gt;
+&lt;article class="card"&gt;
+    &lt;h3 class="unify-title"&gt;Default Title&lt;/h3&gt;
+    &lt;p class="unify-body"&gt;Default content&lt;/p&gt;
+    &lt;div class="unify-actions"&gt;
+        &lt;button&gt;Default Action&lt;/button&gt;
+    &lt;/div&gt;
+&lt;/article&gt;
+
+&lt;!-- Using the component --&gt;
+&lt;div data-unify="/_includes/card.html"&gt;
+    &lt;h3 class="unify-title"&gt;Product Name&lt;/h3&gt;
+    &lt;p class="unify-body"&gt;Product description and details&lt;/p&gt;
+    &lt;div class="unify-actions"&gt;
+        &lt;a href="/product" class="btn"&gt;Learn More&lt;/a&gt;
+    &lt;/div&gt;
+&lt;/div&gt;</code></pre>
+
+                    <h3>Area Matching Rules</h3>
+                    
+                    <p>DOM Cascade uses a three-tier matching system with clear precedence:</p>
+                    
+                    <h4>1. Area Class Matching (Highest Priority)</h4>
+                    <p>Elements with matching <code>.unify-*</code> classes are paired directly:</p>
+                    <pre><code>&lt;!-- Layout area --&gt;
+&lt;header class="unify-hero"&gt;...&lt;/header&gt;
+
+&lt;!-- Page content --&gt;
+&lt;section class="unify-hero"&gt;...&lt;/section&gt;</code></pre>
+
+                    <h4>2. Landmark Fallback (Medium Priority)</h4>
+                    <p>When no area classes are used, match by unique semantic landmarks:</p>
+                    <pre><code>&lt;!-- Automatic matching --&gt;
+&lt;header&gt; ↔ &lt;header&gt;
+&lt;nav&gt; ↔ &lt;nav&gt;
+&lt;main&gt; ↔ &lt;main&gt;
+&lt;aside&gt; ↔ &lt;aside&gt;
+&lt;footer&gt; ↔ &lt;footer&gt;</code></pre>
+
+                    <h4>3. Ordered Fill (Lowest Priority)</h4>
+                    <p>Map content by document order when other methods fail:</p>
+                    <pre><code>&lt;!-- First section → first section, etc. --&gt;
+&lt;main&gt;
+    &lt;section&gt;...&lt;/section&gt; &lt;!-- 1st --&gt;
+    &lt;section&gt;...&lt;/section&gt; &lt;!-- 2nd --&gt;
+&lt;/main&gt;</code></pre>
+
+                    <h3>Replacement Semantics</h3>
+                    
+                    <p>When areas are matched, DOM Cascade follows these rules:</p>
+                    <ul>
+                        <li><strong>Keep host element:</strong> The layout/component element tag and position are preserved</li>
+                        <li><strong>Replace children:</strong> Page content replaces all children of the matched element</li>
+                        <li><strong>Merge attributes:</strong> Page attributes override host attributes (except <code>id</code> for stability)</li>
+                        <li><strong>Union classes:</strong> <code>class</code> attributes are combined, not replaced</li>
+                    </ul>
+
+                    <h3>Documenting Public Areas</h3>
+                    
+                    <p>Layout and component authors should document their public API using contract blocks:</p>
+
+                    <pre><code>&lt;head&gt;
+    &lt;style data-unify-docs="v1"&gt;
+        /* Public areas for this layout */
+        .unify-hero {
+            /* Main hero section */
+        }
+        .unify-content {
+            /* Primary content area */
+        }
+        .unify-sidebar {
+            /* Secondary content sidebar */
+        }
+        
+        /* Optional state classes */
+        .is-featured {
+            /* Highlighted variant */
+        }
+    &lt;/style&gt;
+&lt;/head&gt;</code></pre>
+
+                    <div class="callout callout-info">
+                        <h3>📋 Best Practices</h3>
+                        <ul>
+                            <li>Keep area classes unique per scope</li>
+                            <li>Use low-specificity selectors in documentation</li>
+                            <li>Prefer semantic landmarks for fallback behavior</li>
+                            <li>Document all public areas in contract blocks</li>
+                        </ul>
+                    </div>
+
+                    <h2>Server-Side Includes (Legacy)</h2>
+                    
+                    <p>Unify supports Apache SSI syntax for backward compatibility and simple content inclusion. While functional, new projects should prefer DOM Cascade for its advanced composition features.</p>
+
+                    <h3>SSI Syntax</h3>
+                    
+                    <p>Include files using Apache SSI comment syntax:</p>
+
+                    <pre><code>&lt;!-- Include relative to current file --&gt;
+&lt;!--#include file="header.html" --&gt;
+
+&lt;!-- Include from source root --&gt;
+&lt;!--#include virtual="/shared/navigation.html" --&gt;
+
+&lt;!-- Include markdown files --&gt;
+&lt;!--#include file="content.md" --&gt;
+&lt;!--#include virtual="/blog/latest-post.md" --&gt;</code></pre>
+
+                    <h4>Path Resolution</h4>
+                    <ul>
+                        <li><strong>file:</strong> Resolved relative to the current file's directory</li>
+                        <li><strong>virtual:</strong> Resolved from the source root directory</li>
+                    </ul>
+
+                    <h4>Markdown Support</h4>
+                    <p>When including <code>.md</code> files, unify processes them through the Markdown processor. YAML frontmatter is processed but not included in the output.</p>
+
+                    <h3>SSI Limitations</h3>
+                    
+                    <div class="callout callout-warning">
+                        <h3>⚠️ SSI Limitations</h3>
+                        <ul>
+                            <li>No area-based composition or content targeting</li>
+                            <li>No attribute merging or semantic replacement</li>
+                            <li>Simple content insertion only</li>
+                            <li>No head merging or asset ordering</li>
+                        </ul>
+                    </div>
+
+                    <h2>Choosing the Right System</h2>
+                    
+                    <h3>Use DOM Cascade When:</h3>
+                    <ul>
+                        <li>Building new projects with modern composition needs</li>
+                        <li>You need area-based content targeting</li>
+                        <li>You want predictable attribute and head merging</li>
+                        <li>You're creating reusable layouts and components</li>
+                        <li>You need semantic fallback behavior</li>
+                    </ul>
+
+                    <h3>Use SSI When:</h3>
+                    <ul>
+                        <li>Migrating from legacy systems</li>
+                        <li>Simple content inclusion without composition</li>
+                        <li>Quick prototyping or basic templates</li>
+                        <li>Including content that doesn't need targeting</li>
+                    </ul>
+
+                    <h2>Migration from SSI to DOM Cascade</h2>
+                    
+                    <p>Converting from SSI to DOM Cascade typically involves:</p>
+                    
+                    <ol>
+                        <li><strong>Replace includes with imports:</strong>
+                            <pre><code>&lt;!-- Before: SSI --&gt;
+&lt;!--#include file="header.html" --&gt;
+
+&lt;!-- After: DOM Cascade --&gt;
+&lt;div data-unify="header.html"&gt;
+    &lt;!-- Optional content targeting --&gt;
+&lt;/div&gt;</code></pre>
+                        </li>
+                        
+                        <li><strong>Add area classes for targeting:</strong>
+                            <pre><code>&lt;!-- Add public areas to included files --&gt;
+&lt;header&gt;
+    &lt;h1 class="unify-title"&gt;Default Title&lt;/h1&gt;
+    &lt;nav class="unify-nav"&gt;Default Nav&lt;/nav&gt;
+&lt;/header&gt;</code></pre>
+                        </li>
+                        
+                        <li><strong>Document the public API:</strong>
+                            <pre><code>&lt;style data-unify-docs="v1"&gt;
+    .unify-title { /* Page title */ }
+    .unify-nav { /* Main navigation */ }
+&lt;/style&gt;</code></pre>
+                        </li>
+                    </ol>
+
+                    <div class="callout callout-success">
+                        <h3>✅ Pro Tips</h3>
+                        <ul>
+                            <li>Both systems can coexist in the same project during migration</li>
+                            <li>Use <code>unify --dry-run</code> to preview composition behavior</li>
+                            <li>Test thoroughly with the development server's live reload</li>
+                            <li>Consider the linting rules to maintain code quality</li>
+                        </ul>
+                    </div>
+
+                    <h2>Next Steps</h2>
+                    
+                    <p>Now that you understand unify's composition systems:</p>
+                    <ul>
+                        <li><a href="/unify/docs/components">Learn about component patterns</a></li>
+                        <li><a href="/unify/docs/markdown">Explore Markdown integration</a></li>
+                        <li><a href="/unify/docs/project-structure">Review project structure best practices</a></li>
+                        <li><a href="/unify/docs/cli-build">Master the build command options</a></li>
+                    </ul>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

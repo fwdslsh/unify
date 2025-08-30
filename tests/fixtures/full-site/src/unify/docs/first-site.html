@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your First Site - unify Documentation</title>
+    <meta name="description" content="Step-by-step tutorial for creating your first unify static site. Learn DOM Cascade basics, layouts, and components through a practical example.">
+    <link rel="stylesheet" href="/assets/styles.css">
+    <style>
+        .docs-layout { display: flex; min-height: 100vh; }
+        .sidebar { width: 280px; background: var(--bg-darker); border-right: 1px solid var(--border); padding: 2rem 0; position: fixed; height: calc(100vh - 80px); overflow-y: auto; z-index: 100; }
+        .sidebar-content { padding: 0 2rem; }
+        .sidebar-section { margin-bottom: 2rem; }
+        .sidebar-title { font-size: 0.9rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 0.05em; font-family: var(--font-mono); }
+        .sidebar-nav { list-style: none; }
+        .sidebar-nav li { margin-bottom: 0.5rem; }
+        .sidebar-nav a { color: var(--text-dim); text-decoration: none; font-size: 0.9rem; display: block; padding: 0.5rem 1rem; border-radius: 6px; transition: all 0.3s ease; font-family: var(--font-mono); }
+        .sidebar-nav a:hover { color: var(--text-primary); background: var(--bg-card); }
+        .sidebar-nav a.active { color: var(--primary); background: rgba(0, 255, 65, 0.1); border-left: 3px solid var(--primary); }
+        .main-content { flex: 1; margin-left: 280px; padding: 2rem 4rem; max-width: calc(100vw - 280px); }
+        .content-wrapper { max-width: 800px; }
+        .content h1 { font-size: 2.5rem; font-weight: 800; margin-bottom: 1rem; color: var(--text-primary); line-height: 1.2; }
+        .content p { margin-bottom: 1.5rem; color: var(--text-secondary); line-height: 1.7; }
+        @media (max-width: 1024px) {
+            .sidebar { transform: translateX(-100%); transition: transform 0.3s ease; }
+            .sidebar.open { transform: translateX(0); }
+            .main-content { margin-left: 0; max-width: 100vw; padding: 2rem; }
+        }
+    </style>
+</head>
+<body data-unify="/_includes/tool-page.html">
+    <ul class="unify-nav-links">
+        <li><a href="/unify/">Overview</a></li>
+        <li><a href="/unify/getting-started.html">Getting Started</a></li>
+        <li><a href="/unify/docs.html">Documentation</a></li>
+        <li><a href="/unify/examples.html">Examples</a></li>
+    </ul>
+    <div class="unify-content docs-layout">
+        <aside class="sidebar">
+            <div class="sidebar-content">
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Getting Started</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs">Quick Start</a></li>
+                        <li><a href="/unify/docs/installation">Installation</a></li>
+                        <li><a href="/unify/docs/project-structure">Project Structure</a></li>
+                        <li><a href="/unify/docs/first-site" class="active">Your First Site</a></li>
+                    </ul>
+                </div>
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Core Concepts</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs/includes">Server-Side Includes</a></li>
+                        <li><a href="/unify/docs/components">Components</a></li>
+                        <li><a href="/unify/docs/markdown">Markdown</a></li>
+                        <li><a href="/unify/docs/assets">Static Assets</a></li>
+                    </ul>
+                </div>
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">CLI Reference</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs/cli-build">unify build</a></li>
+                        <li><a href="/unify/docs/cli-serve">unify serve</a></li>
+                        <li><a href="/unify/docs/cli-watch">unify watch</a></li>
+                        <li><a href="/unify/docs/configuration">Configuration</a></li>
+                    </ul>
+                </div>
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Deployment</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs/deployment">Static Hosting</a></li>
+                        <li><a href="/unify/docs/docker">Docker</a></li>
+                        <li><a href="/unify/docs/ci-cd">CI/CD</a></li>
+                    </ul>
+                </div>
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Advanced</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs/performance">Performance</a></li>
+                        <li><a href="/unify/docs/security">Security</a></li>
+                        <li><a href="/unify/docs/migration">Migration Guide</a></li>
+                        <li><a href="/unify/docs/troubleshooting">Troubleshooting</a></li>
+                    </ul>
+                </div>
+            </div>
+        </aside>
+        <main class="main-content">
+            <div class="content-wrapper">
+                <div class="content">
+                    <h1>Your First Site</h1>
+
+                    <p>This tutorial walks you through creating your first unify static site from scratch. You'll learn the DOM Cascade fundamentals by building a complete website with layouts, components, and pages.</p>
+
+                    <div class="callout callout-info">
+                        <div class="callout-title">🎯 What You'll Learn</div>
+                        <p>DOM Cascade area targeting, layout composition, component creation, and the complete build-to-deploy workflow.</p>
+                    </div>
+
+                    <h2>Prerequisites</h2>
+
+                    <p>Before starting, ensure you have unify installed. If not, see the <a href="/unify/docs/installation" style="color: var(--primary);">Installation Guide</a>.</p>
+
+                    <div class="code-block">
+                        <div class="language-label">bash</div>
+                        <pre># Verify unify is installed
+unify --version</pre>
+                    </div>
+
+                    <h2>Step 1: Project Setup</h2>
+
+                    <p>Create a new directory for your first site and set up the basic structure:</p>
+
+                    <div class="code-block">
+                        <div class="language-label">bash</div>
+                        <pre># Create project directory
+mkdir my-first-site
+cd my-first-site
+
+# Create directory structure
+mkdir src src/_includes src/assets src/assets/css src/assets/images</pre>
+                    </div>
+
+                    <p>Your project structure should look like this:</p>
+
+                    <div class="code-block">
+                        <div class="language-label">text</div>
+                        <pre>my-first-site/
+├── src/
+│   ├── _includes/
+│   └── assets/
+│       ├── css/
+│       └── images/</pre>
+                    </div>
+
+                    <h2>Step 2: Create Your First Layout</h2>
+
+                    <p>Layouts define the overall structure of your pages. Create a base layout with public areas that pages can target:</p>
+
+                    <div class="code-block">
+                        <div class="language-label">html</div>
+                        <pre># src/_includes/_layout.html
+&lt;!DOCTYPE html&gt;
+&lt;html lang="en"&gt;
+&lt;head&gt;
+  &lt;style data-unify-docs="v1"&gt;
+    /* Public areas that pages can target */
+    .unify-header {
+      /* Site header area - navigation, logo */
+    }
+    .unify-content {
+      /* Main content area - page content goes here */
+    }
+    .unify-sidebar {
+      /* Optional sidebar - additional content */
+    }
+    .unify-footer {
+      /* Site footer - links, copyright */
+    }
+  &lt;/style&gt;
+  &lt;meta charset="UTF-8"&gt;
+  &lt;meta name="viewport" content="width=device-width, initial-scale=1.0"&gt;
+  &lt;title&gt;My First Site&lt;/title&gt;
+  &lt;link rel="stylesheet" href="/assets/css/style.css"&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;header class="unify-header"&gt;
+    &lt;h1&gt;My Site&lt;/h1&gt;
+    &lt;nav&gt;
+      &lt;a href="/"&gt;Home&lt;/a&gt;
+      &lt;a href="/about.html"&gt;About&lt;/a&gt;
+      &lt;a href="/contact.html"&gt;Contact&lt;/a&gt;
+    &lt;/nav&gt;
+  &lt;/header&gt;
+
+  &lt;main class="unify-content"&gt;
+    &lt;p&gt;Default content - this will be replaced by page content&lt;/p&gt;
+  &lt;/main&gt;
+
+  &lt;aside class="unify-sidebar"&gt;
+    &lt;h3&gt;Sidebar&lt;/h3&gt;
+    &lt;p&gt;Default sidebar content&lt;/p&gt;
+  &lt;/aside&gt;
+
+  &lt;footer class="unify-footer"&gt;
+    &lt;p&gt;&amp;copy; 2024 My First Site. Built with unify.&lt;/p&gt;
+  &lt;/footer&gt;
+&lt;/body&gt;
+&lt;/html&gt;</pre>
+                    </div>
+
+                    <div class="callout callout-warning">
+                        <div class="callout-title">🔍 Key Concept: data-unify-docs</div>
+                        <p>The <code>&lt;style data-unify-docs="v1"&gt;</code> block documents the public areas this layout exposes. This is removed during build but helps page authors understand what areas they can target.</p>
+                    </div>
+
+                    <h2>Step 3: Create Basic CSS</h2>
+
+                    <p>Add some basic styling to make your site look good:</p>
+
+                    <div class="code-block">
+                        <div class="language-label">css</div>
+                        <pre># src/assets/css/style.css
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.6;
+  color: #333;
+  background: #f9f9f9;
+}
+
+header {
+  background: #2c3e50;
+  color: white;
+  padding: 1rem 0;
+}
+
+header h1 {
+  display: inline-block;
+  margin-left: 2rem;
+}
+
+nav {
+  display: inline-block;
+  float: right;
+  margin-right: 2rem;
+}
+
+nav a {
+  color: white;
+  text-decoration: none;
+  margin-left: 1rem;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  transition: background 0.3s;
+}
+
+nav a:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+main {
+  max-width: 800px;
+  margin: 2rem auto;
+  padding: 0 2rem;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  padding: 2rem;
+}
+
+aside {
+  max-width: 800px;
+  margin: 1rem auto;
+  padding: 0 2rem;
+}
+
+footer {
+  text-align: center;
+  padding: 2rem;
+  color: #666;
+  border-top: 1px solid #eee;
+  margin-top: 2rem;
+}</pre>
+                    </div>
+
+                    <h2>Step 4: Create Your Homepage</h2>
+
+                    <p>Now create your first page that uses the layout. This demonstrates DOM Cascade area targeting:</p>
+
+                    <div class="code-block">
+                        <div class="language-label">html</div>
+                        <pre># src/index.html
+&lt;head&gt;
+  &lt;title&gt;Home - My First Site&lt;/title&gt;
+  &lt;meta name="description" content="Welcome to my first unify static site"&gt;
+&lt;/head&gt;
+
+&lt;body data-unify="/_includes/_layout.html"&gt;
+  &lt;!-- Target the unify-content area --&gt;
+  &lt;main class="unify-content"&gt;
+    &lt;h1&gt;Welcome to My First Site!&lt;/h1&gt;
+    &lt;p&gt;This is my homepage built with unify. The content you're reading now replaces the default content from the layout because it targets the &lt;code&gt;.unify-content&lt;/code&gt; area.&lt;/p&gt;
+    
+    &lt;h2&gt;What is DOM Cascade?&lt;/h2&gt;
+    &lt;p&gt;DOM Cascade is unify's composition system. Pages target specific areas in layouts using CSS classes. The layout defines areas like &lt;code&gt;.unify-header&lt;/code&gt; and &lt;code&gt;.unify-content&lt;/code&gt;, and pages provide content for those areas.&lt;/p&gt;
+    
+    &lt;h2&gt;Features&lt;/h2&gt;
+    &lt;ul&gt;
+      &lt;li&gt;✨ Zero JavaScript frameworks required&lt;/li&gt;
+      &lt;li&gt;🚀 Fast builds with Bun&lt;/li&gt;
+      &lt;li&gt;🔄 Live development server&lt;/li&gt;
+      &lt;li&gt;📱 Works everywhere - pure HTML/CSS output&lt;/li&gt;
+    &lt;/ul&gt;
+  &lt;/main&gt;
+
+  &lt;!-- Target the unify-sidebar area --&gt;
+  &lt;aside class="unify-sidebar"&gt;
+    &lt;h3&gt;Quick Links&lt;/h3&gt;
+    &lt;ul&gt;
+      &lt;li&gt;&lt;a href="/about.html"&gt;About This Site&lt;/a&gt;&lt;/li&gt;
+      &lt;li&gt;&lt;a href="/contact.html"&gt;Get in Touch&lt;/a&gt;&lt;/li&gt;
+    &lt;/ul&gt;
+    
+    &lt;h3&gt;Latest News&lt;/h3&gt;
+    &lt;p&gt;🎉 Site launched with unify!&lt;/p&gt;
+  &lt;/aside&gt;
+&lt;/body&gt;</pre>
+                    </div>
+
+                    <div class="callout callout-success">
+                        <div class="callout-title">🎯 DOM Cascade in Action</div>
+                        <p>Notice how the page provides content for <code>.unify-content</code> and <code>.unify-sidebar</code> but not <code>.unify-header</code> or <code>.unify-footer</code>. Those areas will use the default content from the layout.</p>
+                    </div>
+
+                    <h2>Step 5: Add More Pages</h2>
+
+                    <p>Create an about page to demonstrate consistent layout usage:</p>
+
+                    <div class="code-block">
+                        <div class="language-label">html</div>
+                        <pre># src/about.html
+&lt;head&gt;
+  &lt;title&gt;About - My First Site&lt;/title&gt;
+  &lt;meta name="description" content="Learn about this unify-powered website"&gt;
+&lt;/head&gt;
+
+&lt;body data-unify="/_includes/_layout.html"&gt;
+  &lt;main class="unify-content"&gt;
+    &lt;h1&gt;About This Site&lt;/h1&gt;
+    &lt;p&gt;This website is built with &lt;strong&gt;unify&lt;/strong&gt;, a modern static site generator that uses DOM Cascade for composition.&lt;/p&gt;
+    
+    &lt;h2&gt;Why unify?&lt;/h2&gt;
+    &lt;p&gt;I chose unify because:&lt;/p&gt;
+    &lt;ul&gt;
+      &lt;li&gt;No complex templating languages to learn&lt;/li&gt;
+      &lt;li&gt;Standard HTML and CSS&lt;/li&gt;
+      &lt;li&gt;Fast builds with Bun&lt;/li&gt;
+      &lt;li&gt;Predictable composition behavior&lt;/li&gt;
+    &lt;/ul&gt;
+    
+    &lt;h2&gt;Technical Details&lt;/h2&gt;
+    &lt;p&gt;This site uses:&lt;/p&gt;
+    &lt;ul&gt;
+      &lt;li&gt;DOM Cascade for layout composition&lt;/li&gt;
+      &lt;li&gt;Public areas with &lt;code&gt;.unify-*&lt;/code&gt; classes&lt;/li&gt;
+      &lt;li&gt;Head merging for metadata&lt;/li&gt;
+      &lt;li&gt;Automatic asset copying&lt;/li&gt;
+    &lt;/ul&gt;
+  &lt;/main&gt;
+&lt;/body&gt;</pre>
+                    </div>
+
+                    <h2>Step 6: Build Your Site</h2>
+
+                    <p>Now build your site and see the DOM Cascade in action:</p>
+
+                    <div class="code-block">
+                        <div class="language-label">bash</div>
+                        <pre># Build the site
+unify build --source src --output dist
+
+# Expected output:
+# ✅ Build completed successfully!
+# 📁 2 files processed
+# 📦 1 assets copied</pre>
+                    </div>
+
+                    <p>Check the generated files:</p>
+
+                    <div class="code-block">
+                        <div class="language-label">bash</div>
+                        <pre># View the generated homepage
+cat dist/index.html
+
+# Notice how:
+# - Layout and page head elements are merged
+# - Page content replaced layout's default .unify-content
+# - Layout's .unify-header and .unify-footer are preserved
+# - data-unify attributes are removed</pre>
+                    </div>
+
+                    <h2>Step 7: Development Server</h2>
+
+                    <p>Start the development server for live editing:</p>
+
+                    <div class="code-block">
+                        <div class="language-label">bash</div>
+                        <pre># Start development server
+unify serve --source src --port 3000
+
+# Output:
+# 🚀 Server running at http://localhost:3000
+# 👀 Watching for changes...</pre>
+                    </div>
+
+                    <p>Open <code>http://localhost:3000</code> in your browser. Try editing the homepage content and watch it reload automatically!</p>
+
+                    <h2>Step 8: Create a Component</h2>
+
+                    <p>Let's add a reusable component to demonstrate component composition:</p>
+
+                    <div class="code-block">
+                        <div class="language-label">html</div>
+                        <pre># src/_includes/card.html
+&lt;div class="card"&gt;
+  &lt;style data-unify-docs="v1"&gt;
+    /* This component exposes these areas */
+    .unify-card-header { /* Card header area */ }
+    .unify-card-content { /* Card content area */ }
+  &lt;/style&gt;
+  
+  &lt;div class="unify-card-header"&gt;
+    &lt;h3&gt;Default Card Title&lt;/h3&gt;
+  &lt;/div&gt;
+  
+  &lt;div class="unify-card-content"&gt;
+    &lt;p&gt;Default card content&lt;/p&gt;
+  &lt;/div&gt;
+&lt;/div&gt;</pre>
+                    </div>
+
+                    <p>Add CSS for the card:</p>
+
+                    <div class="code-block">
+                        <div class="language-label">css</div>
+                        <pre># Add to src/assets/css/style.css
+.card {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+  background: white;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.card h3 {
+  color: #2c3e50;
+  margin-bottom: 0.5rem;
+}</pre>
+                    </div>
+
+                    <p>Use the component in your homepage:</p>
+
+                    <div class="code-block">
+                        <div class="language-label">html</div>
+                        <pre># Add to src/index.html (inside .unify-content)
+&lt;h2&gt;Featured Content&lt;/h2&gt;
+
+&lt;div data-unify="/_includes/card.html"&gt;
+  &lt;div class="unify-card-header"&gt;
+    &lt;h3&gt;🚀 Getting Started Guide&lt;/h3&gt;
+  &lt;/div&gt;
+  &lt;div class="unify-card-content"&gt;
+    &lt;p&gt;Learn how to build static sites with unify's DOM Cascade system. Perfect for beginners!&lt;/p&gt;
+    &lt;a href="/about.html"&gt;Read More →&lt;/a&gt;
+  &lt;/div&gt;
+&lt;/div&gt;</pre>
+                    </div>
+
+                    <h2>Step 9: Understanding the Build Output</h2>
+
+                    <p>Let's examine what unify generated to understand DOM Cascade:</p>
+
+                    <div class="code-block">
+                        <div class="language-label">html</div>
+                        <pre># The built index.html will contain:
+
+&lt;!DOCTYPE html&gt;
+&lt;html lang="en"&gt;
+&lt;head&gt;
+  &lt;!-- Head merge: layout + page head combined --&gt;
+  &lt;meta charset="UTF-8"&gt;
+  &lt;meta name="viewport" content="width=device-width, initial-scale=1.0"&gt;
+  &lt;title&gt;Home - My First Site&lt;/title&gt; &lt;!-- Page wins --&gt;
+  &lt;meta name="description" content="Welcome to my first unify static site"&gt;
+  &lt;link rel="stylesheet" href="/assets/css/style.css"&gt;
+  &lt;!-- data-unify-docs blocks removed --&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;!-- Layout header preserved (page didn't target it) --&gt;
+  &lt;header class="unify-header"&gt;
+    &lt;h1&gt;My Site&lt;/h1&gt;
+    &lt;nav&gt;...&lt;/nav&gt;
+  &lt;/header&gt;
+
+  &lt;!-- Page content replaced layout default --&gt;
+  &lt;main class="unify-content"&gt;
+    &lt;h1&gt;Welcome to My First Site!&lt;/h1&gt;
+    &lt;!-- Page content here --&gt;
+    
+    &lt;!-- Component inlined and composed --&gt;
+    &lt;div class="card"&gt;
+      &lt;div class="unify-card-header"&gt;
+        &lt;h3&gt;🚀 Getting Started Guide&lt;/h3&gt;
+      &lt;/div&gt;
+      &lt;div class="unify-card-content"&gt;
+        &lt;p&gt;Learn how to build...&lt;/p&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/main&gt;
+
+  &lt;!-- Page sidebar replaced layout default --&gt;
+  &lt;aside class="unify-sidebar"&gt;
+    &lt;h3&gt;Quick Links&lt;/h3&gt;
+    &lt;!-- Page sidebar content --&gt;
+  &lt;/aside&gt;
+
+  &lt;!-- Layout footer preserved (page didn't target it) --&gt;
+  &lt;footer class="unify-footer"&gt;
+    &lt;p&gt;&copy; 2024 My First Site. Built with unify.&lt;/p&gt;
+  &lt;/footer&gt;
+&lt;/body&gt;
+&lt;/html&gt;</pre>
+                    </div>
+
+                    <h2>Congratulations! 🎉</h2>
+
+                    <p>You've successfully created your first unify static site and learned the core concepts:</p>
+
+                    <div class="callout callout-success">
+                        <div class="callout-title">✅ What You've Learned</div>
+                        <ul>
+                            <li><strong>DOM Cascade</strong>: How layouts expose areas and pages target them</li>
+                            <li><strong>Public Areas</strong>: Using <code>.unify-*</code> classes for composition</li>
+                            <li><strong>Documentation</strong>: <code>data-unify-docs</code> blocks for area contracts</li>
+                            <li><strong>Head Merging</strong>: How layout and page metadata combine</li>
+                            <li><strong>Components</strong>: Reusable fragments with their own areas</li>
+                            <li><strong>Development Workflow</strong>: Build and serve commands</li>
+                        </ul>
+                    </div>
+
+                    <h2>Next Steps</h2>
+
+                    <div class="quick-links">
+                        <a href="/unify/docs/components" class="quick-link">
+                            <span class="quick-link-icon">🧩</span>
+                            <div class="quick-link-content">
+                                <h4>Learn Components</h4>
+                                <p>Deep dive into creating reusable components</p>
+                            </div>
+                        </a>
+                        <a href="/unify/docs/markdown" class="quick-link">
+                            <span class="quick-link-icon">📝</span>
+                            <div class="quick-link-content">
+                                <h4>Add Markdown</h4>
+                                <p>Learn about Markdown support and frontmatter</p>
+                            </div>
+                        </a>
+                        <a href="/unify/docs/deployment" class="quick-link">
+                            <span class="quick-link-icon">🚀</span>
+                            <div class="quick-link-content">
+                                <h4>Deploy Your Site</h4>
+                                <p>Get your site live on the web</p>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

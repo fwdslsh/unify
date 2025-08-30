@@ -1,0 +1,900 @@
+<html data-unify="tool-page">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>unify Examples - Real-World Static Site Generation</title>
+    <meta name="description"
+        content="Real-world examples and patterns for using unify to build static sites. DOM Cascade patterns, layout composition, and build workflows.">
+    <meta name="keywords" content="unify, examples, static site generator, DOM Cascade, fwdslsh">
+    <meta property="og:title" content="unify Examples - Real-World Static Site Generation">
+    <meta property="og:description"
+        content="Real-world examples and patterns for using unify to build static sites. DOM Cascade patterns, layout composition, and build workflows.">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="unify Examples - Real-World Static Site Generation">
+    <meta name="twitter:description"
+        content="Real-world examples and patterns for using unify to build static sites. DOM Cascade patterns, layout composition, and build workflows.">
+    <style>
+        /* Page-specific styles for unify examples */
+        .example-tabs {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            margin-top: 2rem;
+        }
+
+        .tab-buttons {
+            display: flex;
+            background: var(--bg-darker);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .tab-button {
+            flex: 1;
+            padding: 1rem;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .tab-button.active {
+            color: var(--primary);
+            background: var(--bg-card);
+        }
+
+        .tab-content {
+            padding: 2rem;
+        }
+
+        .tab-panel {
+            display: none;
+        }
+
+        .tab-panel.active {
+            display: block;
+        }
+
+        .example-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .example-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .example-icon {
+            font-size: 1.5rem;
+        }
+
+        .difficulty-badge {
+            background: var(--gradient-primary);
+            color: var(--bg-dark);
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-left: auto;
+        }
+
+        .difficulty-badge.intermediate {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        }
+
+        .difficulty-badge.advanced {
+            background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+        }
+
+        .workflow-steps {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 2rem 0;
+            position: relative;
+        }
+
+        .workflow-step {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            text-align: center;
+            position: relative;
+        }
+
+        .workflow-step::after {
+            content: '→';
+            position: absolute;
+            right: -1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--primary);
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        .workflow-step:last-child::after {
+            display: none;
+        }
+
+        .step-icon {
+            width: 40px;
+            height: 40px;
+            margin: 0 auto 1rem;
+            background: var(--gradient-primary);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-mono);
+            font-weight: bold;
+            color: var(--bg-dark);
+            font-size: 1rem;
+        }
+
+        .file-structure {
+            background: var(--bg-darker);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin: 1rem 0;
+        }
+
+        .file-structure .folder {
+            color: var(--primary);
+            font-weight: bold;
+        }
+
+        .file-structure .file {
+            color: var(--text-primary);
+        }
+
+        .file-structure .fragment {
+            color: #f59e0b;
+        }
+
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 2rem;
+            align-items: center;
+            margin: 2rem 0;
+        }
+
+        .comparison-side h4 {
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+        }
+
+        .comparison-arrow {
+            color: var(--primary);
+            font-size: 2rem;
+            font-weight: bold;
+        }
+
+        .dom-cascade-demo {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+
+        .dom-step {
+            margin: 1.5rem 0;
+            padding: 1rem;
+            background: var(--bg-darker);
+            border-radius: 8px;
+            border-left: 4px solid var(--primary);
+        }
+
+        .dom-step h5 {
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .command-showcase {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .command-demo {
+            background: var(--bg-darker);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .command-demo-header {
+            background: var(--border);
+            padding: 0.5rem 1rem;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .command-demo-content {
+            padding: 1.5rem;
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+        }
+
+        .command-line {
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .command-output {
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+            padding-left: 1rem;
+        }
+
+        @media (max-width: 768px) {
+            .tab-buttons {
+                flex-direction: column;
+            }
+
+            .workflow-step::after {
+                content: '↓';
+                right: 50%;
+                top: 100%;
+                transform: translateX(50%);
+                bottom: -1rem;
+            }
+
+            .comparison {
+                grid-template-columns: 1fr;
+            }
+
+            .comparison-arrow {
+                text-align: center;
+                transform: rotate(90deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Tool-specific navigation links -->
+    <ul class="unify-nav-links">
+        <li><a href="/unify/">Overview</a></li>
+        <li><a href="/unify/getting-started.html">Getting Started</a></li>
+        <li><a href="/unify/docs.html">Documentation</a></li>
+        <li><a href="/unify/examples.html" class="active">Examples</a></li>
+    </ul>
+
+    <main class="unify-content">
+        <section class="tool-hero">
+            <div class="tool-hero-content">
+                <h1>unify Examples</h1>
+                <div class="tagline">Real-world patterns for DOM Cascade static site generation</div>
+                <div class="description">Practical examples, proven workflows, and build patterns for creating
+                    maintainable static sites with unify's DOM Cascade system.</div>
+
+                <div class="hero-buttons">
+                    <a href="#basic-examples" class="btn btn-primary">
+                        <span class="btn-icon">🏗️</span>
+                        Build Examples
+                    </a>
+                    <a href="#dom-cascade" class="btn btn-secondary">DOM Cascade Patterns</a>
+                </div>
+            </div>
+        </section>
+
+        <section id="basic-examples" class="tool-section">
+            <div class="section-header">
+                <h2>Basic Build Examples</h2>
+                <p>Essential CLI patterns you'll use every day</p>
+            </div>
+
+            <div class="command-showcase">
+                <div class="command-demo">
+                    <div class="command-demo-header">Simple Build</div>
+                    <div class="command-demo-content">
+                        <div class="command-line">$ unify build</div>
+                        <div class="command-output">✓ Built 12 pages in 245ms</div>
+                        <div class="command-line">$ unify build --source src --output dist</div>
+                        <div class="command-output">✓ Custom paths, built to dist/</div>
+                    </div>
+                </div>
+
+                <div class="command-demo">
+                    <div class="command-demo-header">Development Server</div>
+                    <div class="command-demo-content">
+                        <div class="command-line">$ unify serve</div>
+                        <div class="command-output">🚀 Server running at http://localhost:3000</div>
+                        <div class="command-line">$ unify serve --port 8080</div>
+                        <div class="command-output">🚀 Custom port server started</div>
+                    </div>
+                </div>
+
+                <div class="command-demo">
+                    <div class="command-demo-header">Watch Mode</div>
+                    <div class="command-demo-content">
+                        <div class="command-line">$ unify watch</div>
+                        <div class="command-output">👀 Watching for changes...</div>
+                        <div class="command-line">$ unify watch --verbose</div>
+                        <div class="command-output">👀 Verbose rebuild logging enabled</div>
+                    </div>
+                </div>
+
+                <div class="command-demo">
+                    <div class="command-demo-header">Clean Builds</div>
+                    <div class="command-demo-content">
+                        <div class="command-line">$ unify build --clean</div>
+                        <div class="command-output">🧹 Cleaned output, rebuilt from scratch</div>
+                        <div class="command-line">$ unify build --clean --minify</div>
+                        <div class="command-output">📦 Minified HTML output</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="project-structures" class="tool-section alt-bg">
+            <div class="section-header">
+                <h2>Project Structure Examples</h2>
+                <p>Proven patterns for organizing unify projects</p>
+            </div>
+
+            <div class="example-tabs">
+                <div class="tab-buttons">
+                    <button class="tab-button active" data-tab="simple-blog">Simple Blog</button>
+                    <button class="tab-button" data-tab="documentation">Documentation Site</button>
+                    <button class="tab-button" data-tab="marketing">Marketing Site</button>
+                </div>
+
+                <div class="tab-content">
+                    <div class="tab-panel active" data-tab="simple-blog">
+                        <div class="example-card">
+                            <div class="example-header">
+                                <span class="example-icon">📝</span>
+                                <h3>Simple Blog Structure</h3>
+                                <span class="difficulty-badge">Beginner</span>
+                            </div>
+                            <p>Perfect for personal blogs and content sites with minimal complexity.</p>
+
+                            <div class="file-structure">
+                                <pre><span class="folder">blog/</span>
+├── <span class="folder">src/</span>
+│   ├── <span class="file">index.html</span>                 <span class="comment"># Homepage</span>
+│   ├── <span class="file">about.html</span>                <span class="comment"># About page</span>
+│   ├── <span class="folder">posts/</span>
+│   │   ├── <span class="file">first-post.html</span>
+│   │   └── <span class="file">second-post.html</span>
+│   ├── <span class="folder">_includes/</span>
+│   │   ├── <span class="fragment">_layout.html</span>       <span class="comment"># Main layout</span>
+│   │   ├── <span class="fragment">_header.html</span>       <span class="comment"># Site header</span>
+│   │   └── <span class="fragment">_footer.html</span>       <span class="comment"># Site footer</span>
+│   └── <span class="folder">assets/</span>
+│       ├── <span class="file">styles.css</span>
+│       └── <span class="file">script.js</span>
+└── <span class="folder">dist/</span>                       <span class="comment"># Built output</span></pre>
+                            </div>
+
+                            <div class="code-block">
+                                <pre><code># Build the blog
+unify build --source src --output dist
+
+# Serve during development  
+unify serve --source src --port 3000</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tab-panel" data-tab="documentation">
+                        <div class="example-card">
+                            <div class="example-header">
+                                <span class="example-icon">📚</span>
+                                <h3>Documentation Site</h3>
+                                <span class="difficulty-badge intermediate">Intermediate</span>
+                            </div>
+                            <p>Multi-section documentation with navigation and search.</p>
+
+                            <div class="file-structure">
+                                <pre><span class="folder">docs/</span>
+├── <span class="folder">src/</span>
+│   ├── <span class="file">index.html</span>
+│   ├── <span class="folder">guide/</span>
+│   │   ├── <span class="file">index.html</span>
+│   │   ├── <span class="file">installation.html</span>
+│   │   └── <span class="file">configuration.html</span>
+│   ├── <span class="folder">api/</span>
+│   │   ├── <span class="file">index.html</span>
+│   │   └── <span class="file">reference.html</span>
+│   ├── <span class="folder">_includes/</span>
+│   │   ├── <span class="fragment">_docs-layout.html</span>   <span class="comment"># Docs layout</span>
+│   │   ├── <span class="fragment">_nav.html</span>           <span class="comment"># Navigation</span>
+│   │   └── <span class="fragment">_sidebar.html</span>       <span class="comment"># Sidebar nav</span>
+│   └── <span class="folder">assets/</span>
+│       ├── <span class="file">docs.css</span>
+│       └── <span class="file">search.js</span>
+└── <span class="file">unify.config.yaml</span>           <span class="comment"># Configuration</span></pre>
+                            </div>
+
+                            <div class="code-block">
+                                <pre><code># Configuration in unify.config.yaml
+source: src
+output: dist
+pretty-urls: true
+clean: true
+
+# Build with pretty URLs
+unify build --pretty-urls
+
+# Watch mode for development
+unify watch --verbose</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tab-panel" data-tab="marketing">
+                        <div class="example-card">
+                            <div class="example-header">
+                                <span class="example-icon">🚀</span>
+                                <h3>Marketing Site</h3>
+                                <span class="difficulty-badge advanced">Advanced</span>
+                            </div>
+                            <p>High-performance marketing site with landing pages and forms.</p>
+
+                            <div class="file-structure">
+                                <pre><span class="folder">marketing/</span>
+├── <span class="folder">src/</span>
+│   ├── <span class="file">index.html</span>                 <span class="comment"># Homepage</span>
+│   ├── <span class="file">pricing.html</span>              <span class="comment"># Pricing page</span>
+│   ├── <span class="folder">landing/</span>
+│   │   ├── <span class="file">product-a.html</span>
+│   │   └── <span class="file">product-b.html</span>
+│   ├── <span class="folder">_includes/</span>
+│   │   ├── <span class="fragment">_base-layout.html</span>  <span class="comment"># Base layout</span>
+│   │   ├── <span class="fragment">_landing-layout.html</span> <span class="comment"># Landing layout</span>
+│   │   ├── <span class="fragment">_hero.html</span>         <span class="comment"># Hero component</span>
+│   │   ├── <span class="fragment">_pricing-table.html</span> <span class="comment"># Pricing component</span>
+│   │   └── <span class="fragment">_cta.html</span>          <span class="comment"># Call-to-action</span>
+│   └── <span class="folder">assets/</span>
+│       ├── <span class="file">marketing.css</span>
+│       ├── <span class="file">analytics.js</span>
+│       └── <span class="folder">images/</span>
+└── <span class="folder">dist/</span></pre>
+                            </div>
+
+                            <div class="code-block">
+                                <pre><code># Production build with optimization
+unify build --clean --minify --pretty-urls
+
+# Generate sitemap for SEO
+unify build --sitemap
+
+# Development with custom port
+unify serve --port 8080 --host 0.0.0.0</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="dom-cascade" class="tool-section">
+            <div class="section-header">
+                <h2>DOM Cascade Examples</h2>
+                <p>Understanding unify's unique composition system</p>
+            </div>
+
+            <div class="dom-cascade-demo">
+                <h3>🎯 Basic Layout Composition</h3>
+                <p>See how pages merge with layouts using the DOM Cascade system.</p>
+
+                <div class="comparison">
+                    <div class="comparison-side">
+                        <h4>Layout (_layout.html)</h4>
+                        <div class="code-block">
+                            <pre><code>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+    &lt;title&gt;My Site&lt;/title&gt;
+    &lt;link rel="stylesheet" href="styles.css"&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;header class="unify-header"&gt;
+        &lt;h1&gt;Default Title&lt;/h1&gt;
+    &lt;/header&gt;
+    
+    &lt;main class="unify-content"&gt;
+        &lt;p&gt;Default content&lt;/p&gt;
+    &lt;/main&gt;
+    
+    &lt;footer class="unify-footer"&gt;
+        &lt;p&gt;&copy; 2024&lt;/p&gt;
+    &lt;/footer&gt;
+&lt;/body&gt;
+&lt;/html&gt;</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="comparison-arrow">+</div>
+
+                    <div class="comparison-side">
+                        <h4>Page (about.html)</h4>
+                        <div class="code-block">
+                            <pre><code>&lt;body data-unify="_layout.html"&gt;
+    &lt;header class="unify-header"&gt;
+        &lt;h1&gt;About Us&lt;/h1&gt;
+        &lt;nav&gt;
+            &lt;a href="/"&gt;Home&lt;/a&gt;
+            &lt;a href="/about"&gt;About&lt;/a&gt;
+        &lt;/nav&gt;
+    &lt;/header&gt;
+    
+    &lt;main class="unify-content"&gt;
+        &lt;h2&gt;Our Story&lt;/h2&gt;
+        &lt;p&gt;We started this company...&lt;/p&gt;
+    &lt;/main&gt;
+&lt;/body&gt;</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="comparison-arrow" style="text-align: center; margin: 2rem 0;">↓</div>
+
+                <div style="text-align: center;">
+                    <h4>Final Result</h4>
+                    <div class="code-block">
+                        <pre><code>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+    &lt;title&gt;My Site&lt;/title&gt;
+    &lt;link rel="stylesheet" href="styles.css"&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;header class="unify-header"&gt;
+        &lt;h1&gt;About Us&lt;/h1&gt;
+        &lt;nav&gt;
+            &lt;a href="/"&gt;Home&lt;/a&gt;
+            &lt;a href="/about"&gt;About&lt;/a&gt;
+        &lt;/nav&gt;
+    &lt;/header&gt;
+    
+    &lt;main class="unify-content"&gt;
+        &lt;h2&gt;Our Story&lt;/h2&gt;
+        &lt;p&gt;We started this company...&lt;/p&gt;
+    &lt;/main&gt;
+    
+    &lt;footer class="unify-footer"&gt;
+        &lt;p&gt;&copy; 2024&lt;/p&gt;
+    &lt;/footer&gt;
+&lt;/body&gt;
+&lt;/html&gt;</code></pre>
+                    </div>
+                </div>
+
+                <div class="dom-step">
+                    <h5>What Happened?</h5>
+                    <p>The DOM Cascade matched elements by class: <code>.unify-header</code> content was replaced,
+                        <code>.unify-content</code> was replaced, but <code>.unify-footer</code> kept its layout default
+                        since the page didn't provide it.</p>
+                </div>
+            </div>
+
+            <div class="dom-cascade-demo">
+                <h3>🔗 Component Imports</h3>
+                <p>Using data-unify on elements to import reusable components.</p>
+
+                <div class="comparison">
+                    <div class="comparison-side">
+                        <h4>Component (_hero.html)</h4>
+                        <div class="code-block">
+                            <pre><code>&lt;section class="hero"&gt;
+    &lt;div class="unify-hero-content"&gt;
+        &lt;h2&gt;Default Hero&lt;/h2&gt;
+        &lt;p&gt;Default description&lt;/p&gt;
+    &lt;/div&gt;
+    &lt;div class="unify-hero-image"&gt;
+        &lt;img src="default.jpg" alt="Hero"&gt;
+    &lt;/div&gt;
+&lt;/section&gt;</code></pre>
+                        </div>
+                    </div>
+
+                    <div class="comparison-arrow">+</div>
+
+                    <div class="comparison-side">
+                        <h4>Page Usage</h4>
+                        <div class="code-block">
+                            <pre><code>&lt;section data-unify="_hero.html"&gt;
+    &lt;div class="unify-hero-content"&gt;
+        &lt;h2&gt;Welcome to Our Product&lt;/h2&gt;
+        &lt;p&gt;Revolutionary new features&lt;/p&gt;
+        &lt;a href="/signup" class="btn"&gt;Get Started&lt;/a&gt;
+    &lt;/div&gt;
+&lt;/section&gt;</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dom-step">
+                    <h5>Result</h5>
+                    <p>The hero component's <code>.unify-hero-content</code> gets replaced with the page content, but
+                        <code>.unify-hero-image</code> stays from the component since the page didn't provide it.</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="advanced-patterns" class="tool-section alt-bg">
+            <div class="section-header">
+                <h2>Advanced Build Patterns</h2>
+                <p>Complex workflows for production sites</p>
+            </div>
+
+            <div class="example-card">
+                <div class="example-header">
+                    <span class="example-icon">⚙️</span>
+                    <h3>Multi-Environment Builds</h3>
+                    <span class="difficulty-badge advanced">Advanced</span>
+                </div>
+
+                <p>Different build configurations for development, staging, and production environments.</p>
+
+                <div class="workflow-steps">
+                    <div class="workflow-step">
+                        <div class="step-icon">🏗️</div>
+                        <div class="step-content">
+                            <h4>Development</h4>
+                            <div class="code-block">
+                                <pre><code># Fast rebuilds, verbose output
+unify watch --verbose
+# OR
+unify serve --port 3000</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="workflow-step">
+                        <div class="step-icon">🧪</div>
+                        <div class="step-content">
+                            <h4>Staging</h4>
+                            <div class="code-block">
+                                <pre><code># Clean build with pretty URLs
+unify build --clean --pretty-urls
+# Test the output
+unify serve --source dist</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="workflow-step">
+                        <div class="step-icon">🚀</div>
+                        <div class="step-content">
+                            <h4>Production</h4>
+                            <div class="code-block">
+                                <pre><code># Optimized production build
+unify build --clean --minify --pretty-urls
+# Generate files for CDN/hosting</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="example-card">
+                <div class="example-header">
+                    <span class="example-icon">🔄</span>
+                    <h3>CI/CD Integration</h3>
+                    <span class="difficulty-badge intermediate">Intermediate</span>
+                </div>
+
+                <p>Automated builds and deployments with GitHub Actions or other CI systems.</p>
+
+                <div class="code-block">
+                    <pre><code># GitHub Actions example (.github/workflows/build.yml)
+name: Build and Deploy
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        
+      - name: Install unify
+        run: bun install -g @fwdslsh/unify
+        
+      - name: Build site
+        run: unify build --clean --minify --pretty-urls
+        
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist</code></pre>
+                </div>
+            </div>
+
+            <div class="example-card">
+                <div class="example-header">
+                    <span class="example-icon">📊</span>
+                    <h3>Performance Optimization</h3>
+                    <span class="difficulty-badge advanced">Advanced</span>
+                </div>
+
+                <p>Techniques for building fast, optimized static sites.</p>
+
+                <div class="command-showcase">
+                    <div class="command-demo">
+                        <div class="command-demo-header">HTML Minification</div>
+                        <div class="command-demo-content">
+                            <div class="command-line">$ unify build --minify</div>
+                            <div class="command-output">📦 HTML minified, 23% size reduction</div>
+                        </div>
+                    </div>
+
+                    <div class="command-demo">
+                        <div class="command-demo-header">Pretty URLs</div>
+                        <div class="command-demo-content">
+                            <div class="command-line">$ unify build --pretty-urls</div>
+                            <div class="command-output">🔗 about.html → about/index.html</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="code-block">
+                    <pre><code># Comprehensive production build
+unify build \
+  --source src \
+  --output dist \
+  --clean \
+  --minify \
+  --pretty-urls \
+  --verbose
+
+# Serve optimized build locally for testing  
+unify serve --source dist --port 8080</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <section id="troubleshooting" class="tool-section">
+            <div class="section-header">
+                <h2>Common Patterns & Troubleshooting</h2>
+                <p>Solutions for frequently encountered scenarios</p>
+            </div>
+
+            <div class="example-card">
+                <h3>🐛 Debugging Build Issues</h3>
+                <div class="code-block">
+                    <pre><code># Get detailed build information
+unify build --verbose
+
+# Check which files are being processed
+unify build --verbose | grep "Processing:"
+
+# Validate your DOM Cascade setup
+unify build --fail-on error</code></pre>
+                </div>
+            </div>
+
+            <div class="example-card">
+                <h3>🔍 Development Workflow</h3>
+                <div class="code-block">
+                    <pre><code># Start development server with hot reload
+unify serve --port 3000
+
+# In another terminal, watch for changes
+unify watch --verbose
+
+# Or combine both (watch + serve)
+unify serve --watch</code></pre>
+                </div>
+            </div>
+
+            <div class="example-card">
+                <h3>📁 Asset Management</h3>
+                <div class="code-block">
+                    <pre><code># Assets are automatically copied from source to output
+# Reference them relatively in your HTML:
+&lt;link rel="stylesheet" href="/assets/styles.css"&gt;
+&lt;img src="images/logo.png" alt="Logo"&gt;
+
+# unify automatically handles:
+# - CSS url() references  
+# - Image src attributes
+# - Script src attributes
+# - Link href attributes (for assets)</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <section id="next-steps" class="tool-section alt-bg">
+            <div class="section-header">
+                <h2>Continue Learning</h2>
+                <p>Dive deeper into unify capabilities</p>
+            </div>
+
+            <div class="next-steps-grid">
+                <a href="/unify/docs" class="next-step-card">
+                    <div class="card-icon">📚</div>
+                    <h3>Complete Documentation</h3>
+                    <p>Master all unify features with comprehensive CLI reference and DOM Cascade guide</p>
+                    <span class="card-arrow">→</span>
+                </a>
+
+                <a href="/unify/getting-started" class="next-step-card">
+                    <div class="card-icon">🚀</div>
+                    <h3>Getting Started Guide</h3>
+                    <p>Step-by-step installation and first site setup tutorial</p>
+                    <span class="card-arrow">→</span>
+                </a>
+
+                <a href="https://github.com/fwdslsh/unify" class="next-step-card">
+                    <div class="card-icon">📂</div>
+                    <h3>Source Code</h3>
+                    <p>View source code, contribute improvements, or report issues on GitHub</p>
+                    <span class="card-arrow">→</span>
+                </a>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        // Tab functionality for examples
+        document.querySelectorAll('.tab-button').forEach(button => {
+            button.addEventListener('click', () => {
+                const tabName = button.dataset.tab;
+
+                // Update active tab button
+                document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+
+                // Update active tab panel
+                document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
+                document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+            });
+        });
+
+        // Copy code blocks to clipboard on click
+        document.querySelectorAll('.code-block pre').forEach(pre => {
+            pre.style.cursor = 'pointer';
+            pre.title = 'Click to copy code';
+
+            pre.addEventListener('click', function () {
+                const code = this.textContent;
+                navigator.clipboard.writeText(code).then(() => {
+                    // Visual feedback
+                    const original = this.style.background;
+                    this.style.background = 'rgba(0, 255, 65, 0.2)';
+                    setTimeout(() => {
+                        this.style.background = original;
+                    }, 200);
+                }).catch(err => {
+                    console.log('Copy failed:', err);
+                });
+            });
+        });
+    </script>
+
+</body>
+
+</html>

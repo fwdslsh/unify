@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>catalog Documentation - Complete Reference Guide</title>
+    <meta name="description" content="Complete documentation for catalog - the AI-ready documentation indexer. CLI reference, llms.txt standard compliance, and enterprise features.">
+    <meta name="keywords" content="catalog, documentation, llms.txt, CLI reference, fwdslsh">
+    <meta property="og:title" content="catalog Documentation - Complete Reference Guide">
+    <meta property="og:description" content="Complete documentation for catalog - the AI-ready documentation indexer. CLI reference, llms.txt standard compliance, and enterprise features.">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="catalog Documentation - Complete Reference Guide">
+    <meta name="twitter:description" content="Complete documentation for catalog - the AI-ready documentation indexer. CLI reference, llms.txt standard compliance, and enterprise features.">
+</head>
+
+<body data-unify="/_includes/tool-page.html">
+
+<!-- Tool-specific navigation links -->
+<ul class="unify-nav-links">
+    <li><a href="/catalog/">Overview</a></li>
+    <li><a href="/catalog/getting-started.html">Getting Started</a></li>
+    <li><a href="/catalog/docs.html">Documentation</a></li>
+    <li><a href="/catalog/examples.html">Examples</a></li>
+</ul>
+
+<main class="unify-content">
+
+<section class="tool-hero">
+    <div class="tool-hero-content">
+        <h1>catalog Documentation</h1>
+        <div class="tagline">Complete reference guide for AI-ready documentation indexing</div>
+        <div class="description">Master catalog's features for generating llms.txt standard-compliant indexes, SEO-optimized sitemaps, and enterprise-grade documentation processing.</div>
+        
+        <div class="hero-buttons">
+            <a href="#cli-reference" class="btn btn-primary">
+                <span class="btn-icon">📋</span>
+                CLI Reference
+            </a>
+            <a href="#llms-standard" class="btn btn-secondary">llms.txt Standard</a>
+        </div>
+    </div>
+</section>
+
+
+<section id="cli-reference" class="tool-section">
+                <div class="section-header">
+                    <h2>Command Line Reference</h2>
+                    <p>Complete guide to all catalog command-line options and parameters</p>
+                </div>
+
+                <div class="cli-sections">
+                    <div class="cli-section">
+                        <h3>Basic Syntax</h3>
+                        <div class="code-block">
+                            <code>catalog [OPTIONS]</code>
+                        </div>
+                        <p>Generate llms.txt, llms-full.txt, and related files from Markdown/HTML directories.</p>
+                    </div>
+
+                    <div class="cli-section">
+                        <h3>Core Options</h3>
+                        <div class="option-list">
+                            <div class="option-item">
+                                <div class="option-syntax">
+                                    <code>--input, -i &lt;path&gt;</code>
+                                </div>
+                                <div class="option-description">
+                                    <p>Source directory of Markdown/HTML files (default: current directory)</p>
+                                    <div class="option-example">
+                                        <code>catalog --input docs --output build</code>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="option-item">
+                                <div class="option-syntax">
+                                    <code>--output, -o &lt;path&gt;</code>
+                                </div>
+                                <div class="option-description">
+                                    <p>Destination directory for generated files (default: current directory)</p>
+                                    <div class="option-example">
+                                        <code>catalog --input docs --output build</code>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="option-item">
+                                <div class="option-syntax">
+                                    <code>--base-url &lt;url&gt;</code>
+                                </div>
+                                <div class="option-description">
+                                    <p>Base URL for generating absolute links in output files</p>
+                                    <div class="option-example">
+                                        <code>catalog --base-url https://docs.example.com</code>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="option-item">
+                                <div class="option-syntax">
+                                    <code>--silent</code>
+                                </div>
+                                <div class="option-description">
+                                    <p>Suppress non-error output for automation</p>
+                                    <div class="option-example">
+                                        <code>catalog --input docs --output build --silent</code>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="cli-section">
+                        <h3>Content Selection</h3>
+                        <div class="option-list">
+                            <div class="option-item">
+                                <div class="option-syntax">
+                                    <code>--include &lt;pattern&gt;</code>
+                                </div>
+                                <div class="option-description">
+                                    <p>Include files matching glob pattern (can be used multiple times)</p>
+                                    <div class="option-example">
+                                        <code>catalog --include "*.md" --include "guides/*.html"</code>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="option-item">
+                                <div class="option-syntax">
+                                    <code>--exclude &lt;pattern&gt;</code>
+                                </div>
+                                <div class="option-description">
+                                    <p>Exclude files matching glob pattern (can be used multiple times)</p>
+                                    <div class="option-example">
+                                        <code>catalog --exclude "**/*draft*" --exclude "temp/*"</code>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="option-item">
+                                <div class="option-syntax">
+                                    <code>--optional &lt;pattern&gt;</code>
+                                </div>
+                                <div class="option-description">
+                                    <p>Mark files matching glob pattern as optional (can be used multiple times)</p>
+                                    <div class="option-example">
+                                        <code>catalog --optional "drafts/**/*" --optional "**/CHANGELOG.md"</code>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="cli-section">
+                        <h3>Output Generation</h3>
+                        <div class="option-list">
+                            <div class="option-item">
+                                <div class="option-syntax">
+                                    <code>--validate</code>
+                                </div>
+                                <div class="option-description">
+                                    <p>Validate generated llms.txt compliance with standard</p>
+                                    <div class="option-example">
+                                        <code>catalog --input docs --output build --validate</code>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="option-item">
+                                <div class="option-syntax">
+                                    <code>--index</code>
+                                </div>
+                                <div class="option-description">
+                                    <p>Generate index.json files for directory navigation and metadata</p>
+                                    <div class="option-example">
+                                        <code>catalog --input docs --output build --index</code>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="option-item">
+                                <div class="option-syntax">
+                                    <code>--sitemap</code>
+                                </div>
+                                <div class="option-description">
+                                    <p>Generate XML sitemap for search engines (requires --base-url)</p>
+                                    <div class="option-example">
+                                        <code>catalog --sitemap --base-url https://docs.example.com</code>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="option-item">
+                                <div class="option-syntax">
+                                    <code>--sitemap-no-extensions</code>
+                                </div>
+                                <div class="option-description">
+                                    <p>Generate sitemap URLs without file extensions for clean URLs</p>
+                                    <div class="option-example">
+                                        <code>catalog --sitemap --sitemap-no-extensions --base-url https://docs.example.com</code>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="cli-section">
+                        <h3>Complete Example Workflows</h3>
+                        <div class="workflow-examples">
+                            <div class="workflow-card">
+                                <h4>🤖 AI Training Pipeline</h4>
+                                <div class="code-block">
+                                    <code>catalog --input docs --output ai-training \
+  --optional "examples/**/*" \
+  --optional "appendix/**/*" \
+  --validate</code>
+                                </div>
+                                <p>Creates AI-optimized documentation with essential content prioritized and supplementary material marked as optional.</p>
+                            </div>
+
+                            <div class="workflow-card">
+                                <h4>🌐 Documentation Website</h4>
+                                <div class="code-block">
+                                    <code>catalog --input docs --output build \
+  --base-url https://docs.example.com \
+  --sitemap --sitemap-no-extensions \
+  --index --validate</code>
+                                </div>
+                                <p>Complete documentation site preparation with SEO optimization, navigation metadata, and standards compliance.</p>
+                            </div>
+
+                            <div class="workflow-card">
+                                <h4>🔄 CI/CD Integration</h4>
+                                <div class="code-block">
+                                    <code>catalog --input docs --output dist \
+  --validate \
+  --silent</code>
+                                </div>
+                                <p>Automated documentation processing with validation and silent operation for continuous integration pipelines.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+<section id="llms-standard" class="tool-section alt-bg">
+                <div class="section-header">
+                    <h2>llms.txt Standard Compliance</h2>
+                    <p>Understanding the llms.txt format and catalog's enterprise-grade compliance features</p>
+                </div>
+
+                <div class="standard-compliance">
+                    <div class="compliance-section">
+                        <h3>🏆 Complete Standard Implementation</h3>
+                        <p>catalog provides full compliance with the llms.txt standard for AI-ready documentation indexing:</p>
+                        
+                        <div class="compliance-features">
+                            <div class="compliance-feature">
+                                <span class="feature-status">✅</span>
+                                <div class="feature-content">
+                                    <h4>H1 → Blockquote → Sections Format</h4>
+                                    <p>Proper structure with title, description, and organized sections</p>
+                                </div>
+                            </div>
+
+                            <div class="compliance-feature">
+                                <span class="feature-status">✅</span>
+                                <div class="feature-content">
+                                    <h4>Section Hierarchy Validation</h4>
+                                    <p>Ensures correct H2 section organization and ordering</p>
+                                </div>
+                            </div>
+
+                            <div class="compliance-feature">
+                                <span class="feature-status">✅</span>
+                                <div class="feature-content">
+                                    <h4>Markdown Link Syntax Compliance</h4>
+                                    <p>Validates proper link formatting and descriptions</p>
+                                </div>
+                            </div>
+
+                            <div class="compliance-feature">
+                                <span class="feature-status">✅</span>
+                                <div class="feature-content">
+                                    <h4>Intelligent Document Ordering</h4>
+                                    <p>Prioritizes important documentation with smart organization</p>
+                                </div>
+                            </div>
+
+                            <div class="compliance-feature">
+                                <span class="feature-status">✅</span>
+                                <div class="feature-content">
+                                    <h4>Path-Based Section Generation</h4>
+                                    <p>Automatic organization using directory structure</p>
+                                </div>
+                            </div>
+
+                            <div class="compliance-feature">
+                                <span class="feature-status">✅</span>
+                                <div class="feature-content">
+                                    <h4>Optional Content Categorization</h4>
+                                    <p>Separates core and supplementary content appropriately</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="compliance-section">
+                        <h3>📋 Standard Format Structure</h3>
+                        <p>The llms.txt format follows a specific structure that catalog implements perfectly:</p>
+                        
+                        <div class="format-example">
+                            <h4>Required Format Elements</h4>
+                            <div class="code-block">
+                                <code># Project Title
+> Brief project description
+
+## Section Name
+- [file.md](file.md) - Optional file description
+- [another-file.md](another-file.md) - Another description
+
+## Another Section  
+- [section/file.md](section/file.md) - Organized by directory
+- [section/other.md](section/other.md) - Maintains structure
+
+## Optional
+- [drafts/future.md](drafts/future.md) - Supplementary content
+- [archive/old.md](archive/old.md) - Historical documentation</code>
+                            </div>
+                        </div>
+
+                        <div class="format-rules">
+                            <h4>Format Rules</h4>
+                            <ul>
+                                <li><strong>H1 Title:</strong> Single project title at the top</li>
+                                <li><strong>Blockquote Description:</strong> Brief project description following the title</li>
+                                <li><strong>H2 Sections:</strong> Organized content sections with meaningful names</li>
+                                <li><strong>Markdown Links:</strong> Proper link syntax with optional descriptions</li>
+                                <li><strong>Optional Section:</strong> Separate section for supplementary content</li>
+                                <li><strong>Consistent Structure:</strong> Maintains organization and readability</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="compliance-section">
+                        <h3>✅ Validation Features</h3>
+                        <p>catalog includes comprehensive validation to ensure your output meets the standard:</p>
+                        
+                        <div class="validation-features">
+                            <div class="validation-feature">
+                                <h4>Structure Validation</h4>
+                                <div class="code-block">
+                                    <code># Validates proper H1 → blockquote → sections format
+catalog --validate
+
+# Example validation output:
+✅ H1 title found: "Documentation Project"
+✅ Blockquote description found
+✅ Proper section hierarchy (H2 sections)
+✅ Valid Markdown link syntax
+✅ Appropriate content organization</code>
+                                </div>
+                            </div>
+
+                            <div class="validation-feature">
+                                <h4>Link Format Checking</h4>
+                                <div class="code-block">
+                                    <code># Ensures all links use proper Markdown syntax
+❌ Error: Invalid link format found
+   Line 15: [file.md] - Missing parentheses
+   Should be: [file.md](file.md) - Description
+
+✅ Suggestion: Use proper Markdown link syntax</code>
+                                </div>
+                            </div>
+
+                            <div class="validation-feature">
+                                <h4>URL Validation</h4>
+                                <div class="code-block">
+                                    <code># When using --base-url, validates absolute URLs
+catalog --base-url https://docs.example.com --validate
+
+✅ All URLs properly formatted with base URL
+✅ No broken or malformed links detected
+✅ Consistent URL structure maintained</code>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+<section id="file-processing" class="tool-section">
+                <div class="section-header">
+                    <h2>File Processing and Content Extraction</h2>
+                    <p>How catalog intelligently processes different file types and extracts metadata</p>
+                </div>
+
+                <div class="processing-details">
+                    <div class="processing-section">
+                        <h3>📝 Supported File Types</h3>
+                        <div class="file-types">
+                            <div class="file-type">
+                                <div class="file-icon">📄</div>
+                                <div class="file-content">
+                                    <h4>Markdown Files (.md, .mdx)</h4>
+                                    <p>Full support for Markdown with YAML frontmatter extraction and content processing.</p>
+                                    <div class="file-features">
+                                        <span class="feature-tag">YAML Frontmatter</span>
+                                        <span class="feature-tag">Title Extraction</span>
+                                        <span class="feature-tag">Content Processing</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="file-type">
+                                <div class="file-icon">🌐</div>
+                                <div class="file-content">
+                                    <h4>HTML Files (.html)</h4>
+                                    <p>Automatic conversion to Markdown with meta tag extraction and content cleaning.</p>
+                                    <div class="file-features">
+                                        <span class="feature-tag">HTML to Markdown</span>
+                                        <span class="feature-tag">Meta Tag Extraction</span>
+                                        <span class="feature-tag">Content Cleaning</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="processing-section">
+                        <h3>🧠 Intelligent Document Ordering</h3>
+                        <p>catalog uses sophisticated logic to organize documents in a meaningful hierarchy:</p>
+                        
+                        <div class="ordering-priority">
+                            <div class="priority-item">
+                                <div class="priority-number">1</div>
+                                <div class="priority-content">
+                                    <h4>Index/Root Files</h4>
+                                    <p>Prioritizes <code>index.md</code>, <code>readme.md</code>, <code>home.md</code> files</p>
+                                    <div class="priority-details">
+                                        <span>index.md > readme.md > home.md</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="priority-item">
+                                <div class="priority-number">2</div>
+                                <div class="priority-content">
+                                    <h4>Important Documentation</h4>
+                                    <p>Files containing keywords like <code>catalog</code>, <code>tutorial</code>, <code>intro</code>, <code>getting-started</code></p>
+                                    <div class="priority-details">
+                                        <span>Tutorial content gets higher priority</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="priority-item">
+                                <div class="priority-number">3</div>
+                                <div class="priority-content">
+                                    <h4>Path-Based Sections</h4>
+                                    <p>Automatic organization by directory structure (e.g., <code>api/</code>, <code>guides/</code>)</p>
+                                    <div class="priority-details">
+                                        <span>Maintains logical content grouping</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="priority-item">
+                                <div class="priority-number">4</div>
+                                <div class="priority-content">
+                                    <h4>Alphabetical Fallback</h4>
+                                    <p>Within sections, files are sorted alphabetically for consistent organization</p>
+                                    <div class="priority-details">
+                                        <span>Ensures predictable structure</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="processing-section">
+                        <h3>🔍 Metadata Extraction</h3>
+                        <p>catalog automatically extracts metadata from multiple sources:</p>
+                        
+                        <div class="metadata-sources">
+                            <div class="metadata-source">
+                                <h4>📋 YAML Frontmatter</h4>
+                                <div class="code-block">
+                                    <code>---
+title: "Getting Started Guide"
+description: "Complete setup instructions"
+date: 2024-01-15
+author: "Documentation Team"
+---
+
+# Getting Started
+
+Content here...</code>
+                                </div>
+                                <p>Extracts title, description, and other metadata while preserving content structure.</p>
+                            </div>
+
+                            <div class="metadata-source">
+                                <h4>🌐 HTML Meta Tags</h4>
+                                <div class="code-block">
+                                    <code>&lt;head&gt;
+  &lt;title&gt;API Documentation&lt;/title&gt;
+  &lt;meta name="description" content="Complete API reference"&gt;
+  &lt;meta name="author" content="API Team"&gt;
+&lt;/head&gt;</code>
+                                </div>
+                                <p>Processes HTML meta tags for title, description, and SEO information.</p>
+                            </div>
+
+                            <div class="metadata-source">
+                                <h4>📂 Site Metadata Detection</h4>
+                                <div class="code-block">
+                                    <code># Automatically detects from root index files
+# Uses directory name as fallback
+# Extracts site-wide description and title</code>
+                                </div>
+                                <p>Intelligent detection of site-wide metadata from root documentation files.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="processing-section">
+                        <h3>🧹 Content Processing Pipeline</h3>
+                        <p>catalog uses a sophisticated multi-stage processing pipeline:</p>
+                        
+                        <div class="pipeline-stages">
+                            <div class="pipeline-stage">
+                                <div class="stage-icon">📂</div>
+                                <div class="stage-content">
+                                    <h4>Discovery & Scanning</h4>
+                                    <p>Recursive directory traversal with pattern matching and security validation</p>
+                                </div>
+                            </div>
+                            <div class="pipeline-arrow">→</div>
+                            
+                            <div class="pipeline-stage">
+                                <div class="stage-icon">🔍</div>
+                                <div class="stage-content">
+                                    <h4>Content Extraction</h4>
+                                    <p>YAML frontmatter stripping, HTML processing, and metadata extraction</p>
+                                </div>
+                            </div>
+                            <div class="pipeline-arrow">→</div>
+                            
+                            <div class="pipeline-stage">
+                                <div class="stage-icon">📊</div>
+                                <div class="stage-content">
+                                    <h4>Organization</h4>
+                                    <p>Intelligent ordering, section generation, and content categorization</p>
+                                </div>
+                            </div>
+                            <div class="pipeline-arrow">→</div>
+                            
+                            <div class="pipeline-stage">
+                                <div class="stage-icon">📋</div>
+                                <div class="stage-content">
+                                    <h4>Generation</h4>
+                                    <p>Multiple output formats with validation and optimization</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+<section id="output-formats" class="tool-section alt-bg">
+                <div class="section-header">
+                    <h2>Output Formats and Features</h2>
+                    <p>Comprehensive guide to all output formats generated by catalog</p>
+                </div>
+
+                <div class="output-formats">
+                    <div class="format-card">
+                        <div class="format-header">
+                            <span class="format-icon">📋</span>
+                            <h3>llms.txt (Structured Index)</h3>
+                        </div>
+                        <div class="format-description">
+                            <p>Standard-compliant structured index with H1 → blockquote → sections format, perfect for AI context windows with clear organization.</p>
+                        </div>
+                        <div class="format-example">
+                            <div class="code-block">
+                                <code># Documentation Project
+> Complete API and user guide documentation
+
+## Core Documentation
+- [index.md](index.md) - Project overview and introduction
+- [getting-started.md](getting-started.md) - Quick start guide
+
+## API Reference
+- [api/authentication.md](api/authentication.md) - Authentication methods
+- [api/endpoints.md](api/endpoints.md) - API endpoints reference
+
+## Optional
+- [drafts/future-plans.md](drafts/future-plans.md) - Future development plans</code>
+                            </div>
+                        </div>
+                        <div class="format-features">
+                            <span class="feature-tag">Standard Compliant</span>
+                            <span class="feature-tag">AI Optimized</span>
+                            <span class="feature-tag">Hierarchical</span>
+                        </div>
+                    </div>
+
+                    <div class="format-card">
+                        <div class="format-header">
+                            <span class="format-icon">📚</span>
+                            <h3>llms-full.txt (Complete Content)</h3>
+                        </div>
+                        <div class="format-description">
+                            <p>Complete concatenated content with clear separators for comprehensive AI analysis and training data preparation.</p>
+                        </div>
+                        <div class="format-example">
+                            <div class="code-block">
+                                <code># Documentation Project
+> Complete API and user guide documentation
+
+## index.md
+# Welcome to Our Documentation
+[Complete content with frontmatter stripped]
+
+---
+## getting-started.md
+# Getting Started Guide
+[Full content continues...]
+
+---
+[Content continues for all files...]</code>
+                            </div>
+                        </div>
+                        <div class="format-features">
+                            <span class="feature-tag">Full Content</span>
+                            <span class="feature-tag">Training Data</span>
+                            <span class="feature-tag">Separated</span>
+                        </div>
+                    </div>
+
+                    <div class="format-card">
+                        <div class="format-header">
+                            <span class="format-icon">🎯</span>
+                            <h3>llms-ctx.txt (Context-Only)</h3>
+                        </div>
+                        <div class="format-description">
+                            <p>Structured index without optional sections, optimized for AI systems with limited context windows.</p>
+                        </div>
+                        <div class="format-example">
+                            <div class="code-block">
+                                <code># Documentation Project
+> Complete API and user guide documentation
+
+## Core Documentation
+- [index.md](index.md) - Project overview and introduction
+- [getting-started.md](getting-started.md) - Quick start guide
+
+## API Reference
+- [api/authentication.md](api/authentication.md) - Authentication methods
+- [api/endpoints.md](api/endpoints.md) - API endpoints reference
+
+# Note: Optional sections excluded for context optimization</code>
+                            </div>
+                        </div>
+                        <div class="format-features">
+                            <span class="feature-tag">Context Limited</span>
+                            <span class="feature-tag">Essential Only</span>
+                            <span class="feature-tag">Optimized</span>
+                        </div>
+                    </div>
+
+                    <div class="format-card">
+                        <div class="format-header">
+                            <span class="format-icon">🗺️</span>
+                            <h3>sitemap.xml (SEO Optimization)</h3>
+                        </div>
+                        <div class="format-description">
+                            <p>XML sitemap with intelligent priority assignment and change frequency detection for search engine optimization.</p>
+                        </div>
+                        <div class="format-example">
+                            <div class="code-block">
+                                <code>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"&gt;
+  &lt;url&gt;
+    &lt;loc&gt;https://docs.example.com/&lt;/loc&gt;
+    &lt;lastmod&gt;2024-01-15T10:30:00Z&lt;/lastmod&gt;
+    &lt;changefreq&gt;weekly&lt;/changefreq&gt;
+    &lt;priority&gt;1.0&lt;/priority&gt;
+  &lt;/url&gt;
+&lt;/urlset&gt;</code>
+                            </div>
+                        </div>
+                        <div class="format-features">
+                            <span class="feature-tag">SEO Optimized</span>
+                            <span class="feature-tag">Smart Priorities</span>
+                            <span class="feature-tag">Clean URLs</span>
+                        </div>
+                    </div>
+
+                    <div class="format-card">
+                        <div class="format-header">
+                            <span class="format-icon">📊</span>
+                            <h3>index.json (Navigation Metadata)</h3>
+                        </div>
+                        <div class="format-description">
+                            <p>Comprehensive directory and file metadata for programmatic navigation and content management.</p>
+                        </div>
+                        <div class="format-example">
+                            <div class="code-block">
+                                <code>{
+  "directory": ".",
+  "generated": "2024-01-15T10:30:00Z",
+  "files": [
+    {
+      "name": "index.md",
+      "path": "index.md", 
+      "size": 1234,
+      "modified": "2024-01-15T10:30:00Z",
+      "type": "md",
+      "isMarkdown": true
+    }
+  ],
+  "summary": {
+    "totalFiles": 5,
+    "markdownFiles": 3,
+    "totalSize": 12543
+  }
+}</code>
+                            </div>
+                        </div>
+                        <div class="format-features">
+                            <span class="feature-tag">Metadata Rich</span>
+                            <span class="feature-tag">Navigation</span>
+                            <span class="feature-tag">Statistics</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+<section id="enterprise-features" class="tool-section">
+                <div class="section-header">
+                    <h2>Enterprise Features</h2>
+                    <p>Advanced capabilities for large-scale documentation processing</p>
+                </div>
+
+                <div class="enterprise-features">
+                    <div class="feature-section">
+                        <h3>🛡️ Security and Validation</h3>
+                        <div class="security-features">
+                            <div class="security-feature">
+                                <h4>Path Traversal Prevention</h4>
+                                <p>Blocks <code>../</code> sequences and validates all file paths to prevent directory traversal attacks.</p>
+                            </div>
+                            <div class="security-feature">
+                                <h4>Input Sanitization</h4>
+                                <p>All user inputs are validated and sanitized to prevent injection attacks and ensure safe processing.</p>
+                            </div>
+                            <div class="security-feature">
+                                <h4>Content Scanning</h4>
+                                <p>Detects malicious patterns, suspicious URLs, and potentially harmful content during processing.</p>
+                            </div>
+                            <div class="security-feature">
+                                <h4>File Size Limits</h4>
+                                <p>Configurable limits prevent processing of extremely large files that could cause memory issues.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="feature-section">
+                        <h3>📊 Performance Monitoring</h3>
+                        <div class="performance-features">
+                            <div class="performance-example">
+                                <h4>Real-Time Performance Tracking</h4>
+                                <div class="code-block">
+                                    <code>📊 Performance Report:
+  Total Time: 147ms
+  Memory Usage:
+    Heap Used: 12.45MB
+    RSS: 89.23MB
+  Memory Delta:
+    Heap: +2.1MB
+    RSS: +5.7MB
+  Operations:
+    file_scanning: 23ms
+    content_processing: 89ms
+    sitemap_generation: 12ms
+    files_processed: 42
+    total_file_size: 2.3MB</code>
+                                </div>
+                            </div>
+                            <div class="performance-benefits">
+                                <ul>
+                                    <li>Detailed timing for all major operations</li>
+                                    <li>Memory usage monitoring and optimization</li>
+                                    <li>Processing statistics and bottleneck identification</li>
+                                    <li>Concurrent processing utilities for large document sets</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="feature-section">
+                        <h3>🔧 Error Handling and Recovery</h3>
+                        <div class="error-features">
+                            <div class="error-example">
+                                <h4>Actionable Error Messages</h4>
+                                <div class="code-block">
+                                    <code>❌ Error in file processing: Permission denied: /protected/file.md
+
+Details:
+  EACCES: permission denied
+
+Suggestions:
+  → Check file permissions
+  → Ensure the directory is not locked by another process
+  → Try running with appropriate permissions</code>
+                                </div>
+                            </div>
+                            <div class="error-benefits">
+                                <ul>
+                                    <li>Graceful degradation when individual files fail</li>
+                                    <li>Comprehensive error categorization with recovery suggestions</li>
+                                    <li>Standard exit codes for reliable automation</li>
+                                    <li>Detailed logging with security-focused error handling</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+<section id="integration-architecture" class="tool-section alt-bg">
+                <div class="section-header">
+                    <h2>Integration Architecture</h2>
+                    <p>How catalog fits into enterprise documentation workflows</p>
+                </div>
+
+                <div class="integration-architecture">
+                    <div class="architecture-diagram">
+                        <div class="arch-step">
+                            <div class="arch-icon">📥</div>
+                            <h4>Content Sources</h4>
+                            <p>Markdown, HTML, Git repos</p>
+                        </div>
+                        <div class="arch-arrow">→</div>
+                        
+                        <div class="arch-step">
+                            <div class="arch-icon">i</div>
+                            <h4>inform</h4>
+                            <p>Web content extraction</p>
+                        </div>
+                        <div class="arch-arrow">→</div>
+                        
+                        <div class="arch-step">
+                            <div class="arch-icon">c</div>
+                            <h4>catalog</h4>
+                            <p>AI-ready indexing</p>
+                        </div>
+                        <div class="arch-arrow">→</div>
+                        
+                        <div class="arch-step">
+                            <div class="arch-icon">🤖</div>
+                            <h4>AI Systems</h4>
+                            <p>Training, RAG, Context</p>
+                        </div>
+                    </div>
+
+                    <div class="architecture-benefits">
+                        <h3>Integration Benefits</h3>
+                        <div class="benefits-grid">
+                            <div class="benefit-item">
+                                <span class="benefit-icon">🔄</span>
+                                <div>
+                                    <h4>Seamless Workflow</h4>
+                                    <p>Works perfectly with inform for web content extraction and unify for site generation</p>
+                                </div>
+                            </div>
+                            <div class="benefit-item">
+                                <span class="benefit-icon">📊</span>
+                                <div>
+                                    <h4>Multiple Outputs</h4>
+                                    <p>Single source generates formats for AI training, context windows, and SEO optimization</p>
+                                </div>
+                            </div>
+                            <div class="benefit-item">
+                                <span class="benefit-icon">⚙️</span>
+                                <div>
+                                    <h4>CI/CD Ready</h4>
+                                    <p>Standard exit codes and silent operation for automated documentation pipelines</p>
+                                </div>
+                            </div>
+                            <div class="benefit-item">
+                                <span class="benefit-icon">🛡️</span>
+                                <div>
+                                    <h4>Enterprise Security</h4>
+                                    <p>Comprehensive security validation and monitoring for production environments</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+<section id="next-steps" class="tool-section">
+                <div class="section-header">
+                    <h2>Continue Learning</h2>
+                    <p>Explore more catalog capabilities and related tools</p>
+                </div>
+
+                <div class="next-steps-grid">
+                    <a href="/catalog/examples" class="next-step-card">
+                        <div class="card-icon">🎯</div>
+                        <h3>Real-World Examples</h3>
+                        <p>See catalog in action with practical use cases, automation scripts, and integration patterns</p>
+                        <span class="card-arrow">→</span>
+                    </a>
+
+                    <a href="/ecosystem/" class="next-step-card">
+                        <div class="card-icon">🔄</div>
+                        <h3>Ecosystem Integration</h3>
+                        <p>Learn how catalog works with inform, unify, and giv for complete development workflows</p>
+                        <span class="card-arrow">→</span>
+                    </a>
+
+                    <a href="https://github.com/fwdslsh/catalog" class="next-step-card">
+                        <div class="card-icon">📂</div>
+                        <h3>Source Code</h3>
+                        <p>View the source code, contribute improvements, or report issues on GitHub</p>
+                        <span class="card-arrow">→</span>
+                    </a>
+                </div>
+            </section>
+
+</main>
+</body>
+</html>

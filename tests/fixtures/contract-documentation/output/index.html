@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Contract Documentation Example</title>
+    
+    <!-- All data-unify-docs style blocks removed -->
+    <!-- Only regular styles preserved -->
+    <style>
+        .hero { background: linear-gradient(45deg, blue, purple); }
+        .content { padding: 2rem; }
+    </style>
+    <style>
+        .card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 1rem;
+        }
+        .card-header { font-weight: bold; }
+    </style>
+    <style>
+        .custom-hero { background: gold; }
+        .highlight { color: red; }
+    </style>
+</head>
+<body class="is-dark-theme">
+    <header>
+        <h1>Site Layout</h1>
+    </header>
+    <main>
+        <section class="unify-hero hero custom-hero">
+            <h2>Custom Hero from Page</h2>
+            <p class="highlight">This uses the layout's .unify-hero area as documented</p>
+        </section>
+        
+        <div class="card-container">
+            <article class="card">
+                <header class="unify-card-header card-header is-featured">
+                    <h4>✨ Featured Card Title</h4>
+                    <p>This uses the component's documented .unify-card-header area</p>
+                </header>
+                
+                <div class="unify-card-body">
+                    <p>Custom card content from the page</p>
+                    <p>This replaces the component's default body content</p>
+                    <ul>
+                        <li>Feature 1</li>
+                        <li>Feature 2</li>
+                        <li>Feature 3</li>
+                    </ul>
+                </div>
+                
+                <footer class="unify-card-footer">
+                    <button>Learn More</button>
+                    <button>Get Started</button>
+                </footer>
+            </article>
+        </div>
+        
+        <section class="unify-content content">
+            <h3>Custom Page Content</h3>
+            <p>This content targets the layout's .unify-content area</p>
+        </section>
+        
+        <section class="unify-cta is-centered">
+            <h3>Ready to Get Started?</h3>
+            <button>Sign Up Now</button>
+            <p>Join thousands of satisfied customers</p>
+        </section>
+    </main>
+</body>
+</html>

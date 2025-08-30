@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en" data-unify="_includes/layout.html">
+<head>
+    <title>Page Title Wins</title>
+    <link rel="stylesheet" href="/page.css">
+</head>
+<body>
+    <!-- Multiple elements with same area class - children should concatenate in order -->
+    <section class="unify-hero" data-theme="light" data-custom="page-value" id="page-hero">
+        <h2 id="page-title">First Hero Element</h2>
+        <p>First hero paragraph</p>
+    </section>
+    
+    <!-- Second element with same area class -->
+    <div class="unify-hero" data-priority="2">
+        <h3>Second Hero Element</h3>
+        <p>Second hero paragraph</p>
+        <button>Call to Action</button>
+    </div>
+    
+    <!-- Third element with same area class -->
+    <article class="unify-hero">
+        <blockquote>
+            <p>"Amazing testimonial quote"</p>
+            <cite>- Happy Customer</cite>
+        </blockquote>
+    </article>
+    
+    <!-- Different area for comparison -->
+    <section class="unify-content" data-page-attr="added">
+        <h2>Page Content</h2>
+        <p>This replaces the default content section.</p>
+    </section>
+</body>
+</html>

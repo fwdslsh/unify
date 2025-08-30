@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>giv Documentation - Complete Reference Guide</title>
+    <meta name="description" content="Complete documentation for giv - the AI-powered Git history assistant. CLI reference, AI provider configuration, and template customization.">
+    <meta name="keywords" content="giv, documentation, AI Git assistant, CLI reference, fwdslsh">
+    <meta property="og:title" content="giv Documentation - Complete Reference Guide">
+    <meta property="og:description" content="Complete documentation for giv - the AI-powered Git history assistant. CLI reference, AI provider configuration, and template customization.">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="giv Documentation - Complete Reference Guide">
+    <meta name="twitter:description" content="Complete documentation for giv - the AI-powered Git history assistant. CLI reference, AI provider configuration, and template customization.">
+</head>
+
+<body data-layout="/_includes/tool-page.layout.html">
+
+<section class="tool-hero">
+    <div class="tool-hero-content">
+        <h1>giv Documentation</h1>
+        <div class="tagline">Complete reference guide for AI-powered Git workflows</div>
+        <div class="description">Master giv's features for generating commit messages, changelogs, release notes, and announcements with multiple AI backends and advanced Git integration.</div>
+        
+        <div class="hero-buttons">
+            <a href="#cli-reference" class="btn btn-primary">
+                <span class="btn-icon">📋</span>
+                CLI Reference
+            </a>
+            <a href="#ai-providers" class="btn btn-secondary">AI Providers</a>
+        </div>
+    </div>
+</section>
+
+<section class="tool-nav">
+    <div class="tool-nav-container">
+        <ul class="tool-nav-links">
+            <li><a href="/giv/">Overview</a></li>
+            <li><a href="/giv/getting-started">Getting Started</a></li>
+            <li><a href="/giv/docs" class="active">Documentation</a></li>
+            <li><a href="/giv/examples">Examples</a></li>
+        </ul>
+    </div>
+</section>
+
+<section id="cli-reference" class="tool-section">
+                <div class="section-header">
+                    <h2>Command Line Reference</h2>
+                    <p>Complete guide to all giv commands and options</p>
+                </div>
+
+                <div class="cli-sections">
+                    <div class="cli-section">
+                        <h3>Core Commands</h3>
+                        <div class="command-list">
+                            <div class="command-item">
+                                <div class="command-syntax">
+                                    <code>giv message [&lt;revision-range&gt;] [OPTIONS]</code>
+                                </div>
+                                <div class="command-description">
+                                    <p>Generate commit messages from Git diffs (default command)</p>
+                                    <div class="command-examples">
+                                        <div class="command-example">
+                                            <code># Generate message for staged changes
+giv message
+
+# Generate message for specific commits
+giv message HEAD~3..HEAD
+
+# Generate message with custom model
+giv message --model gpt-4</code>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="command-item">
+                                <div class="command-syntax">
+                                    <code>giv summary [&lt;revision-range&gt;] [OPTIONS]</code>
+                                </div>
+                                <div class="command-description">
+                                    <p>Create summaries of changes over time periods</p>
+                                    <div class="command-examples">
+                                        <div class="command-example">
+                                            <code># Summarize last week's changes
+giv summary --since="1 week ago"
+
+# Summarize between releases
+giv summary v1.0.0..v1.1.0
+
+# Detailed summary with stats
+giv summary --verbose</code>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="command-item">
+                                <div class="command-syntax">
+                                    <code>giv changelog [&lt;version&gt;] [OPTIONS]</code>
+                                </div>
+                                <div class="command-description">
+                                    <p>Generate or update CHANGELOG.md with version management</p>
+                                    <div class="command-examples">
+                                        <div class="command-example">
+                                            <code># Generate changelog for current version
+giv changelog
+
+# Generate changelog for specific version
+giv changelog v1.2.0
+
+# Update changelog with new entry
+giv changelog --update</code>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="command-item">
+                                <div class="command-syntax">
+                                    <code>giv release-notes [&lt;version&gt;] [OPTIONS]</code>
+                                </div>
+                                <div class="command-description">
+                                    <p>Generate release notes for tagged releases</p>
+                                    <div class="command-examples">
+                                        <div class="command-example">
+                                            <code># Generate release notes for latest tag
+giv release-notes
+
+# Generate release notes for specific release
+giv release-notes v1.2.0
+
+# Format for GitHub releases
+giv release-notes --format github</code>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="command-item">
+                                <div class="command-syntax">
+                                    <code>giv announcement [&lt;version&gt;] [OPTIONS]</code>
+                                </div>
+                                <div class="command-description">
+                                    <p>Create marketing-style announcements for releases</p>
+                                    <div class="command-examples">
+                                        <div class="command-example">
+                                            <code># Generate announcement for latest release
+giv announcement
+
+# Generate announcement with specific tone
+giv announcement --tone professional
+
+# Social media announcement
+giv announcement --format twitter</code>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="cli-section">
+                        <h3>Configuration Commands</h3>
+                        <div class="command-list">
+                            <div class="command-item">
+                                <div class="command-syntax">
+                                    <code>giv config &lt;action&gt; [&lt;key&gt;] [&lt;value&gt;]</code>
+                                </div>
+                                <div class="command-description">
+                                    <p>Manage configuration values with Git-style syntax</p>
+                                    <div class="command-examples">
+                                        <div class="command-example">
+                                            <code># Set API configuration
+giv config set api.url https://api.openai.com/v1/chat/completions
+giv config set api.model gpt-4
+
+# Get configuration values
+giv config get api.model
+
+# List all configuration
+giv config list</code>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="command-item">
+                                <div class="command-syntax">
+                                    <code>giv init [OPTIONS]</code>
+                                </div>
+                                <div class="command-description">
+                                    <p>Initialize giv in a project with templates and configuration</p>
+                                    <div class="command-examples">
+                                        <div class="command-example">
+                                            <code># Initialize with default templates
+giv init
+
+# Initialize with specific provider
+giv init --provider anthropic
+
+# Force reinitialize
+giv init --force</code>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="cli-section">
+                        <h3>Global Options</h3>
+                        <div class="option-list">
+                            <div class="option-item">
+                                <div class="option-syntax">
+                                    <code>--model &lt;model&gt;</code>
+                                </div>
+                                <div class="option-description">
+                                    <p>Specify AI model to use (overrides configuration)</p>
+                                    <div class="option-example">
+                                        <code>giv message --model claude-3-sonnet</code>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="option-item">
+                                <div class="option-syntax">
+                                    <code>--provider &lt;provider&gt;</code>
+                                </div>
+                                <div class="option-description">
+                                    <p>Specify AI provider (openai, anthropic, ollama, custom)</p>
+                                    <div class="option-example">
+                                        <code>giv message --provider anthropic</code>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="option-item">
+                                <div class="option-syntax">
+                                    <code>--output &lt;file&gt;</code>
+                                </div>
+                                <div class="option-description">
+                                    <p>Write output to file instead of stdout</p>
+                                    <div class="option-example">
+                                        <code>giv changelog --output CHANGELOG.md</code>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="option-item">
+                                <div class="option-syntax">
+                                    <code>--format &lt;format&gt;</code>
+                                </div>
+                                <div class="option-description">
+                                    <p>Output format (markdown, conventional, github, plain)</p>
+                                    <div class="option-example">
+                                        <code>giv message --format conventional</code>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="option-item">
+                                <div class="option-syntax">
+                                    <code>--verbose, -v</code>
+                                </div>
+                                <div class="option-description">
+                                    <p>Enable verbose output with detailed information</p>
+                                    <div class="option-example">
+                                        <code>giv summary --verbose</code>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+<section id="ai-providers" class="tool-section alt-bg">
+                <div class="section-header">
+                    <h2>AI Provider Configuration</h2>
+                    <p>Complete guide to configuring and using different AI backends</p>
+                </div>
+
+                <div class="provider-sections">
+                    <div class="provider-section">
+                        <h3>🤖 OpenAI</h3>
+                        <div class="provider-config">
+                            <h4>Configuration</h4>
+                            <div class="code-block">
+                                <code># Environment variables (recommended)
+export OPENAI_API_KEY="your-api-key"
+export GIV_API_MODEL="gpt-4"
+
+# Or via giv config
+giv config set api.key "your-api-key"
+giv config set api.url "https://api.openai.com/v1/chat/completions"
+giv config set api.model "gpt-4"</code>
+                            </div>
+
+                            <h4>Supported Models</h4>
+                            <div class="model-list">
+                                <span class="model-tag">gpt-4</span>
+                                <span class="model-tag">gpt-4-turbo</span>
+                                <span class="model-tag">gpt-3.5-turbo</span>
+                                <span class="model-tag">gpt-4o</span>
+                            </div>
+
+                            <h4>Usage Examples</h4>
+                            <div class="code-block">
+                                <code># Use specific OpenAI model
+giv message --provider openai --model gpt-4
+
+# Generate changelog with GPT-4 Turbo
+giv changelog --model gpt-4-turbo</code>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="provider-section">
+                        <h3>🧠 Anthropic (Claude)</h3>
+                        <div class="provider-config">
+                            <h4>Configuration</h4>
+                            <div class="code-block">
+                                <code># Environment variables
+export ANTHROPIC_API_KEY="your-api-key"
+export GIV_API_MODEL="claude-3-sonnet-20240229"
+
+# Or via giv config
+giv config set api.key "your-api-key"
+giv config set api.url "https://api.anthropic.com/v1/messages"
+giv config set api.model "claude-3-sonnet-20240229"</code>
+                            </div>
+
+                            <h4>Supported Models</h4>
+                            <div class="model-list">
+                                <span class="model-tag">claude-3-sonnet-20240229</span>
+                                <span class="model-tag">claude-3-opus-20240229</span>
+                                <span class="model-tag">claude-3-haiku-20240307</span>
+                                <span class="model-tag">claude-3-5-sonnet-20241022</span>
+                            </div>
+
+                            <h4>Usage Examples</h4>
+                            <div class="code-block">
+                                <code># Use Anthropic Claude
+giv message --provider anthropic
+
+# Use specific Claude model
+giv summary --provider anthropic --model claude-3-opus-20240229</code>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="provider-section">
+                        <h3>🏠 Ollama (Local Models)</h3>
+                        <div class="provider-config">
+                            <h4>Configuration</h4>
+                            <div class="code-block">
+                                <code># Install and run Ollama
+curl -fsSL https://ollama.ai/install.sh | sh
+ollama serve
+
+# Pull models
+ollama pull llama3.2
+ollama pull codellama
+
+# Configure giv for Ollama
+giv config set api.url "http://localhost:11434/api/chat"
+giv config set api.model "llama3.2"</code>
+                            </div>
+
+                            <h4>Popular Models</h4>
+                            <div class="model-list">
+                                <span class="model-tag">llama3.2</span>
+                                <span class="model-tag">codellama</span>
+                                <span class="model-tag">mistral</span>
+                                <span class="model-tag">deepseek-coder</span>
+                            </div>
+
+                            <h4>Usage Examples</h4>
+                            <div class="code-block">
+                                <code># Use local Ollama model
+giv message --provider ollama --model llama3.2
+
+# Generate commit with code-specialized model
+giv message --provider ollama --model codellama</code>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="provider-section">
+                        <h3>🔧 Custom API Endpoints</h3>
+                        <div class="provider-config">
+                            <h4>Configuration</h4>
+                            <div class="code-block">
+                                <code># Configure custom OpenAI-compatible endpoint
+giv config set api.url "https://your-custom-api.com/v1/chat/completions"
+giv config set api.key "your-api-key"
+giv config set api.model "your-custom-model"
+
+# Custom headers (if needed)
+giv config set api.headers.Authorization "Bearer your-token"
+giv config set api.headers.Custom-Header "value"</code>
+                            </div>
+
+                            <h4>Compatible Services</h4>
+                            <div class="service-list">
+                                <div class="service-item">
+                                    <h5>Azure OpenAI</h5>
+                                    <div class="code-block">
+                                        <code>giv config set api.url "https://your-resource.openai.azure.com/openai/deployments/your-deployment/chat/completions?api-version=2023-12-01-preview"</code>
+                                    </div>
+                                </div>
+                                <div class="service-item">
+                                    <h5>Together AI</h5>
+                                    <div class="code-block">
+                                        <code>giv config set api.url "https://api.together.xyz/v1/chat/completions"</code>
+                                    </div>
+                                </div>
+                                <div class="service-item">
+                                    <h5>LM Studio</h5>
+                                    <div class="code-block">
+                                        <code>giv config set api.url "http://localhost:1234/v1/chat/completions"</code>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+<section id="template-system" class="tool-section">
+                <div class="section-header">
+                    <h2>Template System and Customization</h2>
+                    <p>Advanced template system for customizing AI prompts and output</p>
+                </div>
+
+                <div class="template-sections">
+                    <div class="template-section">
+                        <h3>📝 Built-in Templates</h3>
+                        <p>giv includes optimized templates for different output types:</p>
+                        
+                        <div class="template-list">
+                            <div class="template-item">
+                                <h4>commit_message_prompt.md</h4>
+                                <p>Generates concise, actionable commit messages following conventional commit format</p>
+                                <div class="template-preview">
+                                    <div class="code-block">
+                                        <code>Generate a concise commit message for these changes:
+
+{DIFF}
+
+Requirements:
+- Follow conventional commit format (type: description)
+- Use present tense ("add" not "added")
+- Keep under 72 characters
+- Focus on what the change accomplishes</code>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="template-item">
+                                <h4>changelog_prompt.md</h4>
+                                <p>Creates structured changelog entries with categorized changes</p>
+                                <div class="template-preview">
+                                    <div class="code-block">
+                                        <code>Generate a changelog entry for version {VERSION}:
+
+{HISTORY}
+
+Format as:
+## [{VERSION}] - {DATE}
+
+### Added
+- New features
+
+### Changed  
+- Enhancements to existing features
+
+### Fixed
+- Bug fixes</code>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="template-item">
+                                <h4>release_notes_prompt.md</h4>
+                                <p>Generates comprehensive release notes with highlights and breaking changes</p>
+                                <div class="template-preview">
+                                    <div class="code-block">
+                                        <code>Create release notes for {PROJECT_TITLE} version {VERSION}:
+
+{HISTORY}
+
+Include:
+- Key highlights and new features
+- Breaking changes (if any)
+- Migration instructions
+- Acknowledgments</code>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="template-section">
+                        <h3>🛠️ Template Variables</h3>
+                        <p>Available variables for template customization:</p>
+                        
+                        <div class="variable-categories">
+                            <div class="variable-category">
+                                <h4>Git Content</h4>
+                                <div class="variable-list">
+                                    <div class="variable-item">
+                                        <code>{DIFF}</code>
+                                        <span>Current Git diff or staged changes</span>
+                                    </div>
+                                    <div class="variable-item">
+                                        <code>{HISTORY}</code>
+                                        <span>Git commit history for specified range</span>
+                                    </div>
+                                    <div class="variable-item">
+                                        <code>{SUMMARY}</code>
+                                        <span>Summary of changes</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="variable-category">
+                                <h4>Project Metadata</h4>
+                                <div class="variable-list">
+                                    <div class="variable-item">
+                                        <code>{PROJECT_TITLE}</code>
+                                        <span>Project name from package.json, pyproject.toml, etc.</span>
+                                    </div>
+                                    <div class="variable-item">
+                                        <code>{VERSION}</code>
+                                        <span>Current or specified version</span>
+                                    </div>
+                                    <div class="variable-item">
+                                        <code>{DESCRIPTION}</code>
+                                        <span>Project description</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="variable-category">
+                                <h4>Git Metadata</h4>
+                                <div class="variable-list">
+                                    <div class="variable-item">
+                                        <code>{COMMIT_ID}</code>
+                                        <span>Current commit hash</span>
+                                    </div>
+                                    <div class="variable-item">
+                                        <code>{BRANCH}</code>
+                                        <span>Current Git branch</span>
+                                    </div>
+                                    <div class="variable-item">
+                                        <code>{DATE}</code>
+                                        <span>Current date in ISO format</span>
+                                    </div>
+                                    <div class="variable-item">
+                                        <code>{AUTHOR}</code>
+                                        <span>Git author information</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="template-section">
+                        <h3>✏️ Custom Templates</h3>
+                        <p>Create and use custom templates for specialized workflows:</p>
+                        
+                        <div class="custom-template-examples">
+                            <div class="custom-example">
+                                <h4>Creating Custom Templates</h4>
+                                <div class="code-block">
+                                    <code># Initialize project templates
+giv init
+
+# Edit templates
+nano .giv/templates/commit_message_prompt.md
+nano .giv/templates/changelog_prompt.md
+
+# Create custom template
+cat> custom-commit.md << 'EOF'
+You are a senior software engineer writing a commit message.
+
+Changes made:
+{DIFF}
+
+Write a commit message that:
+- Follows our team's conventional commit format
+- Explains the business value
+- Mentions any breaking changes
+- Stays under 100 characters for the subject line
+EOF</code>
+                                </div>
+                            </div>
+
+                            <div class="custom-example">
+                                <h4>Using Custom Templates</h4>
+                                <div class="code-block">
+                                    <code># Use custom template file
+giv message --prompt-file custom-commit.md
+
+# Use inline template
+giv message --prompt "Generate a commit message in our team style: {DIFF}"
+
+# Override specific templates
+giv changelog --prompt-file team-changelog-template.md</code>
+                                </div>
+                            </div>
+
+                            <div class="custom-example">
+                                <h4>Template Inheritance</h4>
+                                <div class="code-block">
+                                    <code># Project-level templates (highest priority)
+.giv/templates/commit_message_prompt.md
+
+# User-level templates
+~/.giv/templates/commit_message_prompt.md
+
+# System defaults (lowest priority)
+Built-in templates</code>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+<section id="git-integration" class="tool-section alt-bg">
+                <div class="section-header">
+                    <h2>Advanced Git Integration</h2>
+                    <p>Leverage Git's full power with revision ranges, pathspecs, and advanced targeting</p>
+                </div>
+
+                <div class="git-integration">
+                    <div class="git-section">
+                        <h3>🎯 Revision Ranges and Targeting</h3>
+                        <div class="git-examples">
+                            <div class="git-example">
+                                <h4>Revision Ranges</h4>
+                                <div class="code-block">
+                                    <code># Generate summary for last 3 commits
+giv summary HEAD~3..HEAD
+
+# Changes between specific commits
+giv summary abc123..def456
+
+# Changes between tags
+giv changelog v1.0.0..v1.1.0
+
+# Changes since yesterday
+giv summary --since="yesterday"
+
+# Changes in last week
+giv summary --since="1 week ago"</code>
+                                </div>
+                            </div>
+
+                            <div class="git-example">
+                                <h4>Pathspec Filtering</h4>
+                                <div class="code-block">
+                                    <code># Changes to specific files
+giv message -- src/api.py src/utils.py
+
+# Changes to directory
+giv summary HEAD~5..HEAD -- docs/
+
+# Changes to file pattern
+giv message -- "*.py"
+
+# Exclude specific files
+giv summary -- . ":(exclude)*.log"</code>
+                                </div>
+                            </div>
+
+                            <div class="git-example">
+                                <h4>Staged and Working Changes</h4>
+                                <div class="code-block">
+                                    <code># Generate message for staged changes (default)
+giv message
+
+# Include unstaged changes
+giv message --include-unstaged
+
+# Only unstaged changes
+giv message --unstaged-only
+
+# Specific files from staging
+giv message -- src/main.py</code>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="git-section">
+                        <h3>🔧 Git Workflow Integration</h3>
+                        <div class="workflow-examples">
+                            <div class="workflow-example">
+                                <h4>Feature Branch Workflow</h4>
+                                <div class="code-block">
+                                    <code># Generate commit for current feature work
+git add .
+giv message
+
+# Summarize entire feature branch
+giv summary main..feature-branch
+
+# Generate changelog entry for feature
+giv changelog --format feature-summary</code>
+                                </div>
+                            </div>
+
+                            <div class="workflow-example">
+                                <h4>Release Workflow</h4>
+                                <div class="code-block">
+                                    <code># Tag new release
+git tag v1.2.0
+
+# Generate release notes
+giv release-notes v1.1.0..v1.2.0
+
+# Update changelog
+giv changelog v1.2.0 --update
+
+# Generate announcement
+giv announcement v1.2.0</code>
+                                </div>
+                            </div>
+
+                            <div class="workflow-example">
+                                <h4>Code Review Workflow</h4>
+                                <div class="code-block">
+                                    <code># Summarize PR changes
+giv summary origin/main..HEAD
+
+# Generate commit messages for fixup commits
+git add -A
+giv message --format conventional
+
+# Squash commit message
+giv summary --format single-line</code>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="git-section">
+                        <h3>📊 Version Intelligence</h3>
+                        <div class="version-features">
+                            <div class="version-feature">
+                                <h4>Automatic Version Detection</h4>
+                                <p>giv automatically detects project versions from:</p>
+                                <div class="version-sources">
+                                    <span class="source-tag">package.json</span>
+                                    <span class="source-tag">pyproject.toml</span>
+                                    <span class="source-tag">Cargo.toml</span>
+                                    <span class="source-tag">pom.xml</span>
+                                    <span class="source-tag">Git tags</span>
+                                </div>
+                            </div>
+
+                            <div class="version-feature">
+                                <h4>SemVer Management</h4>
+                                <div class="code-block">
+                                    <code># Auto-detect next version
+giv changelog --next-version
+
+# Specify version explicitly
+giv changelog v1.2.0
+
+# Generate version-specific content
+giv release-notes --version 2.0.0</code>
+                                </div>
+                            </div>
+
+                            <div class="version-feature">
+                                <h4>Changelog Management</h4>
+                                <div class="code-block">
+                                    <code># Update existing CHANGELOG.md
+giv changelog --update
+
+# Prepend to changelog
+giv changelog --mode prepend
+
+# Append to specific section
+giv changelog --mode append --section "Unreleased"</code>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+<section id="configuration-reference" class="tool-section">
+                <div class="section-header">
+                    <h2>Configuration Reference</h2>
+                    <p>Complete configuration system with inheritance and environment variables</p>
+                </div>
+
+                <div class="config-reference">
+                    <div class="config-section">
+                        <h3>⚙️ Configuration Hierarchy</h3>
+                        <p>Configuration values are resolved in this order (highest to lowest priority):</p>
+                        
+                        <div class="config-hierarchy">
+                            <div class="config-level">
+                                <div class="level-number">1</div>
+                                <div class="level-content">
+                                    <h4>Command Line Arguments</h4>
+                                    <p>Options passed directly to commands</p>
+                                    <div class="config-example">
+                                        <code>giv message --model gpt-4 --provider openai</code>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="config-level">
+                                <div class="level-number">2</div>
+                                <div class="level-content">
+                                    <h4>Environment Variables</h4>
+                                    <p>Environment variables with <code>GIV_</code> prefix</p>
+                                    <div class="config-example">
+                                        <code>export GIV_API_MODEL="claude-3-sonnet"
+export OPENAI_API_KEY="your-key"</code>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="config-level">
+                                <div class="level-number">3</div>
+                                <div class="level-content">
+                                    <h4>Project Configuration</h4>
+                                    <p>Project-specific config in <code>.giv/config</code></p>
+                                    <div class="config-example">
+                                        <code>[api]
+model = gpt-4
+provider = openai</code>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="config-level">
+                                <div class="level-number">4</div>
+                                <div class="level-content">
+                                    <h4>User Configuration</h4>
+                                    <p>User-wide config in <code>~/.giv/config</code></p>
+                                    <div class="config-example">
+                                        <code>[api]
+key = your-global-api-key</code>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="config-level">
+                                <div class="level-number">5</div>
+                                <div class="level-content">
+                                    <h4>Default Values</h4>
+                                    <p>Built-in defaults and fallbacks</p>
+                                    <div class="config-example">
+                                        <code>api.model = gpt-3.5-turbo
+output.format = markdown</code>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="config-section">
+                        <h3>📋 Configuration Reference</h3>
+                        <div class="config-categories">
+                            <div class="config-category">
+                                <h4>API Configuration</h4>
+                                <div class="config-options">
+                                    <div class="config-option">
+                                        <code>api.key</code>
+                                        <span>API key for authentication</span>
+                                    </div>
+                                    <div class="config-option">
+                                        <code>api.url</code>
+                                        <span>API endpoint URL</span>
+                                    </div>
+                                    <div class="config-option">
+                                        <code>api.model</code>
+                                        <span>Model name to use</span>
+                                    </div>
+                                    <div class="config-option">
+                                        <code>api.provider</code>
+                                        <span>Provider type (openai, anthropic, ollama)</span>
+                                    </div>
+                                    <div class="config-option">
+                                        <code>api.timeout</code>
+                                        <span>Request timeout in seconds</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="config-category">
+                                <h4>Output Configuration</h4>
+                                <div class="config-options">
+                                    <div class="config-option">
+                                        <code>output.format</code>
+                                        <span>Default output format</span>
+                                    </div>
+                                    <div class="config-option">
+                                        <code>output.mode</code>
+                                        <span>Output mode (stdout, append, prepend)</span>
+                                    </div>
+                                    <div class="config-option">
+                                        <code>output.file</code>
+                                        <span>Default output file</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="config-category">
+                                <h4>Template Configuration</h4>
+                                <div class="config-options">
+                                    <div class="config-option">
+                                        <code>template.path</code>
+                                        <span>Custom template directory</span>
+                                    </div>
+                                    <div class="config-option">
+                                        <code>template.variables</code>
+                                        <span>Custom template variables</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="config-section">
+                        <h3>🔧 Configuration Management</h3>
+                        <div class="config-management">
+                            <div class="management-examples">
+                                <h4>Common Configuration Tasks</h4>
+                                <div class="code-block">
+                                    <code># View current configuration
+giv config list
+
+# Set API provider
+giv config set api.provider anthropic
+giv config set api.model claude-3-sonnet-20240229
+
+# Set output preferences
+giv config set output.format conventional
+giv config set output.mode append
+
+# Remove configuration
+giv config unset api.key
+
+# Get specific value
+giv config get api.model</code>
+                                </div>
+                            </div>
+
+                            <div class="management-examples">
+                                <h4>Environment Variable Mapping</h4>
+                                <div class="code-block">
+                                    <code># Common environment variables
+export GIV_API_KEY="your-api-key"
+export GIV_API_MODEL="gpt-4"
+export GIV_API_PROVIDER="openai"
+export GIV_OUTPUT_FORMAT="conventional"
+
+# Provider-specific variables
+export OPENAI_API_KEY="sk-..."
+export ANTHROPIC_API_KEY="sk-ant-..."
+export OLLAMA_API_URL="http://localhost:11434"</code>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+<section id="next-steps" class="tool-section alt-bg">
+                <div class="section-header">
+                    <h2>Continue Learning</h2>
+                    <p>Explore more giv capabilities and related tools</p>
+                </div>
+
+                <div class="next-steps-grid">
+                    <a href="/giv/examples" class="next-step-card">
+                        <div class="card-icon">🎯</div>
+                        <h3>Real-World Examples</h3>
+                        <p>See giv in action with practical workflows, team collaboration patterns, and automation scripts</p>
+                        <span class="card-arrow">→</span>
+                    </a>
+
+                    <a href="/ecosystem/" class="next-step-card">
+                        <div class="card-icon">🔄</div>
+                        <h3>Ecosystem Integration</h3>
+                        <p>Learn how giv works with inform, catalog, and unify for complete development workflows</p>
+                        <span class="card-arrow">→</span>
+                    </a>
+
+                    <a href="https://github.com/fwdslsh/giv" class="next-step-card">
+                        <div class="card-icon">📂</div>
+                        <h3>Source Code</h3>
+                        <p>View the source code, contribute improvements, or report issues on GitHub</p>
+                        <span class="card-arrow">→</span>
+                    </a>
+                </div>
+            </section>
+
+</body>
+</html>

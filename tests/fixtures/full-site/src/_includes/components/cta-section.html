@@ -1,0 +1,147 @@
+<style data-unify-docs="v1">
+    /* Public areas */
+    .unify-cta-title { /* CTA section title */ }
+    .unify-cta-subtitle { /* CTA section subtitle */ }
+    .unify-cta-buttons { /* CTA buttons area */ }
+    .unify-cta-links { /* Quick links area */ }
+</style>
+
+<section class="cta-section">
+    <div class="section-header">
+        <h2 class="unify-cta-title">Ready to Build?</h2>
+        <p class="unify-cta-subtitle">Get started today</p>
+    </div>
+
+    <div class="unify-cta-buttons cta-buttons">
+        <!-- Default CTA buttons -->
+        <a href="#install" class="btn btn-primary">Get Started</a>
+        <a href="/docs" class="btn btn-secondary">Read Docs</a>
+    </div>
+
+    <div class="unify-cta-links quick-links">
+        <!-- Optional quick links -->
+    </div>
+</section>
+
+<style>
+/* CTA Section */
+.cta-section {
+    padding: 6rem 2rem;
+    text-align: center;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.cta-buttons {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 3rem;
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1rem 2rem;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+    cursor: pointer;
+    font-family: var(--font-sans);
+}
+
+.btn-primary {
+    background: var(--gradient-primary);
+    color: var(--bg-dark);
+    box-shadow: 0 4px 14px rgba(0, 255, 65, 0.3);
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 255, 65, 0.4);
+}
+
+.btn-secondary {
+    background: transparent;
+    color: var(--text-primary);
+    border-color: var(--border);
+}
+
+.btn-secondary:hover {
+    background: var(--bg-card);
+    border-color: var(--primary);
+    color: var(--primary);
+    transform: translateY(-2px);
+}
+
+/* Quick links */
+.quick-links {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-top: 3rem;
+}
+
+.quick-link {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.5rem;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.quick-link:hover {
+    border-color: var(--primary);
+    transform: translateY(-2px);
+}
+
+.quick-link-icon {
+    font-size: 1.5rem;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--gradient-primary);
+    border-radius: 8px;
+    color: var(--bg-dark);
+}
+
+.quick-link-content h4 {
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+    font-size: 1rem;
+}
+
+.quick-link-content p {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin: 0;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .cta-buttons {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .btn {
+        width: 100%;
+        max-width: 280px;
+    }
+    
+    .quick-links {
+        grid-template-columns: 1fr;
+    }
+}
+</style>

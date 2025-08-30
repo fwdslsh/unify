@@ -1,0 +1,141 @@
+<style data-unify-docs="v1">
+    /* Public areas */
+    .unify-install-title { /* Install section title */ }
+    .unify-install-subtitle { /* Install section subtitle */ }
+    .unify-install-options { /* Install options grid */ }
+</style>
+
+<section id="install" class="install-section">
+    <div class="install-container">
+        <div class="section-header">
+            <h2><div class="unify-install-title">Get Running in 30 Seconds</div></h2>
+            <p><div class="unify-install-subtitle">One command, zero config ceremony</div></p>
+        </div>
+
+        <div class="install-grid">
+            <div class="unify-install-options">
+                <!-- Installation cards will be injected here -->
+            </div>
+        </div>
+    </div>
+</section>
+
+<style>
+/* Installation Section */
+.install-section {
+    padding: 6rem 2rem;
+    background: var(--bg-darker);
+}
+
+.install-container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.install-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+    margin-top: 3rem;
+}
+
+.install-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 2rem;
+    text-align: center;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.install-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    background: var(--gradient-primary);
+    transform: scaleX(0);
+    transition: transform 0.3s ease;
+}
+
+.install-card:hover::before {
+    transform: scaleX(1);
+}
+
+.install-card:hover {
+    transform: translateY(-5px);
+    border-color: var(--primary);
+}
+
+.install-icon {
+    width: 60px;
+    height: 60px;
+    margin: 0 auto 1rem;
+    background: var(--gradient-primary);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: var(--bg-dark);
+}
+
+.install-card h3 {
+    font-size: 1.3rem;
+    margin-bottom: 1rem;
+    color: var(--text-primary);
+}
+
+.install-code {
+    background: var(--bg-darker);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    margin: 1rem 0;
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    color: var(--primary);
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.install-code:hover {
+    background: rgba(0, 255, 65, 0.1);
+}
+
+.install-card p {
+    color: var(--text-secondary);
+    margin: 0;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .install-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
+<script>
+// Copy to clipboard functionality for install codes
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.install-code').forEach(codeBlock => {
+        codeBlock.addEventListener('click', function() {
+            const text = this.textContent.trim();
+            navigator.clipboard.writeText(text).then(() => {
+                // Visual feedback
+                const original = this.style.background;
+                this.style.background = 'rgba(0, 255, 65, 0.2)';
+                setTimeout(() => {
+                    this.style.background = original;
+                }, 200);
+            });
+        });
+    });
+});
+</script>

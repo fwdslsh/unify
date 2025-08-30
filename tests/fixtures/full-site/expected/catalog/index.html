@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head><title>catalog - AI-Ready Documentation Indexer</title>
+<meta name="description" content="Generate llms.txt and llms-full.txt from Markdown/HTML directories. Perfect for AI-powered documentation workflows and searchable knowledge bases.">
+<link rel="stylesheet" href="assets/styles.css">
+<style>/* Page-specific styles */
+        .catalog-hero {
+            background: linear-gradient(135deg, rgba(168, 255, 96, 0.05) 0%, transparent 50%);
+        }
+
+        .catalog-icon {
+            background: linear-gradient(135deg, #a8ff60 0%, #64ff4a 100%);
+        }
+
+        .indexing-demo {
+            background: var(--bg-darker);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            margin: 4rem auto;
+            max-width: 900px;
+            overflow: hidden;
+        }
+
+        .demo-tabs {
+            display: flex;
+            background: var(--border);
+        }
+
+        .demo-tab {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            transition: all 0.3s ease;
+        }
+
+        .demo-tab.active {
+            background: var(--bg-darker);
+            color: var(--primary);
+        }
+
+        .demo-content {
+            display: none;
+            padding: 1.5rem;
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .demo-content.active {
+            display: block;
+        }
+
+        .demo-content h4 {
+            color: var(--primary);
+            margin-bottom: 1rem;
+            font-size: 1rem;
+        }
+
+        .llms-section {
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+        }
+
+        .llms-title {
+            color: var(--primary);
+            font-weight: bold;
+        }
+
+        .llms-description {
+            color: var(--text-dim);
+            font-style: italic;
+        }
+
+        .llms-link {
+            color: var(--secondary);
+            text-decoration: none;
+        }
+
+        .llms-link:hover {
+            text-decoration: underline;
+        }
+
+        .format-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .format-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 2rem;
+            transition: all 0.3s ease;
+        }
+
+        .format-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+        }
+
+        .format-icon {
+            width: 50px;
+            height: 50px;
+            background: var(--gradient-primary);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1rem;
+            font-size: 1.2rem;
+            color: var(--bg-dark);
+        }
+
+        .compliance-section {
+            background: linear-gradient(135deg, rgba(0, 255, 65, 0.05) 0%, rgba(59, 130, 246, 0.05) 100%);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem;
+            margin-top: 3rem;
+        }
+
+        .compliance-features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .compliance-feature {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .compliance-check {
+            color: var(--success);
+            font-weight: bold;
+        }
+
+        .workflow-diagram {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-top: 3rem;
+            position: relative;
+        }
+
+        .workflow-step {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            text-align: center;
+            position: relative;
+        }
+
+        .workflow-step::after {
+            content: '→';
+            position: absolute;
+            right: -0.5rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--primary);
+            font-size: 1.2rem;
+            font-weight: bold;
+            z-index: 1;
+        }
+
+        .workflow-step:last-child::after {
+            display: none;
+        }
+
+        .workflow-icon {
+            width: 40px;
+            height: 40px;
+            margin: 0 auto 1rem;
+            background: var(--gradient-primary);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            color: var(--bg-dark);
+        }
+
+        .use-cases {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minMax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .use-case {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 2rem;
+        }
+
+        .use-case-icon {
+            width: 50px;
+            height: 50px;
+            background: var(--gradient-primary);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1rem;
+            font-size: 1.2rem;
+            color: var(--bg-dark);
+        }
+
+        .ai-integration {
+            background: linear-gradient(135deg, rgba(168, 255, 96, 0.05) 0%, rgba(245, 158, 11, 0.05) 100%);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem;
+            margin-top: 3rem;
+        }
+
+        @media (max-width: 768px) {
+            .workflow-step::after {
+                content: '↓';
+                right: 50%;
+                top: 100%;
+                transform: translateX(50%);
+                bottom: -1rem;
+            }
+
+            .workflow-step:last-child::after {
+                display: none;
+            }
+        }</style></head>
+
+<body>
+    <div class="page-bg"></div>
+
+    <header class="unify-header">
+        <div>
+            <!-- Tool-specific navigation replaces main nav-links -->
+            <ul class="unify-nav-links">
+                <li><a href="index.html">Overview</a></li>
+                <li><a href="getting-started.html">Getting Started</a></li>
+                <li><a href="docs.html">Documentation</a></li>
+                <li><a href="examples.html">Examples</a></li>
+            </ul>
+        </div>
+    </header>
+
+    <main class="unify-content">
+        <!-- Page content goes here -->
+    </main>
+
+    <footer class="unify-footer">
+        <div></div>
+    </footer>
+    
+    <div></div>
+</body>
+
+</html>

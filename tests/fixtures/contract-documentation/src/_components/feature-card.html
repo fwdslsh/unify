@@ -1,0 +1,58 @@
+<head>
+    <!-- Component contract documentation - should be removed in build -->
+    <style data-unify-docs="v1">
+        /* Feature Card Component Public Areas
+           Version: 1.0
+           
+           Usage: Import this component and use these classes to customize content
+        */
+        
+        /* Card header with title and optional icon */
+        .unify-card-header {
+            /* Main card title area */
+        }
+        
+        /* Card body content */
+        .unify-card-body {
+            /* Primary card content and description */
+        }
+        
+        /* Card footer with actions */
+        .unify-card-footer {
+            /* Buttons, links, and call-to-actions */
+        }
+        
+        /* Optional modifiers */
+        .is-featured {
+            /* Highlight this card as featured content */
+        }
+        .is-compact {
+            /* Reduce padding and spacing for tight layouts */
+        }
+    </style>
+    
+    <!-- Component styles that should be preserved -->
+    <style>
+        .card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 1rem;
+        }
+        .card-header { font-weight: bold; }
+    </style>
+</head>
+
+<article class="card">
+    <header class="unify-card-header card-header">
+        <h4>Default Card Title</h4>
+    </header>
+    
+    <div class="unify-card-body">
+        <p>Default card description goes here.</p>
+        <p>Multiple paragraphs supported.</p>
+    </div>
+    
+    <footer class="unify-card-footer">
+        <button>Default Action</button>
+    </footer>
+</article>

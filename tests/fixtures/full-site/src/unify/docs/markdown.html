@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown Support - unify Documentation</title>
+    <meta name="description" content="Learn how to use Markdown files in unify with YAML frontmatter, head synthesis, layout composition, and advanced content authoring features.">
+    <link rel="stylesheet" href="/assets/styles.css">
+    <style>
+        .docs-layout { display: flex; min-height: 100vh; }
+        .sidebar { width: 280px; background: var(--bg-darker); border-right: 1px solid var(--border); padding: 2rem 0; position: fixed; height: calc(100vh - 80px); overflow-y: auto; z-index: 100; }
+        .sidebar-content { padding: 0 2rem; }
+        .sidebar-section { margin-bottom: 2rem; }
+        .sidebar-title { font-size: 0.9rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 0.05em; font-family: var(--font-mono); }
+        .sidebar-nav { list-style: none; }
+        .sidebar-nav li { margin-bottom: 0.5rem; }
+        .sidebar-nav a { color: var(--text-dim); text-decoration: none; font-size: 0.9rem; display: block; padding: 0.5rem 1rem; border-radius: 6px; transition: all 0.3s ease; font-family: var(--font-mono); }
+        .sidebar-nav a:hover { color: var(--text-primary); background: var(--bg-card); }
+        .sidebar-nav a.active { color: var(--primary); background: rgba(0, 255, 65, 0.1); border-left: 3px solid var(--primary); }
+        .main-content { flex: 1; margin-left: 280px; padding: 2rem 4rem; max-width: calc(100vw - 280px); }
+        .content-wrapper { max-width: 800px; }
+        .content h1 { font-size: 2.5rem; font-weight: 800; margin-bottom: 1rem; color: var(--text-primary); line-height: 1.2; }
+        .content p { margin-bottom: 1.5rem; color: var(--text-secondary); line-height: 1.7; }
+        @media (max-width: 1024px) {
+            .sidebar { transform: translateX(-100%); transition: transform 0.3s ease; }
+            .sidebar.open { transform: translateX(0); }
+            .main-content { margin-left: 0; max-width: 100vw; padding: 2rem; }
+        }
+    </style>
+</head>
+<body data-unify="/_includes/tool-page.html">
+    <ul class="unify-nav-links">
+        <li><a href="/unify/">Overview</a></li>
+        <li><a href="/unify/getting-started.html">Getting Started</a></li>
+        <li><a href="/unify/docs.html">Documentation</a></li>
+        <li><a href="/unify/examples.html">Examples</a></li>
+    </ul>
+    <div class="unify-content docs-layout">
+        <aside class="sidebar">
+            <div class="sidebar-content">
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Getting Started</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs">Quick Start</a></li>
+                        <li><a href="/unify/docs/installation">Installation</a></li>
+                        <li><a href="/unify/docs/project-structure">Project Structure</a></li>
+                        <li><a href="/unify/docs/first-site">Your First Site</a></li>
+                    </ul>
+                </div>
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Core Concepts</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs/includes">Server-Side Includes</a></li>
+                        <li><a href="/unify/docs/components">Components</a></li>
+                        <li><a href="/unify/docs/markdown" class="active">Markdown</a></li>
+                        <li><a href="/unify/docs/assets">Static Assets</a></li>
+                    </ul>
+                </div>
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">CLI Reference</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs/cli-build">unify build</a></li>
+                        <li><a href="/unify/docs/cli-serve">unify serve</a></li>
+                        <li><a href="/unify/docs/cli-watch">unify watch</a></li>
+                        <li><a href="/unify/docs/configuration">Configuration</a></li>
+                    </ul>
+                </div>
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Deployment</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs/deployment">Static Hosting</a></li>
+                        <li><a href="/unify/docs/docker">Docker</a></li>
+                        <li><a href="/unify/docs/ci-cd">CI/CD</a></li>
+                    </ul>
+                </div>
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Advanced</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs/performance">Performance</a></li>
+                        <li><a href="/unify/docs/security">Security</a></li>
+                        <li><a href="/unify/docs/migration">Migration Guide</a></li>
+                        <li><a href="/unify/docs/troubleshooting">Troubleshooting</a></li>
+                    </ul>
+                </div>
+            </div>
+        </aside>
+        <main class="main-content">
+            <div class="content-wrapper">
+                <div class="content">
+                    <h1>Markdown Support</h1>
+                    
+                    <p>Unify provides comprehensive Markdown support with YAML frontmatter, automatic head synthesis, and full DOM Cascade composition. Markdown files are processed into HTML and can use all of unify's layout and component features.</p>
+
+                    <div class="callout callout-info">
+                        <h3>📋 What You'll Learn</h3>
+                        <p>This guide covers Markdown processing, YAML frontmatter, head synthesis, layout integration, and advanced content authoring techniques.</p>
+                    </div>
+
+                    <h2>Markdown Fundamentals</h2>
+                    
+                    <h3>File Processing</h3>
+                    <p>Unify treats <code>.md</code> files as first-class content sources:</p>
+                    <ul>
+                        <li>Markdown is converted to semantic HTML</li>
+                        <li>YAML frontmatter generates <code>&lt;head&gt;</code> metadata</li>
+                        <li>Converted HTML follows DOM Cascade composition rules</li>
+                        <li>Layouts are applied automatically or explicitly</li>
+                    </ul>
+
+                    <h3>Basic Markdown File</h3>
+                    <p>A simple Markdown file structure:</p>
+
+                    <pre><code>---
+title: Getting Started with Unify
+description: Learn how to build your first static site with unify
+layout: blog
+---
+
+# Getting Started with Unify
+
+Unify is a modern static site generator that makes building maintainable sites simple and enjoyable.
+
+## Key Features
+
+- **DOM Cascade composition** for layouts and components  
+- **Zero runtime dependencies** in generated sites
+- **Live development server** with hot reload
+- **Markdown support** with YAML frontmatter
+
+## Quick Start
+
+Get started with unify in three steps:
+
+1. Install unify: `npm install -g @fwdslsh/unify`
+2. Initialize project: `unify init`
+3. Start developing: `unify serve`
+
+That's it! Your site is ready for development.</code></pre>
+
+                    <h2>YAML Frontmatter</h2>
+                    
+                    <p>YAML frontmatter provides metadata and configuration for Markdown files. It must appear at the very beginning of the file, delimited by <code>---</code>.</p>
+
+                    <h3>Supported Frontmatter Fields</h3>
+                    
+                    <h4>Basic Metadata</h4>
+                    <pre><code>---
+title: string           # Page title (synthesized to &lt;title&gt;)
+description: string     # Meta description (synthesized to &lt;meta name="description"&gt;)
+layout: string          # Layout file to apply
+---</code></pre>
+
+                    <h4>Advanced Head Synthesis</h4>
+                    <p>The <code>head</code> section allows complex metadata specification:</p>
+
+                    <pre><code>---
+title: Advanced Unify Guide
+description: Deep dive into unify's advanced features
+
+head:
+  meta:
+    - name: robots
+      content: "index,follow"
+    - property: og:title
+      content: "Advanced Unify Guide"
+    - property: og:description  
+      content: "Master unify's advanced features and patterns"
+    - property: og:image
+      content: "/images/advanced-guide.jpg"
+    - property: og:url
+      content: "https://example.com/guides/advanced"
+      
+  link:
+    - rel: canonical
+      href: "https://example.com/guides/advanced"
+    - rel: preload
+      as: image
+      href: "/images/hero.avif"
+    - rel: stylesheet
+      href: "/css/guide.css"
+      media: "screen"
+      
+  script:
+    # External script
+    - src: "/js/analytics.js"
+      defer: true
+      
+    # JSON-LD structured data
+    - type: "application/ld+json"
+      json:
+        "@context": "https://schema.org"
+        "@type": "Article"
+        headline: "Advanced Unify Guide"
+        author:
+          "@type": "Person"
+          name: "John Doe"
+        datePublished: "2024-01-15"
+        dateModified: "2024-01-20"
+        
+  style:
+    # Inline CSS
+    - inline: |
+        .guide-hero {
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+          contain: paint;
+        }
+        
+    # External stylesheet with media query
+    - href: "/css/print-guide.css"
+      media: "print"
+---</code></pre>
+
+                    <h3>Head Synthesis Rules</h3>
+                    <p>Frontmatter is converted to HTML head elements following these rules:</p>
+                    
+                    <ul>
+                        <li><strong><code>title</code>:</strong> Generates <code>&lt;title&gt;Page Title&lt;/title&gt;</code></li>
+                        <li><strong><code>description</code>:</strong> Generates <code>&lt;meta name="description" content="..."&gt;</code></li>
+                        <li><strong><code>head.meta</code>:</strong> Each item becomes <code>&lt;meta&gt;</code> with specified attributes</li>
+                        <li><strong><code>head.link</code>:</strong> Each item becomes <code>&lt;link&gt;</code> with specified attributes</li>
+                        <li><strong><code>head.script</code>:</strong> External scripts or JSON-LD blocks</li>
+                        <li><strong><code>head.style</code>:</strong> Inline styles or external stylesheets</li>
+                    </ul>
+
+                    <h3>Frontmatter Validation</h3>
+                    <p>Unify validates frontmatter and provides helpful warnings:</p>
+                    
+                    <div class="callout callout-warning">
+                        <h3>⚠️ Validation Rules</h3>
+                        <ul>
+                            <li><strong>Title conflicts:</strong> Warning if both <code>title</code> and <code>head.meta</code> title entries exist</li>
+                            <li><strong>Description conflicts:</strong> Warning if both <code>description</code> and matching <code>head.meta</code> exist</li>
+                            <li><strong>Empty items:</strong> Warning for empty entries in <code>head</code> arrays</li>
+                            <li><strong>Missing attributes:</strong> Warning for incomplete <code>link</code>, <code>script</code>, or <code>style</code> entries</li>
+                        </ul>
+                    </div>
+
+                    <h2>Layout Integration</h2>
+                    
+                    <h3>Layout Application</h3>
+                    <p>Markdown files can specify layouts in several ways:</p>
+                    
+                    <h4>1. Frontmatter Layout</h4>
+                    <pre><code>---
+layout: blog-post
+---
+
+# My Blog Post
+
+Content goes here...</code></pre>
+
+                    <h4>2. Automatic Layout Discovery</h4>
+                    <p>Without a <code>layout</code> field, unify discovers layouts automatically:</p>
+                    <ol>
+                        <li>Look for <code>_layout.html</code> in the Markdown file's directory</li>
+                        <li>Climb parent directories to source root</li>
+                        <li>Fall back to <code>_includes/layout.html</code></li>
+                    </ol>
+
+                    <h4>3. CLI Default Layouts</h4>
+                    <pre><code># Set default layout for blog posts
+unify build --default-layout "blog/**=_post.html"
+
+# Global fallback layout
+unify build --default-layout "_base.html"</code></pre>
+
+                    <h3>Layout Precedence</h3>
+                    <p>Layout resolution follows this order:</p>
+                    <ol>
+                        <li><strong>Frontmatter <code>layout</code>:</strong> Highest priority</li>
+                        <li><strong>CLI <code>--default-layout</code> glob matches:</strong> Last matching pattern wins</li>
+                        <li><strong>CLI <code>--default-layout</code> filename:</strong> Global fallback</li>
+                        <li><strong>Auto-discovery:</strong> Directory-based discovery</li>
+                        <li><strong>No layout:</strong> Basic HTML5 document wrapper</li>
+                    </ol>
+
+                    <h2>DOM Cascade with Markdown</h2>
+                    
+                    <h3>Area-Based Composition</h3>
+                    <p>Markdown content can target specific areas in layouts using HTML blocks:</p>
+
+                    <pre><code>---
+title: Product Launch
+layout: marketing-page
+---
+
+&lt;section class="unify-hero"&gt;
+
+# Introducing Our New Product
+
+Revolutionary technology meets elegant design.
+
+&lt;div class="hero-cta"&gt;
+  &lt;a href="/signup" class="btn btn-primary"&gt;Get Started Today&lt;/a&gt;
+&lt;/div&gt;
+
+&lt;/section&gt;
+
+&lt;div class="unify-features"&gt;
+
+## Key Features
+
+- **Lightning Fast:** Optimized for performance
+- **Secure by Design:** Built with security first
+- **Developer Friendly:** Easy to integrate and customize
+
+&lt;/div&gt;
+
+&lt;section class="unify-testimonials"&gt;
+
+## What Our Users Say
+
+&gt; "This product changed how we work. Highly recommended!"
+&gt; — Jane Smith, Tech Lead
+
+&lt;/section&gt;</code></pre>
+
+                    <h3>Markdown + HTML Mixing</h3>
+                    <p>Unify's Markdown processor allows seamless mixing of Markdown and HTML:</p>
+
+                    <pre><code># Markdown Heading
+
+This is regular Markdown text.
+
+&lt;div class="custom-component"&gt;
+
+## Markdown Inside HTML
+
+You can use **Markdown formatting** inside HTML blocks.
+
+- Lists work too
+- Including *emphasis*
+
+&lt;/div&gt;
+
+&lt;!-- HTML comments are preserved --&gt;
+
+Back to regular Markdown content.</code></pre>
+
+                    <h2>Advanced Markdown Features</h2>
+                    
+                    <h3>Code Blocks with Syntax Highlighting</h3>
+                    <p>Unify supports fenced code blocks with language specification:</p>
+
+                    <pre><code>```javascript
+// JavaScript example
+const greeting = (name) => {
+  return `Hello, ${name}!`;
+};
+
+console.log(greeting('World'));
+```
+
+```css
+/* CSS example */
+.hero {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 4rem 2rem;
+  text-align: center;
+}
+```
+
+```html
+&lt;!-- HTML example --&gt;
+&lt;div data-unify="/_includes/card.html"&gt;
+  &lt;h3 class="unify-title"&gt;Card Title&lt;/h3&gt;
+  &lt;p class="unify-body"&gt;Card content goes here&lt;/p&gt;
+&lt;/div&gt;
+```</code></pre>
+
+                    <h3>Tables</h3>
+                    <p>GitHub Flavored Markdown table syntax is supported:</p>
+
+                    <pre><code>| Feature | Basic | Pro | Enterprise |
+|---------|-------|-----|------------|
+| Storage | 1GB | 10GB | Unlimited |
+| Users | 1 | 5 | Unlimited |
+| Support | Email | Priority | Dedicated |
+| Price | Free | $9/mo | Contact |
+
+| Left Aligned | Center Aligned | Right Aligned |
+|:-------------|:--------------:|--------------:|
+| Left text    | Center text    | Right text    |
+| More left    | More center    | More right    |</code></pre>
+
+                    <h3>Task Lists</h3>
+                    <pre><code>## Project Checklist
+
+- [x] Set up project structure
+- [x] Create basic layouts
+- [ ] Add component library
+- [ ] Write documentation
+- [ ] Deploy to production</code></pre>
+
+                    <h3>Definition Lists</h3>
+                    <pre><code>Term 1
+: Definition for term 1
+
+Term 2
+: Definition for term 2
+: Another definition for term 2
+
+Term 3 with *inline markup*
+: Definition for term 3</code></pre>
+
+                    <h2>Content Organization Patterns</h2>
+                    
+                    <h3>Blog Structure</h3>
+                    <p>Organize blog content with consistent frontmatter:</p>
+
+                    <pre><code>blog/
+├── _layout.html                # Blog layout template
+├── index.md                    # Blog homepage
+├── 2024/
+│   ├── 01/
+│   │   ├── getting-started.md
+│   │   └── advanced-tips.md
+│   └── 02/
+│       └── new-features.md
+└── tags/
+    ├── tutorial.md
+    └── release.md</code></pre>
+
+                    <pre><code>---
+# Standard blog post frontmatter
+title: Getting Started with Static Sites
+description: Learn the basics of static site generation
+author: John Doe
+date: 2024-01-15
+tags: [tutorial, beginner, static-sites]
+category: tutorial
+layout: blog-post
+
+head:
+  meta:
+    - property: og:type
+      content: article
+    - name: twitter:card
+      content: summary_large_image
+  link:
+    - rel: canonical
+      href: "https://example.com/blog/2024/01/getting-started"
+---</code></pre>
+
+                    <h3>Documentation Structure</h3>
+                    <p>Structure documentation with hierarchical navigation:</p>
+
+                    <pre><code>docs/
+├── _layout.html                # Docs layout with sidebar
+├── index.md                    # Documentation home
+├── getting-started/
+│   ├── index.md
+│   ├── installation.md
+│   └── first-site.md
+├── guides/
+│   ├── index.md
+│   ├── components.md
+│   ├── layouts.md
+│   └── deployment.md
+└── api/
+    ├── index.md
+    ├── cli.md
+    └── configuration.md</code></pre>
+
+                    <pre><code>---
+# Documentation page frontmatter
+title: Component Guide
+description: Learn how to create and use components
+section: guides
+order: 2
+prev: layouts
+next: deployment
+layout: docs
+
+head:
+  link:
+    - rel: stylesheet
+      href: "/css/docs.css"
+---</code></pre>
+
+                    <h2>Best Practices</h2>
+                    
+                    <div class="callout callout-success">
+                        <h3>✅ Markdown Authoring Guidelines</h3>
+                        <ul>
+                            <li><strong>Consistent frontmatter:</strong> Use standard fields across similar content types</li>
+                            <li><strong>Semantic HTML:</strong> Use appropriate HTML5 elements in mixed content</li>
+                            <li><strong>Area classes:</strong> Target layout areas explicitly for predictable composition</li>
+                            <li><strong>Image optimization:</strong> Use appropriate formats and sizes for web delivery</li>
+                        </ul>
+                    </div>
+
+                    <h3>Performance Optimization</h3>
+                    <ul>
+                        <li><strong>Optimize images:</strong> Use modern formats (WebP, AVIF) and responsive sizing</li>
+                        <li><strong>Minimize head elements:</strong> Only include necessary meta tags and scripts</li>
+                        <li><strong>Lazy load assets:</strong> Preload critical resources, lazy load secondary content</li>
+                        <li><strong>Content structure:</strong> Use proper heading hierarchy for accessibility and SEO</li>
+                    </ul>
+
+                    <h3>SEO and Accessibility</h3>
+                    <ul>
+                        <li><strong>Meta descriptions:</strong> Write compelling, accurate descriptions under 160 characters</li>
+                        <li><strong>Structured data:</strong> Use JSON-LD for rich snippets and search enhancement</li>
+                        <li><strong>Alt text:</strong> Provide descriptive alt text for all images</li>
+                        <li><strong>Heading structure:</strong> Use logical heading hierarchy (H1 → H2 → H3)</li>
+                    </ul>
+
+                    <h2>Integration with Components</h2>
+                    
+                    <h3>Including Components in Markdown</h3>
+                    <p>Use HTML blocks to include components within Markdown content:</p>
+
+                    <pre><code># Product Comparison
+
+Compare our different pricing tiers:
+
+&lt;div data-unify="/_includes/pricing-table.html"&gt;
+  &lt;!-- Pricing data can be customized here --&gt;
+&lt;/div&gt;
+
+## Need help choosing?
+
+Contact our sales team for personalized recommendations.
+
+&lt;div data-unify="/_includes/contact-form.html"&gt;
+  &lt;div class="unify-title"&gt;
+    &lt;h3&gt;Get in Touch&lt;/h3&gt;
+  &lt;/div&gt;
+  &lt;div class="unify-message"&gt;
+    &lt;p&gt;Tell us about your project and we'll help you choose the right plan.&lt;/p&gt;
+  &lt;/div&gt;
+&lt;/div&gt;</code></pre>
+
+                    <h3>Markdown Components</h3>
+                    <p>Components can also be Markdown files:</p>
+
+                    <pre><code>&lt;!-- _includes/faq-item.md --&gt;
+---
+title: Default Question
+---
+
+## {{ frontmatter.title }}
+
+Default answer content goes here. This can include:
+
+- **Markdown formatting**
+- [Links](https://example.com)
+- `Code snippets`
+
+&gt; Important notes can be highlighted in blockquotes.</code></pre>
+
+                    <h2>Common Patterns</h2>
+                    
+                    <h3>Landing Pages</h3>
+                    <pre><code>---
+title: Welcome to Our Product
+description: The best solution for your business needs
+layout: landing-page
+
+head:
+  meta:
+    - property: og:type
+      content: website
+    - name: twitter:card
+      content: summary_large_image
+  link:
+    - rel: preload
+      as: image
+      href: "/images/hero-bg.jpg"
+---
+
+&lt;section class="unify-hero"&gt;
+
+# Transform Your Business Today
+
+Discover how our solution can streamline your workflow and boost productivity.
+
+&lt;div class="hero-actions"&gt;
+  &lt;a href="/signup" class="btn btn-primary btn-large"&gt;Start Free Trial&lt;/a&gt;
+  &lt;a href="/demo" class="btn btn-secondary"&gt;Watch Demo&lt;/a&gt;
+&lt;/div&gt;
+
+&lt;/section&gt;</code></pre>
+
+                    <h3>Article Templates</h3>
+                    <pre><code>---
+title: Advanced CSS Techniques
+description: Master modern CSS with these advanced techniques and patterns
+author: Jane Smith
+date: 2024-01-20
+category: tutorial
+tags: [css, web-development, advanced]
+layout: article
+
+head:
+  meta:
+    - property: article:author
+      content: "Jane Smith"
+    - property: article:published_time
+      content: "2024-01-20"
+    - property: article:tag
+      content: "css"
+  link:
+    - rel: stylesheet
+      href: "/css/article.css"
+---
+
+# Advanced CSS Techniques
+
+Modern CSS provides powerful tools for creating sophisticated layouts and interactions.
+
+## Table of Contents
+
+1. [Grid Layout Patterns](#grid-layout-patterns)
+2. [Custom Properties](#custom-properties)
+3. [Container Queries](#container-queries)
+
+## Grid Layout Patterns
+
+CSS Grid enables complex layouts with minimal code...</code></pre>
+
+                    <div class="callout callout-warning">
+                        <h3>⚠️ Markdown Limitations</h3>
+                        <ul>
+                            <li><strong>No frontmatter in HTML:</strong> HTML files cannot use YAML frontmatter</li>
+                            <li><strong>No head elements in body:</strong> Markdown files cannot include <code>&lt;head&gt;</code> in content</li>
+                            <li><strong>Processing order:</strong> Markdown is converted before DOM Cascade composition</li>
+                            <li><strong>Syntax conflicts:</strong> Some Markdown syntax may conflict with HTML attributes</li>
+                        </ul>
+                    </div>
+
+                    <h2>Troubleshooting</h2>
+                    
+                    <h3>Common Issues</h3>
+                    
+                    <h4>Frontmatter Not Processing</h4>
+                    <ul>
+                        <li>Ensure YAML frontmatter is at the very beginning of the file</li>
+                        <li>Use proper YAML syntax with <code>---</code> delimiters</li>
+                        <li>Check for invisible characters or encoding issues</li>
+                    </ul>
+
+                    <h4>Layout Not Applied</h4>
+                    <ul>
+                        <li>Verify layout file exists at specified path</li>
+                        <li>Check layout file has proper DOM Cascade areas</li>
+                        <li>Review layout precedence rules</li>
+                    </ul>
+
+                    <h4>HTML Not Rendering</h4>
+                    <ul>
+                        <li>Ensure HTML blocks have proper spacing around them</li>
+                        <li>Check for conflicting Markdown syntax</li>
+                        <li>Validate HTML syntax within Markdown</li>
+                    </ul>
+
+                    <h2>Next Steps</h2>
+                    
+                    <p>Now that you understand Markdown in unify:</p>
+                    <ul>
+                        <li><a href="/unify/docs/includes">Learn about DOM Cascade composition</a></li>
+                        <li><a href="/unify/docs/components">Explore component integration</a></li>
+                        <li><a href="/unify/docs/assets">Understand asset management</a></li>
+                        <li><a href="/unify/docs/deployment">Deploy your Markdown-powered site</a></li>
+                    </ul>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>
