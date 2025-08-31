@@ -7,7 +7,6 @@
 import { FileSystemError } from "./errors.js";
 import { SecurityScanner } from "./security-scanner.js";
 import { SSIProcessor } from "./ssi-processor.js";
-import { HTMLMinifier } from "./html-minifier.js";
 import { ShortNameResolver } from "./short-name-resolver.js";
 import { HeadMerger } from "./cascade/head-merger.js";
 import { createLogger } from '../utils/logger.js';
@@ -37,7 +36,6 @@ export class HtmlProcessor {
     }
     
     this.securityScanner = new SecurityScanner();
-    this.htmlMinifier = new HTMLMinifier();
     
     try {
       this.headMerger = new HeadMerger(); // DOM Cascade v1 compliant head merging
@@ -135,15 +133,6 @@ export class HtmlProcessor {
           }
         }
         
-        // Legacy shortname mappings for backward compatibility
-        // TODO: Remove once all sites migrate to proper short name resolution
-        const legacyMappings = {
-          'head-content': '_includes/base/head.html'
-        };
-        
-        if (legacyMappings[path] && fileSystem[legacyMappings[path]]) {
-          return fileSystem[legacyMappings[path]];
-        }
         
         // Log error with file context before throwing
         htmlProcessor.logger.error(`Layout file not found: ${path}`, { 
@@ -164,11 +153,6 @@ export class HtmlProcessor {
 
       // Process the HTML
       let result = await processor.process(htmlContent, filePath);
-
-      // Apply post-processing
-      if (options.minify) {
-        result = this.htmlMinifier.minify(result);
-      }
 
       // Process SSI includes
       let ssiWarnings = [];
@@ -552,6 +536,8 @@ export class UnifyProcessor {
       }
       
       const analysis = await this.analyzeUnifyElements(result);
+      
+      
       if (analysis.componentImports.length === 0) break;
       
       // Process first component import found
@@ -576,13 +562,22 @@ export class UnifyProcessor {
       if (componentHead) {
         // Component has proper <head> element
         componentHeadData = this.extractHeadData(componentHead);
+        this.logger.debug('Component has formal head element', { 
+          componentPath: importInfo.path,
+          extractedData: componentHeadData 
+        });
       } else {
         // Component may have head elements (link, style, script) as direct children
         // This is common for fragments that don't have full HTML structure
         componentHeadData = this.extractHeadData(componentDoc.documentElement || componentDoc);
+        this.logger.debug('Component has no formal head, extracting from document element', { 
+          componentPath: importInfo.path,
+          hasDocumentElement: !!componentDoc.documentElement,
+          extractedData: componentHeadData 
+        });
       }
       
-      if (componentHeadData && (componentHeadData.styles?.length > 0 || componentHeadData.scripts?.length > 0 || componentHeadData.metas?.length > 0)) {
+      if (componentHeadData && (componentHeadData.styles?.length > 0 || componentHeadData.scripts?.length > 0 || componentHeadData.meta?.length > 0)) {
         this.logger.debug('Component head data extracted', { 
           componentPath: importInfo.path,
           headData: componentHeadData,
@@ -612,66 +607,24 @@ export class UnifyProcessor {
           hasMethod: this.headMerger && typeof this.headMerger.mergeWithComponents === 'function'
         });
         
-        // Use proper DOM Cascade v1 head merging: current (layout+page) + components
-        // This is a partial fix - proper fix would collect layout, components, page separately
-        let merged;
-        // HOTFIX: Reinitialize HeadMerger if it becomes null (likely due to test environment issues)
+        // Use DOM Cascade v1 head merging
+        // Initialize HeadMerger if not available
         if (!this.headMerger) {
           try {
             this.headMerger = new HeadMerger();
-            this.logger.debug('HeadMerger reinitialized during processing');
+            this.logger.debug('HeadMerger initialized during processing');
           } catch (error) {
-            this.logger.error('Failed to reinitialize HeadMerger', { error: error.message });
-            this.headMerger = null;
+            this.logger.error('Failed to initialize HeadMerger during processing', { error: error.message });
+            throw new Error(`HeadMerger initialization failed: ${error.message}`);
           }
         }
         
-        if (this.headMerger && typeof this.headMerger.mergeWithComponents === 'function') {
-          merged = this.headMerger.mergeWithComponents(
-            currentHeadData, // Current head (already contains layout+page merge)
-            allComponentHeads, // Component heads
-            {} // No additional page head at this point
-          );
-        } else {
-          // Fallback to basic merging if HeadMerger is not available
-          this.logger.warn('HeadMerger not available, falling back to basic component head merging with deduplication');
-          merged = { ...currentHeadData };
-          
-          // Deduplicate styles by href attribute
-          const seenHrefs = new Set();
-          const allStyles = [...(merged.styles || [])];
-          
-          // Add current styles to seen hrefs
-          for (const style of merged.styles || []) {
-            const href = this._extractHrefFromStyle(style);
-            if (href) {
-              seenHrefs.add(href);
-              this.logger.debug('Added existing style to dedup set', { href });
-            }
-          }
-          
-          // Add component styles with deduplication
-          for (const componentHead of allComponentHeads) {
-            if (componentHead.styles && componentHead.styles.length > 0) {
-              for (const style of componentHead.styles) {
-                const href = this._extractHrefFromStyle(style);
-                if (href && !seenHrefs.has(href)) {
-                  seenHrefs.add(href);
-                  allStyles.push(style);
-                  this.logger.debug('Added new component style', { href });
-                } else if (href && seenHrefs.has(href)) {
-                  this.logger.debug('Skipped duplicate component style', { href });
-                } else if (!href) {
-                  // Include non-link styles (like inline <style> tags) without deduplication for now
-                  allStyles.push(style);
-                  this.logger.debug('Added non-link component style', { stylePreview: style });
-                }
-              }
-            }
-          }
-          
-          merged.styles = allStyles;
-        }
+        // Use HeadMerger to properly merge component heads with current head
+        const merged = this.headMerger.mergeWithComponents(
+          currentHeadData, // Current head (already contains layout+page merge)
+          allComponentHeads, // Component heads
+          {} // No additional page head at this point
+        );
         
         this.logger.debug('Head merge completed', {
           mergedStylesCount: merged.styles?.length || 0,
@@ -741,24 +694,22 @@ export class UnifyProcessor {
     // DOM Cascade specification: Use component as base structure, only replace matching areas
     const parent = hostElement.parentNode;
     
-    // Find appropriate component element based on context
-    let baseElement;
+    // FIXED: Properly separate head elements from body elements
+    // Head elements should never be inserted into body - they get handled by head merging
+    const headElements = componentElements.filter(el => 
+      el.tagName && el.tagName.toLowerCase() === 'head'
+    );
+    const bodyElements = componentElements.filter(el => 
+      !el.tagName || el.tagName.toLowerCase() !== 'head'
+    );
     
-    // If host is in body context, filter out head elements from component
-    const isInBodyContext = this.isElementInBodyContext(hostElement);
-    if (isInBodyContext) {
-      // Filter out head elements from component elements
-      const bodyElements = componentElements.filter(el => 
-        el.tagName && el.tagName.toLowerCase() !== 'head'
-      );
-      baseElement = bodyElements[0] || componentElements[0];
-    } else {
-      // Use first element as fallback
-      baseElement = componentElements[0];
-    }
+    // Use first body element as base (head elements are handled separately)
+    const baseElement = bodyElements[0];
     
     if (!baseElement || typeof baseElement.cloneNode !== 'function') {
-      return hostHtml;
+      // No body elements to merge, just return (head elements handled elsewhere)
+      hostElement.remove();
+      return this.serializeHTML(hostDoc);
     }
     
     const clonedBase = baseElement.cloneNode(true);
@@ -771,9 +722,9 @@ export class UnifyProcessor {
     // Replace the host element with the modified component base
     parent.insertBefore(clonedBase, hostElement);
     
-    // If there are additional component elements, insert them too (but not the base element)
-    // This handles cases where components have multiple root elements
-    for (const element of componentElements) {
+    // Process additional body elements (but NOT head elements)
+    // Head elements are processed during head merging phase
+    for (const element of bodyElements) {
       if (element !== baseElement && element && typeof element.cloneNode === 'function') {
         const clonedElement = element.cloneNode(true);
         this.stripCommentsFromComponent(clonedElement);
@@ -980,7 +931,8 @@ export class UnifyProcessor {
    * Extract head data
    */
   extractHeadData(head) {
-    if (!head) return { title: null, metas: [], styles: [], scripts: [], components: [] };
+    if (!head) return { title: null, meta: [], styles: [], scripts: [], components: [] };
+    
     
     const title = this.querySelector(head, 'title');
     const metas = this.querySelectorAll(head, 'meta');
@@ -995,22 +947,52 @@ export class UnifyProcessor {
         !['meta', 'link', 'style', 'script', 'title'].includes(el.tagName?.toLowerCase())
       );
     
-    return {
+    const extractedData = {
       title: title ? this.getTextContent(title) : null,
-      metas: metas.filter(meta => 
+      // FIXED: Use HTMLRewriterUtils.extractHeadElements format for compatibility
+      meta: metas.filter(meta => 
         this.getAttribute(meta, 'name') || 
         this.getAttribute(meta, 'property') || 
-        this.getAttribute(meta, 'http-equiv')
-      ).map(meta => ({
-        element: meta,
-        key: this.getAttribute(meta, 'name') || 
-             this.getAttribute(meta, 'property') || 
-             this.getAttribute(meta, 'http-equiv')
-      })),
+        this.getAttribute(meta, 'http-equiv') ||
+        this.getAttribute(meta, 'charset')
+      ).map(meta => {
+        // Convert DOM element to object format expected by HeadMerger
+        const attributes = {};
+        
+        // Extract all attributes from the meta element
+        for (const attr of meta.attributes || []) {
+          attributes[attr.name] = attr.value;
+        }
+        
+        return attributes;
+      }),
       styles,
-      scripts,
+      scripts: scripts.map(script => {
+        // Convert DOM element to object format expected by HeadMerger
+        const src = this.getAttribute(script, 'src');
+        const inline = src ? null : this.getTextContent(script);
+        
+        return {
+          src,
+          inline,
+          element: script // Keep original element for fallback
+        };
+      }),
       components
     };
+    
+    // Debug component extraction
+    if (components.length > 0) {
+      this.logger.debug('extractHeadData found components', {
+        componentCount: components.length,
+        componentDetails: components.map(c => ({
+          tagName: c.tagName,
+          dataUnify: this.getAttribute(c, 'data-unify')
+        }))
+      });
+    }
+    
+    return extractedData;
   }
 
   /**
@@ -1156,91 +1138,59 @@ export class UnifyProcessor {
   }
 
   /**
-   * Merge head content
+   * Merge head content using DOM Cascade v1 HeadMerger
    */
-  mergeHead(layoutDoc, pageHeadData) {
+  mergeHead(layoutDoc, pageHeadData, componentHeadsData = []) {
     const layoutHead = this.querySelector(layoutDoc, 'head');
-    if (!layoutHead || !pageHeadData) return;
+    if (!layoutHead) return;
 
-    // --- Title: page wins ---
-    if (pageHeadData.title) {
-      let titleEl = this.querySelector(layoutHead, 'title');
-      if (!titleEl) {
-        titleEl = this.createElement('title');
-        this.appendChild(layoutHead, titleEl);
-      }
-      this.setTextContent(titleEl, pageHeadData.title);
-    }
-
-    // --- Meta tags: page overrides matching entries ---
-    for (const meta of pageHeadData.metas) {
-      const key = meta.key;
-      const nameAttr = this.getAttribute(meta.element, 'name');
-      const propertyAttr = this.getAttribute(meta.element, 'property');
-      const httpEquivAttr = this.getAttribute(meta.element, 'http-equiv');
-      
-      const selector =
-        nameAttr ? `meta[name="${key}"]` :
-        propertyAttr ? `meta[property="${key}"]` :
-        httpEquivAttr ? `meta[http-equiv="${key}"]` : null;
-        
-      if (selector) {
-        const existing = this.querySelector(layoutHead, selector);
-        if (existing) {
-          this.replaceElement(existing, meta.element);
-        } else {
-          this.appendChild(layoutHead, meta.element);
-        }
+    // Ensure HeadMerger is available
+    if (!this.headMerger) {
+      try {
+        this.headMerger = new HeadMerger();
+        this.logger.debug('HeadMerger initialized in mergeHead');
+      } catch (error) {
+        this.logger.error('Failed to initialize HeadMerger in mergeHead', { error: error.message });
+        throw new Error(`HeadMerger initialization failed: ${error.message}`);
       }
     }
 
-    // --- Styles: append page styles (skip docs styles) ---
-    for (const style of pageHeadData.styles) {
-      // Deduplicate by href for <link>
-      if (style.tagName === 'LINK') {
-        const href = this.getAttribute(style, 'href');
-        if (href && this.querySelector(layoutHead, `link[href="${href}"]`)) continue;
-      } else if (style.tagName === 'STYLE') {
-        // Deduplicate by content for <style>
-        const styleContent = this.getTextContent(style);
-        const existing = Array.from(this.querySelectorAll(layoutHead, 'style')).find(existingStyle => 
-          this.getTextContent(existingStyle).trim() === styleContent.trim()
-        );
-        if (existing) continue;
-      }
-      this.appendChild(layoutHead, style);
-    }
-
-    // --- Scripts: append page scripts (dedupe by src and content hash) ---
-    for (const script of pageHeadData.scripts) {
-      const src = this.getAttribute(script, 'src');
-      
-      // External script: deduplicate by src attribute
-      if (src) {
-        if (this.querySelector(layoutHead, `script[src="${src}"]`)) continue;
-      } else {
-        // Inline script: deduplicate by content hash per DOM Cascade v1 spec
-        const pageScriptContent = this.getTextContent(script);
-        if (pageScriptContent.trim()) {
-          // Check if any layout script has the same content
-          const existingScripts = this.querySelectorAll(layoutHead, 'script:not([src])');
-          const isDuplicate = existingScripts.some(existingScript => {
-            const existingContent = this.getTextContent(existingScript);
-            return existingContent.trim() === pageScriptContent.trim();
-          });
-          
-          if (isDuplicate) continue; // Skip duplicate inline script
-        }
-      }
-      
-      this.appendChild(layoutHead, script);
+    // Use DOM Cascade v1 compliant head merging
+    const layoutHeadData = this.extractHeadData(layoutHead);
+    
+    // Debug pageHeadData to see if components are preserved
+    if (pageHeadData && pageHeadData.components && pageHeadData.components.length > 0) {
+      this.logger.debug('mergeHead found pageHeadData components', {
+        pageComponentCount: pageHeadData.components.length,
+        pageComponentDetails: pageHeadData.components.map(c => ({
+          tagName: c.tagName,
+          dataUnify: this.getAttribute(c, 'data-unify')
+        }))
+      });
     }
     
-    // --- Components: append component import elements (elements with data-unify attributes) ---
-    for (const component of pageHeadData.components || []) {
-      // Component imports should be preserved in the head for later processing
-      this.appendChild(layoutHead, component);
-    }
+    
+    const mergedHead = this.headMerger.mergeWithComponents(
+      layoutHeadData,
+      componentHeadsData, 
+      pageHeadData || {}
+    );
+    
+    // Debug what HeadMerger returned
+    this.logger.debug('HeadMerger result', {
+      hasComponents: !!mergedHead.components,
+      componentCount: mergedHead.components?.length || 0,
+      mergedHeadKeys: Object.keys(mergedHead)
+    });
+    
+    this.logger.debug('Head merge using DOM Cascade v1', {
+      layoutStylesCount: layoutHeadData.styles?.length || 0,
+      componentHeadsCount: componentHeadsData.length,
+      pageStylesCount: pageHeadData?.styles?.length || 0,
+      mergedStylesCount: mergedHead.styles?.length || 0
+    });
+
+    this.replaceHeadContent(layoutDoc, mergedHead);
   }
 
   /**
@@ -1312,23 +1262,85 @@ export class UnifyProcessor {
    * Merge two elements according to spec
    */
   mergeElements(hostElement, pageElement) {
-    // Collect ID mappings for reference rewriting
-    const idMappings = this.collectIdMappings(hostElement, pageElement);
-    
-    // Merge attributes (page wins except id)
+    // Merge attributes first (page wins except id and class)
     this.mergeAttributes(hostElement, pageElement);
     
-    // Replace children - use childNodes to include text nodes
+    // For ID stability (DOM Cascade v1), we need to preserve layout IDs
+    // while using page content. This requires intelligent merging of inner elements.
+    this.mergeElementsWithIdStability(hostElement, pageElement);
+  }
+
+  /**
+   * Merge elements preserving layout IDs for DOM Cascade v1 compliance
+   * @param {Element} hostElement - Layout element (IDs preserved) 
+   * @param {Element} pageElement - Page element (content used)
+   */
+  mergeElementsWithIdStability(hostElement, pageElement) {
+    // Get children from both elements
+    const hostChildren = Array.from(hostElement.children);
+    const pageChildren = Array.from(pageElement.children);
+    
+    // Clear host element to rebuild content
     this.clearChildren(hostElement);
-    const childNodes = Array.from(pageElement.childNodes);
-    for (const child of childNodes) {
-      if (child && typeof child.cloneNode === 'function') {
-        const clonedChild = child.cloneNode(true);
-        // Rewrite any ID references in the cloned content
-        this.rewriteIdReferences(clonedChild, idMappings);
-        hostElement.appendChild(clonedChild);
+    
+    // Strategy: Merge element by element, preserving layout IDs when they exist
+    const maxChildren = Math.max(hostChildren.length, pageChildren.length);
+    
+    for (let i = 0; i < maxChildren; i++) {
+      const hostChild = hostChildren[i];
+      const pageChild = pageChildren[i];
+      
+      if (pageChild && hostChild) {
+        // Both exist: merge with ID stability
+        const mergedChild = this.mergeElementPair(hostChild, pageChild);
+        hostElement.appendChild(mergedChild);
+      } else if (pageChild) {
+        // Only page child exists: use page child directly
+        const clonedPageChild = pageChild.cloneNode(true);
+        hostElement.appendChild(clonedPageChild);
+      } else if (hostChild) {
+        // Only host child exists: preserve layout child
+        const clonedHostChild = hostChild.cloneNode(true);
+        hostElement.appendChild(clonedHostChild);
       }
     }
+    
+    // Add any remaining page text nodes and non-element content
+    for (const node of pageElement.childNodes) {
+      if (node.nodeType === 3 && node.textContent.trim()) { // TEXT_NODE = 3
+        const clonedTextNode = node.cloneNode(true);
+        hostElement.appendChild(clonedTextNode);
+      }
+    }
+  }
+
+  /**
+   * Merge a pair of elements with ID stability
+   * @param {Element} hostChild - Layout element (ID preserved)
+   * @param {Element} pageChild - Page element (content used) 
+   * @returns {Element} Merged element
+   */
+  mergeElementPair(hostChild, pageChild) {
+    // Start with page element structure but preserve host ID
+    const merged = pageChild.cloneNode(false); // Shallow clone (no children)
+    
+    // Preserve layout ID if it exists (ID stability requirement)
+    const hostId = this.getAttribute(hostChild, 'id');
+    if (hostId) {
+      this.setAttribute(merged, 'id', hostId);
+    }
+    
+    // Use page content (text content)
+    if (pageChild.childNodes.length === 0 || 
+        (pageChild.childNodes.length === 1 && pageChild.firstChild.nodeType === 3)) { // TEXT_NODE = 3
+      // Simple case: page element has only text content
+      merged.textContent = pageChild.textContent;
+    } else {
+      // Complex case: recursively merge children
+      this.mergeElementsWithIdStability(merged, pageChild);
+    }
+    
+    return merged;
   }
 
   /**
@@ -1466,8 +1478,94 @@ export class UnifyProcessor {
     // Note: data-unify attributes are NOT removed here anymore
     // They are removed after all component processing is complete
     
-    // Use linkedom's serialization
-    return doc.toString();
+    // Use linkedom's serialization with formatting
+    const html = doc.toString();
+    return this.formatHTML(html);
+  }
+
+  /**
+   * Format HTML with proper indentation and newlines
+   */
+  formatHTML(html) {
+    if (!html || typeof html !== 'string') {
+      return html || '';
+    }
+
+    let formatted = html;
+    let indent = 0;
+    const indentSize = 4; // 4 spaces per indent level
+
+    // Fix DOCTYPE case - normalize to lowercase as expected by fixtures
+    formatted = formatted.replace(/<!DOCTYPE html>/gi, '<!doctype html>');
+
+    // First pass: Add strategic newlines only where needed
+    formatted = formatted
+      // Add newlines before major block elements
+      .replace(/(<(html|head|body|main|header|footer|nav|aside|section|article|div|form|fieldset)[^>]*>)/gi, '\n$1')
+      // Add newlines after major block elements
+      .replace(/(<\/(html|head|body|main|header|footer|nav|aside|section|article|div|form|fieldset)>)/gi, '$1\n')
+      // Add newlines before head elements but keep them inline
+      .replace(/(<(meta|link)[^>]*>)/gi, '\n$1')
+      // Handle script and style tags specially - add newlines around them
+      .replace(/(<(script|style)[^>]*>)([\s\S]*?)(<\/\2>)/gi, '\n$1$3$4\n');
+
+    // Second pass: Process lines for indentation
+    const lines = formatted.split('\n');
+    const indentedLines = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      
+      if (!line) {
+        continue; // Skip empty lines
+      }
+
+      // Decrease indent for closing tags
+      if (line.startsWith('</')) {
+        indent = Math.max(0, indent - indentSize);
+      }
+
+      // Add current indentation
+      const indentedLine = ' '.repeat(indent) + line;
+      indentedLines.push(indentedLine);
+
+      // Increase indent for opening tags (but not self-closing or inline content)
+      if (line.startsWith('<') && !line.startsWith('</') && !line.endsWith('/>') && !this.isSelfClosingTag(line) && !this.isInlineElement(line)) {
+        indent += indentSize;
+      }
+    }
+
+    return indentedLines.join('\n');
+  }
+
+  /**
+   * Check if a line contains a self-closing tag
+   */
+  isSelfClosingTag(line) {
+    const selfClosingTags = ['meta', 'link', 'input', 'img', 'br', 'hr', 'area', 'base', 'col', 'embed', 'source', 'track', 'wbr'];
+    
+    for (const tag of selfClosingTags) {
+      if (line.toLowerCase().includes(`<${tag}`)) {
+        return true;
+      }
+    }
+    
+    return false;
+  }
+
+  /**
+   * Check if a line contains an inline element that should not increase indentation
+   */
+  isInlineElement(line) {
+    const inlineElements = ['title', 'span', 'a', 'strong', 'em', 'b', 'i', 'small', 'code'];
+    
+    for (const tag of inlineElements) {
+      if (line.toLowerCase().includes(`<${tag}`)) {
+        return true;
+      }
+    }
+    
+    return false;
   }
 
   querySelector(parent, selector) {
@@ -1502,7 +1600,23 @@ export class UnifyProcessor {
   }
 
   createElement(tagName) {
-    return this.parseHTML(`<${tagName}></${tagName}>`).body.firstElementChild;
+    const tag = tagName.toLowerCase();
+    
+    // Handle self-closing tags
+    const selfClosingTags = ['meta', 'link', 'input', 'img', 'br', 'hr', 'area', 'base', 'col', 'embed', 'source', 'track', 'wbr'];
+    
+    if (selfClosingTags.includes(tag)) {
+      return this.parseHTML(`<html><head><${tag}></head></html>`).querySelector(tag);
+    }
+    
+    // Handle head elements
+    const headElements = ['title', 'script', 'style', 'noscript'];
+    if (headElements.includes(tag)) {
+      return this.parseHTML(`<html><head><${tag}></${tag}></head></html>`).querySelector(tag);
+    }
+    
+    // Handle other elements in body
+    return this.parseHTML(`<html><body><${tag}></${tag}></body></html>`).querySelector(tag);
   }
 
   appendChild(parent, child) {
@@ -1576,6 +1690,24 @@ export class UnifyProcessor {
     // Clone the first element with all its content as the base
     const combined = el1.cloneNode(true);
     
+    // Merge attributes from el2 to combined (last-wins precedence)
+    // This fixes the multiple element attribute merging issue
+    if (el2.attributes) {
+      for (const attr of el2.attributes) {
+        if (attr.name !== 'class') { // Class handled separately below
+          this.setAttribute(combined, attr.name, attr.value);
+        }
+      }
+    }
+    
+    // Merge classes (union, avoiding duplicates)
+    const el1Classes = (this.getAttribute(el1, 'class') || '').split(' ').filter(Boolean);
+    const el2Classes = (this.getAttribute(el2, 'class') || '').split(' ').filter(Boolean);
+    const mergedClasses = [...new Set([...el1Classes, ...el2Classes])].join(' ');
+    if (mergedClasses) {
+      this.setAttribute(combined, 'class', mergedClasses);
+    }
+    
     // Add all children from the second element
     const el2Children = Array.from(el2.childNodes || []);
     for (const child of el2Children) {
@@ -1618,6 +1750,35 @@ export class UnifyProcessor {
     for (const meta of mergedHead.meta || []) {
       if (meta.element) {
         this.appendChild(head, meta.element);
+      } else {
+        // Create meta element from plain object (HeadMerger format)
+        const metaEl = this.createElement('meta');
+        if (!metaEl) {
+          this.logger.error('Failed to create meta element');
+          continue;
+        }
+        if (meta.charset) {
+          this.setAttribute(metaEl, 'charset', meta.charset);
+        }
+        if (meta.name) {
+          this.setAttribute(metaEl, 'name', meta.name);
+          if (meta.content) {
+            this.setAttribute(metaEl, 'content', meta.content);
+          }
+        }
+        if (meta.property) {
+          this.setAttribute(metaEl, 'property', meta.property);
+          if (meta.content) {
+            this.setAttribute(metaEl, 'content', meta.content);
+          }
+        }
+        if (meta['http-equiv']) {
+          this.setAttribute(metaEl, 'http-equiv', meta['http-equiv']);
+          if (meta.content) {
+            this.setAttribute(metaEl, 'content', meta.content);
+          }
+        }
+        this.appendChild(head, metaEl);
       }
     }
     
@@ -1627,6 +1788,25 @@ export class UnifyProcessor {
         this.appendChild(head, link.element);
       } else if (link.tagName && link.tagName === 'LINK') {
         this.appendChild(head, link);
+      } else {
+        // Create link element from plain object (HeadMerger format)
+        const linkEl = this.createElement('link');
+        if (link.rel) {
+          this.setAttribute(linkEl, 'rel', link.rel);
+        }
+        if (link.href) {
+          this.setAttribute(linkEl, 'href', link.href);
+        }
+        if (link.type) {
+          this.setAttribute(linkEl, 'type', link.type);
+        }
+        if (link.media) {
+          this.setAttribute(linkEl, 'media', link.media);
+        }
+        if (link.sizes) {
+          this.setAttribute(linkEl, 'sizes', link.sizes);
+        }
+        this.appendChild(head, linkEl);
       }
     }
     
@@ -1654,6 +1834,42 @@ export class UnifyProcessor {
         this.appendChild(head, script.element);
       } else if (script.tagName && script.tagName === 'SCRIPT') {
         this.appendChild(head, script);
+      } else {
+        // Create script element from plain object (HeadMerger format)
+        const scriptEl = this.createElement('script');
+        if (!scriptEl) {
+          this.logger.error('Failed to create script element');
+          continue;
+        }
+        if (script.src) {
+          this.setAttribute(scriptEl, 'src', script.src);
+        }
+        if (script.type) {
+          this.setAttribute(scriptEl, 'type', script.type);
+        }
+        if (script.async) {
+          this.setAttribute(scriptEl, 'async', '');
+        }
+        if (script.defer) {
+          this.setAttribute(scriptEl, 'defer', '');
+        }
+        if (script.inline) {
+          this.setTextContent(scriptEl, script.inline);
+        }
+        this.appendChild(head, scriptEl);
+      }
+    }
+    
+    // Restore component imports (elements with data-unify attributes)
+    // These need to be preserved so they can be processed after head merging
+    if (mergedHead.components && mergedHead.components.length > 0) {
+      this.logger.debug('replaceHeadContent restoring components', {
+        componentCount: mergedHead.components.length
+      });
+      for (const component of mergedHead.components) {
+        if (component) {
+          this.appendChild(head, component);
+        }
       }
     }
   }

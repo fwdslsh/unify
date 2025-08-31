@@ -136,9 +136,19 @@ description: Page description
 
       // Assert: Page wins precedence per DOM Cascade v1
       expect(processResult.html).toContain('<title>Page Title</title>'); // Page wins
-      expect(processResult.html).toContain('name="author" content="Page Author"'); // Page wins  
-      expect(processResult.html).toContain('name="description" content="Page description"'); // From frontmatter
-      expect(processResult.html).toContain('name="keywords" content="layout, keywords"'); // Layout preserved
+      
+      // Check for both possible attribute orders since HTML attributes can be in any order
+      const hasAuthor = processResult.html.includes('name="author" content="Page Author"') || 
+                        processResult.html.includes('content="Page Author" name="author"');
+      expect(hasAuthor).toBe(true); // Page wins
+      
+      const hasDescription = processResult.html.includes('name="description" content="Page description"') ||
+                             processResult.html.includes('content="Page description" name="description"');
+      expect(hasDescription).toBe(true); // From frontmatter
+      
+      const hasKeywords = processResult.html.includes('name="keywords" content="layout, keywords"') ||
+                          processResult.html.includes('content="layout, keywords" name="keywords"');
+      expect(hasKeywords).toBe(true); // Layout preserved
     });
 
     test('should_apply_area_matching_to_markdown_generated_html', async () => {

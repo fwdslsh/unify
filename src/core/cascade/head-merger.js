@@ -87,12 +87,16 @@ export class HeadMerger {
     }
     styles.push(...pageNormalized.styles);
     
+    // Preserve component imports from page head (they need to be processed after head merging)
+    const components = pageNormalized.components || [];
+    
     const merged = {
       title,
       meta,
       links,
       scripts,
-      styles
+      styles,
+      components
     };
 
     // Clean up undefined values
@@ -118,7 +122,7 @@ export class HeadMerger {
    */
   _normalizeHead(head) {
     if (!head || typeof head !== 'object') {
-      return { title: null, meta: [], links: [], scripts: [], styles: [] };
+      return { title: null, meta: [], links: [], scripts: [], styles: [], components: [] };
     }
 
     return {
@@ -126,7 +130,8 @@ export class HeadMerger {
       meta: Array.isArray(head.meta) ? head.meta : [],
       links: Array.isArray(head.links) ? head.links : [],
       scripts: Array.isArray(head.scripts) ? head.scripts : [],
-      styles: Array.isArray(head.styles) ? head.styles : []
+      styles: Array.isArray(head.styles) ? head.styles : [],
+      components: Array.isArray(head.components) ? head.components : []
     };
   }
 
@@ -403,6 +408,10 @@ export class HeadMerger {
 
     if (head.styles && head.styles.length > 0) {
       cleaned.styles = head.styles;
+    }
+
+    if (head.components && head.components.length > 0) {
+      cleaned.components = head.components;
     }
 
     return cleaned;

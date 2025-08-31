@@ -21,6 +21,7 @@ import { readFileSync, existsSync } from 'fs';
 import { resolve, dirname, basename, extname, join } from 'path';
 import { ValidationError } from './errors.js';
 import { PathValidator } from './path-validator.js';
+import { HTMLRewriterUtils } from './html-rewriter-utils.js';
 
 // Initialize path validator for security
 const pathValidator = new PathValidator();
@@ -148,13 +149,86 @@ function addJsonLdScript(frontmatter, headElements) {
 function addCustomHeadElements(frontmatter, headElements) {
   // Handle head_html: raw HTML string in frontmatter
   if (frontmatter.head_html && typeof frontmatter.head_html === 'string') {
-    // Split by lines and add non-empty lines as individual head elements
-    const htmlLines = frontmatter.head_html.split('\n')
-      .map(line => line.trim())
-      .filter(line => line.length > 0);
+    // Parse head_html content using HTMLRewriterUtils to enable proper HeadMerger deduplication
+    // Wrap head_html in a temporary head tag for parsing
+    const tempHeadHtml = `<head>${frontmatter.head_html}</head>`;
     
-    for (const htmlLine of htmlLines) {
-      headElements.push(htmlLine);
+    try {
+      const parsedHead = HTMLRewriterUtils.extractHeadElements(tempHeadHtml);
+      
+      // Convert parsed elements back to HTML strings with internal deduplication
+      const seenScripts = new Set();
+      const seenLinks = new Set();
+      
+      // Add scripts with deduplication
+      if (parsedHead.scripts && Array.isArray(parsedHead.scripts)) {
+        for (const script of parsedHead.scripts) {
+          let scriptHtml;
+          if (script.src) {
+            // External script - deduplicate by src
+            if (seenScripts.has(`src:${script.src}`)) continue;
+            seenScripts.add(`src:${script.src}`);
+            scriptHtml = `<script src="${script.src}"></script>`;
+          } else if (script.inline) {
+            // Inline script - deduplicate by normalized content
+            const normalized = script.inline.trim().replace(/\s+/g, ' ');
+            if (seenScripts.has(`inline:${normalized}`)) continue;
+            seenScripts.add(`inline:${normalized}`);
+            scriptHtml = `<script>${script.inline}</script>`;
+          } else {
+            scriptHtml = '<script></script>';
+          }
+          headElements.push(scriptHtml);
+        }
+      }
+      
+      // Add links with deduplication
+      if (parsedHead.links && Array.isArray(parsedHead.links)) {
+        for (const link of parsedHead.links) {
+          const linkKey = `${link.rel || ''}:${link.href || ''}`;
+          if (seenLinks.has(linkKey)) continue;
+          seenLinks.add(linkKey);
+          
+          let linkHtml = '<link';
+          if (link.rel) linkHtml += ` rel="${link.rel}"`;
+          if (link.href) linkHtml += ` href="${link.href}"`;
+          if (link.type) linkHtml += ` type="${link.type}"`;
+          linkHtml += '>';
+          headElements.push(linkHtml);
+        }
+      }
+      
+      // Add other elements (meta, styles)
+      if (parsedHead.meta && Array.isArray(parsedHead.meta)) {
+        for (const meta of parsedHead.meta) {
+          let metaHtml = '<meta';
+          if (meta.name) metaHtml += ` name="${meta.name}"`;
+          if (meta.content) metaHtml += ` content="${meta.content}"`;
+          if (meta.property) metaHtml += ` property="${meta.property}"`;
+          if (meta.charset) metaHtml += ` charset="${meta.charset}"`;
+          if (meta['http-equiv']) metaHtml += ` http-equiv="${meta['http-equiv']}"`;
+          metaHtml += '>';
+          headElements.push(metaHtml);
+        }
+      }
+      
+      if (parsedHead.styles && Array.isArray(parsedHead.styles)) {
+        for (const style of parsedHead.styles) {
+          if (style.inline) {
+            headElements.push(`<style>${style.inline}</style>`);
+          }
+        }
+      }
+      
+    } catch (error) {
+      // Fallback to original behavior if parsing fails
+      const htmlLines = frontmatter.head_html.split('\n')
+        .map(line => line.trim())
+        .filter(line => line.length > 0);
+      
+      for (const htmlLine of htmlLines) {
+        headElements.push(htmlLine);
+      }
     }
   }
   

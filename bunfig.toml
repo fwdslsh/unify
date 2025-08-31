@@ -5,7 +5,6 @@ registry = "https://registry.npmjs.org/"
 
 [test]
 # Use Bun's test runner
-preload = ["./test/bun-setup.js"]
 timeout = 5000 # timeout in milliseconds (example: 5000ms = 5s)
 
 [run]

@@ -81,13 +81,10 @@ temp/
 # Test output
 test-results/
 coverage/
-.claude/
-CLAUDE.md
+
 .notes/
 .plans/
-.giv/config
-test/test-temp/
-test/fixtures/*-test-*/
+.giv/config/
 .unify-cache/
 .vendor/
 .remove

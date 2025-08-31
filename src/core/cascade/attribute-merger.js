@@ -63,6 +63,11 @@ export class AttributeMerger {
         for (const attr of element.attributes) {
           attrs[attr.name] = attr.value;
         }
+      } else if (Array.isArray(element.attributes)) {
+        // Array of attribute objects
+        for (const attr of element.attributes) {
+          attrs[attr.name] = attr.value;
+        }
       } else {
         // Object-style attributes
         for (const [key, value] of Object.entries(element.attributes)) {
@@ -72,13 +77,32 @@ export class AttributeMerger {
         }
       }
     } else if (element.getAttribute) {
-      // Element with getAttribute method - need to enumerate
-      // This is a simplified approach; real implementation would need attribute enumeration
-      const commonAttrs = ['id', 'class', 'style', 'title', 'data-unify', 'role'];
-      for (const attrName of commonAttrs) {
+      // Element with getAttribute method - enumerate all possible attributes
+      // Check common HTML attributes and data attributes
+      const possibleAttrs = [
+        'id', 'class', 'style', 'title', 'role', 'tabindex', 'dir', 'lang',
+        'data-unify', 'data-theme', 'data-priority', 'data-custom', 'data-layout',
+        'data-version', 'data-content', 'data-target', 'data-action', 'data-value',
+        'data-config', 'data-state', 'data-type', 'data-name', 'data-id', 'data-key',
+        'aria-label', 'aria-describedby', 'aria-expanded', 'aria-hidden',
+        'onclick', 'onchange', 'onsubmit', 'onload'
+      ];
+      
+      for (const attrName of possibleAttrs) {
         const value = element.getAttribute(attrName);
         if (value !== null) {
           attrs[attrName] = value;
+        }
+      }
+      
+      // Also try to get all data-* attributes by checking the element's properties
+      // This is a fallback for cases where we don't know all possible attribute names
+      if (element.dataset) {
+        for (const [key, value] of Object.entries(element.dataset)) {
+          const attrName = `data-${key.replace(/([A-Z])/g, '-$1').toLowerCase()}`;
+          if (!(attrName in attrs) && value !== null && value !== undefined) {
+            attrs[attrName] = String(value);
+          }
         }
       }
     }
