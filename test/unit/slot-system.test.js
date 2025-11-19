@@ -324,48 +324,5 @@ describe('slot system v0.5.0', () => {
     expect(html).not.toContain('Default main content');  // Should not have fallback
   });
 
-  it('should prefer .layout. files over non-.layout. files', async () => {
-    // Create both types of layout files
-    const preferredLayoutContent = `<!DOCTYPE html>
-<html>
-<body>
-  <h1>Preferred Layout</h1>
-  <div data-slot="default">Content</div>
-</body>
-</html>`;
-    
-    const secondaryLayoutContent = `<!DOCTYPE html>
-<html>
-<body>
-  <h1>Secondary Layout</h1>
-  <div data-slot="default">Content</div>
-</body>
-</html>`;
-    
-    await fs.writeFile(path.join(layoutsDir, '_blog.layout.html'), preferredLayoutContent);
-    await fs.writeFile(path.join(layoutsDir, '_blog.html'), secondaryLayoutContent);
-    
-    // Create page with short name reference
-    const pageContent = `<div data-layout="blog">
-<p>Test content</p>
-</div>`;
-    
-    const pagePath = path.join(sourceDir, 'post.html');
-    await fs.writeFile(pagePath, pageContent);
-    
-    // Process the page
-    const result = await processHtmlUnified(
-      pageContent,
-      pagePath,
-      sourceDir,
-      dependencyTracker,
-      {}
-    );
-    
-    const html = result.content;
-    
-    // Verify preferred layout was used
-    expect(html).toContain('Preferred Layout');
-    expect(html).not.toContain('Secondary Layout');
-  });
+  // v2: Removed test for short name layout preference - short names not supported in v2
 });

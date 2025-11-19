@@ -1,0 +1,1337 @@
+bun test v1.3.2 (b131639c)
+
+test/security/path-traversal.test.js:
+🧪 Setting up test environment...
+   Runtime: node (v24.3.0)
+   Features: HTMLRewriter=true, fs.watch=true
+✅ Test environment ready
+118 | 
+119 |   describe('include type validation', () => {
+120 |     it('should reject invalid include types', () => {
+121 |       expect(() => {
+122 |         resolveIncludePath('invalid', 'header.html', currentFile, sourceRoot);
+123 |       }).toThrow(/Invalid include type/);
+               ^
+error: expect(received).toThrow(expected)
+
+Expected pattern: /Invalid include type/
+
+Received function did not throw
+Received value: undefined
+
+      at <anonymous> (/home/user/unify/test/security/path-traversal.test.js:123:10)
+(fail) path-traversal security > include type validation > should reject invalid include types [1.03ms]
+
+test/integration/component-asset-inline-behavior.test.js:
+57 |     });
+58 |     const output = await readFile(join(outputDir, 'index.html'), 'utf-8');
+59 | 
+60 |     // Verify style remains inline within the component content
+61 |     expect(output).toContain('<div class="button-container">');
+62 |     expect(output).toContain('<style>');
+                        ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "<style>"
+Received: "<!DOCTYPE html>\n<html>\n<head>\n  <title>Test Page</title>\n</head>\n<body>\n  <h1>My Page</h1>\n  <div class=\"button-container\">\n    <!--#include virtual=\"/.components/styled-button.html\" -->\n  </div>\n</body>\n</html>"
+
+      at <anonymous> (/home/user/unify/test/integration/component-asset-inline-behavior.test.js:62:20)
+(fail) Component Asset Inline Behavior > SSI-included components keep styles inline at include location [36.55ms]
+91 |       clean: true
+92 |     });
+93 |     const output = await readFile(join(outputDir, 'index.html'), 'utf-8');
+94 | 
+95 |     // Verify script remains inline within the component content
+96 |     expect(output).toContain('<button onclick="showAlert()">Click for Alert</button>');
+                        ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "<button onclick=\"showAlert()\">Click for Alert</button>"
+Received: "<!DOCTYPE html>\n<html>\n<body>\n  <h1>Script Test</h1>\n  <!--#include virtual=\"/.components/alert-button.html\" -->\n</body>\n</html>"
+
+      at <anonymous> (/home/user/unify/test/integration/component-asset-inline-behavior.test.js:96:20)
+(fail) Component Asset Inline Behavior > SSI-included components keep scripts inline at include location [18.04ms]
+171 |       components: '.components',
+172 |       clean: true
+173 |     });
+174 | 
+175 |     let output = await readFile(join(outputDir, 'index.html'), 'utf-8');
+176 |     expect(output).toContain('Version 1');
+                         ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "Version 1"
+Received: "<!DOCTYPE html>\n<html>\n<head>\n  <title>Component Rebuild Test</title>\n</head>\n<body>\n  <h1>Main Page</h1>\n  <!--#include virtual=\"/.components/dynamic-content.html\" -->\n  <footer>End of page</footer>\n</body>\n</html>"
+
+      at <anonymous> (/home/user/unify/test/integration/component-asset-inline-behavior.test.js:176:20)
+(fail) Component Asset Inline Behavior > component changes trigger complete page rebuild with updated content [12.22ms]
+250 | 
+251 |     let indexOutput = await readFile(join(outputDir, 'index.html'), 'utf-8');
+252 |     let aboutOutput = await readFile(join(outputDir, 'about.html'), 'utf-8');
+253 | 
+254 |     // Verify initial content in both pages
+255 |     expect(indexOutput).toContain('nav-v1');
+                              ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "nav-v1"
+Received: "<!DOCTYPE html>\n<html>\n<head><title>Nested Include Test</title></head>\n<body>\n  <!--#include virtual=\"/.components/header.html\" -->\n  <main>Index page content</main>\n</body>\n</html>"
+
+      at <anonymous> (/home/user/unify/test/integration/component-asset-inline-behavior.test.js:255:25)
+(fail) Component Asset Inline Behavior > nested include changes trigger complete rebuild of all dependent pages [18.71ms]
+
+test/integration/build-process.test.js:
+123 |     });
+124 | 
+125 |     const indexContent = await fs.readFile(path.join(outputDir, 'index.html'), 'utf-8');
+126 | 
+127 |     // Should contain nested navigation from header -> nav
+128 |     expect(indexContent.includes('<ul><li><a href="/">Home</a></li>')).toBeTruthy();
+                                                                             ^
+error: expect(received).toBeTruthy()
+
+Received: false
+
+      at <anonymous> (/home/user/unify/test/integration/build-process.test.js:128:72)
+[TEST OUTPUT DIR] /home/user/unify/test/fixtures/integration-test-1763520822612-uqk07ncm6/dist
+(fail) build-process integration > should process nested components correctly [22.32ms]
+ENOENT: no such file or directory, open '/home/user/unify/test/fixtures/integration-test-1763520822634-37c6iahcr/dist/css/style.css'
+    path: "/home/user/unify/test/fixtures/integration-test-1763520822634-37c6iahcr/dist/css/style.css",
+ syscall: "open",
+   errno: -2,
+    code: "ENOENT"
+
+[TEST OUTPUT DIR] /home/user/unify/test/fixtures/integration-test-1763520822634-37c6iahcr/dist
+(fail) build-process integration > should maintain directory structure for assets [24.26ms]
+156 |     const indexPath = path.join(sourceDir, 'index.html');
+157 |     const headerPath = path.join(sourceDir, '.components', 'header.html');
+158 |     const navPath = path.join(sourceDir, '.components', 'nav.html');
+159 | 
+160 |     const indexDeps = tracker.getPageDependencies(indexPath);
+161 |     expect(indexDeps.includes(headerPath)).toBeTruthy();
+                                                 ^
+error: expect(received).toBeTruthy()
+
+Received: false
+
+      at <anonymous> (/home/user/unify/test/integration/build-process.test.js:161:44)
+[TEST OUTPUT DIR] /home/user/unify/test/fixtures/integration-test-1763520822659-vl01ioia5/dist
+(fail) build-process integration > should track dependencies correctly [20.25ms]
+190 |     // Verify the build succeeded
+191 | 
+192 |     expect(result.errors.length).toBe(0); // Expect one warning/error
+193 |     //Output broken.html should contain a warning comment
+194 |     const brokenContent = await fs.readFile(brokenFilePath.replace('src', 'dist'), 'utf-8');
+195 |     expect(brokenContent.includes('<!-- Include not found: missing.html -->')).toBeTruthy();
+                                                                                     ^
+error: expect(received).toBeTruthy()
+
+Received: false
+
+      at <anonymous> (/home/user/unify/test/integration/build-process.test.js:195:80)
+[TEST OUTPUT DIR] /home/user/unify/test/fixtures/integration-test-1763520822679-81zl42l6p/dist
+(fail) build-process integration > should fail build when components are missing [24.94ms]
+[TEST OUTPUT DIR] /home/user/unify/test/fixtures/integration-test-1763520822704-qr0k97bom/dist
+300 |       clean: true
+301 |     });
+302 | 
+303 |     // Verify markdown without html element uses default layout
+304 |     const testMarkdownContent = await fs.readFile(path.join(outputDir, 'test-markdown.html'), 'utf-8');
+305 |     expect(testMarkdownContent.includes('Default Layout')).toBeTruthy();
+                                                                 ^
+error: expect(received).toBeTruthy()
+
+Received: false
+
+      at <anonymous> (/home/user/unify/test/integration/build-process.test.js:305:60)
+[TEST OUTPUT DIR] /home/user/unify/test/fixtures/integration-test-1763520822726-cvg1gnai5/dist
+(fail) build-process integration > should apply default layout unless the source page includes an <html> element explicitly [48.10ms]
+[TEST DEBUG] no-layout.html exists: true
+[TEST DEBUG] no-layout.html content: <!DOCTYPE html>
+  <html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>No Layout Test</title>
+    <meta name="description" content="">
+  </head>
+  <body>
+    <main>
+      <h1 id="content-without-layout">Content Without Layout</h1>
+<p>This should get basic HTML structure.</p>
+
+    </main>
+  </body>
+  </html>
+[TEST OUTPUT DIR] /home/user/unify/test/fixtures/integration-test-1763520822774-n1a2e8jqk/dist
+
+test/integration/exit-codes.test.js:
+155 |         '--source', sourceDir,
+156 |         '--output', outputDir,
+157 |         '--fail-on', 'error'
+158 |       ]);
+159 | 
+160 |       expect(result.code).toBe(1); // Exit code 1 for build errors in fail-on error mode
+                                ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 0
+
+      at <anonymous> (/home/user/unify/test/integration/exit-codes.test.js:160:27)
+(fail) Exit Code Validation > Exit Code 1 - Recoverable Errors > should return 1 when --fail-on error flag encounters errors [201.74ms]
+
+test/integration/include-depth-limiting.test.js:
+[ERROR] processIncludesWithStringReplacement failed: 271 |   try {
+272 | 
+273 |   // Check for circular dependency
+274 |   if (callStack.has(filePath)) {
+275 |     const chain = Array.from(callStack);
+276 |     throw new CircularDependencyError(filePath, chain);
+                ^
+CircularDependencyError: Circular dependency detected: /tmp/include-depth-test/src/circular-test.html → /tmp/include-depth-test/src/_includes/circular-a.html → /tmp/include-depth-test/src/_includes/circular-b.html → /tmp/include-depth-test/src/_includes/circular-a.html in /tmp/include-depth-test/src/_includes/circular-a.html
+   filePath: "/tmp/include-depth-test/src/_includes/circular-a.html",
+ lineNumber: null,
+ suggestions: [
+  "Remove one of the include statements to break the cycle", "Consider restructuring your components to avoid circular references",
+  "Use conditional includes if the circular dependency is intentional"
+],
+ dependencyChain: [ "/tmp/include-depth-test/src/circular-test.html", "/tmp/include-depth-test/src/_includes/circular-a.html",
+  "/tmp/include-depth-test/src/_includes/circular-b.html"
+],
+
+      at processIncludesWithStringReplacement (/home/user/unify/src/core/unified-html-processor.js:276:11)
+      at processIncludesWithStringReplacement (/home/user/unify/src/core/unified-html-processor.js:266:53)
+      at processIncludesWithStringReplacement (/home/user/unify/src/core/unified-html-processor.js:329:36)
+      at <anonymous> (/home/user/unify/test/integration/include-depth-limiting.test.js:163:75)
+
+158 | </body>
+159 | </html>`
+160 |     );
+161 | 
+162 |     // Should throw circular dependency error
+163 |     await expect(build({ source: sourceDir, output: outputDir })).rejects.toThrow();
+                                                                                ^
+error: 
+
+Expected promise that rejects
+Received promise that resolved: Promise { <resolved> }
+
+      at <anonymous> (/home/user/unify/test/integration/include-depth-limiting.test.js:163:75)
+(fail) Include Depth Limiting > should detect circular dependencies before depth limit [31.78ms]
+
+test/integration/dom-mode-includes.test.js:
+
+=== ACTUAL OUTPUT CONTENT ===
+<!DOCTYPE html>
+<html>
+<head>
+  <title><title>Welcome to DOM Mode</title></title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="/styles/site.css">
+  <style>
+    .blog-layout {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .blog-header {
+      text-align: center;
+      border-bottom: 2px solid #eee;
+      padding-bottom: 20px;
+      margin-bottom: 30px;
+    }
+    .blog-content {
+      line-height: 1.6;
+    }
+    .blog-footer {
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 1px solid #eee;
+      text-align: center;
+      color: #666;
+    }
+  </style>
+<style>
+  .alert { 
+    color: red; 
+    padding: 1rem; 
+    border: 1px solid red; 
+    border-radius: 4px;
+    background: #fff5f5;
+    margin: 16px 0;
+  }
+  .alert strong {
+    display: block;
+    margin-bottom: 8px;
+  }
+</style>
+<style>
+  .card {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 1rem;
+    margin: 1rem 0;
+    background: white;
+  }
+  .card h3 {
+    margin-top: 0;
+    color: #333;
+  }
+</style>
+</head>
+<body class="blog-layout">
+  <template>
+    <h1>🧱 Unify DOM Mode</h1>
+    <p>Modern templating with pure HTML</p>
+  </template>
+  <main class="blog-content">
+    <main><h2>Hello!</h2>
+  <p>This is a blog post rendered with the Unify DOM Mode layout engine. This content goes into the unnamed slot.</p>
+
+  
+
+<div class="alert">
+  <strong>Title</strong>
+  <p>Message</p>
+</div>
+
+  <h3>Components Example</h3>
+  <p>Here are some reusable components:</p>
+
+  
+
+<div class="card">
+  <h3>Card Title</h3>
+  <p>Card content goes here.</p>
+</div>
+
+  
+
+<div class="card">
+  <h3>Card Title</h3>
+  <p>Card content goes here.</p>
+</div>
+
+  <nav>
+  <ul>
+    <li><a href="/">Home</a></li>
+    <li><a href="/about.html">About</a></li>
+    <li><a href="/blog.html">Blog</a></li>
+  </ul>
+</nav></main> <!-- Main blog content -->
+  </main>
+</body>
+</html>
+=== END OUTPUT ===
+
+
+test/integration/live-reload.test.js:
+109 |       try {
+110 |         // Check that includes are processed correctly
+111 |         const response = await fetch(`http://localhost:${server.port}/`);
+112 |         expect(response.ok).toBeTruthy();
+113 |         const content = await response.text();
+114 |         expect(content).toContain('Test Header');
+                              ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "Test Header"
+Received: "<!DOCTYPE html>\n<html>\n<head>\n  <title>Page</title>\n</head>\n<body>\n<!--#include virtual=\"/includes/header.html\" --><p>Main content</p>\n\n<script>\n(function() {\n  let reconnectAttempts = 0;\n  const maxReconnectAttempts = 3; // Reduced from 5\n  let eventSource = null;\n  let lastHeartbeat = Date.now();\n  \n  function connectToLiveReload() {\n    if (reconnectAttempts >= maxReconnectAttempts) {\n      console.log('Live reload: Max reconnection attempts reached, giving up');\n      return;\n    }\n    \n    // Close existing connection if any\n    if (eventSource) {\n      eventSource.close();\n    }\n    \n    eventSource = new EventSource('/__live-reload');\n    \n    eventSource.onopen = function() {\n      console.log('Live reload: Connected');\n      reconnectAttempts = 0; // Reset on successful connection\n      lastHeartbeat = Date.now();\n    };\n    \n    eventSource.onmessage = function(event) {\n      try {\n        const data = JSON.parse(event.data);\n        \n        if (data.type === 'reload') {\n          console.log('Live reload: Reloading page...');\n          window.location.reload();\n        } else if (data.type === 'connected') {\n          console.log('Live reload: Server connection established');\n        } else if (data.type === 'heartbeat') {\n          lastHeartbeat = Date.now();\n          // Don't log heartbeats to reduce console noise\n        }\n      } catch (e) {\n        console.warn('Live reload: Invalid message format');\n      }\n    };\n    \n    eventSource.onerror = function(event) {\n      console.log('Live reload: Connection lost');\n      eventSource.close();\n      \n      // Check if we haven't received a heartbeat in a while (more than 35 seconds)\n      const timeSinceHeartbeat = Date.now() - lastHeartbeat;\n      if (timeSinceHeartbeat > 35000) {\n        console.log('Live reload: Heartbeat timeout, attempting reconnect');\n      }\n      \n      reconnectAttempts++;\n      if (reconnectAttempts <= maxReconnectAttempts) {\n        const delay = Math.min(2000 * reconnectAttempts, 8000); // Linear backoff, max 8s\n        console.log(`Live reload: Retrying in ${delay}ms (attempt ${reconnectAttempts}/${maxReconnectAttempts})`);\n        setTimeout(connectToLiveReload, delay);\n      }\n    };\n  }\n  \n  // Start connection\n  connectToLiveReload();\n  \n  // Cleanup on page unload\n  window.addEventListener('beforeunload', function() {\n    if (eventSource) {\n      eventSource.close();\n    }\n  });\n})();\n</script>\n</body>\n</html>"
+
+      at <anonymous> (/home/user/unify/test/integration/live-reload.test.js:114:25)
+(fail) Live Reload Functionality > File Watching and Rebuilds > should serve include-processed content correctly [979.30ms]
+132 |       try {
+133 |         // Check that layouts are processed correctly
+134 |         const response = await fetch(`http://localhost:${server.port}/page.html`);
+135 |         expect(response.ok).toBeTruthy();
+136 |         const content = await response.text();
+137 |         expect(content).toContain('Layout:');
+                              ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "Layout:"
+Received: "<!DOCTYPE html>\n<html>\n<head>\n  <title>Page</title>\n</head>\n<body>\n<div><h1>Content</h1></div>\n\n<script>\n(function() {\n  let reconnectAttempts = 0;\n  const maxReconnectAttempts = 3; // Reduced from 5\n  let eventSource = null;\n  let lastHeartbeat = Date.now();\n  \n  function connectToLiveReload() {\n    if (reconnectAttempts >= maxReconnectAttempts) {\n      console.log('Live reload: Max reconnection attempts reached, giving up');\n      return;\n    }\n    \n    // Close existing connection if any\n    if (eventSource) {\n      eventSource.close();\n    }\n    \n    eventSource = new EventSource('/__live-reload');\n    \n    eventSource.onopen = function() {\n      console.log('Live reload: Connected');\n      reconnectAttempts = 0; // Reset on successful connection\n      lastHeartbeat = Date.now();\n    };\n    \n    eventSource.onmessage = function(event) {\n      try {\n        const data = JSON.parse(event.data);\n        \n        if (data.type === 'reload') {\n          console.log('Live reload: Reloading page...');\n          window.location.reload();\n        } else if (data.type === 'connected') {\n          console.log('Live reload: Server connection established');\n        } else if (data.type === 'heartbeat') {\n          lastHeartbeat = Date.now();\n          // Don't log heartbeats to reduce console noise\n        }\n      } catch (e) {\n        console.warn('Live reload: Invalid message format');\n      }\n    };\n    \n    eventSource.onerror = function(event) {\n      console.log('Live reload: Connection lost');\n      eventSource.close();\n      \n      // Check if we haven't received a heartbeat in a while (more than 35 seconds)\n      const timeSinceHeartbeat = Date.now() - lastHeartbeat;\n      if (timeSinceHeartbeat > 35000) {\n        console.log('Live reload: Heartbeat timeout, attempting reconnect');\n      }\n      \n      reconnectAttempts++;\n      if (reconnectAttempts <= maxReconnectAttempts) {\n        const delay = Math.min(2000 * reconnectAttempts, 8000); // Linear backoff, max 8s\n        console.log(`Live reload: Retrying in ${delay}ms (attempt ${reconnectAttempts}/${maxReconnectAttempts})`);\n        setTimeout(connectToLiveReload, delay);\n      }\n    };\n  }\n  \n  // Start connection\n  connectToLiveReload();\n  \n  // Cleanup on page unload\n  window.addEventListener('beforeunload', function() {\n    if (eventSource) {\n      eventSource.close();\n    }\n  });\n})();\n</script>\n</body>\n</html>"
+
+      at <anonymous> (/home/user/unify/test/integration/live-reload.test.js:137:25)
+(fail) Live Reload Functionality > File Watching and Rebuilds > should serve layout-processed content correctly [986.55ms]
+
+test/integration/final-boss.test.js:
+190 |       // Verify content processing
+191 |       const indexContent = await fs.readFile(path.join(outputDir, 'index.html'), 'utf-8');
+192 |       expect(indexContent.includes('<!DOCTYPE html>')).toBeTruthy();
+193 |       expect(indexContent.includes('Home - Final Boss Test')).toBeTruthy();
+194 |       expect(indexContent.includes('Welcome to Final Boss Test Site')).toBeTruthy();
+195 |       expect(indexContent.includes('<div class="card">')).toBeTruthy();
+                                                                ^
+error: expect(received).toBeTruthy()
+
+Received: false
+
+      at <anonymous> (/home/user/unify/test/integration/final-boss.test.js:195:59)
+(fail) Final Boss Integration Test > Complete Website Build > should build a complex multi-page website with all features [218.36ms]
+267 |       expect(result.code).toBe(1);
+268 |       // Should have either missing file or circular dependency error (or both)
+269 |       const hasExpectedError =
+270 |         result.stderr.includes('missing.html') || result.stdout.includes('missing.html') ||
+271 |         result.stderr.includes('Circular dependency') || result.stdout.includes('Circular dependency');
+272 |       expect(hasExpectedError).toBeTruthy();
+                                     ^
+error: expect(received).toBeTruthy()
+
+Received: false
+
+      at <anonymous> (/home/user/unify/test/integration/final-boss.test.js:272:32)
+(fail) Final Boss Integration Test > Complete Website Build > should handle edge cases and error conditions [194.25ms]
+354 | 
+355 |       // Should not contain actual sensitive file content
+356 |       expect(edgeContent.includes('root:x:0:0')).toBeFalsy();
+357 | 
+358 |       // Should contain error comments for missing files
+359 |       expect(edgeContent.includes('Error:') || edgeContent.includes('not found')).toBeTruthy();
+                                                                                        ^
+error: expect(received).toBeTruthy()
+
+Received: false
+
+      at <anonymous> (/home/user/unify/test/integration/final-boss.test.js:359:83)
+(fail) Final Boss Integration Test > Complete Website Build > should handle edge cases and error conditions [177.64ms]
+459 |       expect(buildResult.code).toBe(0);
+460 | 
+461 |       const content = await fs.readFile(path.join(outputDir, 'index.html'), 'utf-8');
+462 | 
+463 |       // Should contain all levels
+464 |       expect(content.includes('Level 0')).toBeTruthy();
+                                                ^
+error: expect(received).toBeTruthy()
+
+Received: false
+
+      at <anonymous> (/home/user/unify/test/integration/final-boss.test.js:464:43)
+(fail) Final Boss Integration Test > Performance and Stress Tests > should handle deeply nested includes [173.49ms]
+
+test/integration/issue-29-complete-requirements.test.js:
+[ERROR] ERROR FileSystemError: File system error during copy: ENOTSUP: operation not supported on socket, copyfile '/tmp/unify-test-1763520866173-po9hkuca6/src/docs' -> '/tmp/unify-test-1763520866173-po9hkuca6/dist/docs'
+   File: /tmp/unify-test-1763520866173-po9hkuca6/src/docs
+[ERROR] Incremental build failed with 1 errors
+[ERROR] ERROR BuildError: Build failed: Incremental build failed with 1 errors
+
+Suggestions:
+   - Fix the 1 error(s) listed above
+   - Run with DEBUG=* for more detailed error information
+[ERROR] ERROR BuildError: Build failed: Incremental build failed with 1 errors
+
+Suggestions:
+   - Fix the 1 error(s) listed above
+   - Run with DEBUG=* for more detailed error information
+274 |       const initialHome = await fs.readFile(path.join(outputDir, 'home.html'), 'utf-8');
+275 |       const initialAbout = await fs.readFile(path.join(outputDir, 'about.html'), 'utf-8');
+276 |       const initialContact = await fs.readFile(path.join(outputDir, 'contact.html'), 'utf-8');
+277 | 
+278 |       // Pages that include the component should have it
+279 |       expect(initialHome).toContain('Original Navigation Menu');
+                                ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "Original Navigation Menu"
+Received: "<!DOCTYPE html>\n<html>\n<head><title>Home</title></head>\n<body>\n  <!--#include virtual=\"/.components/navbar.html\" -->\n  <main><h1>Home Page</h1></main>\n</body>\n</html>"
+
+      at <anonymous> (/home/user/unify/test/integration/issue-29-complete-requirements.test.js:279:27)
+(fail) Issue #29: Complete File Watching Requirements > Requirement 3: Component changes trigger dependent page rebuilds > should rebuild all pages that include a component when the component changes [320.42ms]
+328 |       // Wait for initial build
+329 |       await new Promise(resolve => setTimeout(resolve, 300));
+330 | 
+331 |       // Verify initial state - page should have nested component content
+332 |       const initialContent = await fs.readFile(path.join(outputDir, 'index.html'), 'utf-8');
+333 |       expect(initialContent).toContain('Original Navbar');
+                                   ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "Original Navbar"
+Received: "<!DOCTYPE html>\n<html>\n<head><title>Home</title></head>\n<body>\n  <!--#include virtual=\"/.components/header.html\" -->\n  <main><h1>Home Content</h1></main>\n</body>\n</html>"
+
+      at <anonymous> (/home/user/unify/test/integration/issue-29-complete-requirements.test.js:333:30)
+(fail) Issue #29: Complete File Watching Requirements > Requirement 3: Component changes trigger dependent page rebuilds > should handle nested component dependencies [312.03ms]
+[ERROR] ERROR FileSystemError: File system error during copy: ENOTSUP: operation not supported on socket, copyfile '/tmp/unify-test-1763520868435-ow2xs3kvi/src/images' -> '/tmp/unify-test-1763520868435-ow2xs3kvi/dist/images'
+   File: /tmp/unify-test-1763520868435-ow2xs3kvi/src/images
+[ERROR] Incremental build failed with 1 errors
+[ERROR] ERROR BuildError: Build failed: Incremental build failed with 1 errors
+
+Suggestions:
+   - Fix the 1 error(s) listed above
+   - Run with DEBUG=* for more detailed error information
+[ERROR] ERROR BuildError: Build failed: Incremental build failed with 1 errors
+
+Suggestions:
+   - Fix the 1 error(s) listed above
+   - Run with DEBUG=* for more detailed error information
+
+test/integration/cli.test.js:
+89 |     await fs.access(path.join(outputDir, 'index.html'));
+90 |     await fs.access(path.join(outputDir, 'main.css'));
+91 | 
+92 |     // Verify content processing
+93 |     const indexContent = await fs.readFile(path.join(outputDir, 'index.html'), 'utf-8');
+94 |     expect(indexContent.includes('<header><h1>CLI Test</h1></header>')).toBeTruthy();
+                                                                             ^
+error: expect(received).toBeTruthy()
+
+Received: false
+
+      at <anonymous> (/home/user/unify/test/integration/cli.test.js:94:73)
+(fail) CLI integration > should run build when no command is provided [171.69ms]
+110 |     await fs.access(path.join(outputDir, 'index.html'));
+111 |     await fs.access(path.join(outputDir, 'main.css'));
+112 | 
+113 |     // Verify content processing
+114 |     const indexContent = await fs.readFile(path.join(outputDir, 'index.html'), 'utf-8');
+115 |     expect(indexContent.includes('<header><h1>CLI Test</h1></header>')).toBeTruthy();
+                                                                              ^
+error: expect(received).toBeTruthy()
+
+Received: false
+
+      at <anonymous> (/home/user/unify/test/integration/cli.test.js:115:73)
+(fail) CLI integration > should build site with build command [168.20ms]
+140 |       '--output', outputDir
+141 |     ]);
+142 | 
+143 |     expect(result.code).toBe(0);
+144 |     const allOutput = result.stdout + result.stderr;
+145 |     expect(allOutput.includes('Include not found') || allOutput.includes('Include file not found')).toBeTruthy();
+                                                                                                          ^
+error: expect(received).toBeTruthy()
+
+Received: false
+
+      at <anonymous> (/home/user/unify/test/integration/cli.test.js:145:101)
+(fail) CLI integration > should fail build when components are missing [173.38ms]
+221 |     expect(result.stdout.includes('Build completed successfully')).toBeTruthy();
+222 | 
+223 |     // Verify output in default dist directory
+224 |     await fs.access(path.join(defaultDist, 'index.html'));
+225 |     const indexContent = await fs.readFile(path.join(defaultDist, 'index.html'), 'utf-8');
+226 |     expect(indexContent.includes('<header><h1>Default Test</h1></header>')).toBeTruthy();
+                                                                                  ^
+error: expect(received).toBeTruthy()
+
+Received: false
+
+      at <anonymous> (/home/user/unify/test/integration/cli.test.js:226:77)
+(fail) CLI integration > should work with simplified usage (no arguments) [188.50ms]
+
+test/integration/component-behavior-current.test.js:
+60 | 
+61 |     const outputFile = path.join(outputDir, 'index.html');
+62 |     const content = await fs.readFile(outputFile, 'utf-8');
+63 | 
+64 |     // Current behavior: styles are inlined at include location, NOT moved to head
+65 |     expect(content).toMatch(/<div>[\s\S]*<style>[\s\S]*\.btn[\s\S]*background:\s*blue[\s\S]*<\/style>[\s\S]*<button class="btn">Click Me<\/button>[\s\S]*<\/div>/);
+                         ^
+error: expect(received).toMatch(expected)
+
+Expected substring or pattern: /<div>[\s\S]*<style>[\s\S]*\.btn[\s\S]*background:\s*blue[\s\S]*<\/style>[\s\S]*<button class="btn">Click Me<\/button>[\s\S]*<\/div>/
+Received: "\n<!DOCTYPE html>\n<html>\n<head>\n  <title>SSI Style Test</title>\n</head>\n<body>\n  <div>\n    <!--#include virtual=\"/.components/styled-button.html\" -->\n  </div>\n</body>\n</html>\n      "
+
+      at <anonymous> (/home/user/unify/test/integration/component-behavior-current.test.js:65:21)
+(fail) Current Component Include Behavior > should inline style elements from SSI-included components [10.70ms]
+109 | 
+110 |     const outputFile = path.join(outputDir, 'index.html');
+111 |     const content = await fs.readFile(outputFile, 'utf-8');
+112 | 
+113 |     // Current behavior: scripts are inlined at include location, NOT moved to end of body
+114 |     expect(content).toMatch(/<div>[\s\S]*<div id="counter">0<\/div>[\s\S]*<script>[\s\S]*function increment\(\)[\s\S]*<\/script>[\s\S]*<\/div>/);
+                          ^
+error: expect(received).toMatch(expected)
+
+Expected substring or pattern: /<div>[\s\S]*<div id="counter">0<\/div>[\s\S]*<script>[\s\S]*function increment\(\)[\s\S]*<\/script>[\s\S]*<\/div>/
+Received: "\n<!DOCTYPE html>\n<html>\n<head>\n  <title>SSI Script Test</title>\n</head>\n<body>\n  <div>\n    <!--#include virtual=\"/.components/counter.html\" -->\n  </div>\n</body>\n</html>\n      "
+
+      at <anonymous> (/home/user/unify/test/integration/component-behavior-current.test.js:114:21)
+(fail) Current Component Include Behavior > should inline script elements from SSI-included components [10.07ms]
+
+test/integration/live-reload-component-rebuild.test.js:
+52 |       // Wait for initial build
+53 |       await waitForBuild(outputDir);
+54 | 
+55 |       // Verify initial content
+56 |       let output = await readFile(join(outputDir, 'index.html'), 'utf-8');
+57 |       expect(output).toContain('status-v1');
+                          ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "status-v1"
+Received: "<!DOCTYPE html>\n<html>\n<head><title>Status Page</title></head>\n<body>\n  <h1>System Status</h1>\n  <!--#include virtual=\"/.components/status.html\" -->\n  <footer>Last updated: Never</footer>\n</body>\n</html>"
+
+      at <anonymous> (/home/user/unify/test/integration/live-reload-component-rebuild.test.js:57:22)
+(fail) Live Reload Component Rebuild Integration > component changes trigger complete page rebuild before browser reload [1476.45ms]
+130 | 
+131 |       // Verify initial content in both pages
+132 |       let dashboardOutput = await readFile(join(outputDir, 'dashboard.html'), 'utf-8');
+133 |       let profileOutput = await readFile(join(outputDir, 'profile.html'), 'utf-8');
+134 | 
+135 |       expect(dashboardOutput).toContain('John Doe v1');
+                                    ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "John Doe v1"
+Received: "<!DOCTYPE html>\n<html>\n<head><title>Dashboard</title></head>\n<body>\n  <!--#include virtual=\"/.components/sidebar.html\" -->\n  <main>Dashboard content</main>\n</body>\n</html>"
+
+      at <anonymous> (/home/user/unify/test/integration/live-reload-component-rebuild.test.js:135:31)
+(fail) Live Reload Component Rebuild Integration > nested component changes trigger rebuild of all dependent pages [6520.15ms]
+
+test/integration/file-watcher-addition-deletion.test.js:
+136 |     // Wait for initial build
+137 |     await new Promise(resolve => setTimeout(resolve, 200));
+138 | 
+139 |     // Verify initial state - sidebar include should show as not found
+140 |     const initialContent = await fs.readFile(path.join(outputDir, 'page.html'), 'utf-8');
+141 |     expect(initialContent).toContain('<!-- Include not found: /.components/sidebar.html -->');
+                                 ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "<!-- Include not found: /.components/sidebar.html -->"
+Received: "<!DOCTYPE html>\n<html>\n<head><title>Page</title></head>\n<body>\n  <!--#include virtual=\"/.components/sidebar.html\" -->\n  <main>Content</main>\n</body>\n</html>"
+
+      at <anonymous> (/home/user/unify/test/integration/file-watcher-addition-deletion.test.js:141:28)
+(fail) File Watcher Addition and Deletion > should handle component file additions and trigger page rebuilds [217.59ms]
+173 |     // Wait for initial build
+174 |     await new Promise(resolve => setTimeout(resolve, 200));
+175 | 
+176 |     // Verify initial state - header should be included
+177 |     const initialContent = await fs.readFile(path.join(outputDir, 'page.html'), 'utf-8');
+178 |     expect(initialContent).toContain('<header>Header</header>');
+                                 ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "<header>Header</header>"
+Received: "<!DOCTYPE html>\n<html>\n<head><title>Page</title></head>\n<body>\n  <!--#include virtual=\"/.components/header.html\" -->\n  <main>Content</main>\n</body>\n</html>"
+
+      at <anonymous> (/home/user/unify/test/integration/file-watcher-addition-deletion.test.js:178:28)
+(fail) File Watcher Addition and Deletion > should handle component file deletions and update dependent pages [217.80ms]
+
+test/integration/live-reload-includes.test.js:
+56 |       // Check initial content
+57 |       let content = await fs.readFile(
+58 |         path.join(outputDir, "index.html"),
+59 |         "utf-8"
+60 |       );
+61 |       expect(content).toContain("Original Header");
+                           ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "Original Header"
+Received: "<!DOCTYPE html>\n<html>\n<head>\n  <title>Page</title>\n</head>\n<body>\n<!--#include virtual=\"/includes/header.html\" --><p>Main content</p>\n</body>\n</html>"
+
+      at <anonymous> (/home/user/unify/test/integration/live-reload-includes.test.js:61:23)
+(fail) Live Reload - Include File Changes > should trigger rebuild when include file changes [1481.01ms]
+117 |       await waitForBuild(outputDir);
+118 |       const content = await fs.readFile(
+119 |         path.join(outputDir, "index.html"),
+120 |         "utf-8"
+121 |       );
+122 |       expect(content).toContain("Updated Navigation Menu");
+                            ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "Updated Navigation Menu"
+Received: "<!DOCTYPE html>\n<html>\n<head>\n  <title>Page</title>\n</head>\n<body>\n<!--#include virtual=\"/includes/nav.html\" --><main>Content</main>\n</body>\n</html>"
+
+      at <anonymous> (/home/user/unify/test/integration/live-reload-includes.test.js:122:23)
+(fail) Live Reload - Include File Changes > should broadcast reload event when include file changes [2294.06ms]
+
+test/integration/debug-paths.test.js:
+=== CONFIG VALUES ===
+sourceDir: /home/user/unify/test/test-temp/debug-paths/src
+componentsDir: /home/user/unify/test/test-temp/debug-paths/src/custom_components
+layoutsDir: /home/user/unify/test/test-temp/debug-paths/src/site_layouts
+✅ Build succeeded
+
+test/integration/performance-edge-cases.test.js:
+
+# Unhandled error between tests
+-------------------------------
+1 | })
+2 | {
+    ^
+SyntaxError: Export named 'processIncludes' not found in module '/home/user/unify/src/core/include-processor.js'.
+      at loadAndEvaluateModule (2:1)
+-------------------------------
+
+
+test/integration/component-assets.test.js:
+=== OUTPUT CONTENT ===
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Page</title>
+<style>
+  .btn {
+    background: #007bff;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.2s;
+  }
+  .btn:hover {
+    background: #0056b3;
+  }
+  .btn:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+  }
+</style>
+<style>
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: none;
+    z-index: 1000;
+  }
+  .modal-content {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    max-width: 500px;
+    width: 90%;
+  }
+  .modal-close {
+    float: right;
+    font-size: 24px;
+    cursor: pointer;
+    color: #999;
+  }
+</style>
+</head>
+<body>
+<div>
+  <h1>Testing Component Styles</h1>
+  
+
+<button class="btn">Click Me</button>
+  
+
+<div class="modal-overlay" id="modal">
+  <div class="modal-content">
+    <span class="modal-close" onclick="closeModal()">&times;</span>
+    <h3>Modal Title</h3>
+    <p>Modal content goes here.</p>
+  </div>
+</div>
+
+
+</div>
+<script>
+  function openModal() {
+    document.getElementById('modal').style.display = 'block';
+    document.body.style.overflow = 'hidden';
+  }
+  
+  function closeModal() {
+    document.getElementById('modal').style.display = 'none';
+    document.body.style.overflow = 'auto';
+  }
+  
+  // Close modal when clicking overlay
+  document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('modal-overlay')) {
+      closeModal();
+    }
+  });
+</script>
+</body>
+</html>
+=== END OUTPUT ===
+432 |     const lastScriptIndex = outputContent.lastIndexOf('</script>');
+433 |     const bodyEndIndex = outputContent.lastIndexOf('</body>');
+434 |     expect(lastScriptIndex).toBeLessThan(bodyEndIndex);
+435 | 
+436 |     // Check that layout styles and scripts are preserved
+437 |     expect(headSection.includes('font-family: Arial, sans-serif')).toBeTruthy(); // layout style
+                                                                         ^
+error: expect(received).toBeTruthy()
+
+Received: false
+
+      at <anonymous> (/home/user/unify/test/integration/component-assets.test.js:437:68)
+(fail) Component Asset Processing > should handle components with both styles and scripts correctly [17.80ms]
+
+test/integration/bug-reproduction.test.js:
+Building site...
+=== OUTPUT CONTENT ===
+<!DOCTYPE html>
+<html>
+<head>
+  <title><slot name="title">My Blog</slot></title>
+</head>
+<body>
+  <main><h2>Hello!</h2>
+  <p>This is a test page.</p>
+
+  <div class="alert">
+  <strong>Title</strong>
+  <p>Message</p>
+</div></main>
+</body>
+</html>
+=== END OUTPUT ===
+Has <include> elements: false
+Component directory copied to output: false
+Layouts directory copied to output: false
+
+✅ All DOM Mode processing working correctly!
+
+test/integration/complex-workflows.test.js:
+89 |       }
+90 |       expect(buildResult.code).toBe(0);
+91 | 
+92 |       // Verify initial build output
+93 |       const indexContent = await fs.readFile(path.join(outputDir, 'index.html'), 'utf-8');
+94 |       expect(indexContent).toContain('<title>Site</title>');
+                                ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "<title>Site</title>"
+Received: "<!DOCTYPE html>\n<html>\n<head>\n  <title>Page</title>\n</head>\n<body>\n\n          <div>\n            <h1>Home Page</h1>\n            <!--#include file=\"includes/nav.html\" -->\n            <main>Welcome to the site</main>\n          </div>\n        \n</body>\n</html>"
+
+      at <anonymous> (/home/user/unify/test/integration/complex-workflows.test.js:94:28)
+(fail) Complex Integration Scenarios > Full Workflow Integration > should handle complete serve → watch → live reload → rebuild workflow [194.81ms]
+220 | 
+221 |       for (const file of files) {
+222 |         const content = await fs.readFile(path.join(outputDir, file), 'utf-8');
+223 |         expect(content).toContain('<!DOCTYPE html>');
+224 |         expect(content).toContain('<title>');
+225 |         expect(content).toContain('My Site'); // From header include
+                              ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "My Site"
+Received: "<!DOCTYPE html>\n<html>\n<head>\n  <title>Page</title>\n</head>\n<body>\n<div><h1>Home</h1><!--#include file=\"includes/sidebar.html\" --></div>\n</body>\n</html>"
+
+      at <anonymous> (/home/user/unify/test/integration/complex-workflows.test.js:225:25)
+(fail) Complex Integration Scenarios > Full Workflow Integration > should handle mixed file types in single build with complex dependencies [232.68ms]
+268 |         '--output', outputDir
+269 |       ]);
+270 |       expect(deepResult.code).toBe(0);
+271 | 
+272 |       const pageContent = await fs.readFile(path.join(outputDir, 'page.html'), 'utf-8');
+273 |       expect(pageContent).toContain('Level 1:');
+                                ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "Level 1:"
+Received: "<!DOCTYPE html>\n<html>\n<head>\n  <title>Page</title>\n</head>\n<body>\n<!--#include file=\"includes/level1.html\" -->\n</body>\n</html>"
+
+      at <anonymous> (/home/user/unify/test/integration/complex-workflows.test.js:273:27)
+(fail) Complex Integration Scenarios > Nested Component Dependencies > should handle complex nested includes with circular detection [208.32ms]
+325 |       ]);
+326 |       expect(result.code).toBe(0);
+327 | 
+328 |       const content = await fs.readFile(path.join(outputDir, 'page.html'), 'utf-8');
+329 |       expect(content).toContain('<!DOCTYPE html>');
+330 |       expect(content).toContain('grandparent-wrapper');
+                            ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "grandparent-wrapper"
+Received: "<!DOCTYPE html>\n<html>\n<head>\n  <title>Page</title>\n</head>\n<body>\n<div data-layout=\"child\"><h1>Content</h1></div>\n</body>\n</html>"
+
+      at <anonymous> (/home/user/unify/test/integration/complex-workflows.test.js:330:23)
+(fail) Complex Integration Scenarios > Nested Component Dependencies > should handle complex layout inheritance chains [189.65ms]
+Built 57 files in 353ms
+473 |       expect(sitemapContent).toContain('https://example.com');
+474 | 
+475 |       // Verify assets were copied
+476 |       // TODO: Fix asset copying for images - currently only CSS is being copied
+477 |       // expect(await fileExists(path.join(outputDir, 'images/logo.png'))).toBe(true);
+478 |       expect(await fileExists(path.join(outputDir, 'css/style.css'))).toBe(true);
+                                                                            ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/home/user/unify/test/integration/complex-workflows.test.js:478:71)
+(fail) Complex Integration Scenarios > Edge Case Combinations > should handle all flags together with complex content [204.92ms]
+496 |         '--fail-on', 'error'
+497 |       ]);
+498 |       // TODO: Fix fail-on error mode to properly fail on missing includes
+499 |       // Currently errors are logged but build still succeeds
+500 |       // expect(errorResult.code).toBe(1);
+501 |       expect(errorResult.stderr).toContain('Include not found: includes/missing.html');
+                                       ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "Include not found: includes/missing.html"
+Received: ""
+
+      at <anonymous> (/home/user/unify/test/integration/complex-workflows.test.js:501:34)
+(fail) Complex Integration Scenarios > Edge Case Combinations > should handle fail-on error mode with complex dependencies [190.08ms]
+
+test/performance/scalability.test.js:
+Built 1000 pages in 2166ms
+(fail) Performance Scalability > Large Project Handling > should handle pages over 5MB in size [38223.38ms]
+  ^ this test timed out after 30000ms.
+
+# Unhandled error between tests
+-------------------------------
+ENOENT: no such file or directory, open '/tmp/unify-test-1763520926122-dai1jhk0t/src/large-page.html'
+    path: "/tmp/unify-test-1763520926122-dai1jhk0t/src/large-page.html",
+ syscall: "open",
+   errno: -2,
+    code: "ENOENT"
+
+-------------------------------
+
+Incremental build of 50 pages in 212ms
+Initial build of 100 pages in 416ms
+Memory usage: 2.55MB for 200 pages
+Built 50 pages with 100 includes in 307ms
+309 |       const buildTime = Date.now() - startTime;
+310 | 
+311 |       expect(result.code).toBe(0);
+312 | 
+313 |       // Should handle many assets efficiently
+314 |       expect(buildTime).toBeLessThan(1000); // 1 second
+                              ^
+error: expect(received).toBeLessThan(expected)
+
+Expected: < 1000
+Received: 1110
+
+      at <anonymous> (/home/user/unify/test/performance/scalability.test.js:314:25)
+(fail) Performance Scalability > Asset Handling Performance > should efficiently handle large numbers of assets [1670.27ms]
+Built 50 files with complex dependencies in 367ms
+
+test/unit/css-asset-tracking.test.js:
+sourceDir: /tmp/unify-test-fixed/src
+File exists: /tmp/unify-test-fixed/src/index.html true
+File exists: /tmp/unify-test-fixed/src/css/fonts.css true
+File exists: /tmp/unify-test-fixed/src/fonts/custom.woff2 true
+File exists: /tmp/unify-test-fixed/src/fonts/custom.woff true
+File exists: /tmp/unify-test-fixed/src/fonts/another.ttf true
+
+test/unit/error-formatting.test.js:
+61 |         '--source', sourceDir,
+62 |         '--output', outputDir
+63 |       ]);
+64 | 
+65 |       expect(result.code).toBe(0); // Build succeeds with warnings in normal mode
+66 |       expect(result.stderr).toMatch(/\[WARN\].*Include not found.*missing\.html/);
+                                 ^
+error: expect(received).toMatch(expected)
+
+Expected substring or pattern: /\[WARN\].*Include not found.*missing\.html/
+Received: ""
+
+      at <anonymous> (/home/user/unify/test/unit/error-formatting.test.js:66:29)
+(fail) Error Message Format Validation > Spec-Compliant Error Format > should format build errors according to spec [201.25ms]
+78 |         '--source', sourceDir,
+79 |         '--output', outputDir,
+80 |         '--fail-on', 'error'
+81 |       ]);
+82 | 
+83 |       expect(result.code).toBe(1);
+                               ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 0
+
+      at <anonymous> (/home/user/unify/test/unit/error-formatting.test.js:83:27)
+(fail) Error Message Format Validation > Spec-Compliant Error Format > should format fail-on error mode errors according to spec [196.26ms]
+148 |         '--source', sourceDir,
+149 |         '--output', outputDir,
+150 |         '--fail-on', 'error'
+151 |       ]);
+152 | 
+153 |       expect(result.code).toBe(1);
+                                ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 0
+
+      at <anonymous> (/home/user/unify/test/unit/error-formatting.test.js:153:27)
+(fail) Error Message Format Validation > Error Message Content Validation > should format circular dependency errors clearly [170.42ms]
+167 |         '--source', sourceDir,
+168 |         '--output', outputDir,
+169 |         '--fail-on', 'error'
+170 |       ]);
+171 | 
+172 |       expect(result.code).toBe(1);
+                                ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 0
+
+      at <anonymous> (/home/user/unify/test/unit/error-formatting.test.js:172:27)
+(fail) Error Message Format Validation > Error Message Content Validation > should format path traversal errors clearly [166.05ms]
+227 |       // Should have info messages
+228 |       expect(output).toMatch(/\[INFO\].*Building static site/);
+229 |       expect(output).toMatch(/\[INFO\].*Found.*files/);
+230 | 
+231 |       // Should have warning messages
+232 |       expect(output).toMatch(/\[WARN\].*Include not found/);
+                           ^
+error: expect(received).toMatch(expected)
+
+Expected substring or pattern: /\[WARN\].*Include not found/
+Received: "[INFO] Building static site...\n[INFO] Building site from /tmp/unify-test-1763520972175-64krzvt86/src to /tmp/unify-test-1763520972175-64krzvt86/dist\n[DEBUG] No existing cache found, starting fresh\n[DEBUG] Build cache initialized at .unify-cache\n[DEBUG] Build cache initialized with native hashing\n[INFO] Found 2 source files\n[DEBUG] Processing HTML with conventions: warning.html\n[DEBUG] Using HTMLRewriter for: warning.html\n[DEBUG] Optimizing HTML content, optimize=undefined\n[DEBUG] Auto-discovering layout for page: warning.html\n[DEBUG] No layout found for page: warning.html\n[DEBUG] Processed HTML: warning.html → /tmp/unify-test-1763520972175-64krzvt86/dist/warning.html\n[DEBUG] Processing HTML with conventions: index.html\n[DEBUG] Using HTMLRewriter for: index.html\n[DEBUG] Optimizing HTML content, optimize=undefined\n[DEBUG] Auto-discovering layout for page: index.html\n[DEBUG] No layout found for page: index.html\n[DEBUG] Processed HTML: index.html → /tmp/unify-test-1763520972175-64krzvt86/dist/index.html\n[DEBUG] No package.json found at /tmp/unify-test-1763520972175-64krzvt86/src/package.json\n[DEBUG] No package.json found at /tmp/unify-test-1763520972175-64krzvt86/package.json\n[DEBUG] No package.json found at /tmp/package.json\n[DEBUG] No package.json found in directory tree\n[DEBUG] No homepage in package.json, using fallback: https://example.com\n[DEBUG] Generated sitemap info for 2 pages\n[INFO] Generated sitemap.xml with 2 pages\n[SUCCESS] Build completed in 28ms\n[INFO] Processed: 2 pages, Copied: 0 assets, Skipped: 0 partials\n[DEBUG] Build cache saved to disk\n[DEBUG] Build cache saved\n[INFO] Build completed successfully!\n"
+
+      at <anonymous> (/home/user/unify/test/unit/error-formatting.test.js:232:22)
+(fail) Error Message Format Validation > Error Message Formatting Consistency > should use appropriate log levels with consistent formatting [174.17ms]
+271 |         '--source', sourceDir,
+272 |         '--output', outputDir,
+273 |         '--fail-on', 'error'
+274 |       ]);
+275 | 
+276 |       expect(result.code).toBe(1);
+                                ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 0
+
+      at <anonymous> (/home/user/unify/test/unit/error-formatting.test.js:276:27)
+(fail) Error Message Format Validation > Cross-Platform Error Formatting > should format file paths appropriately for the platform [178.99ms]
+296 |         '--source', sourceDir,
+297 |         '--output', outputDir,
+298 |         '--fail-on', 'error'
+299 |       ]);
+300 | 
+301 |       expect(result.code).toBe(1);
+                                ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 0
+
+      at <anonymous> (/home/user/unify/test/unit/error-formatting.test.js:301:27)
+(fail) Error Message Format Validation > Cross-Platform Error Formatting > should handle Unicode and special characters in error messages [179.42ms]
+317 |         '--source', sourceDir,
+318 |         '--output', outputDir,
+319 |         '--fail-on', 'error'
+320 |       ]);
+321 | 
+322 |       expect(result.stderr).toMatch(/Suggestions:/);
+                                  ^
+error: expect(received).toMatch(expected)
+
+Expected substring or pattern: /Suggestions:/
+Received: ""
+
+      at <anonymous> (/home/user/unify/test/unit/error-formatting.test.js:322:29)
+(fail) Error Message Format Validation > Error Recovery Suggestions > should provide actionable suggestions for different error types [168.56ms]
+337 |         '--source', sourceDir,
+338 |         '--output', outputDir,
+339 |         '--fail-on', 'error'
+340 |       ]);
+341 | 
+342 |       expect(result.stderr).toMatch(/Run with.*DEBUG.*for more detailed/);
+                                  ^
+error: expect(received).toMatch(expected)
+
+Expected substring or pattern: /Run with.*DEBUG.*for more detailed/
+Received: ""
+
+      at <anonymous> (/home/user/unify/test/unit/error-formatting.test.js:342:29)
+(fail) Error Message Format Validation > Error Recovery Suggestions > should suggest using debug mode for complex errors [165.95ms]
+
+test/unit/slot-system.test.js:
+[ERROR] Invalid layout path: "blog". Short names are not supported in v2. Use explicit paths like "/layouts/blog.html" or "./blog.html"
+[ERROR] Invalid layout path: "blog". Short names are not supported in v2. Use explicit paths like "/layouts/blog.html" or "./blog.html"
+[ERROR] Invalid layout path: "blog". Short names are not supported in v2. Use explicit paths like "/layouts/blog.html" or "./blog.html"
+[ERROR] Invalid layout path: "blog". Short names are not supported in v2. Use explicit paths like "/layouts/blog.html" or "./blog.html"
+363 |     );
+364 | 
+365 |     const html = result.content;
+366 | 
+367 |     // Verify preferred layout was used
+368 |     expect(html).toContain('Preferred Layout');
+                       ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "Preferred Layout"
+Received: "<!DOCTYPE html>\n<html>\n<head>\n  <title>Page</title>\n</head>\n<body>\n<div data-layout=\"blog\">\n<p>Test content</p>\n</div>\n</body>\n</html>"
+
+      at <anonymous> (/home/user/unify/test/unit/slot-system.test.js:368:18)
+(fail) slot system v0.5.0 > should prefer .layout. files over non-.layout. files [3.99ms]
+
+test/unit/include-processor.test.js:
+
+# Unhandled error between tests
+-------------------------------
+1 | })
+2 | {
+    ^
+SyntaxError: Export named 'parseIncludeDirective' not found in module '/home/user/unify/src/core/include-processor.js'.
+      at loadAndEvaluateModule (2:1)
+-------------------------------
+
+
+test/unit/layout-logic.test.js:
+wrapInLayout result: <!DOCTYPE html>
+<html>
+<head><title>Test Page</title></head>
+<body><h1 id="test-title">Test Title</h1>
+<p>Content here</p></body>
+</html>
+
+test/unit/cli-options-complete.test.js:
+178 |         '--output', outputDir,
+179 |         '--verbose',
+180 |         '--fail-on', 'error'
+181 |       ]);
+182 | 
+183 |       expect(result.code).toBe(1); // Should fail due to missing include
+                                ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 0
+
+      at <anonymous> (/home/user/unify/test/unit/cli-options-complete.test.js:183:27)
+(fail) Complete CLI Options Coverage > --verbose Option > should work with fail-on error flag [181.08ms]
+
+test/unit/html-page-types.test.js:
+[ERROR] Unified HTML processing failed for invalid-fragment.html: Build failed: Fragment pages cannot have multiple data-layout attributes
+[ERROR] Invalid layout path: "blog". Short names are not supported in v2. Use explicit paths like "/layouts/blog.html" or "./blog.html"
+[ERROR] Invalid layout path: "blog". Short names are not supported in v2. Use explicit paths like "/layouts/blog.html" or "./blog.html"
+268 |         documentPath,
+269 |         sourceDir,
+270 |         dependencyTracker
+271 |       );
+272 | 
+273 |       expect(result.content).toContain('<div class="blog">');
+                                   ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "<div class=\"blog\">"
+Received: "<!DOCTYPE html>\n<html>\n<head>\n  <title>Page</title>\n</head>\n<body>\n<!DOCTYPE html>\n<html>\n<head>\n  <title>Blog Post</title>\n  <link rel=\"layout\" href=\"blog\">\n</head>\n<body>\n  <h1>Post Content</h1>\n</body>\n</html>\n</body>\n</html>"
+
+      at <anonymous> (/home/user/unify/test/unit/html-page-types.test.js:273:30)
+(fail) HTML Page Types > Link rel=layout Precedence > should support short name syntax in link rel=layout [2.48ms]
+
+test/unit/markdown-includes.test.js:
+
+# Unhandled error between tests
+-------------------------------
+1 | })
+2 | {
+    ^
+SyntaxError: Export named 'processIncludes' not found in module '/home/user/unify/src/core/include-processor.js'.
+      at loadAndEvaluateModule (2:1)
+-------------------------------
+
+
+test/unit/asset-handling.test.js:
+Build result: {
+  processed: 2,
+  copied: 2,
+  skipped: 3,
+  errors: [],
+  duration: 15,
+  dependencyTracker: DependencyTracker {
+    includesInPage: Map {},
+    pagesByInclude: Map {},
+    knownFiles: Set(2) {
+      "/home/user/unify/test/test-temp/asset-test-1763520977654-kxmsvsok5/src/index.html",
+      "/home/user/unify/test/test-temp/asset-test-1763520977654-kxmsvsok5/src/about.html",
+    },
+    recordDependencies: [Function: recordDependencies],
+    clearPageDependencies: [Function: clearPageDependencies],
+    getDependentPages: [Function: getDependentPages],
+    getAffectedPages: [Function: getAffectedPages],
+    getPageDependencies: [Function: getPageDependencies],
+    isIncludeFile: [Function: isIncludeFile],
+    isMainPage: [Function: isMainPage],
+    getAllFiles: [Function: getAllFiles],
+    getMainPages: [Function: getMainPages],
+    getIncludeFiles: [Function: getIncludeFiles],
+    analyzePage: [AsyncFunction: analyzePage],
+    extractLayoutDependencies: [AsyncFunction: extractLayoutDependencies],
+    analyzeNestedDependencies: [AsyncFunction: analyzeNestedDependencies],
+    removeFile: [Function: removeFile],
+    getStats: [Function: getStats],
+    clear: [Function: clear],
+    export: [Function: export],
+    import: [Function: import],
+  },
+  assetTracker: AssetTracker {
+    assetReferences: Map(2) {
+      "/home/user/unify/test/test-temp/asset-test-1763520977654-kxmsvsok5/src/css/style.css": [
+        "/home/user/unify/test/test-temp/asset-test-1763520977654-kxmsvsok5/src/index.html"
+      ],
+      "/home/user/unify/test/test-temp/asset-test-1763520977654-kxmsvsok5/src/images/logo.png": [
+        "/home/user/unify/test/test-temp/asset-test-1763520977654-kxmsvsok5/src/index.html"
+      ],
+    },
+    referencedAssets: Set(2) {
+      "/home/user/unify/test/test-temp/asset-test-1763520977654-kxmsvsok5/src/css/style.css",
+      "/home/user/unify/test/test-temp/asset-test-1763520977654-kxmsvsok5/src/images/logo.png",
+    },
+    htmlAssetCache: Map(2) {
+      "/home/user/unify/test/test-temp/asset-test-1763520977654-kxmsvsok5/src/index.html": [
+        "/home/user/unify/test/test-temp/asset-test-1763520977654-kxmsvsok5/src/css/style.css",
+        "/home/user/unify/test/test-temp/asset-test-1763520977654-kxmsvsok5/src/images/logo.png"
+      ],
+      "/home/user/unify/test/test-temp/asset-test-1763520977654-kxmsvsok5/src/about.html": [],
+    },
+    extractAssetReferences: [Function: extractAssetReferences],
+    extractCssAssetReferences: [Function: extractCssAssetReferences],
+    resolveAssetPath: [Function: resolveAssetPath],
+    recordAssetReferences: [AsyncFunction: recordAssetReferences],
+    clearPageAssetReferences: [Function: clearPageAssetReferences],
+    isAssetReferenced: [Function: isAssetReferenced],
+    getPagesThatReference: [Function: getPagesThatReference],
+    getAllReferencedAssets: [Function: getAllReferencedAssets],
+    getPageAssets: [Function: getPageAssets],
+    removePage: [Function: removePage],
+    getStats: [Function: getStats],
+    clear: [Function: clear],
+    export: [Function: export],
+    import: [Function: import],
+  },
+  buildCache: BuildCache {
+    cacheDir: ".unify-cache",
+    hashCache: Map(66) {
+      "/tmp/unify-test-1763520909665-3zzfw9vbj/src/blog/index.html": "10b3026e69b1579d6e048ea7f37d82832ac7bcfa5df1628a34ddff3548b1f865",
+      "/tmp/unify-test-1763520909665-3zzfw9vbj/src/blog.html": "f7e176e8f17ddb89163fc8fdebde1d6da1ca330e83d4cdb4c0bbbf7cdac118be",
+      "/tmp/unify-test-1763520909665-3zzfw9vbj/src/index.html": "3ed6fd18fb2460bd0f01e05c31dd6c1131633dbe0cc65889686036a14f4f4a40",
+      "/tmp/unify-test-1763520910672-oc9n9oq87/src/index.html": "7d989b1824c520092cb03e2c82e6ea21f0ff233a71891c4fe3251dd7c0d70c07",
+      "/tmp/unify-test-1763520912153-am4vg1k90/src/index.html": "34fe0948bfb2d6db2a7cb12045a6a49601be20180c3026b4bfe3c86e88333f47",
+      "/home/user/unify/test/test-temp/debug-paths/src/test.html": "9d14c6fcfd592ef0f5bd5ee10a2e1bcbbd3d68968735359ff83d940dd9e72cdd",
+      "/tmp/unify-test-1763520914466-9zodardu9/src/index.html": "752624c94ef97e4ea642c4cea0291ee536bcfcb60722cae09c7a532a5ab9c241",
+      "/tmp/unify-test-1763520916753-5nkx37ny9/src/index.html": "7d989b1824c520092cb03e2c82e6ea21f0ff233a71891c4fe3251dd7c0d70c07",
+      "/tmp/unify-test-1763520919041-pngwufqyd/src/index.html": "72acf50537198b69546147b9578b24e33326ce1e824c486b6b3edc41cbdd5ef2",
+      "/home/user/unify/test/test-temp/component-assets-1763520921344-nosgl5y87/src/styles-test.html": "ab0c2e039b741bb47cb5dcaece9966ac09c8bb8da4e527a18f710f6a0283363f",
+      "/home/user/unify/test/test-temp/component-assets-1763520921360-pyjnt8s4f/src/scripts-test.html": "b9159f067346d4995eacacef28807c90b89517db77f8bcff3944c3f4abb9a7d0",
+      "/home/user/unify/test/test-temp/component-assets-1763520921377-qt7ul5nkf/src/mixed-assets.html": "46064a4a1623c27b8f84f1ab5618c24dd32343cd8f176b73f1c41dd83ab8a94b",
+      "/home/user/unify/test/test-temp/component-assets-1763520921395-rpte5sjl3/src/multiple-blocks.html": "3982cdf97f557ca6ca7f0873c58d2b6be58ed876a2ec79e1801bc4af1b360baf",
+      "/home/user/unify/test/test-temp/component-assets-1763520921408-zda3mvyde/src/duplicate-components.html": "a3f190234130d6f463d8ab798b1bf3e3dcbea220ad9f2bca877597ca468f6115",
+      "/home/user/unify/test/test-temp/bug-reproduction/src/blog.html": "35573e0eb9178ac0d7f49f49b2831b0e03f195f6e33d4c1b4b0757a2f2f1ba1d",
+      "/tmp/unify-test-1763520921444-d33jwopur/src/blog/post.html": "5baa5ba164468bfe35a98dd76a9476c9ac32c19b6642d9959d8ac756b0cf9541",
+      "/tmp/unify-test-1763520921444-d33jwopur/src/index.html": "41309066ec339b93f468b0c4317ab764327aaddb394b0d48724e8e2216931e17",
+      "/tmp/unify-test-1763520921444-d33jwopur/src/about.html": "432a4356af6ea9b571e5c5ae3cdc3e9fd1865dd6fbc14c95857a721309ace9cc",
+      "/tmp/unify-test-1763520921471-2xrlhjqe1/src/docs/guide.html": "9178433f272eca6ff84b9e45748671f873f046365c5e8f90a867abdcf895447a",
+      "/tmp/unify-test-1763520921471-2xrlhjqe1/src/index.html": "1a7133067a4ac7fe06565943dd44870f232041b1d28b4340e2b678244a3b79f6",
+      "/tmp/unify-test-1763520921488-hz6c0a2jg/src/blog/post.html": "1e5c6a869106280771117bb4eface8bc5ff0febd492c35c363db812d353519f5",
+      "/tmp/unify-test-1763520921488-hz6c0a2jg/src/docs/guide.html": "2aa69a3271e57ce6270e7bde1f464ff16d08e99ac5b8a8fcc3a144fe7133b4fd",
+      "/tmp/unify-test-1763520921488-hz6c0a2jg/src/simple.html": "a5d0dd592ae4bf9b4a86aff923886ea50e32cfb6836660d6f29e1db1514b82cc",
+      "/tmp/unify-test-1763520921508-4g1m8uajr/src/custom-layout.html": "29856e52826609616105cbd7d40f1269ac85cc1cb0aa434d52f1eba9f57b50cb",
+      "/tmp/unify-test-1763520921526-g8dewjjuf/src/index.html": "d615635ec0c74aa13fc29b8d9c955ee4e75e225124c51132e3c392e7a5d40f5c",
+      "/tmp/unify-test-1763520921544-u7chviizo/src/index.html": "492681767ea31f1f6aaff66eb2a45f64131db85b809e6efd695fea3b51669851",
+      "/tmp/unify-test-1763520921552-159pbfik0/src/sidebar.html": "a877168393d2e11de38ee8fd7828be56fddc0657136d86247951fb24781e8458",
+      "/tmp/unify-test-1763520921552-159pbfik0/src/index.html": "1a7133067a4ac7fe06565943dd44870f232041b1d28b4340e2b678244a3b79f6",
+      "/tmp/unify-test-1763520921552-159pbfik0/src/header.html": "13e9345e1e8df029ec1c555dc0b5f5798e3b82c1cd254c549e93cb12b6d5dab8",
+      "/home/user/unify/test/fixtures/minification-test-1763520968747-hwxnqd3i5/src/index.html": "d7d02ac667779921e014e26740f874fad7e0990c258cc6ed15de3596eb7b45f7",
+      "/home/user/unify/test/fixtures/minification-test-1763520968765-nk0vnjbfh/src/attributes.html": "f096d73c3906de9e0ba3642ad2d768ab9d1efba49bb1bb0ed620d0115ad0e977",
+      "/home/user/unify/test/fixtures/minification-test-1763520968781-5xa2cnxgz/src/no-minify.html": "17f229292b5ddee43ec28c5a106aa88858c5d80f9e498062c5945a915e78f8de",
+      "/tmp/unify-test-fixed/src/index.html": "d826a08df69995f37e439b2d6d15769e46a9f64eef24e299ae9ccd2c7b6025d6",
+      "/tmp/link-norm-edge-test/src/tel-test.html": "d1633bc4035349d2c59ca95cff63e1df9bce1c359aed92cf75216308630635a0",
+      "/tmp/link-norm-edge-test/src/ftp-test.html": "57193d2da1ec98d3fa3b96debd76c9291456745ccdc5959a64992cf4d50581ca",
+      "/tmp/link-norm-edge-test/src/protocols-test.html": "465c4a3a6a9059b04917d35d20f69d964ed1ab0434bcfe963743e227207dd137",
+      "/tmp/link-norm-edge-test/src/data-url-test.html": "f53f9e96ddce7881a8cfd81b7740acf439307a1cbe6ada93dd1c7b580906ea5d",
+      "/tmp/link-norm-edge-test/src/data-img-test.html": "9096b38869185fd55de42d2ca81a4754df90c243d3bf6e2eed3e54b880e1195c",
+      "/tmp/link-norm-edge-test/src/index-link-test.html": "13a4b4448e0a2ac5ab541a8215b82b910c3f8c867b8e52795cab70f85c6d46fe",
+      "/tmp/link-norm-edge-test/src/nested-index-test.html": "341b11fadfa911c1904e886432fb117ab3862eba873585a1b7a65f91c7c70da3",
+      "/tmp/link-norm-edge-test/src/blog/posts/post1.html": "a80f76dff8ca4a86de9cf2d269f519d6499fd88c94801d0b28887abccf6ef407",
+      "/tmp/link-norm-edge-test/src/query-fragment-test.html": "e31f8768d6065a26de4aa43400ba6cf0f933ecd3a01c55774f93777002bda209",
+      "/tmp/link-norm-edge-test/src/mixed-links.html": "d51235ce28a52ce67e7e84bdd0ff582c3513531e6ad3e40b599623305343ec2f",
+      "/tmp/unify-test-1763520977369-c6sjpmd6v/src/docs/some-guide.html": "4ed801c4ea6c4c2cb7952a2c73068e71e078cc2b1b96a7d8692c26a46ee026ad",
+      "/tmp/unify-test-1763520977369-c6sjpmd6v/src/docs/another-guide.html": "5fbb57646cab52098e62553853fb69df7fc767cc0971687dac14e8d4681151ef",
+      "/tmp/unify-test-1763520977369-c6sjpmd6v/src/docs.html": "43b18ff70525ee5fd20125ca60688bd549b39ae44c4a819d0bb827153f2d6cec",
+      "/tmp/unify-test-1763520977369-c6sjpmd6v/src/index.html": "48985098439ed29c0f211e0f2f9f2b36a9494f96a355dd49df56e0de99483cbd",
+      "/tmp/unify-test-1763520977369-c6sjpmd6v/src/about.html": "7c17d93a517fa54ea8412a4a9d9bcb3c618608d6a29350b7e278d2b308c085ea",
+      "/tmp/unify-test-1763520977394-qxp1raab6/src/docs.html": "43b18ff70525ee5fd20125ca60688bd549b39ae44c4a819d0bb827153f2d6cec",
+      "/tmp/unify-test-1763520977394-qxp1raab6/src/index.html": "48985098439ed29c0f211e0f2f9f2b36a9494f96a355dd49df56e0de99483cbd",
+      "/tmp/unify-test-1763520977394-qxp1raab6/src/about.html": "7c17d93a517fa54ea8412a4a9d9bcb3c618608d6a29350b7e278d2b308c085ea",
+      "/tmp/unify-test-1763520977411-tyqywcnd5/src/docs/guide.html": "9178433f272eca6ff84b9e45748671f873f046365c5e8f90a867abdcf895447a",
+      "/tmp/unify-test-1763520977411-tyqywcnd5/src/docs/index.html": "4d2bb1957ebe3e8f8b642b786d81dd6823d680f88740e89b2437a0db484b51ea",
+      "/tmp/unify-test-1763520977411-tyqywcnd5/src/docs/tutorials/advanced.html": "c65e8ca38bff06fd056c1de9faffd0e1d4368bf4317ca665feb5e994655d8d93",
+      "/tmp/unify-test-1763520977411-tyqywcnd5/src/docs/tutorials/basic.html": "147d61f4e46dc201b7f8be6db3a4a725b1c64e0d7c863778334c997acdee5745",
+      "/tmp/unify-test-1763520977411-tyqywcnd5/src/index.html": "1a7133067a4ac7fe06565943dd44870f232041b1d28b4340e2b678244a3b79f6",
+      "/tmp/unify-test-1763520977438-pgad0j3yb/src/file.md.html": "0c6b4cd895c37985295fd8c1424f1d55a1edc8a82568373fbb350e344c830181",
+      "/tmp/unify-test-1763520977438-pgad0j3yb/src/nested/file.md.html": "fe02617c0acae99bd8481c99b631923508ccebfbd661af2ede0617294d6552ce",
+      "/home/user/unify/test/test-temp/asset-test-1763520977523-oh03eccpy/src/index.html": "3ee6c24bef2c84facdb62be798025c93e0ee8d9edde4d464b2bbd9afaeda8777",
+      "/home/user/unify/test/test-temp/asset-test-1763520977545-emw1o939h/src/index.html": "3b293aac681f9582878535b76b9b32287f695f38092798ee1e139906e93ea472",
+      "/home/user/unify/test/test-temp/asset-test-1763520977564-c69b2ul0c/src/index.html": "b1e3be9f47f60744bdfef57b434aebc361cbfb02e91f7a33aed5ac6bc24b89fa",
+      "/home/user/unify/test/test-temp/asset-test-1763520977582-1kxbngw2c/src/index.html": "c8bc7132ada8c1a6f8dcb6f2739ee37b085a02496aa9906c64feb2138ab4ecdf",
+      "/home/user/unify/test/test-temp/asset-test-1763520977615-4qi4wpw62/src/index.html": "856bed09cb50c0d9e9f86de569c0538c3a6940a572e15bb390400b8a35f55425",
+      "/home/user/unify/test/test-temp/asset-test-1763520977636-jzxwzuutp/src/index.html": "d8229c2ff0e8ab48c28b8f7d2a914af7ad5434cfb3333bc2acf1d80b7bdc7649",
+      "/home/user/unify/test/test-temp/asset-test-1763520977654-kxmsvsok5/src/index.html": "7c24e1843f09511458155335194fc4e8e4f275cfd1a964bc60730c39a387c279",
+      "/home/user/unify/test/test-temp/asset-test-1763520977654-kxmsvsok5/src/about.html": "d1b1ba8c8e4d46bbce6aa4da2ac40aafeb7d97b8d41338ddc48e631ff3cf7bd8",
+    },
+    dependencyGraph: Map(10) {
+      "/home/user/unify/test/test-temp/debug-paths/src/test.html": [ "/home/user/unify/test/test-temp/debug-paths/src/custom_components/alert.html" ],
+      "/home/user/unify/test/test-temp/component-assets-1763520921344-nosgl5y87/src/styles-test.html": [
+        "/home/user/unify/test/test-temp/component-assets-1763520921344-nosgl5y87/src/.components/styled-button.html",
+        "/home/user/unify/test/test-temp/component-assets-1763520921344-nosgl5y87/src/.components/modal-dialog.html"
+      ],
+      "/home/user/unify/test/test-temp/component-assets-1763520921360-pyjnt8s4f/src/scripts-test.html": [
+        "/home/user/unify/test/test-temp/component-assets-1763520921360-pyjnt8s4f/src/.components/interactive-counter.html",
+        "/home/user/unify/test/test-temp/component-assets-1763520921360-pyjnt8s4f/src/.components/modal-dialog.html"
+      ],
+      "/home/user/unify/test/test-temp/component-assets-1763520921377-qt7ul5nkf/src/mixed-assets.html": [
+        "/home/user/unify/test/test-temp/component-assets-1763520921377-qt7ul5nkf/src/.components/styled-button.html",
+        "/home/user/unify/test/test-temp/component-assets-1763520921377-qt7ul5nkf/src/.components/interactive-counter.html",
+        "/home/user/unify/test/test-temp/component-assets-1763520921377-qt7ul5nkf/src/.components/modal-dialog.html",
+        "/home/user/unify/test/test-temp/component-assets-1763520921377-qt7ul5nkf/src/.components/complex-widget.html"
+      ],
+      "/home/user/unify/test/test-temp/component-assets-1763520921395-rpte5sjl3/src/multiple-blocks.html": [
+        "/home/user/unify/test/test-temp/component-assets-1763520921395-rpte5sjl3/src/.components/complex-widget.html"
+      ],
+      "/home/user/unify/test/test-temp/component-assets-1763520921408-zda3mvyde/src/duplicate-components.html": [
+        "/home/user/unify/test/test-temp/component-assets-1763520921408-zda3mvyde/src/.components/styled-button.html",
+        "/home/user/unify/test/test-temp/component-assets-1763520921408-zda3mvyde/src/.components/styled-button.html",
+        "/home/user/unify/test/test-temp/component-assets-1763520921408-zda3mvyde/src/.components/styled-button.html"
+      ],
+      "/home/user/unify/test/test-temp/bug-reproduction/src/blog.html": [ "/home/user/unify/test/test-temp/bug-reproduction/src/custom_components/alert.html",
+        "/home/user/unify/test/test-temp/bug-reproduction/src/site_layouts/blog.html"
+      ],
+      "/tmp/unify-test-1763520921444-d33jwopur/src/blog/post.html": [ "/tmp/unify-test-1763520921444-d33jwopur/src/blog/_layout.html" ],
+      "/tmp/unify-test-1763520921488-hz6c0a2jg/src/blog/post.html": [ "/tmp/unify-test-1763520921488-hz6c0a2jg/src/blog/_layout.html" ],
+      "/tmp/unify-test-1763520921488-hz6c0a2jg/src/docs/guide.html": [ "/tmp/unify-test-1763520921488-hz6c0a2jg/src/docs/_layout.html" ],
+    },
+    isInitialized: true,
+    initialize: [AsyncFunction: initialize],
+    hashFile: [AsyncFunction: hashFile],
+    hashContent: [Function: hashContent],
+    hasFileChanged: [AsyncFunction: hasFileChanged],
+    updateFileHash: [AsyncFunction: updateFileHash],
+    haveDependenciesChanged: [AsyncFunction: haveDependenciesChanged],
+    setDependencies: [Function: setDependencies],
+    addDependency: [Function: addDependency],
+    isUpToDate: [AsyncFunction: isUpToDate],
+    getStats: [Function: getStats],
+    loadCache: [AsyncFunction: loadCache],
+    saveCache: [AsyncFunction: saveCache],
+    clearCache: [AsyncFunction: clearCache],
+    hashFiles: [AsyncFunction: hashFiles],
+    hasGroupChanged: [AsyncFunction: hasGroupChanged],
+  },
+}
+
+test/unit/default-command.test.js:
+🧹 Cleaning up test environment...
+✅ Test cleanup complete
+
+ 443 pass
+ 56 fail
+ 4 errors
+ 1431 expect() calls
+Ran 499 tests across 59 files. [155.49s]
