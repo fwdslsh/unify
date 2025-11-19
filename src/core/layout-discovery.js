@@ -113,8 +113,13 @@ export class LayoutDiscovery {
     logger.debug(`Resolving explicit layout: ${layoutSpec}`);
 
     // v2 BREAKING CHANGE: No more short name support
-    // Short names (no path separators) are treated as invalid
-    if (!layoutSpec.includes('/') && !layoutSpec.includes('\\')) {
+    // Short names have no path separator AND no file extension (e.g., "blog")
+    // But simple filenames like "shared.html" are valid (treated as relative to current directory)
+    const hasPathSeparator = layoutSpec.includes('/') || layoutSpec.includes('\\');
+    const hasExtension = path.extname(layoutSpec) !== '';
+
+    if (!hasPathSeparator && !hasExtension) {
+      // This is a short name (e.g., "blog" instead of "/layouts/blog.html")
       logger.error(`Invalid layout path: "${layoutSpec}". Short names are not supported in v2. Use explicit paths like "/layouts/${layoutSpec}.html" or "./${layoutSpec}.html"`);
       return null;
     }
@@ -125,7 +130,7 @@ export class LayoutDiscovery {
       // Absolute path from source root
       layoutPath = path.join(sourceRoot, layoutSpec.substring(1));
     } else {
-      // Relative path from page directory
+      // Relative path from page directory (including simple filenames like "shared.html")
       layoutPath = path.resolve(path.dirname(pagePath), layoutSpec);
     }
 
