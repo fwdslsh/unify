@@ -578,3 +578,74 @@ All planning and documentation is complete. GitHub issues templates created. Now
 **Commits**: 16 commits
 
 **Ready for Release**: YES ✅
+
+---
+
+## Post-V2 Test Suite Cleanup
+
+### Additional V1 Test Cleanup [IN PROGRESS]
+
+**Date**: 2025-11-19
+**Goal**: Further improve test pass rate by removing remaining v1-only tests
+
+**Deletions Made:**
+- Deleted test/integration/component-asset-inline-behavior.test.js (5 tests)
+  - Tests SSI include syntax (`<!--#include virtual="..." -->`)
+  - Tests inline style/script behavior specific to SSI
+- Deleted test/unit/include-processor.test.js (tests with import error)
+  - Tried to import `parseIncludeDirective` which doesn't exist in v2
+  - All tests used SSI syntax
+- Removed test from test/unit/slot-system.test.js
+  - "should prefer .layout. files over non-.layout. files"
+  - Used short name layout resolution (`data-layout="blog"`)
+
+**Test Results After Cleanup:**
+- Before: 443 pass, 56 fail, 4 errors (499 tests) - 88.8% pass rate
+- After: 443 pass, 49 fail, 3 errors (492 tests) - **90.0% pass rate**
+- Improvement: 1.2 percentage points, 7 fewer failing tests
+- Removed 7 invalid tests that tested v1-only features
+
+**Remaining Work:**
+- 49 failing tests to analyze and address
+- 3 error tests to fix
+- Many integration tests still use SSI syntax in fixtures (need updating to v2)
+
+**Commit**: 61021ab - "test: Delete v1-only tests (SSI and short name layouts)"
+
+**Status**: Good progress! Reached 90% pass rate. Continuing to analyze remaining failures.
+
+**Analysis of Remaining 49 Failures:**
+
+Analyzed all failing tests - discovered root cause:
+- **47+ of 49 failures** are due to test fixtures using v1 SSI syntax
+- Tests are testing valid v2 features (build, live reload, file watching, CLI)
+- BUT: Test fixtures use `<!--#include virtual="..." -->` instead of `<include src="..." />`
+- These aren't v1-only tests - they just need fixture updates
+
+**Affected Test Files (fixtures need v2 syntax updates):**
+- test/integration/build-process.test.js (5 failures)
+- test/integration/cli.test.js (4 failures)
+- test/integration/final-boss.test.js (4 failures)
+- test/integration/live-reload.test.js (2 failures)
+- test/integration/live-reload-includes.test.js (2 failures)
+- test/integration/live-reload-component-rebuild.test.js (2 failures)
+- test/integration/file-watcher-addition-deletion.test.js (2 failures)
+- test/integration/issue-29-complete-requirements.test.js (2 failures)
+- test/integration/component-behavior-current.test.js (2 failures)
+- test/integration/component-assets.test.js (1 failure)
+- test/integration/exit-codes.test.js (1 failure)
+- test/integration/include-depth-limiting.test.js (1 failure)
+- test/security/path-traversal.test.js (1 failure)
+- Plus several others
+
+**What Needs to be Done:**
+- Systematic update of ~15 test files to replace SSI syntax in fixtures
+- Change `<!--#include virtual="X" -->` to `<include src="X" />`
+- Change `<!--#include file="X" -->` to `<include src="X" />`
+- No test deletion needed - these are valid tests
+- Estimate: 2-3 hours of systematic find/replace work
+
+**Next Steps:**
+- Option A: Systematically update all test fixtures to v2 syntax (time-consuming but complete)
+- Option B: Document findings and leave for follow-up work
+- Option C: Create helper script to automate fixture updates
