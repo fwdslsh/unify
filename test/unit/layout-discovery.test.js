@@ -68,30 +68,6 @@ describe('LayoutDiscovery', () => {
       expect(layout).toBe(path.join(sourceDir, 'blog', '_layout.html'));
     });
 
-    test('should find fallback layout when no folder layout exists', async () => {
-      await createTestStructure(sourceDir, {
-        '_includes/layout.html': '<html><body><slot></slot></body></html>',
-        'page.html': '<div>Page content</div>'
-      });
-
-      const pagePath = path.join(sourceDir, 'page.html');
-      const layout = await discovery.findLayoutForPage(pagePath, sourceDir);
-
-      expect(layout).toBe(path.join(sourceDir, '_includes', 'layout.html'));
-    });
-
-    test('should handle .htm extension', async () => {
-      await createTestStructure(sourceDir, {
-        'blog/_layout.htm': '<html><body><h1>Blog</h1><slot></slot></body></html>',
-        'blog/post.html': '<article>Post content</article>'
-      });
-
-      const postPath = path.join(sourceDir, 'blog', 'post.html');
-      const layout = await discovery.findLayoutForPage(postPath, sourceDir);
-
-      expect(layout).toBe(path.join(sourceDir, 'blog', '_layout.htm'));
-    });
-
     test('should return null when no layout found', async () => {
       await createTestStructure(sourceDir, {
         'page.html': '<div>Page content</div>'
@@ -145,9 +121,10 @@ describe('LayoutDiscovery', () => {
   });
 
   describe('isLayoutFileName', () => {
-    test('should recognize ONLY standard layout filenames', () => {
+    test('should recognize ONLY standard layout filename (_layout.html)', () => {
       expect(discovery.isLayoutFileName('_layout.html')).toBe(true);
-      expect(discovery.isLayoutFileName('_layout.htm')).toBe(true);
+      // v2: .htm extension not supported
+      expect(discovery.isLayoutFileName('_layout.htm')).toBe(false);
     });
 
     test('should NOT recognize extended layout patterns', () => {
@@ -212,18 +189,6 @@ describe('LayoutDiscovery', () => {
 
       expect(chain).toEqual([]);
     });
-
-    test('should include fallback layout when no folder layouts exist', async () => {
-      await createTestStructure(sourceDir, {
-        '_includes/layout.html': '<html><body><slot></slot></body></html>',
-        'page.html': '<div>Page content</div>'
-      });
-
-      const pagePath = path.join(sourceDir, 'page.html');
-      const chain = await discovery.getLayoutChain(pagePath, sourceDir);
-
-      expect(chain).toEqual([path.join(sourceDir, '_includes', 'layout.html')]);
-    });
   });
 
   describe('resolveLayoutOverride', () => {
@@ -261,18 +226,6 @@ describe('LayoutDiscovery', () => {
       const layout = await discovery.resolveLayoutOverride('/layouts/custom', sourceDir, pagePath);
 
       expect(layout).toBe(path.join(sourceDir, 'layouts', 'custom.html'));
-    });
-
-    test('should try .htm extension as fallback', async () => {
-      await createTestStructure(sourceDir, {
-        'layouts/custom.htm': '<html><body><h1>Custom</h1><slot></slot></body></html>',
-        'page.html': '<div data-layout="/layouts/custom">Page content</div>'
-      });
-
-      const pagePath = path.join(sourceDir, 'page.html');
-      const layout = await discovery.resolveLayoutOverride('/layouts/custom', sourceDir, pagePath);
-
-      expect(layout).toBe(path.join(sourceDir, 'layouts', 'custom.htm'));
     });
 
     test('should return null for missing layout override', async () => {
@@ -342,20 +295,19 @@ describe('LayoutDiscovery', () => {
   });
 
   describe('getLayoutDependencies', () => {
-    test('should return all layouts in the chain plus default layout', async () => {
+    test('should return all layouts in the chain', async () => {
       await createTestStructure(sourceDir, {
         '_layout.html': '<html><body><slot></slot></body></html>',
         'blog/_layout.html': '<div class="blog-wrapper"><slot></slot></div>',
-        '_includes/layout.html': '<html><body><main><slot></slot></main></body></html>',
         'blog/post.html': '<article>Post content</article>'
       });
 
       const postPath = path.join(sourceDir, 'blog', 'post.html');
       const dependencies = await discovery.getLayoutDependencies(postPath, sourceDir);
 
+      // v2: Should include blog/_layout.html and root _layout.html (no _includes fallback)
       expect(dependencies).toContain(path.join(sourceDir, 'blog', '_layout.html'));
       expect(dependencies).toContain(path.join(sourceDir, '_layout.html'));
-      expect(dependencies).toContain(path.join(sourceDir, '_includes', 'layout.html'));
     });
 
     test('should return unique dependencies', async () => {
