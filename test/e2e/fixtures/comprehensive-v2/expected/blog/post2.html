@@ -1,50 +1,42 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Second Post - Blog</title>
+  
   <link rel="stylesheet" href="/assets/css/style.css">
-  <meta name="description" content="Second blog post with layout override">
+
+<title>Second Post - Blog</title>
+
+  
+  <meta name="description" content="A blog post">
+
 </head>
 <body class="base-layout">
+
   <div class="container">
-    <main>
-      <article class="blog-post">
-    <header class="post-header">
+    <main><article class="blog-post">
+    
       <h1>Second Blog Post</h1>
       <time>2024-01-20</time>
-    </header>
+    
 
     <div class="post-content">
-      <h2>Explicit Layout Override</h2>
-
-  <p>This HTML fragment explicitly uses <code>/_layouts/blog.html</code> instead of the auto-discovered <code>blog/_layout.html</code>.</p>
-
-  <p>The blog layout demonstrates layout chaining - it uses <code>data-layout="/_layouts/base.html"</code>.</p>
-
-
-
-  <div class="card">
-  <h3 class="card-title">Related Content</h3>
-  <div class="card-content">
-      <p>Check out our other posts!</p>
-    </div>
-  <div class="card-footer">
-    <p>Default footer</p>
-  </div>
-</div>
+      <!-- Post content here -->
     </div>
 
     <aside>
-      <h3>Custom Sidebar</h3>
+    <h3>Custom Sidebar</h3>
     <p>This sidebar content overrides the default sidebar in the blog layout.</p>
     <ul>
       <li><a href="/blog/post1.html">Read Post 1</a></li>
     </ul>
+  </aside>
+
     </aside>
-  </article>
-    </main>
+  </article></main>
   </div>
+
 </body>
 </html>
