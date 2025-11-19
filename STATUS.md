@@ -315,3 +315,24 @@ All planning and documentation is complete. GitHub issues templates created. Now
 - Committed: e97cf11 - "refactor: Remove SSI include system (v2 migration - Day 1-2)"
 
 **Status**: SSI removal complete. Test cleanup will happen in Week 3.
+
+### Week 1 Day 3-4: Simplify Layout Discovery [IN PROGRESS]
+
+**Tasks:**
+- [ ] Completely rewrite `src/core/layout-discovery.js`
+- [ ] Delete functions:
+  - resolveShortLayoutName()
+  - searchLayoutHierarchy()
+  - extractLinkLayoutElement()
+  - discoverNamedLayout()
+  - searchIncludesDirectory()
+- [ ] Implement simplified functions:
+  - discoverLayout() - main entry point
+  - extractDataLayoutAttribute() - find data-layout attr
+  - resolveLayoutPath() - unified path resolution
+  - autoDiscoverLayout() - walk up tree for _layout.html
+- [ ] Update test files (defer detailed test updates to Week 3)
+- [ ] Run `bun test` - verify core functionality works
+- [ ] Run `grep -r "shortName\|short.*layout" src/` - verify no short name code remains
+
+**Status**: Starting layout discovery simplification...
