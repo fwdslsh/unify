@@ -1,0 +1,14 @@
+<article>
+  <template data-slot="title">Fragment Page - E2E Test Site</template>
+
+  <h1>HTML Fragment</h1>
+
+  <p>This is an HTML fragment (no DOCTYPE or html tag) that will be wrapped by the auto-discovered root layout.</p>
+
+  <include src="/_components/card.html">
+    <h3 data-slot="title">Fragment Demo</h3>
+    <div data-slot="content">
+      <p>Fragments are automatically wrapped in layouts.</p>
+    </div>
+  </include>
+</article>

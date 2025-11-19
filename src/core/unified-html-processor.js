@@ -801,9 +801,19 @@ function validateDataLayoutAttributes(htmlContent, isFullDocument) {
   if (isFullDocument) {
     return; // Full documents can have data-layout in any element
   }
-  
+
   // For fragments, count data-layout attributes
-  const dataLayoutMatches = htmlContent.match(/data-layout=["'][^"']*["']/gi);
+  // Exclude data-layout inside <code> and <pre> tags (example code)
+  let contentToValidate = htmlContent;
+
+  // Temporarily replace <code> and <pre> blocks to avoid false positives
+  const codeBlocks = [];
+  contentToValidate = contentToValidate.replace(/<(code|pre)[^>]*>[\s\S]*?<\/\1>/gi, (match) => {
+    codeBlocks.push(match);
+    return `__CODE_BLOCK_${codeBlocks.length - 1}__`;
+  });
+
+  const dataLayoutMatches = contentToValidate.match(/data-layout=["'][^"']*["']/gi);
   if (dataLayoutMatches && dataLayoutMatches.length > 1) {
     throw new BuildError(
       'Fragment pages cannot have multiple data-layout attributes',

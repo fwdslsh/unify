@@ -1,0 +1,21 @@
+<template data-slot="title">Nested Includes Test</template>
+
+<h1>Testing Relative and Nested Includes</h1>
+
+<p>This page demonstrates relative path includes and nested include chains.</p>
+
+<!-- Relative include (same directory) -->
+<include src="./blog-component.html"></include>
+
+<!-- Relative include (parent directory) -->
+<include src="../_components/card.html">
+  <h3 data-slot="title">Relative Path Card</h3>
+  <div data-slot="content">
+    <p>Included using <code>../components/card.html</code></p>
+  </div>
+</include>
+
+<!-- The header component includes nav.html, demonstrating nested includes -->
+<include src="/_components/header.html">
+  <h1 data-slot="site-title">Nested Include Demo</h1>
+</include>

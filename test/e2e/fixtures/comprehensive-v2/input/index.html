@@ -1,0 +1,24 @@
+<template data-slot="title">Home - E2E Test Site</template>
+
+<h1>Welcome to the E2E Test Site</h1>
+
+<p>This page demonstrates auto-discovery of the root <code>_layout.html</code> file.</p>
+
+<section class="cards">
+  <include src="/_components/card.html">
+    <h3 data-slot="title">Feature 1</h3>
+    <div data-slot="content">
+      <p>This demonstrates slot injection with absolute paths.</p>
+    </div>
+    <div data-slot="footer">
+      <a href="/about.html">Learn more</a>
+    </div>
+  </include>
+
+  <include src="/_components/card.html">
+    <h3 data-slot="title">Feature 2</h3>
+    <div data-slot="content">
+      <p>Multiple instances of the same component.</p>
+    </div>
+  </include>
+</section>

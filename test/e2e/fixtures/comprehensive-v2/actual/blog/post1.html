@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title data-slot="title">Blog - E2E Test Site</title>
+  <link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body class="blog-layout">
+  <include src="/_components/header.html">
+    <h1 data-slot="site-title" id="blog-section">Blog Section</h1>
+  </include>
+
+  <div class="blog-container">
+    <main data-slot="content"><p><template data-slot="post-title">My First Blog Post</template>
+<template data-slot="post-date">2024-01-15</template></p>
+<h1 id="introduction">Introduction</h1>
+<p>This is a markdown file with frontmatter. It demonstrates:</p>
+<ul>
+<li>Markdown processing</li>
+<li>Frontmatter extraction</li>
+<li>Auto-discovery of <code>blog/_layout.html</code></li>
+<li>Named slots from markdown</li>
+</ul>
+<h2 id="features">Features</h2>
+<p>The markdown is converted to HTML and wrapped in the blog layout. The frontmatter provides:</p>
+<ol>
+<li>Page title</li>
+<li>Meta description</li>
+<li>Optional layout override (not used here)</li>
+</ol>
+<h2 id="code-example">Code Example</h2>
+<pre><code class="language-html">&lt;include src=&quot;/components/card.html&quot;&gt;
+  &lt;div data-slot=&quot;title&quot;&gt;Card Title&lt;/div&gt;
+&lt;/include&gt;
+</code></pre>
+<p>This content will be inserted into the <code>data-slot=&quot;content&quot;</code> of the blog layout.</p>
+
+      <!-- Blog content here -->
+    </main>
+
+    <aside class="blog-sidebar" data-slot="sidebar">
+      <h3 id="recent-posts">Recent Posts</h3>
+      <ul>
+        <li><a href="/blog/post1.html">Post 1</a></li>
+        <li><a href="/blog/post2.html">Post 2</a></li>
+      </ul>
+    </aside>
+  </div>
+
+  <include src="/_components/footer.html"></include>
+</body>
+</html>

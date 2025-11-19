@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fragment Page - E2E Test Site</title>
+  <link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+  <header class="site-header">
+  <h1>E2E Test Site</h1>
+  <!-- Nested include: header includes nav -->
+  <nav class="main-nav">
+  <ul>
+    <li><a href="/">Home</a></li>
+    <li><a href="/about.html">About</a></li>
+    <li><a href="/blog/post1.html">Blog</a></li>
+  </ul>
+</nav>
+</header>
+
+  <main>
+    <article>
+
+
+  <h1>HTML Fragment</h1>
+
+  <p>This is an HTML fragment (no DOCTYPE or html tag) that will be wrapped by the auto-discovered root layout.</p>
+
+  <div class="card">
+  <h3 class="card-title">Fragment Demo</h3>
+  <div class="card-content">
+      <p>Fragments are automatically wrapped in layouts.</p>
+    </div>
+  <div class="card-footer">
+    <p>Default footer</p>
+  </div>
+</div>
+</article>
+  </main>
+
+  <footer class="site-footer">
+  <p>&copy; 2024 Test Site. All rights reserved.</p>
+</footer>
+</body>
+</html>

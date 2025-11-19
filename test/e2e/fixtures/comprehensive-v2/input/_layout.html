@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title data-slot="title">Default Site Title</title>
+  <link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+  <include src="/_components/header.html">
+    <h1 data-slot="site-title">E2E Test Site</h1>
+  </include>
+
+  <main data-slot="content">
+    <!-- Page content inserted here -->
+  </main>
+
+  <include src="/_components/footer.html"></include>
+</body>
+</html>
