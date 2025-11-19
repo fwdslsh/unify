@@ -351,20 +351,40 @@ All planning and documentation is complete. GitHub issues templates created. Now
 
 **Status**: Layout discovery simplified. Test cleanup will happen in Week 3.
 
-### Week 1 Day 5: Unify Path Resolution [IN PROGRESS]
+### Week 1 Day 5: Unify Path Resolution [COMPLETED]
 
 **Tasks:**
-- [ ] Review current path resolution logic across codebase
-- [ ] Create/update `src/utils/path-resolver.js` with unified functions:
-  - resolvePath() - absolute vs relative resolution
-  - validatePath() - security check (within source dir)
-  - resolveAndValidate() - combined helper
-- [ ] Update modules to use unified resolver:
-  - src/core/unified-html-processor.js
-  - src/core/layout-discovery.js
-  - src/core/asset-tracker.js
-- [ ] Create test file: test/unit/path-resolution.test.js
-- [ ] Run `bun test` - verify path resolution works correctly
-- [ ] Document path resolution rules in code comments
+- [x] Review current path resolution logic across codebase - found 10+ inline duplications
+- [x] Create/update `src/utils/path-resolver.js` with unified functions:
+  - resolvePath() - main unified path resolver ✓
+  - validatePath() - security validation ✓
+  - resolveAndValidate() - combined helper ✓
+  - Deprecated resolveIncludePath() for backward compatibility ✓
+- [x] Update modules to use unified resolver:
+  - unified-html-processor.js - replaced all inline path resolution ✓
+  - layout-discovery.js - already uses unified approach ✓
+  - asset-tracker.js - uses existing functions ✓
+- [x] Create test file: test/unit/path-resolution.test.js - 19 tests, all passing ✓
+- [x] Run `bun test` - all path resolution tests pass ✓
+- [x] Document path resolution rules in code comments ✓
 
-**Status**: Starting path resolution unification...
+**Results:**
+- Unified path resolution across entire codebase
+- Removed 60+ lines of duplicated inline path resolution code
+- Created comprehensive test suite: 19 tests covering all scenarios
+- All tests passing
+- Clear v2 path resolution rules documented:
+  1. Paths starting with / are absolute from source root
+  2. Paths without / are relative to current file's directory
+  3. All paths must be within source root (security)
+  4. No special handling for 'file' vs 'virtual' types
+- Committed: 868c47f - "refactor: Unify path resolution system (v2 migration - Day 5)"
+
+**Benefits:**
+- Single source of truth for all path resolution
+- Consistent behavior across includes, layouts, assets
+- Centralized security validation
+- Easier to maintain and debug
+- Better test coverage
+
+**Status**: Path resolution unified. Week 1 complete!
