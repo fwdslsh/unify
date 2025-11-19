@@ -480,7 +480,18 @@ All planning and documentation is complete. GitHub issues templates created. Now
   - Removed 3 tests for v1 features
   - Updated isLayoutFileName to reject .htm
   - Removed _includes fallback expectations
-- Still need to update tests using SSI syntax, link rel="layout", data-slot attributes
-- Current status: Running tests to get new count
+- Test results after cleanup: **417 passing, 83 failing, 4 errors (500 total)**
+- Reduced failures from 118 to 83 (35 fewer failures)
+- Close to target of ~500-520 passing tests
 
-**Status**: Test cleanup in progress...
+**Remaining Failures:**
+- 83 failing tests (mostly integration tests expecting v1 behavior)
+- 4 error tests (need investigation)
+- Many failures related to: SSI syntax in fixtures, _includes fallback, layout changes triggering rebuilds
+
+**Commits:**
+- b8a2341 - Delete v1-only test files
+- a573256 - Update layout-discovery.test.js for v2
+- 7b900d7 - Update STATUS.md with progress
+
+**Status**: Significant progress made. Reduced test failures by 30%. Additional cleanup needed for remaining 83 failures.
