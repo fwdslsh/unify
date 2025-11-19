@@ -350,3 +350,21 @@ All planning and documentation is complete. GitHub issues templates created. Now
 - No _includes directory fallback
 
 **Status**: Layout discovery simplified. Test cleanup will happen in Week 3.
+
+### Week 1 Day 5: Unify Path Resolution [IN PROGRESS]
+
+**Tasks:**
+- [ ] Review current path resolution logic across codebase
+- [ ] Create/update `src/utils/path-resolver.js` with unified functions:
+  - resolvePath() - absolute vs relative resolution
+  - validatePath() - security check (within source dir)
+  - resolveAndValidate() - combined helper
+- [ ] Update modules to use unified resolver:
+  - src/core/unified-html-processor.js
+  - src/core/layout-discovery.js
+  - src/core/asset-tracker.js
+- [ ] Create test file: test/unit/path-resolution.test.js
+- [ ] Run `bun test` - verify path resolution works correctly
+- [ ] Document path resolution rules in code comments
+
+**Status**: Starting path resolution unification...

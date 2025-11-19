@@ -16,7 +16,7 @@ import {
   LayoutError
 } from "../utils/errors.js";
 import { transformLinksInHtml } from "../utils/link-transformer.js";
-import { isPathWithinDirectory } from "../utils/path-resolver.js";
+import { isPathWithinDirectory, resolvePath } from "../utils/path-resolver.js";
 import { processMarkdown, isMarkdownFile } from "./markdown-processor.js";
 
 /**
@@ -302,18 +302,8 @@ async function processIncludesWithStringReplacement(htmlContent, filePath, sourc
     for (const domMatch of domMatches) {
       const [fullMatch, src, slotContent] = domMatch;
       try {
-        let resolvedPath;
-        if (src.startsWith('/')) {
-          // Absolute path from source root
-          resolvedPath = path.resolve(sourceRoot, src.replace(/^\/+/,''));
-        } else {
-          // Relative path from current file
-          resolvedPath = path.resolve(path.dirname(filePath), src);
-        }
-        // Security: ensure resolved path is within source root
-        if (!isPathWithinDirectory(resolvedPath, sourceRoot)) {
-          throw new PathTraversalError(src, sourceRoot);
-        }
+        // Use unified path resolver
+        const resolvedPath = resolvePath(src, filePath, sourceRoot);
         
         // Read the include content using fallback resolver
         try {
@@ -354,11 +344,15 @@ async function processIncludesWithStringReplacement(htmlContent, filePath, sourc
         try {
           console.error('DOM include (with slots) error:', error && error.stack ? error.stack : error);
         } catch (e) {}
+        // Use unified path resolver for error reporting
         let resolvedPath;
-        if (src.startsWith('/')) {
-          resolvedPath = path.resolve(sourceRoot, src.replace(/^\/+/,''));
-        } else {
-          resolvedPath = path.resolve(path.dirname(filePath), src);
+        try {
+          resolvedPath = resolvePath(src, filePath, sourceRoot);
+        } catch (e) {
+          // If path resolution fails, construct manually for error reporting
+          resolvedPath = src.startsWith('/')
+            ? path.resolve(sourceRoot, src.replace(/^\/+/,''))
+            : path.resolve(path.dirname(filePath), src);
         }
         const errorFilePath = resolvedPath || filePath;
         if (error.code === 'ENOENT' && !error.formatForCLI) {
@@ -387,18 +381,8 @@ async function processIncludesWithStringReplacement(htmlContent, filePath, sourc
     for (const selfClosingMatch of selfClosingMatches) {
       const [fullMatch, src] = selfClosingMatch;
       try {
-        let resolvedPath;
-        if (src.startsWith('/')) {
-          // Absolute path from source root
-          resolvedPath = path.resolve(sourceRoot, src.replace(/^\/+/,''));
-        } else {
-          // Relative path from current file
-          resolvedPath = path.resolve(path.dirname(filePath), src);
-        }
-        // Security: ensure resolved path is within source root
-        if (!isPathWithinDirectory(resolvedPath, sourceRoot)) {
-          throw new PathTraversalError(src, sourceRoot);
-        }
+        // Use unified path resolver
+        const resolvedPath = resolvePath(src, filePath, sourceRoot);
         
         // Read the include content using fallback resolver
         try {
@@ -434,11 +418,15 @@ async function processIncludesWithStringReplacement(htmlContent, filePath, sourc
         try {
           console.error('Self-closing include error:', error && error.stack ? error.stack : error);
         } catch (e) {}
+        // Use unified path resolver for error reporting
         let resolvedPath;
-        if (src.startsWith('/')) {
-          resolvedPath = path.resolve(sourceRoot, src.replace(/^\/+/,''));
-        } else {
-          resolvedPath = path.resolve(path.dirname(filePath), src);
+        try {
+          resolvedPath = resolvePath(src, filePath, sourceRoot);
+        } catch (e) {
+          // If path resolution fails, construct manually for error reporting
+          resolvedPath = src.startsWith('/')
+            ? path.resolve(sourceRoot, src.replace(/^\/+/,''))
+            : path.resolve(path.dirname(filePath), src);
         }
         const errorFilePath = resolvedPath || filePath;
         if (error.code === 'ENOENT' && !error.formatForCLI) {
@@ -906,15 +894,9 @@ async function processIncludesInHTML(htmlContent, layoutPath, sourceRoot, config
       const src = srcMatch[1];
       let resolvedPath;
       try {
-        if (src.startsWith('/')) {
-          resolvedPath = path.resolve(sourceRoot, src.replace(/^\/+/,''));
-        } else {
-          resolvedPath = path.resolve(path.dirname(layoutPath), src);
-        }
+        // Use unified path resolver
+        resolvedPath = resolvePath(src, layoutPath, sourceRoot);
         logger.debug('[UNIFY] Attempting to resolve DOM include:', { src, fromFile: layoutPath, resolvedPath });
-        if (!isPathWithinDirectory(resolvedPath, sourceRoot)) {
-          throw new PathTraversalError(src, sourceRoot);
-        }
         
         // Check if this is a component (in components directory)
         const isComponent = resolvedPath.includes(config.componentsDir) || resolvedPath.includes('.components');
@@ -953,10 +935,14 @@ async function processIncludesInHTML(htmlContent, layoutPath, sourceRoot, config
         
         logger.debug('[UNIFY] Successfully processed DOM include:', src, '->', resolvedPath);
       } catch (error) {
-        if (src.startsWith('/')) {
-          resolvedPath = path.resolve(sourceRoot, src.replace(/^\/+/,''));
-        } else {
-          resolvedPath = path.resolve(path.dirname(layoutPath), src);
+        // Use unified path resolver for error reporting
+        try {
+          resolvedPath = resolvePath(src, layoutPath, sourceRoot);
+        } catch (e) {
+          // If path resolution fails, construct manually for error reporting
+          resolvedPath = src.startsWith('/')
+            ? path.resolve(sourceRoot, src.replace(/^\/+/,''))
+            : path.resolve(path.dirname(layoutPath), src);
         }
         logger.error('[UNIFY] Failed to resolve DOM include:', { src, fromFile: layoutPath, resolvedPath, error: error.message });
         if (error.code === 'ENOENT' && !error.formatForCLI) {

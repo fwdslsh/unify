@@ -1,28 +1,6 @@
 /**
- * Get output path for a source file, supporting pretty URLs
- * @param {string} sourcePath - Source file path
- * @param {string} sourceRoot - Source root directory
- * @param {string} outputRoot - Output root directory
- * @param {boolean} prettyUrls - Whether to use pretty URLs
- * @returns {string} Output file path
- */
-export function getOutputPathWithPrettyUrls(sourcePath, sourceRoot, outputRoot, prettyUrls = false) {
-  const relativePath = path.relative(sourceRoot, sourcePath);
-  const ext = path.extname(sourcePath).toLowerCase();
-  // Only apply pretty URLs to HTML/Markdown files not starting with '_'
-  const fileName = path.basename(sourcePath);
-  const isPage = !fileName.startsWith('_') && (ext === '.html' || ext === '.htm' || ext === '.md');
-  if (prettyUrls && isPage) {
-    // Remove extension and create subdirectory with index.html
-    const withoutExt = relativePath.replace(/\.[^.]+$/, '');
-    return path.resolve(outputRoot, withoutExt, 'index.html');
-  }
-  // Standard output: preserve relative path
-  return path.resolve(outputRoot, relativePath);
-}
-/**
- * Path resolution utilities for unify
- * Handles secure path resolution and validation
+ * Path resolution utilities for unify v2
+ * Provides unified, secure path resolution across the codebase
  */
 
 import path from 'path';
@@ -30,40 +8,53 @@ import { fileURLToPath } from 'url';
 import { PathTraversalError } from './errors.js';
 
 /**
- * Resolve include path based on type (file vs virtual)
- * @param {string} type - 'file' or 'virtual'
- * @param {string} includePath - Path from include directive
- * @param {string} currentFilePath - Path of file containing the include
+ * V2 Unified Path Resolution Rules:
+ * 1. Paths starting with / are absolute from source root
+ * 2. Paths without / are relative to current file's directory
+ * 3. All paths must be within source root (security)
+ * 4. No special handling for 'file' vs 'virtual' types (SSI removed in v2)
+ */
+
+/**
+ * Resolve a path according to v2 unified rules
+ * @param {string} pathSpec - Path from attribute (e.g., "/layouts/main.html" or "./header.html")
+ * @param {string} currentFilePath - Path of file containing the reference
  * @param {string} sourceRoot - Root source directory
  * @returns {string} Resolved absolute path
+ * @throws {PathTraversalError} If path is outside source root
+ *
+ * @example
+ * // Absolute path from source root
+ * resolvePath('/layouts/main.html', '/src/pages/index.html', '/src')
+ * // => '/src/layouts/main.html'
+ *
+ * // Relative path from current file
+ * resolvePath('./header.html', '/src/pages/index.html', '/src')
+ * // => '/src/pages/header.html'
  */
-export function resolveIncludePath(type, includePath, currentFilePath, sourceRoot) {
-  // Validate input
-  if (!includePath || typeof includePath !== 'string') {
-    throw new Error('Include path must be a non-empty string');
+export function resolvePath(pathSpec, currentFilePath, sourceRoot) {
+  if (!pathSpec || typeof pathSpec !== 'string') {
+    throw new Error('Path must be a non-empty string');
   }
-  
+
   let resolvedPath;
-  
-  if (type === 'file') {
-    // Relative to current file's directory
-    const currentDir = path.dirname(currentFilePath);
-    resolvedPath = path.resolve(currentDir, includePath);
-  } else if (type === 'virtual') {
-    // Relative to source root, remove all leading slashes and normalize
-    let cleanPath = includePath.replace(/^\/+/, '');
-    // Normalize multiple slashes
-    cleanPath = cleanPath.replace(/\/+/g, '/');
+
+  if (pathSpec.startsWith('/')) {
+    // Absolute path from source root
+    // Remove leading slashes and resolve from source root
+    const cleanPath = pathSpec.replace(/^\/+/, '');
     resolvedPath = path.resolve(sourceRoot, cleanPath);
   } else {
-    throw new Error(`Invalid include type: ${type}`);
+    // Relative path from current file's directory
+    const currentDir = path.dirname(currentFilePath);
+    resolvedPath = path.resolve(currentDir, pathSpec);
   }
-  
-  // Security check: ensure resolved path is within source root
+
+  // Security validation
   if (!isPathWithinDirectory(resolvedPath, sourceRoot)) {
-    throw new PathTraversalError(includePath, sourceRoot);
+    throw new PathTraversalError(pathSpec, sourceRoot);
   }
-  
+
   return resolvedPath;
 }
 
@@ -76,9 +67,54 @@ export function resolveIncludePath(type, includePath, currentFilePath, sourceRoo
 export function isPathWithinDirectory(filePath, directory) {
   const resolvedFilePath = path.resolve(filePath);
   const resolvedDirectory = path.resolve(directory);
-  
-  return resolvedFilePath.startsWith(resolvedDirectory + path.sep) || 
+
+  return resolvedFilePath.startsWith(resolvedDirectory + path.sep) ||
          resolvedFilePath === resolvedDirectory;
+}
+
+/**
+ * Validate that a path is within source root
+ * @param {string} filePath - Path to validate
+ * @param {string} sourceRoot - Root source directory
+ * @returns {boolean} True if valid
+ * @throws {PathTraversalError} If path is outside source root
+ */
+export function validatePath(filePath, sourceRoot) {
+  if (!isPathWithinDirectory(filePath, sourceRoot)) {
+    throw new PathTraversalError(filePath, sourceRoot);
+  }
+  return true;
+}
+
+/**
+ * Resolve and validate a path in one call
+ * Convenience function combining resolvePath() and validatePath()
+ * @param {string} pathSpec - Path specification
+ * @param {string} currentFilePath - Current file path
+ * @param {string} sourceRoot - Source root directory
+ * @returns {string} Resolved and validated absolute path
+ * @throws {PathTraversalError} If path is outside source root
+ */
+export function resolveAndValidate(pathSpec, currentFilePath, sourceRoot) {
+  const resolved = resolvePath(pathSpec, currentFilePath, sourceRoot);
+  validatePath(resolved, sourceRoot);
+  return resolved;
+}
+
+/**
+ * DEPRECATED: Legacy function for SSI compatibility
+ * Use resolvePath() instead for v2
+ * @deprecated Since v2.0.0 - Use resolvePath() instead
+ */
+export function resolveIncludePath(type, includePath, currentFilePath, sourceRoot) {
+  // Convert SSI-style types to v2 paths
+  if (type === 'virtual') {
+    // Virtual paths start with /
+    return resolvePath('/' + includePath.replace(/^\/+/, ''), currentFilePath, sourceRoot);
+  } else {
+    // File paths are relative
+    return resolvePath(includePath, currentFilePath, sourceRoot);
+  }
 }
 
 /**
@@ -107,7 +143,7 @@ export function isHtmlFile(filePath) {
  */
 export function isPartialFile(filePath, config = '.components') {
   const fileName = path.basename(filePath);
-  
+
   // Handle both string and object config for backward compatibility
   let componentsDir, layoutsDir;
   if (typeof config === 'string') {
@@ -117,35 +153,35 @@ export function isPartialFile(filePath, config = '.components') {
     componentsDir = config.components || '.components';
     layoutsDir = config.layouts || '.layouts';
   }
-  
+
   // Check if filename starts with underscore (traditional partial marker)
   if (fileName.startsWith('_')) {
     return true;
   }
-  
+
   // Check if in configured components directory
   if (isFileInDirectory(filePath, componentsDir)) {
     return true;
   }
-  
+
   // Check if in configured layouts directory
   if (isFileInDirectory(filePath, layoutsDir)) {
     return true;
   }
-  
+
   // Also check for common standard directory names that should be treated as partials
   const commonPartialDirs = [
     'layouts', 'components', '.components', '.layouts',
     'includes', 'partials', 'templates',
     'custom_components', 'site_layouts'  // Support custom naming conventions
   ];
-  
+
   for (const dirName of commonPartialDirs) {
     if (isFileInDirectory(filePath, dirName)) {
       return true;
     }
   }
-  
+
   return false;
 }
 
@@ -157,18 +193,18 @@ export function isPartialFile(filePath, config = '.components') {
  */
 function isFileInDirectory(filePath, dirPattern) {
   const normalizedFilePath = path.resolve(filePath);
-  
+
   // If dirPattern is an absolute path, check if file is within that directory
   if (path.isAbsolute(dirPattern)) {
     const normalizedDirPattern = path.resolve(dirPattern);
-    return normalizedFilePath.startsWith(normalizedDirPattern + path.sep) || 
+    return normalizedFilePath.startsWith(normalizedDirPattern + path.sep) ||
            normalizedFilePath === normalizedDirPattern;
   }
-  
+
   // If dirPattern is a relative directory name, check if any part of the path matches
   const normalizedPath = path.normalize(filePath);
   const pathParts = normalizedPath.split(path.sep);
-  
+
   // Check if any part of the path matches the directory name
   return pathParts.includes(dirPattern);
 }
@@ -186,6 +222,29 @@ export function getOutputPath(sourcePath, sourceRoot, outputRoot) {
 }
 
 /**
+ * Get output path for a source file, supporting pretty URLs
+ * @param {string} sourcePath - Source file path
+ * @param {string} sourceRoot - Source root directory
+ * @param {string} outputRoot - Output root directory
+ * @param {boolean} prettyUrls - Whether to use pretty URLs
+ * @returns {string} Output file path
+ */
+export function getOutputPathWithPrettyUrls(sourcePath, sourceRoot, outputRoot, prettyUrls = false) {
+  const relativePath = path.relative(sourceRoot, sourcePath);
+  const ext = path.extname(sourcePath).toLowerCase();
+  // Only apply pretty URLs to HTML/Markdown files not starting with '_'
+  const fileName = path.basename(sourcePath);
+  const isPage = !fileName.startsWith('_') && (ext === '.html' || ext === '.htm' || ext === '.md');
+  if (prettyUrls && isPage) {
+    // Remove extension and create subdirectory with index.html
+    const withoutExt = relativePath.replace(/\.[^.]+$/, '');
+    return path.resolve(outputRoot, withoutExt, 'index.html');
+  }
+  // Standard output: preserve relative path
+  return path.resolve(outputRoot, relativePath);
+}
+
+/**
  * Get current file's directory (for ES modules)
  * @param {string} importMetaUrl - import.meta.url
  * @returns {string} Directory path
@@ -197,7 +256,7 @@ export function getCurrentDirectory(importMetaUrl) {
 /**
  * Resolve layout or component path with security checks
  * @param {string} resourcePath - The layout/component path from attribute
- * @param {string} sourceRoot - Source root directory  
+ * @param {string} sourceRoot - Source root directory
  * @param {string} resourceDir - Base directory for the resource (layouts/components)
  * @param {string} resourceType - Type of resource for error messages ('layout' or 'component')
  * @param {boolean} allowDirectoryPaths - Whether to treat paths with slashes as relative to sourceRoot
@@ -206,12 +265,12 @@ export function getCurrentDirectory(importMetaUrl) {
  */
 export function resolveResourcePath(resourcePath, sourceRoot, resourceDir, resourceType = 'resource', allowDirectoryPaths = false) {
   let resolvedPath;
-  
+
   if (resourcePath.startsWith('/')) {
     // Absolute path relative to source root
     const relativePath = resourcePath.substring(1); // Remove leading slash
     resolvedPath = path.join(sourceRoot, relativePath);
-    
+
     // Security check - must be within source root for absolute paths
     if (!isPathWithinDirectory(resolvedPath, sourceRoot)) {
       throw new Error(`${resourceType} path outside source directory: ${resourcePath}`);
@@ -219,7 +278,7 @@ export function resolveResourcePath(resourcePath, sourceRoot, resourceDir, resou
   } else if (allowDirectoryPaths && resourcePath.includes('/')) {
     // Path with directory structure, relative to source root
     resolvedPath = path.join(sourceRoot, resourcePath);
-    
+
     // Security check - must be within source root
     if (!isPathWithinDirectory(resolvedPath, sourceRoot)) {
       throw new Error(`${resourceType} path outside source directory: ${resourcePath}`);
@@ -229,7 +288,7 @@ export function resolveResourcePath(resourcePath, sourceRoot, resourceDir, resou
     if (path.isAbsolute(resourceDir)) {
       // If resourceDir is an absolute path (from CLI), use it directly
       resolvedPath = path.join(resourceDir, resourcePath);
-      
+
       // Security check - must be within the configured resource directory
       if (!isPathWithinDirectory(resolvedPath, resourceDir)) {
         throw new Error(`${resourceType} path outside ${resourceType} directory: ${resourcePath}`);
@@ -237,13 +296,13 @@ export function resolveResourcePath(resourcePath, sourceRoot, resourceDir, resou
     } else {
       // If resourceDir is relative, join with sourceRoot
       resolvedPath = path.join(sourceRoot, resourceDir, resourcePath);
-      
+
       // Security check - must be within source root for relative paths
       if (!isPathWithinDirectory(resolvedPath, sourceRoot)) {
         throw new Error(`${resourceType} path outside source directory: ${resourcePath}`);
       }
     }
   }
-  
+
   return resolvedPath;
 }
