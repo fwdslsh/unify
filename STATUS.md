@@ -454,3 +454,26 @@ All planning and documentation is complete. GitHub issues templates created. Now
 - Migration sections preserved showing v1→v2 changes
 
 **Status**: All documentation updated to v2. Only migration guides and v1-old archived files contain SSI references.
+
+**Committed:** 22dbccb - "docs: Update all documentation to v2 (Day 8-9)"
+
+### Week 3 Day 10-11: Clean Up Test Suite [IN PROGRESS]
+
+**Tasks:**
+- [x] Delete test files for removed v1 features:
+  - test/unit/layout-discovery-short-names.test.js (short names)
+  - test/unit/frontmatter-head-synthesis.test.js (complex frontmatter)
+  - test/unit/head-merge-algorithm.test.js (link rel="layout")
+  - test/unit/layout-discovery-new-spec.test.js (v1 features)
+- [ ] Delete/update additional test files with v1 feature references
+- [ ] Fix failing tests to work with v2 implementation
+- [ ] Run full test suite and verify ~500-520 passing tests
+- [ ] Create v2 validation tests if needed
+
+**Progress:**
+- Deleted 4 test files testing v1-only features
+- Current test status: 422 passing, 118 failing (needs cleanup)
+- Many failures are tests expecting v1 behavior (short names, _includes fallback, .htm extension, <link rel="layout">)
+- Need to systematically update remaining tests for v2
+
+**Status**: Test cleanup in progress...
