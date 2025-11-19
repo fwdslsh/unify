@@ -1,6 +1,6 @@
-# Layouts, Slots, and Templates
+# Layouts, Slots, and Templates (v2)
 
-unify provides a powerful templating system that combines convention-based layouts with modern template and slot syntax. This document covers all aspects of the template system.
+unify provides a powerful templating system that combines convention-based layouts with modern template and slot syntax. This document covers all aspects of the v2 template system.
 
 ## Overview
 
@@ -19,7 +19,7 @@ unify supports two types of HTML pages with different processing behavior:
 HTML content without complete document structure (`<!DOCTYPE>`, `<html>`, `<head>`, `<body>` elements):
 
 ```html
-<div data-layout="blog">
+<div data-layout="/layouts/blog.html">
   <h1>Article Title</h1>
   <p>This is a page fragment.</p>
 </div>
@@ -37,10 +37,9 @@ Complete HTML documents with `<!DOCTYPE html>`, `<html>`, `<head>`, and `<body>`
 
 ```html
 <!DOCTYPE html>
-<html>
+<html data-layout="/layouts/blog.html">
 <head>
   <title>Page Title</title>
-  <link rel="layout" href="/layouts/blog.html">
 </head>
 <body>
   <h1>Article Title</h1>
@@ -51,8 +50,7 @@ Complete HTML documents with `<!DOCTYPE html>`, `<html>`, `<head>`, and `<body>`
 
 **Features:**
 - Document elements are merged with the layout during processing
-- Layout discovery via `<link rel="layout">` in document head (highest priority)
-- Can also use `data-layout` attribute (lower priority)
+- Can use `data-layout` attribute on `<html>` or `<body>` elements
 - **Document Merging**:
   - Page's DOCTYPE is used if present, otherwise layout's DOCTYPE
   - Layout's `<html>` attributes preserved, page's attributes added/override on conflict
@@ -67,39 +65,32 @@ unify automatically discovers and applies layouts based on file naming conventio
 
 **Layout Discovery Precedence (highest to lowest):**
 
-1. **`<link rel="layout">` in document head** (full HTML documents only)
-2. **`data-layout` attribute** on root element (fragments) or any element (full documents)
-3. **Frontmatter `layout` key** (Markdown files only)
-4. **Auto Discovery**: Searches for `_layout.html` or `_layout.htm` files in page directory and parent directories
-5. **Site-wide Fallback**: Uses `_includes/layout.html` if it exists (no underscore prefix required)
-6. **No Layout**: Renders page content as-is if no layout is found
+1. **`data-layout` attribute** on root element (fragments) or `<html>`/`<body>` elements (full documents)
+2. **Frontmatter `layout` key** (Markdown files only)
+3. **Auto Discovery**: Searches for `_layout.html` files in page directory and parent directories
+4. **No Layout**: Renders page content as-is if no layout is found
 
-**Layout Path Resolution:**
-- **Full paths**: `href="/layouts/blog.html"` or `data-layout="../shared/layout.html"`
-- **Short names**: `href="blog"` or `data-layout="blog"` → searches for `_blog.layout.html` in directory hierarchy and `_includes`
-- **Relative paths**: `href="custom.html"` → relative to current page directory
+**Layout Path Resolution (v2):**
+- **Absolute paths**: `data-layout="/layouts/blog.html"` - resolves from source root
+- **Relative paths**: `data-layout="../shared/layout.html"` - relative to current file's directory
+- **Auto-discovery**: Only `_layout.html` files (exact name) are auto-discovered
 
 ### Layout Naming Convention
 
 **Automatic Layout Discovery:**
-- Only files named exactly `_layout.html` or `_layout.htm` are automatically discovered and applied
+- Only files named exactly `_layout.html` are automatically discovered and applied
 - These files must be in the page's directory or a parent directory
-- Site-wide fallback: `_includes/layout.html` or `_includes/layout.htm` (no underscore prefix)
+- Auto-discovery walks up the directory tree until a `_layout.html` is found
 
 **Named Layouts (Referenced Explicitly via data-layout or frontmatter):**
 - Can be located anywhere in src directory
-- Can have any filename (e.g., `_custom.html`, `_blog-template.html`)
-- For short name discovery (e.g., `data-layout="blog"`), must follow pattern `_[name].layout.htm(l)`
-- Files in `_includes/` don't require underscore prefix for short names
+- Can have any filename (e.g., `blog-layout.html`, `docs-layout.html`)
+- Must be referenced with explicit paths (absolute or relative)
 
 **Recommended naming patterns:**
-- `_layout.html`, `_layout.htm` (auto-discovered default layout)
-- `_blog.layout.html`, `_documentation.layout.htm` (named layouts, findable via short names)
-- `_custom-template.html` (must reference via full path)
-
-**Special case for `_includes` directory:**
-- `layout.html` or `layout.htm` serves as site-wide fallback
-- Named layouts should follow pattern `[name].layout.htm(l)` for short name discovery
+- `_layout.html` (auto-discovered default layout)
+- `layouts/blog.html`, `layouts/docs.html` (explicit layouts in dedicated directory)
+- `_blog-layout.html` (co-located with blog pages, must reference explicitly)
 
 ### Basic Layout Usage
 
@@ -115,11 +106,11 @@ Layouts provide a base structure for your pages using slot elements for content 
   <slot name="head"></slot>
 </head>
 <body>
-  <!--#include virtual="/_includes/header.html" -->
+  <include src="/components/header.html" />
   <main>
     <slot></slot>
   </main>
-  <!--#include virtual="/_includes/footer.html" -->
+  <include src="/components/footer.html" />
 </body>
 </html>
 ```
@@ -147,11 +138,11 @@ This content will be placed in the default slot of the layout.
 </div>
 ```
 
-### New Layout Discovery Methods
+### Explicit Layout References
 
-#### Using `<link rel="layout">` in Full HTML Documents
+#### Using `data-layout` Attribute
 
-**Layout file: `src/_includes/blog.layout.html`**
+**Layout file: `src/layouts/blog.html`**
 ```html
 <!DOCTYPE html>
 <html lang="en">
@@ -171,61 +162,20 @@ This content will be placed in the default slot of the layout.
 </html>
 ```
 
-**Full HTML document: `src/posts/my-post.html`**
+**Page fragment with explicit layout: `src/posts/article.html`**
 ```html
-<!DOCTYPE html>
-<html>
-<head>
-  <title>My Blog Post</title>
-  <link rel="layout" href="../_includes/blog.layout.html">
-  <meta name="description" content="A great blog post">
-</head>
-<body>
-  <article>
-    <h2>My Blog Post</h2>
-    <p>This is the content of my blog post.</p>
-  </article>
-</body>
-</html>
-```
-
-**Result:** The page and layout are merged with:
-- Page's DOCTYPE (`<!DOCTYPE html>`) used
-- Layout's `<html>` attributes preserved
-- Page's `<title>` wins over layout's title
-- Page's meta description added to head
-- Page's body content goes into layout's default slot
-
-#### Using Short Names for Layout Discovery
-
-**Layout file: `src/_blog.layout.html`**
-```html
-<!DOCTYPE html>
-<html>
-<head><title>Blog Layout</title></head>
-<body>
-  <div class="blog-container">
-    <slot></slot>
-  </div>
-</body>
-</html>
-```
-
-**Page fragment: `src/posts/article.html`**
-```html
-<article data-layout="blog">
+<article data-layout="/layouts/blog.html">
   <h1>Article Title</h1>
   <p>Article content goes here.</p>
 </article>
 ```
 
-**Full HTML document: `src/posts/full-article.html`**
+**Full HTML document with explicit layout: `src/posts/full-article.html`**
 ```html
 <!DOCTYPE html>
-<html>
+<html data-layout="/layouts/blog.html">
 <head>
   <title>Full Article</title>
-  <link rel="layout" href="blog">
 </head>
 <body>
   <article>
@@ -236,7 +186,14 @@ This content will be placed in the default slot of the layout.
 </html>
 ```
 
-Both examples will use the `_blog.layout.html` layout file via short name resolution.
+**Relative path to layout:**
+```html
+<!-- From src/blog/posts/article.html -->
+<article data-layout="../blog-layout.html">
+  <h1>Article Title</h1>
+  <p>Uses layout at src/blog/blog-layout.html</p>
+</article>
+```
 
 ### Layout Directory Structure Examples
 
@@ -244,7 +201,7 @@ Both examples will use the `_blog.layout.html` layout file via short name resolu
 ```
 src/
 ├── _layout.html              # Root layout (wraps all pages)
-├── _includes/
+├── components/
 │   ├── header.html           # Shared header
 │   └── footer.html           # Shared footer
 ├── index.html                # Homepage (uses _layout.html)
@@ -254,64 +211,46 @@ src/
 #### Multi-Section Site
 ```
 src/
-├── _includes/
-│   ├── layout.html           # Site-wide fallback layout
+├── _layout.html              # Root default layout
+├── layouts/
+│   ├── blog.html             # Blog-specific layout
+│   └── docs.html             # Documentation layout
+├── components/
 │   ├── header.html           # Global header
 │   └── footer.html           # Global footer
 ├── blog/
-│   ├── _blog.layout.html     # Blog-specific layout
-│   ├── _sidebar.html         # Blog sidebar partial
-│   ├── post1.md              # Blog post (uses _blog.layout.html)
-│   └── post2.md              # Another post (uses _blog.layout.html)
+│   ├── _layout.html          # Blog section default (or use data-layout="/layouts/blog.html")
+│   ├── sidebar.html          # Blog sidebar component
+│   ├── post1.md              # Blog post (uses blog/_layout.html or /layouts/blog.html)
+│   └── post2.md              # Another post
 ├── docs/
-│   ├── _docs.layout.html     # Documentation layout
-│   ├── _toc.html             # Table of contents
-│   ├── guide.html            # Guide (uses _docs.layout.html)
-│   └── api.html              # API docs (uses _docs.layout.html)
-├── index.html                # Homepage (uses _includes/layout.html)
-└── about.html                # About (uses _includes/layout.html)
+│   ├── _layout.html          # Docs section default
+│   ├── toc.html              # Table of contents component
+│   ├── guide.html            # Guide (uses docs/_layout.html)
+│   └── api.html              # API docs (uses docs/_layout.html)
+├── index.html                # Homepage (uses root _layout.html)
+└── about.html                # About (uses root _layout.html)
 ```
 
 ### Layout Selection and Overrides
 
 Layouts are selected in order of precedence:
 
-1. **Data attribute**: `<div data-layout="_custom.layout.html">` or `<div data-layout="blog">` (supports short names)
-2. **Frontmatter**: `layout: custom` (for markdown files - searches for `_custom.layout.html`)
-3. **Auto discovery**: Nearest `_layout.html` or `_layout.htm` file in directory tree
-4. **Site-wide fallback**: `_includes/layout.html` if it exists
-5. **No layout**: Renders page content as-is
+1. **Data attribute**: `data-layout="/layouts/custom.html"` (must be absolute or relative path)
+2. **Frontmatter**: `layout: /layouts/custom.html` (for markdown files)
+3. **Auto discovery**: Nearest `_layout.html` file in directory tree
+4. **No layout**: Renders page content as-is
 
 ```html
-<!-- Page with full path data-layout attribute -->
-<div data-layout="_custom.layout.html">
+<!-- Page with absolute path data-layout attribute -->
+<div data-layout="/layouts/custom.html">
   <h1>My Blog Post</h1>
 </div>
 
-<!-- Page with short name data-layout attribute -->
-<div data-layout="blog">
+<!-- Page with relative path data-layout attribute -->
+<div data-layout="../custom-layout.html">
   <h1>My Blog Post</h1>
 </div>
-```
-
-#### Short Name Layout References
-
-Short names provide a convenient way to reference layouts without full file paths:
-
-```html
-<!-- Short name automatically resolves to: -->
-<!-- Same directory: _blog.layout.html, _blog.html -->
-<!-- _includes directory: blog.layout.html, blog.html -->
-<div data-layout="blog">
-  <h1>Blog Content</h1>
-</div>
-```
-
-```markdown
----
-layout: blog              # Searches for _blog.layout.html in current or parent directories
----
-# My Blog Post
 ```
 
 ### Layout Wrapping Process
@@ -322,22 +261,24 @@ When unify processes a page, it follows this wrapping process:
 2. **Discover Layout**: Find the appropriate layout using the selection rules
 3. **Process Layout**: Parse layout file and identify slots
 4. **Fill Slots**: Insert page templates into named slots, default content into unnamed slot
-5. **Process Includes**: Resolve all includes within the final layout
+5. **Process Includes**: Resolve all `<include>` elements within the final layout
 6. **Output**: Generate the complete HTML page
 
 Example of the wrapping process:
 
 **Page: `src/blog/post.html`**
 ```html
-<template slot="title">My First Post</template>
-<template slot="meta">
-  <meta name="author" content="John Doe">
-</template>
-<h1>Welcome to my blog</h1>
-<p>This is my first post content.</p>
+<div data-layout="/layouts/blog.html">
+  <template slot="title">My First Post</template>
+  <template slot="meta">
+    <meta name="author" content="John Doe">
+  </template>
+  <h1>Welcome to my blog</h1>
+  <p>This is my first post content.</p>
+</div>
 ```
 
-**Layout: `src/blog/_blog.layout.html`**
+**Layout: `src/layouts/blog.html`**
 ```html
 <!DOCTYPE html>
 <html>
@@ -346,11 +287,11 @@ Example of the wrapping process:
   <slot name="meta"></slot>
 </head>
 <body>
-  <!--#include virtual="/_includes/header.html" -->
+  <include src="/components/header.html" />
   <article>
     <slot></slot> <!-- Default content goes here -->
   </article>
-  <!--#include virtual="/_includes/footer.html" -->
+  <include src="/components/footer.html" />
 </body>
 </html>
 ```
@@ -382,18 +323,18 @@ Use `<template>` elements for modern component-based templating:
 
 **Page using template: `src/index.html`**
 ```html
-<div data-layout="_custom.layout.html">
+<div data-layout="/layouts/custom.html">
   <template slot="title">Welcome to My Site</template>
   <template slot="meta">
     <meta name="keywords" content="static site, generator">
   </template>
-  
+
   <h1>Homepage Content</h1>
   <p>This content goes in the default slot.</p>
 </div>
 ```
 
-**Layout with slots: `src/_custom.layout.html`**
+**Layout with slots: `src/layouts/custom.html`**
 ```html
 <!DOCTYPE html>
 <html>
@@ -415,7 +356,7 @@ Use the `data-layout` attribute to specify layouts and fill slots:
 
 **Page with data-layout:**
 ```html
-<div data-layout="_blog.layout.html">
+<div data-layout="/layouts/blog.html">
   <template slot="sidebar">
     <h3>Recent Posts</h3>
     <ul>
@@ -426,7 +367,7 @@ Use the `data-layout` attribute to specify layouts and fill slots:
   <template slot="meta">
     <meta name="author" content="John Doe">
   </template>
-  
+
   <!-- Content outside templates goes to default slot -->
   <h1>My Blog Post</h1>
   <p>This is the main content that goes in the default slot.</p>
@@ -435,14 +376,14 @@ Use the `data-layout` attribute to specify layouts and fill slots:
 
 **Alternative placement on html/body elements:**
 ```html
-<html data-layout="_blog.layout.html">
+<html data-layout="/layouts/blog.html">
   <template slot="title">My Page Title</template>
   <!-- Page content -->
 </html>
 
 <!-- OR -->
 
-<body data-layout="_blog.layout.html">
+<body data-layout="/layouts/blog.html">
   <template slot="header">Custom Header</template>
   <!-- Page content -->
 </body>
@@ -452,11 +393,9 @@ Use the `data-layout` attribute to specify layouts and fill slots:
 
 Layout paths are resolved in this order:
 
-1. **Short names**: `data-layout="blog"` → Searches for `_blog.layout.html`, `_blog.html` in same directory and `blog.layout.html`, `blog.html` in `_includes`
-2. **Absolute from source**: `data-layout="/_includes/layout.html"` → `src/_includes/layout.html`
-3. **Relative to current directory**: `data-layout="_custom.layout.html"` → current directory
-4. **Auto discovery**: Search up directory tree for `_*.layout.html` then `_*.html` files
-5. **Site-wide fallback**: `src/_includes/layout.html` if it exists
+1. **Absolute from source**: `data-layout="/layouts/blog.html"` → `src/layouts/blog.html`
+2. **Relative to current file**: `data-layout="../shared/layout.html"` → relative to current file's directory
+3. **Auto discovery**: Search up directory tree for `_layout.html` files
 
 ### Slot Content Options
 
@@ -467,14 +406,14 @@ Pages can provide content for named slots using two approaches with different ra
 Use `<template slot="name">` for content that should be hidden when viewing the uncompiled page directly in a browser:
 
 ```html
-<div data-layout="_blog.layout.html">
+<div data-layout="/layouts/blog.html">
   <template slot="sidebar">
     <h3>Recent Posts</h3>
     <ul>
       <li><a href="/post1">First Post</a></li>
     </ul>
   </template>
-  
+
   <h1>Main Blog Post</h1>
   <p>This content is visible in both raw and compiled views.</p>
 </div>
@@ -489,14 +428,14 @@ Use `<template slot="name">` for content that should be hidden when viewing the 
 Use any element with `slot="name"` for content that should be visible when viewing the uncompiled page:
 
 ```html
-<div data-layout="_blog.layout.html">
+<div data-layout="/layouts/blog.html">
   <aside slot="sidebar">
     <h3>Recent Posts</h3>
     <ul>
       <li><a href="/post1">First Post</a></li>
     </ul>
   </aside>
-  
+
   <h1>Main Blog Post</h1>
   <p>This content is visible in both raw and compiled views.</p>
 </div>
@@ -574,26 +513,26 @@ Define specific content areas with named slots:
 
 **Page filling named slots:**
 ```html
-<div data-layout="layouts/complex.html">
+<div data-layout="/layouts/complex.html">
   <template slot="head">
     <title>Custom Page Title</title>
     <link rel="stylesheet" href="/custom.css">
   </template>
-  
+
   <template slot="header">
     <h1>Custom Header</h1>
     <nav>...</nav>
   </template>
-  
+
   <template slot="sidebar">
     <h3>Page Navigation</h3>
     <ul>...</ul>
   </template>
-  
+
   <template slot="footer">
     <p>Custom footer for this page</p>
   </template>
-  
+
   <!-- Default slot content -->
   <h2>Main Content</h2>
   <p>This goes in the default slot.</p>
@@ -611,9 +550,9 @@ The unnamed slot receives content not in named templates:
 </main>
 
 <!-- Page -->
-<div data-layout="layout.html">
+<div data-layout="/layouts/simple.html">
   <template slot="title">Page Title</template>
-  
+
   <!-- This content goes to the default slot -->
   <h1>Main Heading</h1>
   <p>Main content here.</p>
@@ -654,7 +593,7 @@ Provide fallback content for empty slots:
 
 Build reusable components with slots:
 
-**Card component: `src/_includes/card.html`**
+**Card component: `src/components/card.html`**
 ```html
 <div class="card">
   <header class="card-header">
@@ -671,15 +610,15 @@ Build reusable components with slots:
 
 **Using card component:**
 ```html
-<div data-layout="_layout.html">
-  <!--#include virtual="/_includes/card.html" -->
+<div data-layout="/layouts/main.html">
+  <include src="/components/card.html" />
   <template slot="header">
     <h3>Product Card</h3>
   </template>
   <template slot="footer">
     <button>Buy Now</button>
   </template>
-  
+
   <!-- Default slot content -->
   <p>Product description goes here.</p>
   <p class="price">$99.99</p>
@@ -690,7 +629,7 @@ Build reusable components with slots:
 
 Create specialized layouts for different content types:
 
-**Blog layout: `src/blog/_blog.layout.html`**
+**Blog layout: `src/layouts/blog.html`**
 ```html
 <!DOCTYPE html>
 <html>
@@ -701,7 +640,7 @@ Create specialized layouts for different content types:
   </slot>
 </head>
 <body>
-  <!--#include virtual="/_includes/header.html" -->
+  <include src="/components/header.html" />
   <article>
     <header class="post-header">
       <slot name="post-meta"></slot>
@@ -713,73 +652,41 @@ Create specialized layouts for different content types:
       <slot name="comments"></slot>
     </footer>
   </article>
-  <!--#include virtual="/_includes/footer.html" -->
+  <include src="/components/footer.html" />
 </body>
 </html>
 ```
 
-**Using blog layout:**
+**Using blog layout explicitly:**
 ```html
-<!-- This page is in src/blog/ directory, so it automatically uses _blog.layout.html -->
-<template slot="head">
-  <title>My Blog Post - My Site</title>
-  <meta name="description" content="A great blog post">
-</template>
-<template slot="post-meta">
-  <h1>My Blog Post</h1>
-  <p class="meta">Published on January 1, 2024</p>
-</template>
-<template slot="comments">
-  <!--#include virtual="/_includes/comments.html" -->
-</template>
+<div data-layout="/layouts/blog.html">
+  <template slot="head">
+    <title>My Blog Post - My Site</title>
+    <meta name="description" content="A great blog post">
+  </template>
+  <template slot="post-meta">
+    <h1>My Blog Post</h1>
+    <p class="meta">Published on January 1, 2024</p>
+  </template>
+  <template slot="comments">
+    <include src="/components/comments.html" />
+  </template>
 
-<!-- Main content goes in default slot -->
-<p>This is the main blog post content.</p>
-
-## Integration with Includes
-
-### Conditional Slots
-
-Show slots based on conditions:
-
-```html
-<!-- Layout with conditional slots -->
-<article>
-  <header>
-    <h1><slot name="title"></slot></h1>
-    {{#if author}}
-    <p class="author">
-      By <slot name="author">{{ author }}</slot>
-    </p>
-    {{/if}}
-  </header>
-  
-  <div class="content">
-    <slot></slot>
-  </div>
-  
-  {{#if tags}}
-  <footer class="tags">
-    <slot name="tags">
-      {{#each tags}}
-      <span class="tag">{{ . }}</span>
-      {{/each}}
-    </slot>
-  </footer>
-  {{/if}}
-</article>
-## Markdown Integration
+  <!-- Main content goes in default slot -->
+  <p>This is the main blog post content.</p>
+</div>
+```
 
 ## Markdown Integration
 
 ### Templates in Markdown
 
-Markdown files can specify layouts using frontmatter and include template elements:
+Markdown files can specify layouts using frontmatter and include components:
 
 ```markdown
 ---
 title: "Blog Post"
-layout: blog
+layout: /layouts/blog.html
 ---
 
 # My Blog Post
@@ -788,7 +695,7 @@ This markdown content will be processed and placed in the default slot of the bl
 
 You can also include components within markdown:
 
-<!--#include virtual="/_includes/code-example.html" -->
+<include src="/components/code-example.html" />
 
 More markdown content here.
 ```
@@ -799,13 +706,26 @@ Specify layouts in frontmatter:
 
 ```markdown
 ---
-layout: custom-layout    # Searches for _custom-layout.layout.html in current/parent directories
+layout: /layouts/custom.html    # Absolute path from source root
 ---
 
 # Page Content
 
-This content will use the custom-layout layout file.
+This content will use the custom layout file.
 ```
+
+```markdown
+---
+layout: ../custom-layout.html   # Relative path from current file
+---
+
+# Page Content
+
+This uses a relative path to the layout.
+```
+
+**Auto-discovery:**
+If no layout is specified in frontmatter, markdown files use auto-discovery (nearest `_layout.html`).
 
 ## Performance and Best Practices
 
@@ -822,6 +742,8 @@ This content will use the custom-layout layout file.
 2. **Fallback content**: Always provide meaningful defaults
 3. **Documentation**: Comment complex template logic
 4. **Testing**: Verify template rendering with different content
+5. **Explicit paths**: Use absolute paths (`/layouts/blog.html`) for shared layouts
+6. **Auto-discovery**: Use `_layout.html` for section-specific defaults
 
 ### Common Patterns
 
@@ -876,14 +798,12 @@ This content will use the custom-layout layout file.
 - Ensure layout file exists and is accessible
 
 **Layout not applied:**
-
-- Confirm layout file follows naming conventions (`_*.layout.html` or `_*.html`)
-- Check frontmatter layout name matches filename (without `_` prefix)
+- Confirm layout file is named `_layout.html` for auto-discovery
+- Check `data-layout` path is absolute (`/layouts/blog.html`) or relative (`../layout.html`)
 - Verify layout has proper slot placeholders
-- For short names, ensure layout exists in same directory or `_includes/`
+- Check that layout path resolves correctly (use absolute paths to avoid ambiguity)
 
 **Template elements not working:**
-
 - Check template slot attribute matches slot name in layout
 - Ensure template elements are properly nested
 - Verify layout file contains the expected slots
@@ -898,57 +818,51 @@ DEBUG=1 unify build
 unify build --source src --output debug-dist
 ```
 
-## Migration from Other Systems
+## Migration from v1
 
-### From Liquid Templates
+### Layout Discovery Changes
 
-```liquid
-<!-- Liquid -->
-{% layout "base" %}
-{% block title %}Page Title{% endblock %}
-{% block content %}Content here{% endblock %}
+**v1 (multiple discovery methods):**
+```html
+<!-- Short name -->
+<div data-layout="blog">...</div>
 
-<!-- unify -->
-<div data-layout="layouts/base.html">
-  <template slot="title">Page Title</template>
-  Content here (goes to default slot)
-</div>
+<!-- Link element -->
+<link rel="layout" href="blog">
+
+<!-- Multiple naming patterns -->
+_blog.layout.html
+_blog.layout.htm
+blog.layout.html (in _includes)
 ```
 
-### From Handlebars
+**v2 (simplified):**
+```html
+<!-- Explicit path only -->
+<div data-layout="/layouts/blog.html">...</div>
 
-```handlebars
-<!-- Handlebars -->
-{{> header title="Page Title"}}
-<main>{{{content}}}</main>
-{{> footer}}
-
-<!-- unify -->
-<!--#include virtual="/.components/header.html" -->
-<main>
-  <slot></slot>
-</main>
-<!--#include virtual="/.components/footer.html" -->
+<!-- Auto-discovery: only _layout.html -->
+_layout.html (exact name)
 ```
 
-### From Hugo Partials
+### Migration Steps
 
-```go
-<!-- Hugo -->
-{{ partial "header.html" . }}
-<main>{{ .Content }}</main>
-{{ partial "footer.html" . }}
+1. **Replace short names with explicit paths:**
+   - Change `data-layout="blog"` to `data-layout="/layouts/blog.html"`
+   - Change `layout: blog` to `layout: /layouts/blog.html`
 
-<!-- unify -->
-<!--#include virtual="/.components/header.html" -->
-<main>
-  <slot></slot>
-</main>
-<!--#include virtual="/.components/footer.html" -->
-```
+2. **Remove `<link rel="layout">` elements:**
+   - Replace with `data-layout` attribute on `<html>` or root element
+
+3. **Rename layout files:**
+   - Auto-discovered: rename to `_layout.html` (exact name)
+   - Explicit: move to `layouts/` directory with descriptive names
+
+4. **Update include syntax:**
+   - Replace `<!--#include virtual="path"-->` with `<include src="path" />`
 
 ## See Also
 
 - [Include System Documentation](include-syntax.md)
-- [Template Elements in Markdown](template-elements-in-markdown.md)
+- [App Specification](app-spec.md)
 - [Getting Started Guide](getting-started.md)

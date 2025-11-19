@@ -224,9 +224,9 @@ Suggestions:
 Error: Include file not found: header.html
   in: src/index.html:5
 Suggestions:
-  • Create the include file: src/.components/header.html
+  • Create the include file: src/components/header.html
   • Check the include path and spelling
-  • Use virtual path: <!--#include virtual="/.components/header.html" -->
+  • Use absolute path: <include src="/components/header.html" />
 ```
 
 **Port already in use:**

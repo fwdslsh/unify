@@ -431,3 +431,26 @@ All planning and documentation is complete. GitHub issues templates created. Now
 **Committed:** 2c9cbd8 - "refactor: Document simplified frontmatter processing (v2 migration - Day 6-7)"
 
 **Status**: Frontmatter already simplified. Documentation updated.
+
+### Week 2 Day 8-9: Update All Documentation [COMPLETED]
+
+**Tasks:**
+- [x] Review docs/app-spec.md - replaced with simplified-spec.md
+- [x] Update docs/include-syntax.md - completely rewritten for v2 (318 lines)
+- [x] Update docs/layouts-slots-templates.md - completely rewritten for v2 (869 lines)
+- [x] Update docs/cli-reference.md - updated SSI example to `<include>`
+- [x] Update docs/getting-started.md - completely rewritten for v2 (377 lines)
+- [x] Update README.md - updated all examples to v2 syntax
+- [x] Archive docs/templating-quick-start.md to v1-old (outdated, not referenced)
+- [x] Verify references - only migration guides show SSI syntax (for comparison)
+
+**Changes Made:**
+- Renamed `app-spec.md` → `app-spec-v1-old.md`
+- Renamed `simplified-spec.md` → `app-spec.md` (now canonical v2 spec)
+- Renamed `templating-quick-start.md` → `templating-quick-start-v1-old.md`
+- Completely rewrote 3 major documentation files for v2
+- Updated README.md examples from SSI to `<include>` syntax
+- All docs now show explicit paths instead of short names
+- Migration sections preserved showing v1→v2 changes
+
+**Status**: All documentation updated to v2. Only migration guides and v1-old archived files contain SSI references.

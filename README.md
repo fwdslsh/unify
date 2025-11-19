@@ -3,13 +3,13 @@
 
 <img src="example/src/imgs/green-icon-64.png" alt="unify banner" style="float: left; margin-right: 16px;" />
 
-A modern, lightweight static site generator that brings the power of server-side includes, markdown processing, and live development to your workflow. Build maintainable static sites with component-based architecture—no more copying and pasting headers, footers, and navigation across multiple pages!
+A modern, lightweight static site generator that brings the power of HTML includes, markdown processing, and live development to your workflow. Build maintainable static sites with component-based architecture—no more copying and pasting headers, footers, and navigation across multiple pages!
 
 > So simple, it shouldn't be this powerful!
 
 ## ✨ Perfect for Frontend Developers
 
-- **Zero Learning Curve**: Uses familiar Apache SSI syntax (`<!--#include file="header.html" -->`) and modern DOM templating (`<include>`, `data-slot`, `<template>`)
+- **Zero Learning Curve**: Uses simple HTML includes (`<include src="header.html" />`) and modern templating (`<slot>`, `<template>`)
 - **Modern Tooling**: Built with ESM modules, powered by **Bun** for maximum performance
 - **Live Development**: Built-in dev server with live reload via Server-Sent Events
 - **Multi-Format Support**: HTML, Markdown with YAML frontmatter, and static assets
@@ -64,23 +64,26 @@ unify is built exclusively for Bun and uses native APIs for maximum performance:
 
 ```html
 <!-- src/index.html -->
-<!--#include virtual="/_includes/header.html" -->
+<include src="/components/header.html" />
 <main>
   <h1>Welcome!</h1>
   <p>Build maintainable sites with includes and layouts.</p>
 </main>
-<!--#include virtual="/_includes/footer.html" -->
+<include src="/components/footer.html" />
 ```
 
 ```html
-<!-- Alternative modern DOM syntax -->
-<include src="/_includes/header.html"></include>
-<main>
-  <template data-slot="title">My Page Title</template>
+<!-- Advanced layout with slots -->
+<div data-layout="/layouts/main.html">
+  <template slot="title">My Page Title</template>
+  <template slot="meta">
+    <meta name="description" content="Welcome to my site">
+  </template>
+
+  <!-- Main content goes to default slot -->
   <h1>Welcome!</h1>
-  <p>Use data-slot attributes and templates for advanced layouts.</p>
-</main>
-<include src="/_includes/footer.html"></include>
+  <p>Use slots and templates for advanced layouts.</p>
+</div>
 ```
 
 See the [Getting Started Guide](docs/getting-started.md) for a complete tutorial.
@@ -88,9 +91,10 @@ See the [Getting Started Guide](docs/getting-started.md) for a complete tutorial
 ## 📚 Documentation
 
 - **[Getting Started](docs/getting-started.md)** - Your first unify site
-- **[CLI Reference](docs/cli-reference.md)** - Complete command documentation  
-- **[Include Syntax](docs/include-syntax.md)** - Apache SSI and DOM templating
-- **[Layouts & Templates](docs/layouts-slots-templates.md)** - Advanced templating features
+- **[CLI Reference](docs/cli-reference.md)** - Complete command documentation
+- **[Include Syntax](docs/include-syntax.md)** - HTML include elements and path resolution
+- **[Layouts & Templates](docs/layouts-slots-templates.md)** - Advanced templating with slots
+- **[App Specification](docs/app-spec.md)** - Complete v2 specification
 - **[Docker Usage](docs/docker-usage.md)** - Container deployment guide
 - **[Architecture](docs/unify-architecture.md)** - Technical deep dive
 
@@ -118,8 +122,8 @@ See [CLI Reference](docs/cli-reference.md) for all options.
 
 ## 🎯 Why unify?
 
-- **Simple**: Familiar HTML and Apache SSI syntax with modern templating
-- **Fast**: Incremental builds and smart dependency tracking  
+- **Simple**: Clean HTML includes and modern slot-based templating
+- **Fast**: Incremental builds and smart dependency tracking
 - **Modern**: ESM modules, live reload, cross-platform binaries
 - **Flexible**: Works with HTML, Markdown, and convention-based architecture
 - **Portable**: Runs on Bun (optimal), Node.js, and Deno

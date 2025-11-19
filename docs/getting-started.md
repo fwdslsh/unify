@@ -1,4 +1,4 @@
-# Getting Started with unify
+# Getting Started with unify (v2)
 
 This guide will walk you through creating your first unify site and understanding the core concepts.
 
@@ -25,7 +25,7 @@ mkdir my-site
 cd my-site
 
 # Create source directory with conventional structure
-mkdir -p src/_includes
+mkdir -p src/components
 ```
 
 ### 2. Create a Layout
@@ -41,38 +41,18 @@ Create `src/_layout.html` (folder-scoped layout):
     <slot name="head"></slot>
   </head>
   <body>
-    <!--#include virtual="/_includes/header.html" -->
+    <include src="/components/header.html" />
     <main>
       <slot></slot>
     </main>
-    <!--#include virtual="/_includes/footer.html" -->
-  </body>
-</html>
-```
-
-Or create `src/_includes/layout.html` (site-wide fallback layout):
-
-```html
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <slot name="head"></slot>
-  </head>
-  <body>
-    <!--#include virtual="/_includes/header.html" -->
-    <main>
-      <slot></slot>
-    </main>
-    <!--#include virtual="/_includes/footer.html" -->
+    <include src="/components/footer.html" />
   </body>
 </html>
 ```
 
 ### 3. Create Components
 
-Create `src/_includes/header.html`:
+Create `src/components/header.html`:
 
 ```html
 <header>
@@ -86,7 +66,7 @@ Create `src/_includes/header.html`:
 </header>
 ```
 
-Create `src/_includes/footer.html`:
+Create `src/components/footer.html`:
 
 ```html
 <footer>
@@ -125,7 +105,7 @@ This page demonstrates markdown with automatic layout integration.
 - Frontmatter metadata
 - Include processing within markdown
 
-<!--#include virtual="/_includes/contact-form.html" -->
+<include src="/components/contact-form.html" />
 ```
 
 ### 5. Build and Serve
@@ -148,55 +128,83 @@ unify uses conventions to organize your site:
 
 - **Pages**: Any `.html` or `.md` file not starting with `_`
 - **Partials**: Files starting with `_` (non-emitting)
-- **Layouts**: Only `_layout.html` or `_layout.htm` are auto-discovered; named layouts require `.layout.htm(l)` suffix for short name resolution
-- **Shared Components**: Files in `_includes/` directory (no `_` prefix required)
+- **Layouts**: Only `_layout.html` is auto-discovered
+- **Shared Components**: Files in `components/` directory or any other directory you choose
 
 ### Layout System
 
 #### Layout Naming Patterns
 
-Auto-discovered layout files:
-- `_layout.html`, `_layout.htm` (automatically applied to pages)
+**Auto-discovered layout files:**
+- `_layout.html` (automatically applied to pages in that directory and subdirectories)
 
-Named layout files (referenced via data-layout or frontmatter):
-- `_custom.layout.html`, `_blog.layout.htm` (findable via short names)
-- `_documentation.layout.html`, `_admin-panel.layout.htm` (findable via short names)
-- Any other `_*.html` file (must use full path reference)
+**Named layout files (referenced explicitly):**
+- `layouts/blog.html`
+- `layouts/docs.html`
+- `custom-layout.html`
+- Any `.html` file - must use explicit path reference
 
 #### Layout Discovery
 
-1. **Explicit Override**: `data-layout` attribute or frontmatter (supports short names like `data-layout="blog"`)
-2. **Auto Discovery**: Looks for `_layout.html` or `_layout.htm` files only in page directory and parent directories
-3. **Site-wide Fallback**: Uses `_includes/layout.html` if it exists (no underscore prefix required)
-4. **No Layout**: Renders page content as-is
+1. **Explicit Override**: `data-layout` attribute or frontmatter with full path
+2. **Auto Discovery**: Looks for `_layout.html` files only in page directory and parent directories
+3. **No Layout**: Renders page content as-is
 
-#### Short Name Layout References
-
-For convenience, you can use short names instead of full file paths:
+**Examples:**
 
 ```html
-<!-- Instead of data-layout="_blog.layout.html" -->
-<div data-layout="blog">
+<!-- Explicit layout with absolute path -->
+<div data-layout="/layouts/blog.html">
   <h1>Blog Post</h1>
+</div>
+
+<!-- Explicit layout with relative path -->
+<div data-layout="../custom-layout.html">
+  <h1>Custom Page</h1>
+</div>
+
+<!-- Auto-discovery: uses nearest _layout.html -->
+<div>
+  <h1>Auto Layout</h1>
 </div>
 ```
 
-Short names automatically resolve to (must have `.layout.htm(l)` suffix):
-- Search up directory hierarchy: `_blog.layout.html` or `_blog.layout.htm`
-- Then `_includes` directory: `blog.layout.html` or `blog.layout.htm`
-- Warning produced if short name doesn't resolve
+**Markdown frontmatter:**
+
+```markdown
+---
+title: "My Post"
+layout: /layouts/blog.html
+---
+
+# My Blog Post
+
+Content here...
+```
 
 ### Include System
 
-unify uses Apache SSI syntax for includes:
+unify uses HTML `<include>` elements for composing pages:
 
-- `<!--#include virtual="/path/from/source/root.html" -->`
-- `<!--#include file="relative/path.html" -->`
+**Absolute paths** (from source root):
+```html
+<include src="/components/header.html" />
+<include src="/components/footer.html" />
+```
+
+**Relative paths** (from current file):
+```html
+<include src="./sidebar.html" />
+<include src="../shared/nav.html" />
+```
+
+See [Include System Documentation](include-syntax.md) for complete reference.
 
 ### File Organization
 
 - **Source directory** (`src/`): Your content and templates
-- **Includes directory** (`_includes/`): Shared partials and layouts
+- **Components directory** (`src/components/`): Shared partials (recommended)
+- **Layouts directory** (`src/layouts/`): Explicit layouts (recommended)
 - **Output directory** (`dist/`): Generated static site
 
 ### Development Workflow
@@ -209,8 +217,8 @@ unify uses Apache SSI syntax for includes:
 ## Next Steps
 
 - Read the [Full Documentation](../README.md)
-- Check out [Example Projects](../example/)
-- Learn about [Docker Deployment](docker-usage.md)
+- Check the [App Specification](app-spec.md)
+- Learn about [Layouts and Slots](layouts-slots-templates.md)
 
 ## Common Patterns
 
@@ -218,26 +226,50 @@ unify uses Apache SSI syntax for includes:
 
 ```
 src/
-├── _includes/
-│   ├── layout.html           # Site-wide fallback layout
+├── components/
 │   ├── header.html           # Shared header
 │   ├── footer.html           # Shared footer
 │   └── blog-nav.html         # Blog navigation
+├── layouts/
+│   └── blog.html             # Blog-specific layout
 ├── blog/
-│   ├── _blog.layout.html     # Blog-specific layout
-│   ├── _sidebar.html         # Blog sidebar partial
+│   ├── _layout.html          # Auto-discovered blog layout (alternative)
+│   ├── sidebar.html          # Blog sidebar component
 │   ├── 2024-01-01-first-post.md
 │   └── 2024-01-02-second-post.md
 ├── index.html
 └── blog.html
 ```
 
+**Blog post using explicit layout:**
+```markdown
+---
+title: "My First Post"
+layout: /layouts/blog.html
+---
+
+# My First Post
+
+Content here...
+```
+
+**Or use auto-discovery with `blog/_layout.html`:**
+```markdown
+---
+title: "My First Post"
+---
+
+# My First Post
+
+Content automatically uses blog/_layout.html
+```
+
 ### Multi-page Site
 
 ```
 src/
-├── _includes/
-│   ├── layout.html           # Site-wide fallback layout
+├── _layout.html              # Root layout (auto-discovered for all pages)
+├── components/
 │   ├── nav.html              # Main navigation
 │   └── footer.html           # Footer
 ├── pages/
@@ -254,20 +286,92 @@ src/
 
 ```
 src/
-├── _includes/
-│   ├── layout.html           # Site-wide fallback
+├── _layout.html              # Root default layout
+├── layouts/
+│   ├── blog.html             # Blog layout (explicit)
+│   └── docs.html             # Documentation layout (explicit)
+├── components/
 │   ├── header.html
 │   └── footer.html
 ├── docs/
-│   ├── _docs.layout.html     # Documentation layout
-│   ├── _toc.html             # Table of contents partial
+│   ├── _layout.html          # Docs auto-discovered layout (alternative)
+│   ├── toc.html              # Table of contents component
 │   ├── guide.html
 │   └── api.html
 ├── blog/
-│   ├── _blog.layout.html     # Blog layout
-│   ├── _sidebar.html         # Blog sidebar
+│   ├── _layout.html          # Blog auto-discovered layout (alternative)
+│   ├── sidebar.html          # Blog sidebar
 │   └── posts/
 │       ├── first-post.md
 │       └── second-post.md
 └── index.html
 ```
+
+**Using explicit layouts:**
+```html
+<!-- In docs/guide.html -->
+<div data-layout="/layouts/docs.html">
+  <h1>Guide</h1>
+  ...
+</div>
+```
+
+**Or using auto-discovery:**
+Place `_layout.html` in the docs/ or blog/ directory and pages will automatically use it.
+
+## Tips and Best Practices
+
+### 1. Use Absolute Paths for Shared Components
+
+```html
+<!-- Good: Clear, predictable -->
+<include src="/components/header.html" />
+
+<!-- Avoid: Depends on file location -->
+<include src="../../components/header.html" />
+```
+
+### 2. Organize by Purpose
+
+```
+src/
+├── components/     # Reusable UI components
+├── layouts/        # Page layouts
+├── pages/          # Static pages
+├── blog/           # Blog posts
+└── assets/         # Static assets
+```
+
+### 3. Use Auto-Discovery for Section Defaults
+
+Place `_layout.html` in directories to automatically apply layouts to all pages in that section:
+
+```
+src/
+├── _layout.html          # Default for root pages
+├── blog/
+│   ├── _layout.html      # Default for blog pages
+│   └── post1.md
+└── docs/
+    ├── _layout.html      # Default for doc pages
+    └── guide.md
+```
+
+### 4. Use Explicit Layouts for Special Cases
+
+```html
+<!-- Override auto-discovered layout -->
+<div data-layout="/layouts/landing-page.html">
+  <h1>Special Landing Page</h1>
+</div>
+```
+
+## Migration from v1
+
+If you're upgrading from v1, see the [Layouts and Slots documentation](layouts-slots-templates.md#migration-from-v1) for migration steps.
+
+Key changes:
+- Replace `<!--#include virtual="path"-->` with `<include src="path" />`
+- Replace short layout names (`data-layout="blog"`) with explicit paths (`data-layout="/layouts/blog.html"`)
+- Rename `_blog.layout.html` to either `_layout.html` (auto-discovery) or `layouts/blog.html` (explicit)
+- Only `.html` extension supported (no `.htm`)
