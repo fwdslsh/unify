@@ -388,3 +388,21 @@ All planning and documentation is complete. GitHub issues templates created. Now
 - Better test coverage
 
 **Status**: Path resolution unified. Week 1 complete!
+
+### Week 2 Day 6-7: Simplify Frontmatter Processing [IN PROGRESS]
+
+**Tasks:**
+- [ ] Review current frontmatter processing in markdown-processor.js
+- [ ] Simplify processFrontmatter() to handle only: title, description, layout
+- [ ] Delete complex head synthesis functions:
+  - synthesizeHeadMeta()
+  - synthesizeHeadLink()
+  - synthesizeHeadScript()
+  - synthesizeHeadStyle()
+  - processJsonLd()
+  - validateFrontmatterSchema()
+- [ ] Update tests to remove complex frontmatter tests
+- [ ] Run `bun test` - verify simplified frontmatter works
+- [ ] Run `grep -r "synthesizeHead\|head\.meta\|head\.link" src/` - verify no complex synthesis remains
+
+**Status**: Starting frontmatter simplification...

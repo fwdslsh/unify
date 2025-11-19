@@ -1077,21 +1077,9 @@ async function processMarkdownFile(
     throw new FileSystemError("read", filePath, error);
   }
 
-  // Process includes in markdown content first (before converting to HTML)
-  const { processIncludes } = await import("./include-processor.js");
-  const processedMarkdown = await processIncludes(
+  // v2: Process markdown to HTML first, includes will be processed in HTML phase
+  const { html, frontmatter, title, excerpt} = processMarkdown(
     markdownContent,
-    filePath,
-    sourceRoot,
-    new Set(),
-    0,
-    null,
-    failFast
-  );
-
-  // Process markdown to HTML
-  const { html, frontmatter, title, excerpt } = processMarkdown(
-    processedMarkdown,
     filePath
   );
   const htmlWithAnchors = addAnchorLinks(html);
@@ -1110,17 +1098,8 @@ async function processMarkdownFile(
       : path.join(sourceRoot, layoutsDir, frontmatter.layout);
     try {
       const frontmatterLayoutContent = await fs.readFile(layoutPath, "utf-8");
-      const { processIncludes } = await import("./include-processor.js");
-      const processedLayout = await processIncludes(
-        frontmatterLayoutContent,
-        layoutPath,
-        sourceRoot,
-        new Set(),
-        0,
-        null,
-        failFast
-      );
-      let layoutWithContent = processedLayout.replace(
+      // v2: Includes in layouts are processed by unified-html-processor
+      let layoutWithContent = frontmatterLayoutContent.replace(
         /<slot[^>]*><\/slot>/g,
         htmlWithAnchors
       );
@@ -1637,9 +1616,8 @@ async function processMarkdownFileWithConventions(
       }
     }
 
-    // Process includes in the final content AFTER layout application
-    const { processIncludes } = await import("./include-processor.js");
-    finalContent = await processIncludes(finalContent, filePath, sourceRoot);
+    // v2: Include processing is handled by unified-html-processor.js
+    // No separate include processing step needed here
 
     // Determine output path and ensure .html extension
     let outputPath;

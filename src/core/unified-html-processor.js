@@ -303,8 +303,8 @@ async function processIncludesWithStringReplacement(htmlContent, filePath, sourc
       const [fullMatch, src, slotContent] = domMatch;
       try {
         // Use unified path resolver
-        const resolvedPath = resolvePath(src, filePath, sourceRoot);
-        
+        let resolvedPath = resolvePath(src, filePath, sourceRoot);
+
         // Read the include content using fallback resolver
         try {
           const fsSync = require('fs');
@@ -382,8 +382,8 @@ async function processIncludesWithStringReplacement(htmlContent, filePath, sourc
       const [fullMatch, src] = selfClosingMatch;
       try {
         // Use unified path resolver
-        const resolvedPath = resolvePath(src, filePath, sourceRoot);
-        
+        let resolvedPath = resolvePath(src, filePath, sourceRoot);
+
         // Read the include content using fallback resolver
         try {
           const fsSync = require('fs');
