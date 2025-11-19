@@ -814,3 +814,49 @@ Analyzed all failing tests - discovered root cause:
 
 Most remaining failures are complex integration scenarios or edge cases.
 Core functionality is fully tested and working.
+
+---
+
+### Comprehensive E2E Test Suite [COMPLETED]
+
+**Date**: 2025-11-19
+**Goal**: Create specification-based E2E tests to validate complete build process and uncover hidden bugs
+
+**Test Suite Created:**
+- **Location:** `test/e2e/comprehensive-v2.test.js`
+- **Fixtures:** `test/e2e/fixtures/comprehensive-v2/`
+  - Input directory with test source files
+  - Expected directory with hand-crafted correct outputs
+  - README documenting all features tested
+
+**Features Tested:**
+1. **Include System:** Absolute paths, relative paths, nested includes, slot injection, markdown includes
+2. **Layout System:** Auto-discovery, explicit layouts, layout chaining, named slots, fallback content
+3. **File Processing:** HTML fragments, full documents, markdown with frontmatter, head merging
+4. **Path Resolution:** Absolute/relative path handling, security
+5. **Conventions:** Underscore file/directory handling, asset copying
+
+**Bugs Discovered and Fixed:**
+
+1. **Data-Layout Validation Bug** (commit: e969de6)
+   - **Issue:** Validation regex matched `data-layout` inside `<code>` and `<pre>` tags
+   - **Example:** `<code>data-layout="..."</code>` triggered false positive
+   - **Fix:** Temporarily remove code/pre blocks before validation
+   - **Impact:** Enables example code showing data-layout syntax
+
+2. **Data-Layout Cleanup Bug** (commit: d4cde1e)
+   - **Issue:** `data-layout` attribute not removed from final HTML output
+   - **Example:** `<html data-layout="/layouts/base.html">` in output
+   - **Fix:** Filter out `data-layout` from merged attributes in `mergeHtmlDocumentWithLayout`
+   - **Impact:** Cleaner output, data-layout correctly treated as processing directive
+
+**Test Results:**
+- **All 9 test files pass:** index.html, about.html, fragment.html, blog/post1.html, blog/post2.html, blog/nested-includes.html, sitemap.xml, assets/css/style.css, assets/test.txt
+- **Validates:** Correct slot replacement, include processing, layout application, path resolution, file emission rules
+
+**Commits:**
+- e969de6 - Fix data-layout validation to exclude code/pre blocks
+- d4cde1e - Remove data-layout attributes from final HTML output
+- d38dda3 - Add comprehensive E2E test suite
+
+**Impact:** E2E test suite provides regression protection for all v2 features and successfully uncovered 2 production bugs during initial run.
