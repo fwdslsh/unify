@@ -48,7 +48,7 @@ describe('Exit Code Validation', () => {
     it('should return 0 for successful build with warnings (missing includes)', async () => {
       const structure = {
         'src/index.html': '<h1>Home</h1>',
-        'src/page-with-missing-include.html': '<!--#include file="missing.html" --><p>Content</p>'
+        'src/page-with-missing-include.html': '<include src="missing.html" /><p>Content</p>'
       };
 
       await createTestStructure(tempDir, structure);
@@ -145,7 +145,7 @@ describe('Exit Code Validation', () => {
     it('should return 1 when --fail-on error flag encounters errors', async () => {
       const structure = {
         'src/index.html': '<h1>Home</h1>',
-        'src/broken.html': '<!--#include file="missing.html" --><p>Content</p>'
+        'src/broken.html': '<include src="missing.html" /><p>Content</p>'
       };
 
       await createTestStructure(tempDir, structure);

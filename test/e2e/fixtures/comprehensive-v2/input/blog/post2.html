@@ -1,0 +1,27 @@
+<article data-layout="/_layouts/blog.html">
+  <template data-slot="post-title">Second Blog Post</template>
+  <template data-slot="post-date">2024-01-20</template>
+  <template data-slot="title">Second Post - Blog</template>
+  <template data-slot="description">Second blog post with layout override</template>
+
+  <h2>Explicit Layout Override</h2>
+
+  <p>This HTML fragment explicitly uses <code>/_layouts/blog.html</code> instead of the auto-discovered <code>blog/_layout.html</code>.</p>
+
+  <p>The blog layout demonstrates layout chaining - it uses <code>data-layout="/_layouts/base.html"</code>.</p>
+
+  <template data-slot="sidebar">
+    <h3>Custom Sidebar</h3>
+    <p>This sidebar content overrides the default sidebar in the blog layout.</p>
+    <ul>
+      <li><a href="/blog/post1.html">Read Post 1</a></li>
+    </ul>
+  </template>
+
+  <include src="/_components/card.html">
+    <h3 data-slot="title">Related Content</h3>
+    <div data-slot="content">
+      <p>Check out our other posts!</p>
+    </div>
+  </include>
+</article>

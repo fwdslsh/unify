@@ -47,10 +47,10 @@ describe('Performance Scalability', () => {
       // Update first few pages to include dependencies
       for (let i = 0; i < 10; i++) {
         structure[`src/page-${i}.html`] = `
-          <!--#include file="header.html" -->
+          <include src="header.html" />
           <h1>Page ${i}</h1>
           <p>This is test page number ${i}</p>
-          <!--#include file="footer.html" -->
+          <include src="footer.html" />
         `;
       }
 
@@ -250,7 +250,7 @@ describe('Performance Scalability', () => {
       // Generate pages that use multiple includes
       for (let i = 0; i < pageCount; i++) {
         const includesUsed = Array.from({length: 10}, (_, j) => 
-          `<!--#include file="include-${(i + j) % includeCount}.html" -->`
+          `<include src="include-${(i + j) % includeCount}.html" />`
         ).join('\n');
         
         structure[`src/page-${i}.html`] = `
@@ -338,7 +338,7 @@ describe('Performance Scalability', () => {
           if (level < levels - 1) {
             for (let include = 0; include < 3; include++) {
               const includeFile = `level-${level + 1}-file-${(file + include) % filesPerLevel}.html`;
-              content += `\n<!--#include file="${includeFile}" -->`;
+              content += `\n<include src="${includeFile}" />`;
             }
           }
           

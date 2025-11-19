@@ -1,4 +1,4 @@
-# Advanced Example
+# Advanced Example (v2)
 
 This example demonstrates the `unify` convention-based static site generator that uses pure HTML with minimal configuration.
 
@@ -15,13 +15,13 @@ This example demonstrates the `unify` convention-based static site generator tha
 example/advanced/
 ├── src/
 │   ├── _includes/
-│   │   ├── layout.html          # Site-wide fallback layout
+│   │   ├── layout.html          # Site-wide layout
 │   │   ├── header.html          # Shared header component
 │   │   ├── footer.html          # Shared footer component
 │   │   ├── navigation.html      # Navigation component
-│   │   ├── card.html            # Card component  
+│   │   ├── card.html            # Card component
 │   │   └── alert.html           # Alert component
-│   ├── _blog.layout.html        # Blog-specific layout using naming pattern
+│   ├── _blog.layout.html        # Blog-specific layout (explicit reference)
 │   ├── index.html               # Homepage (uses _includes/layout.html)
 │   ├── about.html               # About page (uses _includes/layout.html)
 │   ├── blog.html                # Blog page (uses _blog.layout.html)
@@ -49,40 +49,49 @@ Pages are automatically wrapped with the nearest layout file using naming patter
 </html>
 ```
 
-### 2. Layout Naming Patterns
+### 2. Layout Naming Patterns (v2)
 
-**Recommended layout filenames:**
-- `_layout.html`, `_layout.htm` (standard)
-- `_blog.layout.html`, `_docs.layout.htm` (extended patterns)
-- `_documentation.layout.html` (complex naming)
+**Auto-discovered layout:**
+- `_layout.html` - The ONLY filename that is auto-discovered
 
-**Also valid (but less clear):**
-- `_blog.html`, `_main.htm`, `_template.html` (works but less obvious purpose)
+**Explicit layouts (must be referenced with data-layout):**
+- `_blog.layout.html` - Blog layout (use `data-layout="_blog.layout.html"`)
+- `layouts/docs.html` - Docs layout (use `data-layout="/layouts/docs.html"`)
+- Any `.html` file can be a layout
 
-**Special case for `_includes` directory:**
-- Files in `_includes/` don't require underscore prefix (e.g., `layout.html`, `blog.layout.html`)
+### 3. Layout Discovery Process (v2)
 
-### 3. Layout Discovery Process
+1. **Explicit Override**: `data-layout` attribute or frontmatter with explicit path
+2. **Auto Discovery**: Searches for `_layout.html` only in page directory and parent directories
+3. **No Layout**: Renders content as-is
 
-1. **Explicit Override**: `data-layout` attribute or frontmatter (supports short names like `data-layout="blog"`)
-2. **Auto Discovery**: Searches for `_*.layout.html` then `_*.html` files in page directory and parent directories  
-3. **Site-wide Fallback**: Uses `_includes/layout.html` if it exists (no underscore prefix required)
-4. **No Layout**: Renders content as-is
+**v2 Changes:**
+- ❌ No short names (e.g., `data-layout="blog"` is invalid)
+- ❌ No `_includes/` fallback
+- ❌ No `.htm` extension support
+- ✅ Only `_layout.html` is auto-discovered
+- ✅ All other layouts must be explicitly referenced
 
-### 4. Short Name Layout References
+### 4. Explicit Layout References (v2)
 
-For convenience, you can use short names instead of full file paths:
+Use `data-layout` attribute with explicit paths:
 
 ```html
-<!-- Instead of data-layout="_blog.layout.html" -->
-<div data-layout="blog">
+<!-- Relative path -->
+<html data-layout="_blog.layout.html">
   <h1>Blog Post</h1>
-</div>
-```
+</html>
 
-Short names automatically resolve to:
-- Same directory: `_blog.layout.html`, `_blog.html`
-- `_includes` directory: `blog.layout.html`, `blog.html`
+<!-- Absolute path -->
+<html data-layout="/layouts/blog.html">
+  <h1>Blog Post</h1>
+</html>
+
+<!-- Simple filename (treated as relative to current directory) -->
+<html data-layout="shared.html">
+  <h1>Page Content</h1>
+</html>
+```
 
 ### 5. Slot System
 
@@ -101,12 +110,15 @@ Content for slots:
 <h1>Main Content</h1>
 ```
 
-### 6. Component Inclusion
+### 6. Component Inclusion (v2)
 
-Include components using Apache SSI syntax:
+Include components using HTML include elements:
 ```html
-<!--#include virtual="/_includes/header.html" -->
-<!--#include virtual="/_includes/alert.html" -->
+<include src="/_includes/header.html" />
+<include src="/_includes/alert.html" />
+
+<!-- Relative paths also work -->
+<include src="./components/card.html" />
 ```
 
 ## 🔧 Building This Example
@@ -116,7 +128,7 @@ Include components using Apache SSI syntax:
 unify build --source example/advanced/src --output example/advanced/dist
 
 # The build process will:
-# 1. Discover layout files using naming patterns
+# 1. Discover layout files (_layout.html only for auto-discovery)
 # 2. Automatically wrap pages with nearest layouts
 # 3. Process slot system for content insertion
 # 4. Resolve includes recursively
@@ -130,38 +142,38 @@ The `index.html` file will be processed into a complete HTML document:
 - Layout `_includes/layout.html` provides the base structure
 - Named slots (`title`) filled from `<template slot="...">`
 - Default content goes into the unnamed `<slot></slot>`
-- Include directives replaced with component content
+- Include elements replaced with component content
 - Component styles moved to `<head>` and deduplicated
 
-## 🆚 Comparison with Configuration-Based Approach
+## 🆚 v1 vs v2 Comparison
 
-| Feature | Old Approach | Convention-Based |
-|---------|--------------|------------------|
-| **Layout Discovery** | `--layouts` flag + explicit paths | Automatic discovery using naming patterns |
-| **Component Organization** | `--components` flag | `_includes/` directory by convention |
-| **File Classification** | Configuration-driven | Underscore prefix convention |
-| **Layout Application** | Manual specification | Automatic wrapping based on discovery |
+| Feature | v1 | v2 |
+|---------|----|----|
+| **Include Syntax** | `<!--#include virtual="..." -->` | `<include src="..." />` |
+| **Short Names** | `data-layout="blog"` ✅ | ❌ Not supported |
+| **Auto-discovered Layouts** | `_*.layout.html`, `_*.html` | `_layout.html` only |
+| **Fallback Layout** | `_includes/layout.html` ✅ | ❌ Not supported |
+| **Extensions** | `.html` and `.htm` | `.html` only |
 
 ## 🎨 Convention Details
 
 ### Non-Emitting Files
 Files and directories starting with `_` are non-emitting:
 - `_includes/` - Shared components and layouts
-- `_layout.html` - Layout files
+- `_layout.html` - Auto-discovered layout file
 - `_sidebar.html` - Partial components
 
-### Layout Naming Patterns
+### Layout Naming (v2)
 Valid layout filenames:
-- `_layout.html`, `_layout.htm` (standard)
-- `_blog.layout.html` (extended pattern)
-- `_custom.layout.html` (descriptive naming)
+- `_layout.html` - Auto-discovered default layout
+- `_blog.layout.html` - Explicit layout (use `data-layout="_blog.layout.html"`)
+- `layouts/custom.html` - Explicit layout (use `data-layout="/layouts/custom.html"`)
 
-### Layout Discovery Order
-1. **Explicit Override**: `data-layout` attribute or frontmatter (supports short names)
-2. **Auto Discovery**: Current directory for `_*.layout.html` then `_*.html` files  
-3. **Parent directories**: Climbing up the directory tree
-4. **Site-wide fallback**: `_includes/layout.html` (no underscore prefix required)
-5. **No layout**: Render content as-is
+### Layout Discovery Order (v2)
+1. **Explicit Override**: `data-layout` attribute or frontmatter with full path
+2. **Auto Discovery**: Current directory for `_layout.html` file
+3. **Parent directories**: Climbing up the directory tree looking for `_layout.html`
+4. **No layout**: Render content as-is
 
 ## 🚀 Benefits
 
@@ -174,4 +186,4 @@ Valid layout filenames:
 
 ---
 
-*This example showcases the power of Unify's convention-based architecture - a modern approach to static site generation with minimal configuration.*
+*This example showcases the power of Unify v2's convention-based architecture - a modern approach to static site generation with minimal configuration.*

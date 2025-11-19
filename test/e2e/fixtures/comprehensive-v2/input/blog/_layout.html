@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title data-slot="title">Blog - E2E Test Site</title>
+  <link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body class="blog-layout">
+  <include src="/_components/header.html">
+    <h1 data-slot="site-title">Blog Section</h1>
+  </include>
+
+  <div class="blog-container">
+    <main data-slot="content">
+      <!-- Blog content here -->
+    </main>
+
+    <aside class="blog-sidebar" data-slot="sidebar">
+      <h3>Recent Posts</h3>
+      <ul>
+        <li><a href="/blog/post1.html">Post 1</a></li>
+        <li><a href="/blog/post2.html">Post 2</a></li>
+      </ul>
+    </aside>
+  </div>
+
+  <include src="/_components/footer.html"></include>
+</body>
+</html>

@@ -1,84 +1,66 @@
-# Include System Documentation
+# Include System Documentation (v2)
 
-unify supports two include systems: **Apache SSI-style comments** and **include elements**. This document covers both syntaxes and when to use each.
+unify v2 uses **HTML include elements** for composing pages from reusable components. This provides a clean, modern syntax that's easy to understand and use.
 
-## Include Syntax Types
+## Include Syntax
 
-### Element-Based Includes
+### Basic Include Element
 
-Using HTML elements.
-
-```html
-<!-- include element -->
-<include src="/_includes/header.html" />
-```
-
-**Limitations:**
-
-- Not compatible with traditional Apache SSI implementations
-
-### Comment-Based Includes (Legacy)
-
-Using Apache SSI comments. 
+The `<include>` element loads and injects content from another file:
 
 ```html
-<!--#include virtual="/path/from/source/root.html" -->
-<!--#include file="relative/path/from/current/file.html" -->
+<!-- Self-closing format -->
+<include src="/components/header.html" />
+
+<!-- With closing tag (same behavior) -->
+<include src="/components/header.html"></include>
 ```
 
-#### Virtual Includes
+Both formats work identically - use whichever you prefer for consistency in your project.
 
-Virtual includes use paths relative to the **source root directory**:
+## Path Resolution Rules
+
+unify v2 uses a simple, unified path resolution system:
+
+### Absolute Paths (Starting with `/`)
+
+Absolute paths resolve from the **source root directory**:
 
 ```html
-<!-- In any file, this resolves to src/_includes/header.html -->
-<!--#include virtual="/_includes/header.html" -->
+<!-- Resolves to: src/components/header.html -->
+<include src="/components/header.html" />
 
-<!-- Nested directory structure -->
-<!--#include virtual="/blog/_sidebar.html" -->
+<!-- Resolves to: src/blog/sidebar.html -->
+<include src="/blog/sidebar.html" />
 
-<!-- Cross-directory includes -->
-<!--#include virtual="/shared/navigation.html" -->
+<!-- Resolves to: src/_includes/navigation.html -->
+<include src="/_includes/navigation.html" />
 ```
 
-**Path Resolution:**
+**When to use:**
+- Cross-directory includes
+- Shared components used across the site
+- Components in a central directory
 
-- Always starts from source root (`src/` by default)
-- Leading `/` is optional but recommended for clarity
-- Case-sensitive on most systems
+### Relative Paths
 
-#### File Includes
-
-File includes use paths relative to the **current file's directory**:
+Relative paths resolve from the **current file's directory**:
 
 ```html
 <!-- From src/pages/about.html, includes src/pages/sidebar.html -->
-<!--#include file="sidebar.html" -->
+<include src="./sidebar.html" />
 
-<!-- From src/blog/post.html, includes src/_includes/header.html -->
-<!--#include file="../_includes/header.html" -->
+<!-- From src/blog/post.html, includes src/components/header.html -->
+<include src="../components/header.html" />
 
-<!-- Deeply nested relative path -->
-<!--#include file="../../shared/footer.html" -->
+<!-- Navigate up two directories -->
+<include src="../../shared/footer.html" />
 ```
 
-**Path Resolution:**
-
-- Relative to the directory containing the current file
-- Use `../` to navigate up directories
-- Use `./` for current directory (optional)
-
-## Usage Recommendations
-
-### Use DOM Elements When
-
-- Building component-based architectures
-- Want modern HTML element syntax
-
-### Use SSI Comments When
-
-- Building legacy static sites
-- Need Apache SSI compatibility
+**When to use:**
+- Co-located components (components near the pages that use them)
+- Section-specific includes (blog sidebar for blog pages)
+- Quick relative references
 
 ## Include Features
 
@@ -86,273 +68,250 @@ File includes use paths relative to the **current file's directory**:
 
 Includes can contain other includes, allowing complex composition:
 
-**File: `src/_includes/page-layout.html`**
+**File: `src/components/page-layout.html`**
 
 ```html
 <!DOCTYPE html>
 <html>
   <head>
-    <!--#include virtual="/_includes/head-meta.html" -->
+    <include src="/components/head-meta.html" />
   </head>
   <body>
-    <!--#include virtual="/_includes/header.html" -->
+    <include src="/components/header.html" />
     <main>
       <!-- Content will be inserted here -->
     </main>
-    <!--#include virtual="/_includes/footer.html" -->
+    <include src="/components/footer.html" />
   </body>
 </html>
 ```
 
-**File: `src/_includes/header.html`**
+**File: `src/components/header.html`**
 
 ```html
 <header>
-  <!--#include virtual="/_includes/navigation.html" -->
-  <!--#include virtual="/_includes/user-menu.html" -->
+  <include src="/components/nav.html" />
+  <h1>My Site</h1>
 </header>
 ```
+
+Unify automatically processes nested includes up to 10 levels deep.
 
 ### Circular Dependency Detection
 
-unify automatically detects and prevents infinite include loops:
+unify detects and prevents circular include dependencies:
 
 ```html
-<!-- This will cause a circular dependency error -->
-<!-- file-a.html -->
-<!--#include file="file-b.html" -->
-
-<!-- file-b.html -->
-<!--#include file="file-a.html" -->
+<!-- ❌ This will cause an error -->
+<!-- File A includes File B -->
+<!-- File B includes File A -->
 ```
 
-**Error message:**
+Error message will show the circular chain and prevent infinite loops.
+
+### Include Depth Limiting
+
+Includes are processed up to 10 levels deep:
 
 ```
-Error: Circular dependency detected
-Include chain: file-a.html → file-b.html → file-a.html
+page.html
+  → includes level1.html
+    → includes level2.html
+      → includes level3.html
+        ... up to level 10
 ```
 
-### Depth Limiting
+This prevents accidentally creating overly complex dependency chains.
 
-Includes are limited to 10 levels deep to prevent runaway recursion:
+## Security
+
+### Path Traversal Protection
+
+unify automatically validates that all includes stay within your source directory:
 
 ```html
-<!-- This will work (within limit) -->
-<!--#include virtual="/level1.html" -->
-<!-- level1.html includes level2.html, etc. -->
+<!-- ✅ OK: Within source directory -->
+<include src="/components/header.html" />
 
-<!-- Beyond 10 levels triggers depth limit error -->
+<!-- ❌ ERROR: Attempts to access files outside source -->
+<include src="../../etc/passwd" />
 ```
 
-## Security Features
+Any attempt to access files outside the source directory will result in a `PathTraversalError`.
 
-### Path Traversal Prevention
+## Best Practices
 
-unify prevents includes from accessing files outside the source directory:
+### 1. Use Absolute Paths for Shared Components
 
 ```html
-<!-- These will be blocked for security -->
-<!--#include file="../../../etc/passwd" -->
-<!--#include virtual="/../../../../sensitive-file.txt" -->
+<!-- Good: Clear, predictable -->
+<include src="/components/header.html" />
+<include src="/components/footer.html" />
+
+<!-- Avoid: Depends on current file location -->
+<include src="../../components/header.html" />
 ```
 
-**Error message:**
-
-```
-Security Error: Include path outside source directory
-Attempted path: /etc/passwd
-Allowed directories: src/
-```
-
-### File Type Restrictions
-
-Only certain file types can be included:
-
-**Allowed extensions:**
-
-- `.html`, `.htm` - HTML content
-- `.md`, `.markdown` - Markdown content (processed)
-- `.txt` - Plain text content
-- `.svg` - SVG images (as HTML)
-
-## Directory Structure Best Practices
-
-### Recommended Organization
+### 2. Organize Components in Standard Directories
 
 ```
 src/
-├── _includes/            # Shared partials and layouts (non-emitting)
-│   ├── header.html
-│   ├── footer.html
-│   ├── navigation.html
-│   └── forms/
-│       ├── contact.html
-│       └── newsletter.html
-├── blog/
-│   ├── _blog.layout.html  # Blog layout
-│   ├── _sidebar.html      # Blog sidebar partial
-│   └── posts/
-│       ├── first-post.md
-│       └── second-post.md
-├── pages/                 # Main content
-│   ├── about.html
-│   └── contact.html
-└── index.html
+  components/     # Shared components
+  _includes/      # Alternative component directory
+  layouts/        # Layout files
+  pages/          # Page files
 ```
 
-### Component Naming Conventions
-
-- **Prefix with purpose**: `nav-`, `form-`, `card-`
-- **Use kebab-case**: `user-profile.html`, `blog-sidebar.html`
-- **Descriptive names**: `primary-navigation.html` vs `nav.html`
-- **Organize by feature**: Group related components in subdirectories
-
-## Performance Considerations
-
-### Build Performance
-
-- **Include depth**: Deeper nesting increases build time
-- **File size**: Large includes slow down processing
-- **Dependency chains**: Complex dependency trees take longer to resolve
-
-### Optimization Tips
-
-1. **Keep includes focused**: Single responsibility per include
-2. **Minimize nesting**: Flatten complex include hierarchies
-3. **Use virtual paths**: More efficient than relative file paths
-4. **Cache includes**: unify automatically caches parsed includes
-
-## Error Handling
-
-### Common Errors
-
-**Include file not found:**
-
-```
-Include file not found: header.html
-  in: src/index.html:5
-Suggestions:
-  • Create the include file: src/_includes/header.html
-  • Check the include path and spelling
-  • Use virtual path: <!--#include virtual="/_includes/header.html" -->
-```
-
-**Circular dependency:**
-
-```
-Circular dependency detected in includes
-Include chain: page.html → layout.html → page.html
-  in: src/page.html:3
-Suggestions:
-  • Remove the circular reference
-  • Restructure your include hierarchy
-  • Use layout system instead of mutual includes
-```
-
-**Path traversal blocked:**
-
-```
-Security: Include path outside source directory
-Path: ../../config.html
-  in: src/page.html:7
-Suggestions:
-  • Use paths within the source directory
-  • Move the include file to src/ or subdirectory
-  • Use virtual paths starting from source root
-```
-
-### Debug Mode
-
-Enable detailed include processing information:
-
-```bash
-UNIFY_DEBUG=1 unify build
-```
-
-Shows:
-
-- Include resolution steps
-- File path calculations
-- Dependency chain building
-- Performance timing
-
-## Integration with Other Features
-
-### Markdown Processing
-
-Includes work within markdown files:
-
-```markdown
-# My Blog Post
-
-This is markdown content.
-
-<!--#include virtual="/_includes/code-example.html" -->
-
-More markdown content here.
-```
-
-### Asset Processing
-
-Include files can reference assets that get tracked:
+### 3. Use Descriptive Filenames
 
 ```html
-<!-- header.html -->
+<!-- Good: Clear purpose -->
+<include src="/components/site-header.html" />
+<include src="/components/blog-sidebar.html" />
+
+<!-- Avoid: Unclear -->
+<include src="/components/comp1.html" />
+```
+
+### 4. Keep Include Depth Reasonable
+
+```html
+<!-- Good: 2-3 levels -->
+page.html
+  → layout.html
+    → header.html
+
+<!-- Avoid: Too many levels -->
+page.html
+  → level1.html
+    → level2.html
+      → level3.html
+        → level4.html (hard to debug)
+```
+
+## Common Patterns
+
+### Page with Layout and Components
+
+```html
+<!-- src/pages/about.html -->
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>About Us</title>
+    <include src="/components/meta-tags.html" />
+  </head>
+  <body>
+    <include src="/components/header.html" />
+
+    <main>
+      <h1>About Our Company</h1>
+      <p>Company information...</p>
+      <include src="/components/contact-form.html" />
+    </main>
+
+    <include src="/components/footer.html" />
+  </body>
+</html>
+```
+
+### Layout with Slot for Content
+
+```html
+<!-- src/layouts/main.html -->
+<!DOCTYPE html>
+<html>
+  <head>
+    <include src="/components/meta-tags.html" />
+  </head>
+  <body>
+    <include src="/components/header.html" />
+    <main>
+      <slot></slot> <!-- Page content goes here -->
+    </main>
+    <include src="/components/footer.html" />
+  </body>
+</html>
+```
+
+### Component with Sub-components
+
+```html
+<!-- src/components/header.html -->
 <header>
-  <img src="/assets/images/logo.png" alt="Logo" />
-  <link rel="stylesheet" href="/assets/css/header.css" />
+  <div class="logo">
+    <include src="/components/logo.html" />
+  </div>
+  <nav>
+    <include src="/components/main-nav.html" />
+  </nav>
+  <div class="user-menu">
+    <include src="/components/user-menu.html" />
+  </div>
 </header>
 ```
 
-## Migration Guide
+## Error Handling
 
-### From Other SSG Systems
+### Include Not Found
 
-**From Jekyll includes:**
+When an include file doesn't exist:
 
 ```html
-<!-- Jekyll -->
-{% include header.html %}
-<!-- unify -->
-<include src="/_includes/header.html"/>
+<include src="/components/missing.html" />
 ```
 
-**From Hugo partials:**
-
-```go
-<!-- Hugo -->
-{{ partial "header.html" . }}
-<!-- unify -->
-<include src="/_includes/header.html"/>
+**Default behavior:** Warning logged, comment inserted in output:
+```html
+<!-- Include not found: /components/missing.html -->
 ```
 
-**From 11ty includes:**
+**With `--fail-on warning`:** Build fails with detailed error message.
 
-```liquid
-<!-- 11ty -->
-{% include "header.njk" %}
-<!-- unify -->
-<include src="header.html"/>
+### Path Traversal Attempt
+
+```html
+<include src="../../etc/passwd" />
 ```
 
-### Legacy Apache SSI
+**Always fails** with `PathTraversalError` - security violations are never ignored.
 
-unify is compatible with most Apache SSI include directives:
+### Circular Dependency
 
-```apache
-<!-- Apache SSI (supported) -->
-<!--#include virtual="/includes/header.shtml" -->
-<!--#include file="footer.shtml" -->
-
-<!-- Apache SSI (not supported) -->
-<!--#exec cmd="date" -->
-<!--#echo var="LAST_MODIFIED" -->
+```html
+<!-- a.html includes b.html -->
+<!-- b.html includes a.html -->
 ```
+
+**Always fails** with `CircularDependencyError` showing the dependency chain.
+
+## Migration from v1
+
+v1 supported both SSI comments (`<!--#include-->`) and `<include>` elements. v2 only supports `<include>` elements.
+
+### Before (v1 - SSI syntax)
+
+```html
+<!--#include virtual="/components/header.html" -->
+<!--#include file="../footer.html" -->
+```
+
+### After (v2 - include element)
+
+```html
+<include src="/components/header.html" />
+<include src="../footer.html" />
+```
+
+**Migration steps:**
+1. Replace `<!--#include virtual="path"` with `<include src="/path"`
+2. Replace `<!--#include file="path"` with `<include src="path"`
+3. Change `-->` to `/>` or `></include>`
+
+See [MIGRATION_TO_V2.md](./MIGRATION_TO_V2.md) for detailed migration guide.
 
 ## See Also
 
-- [Layout System Documentation](layouts-slots-templates.md)
-- [Template Elements in Markdown](template-elements-in-markdown.md)
-- [Token Replacement Documentation](token-replacement.md)
-- [Getting Started Guide](getting-started.md)
+- [App Specification](./app-spec.md) - Complete v2 specification
+- [Layouts & Slots](./layouts-slots-templates.md) - Layout system documentation
+- [Getting Started](./getting-started.md) - Tutorial and examples

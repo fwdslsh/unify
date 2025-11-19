@@ -246,57 +246,6 @@ describe('Layout Change Rebuild', () => {
     });
   });
 
-  describe('Layout hierarchy changes', () => {
-    it('should rebuild pages when fallback layout in _includes changes', async () => {
-      const structure = {
-        'src/index.html': `<h1>Home Page</h1>`,
-        'src/about.html': `<h1>About Page</h1>`,
-        'src/_includes/layout.html': `<!DOCTYPE html>
-<html>
-<head><title>Fallback Layout</title></head>
-<body>
-  <header>Original Fallback Header</header>
-  <main><!-- Page content goes here --></main>
-</body>
-</html>`
-      };
-
-      await createTestStructure(tempDir, structure);
-
-      // Start file watcher
-      watcher = await watch({
-        source: sourceDir,
-        output: outputDir,
-        debounceMs: 100
-      });
-
-      // Wait for initial build
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      // Verify initial state
-      const initialHome = await fs.readFile(path.join(outputDir, 'index.html'), 'utf-8');
-      const initialAbout = await fs.readFile(path.join(outputDir, 'about.html'), 'utf-8');
-      expect(initialHome).toContain('Original Fallback Header');
-      expect(initialAbout).toContain('Original Fallback Header');
-      
-      // Change the fallback layout file
-      await fs.writeFile(path.join(sourceDir, '_includes/layout.html'), `<!DOCTYPE html>
-<html>
-<head><title>Fallback Layout</title></head>
-<body>
-  <header>Updated Fallback Header</header>
-  <main><!-- Page content goes here --></main>
-</body>
-</html>`);
-      
-      // Wait for rebuild
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Check that all pages were rebuilt with new fallback layout
-      const updatedHome = await fs.readFile(path.join(outputDir, 'index.html'), 'utf-8');
-      const updatedAbout = await fs.readFile(path.join(outputDir, 'about.html'), 'utf-8');
-      expect(updatedHome).toContain('Updated Fallback Header');
-      expect(updatedAbout).toContain('Updated Fallback Header');
-    });
-  });
+  // v2: _includes/layout.html fallback feature removed
+  // Layout hierarchy changes are tested in other tests
 });

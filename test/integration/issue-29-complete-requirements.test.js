@@ -236,7 +236,7 @@ describe('Issue #29: Complete File Watching Requirements', () => {
 <html>
 <head><title>Home</title></head>
 <body>
-  <!--#include virtual="/.components/navbar.html" -->
+  <include src="/.components/navbar.html" />
   <main><h1>Home Page</h1></main>
 </body>
 </html>`,
@@ -244,7 +244,7 @@ describe('Issue #29: Complete File Watching Requirements', () => {
 <html>
 <head><title>About</title></head>
 <body>
-  <!--#include virtual="/.components/navbar.html" -->
+  <include src="/.components/navbar.html" />
   <main><h1>About Page</h1></main>
 </body>
 </html>`,
@@ -305,12 +305,12 @@ describe('Issue #29: Complete File Watching Requirements', () => {
 <html>
 <head><title>Home</title></head>
 <body>
-  <!--#include virtual="/.components/header.html" -->
+  <include src="/.components/header.html" />
   <main><h1>Home Content</h1></main>
 </body>
 </html>`,
         'src/.components/header.html': `<header>
-  <!--#include virtual="/.components/navbar.html" -->
+  <include src="/.components/navbar.html" />
   <h1>Site Header</h1>
 </header>`,
         'src/.components/navbar.html': `<nav>Original Navbar</nav>`

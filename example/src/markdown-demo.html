@@ -9,26 +9,26 @@
 <body>
     <header>
         <h1>Markdown Includes Demo</h1>
-        <p>This page demonstrates including Markdown files using both SSI and DOM syntax.</p>
+        <p>This page demonstrates including Markdown files using HTML include elements.</p>
     </header>
 
     <section>
-        <h2>SSI-Style Markdown Include</h2>
-        <div class="navigation-ssi">
-            <!--#include file="_includes/navigation.md" -->
+        <h2>Markdown Include with Absolute Path</h2>
+        <div class="navigation-absolute">
+            <include src="/_includes/navigation.md" />
         </div>
     </section>
 
     <section>
-        <h2>DOM-Style Markdown Include</h2>
-        <div class="navigation-dom">
-            <include src="_includes/navigation.md"></include>
+        <h2>Markdown Include with Relative Path</h2>
+        <div class="navigation-relative">
+            <include src="_includes/navigation.md" />
         </div>
     </section>
 
     <section>
         <h2>Note</h2>
-        <p>Both sections above should show the same navigation content, processed from the <code>navigation.md</code> file with frontmatter stripped out.</p>
+        <p>Both sections above show the same navigation content, processed from the <code>navigation.md</code> file with frontmatter stripped out. Unify v2 uses <code>&lt;include src="..."&gt;</code> elements for all includes.</p>
     </section>
 </body>
 </html>

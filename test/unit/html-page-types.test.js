@@ -240,39 +240,7 @@ describe('HTML Page Types', () => {
       expect(result.content).toContain('<title>Page Title</title>');
     });
 
-    test('should support short name syntax in link rel=layout', async () => {
-      await createTestStructure(sourceDir, {
-        '_blog.layout.html': `<!DOCTYPE html>
-<html>
-<head><title>Blog Layout</title></head>
-<body><div class="blog"><slot></slot></div></body>
-</html>`
-      });
-
-      const documentContent = `<!DOCTYPE html>
-<html>
-<head>
-  <title>Blog Post</title>
-  <link rel="layout" href="blog">
-</head>
-<body>
-  <h1>Post Content</h1>
-</body>
-</html>`;
-
-      const documentPath = path.join(sourceDir, 'blog-post.html');
-      const dependencyTracker = new DependencyTracker();
-      
-      const result = await processHtmlUnified(
-        documentContent,
-        documentPath,
-        sourceDir,
-        dependencyTracker
-      );
-
-      expect(result.content).toContain('<div class="blog">');
-      expect(result.content).toContain('<title>Blog Post</title>');
-    });
+    // v2: Removed test for short name syntax in link rel=layout - short names not supported in v2
 
     test('should support absolute paths in link rel=layout', async () => {
       await createTestStructure(sourceDir, {

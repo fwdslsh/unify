@@ -40,10 +40,10 @@ describe('CLI integration', () => {
 <head>
   <title>CLI Test</title>
   <link rel="stylesheet" href="main.css">
-  <!--#include virtual="/.components/head.html" -->
+  <include src="/.components/head.html" />
 </head>
 <body>
-  <!--#include virtual="/.components/header.html" -->
+  <include src="/.components/header.html" />
   <main><p>Testing CLI</p></main>
 </body>
 </html>`
@@ -131,7 +131,7 @@ describe('CLI integration', () => {
     // Create a source file with missing include
     await fs.writeFile(
       path.join(sourceDir, 'broken.html'),
-      '<!DOCTYPE html><html><body><!--#include file="missing.html" --></body></html>'
+      '<!DOCTYPE html><html><body><include src="missing.html" /></body></html>'
     );
     
     const result = await runCLI([
@@ -208,7 +208,7 @@ describe('CLI integration', () => {
 <html>
 <head><title>Default Test</title></head>
 <body>
-  <!--#include virtual="/.components/header.html" -->
+  <include src="/.components/header.html" />
   <main><p>Testing default directories</p></main>
 </body>
 </html>`

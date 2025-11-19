@@ -1,12 +1,11 @@
 /**
  * Unified HTML Processor for unify
- * Handles both SSI-style includes (<!--#include -->) and DOM templating (<template>, <slot>)
+ * Handles <include> elements and DOM templating (<template>, <slot>)
  * using HTMLRewriter for high-performance processing.
  */
 
 import fs from "fs/promises";
 import path from "path";
-import { processIncludes } from "./include-processor.js";
 import { logger } from "../utils/logger.js";
 import { 
   BuildError,
@@ -17,7 +16,7 @@ import {
   LayoutError
 } from "../utils/errors.js";
 import { transformLinksInHtml } from "../utils/link-transformer.js";
-import { resolveIncludePath, isPathWithinDirectory } from "../utils/path-resolver.js";
+import { isPathWithinDirectory, resolvePath } from "../utils/path-resolver.js";
 import { processMarkdown, isMarkdownFile } from "./markdown-processor.js";
 
 /**
@@ -130,7 +129,7 @@ function shouldFailFast(config, errorType = 'error') {
 }
 
 /**
- * Process HTML content with unified support for both SSI includes and DOM templating
+ * Process HTML content with unified support for <include> elements and DOM templating
  * Uses HTMLRewriter for high-performance processing
  * @param {string} htmlContent - Raw HTML content to process
    // Check if the layout itself has a data-layout attribute (nested layouts)
@@ -186,7 +185,7 @@ export async function processHtmlUnified(
       await dependencyTracker.analyzePage(filePath, htmlContent, sourceRoot);
     }
     
-    // Always process includes (SSI and DOM) first
+    // Always process includes first
     let includeResult = await processIncludesWithStringReplacement(
       htmlContent,
       filePath,
@@ -280,76 +279,8 @@ async function processIncludesWithStringReplacement(htmlContent, filePath, sourc
   // Add current file to call stack
   const newCallStack = new Set(callStack);
   newCallStack.add(filePath);
-  
-  // Process SSI-style includes
-  const includeRegex = /<!--\s*#include\s+(virtual|file)="([^"]+)"\s*-->/g;
-  let match;
-  const processedIncludes = new Set();
-  
-  while ((match = includeRegex.exec(htmlContent)) !== null) {
-    const [fullMatch, type, includePath] = match;
-    const includeKey = `${type}:${includePath}`;
-    
-    if (processedIncludes.has(includeKey)) {
-      continue; // Avoid processing the same include multiple times
-    }
-    processedIncludes.add(includeKey);
-    
-    try {
-      const resolvedPath = resolveIncludePathInternal(type, includePath, filePath, sourceRoot);
-      let includeContent = await fs.readFile(resolvedPath, 'utf-8');
-      
-      // Process markdown files if detected
-      if (isMarkdownFile(resolvedPath)) {
-        try {
-          const markdownResult = processMarkdown(includeContent, resolvedPath);
-          includeContent = markdownResult.html;
-          logger.debug(`Processed markdown include: ${includePath} -> ${resolvedPath}`);
-        } catch (error) {
-          logger.error(`Failed to process markdown include ${includePath}: ${error.message}`);
-          throw error;
-        }
-      }
-      
-      // Recursively process nested includes
-      const nestedResult = await processIncludesWithStringReplacement(includeContent, resolvedPath, sourceRoot, config, newCallStack);
-      // SSI includes: Do NOT extract assets, keep Apache SSI behavior (inline everything)
-      const nestedProcessedContent = (typeof nestedResult === 'object' && nestedResult.content !== undefined) 
-        ? nestedResult.content 
-        : nestedResult;
-      
-      // Replace all occurrences of this include
-      processedContent = (processedContent || '')
-        .replace(new RegExp(escapeRegExp(fullMatch), 'g'), nestedProcessedContent || '');
-      logger.debug(`Processed include: ${includePath} -> ${resolvedPath}`);
-    } catch (error) {
-      // Convert file not found errors to IncludeNotFoundError with helpful suggestions
-      if (error.code === 'ENOENT' && !error.formatForCLI) {
-        const resolvedPath = resolveIncludePathInternal(type, includePath, filePath, sourceRoot);
-        error = new IncludeNotFoundError(includePath, filePath, [resolvedPath]);
-      }
-      // In fail-fast mode, fail fast on any include error
-      if (shouldFailFast(config, 'error')) {
-        // Always throw BuildError for any include error in fail-fast mode
-        let msg;
-        if (error instanceof CircularDependencyError) {
-          msg = `Include circular dependency: ${includePath} in ${filePath}`;
-        } else if (error instanceof PathTraversalError) {
-          msg = `Include path traversal: ${includePath} in ${filePath}`;
-        } else if (error instanceof IncludeNotFoundError) {
-          msg = `Include not found: ${includePath} in ${filePath}`;
-        } else {
-          msg = `Include error: ${includePath} in ${filePath}: ${error.message}`;
-        }
-        throw new BuildError(msg, [{ file: filePath, error: msg }]);
-      }
-      logger.warn(`Include not found: ${includePath} in ${filePath}`);
-      processedContent = (processedContent || '')
-        .replace(new RegExp(escapeRegExp(fullMatch), 'g'), `<!-- Include not found: ${includePath} -->`);
-    }
-  }
-  
-  // Recursively process DOM includes until none remain (up to max depth)
+
+  // Process DOM includes until none remain (up to max depth)
   const domIncludeRegex = /<include\s+src="([^"]+)"[^>]*>([\s\S]*?)<\/include>/g;
   const selfClosingIncludeRegex = /<include\s+src="([^"]+)"[^>]*\/>/g;
   let depth = 0;
@@ -371,19 +302,9 @@ async function processIncludesWithStringReplacement(htmlContent, filePath, sourc
     for (const domMatch of domMatches) {
       const [fullMatch, src, slotContent] = domMatch;
       try {
-        let resolvedPath;
-        if (src.startsWith('/')) {
-          // Absolute path from source root
-          resolvedPath = path.resolve(sourceRoot, src.replace(/^\/+/,''));
-        } else {
-          // Relative path from current file
-          resolvedPath = path.resolve(path.dirname(filePath), src);
-        }
-        // Security: ensure resolved path is within source root
-        if (!isPathWithinDirectory(resolvedPath, sourceRoot)) {
-          throw new PathTraversalError(src, sourceRoot);
-        }
-        
+        // Use unified path resolver
+        let resolvedPath = resolvePath(src, filePath, sourceRoot);
+
         // Read the include content using fallback resolver
         try {
           const fsSync = require('fs');
@@ -423,11 +344,15 @@ async function processIncludesWithStringReplacement(htmlContent, filePath, sourc
         try {
           console.error('DOM include (with slots) error:', error && error.stack ? error.stack : error);
         } catch (e) {}
+        // Use unified path resolver for error reporting
         let resolvedPath;
-        if (src.startsWith('/')) {
-          resolvedPath = path.resolve(sourceRoot, src.replace(/^\/+/,''));
-        } else {
-          resolvedPath = path.resolve(path.dirname(filePath), src);
+        try {
+          resolvedPath = resolvePath(src, filePath, sourceRoot);
+        } catch (e) {
+          // If path resolution fails, construct manually for error reporting
+          resolvedPath = src.startsWith('/')
+            ? path.resolve(sourceRoot, src.replace(/^\/+/,''))
+            : path.resolve(path.dirname(filePath), src);
         }
         const errorFilePath = resolvedPath || filePath;
         if (error.code === 'ENOENT' && !error.formatForCLI) {
@@ -456,19 +381,9 @@ async function processIncludesWithStringReplacement(htmlContent, filePath, sourc
     for (const selfClosingMatch of selfClosingMatches) {
       const [fullMatch, src] = selfClosingMatch;
       try {
-        let resolvedPath;
-        if (src.startsWith('/')) {
-          // Absolute path from source root
-          resolvedPath = path.resolve(sourceRoot, src.replace(/^\/+/,''));
-        } else {
-          // Relative path from current file
-          resolvedPath = path.resolve(path.dirname(filePath), src);
-        }
-        // Security: ensure resolved path is within source root
-        if (!isPathWithinDirectory(resolvedPath, sourceRoot)) {
-          throw new PathTraversalError(src, sourceRoot);
-        }
-        
+        // Use unified path resolver
+        let resolvedPath = resolvePath(src, filePath, sourceRoot);
+
         // Read the include content using fallback resolver
         try {
           const fsSync = require('fs');
@@ -503,11 +418,15 @@ async function processIncludesWithStringReplacement(htmlContent, filePath, sourc
         try {
           console.error('Self-closing include error:', error && error.stack ? error.stack : error);
         } catch (e) {}
+        // Use unified path resolver for error reporting
         let resolvedPath;
-        if (src.startsWith('/')) {
-          resolvedPath = path.resolve(sourceRoot, src.replace(/^\/+/,''));
-        } else {
-          resolvedPath = path.resolve(path.dirname(filePath), src);
+        try {
+          resolvedPath = resolvePath(src, filePath, sourceRoot);
+        } catch (e) {
+          // If path resolution fails, construct manually for error reporting
+          resolvedPath = src.startsWith('/')
+            ? path.resolve(sourceRoot, src.replace(/^\/+/,''))
+            : path.resolve(path.dirname(filePath), src);
         }
         const errorFilePath = resolvedPath || filePath;
         if (error.code === 'ENOENT' && !error.formatForCLI) {
@@ -674,65 +593,6 @@ function extractComponentAssets(htmlContent) {
     content: cleanContent,
     assets
   };
-}
-
-/**
- * Process SSI include directive
- */
-async function processIncludeDirective(comment, type, includePath, filePath, sourceRoot, config, callStack = new Set()) {
-  try {
-    const resolvedPath = resolveIncludePathInternal(type, includePath, filePath, sourceRoot);
-    const includeContent = await fs.readFile(resolvedPath, 'utf-8');
-    
-    // Recursively process nested includes in the included content
-    const includeResult = await processIncludesWithStringReplacement(includeContent, resolvedPath, sourceRoot, config, callStack);
-    
-    // Handle both old string format and new object format
-    const processedContent = (typeof includeResult === 'object' && includeResult.content !== undefined) 
-      ? includeResult.content 
-      : includeResult;
-    
-    comment.replace(processedContent, { html: true });
-    logger.debug(`Processed include: ${includePath} -> ${resolvedPath}`);
-  } catch (error) {
-    logger.warn(`Include not found: ${includePath} in ${filePath}`);
-    comment.replace(`<!-- Include not found: ${includePath} -->`, { html: true });
-  }
-}
-
-/**
- * Process modern include element
- */
-async function processIncludeElement(element, src, filePath, sourceRoot, config, callStack = new Set()) {
-  try {
-    const resolvedPath = resolveIncludePathInternal('file', src, filePath, sourceRoot);
-    const includeContent = await fs.readFile(resolvedPath, 'utf-8');
-    
-    // Recursively process nested includes in the included content
-    const includeResult = await processIncludesWithStringReplacement(includeContent, resolvedPath, sourceRoot, config, callStack);
-    
-    // Handle both old string format and new object format
-    const processedContent = (typeof includeResult === 'object' && includeResult.content !== undefined) 
-      ? includeResult.content 
-      : includeResult;
-    
-    element.setInnerContent(processedContent, { html: true });
-    logger.debug(`Processed include element: ${src} -> ${resolvedPath}`);
-  } catch (error) {
-    // In fail-fast mode, fail fast on any include error
-    if (shouldFailFast(config, 'error')) {
-      throw new Error(`Include not found in fail-fast mode: ${src} in ${filePath}`);
-    }
-    logger.warn(`Include element not found: ${src} in ${filePath}`);
-    element.setInnerContent(`<!-- Include not found: ${src} -->`, { html: true });
-  }
-}
-
-/**
- * Resolve include path based on type
- */
-function resolveIncludePathInternal(type, includePath, currentFile, sourceRoot) {
-  return resolveIncludePath(type, includePath, currentFile, sourceRoot);
 }
 
 /**
@@ -941,9 +801,19 @@ function validateDataLayoutAttributes(htmlContent, isFullDocument) {
   if (isFullDocument) {
     return; // Full documents can have data-layout in any element
   }
-  
+
   // For fragments, count data-layout attributes
-  const dataLayoutMatches = htmlContent.match(/data-layout=["'][^"']*["']/gi);
+  // Exclude data-layout inside <code> and <pre> tags (example code)
+  let contentToValidate = htmlContent;
+
+  // Temporarily replace <code> and <pre> blocks to avoid false positives
+  const codeBlocks = [];
+  contentToValidate = contentToValidate.replace(/<(code|pre)[^>]*>[\s\S]*?<\/\1>/gi, (match) => {
+    codeBlocks.push(match);
+    return `__CODE_BLOCK_${codeBlocks.length - 1}__`;
+  });
+
+  const dataLayoutMatches = contentToValidate.match(/data-layout=["'][^"']*["']/gi);
   if (dataLayoutMatches && dataLayoutMatches.length > 1) {
     throw new BuildError(
       'Fragment pages cannot have multiple data-layout attributes',
@@ -1010,21 +880,12 @@ async function detectLayoutFromHTML(htmlContent, sourceRoot, config, pagePath) {
 }
 
 /**
- * Process includes in HTML content (both SSI and <include> elements)
+ * Process includes in HTML content (<include> elements)
  */
 async function processIncludesInHTML(htmlContent, layoutPath, sourceRoot, config) {
-  // Process SSI includes first (already done in main flow, but handle any in layout)
-  let result = await processIncludes(
-    htmlContent,
-    layoutPath, // Use layout path for proper include resolution 
-    sourceRoot,
-    new Set(),
-    0,
-    null, // No dependency tracker needed
-    shouldFailFast(config)
-  );
+  let result = htmlContent;
 
-  // Then process <include> elements if any remain
+  // Process <include> elements
   const includeRegex = /<include\s+([^>]+)\/??\s*>/gi;
   const allStyles = [];
   const allScripts = [];
@@ -1043,15 +904,9 @@ async function processIncludesInHTML(htmlContent, layoutPath, sourceRoot, config
       const src = srcMatch[1];
       let resolvedPath;
       try {
-        if (src.startsWith('/')) {
-          resolvedPath = path.resolve(sourceRoot, src.replace(/^\/+/,''));
-        } else {
-          resolvedPath = path.resolve(path.dirname(layoutPath), src);
-        }
+        // Use unified path resolver
+        resolvedPath = resolvePath(src, layoutPath, sourceRoot);
         logger.debug('[UNIFY] Attempting to resolve DOM include:', { src, fromFile: layoutPath, resolvedPath });
-        if (!isPathWithinDirectory(resolvedPath, sourceRoot)) {
-          throw new PathTraversalError(src, sourceRoot);
-        }
         
         // Check if this is a component (in components directory)
         const isComponent = resolvedPath.includes(config.componentsDir) || resolvedPath.includes('.components');
@@ -1090,10 +945,14 @@ async function processIncludesInHTML(htmlContent, layoutPath, sourceRoot, config
         
         logger.debug('[UNIFY] Successfully processed DOM include:', src, '->', resolvedPath);
       } catch (error) {
-        if (src.startsWith('/')) {
-          resolvedPath = path.resolve(sourceRoot, src.replace(/^\/+/,''));
-        } else {
-          resolvedPath = path.resolve(path.dirname(layoutPath), src);
+        // Use unified path resolver for error reporting
+        try {
+          resolvedPath = resolvePath(src, layoutPath, sourceRoot);
+        } catch (e) {
+          // If path resolution fails, construct manually for error reporting
+          resolvedPath = src.startsWith('/')
+            ? path.resolve(sourceRoot, src.replace(/^\/+/,''))
+            : path.resolve(path.dirname(layoutPath), src);
         }
         logger.error('[UNIFY] Failed to resolve DOM include:', { src, fromFile: layoutPath, resolvedPath, error: error.message });
         if (error.code === 'ENOENT' && !error.formatForCLI) {
@@ -1607,10 +1466,21 @@ function mergeHtmlDocumentWithLayout(pageContent, layoutContent, config) {
     // Parse attributes to handle conflicts
     const pageAttrs = parseHtmlAttributes(pageParts.htmlAttributes);
     const layoutAttrs = parseHtmlAttributes(layoutParts.htmlAttributes);
-    
+
     // Merge: page attributes overwrite layout attributes
     const mergedAttrs = { ...layoutAttrs, ...pageAttrs };
+
+    // Remove data-layout attribute (processing directive, not part of final output)
+    delete mergedAttrs['data-layout'];
+
     finalHtmlAttributes = Object.entries(mergedAttrs)
+      .map(([key, value]) => value === true ? key : `${key}="${value}"`)
+      .join(' ');
+  } else if (layoutParts.htmlAttributes) {
+    // Layout only, but still need to remove data-layout if present
+    const layoutAttrs = parseHtmlAttributes(layoutParts.htmlAttributes);
+    delete layoutAttrs['data-layout'];
+    finalHtmlAttributes = Object.entries(layoutAttrs)
       .map(([key, value]) => value === true ? key : `${key}="${value}"`)
       .join(' ');
   }
@@ -2018,7 +1888,7 @@ async function extractAndRelocateComponentAssets(htmlContent, extractedAssets = 
   }
 
   // Only extract content assets if we have extracted assets from DOM includes
-  // This preserves SSI behavior (inline assets) while supporting DOM include asset relocation
+  // Support asset relocation for <include> elements
   let contentStyles = [];
   let contentScripts = [];
   

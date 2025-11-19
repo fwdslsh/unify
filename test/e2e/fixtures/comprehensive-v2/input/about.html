@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en" data-layout="/_layouts/base.html">
+<head>
+  <title>About - E2E Test Site</title>
+  <meta name="description" content="About page for E2E testing">
+  <meta name="keywords" content="testing, e2e, unify">
+</head>
+<body>
+  <h1>About This Site</h1>
+
+  <p>This is a full HTML document using explicit layout with <code>data-layout</code>.</p>
+
+  <section>
+    <h2>Features Demonstrated</h2>
+    <ul>
+      <li>Explicit layout override</li>
+      <li>Full HTML document structure</li>
+      <li>Head element merging</li>
+    </ul>
+  </section>
+
+  <include src="/_components/card.html">
+    <h3 data-slot="title">Contact Information</h3>
+    <div data-slot="content">
+      <p>Email: test@example.com</p>
+    </div>
+  </include>
+</body>
+</html>

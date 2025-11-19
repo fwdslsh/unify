@@ -115,21 +115,7 @@ describe('path-traversal security', () => {
       expect(crossPlatformPath.pathContains(result, 'header.html')).toBeTruthy();
     });
   });
-  
-  describe('include type validation', () => {
-    it('should reject invalid include types', () => {
-      expect(() => {
-        resolveIncludePath('invalid', 'header.html', currentFile, sourceRoot);
-      }).toThrow(/Invalid include type/);
-    });
-    
-    it('should only accept file and virtual types', () => {
-      // These should work
-      const fileResult = resolveIncludePath('file', 'header.html', currentFile, sourceRoot);
-      const virtualResult = resolveIncludePath('virtual', '/header.html', currentFile, sourceRoot);
-      
-      expect(crossPlatformPath.pathContains(fileResult, 'header.html')).toBeTruthy();
-      expect(crossPlatformPath.pathContains(virtualResult, 'header.html')).toBeTruthy();
-    });
-  });
+
+  // v2: Removed 'include type validation' tests - type parameter deprecated in v2
+  // v2 uses unified path resolution - no distinction between 'file' and 'virtual' types
 });

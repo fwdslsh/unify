@@ -121,7 +121,7 @@ describe('File Watcher Addition and Deletion', () => {
 <html>
 <head><title>Page</title></head>
 <body>
-  <!--#include virtual="/.components/sidebar.html" -->
+  <include src="/.components/sidebar.html" />
   <main>Content</main>
 </body>
 </html>`);
@@ -158,7 +158,7 @@ describe('File Watcher Addition and Deletion', () => {
 <html>
 <head><title>Page</title></head>
 <body>
-  <!--#include virtual="/.components/header.html" -->
+  <include src="/.components/header.html" />
   <main>Content</main>
 </body>
 </html>`);

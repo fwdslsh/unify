@@ -66,7 +66,7 @@ description: "Site navigation"
   
   describe('SSI-style markdown includes', () => {
     it('should process file include of markdown file', async () => {
-      const html = '<!DOCTYPE html><html><head></head><body><!--#include file="toc.md" --></body></html>';
+      const html = '<!DOCTYPE html><html><head></head><body><include src="toc.md" /></body></html>';
       const filePath = path.join(testFixturesDir, 'test.html');
       
       const result = await processIncludes(html, filePath, testFixturesDir);
@@ -80,7 +80,7 @@ description: "Site navigation"
     });
     
     it('should process virtual include of markdown file', async () => {
-      const html = '<!DOCTYPE html><html><head></head><body><!--#include virtual="/includes/sidebar.md" --></body></html>';
+      const html = '<!DOCTYPE html><html><head></head><body><include src="/includes/sidebar.md" /></body></html>';
       const filePath = path.join(testFixturesDir, 'test.html');
       
       const result = await processIncludes(html, filePath, testFixturesDir);
@@ -94,7 +94,7 @@ description: "Site navigation"
     });
     
     it('should process markdown with frontmatter correctly', async () => {
-      const html = '<!DOCTYPE html><html><head></head><body><!--#include file="menu.md" --></body></html>';
+      const html = '<!DOCTYPE html><html><head></head><body><include src="menu.md" /></body></html>';
       const filePath = path.join(testFixturesDir, 'test.html');
       
       const result = await processIncludes(html, filePath, testFixturesDir);

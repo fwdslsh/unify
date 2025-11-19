@@ -1,6 +1,18 @@
 /**
- * Markdown Processing System for Unify
- * Handles conversion of Markdown files to HTML with frontmatter support
+ * Markdown Processing System for Unify v2
+ * Handles conversion of Markdown files to HTML with simplified frontmatter support
+ *
+ * Supported frontmatter fields (v2):
+ * - title: Page title (used in <title> tag and template)
+ * - description: Page description (used in meta description and template)
+ * - layout: Explicit layout path (alternative to data-layout attribute)
+ * - Any custom fields: Available as {{ fieldname }} in templates
+ *
+ * v2 Changes:
+ * - NO complex head synthesis (head.meta, head.link, head.script, head.style)
+ * - NO automatic meta tag generation beyond basic description
+ * - NO JSON-LD processing
+ * - Simple key-value pairs only
  */
 
 import MarkdownIt from 'markdown-it';
@@ -20,14 +32,20 @@ const md = new MarkdownIt({
 });
 
 /**
- * Process markdown content and return HTML with metadata
+ * Process markdown content and return HTML with metadata (v2 simplified)
  * @param {string} markdownContent - Raw markdown content
  * @param {string} filePath - Path to the markdown file
  * @returns {Object} Processed content with metadata
  * @returns {string} returns.html - Generated HTML content
- * @returns {Object} returns.frontmatter - Frontmatter data
+ * @returns {Object} returns.frontmatter - Simple key-value frontmatter data
  * @returns {string} returns.title - Document title (from frontmatter or first heading)
  * @returns {string} returns.excerpt - Document excerpt (from frontmatter or first paragraph)
+ *
+ * v2 Frontmatter Processing:
+ * - Parses YAML frontmatter using gray-matter
+ * - Extracts title, description/excerpt, layout
+ * - All frontmatter fields available as template variables
+ * - NO complex head synthesis or meta tag generation
  */
 export function processMarkdown(markdownContent, filePath) {
   try {

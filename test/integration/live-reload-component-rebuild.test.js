@@ -37,7 +37,7 @@ describe('Live Reload Component Rebuild Integration', () => {
 <head><title>Status Page</title></head>
 <body>
   <h1>System Status</h1>
-  <!--#include virtual="/.components/status.html" -->
+  <include src="/.components/status.html" />
   <footer>Last updated: Never</footer>
 </body>
 </html>`
@@ -98,14 +98,14 @@ describe('Live Reload Component Rebuild Integration', () => {
 </div>`,
       'src/.components/sidebar.html': `<aside class="sidebar">
   <h3>User Panel</h3>
-  <!--#include virtual="/.components/user-info.html" -->
+  <include src="/.components/user-info.html" />
   <nav>Navigation here</nav>
 </aside>`,
       'src/dashboard.html': `<!DOCTYPE html>
 <html>
 <head><title>Dashboard</title></head>
 <body>
-  <!--#include virtual="/.components/sidebar.html" -->
+  <include src="/.components/sidebar.html" />
   <main>Dashboard content</main>
 </body>
 </html>`,
@@ -113,7 +113,7 @@ describe('Live Reload Component Rebuild Integration', () => {
 <html>
 <head><title>Profile</title></head>
 <body>
-  <!--#include virtual="/.components/sidebar.html" -->
+  <include src="/.components/sidebar.html" />
   <main>Profile content</main>
 </body>
 </html>`

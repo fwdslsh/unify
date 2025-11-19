@@ -229,7 +229,7 @@ This uses a custom layout.`,
       await createTestStructure(sourceDir, {
         'index.html': `
           <div>
-            <!--#include virtual="/missing-file.html" -->
+            <include src="/missing-file.html" />
             <p>Regular content</p>
           </div>
         `
