@@ -1,0 +1,463 @@
+bun test v1.3.2 (b131639c)
+🧪 Setting up test environment...
+   Runtime: node (v24.3.0)
+   Features: HTMLRewriter=true, fs.watch=true
+✅ Test environment ready
+[TEST OUTPUT DIR] /home/user/unify/test/fixtures/integration-test-1763521519650-5tlpon079/dist
+[TEST OUTPUT DIR] /home/user/unify/test/fixtures/integration-test-1763521519691-42up0f7td/dist
+[TEST OUTPUT DIR] /home/user/unify/test/fixtures/integration-test-1763521519711-ficzbh5lp/dist
+[TEST OUTPUT DIR] /home/user/unify/test/fixtures/integration-test-1763521519728-jofhb7g9j/dist
+[TEST OUTPUT DIR] /home/user/unify/test/fixtures/integration-test-1763521519749-1lljrtlw7/dist
+[TEST OUTPUT DIR] /home/user/unify/test/fixtures/integration-test-1763521519770-3yrha05e0/dist
+[TEST DEBUG] no-layout.html exists: true
+[TEST DEBUG] no-layout.html content: <!DOCTYPE html>
+  <html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>No Layout Test</title>
+    <meta name="description" content="">
+  </head>
+  <body>
+    <main>
+      <h1 id="content-without-layout">Content Without Layout</h1>
+<p>This should get basic HTML structure.</p>
+
+    </main>
+  </body>
+  </html>
+[TEST OUTPUT DIR] /home/user/unify/test/fixtures/integration-test-1763521519811-f49wxz5tr/dist
+
+=== ACTUAL OUTPUT CONTENT ===
+<!DOCTYPE html>
+<html>
+<head>
+  <title><title>Welcome to DOM Mode</title></title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="/styles/site.css">
+  <style>
+    .blog-layout {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .blog-header {
+      text-align: center;
+      border-bottom: 2px solid #eee;
+      padding-bottom: 20px;
+      margin-bottom: 30px;
+    }
+    .blog-content {
+      line-height: 1.6;
+    }
+    .blog-footer {
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 1px solid #eee;
+      text-align: center;
+      color: #666;
+    }
+  </style>
+<style>
+  .alert { 
+    color: red; 
+    padding: 1rem; 
+    border: 1px solid red; 
+    border-radius: 4px;
+    background: #fff5f5;
+    margin: 16px 0;
+  }
+  .alert strong {
+    display: block;
+    margin-bottom: 8px;
+  }
+</style>
+<style>
+  .card {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 1rem;
+    margin: 1rem 0;
+    background: white;
+  }
+  .card h3 {
+    margin-top: 0;
+    color: #333;
+  }
+</style>
+</head>
+<body class="blog-layout">
+  <template>
+    <h1>🧱 Unify DOM Mode</h1>
+    <p>Modern templating with pure HTML</p>
+  </template>
+  <main class="blog-content">
+    <main><h2>Hello!</h2>
+  <p>This is a blog post rendered with the Unify DOM Mode layout engine. This content goes into the unnamed slot.</p>
+
+  
+
+<div class="alert">
+  <strong>Title</strong>
+  <p>Message</p>
+</div>
+
+  <h3>Components Example</h3>
+  <p>Here are some reusable components:</p>
+
+  
+
+<div class="card">
+  <h3>Card Title</h3>
+  <p>Card content goes here.</p>
+</div>
+
+  
+
+<div class="card">
+  <h3>Card Title</h3>
+  <p>Card content goes here.</p>
+</div>
+
+  <nav>
+  <ul>
+    <li><a href="/">Home</a></li>
+    <li><a href="/about.html">About</a></li>
+    <li><a href="/blog.html">Blog</a></li>
+  </ul>
+</nav></main> <!-- Main blog content -->
+  </main>
+</body>
+</html>
+=== END OUTPUT ===
+
+=== CONFIG VALUES ===
+sourceDir: /home/user/unify/test/test-temp/debug-paths/src
+componentsDir: /home/user/unify/test/test-temp/debug-paths/src/custom_components
+layoutsDir: /home/user/unify/test/test-temp/debug-paths/src/site_layouts
+✅ Build succeeded
+=== OUTPUT CONTENT ===
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Page</title>
+<style>
+  .btn {
+    background: #007bff;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.2s;
+  }
+  .btn:hover {
+    background: #0056b3;
+  }
+  .btn:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+  }
+</style>
+<style>
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: none;
+    z-index: 1000;
+  }
+  .modal-content {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    max-width: 500px;
+    width: 90%;
+  }
+  .modal-close {
+    float: right;
+    font-size: 24px;
+    cursor: pointer;
+    color: #999;
+  }
+</style>
+</head>
+<body>
+<div>
+  <h1>Testing Component Styles</h1>
+  
+
+<button class="btn">Click Me</button>
+  
+
+<div class="modal-overlay" id="modal">
+  <div class="modal-content">
+    <span class="modal-close" onclick="closeModal()">&times;</span>
+    <h3>Modal Title</h3>
+    <p>Modal content goes here.</p>
+  </div>
+</div>
+
+
+</div>
+<script>
+  function openModal() {
+    document.getElementById('modal').style.display = 'block';
+    document.body.style.overflow = 'hidden';
+  }
+  
+  function closeModal() {
+    document.getElementById('modal').style.display = 'none';
+    document.body.style.overflow = 'auto';
+  }
+  
+  // Close modal when clicking overlay
+  document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('modal-overlay')) {
+      closeModal();
+    }
+  });
+</script>
+</body>
+</html>
+=== END OUTPUT ===
+Building site...
+=== OUTPUT CONTENT ===
+<!DOCTYPE html>
+<html>
+<head>
+  <title><slot name="title">My Blog</slot></title>
+</head>
+<body>
+  <main><h2>Hello!</h2>
+  <p>This is a test page.</p>
+
+  <div class="alert">
+  <strong>Title</strong>
+  <p>Message</p>
+</div></main>
+</body>
+</html>
+=== END OUTPUT ===
+Has <include> elements: false
+Component directory copied to output: false
+Layouts directory copied to output: false
+
+✅ All DOM Mode processing working correctly!
+Built 57 files in 298ms
+Built 1000 pages in 2129ms
+Incremental build of 50 pages in 200ms
+Initial build of 100 pages in 401ms
+Memory usage: 1.80MB for 200 pages
+Built 50 pages with 100 includes in 321ms
+Handled 500 assets (copied 500) in 902ms
+Built 50 files with complex dependencies in 288ms
+sourceDir: /tmp/unify-test-fixed/src
+File exists: /tmp/unify-test-fixed/src/index.html true
+File exists: /tmp/unify-test-fixed/src/css/fonts.css true
+File exists: /tmp/unify-test-fixed/src/fonts/custom.woff2 true
+File exists: /tmp/unify-test-fixed/src/fonts/custom.woff true
+File exists: /tmp/unify-test-fixed/src/fonts/another.ttf true
+wrapInLayout result: <!DOCTYPE html>
+<html>
+<head><title>Test Page</title></head>
+<body><h1 id="test-title">Test Title</h1>
+<p>Content here</p></body>
+</html>
+Build result: {
+  processed: 2,
+  copied: 2,
+  skipped: 3,
+  errors: [],
+  duration: 12,
+  dependencyTracker: DependencyTracker {
+    includesInPage: Map {},
+    pagesByInclude: Map {},
+    knownFiles: Set(2) {
+      "/home/user/unify/test/test-temp/asset-test-1763521673151-hrm01pnar/src/index.html",
+      "/home/user/unify/test/test-temp/asset-test-1763521673151-hrm01pnar/src/about.html",
+    },
+    recordDependencies: [Function: recordDependencies],
+    clearPageDependencies: [Function: clearPageDependencies],
+    getDependentPages: [Function: getDependentPages],
+    getAffectedPages: [Function: getAffectedPages],
+    getPageDependencies: [Function: getPageDependencies],
+    isIncludeFile: [Function: isIncludeFile],
+    isMainPage: [Function: isMainPage],
+    getAllFiles: [Function: getAllFiles],
+    getMainPages: [Function: getMainPages],
+    getIncludeFiles: [Function: getIncludeFiles],
+    analyzePage: [AsyncFunction: analyzePage],
+    extractLayoutDependencies: [AsyncFunction: extractLayoutDependencies],
+    analyzeNestedDependencies: [AsyncFunction: analyzeNestedDependencies],
+    removeFile: [Function: removeFile],
+    getStats: [Function: getStats],
+    clear: [Function: clear],
+    export: [Function: export],
+    import: [Function: import],
+  },
+  assetTracker: AssetTracker {
+    assetReferences: Map(2) {
+      "/home/user/unify/test/test-temp/asset-test-1763521673151-hrm01pnar/src/css/style.css": [
+        "/home/user/unify/test/test-temp/asset-test-1763521673151-hrm01pnar/src/index.html"
+      ],
+      "/home/user/unify/test/test-temp/asset-test-1763521673151-hrm01pnar/src/images/logo.png": [
+        "/home/user/unify/test/test-temp/asset-test-1763521673151-hrm01pnar/src/index.html"
+      ],
+    },
+    referencedAssets: Set(2) {
+      "/home/user/unify/test/test-temp/asset-test-1763521673151-hrm01pnar/src/css/style.css",
+      "/home/user/unify/test/test-temp/asset-test-1763521673151-hrm01pnar/src/images/logo.png",
+    },
+    htmlAssetCache: Map(2) {
+      "/home/user/unify/test/test-temp/asset-test-1763521673151-hrm01pnar/src/index.html": [
+        "/home/user/unify/test/test-temp/asset-test-1763521673151-hrm01pnar/src/css/style.css",
+        "/home/user/unify/test/test-temp/asset-test-1763521673151-hrm01pnar/src/images/logo.png"
+      ],
+      "/home/user/unify/test/test-temp/asset-test-1763521673151-hrm01pnar/src/about.html": [],
+    },
+    extractAssetReferences: [Function: extractAssetReferences],
+    extractCssAssetReferences: [Function: extractCssAssetReferences],
+    resolveAssetPath: [Function: resolveAssetPath],
+    recordAssetReferences: [AsyncFunction: recordAssetReferences],
+    clearPageAssetReferences: [Function: clearPageAssetReferences],
+    isAssetReferenced: [Function: isAssetReferenced],
+    getPagesThatReference: [Function: getPagesThatReference],
+    getAllReferencedAssets: [Function: getAllReferencedAssets],
+    getPageAssets: [Function: getPageAssets],
+    removePage: [Function: removePage],
+    getStats: [Function: getStats],
+    clear: [Function: clear],
+    export: [Function: export],
+    import: [Function: import],
+  },
+  buildCache: BuildCache {
+    cacheDir: ".unify-cache",
+    hashCache: Map(66) {
+      "/tmp/unify-test-1763521606511-pqy6lpos6/src/blog/index.html": "10b3026e69b1579d6e048ea7f37d82832ac7bcfa5df1628a34ddff3548b1f865",
+      "/tmp/unify-test-1763521606511-pqy6lpos6/src/blog.html": "f7e176e8f17ddb89163fc8fdebde1d6da1ca330e83d4cdb4c0bbbf7cdac118be",
+      "/tmp/unify-test-1763521606511-pqy6lpos6/src/index.html": "3ed6fd18fb2460bd0f01e05c31dd6c1131633dbe0cc65889686036a14f4f4a40",
+      "/tmp/unify-test-1763521607511-wwsryy8ur/src/index.html": "7d989b1824c520092cb03e2c82e6ea21f0ff233a71891c4fe3251dd7c0d70c07",
+      "/tmp/unify-test-1763521608985-xuop72bb9/src/index.html": "34fe0948bfb2d6db2a7cb12045a6a49601be20180c3026b4bfe3c86e88333f47",
+      "/home/user/unify/test/test-temp/debug-paths/src/test.html": "9d14c6fcfd592ef0f5bd5ee10a2e1bcbbd3d68968735359ff83d940dd9e72cdd",
+      "/tmp/unify-test-1763521611304-et0q2wuek/src/index.html": "752624c94ef97e4ea642c4cea0291ee536bcfcb60722cae09c7a532a5ab9c241",
+      "/tmp/unify-test-1763521613598-kax6ss353/src/index.html": "7d989b1824c520092cb03e2c82e6ea21f0ff233a71891c4fe3251dd7c0d70c07",
+      "/tmp/unify-test-1763521615889-s7im3azed/src/index.html": "72acf50537198b69546147b9578b24e33326ce1e824c486b6b3edc41cbdd5ef2",
+      "/home/user/unify/test/test-temp/component-assets-1763521618196-y0x3ohjnm/src/styles-test.html": "ab0c2e039b741bb47cb5dcaece9966ac09c8bb8da4e527a18f710f6a0283363f",
+      "/home/user/unify/test/test-temp/component-assets-1763521618213-22o1den5l/src/scripts-test.html": "b9159f067346d4995eacacef28807c90b89517db77f8bcff3944c3f4abb9a7d0",
+      "/home/user/unify/test/test-temp/component-assets-1763521618230-gepy2u2nj/src/mixed-assets.html": "46064a4a1623c27b8f84f1ab5618c24dd32343cd8f176b73f1c41dd83ab8a94b",
+      "/home/user/unify/test/test-temp/component-assets-1763521618249-jg8lcuk18/src/multiple-blocks.html": "3982cdf97f557ca6ca7f0873c58d2b6be58ed876a2ec79e1801bc4af1b360baf",
+      "/home/user/unify/test/test-temp/component-assets-1763521618265-42jzx30pg/src/duplicate-components.html": "a3f190234130d6f463d8ab798b1bf3e3dcbea220ad9f2bca877597ca468f6115",
+      "/home/user/unify/test/test-temp/bug-reproduction/src/blog.html": "35573e0eb9178ac0d7f49f49b2831b0e03f195f6e33d4c1b4b0757a2f2f1ba1d",
+      "/tmp/unify-test-1763521618308-1smgw270k/src/blog/post.html": "5baa5ba164468bfe35a98dd76a9476c9ac32c19b6642d9959d8ac756b0cf9541",
+      "/tmp/unify-test-1763521618308-1smgw270k/src/index.html": "41309066ec339b93f468b0c4317ab764327aaddb394b0d48724e8e2216931e17",
+      "/tmp/unify-test-1763521618308-1smgw270k/src/about.html": "432a4356af6ea9b571e5c5ae3cdc3e9fd1865dd6fbc14c95857a721309ace9cc",
+      "/tmp/unify-test-1763521618337-gwd6l0gvc/src/docs/guide.html": "9178433f272eca6ff84b9e45748671f873f046365c5e8f90a867abdcf895447a",
+      "/tmp/unify-test-1763521618337-gwd6l0gvc/src/index.html": "1a7133067a4ac7fe06565943dd44870f232041b1d28b4340e2b678244a3b79f6",
+      "/tmp/unify-test-1763521618355-b4tztujir/src/blog/post.html": "1e5c6a869106280771117bb4eface8bc5ff0febd492c35c363db812d353519f5",
+      "/tmp/unify-test-1763521618355-b4tztujir/src/docs/guide.html": "2aa69a3271e57ce6270e7bde1f464ff16d08e99ac5b8a8fcc3a144fe7133b4fd",
+      "/tmp/unify-test-1763521618355-b4tztujir/src/simple.html": "a5d0dd592ae4bf9b4a86aff923886ea50e32cfb6836660d6f29e1db1514b82cc",
+      "/tmp/unify-test-1763521618376-lupmnefr4/src/custom-layout.html": "29856e52826609616105cbd7d40f1269ac85cc1cb0aa434d52f1eba9f57b50cb",
+      "/tmp/unify-test-1763521618397-52xtjuu5w/src/index.html": "d615635ec0c74aa13fc29b8d9c955ee4e75e225124c51132e3c392e7a5d40f5c",
+      "/tmp/unify-test-1763521618419-0s09jz4oa/src/index.html": "492681767ea31f1f6aaff66eb2a45f64131db85b809e6efd695fea3b51669851",
+      "/tmp/unify-test-1763521618428-lrauidfyy/src/sidebar.html": "a877168393d2e11de38ee8fd7828be56fddc0657136d86247951fb24781e8458",
+      "/tmp/unify-test-1763521618428-lrauidfyy/src/index.html": "1a7133067a4ac7fe06565943dd44870f232041b1d28b4340e2b678244a3b79f6",
+      "/tmp/unify-test-1763521618428-lrauidfyy/src/header.html": "13e9345e1e8df029ec1c555dc0b5f5798e3b82c1cd254c549e93cb12b6d5dab8",
+      "/home/user/unify/test/fixtures/minification-test-1763521664598-g2cm777el/src/index.html": "d7d02ac667779921e014e26740f874fad7e0990c258cc6ed15de3596eb7b45f7",
+      "/home/user/unify/test/fixtures/minification-test-1763521664612-7edax2ryv/src/attributes.html": "f096d73c3906de9e0ba3642ad2d768ab9d1efba49bb1bb0ed620d0115ad0e977",
+      "/home/user/unify/test/fixtures/minification-test-1763521664621-cod213ber/src/no-minify.html": "17f229292b5ddee43ec28c5a106aa88858c5d80f9e498062c5945a915e78f8de",
+      "/tmp/unify-test-fixed/src/index.html": "d826a08df69995f37e439b2d6d15769e46a9f64eef24e299ae9ccd2c7b6025d6",
+      "/tmp/link-norm-edge-test/src/tel-test.html": "d1633bc4035349d2c59ca95cff63e1df9bce1c359aed92cf75216308630635a0",
+      "/tmp/link-norm-edge-test/src/ftp-test.html": "57193d2da1ec98d3fa3b96debd76c9291456745ccdc5959a64992cf4d50581ca",
+      "/tmp/link-norm-edge-test/src/protocols-test.html": "465c4a3a6a9059b04917d35d20f69d964ed1ab0434bcfe963743e227207dd137",
+      "/tmp/link-norm-edge-test/src/data-url-test.html": "f53f9e96ddce7881a8cfd81b7740acf439307a1cbe6ada93dd1c7b580906ea5d",
+      "/tmp/link-norm-edge-test/src/data-img-test.html": "9096b38869185fd55de42d2ca81a4754df90c243d3bf6e2eed3e54b880e1195c",
+      "/tmp/link-norm-edge-test/src/index-link-test.html": "13a4b4448e0a2ac5ab541a8215b82b910c3f8c867b8e52795cab70f85c6d46fe",
+      "/tmp/link-norm-edge-test/src/nested-index-test.html": "341b11fadfa911c1904e886432fb117ab3862eba873585a1b7a65f91c7c70da3",
+      "/tmp/link-norm-edge-test/src/blog/posts/post1.html": "a80f76dff8ca4a86de9cf2d269f519d6499fd88c94801d0b28887abccf6ef407",
+      "/tmp/link-norm-edge-test/src/query-fragment-test.html": "e31f8768d6065a26de4aa43400ba6cf0f933ecd3a01c55774f93777002bda209",
+      "/tmp/link-norm-edge-test/src/mixed-links.html": "d51235ce28a52ce67e7e84bdd0ff582c3513531e6ad3e40b599623305343ec2f",
+      "/tmp/unify-test-1763521672877-zk39ljvq6/src/docs/some-guide.html": "4ed801c4ea6c4c2cb7952a2c73068e71e078cc2b1b96a7d8692c26a46ee026ad",
+      "/tmp/unify-test-1763521672877-zk39ljvq6/src/docs/another-guide.html": "5fbb57646cab52098e62553853fb69df7fc767cc0971687dac14e8d4681151ef",
+      "/tmp/unify-test-1763521672877-zk39ljvq6/src/docs.html": "43b18ff70525ee5fd20125ca60688bd549b39ae44c4a819d0bb827153f2d6cec",
+      "/tmp/unify-test-1763521672877-zk39ljvq6/src/index.html": "48985098439ed29c0f211e0f2f9f2b36a9494f96a355dd49df56e0de99483cbd",
+      "/tmp/unify-test-1763521672877-zk39ljvq6/src/about.html": "7c17d93a517fa54ea8412a4a9d9bcb3c618608d6a29350b7e278d2b308c085ea",
+      "/tmp/unify-test-1763521672905-ihz5x6nfv/src/docs.html": "43b18ff70525ee5fd20125ca60688bd549b39ae44c4a819d0bb827153f2d6cec",
+      "/tmp/unify-test-1763521672905-ihz5x6nfv/src/index.html": "48985098439ed29c0f211e0f2f9f2b36a9494f96a355dd49df56e0de99483cbd",
+      "/tmp/unify-test-1763521672905-ihz5x6nfv/src/about.html": "7c17d93a517fa54ea8412a4a9d9bcb3c618608d6a29350b7e278d2b308c085ea",
+      "/tmp/unify-test-1763521672919-7tp6lvtu2/src/docs/guide.html": "9178433f272eca6ff84b9e45748671f873f046365c5e8f90a867abdcf895447a",
+      "/tmp/unify-test-1763521672919-7tp6lvtu2/src/docs/index.html": "4d2bb1957ebe3e8f8b642b786d81dd6823d680f88740e89b2437a0db484b51ea",
+      "/tmp/unify-test-1763521672919-7tp6lvtu2/src/docs/tutorials/advanced.html": "c65e8ca38bff06fd056c1de9faffd0e1d4368bf4317ca665feb5e994655d8d93",
+      "/tmp/unify-test-1763521672919-7tp6lvtu2/src/docs/tutorials/basic.html": "147d61f4e46dc201b7f8be6db3a4a725b1c64e0d7c863778334c997acdee5745",
+      "/tmp/unify-test-1763521672919-7tp6lvtu2/src/index.html": "1a7133067a4ac7fe06565943dd44870f232041b1d28b4340e2b678244a3b79f6",
+      "/tmp/unify-test-1763521672942-f6z3c83vm/src/file.md.html": "0c6b4cd895c37985295fd8c1424f1d55a1edc8a82568373fbb350e344c830181",
+      "/tmp/unify-test-1763521672942-f6z3c83vm/src/nested/file.md.html": "fe02617c0acae99bd8481c99b631923508ccebfbd661af2ede0617294d6552ce",
+      "/home/user/unify/test/test-temp/asset-test-1763521673024-cyv90qlf1/src/index.html": "3ee6c24bef2c84facdb62be798025c93e0ee8d9edde4d464b2bbd9afaeda8777",
+      "/home/user/unify/test/test-temp/asset-test-1763521673042-nxy482z5x/src/index.html": "3b293aac681f9582878535b76b9b32287f695f38092798ee1e139906e93ea472",
+      "/home/user/unify/test/test-temp/asset-test-1763521673064-8clzp5673/src/index.html": "b1e3be9f47f60744bdfef57b434aebc361cbfb02e91f7a33aed5ac6bc24b89fa",
+      "/home/user/unify/test/test-temp/asset-test-1763521673084-0hqa6u55s/src/index.html": "c8bc7132ada8c1a6f8dcb6f2739ee37b085a02496aa9906c64feb2138ab4ecdf",
+      "/home/user/unify/test/test-temp/asset-test-1763521673111-rwuupkvux/src/index.html": "856bed09cb50c0d9e9f86de569c0538c3a6940a572e15bb390400b8a35f55425",
+      "/home/user/unify/test/test-temp/asset-test-1763521673135-op38qp7sq/src/index.html": "d8229c2ff0e8ab48c28b8f7d2a914af7ad5434cfb3333bc2acf1d80b7bdc7649",
+      "/home/user/unify/test/test-temp/asset-test-1763521673151-hrm01pnar/src/index.html": "7c24e1843f09511458155335194fc4e8e4f275cfd1a964bc60730c39a387c279",
+      "/home/user/unify/test/test-temp/asset-test-1763521673151-hrm01pnar/src/about.html": "d1b1ba8c8e4d46bbce6aa4da2ac40aafeb7d97b8d41338ddc48e631ff3cf7bd8",
+    },
+    dependencyGraph: Map(10) {
+      "/home/user/unify/test/test-temp/debug-paths/src/test.html": [ "/home/user/unify/test/test-temp/debug-paths/src/custom_components/alert.html" ],
+      "/home/user/unify/test/test-temp/component-assets-1763521618196-y0x3ohjnm/src/styles-test.html": [
+        "/home/user/unify/test/test-temp/component-assets-1763521618196-y0x3ohjnm/src/.components/styled-button.html",
+        "/home/user/unify/test/test-temp/component-assets-1763521618196-y0x3ohjnm/src/.components/modal-dialog.html"
+      ],
+      "/home/user/unify/test/test-temp/component-assets-1763521618213-22o1den5l/src/scripts-test.html": [
+        "/home/user/unify/test/test-temp/component-assets-1763521618213-22o1den5l/src/.components/interactive-counter.html",
+        "/home/user/unify/test/test-temp/component-assets-1763521618213-22o1den5l/src/.components/modal-dialog.html"
+      ],
+      "/home/user/unify/test/test-temp/component-assets-1763521618230-gepy2u2nj/src/mixed-assets.html": [
+        "/home/user/unify/test/test-temp/component-assets-1763521618230-gepy2u2nj/src/.components/styled-button.html",
+        "/home/user/unify/test/test-temp/component-assets-1763521618230-gepy2u2nj/src/.components/interactive-counter.html",
+        "/home/user/unify/test/test-temp/component-assets-1763521618230-gepy2u2nj/src/.components/modal-dialog.html",
+        "/home/user/unify/test/test-temp/component-assets-1763521618230-gepy2u2nj/src/.components/complex-widget.html"
+      ],
+      "/home/user/unify/test/test-temp/component-assets-1763521618249-jg8lcuk18/src/multiple-blocks.html": [
+        "/home/user/unify/test/test-temp/component-assets-1763521618249-jg8lcuk18/src/.components/complex-widget.html"
+      ],
+      "/home/user/unify/test/test-temp/component-assets-1763521618265-42jzx30pg/src/duplicate-components.html": [
+        "/home/user/unify/test/test-temp/component-assets-1763521618265-42jzx30pg/src/.components/styled-button.html",
+        "/home/user/unify/test/test-temp/component-assets-1763521618265-42jzx30pg/src/.components/styled-button.html",
+        "/home/user/unify/test/test-temp/component-assets-1763521618265-42jzx30pg/src/.components/styled-button.html"
+      ],
+      "/home/user/unify/test/test-temp/bug-reproduction/src/blog.html": [ "/home/user/unify/test/test-temp/bug-reproduction/src/custom_components/alert.html",
+        "/home/user/unify/test/test-temp/bug-reproduction/src/site_layouts/blog.html"
+      ],
+      "/tmp/unify-test-1763521618308-1smgw270k/src/blog/post.html": [ "/tmp/unify-test-1763521618308-1smgw270k/src/blog/_layout.html" ],
+      "/tmp/unify-test-1763521618355-b4tztujir/src/blog/post.html": [ "/tmp/unify-test-1763521618355-b4tztujir/src/blog/_layout.html" ],
+      "/tmp/unify-test-1763521618355-b4tztujir/src/docs/guide.html": [ "/tmp/unify-test-1763521618355-b4tztujir/src/docs/_layout.html" ],
+    },
+    isInitialized: true,
+    initialize: [AsyncFunction: initialize],
+    hashFile: [AsyncFunction: hashFile],
+    hashContent: [Function: hashContent],
+    hasFileChanged: [AsyncFunction: hasFileChanged],
+    updateFileHash: [AsyncFunction: updateFileHash],
+    haveDependenciesChanged: [AsyncFunction: haveDependenciesChanged],
+    setDependencies: [Function: setDependencies],
+    addDependency: [Function: addDependency],
+    isUpToDate: [AsyncFunction: isUpToDate],
+    getStats: [Function: getStats],
+    loadCache: [AsyncFunction: loadCache],
+    saveCache: [AsyncFunction: saveCache],
+    clearCache: [AsyncFunction: clearCache],
+    hashFiles: [AsyncFunction: hashFiles],
+    hasGroupChanged: [AsyncFunction: hasGroupChanged],
+  },
+}
+🧹 Cleaning up test environment...
+✅ Test cleanup complete
