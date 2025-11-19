@@ -465,15 +465,22 @@ All planning and documentation is complete. GitHub issues templates created. Now
   - test/unit/frontmatter-head-synthesis.test.js (complex frontmatter)
   - test/unit/head-merge-algorithm.test.js (link rel="layout")
   - test/unit/layout-discovery-new-spec.test.js (v1 features)
-- [ ] Delete/update additional test files with v1 feature references
-- [ ] Fix failing tests to work with v2 implementation
+- [x] Update layout-discovery.test.js for v2:
+  - Removed _includes/layout.html fallback tests
+  - Removed .htm extension tests
+  - Updated all tests to v2 behavior
+- [ ] Update remaining test files with v1 feature references
+- [ ] Fix failing integration tests
 - [ ] Run full test suite and verify ~500-520 passing tests
 - [ ] Create v2 validation tests if needed
 
 **Progress:**
-- Deleted 4 test files testing v1-only features
-- Current test status: 422 passing, 118 failing (needs cleanup)
-- Many failures are tests expecting v1 behavior (short names, _includes fallback, .htm extension, <link rel="layout">)
-- Need to systematically update remaining tests for v2
+- Deleted 4 test files testing v1-only features (commit: b8a2341)
+- Updated layout-discovery.test.js (commit: a573256):
+  - Removed 3 tests for v1 features
+  - Updated isLayoutFileName to reject .htm
+  - Removed _includes fallback expectations
+- Still need to update tests using SSI syntax, link rel="layout", data-slot attributes
+- Current status: Running tests to get new count
 
 **Status**: Test cleanup in progress...
