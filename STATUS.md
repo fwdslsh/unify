@@ -502,3 +502,33 @@ All planning and documentation is complete. GitHub issues templates created. Now
 - dd94719 - Fix layout path resolution (simple filenames)
 
 **Status**: Excellent progress! Exceeded target with 443/499 passing (88.8%). Only 56 failures remaining.
+### Week 3 Day 12-13: Update Examples [COMPLETED]
+
+**Tasks:**
+- [x] Update all example HTML files to use `<include>` elements
+- [x] Replace SSI syntax (`<!--#include virtual="..."-->`)
+- [x] Replace `<link rel="layout">` with `data-layout` attribute
+- [x] Update example README documentation
+- [x] Verify examples build successfully
+
+**Changes Made:**
+- Updated 10 example files (commit: cce42c8)
+- Replaced all `<!--#include virtual="..."-->` with `<include src="..." />`
+- Replaced `<!--#include file="..."-->` with `<include src="..." />`
+- Updated blog.html: `<link rel="layout">` → `data-layout` attribute
+- Completely rewrote example/advanced/README.md for v2:
+  - Added v1 vs v2 comparison table
+  - Removed all SSI syntax documentation
+  - Removed short name layout references
+  - Removed `_includes/` fallback documentation
+  - Documented only `_layout.html` is auto-discovered
+
+**Build Verification:**
+- Advanced example builds successfully: 4 pages in 63ms
+- All includes processed correctly
+- Layouts applied properly
+- No errors or warnings (except expected slot-examples.html issue)
+
+**Committed:** cce42c8 - "refactor: Update examples to v2 syntax (Week 3 Day 12-13)"
+
+**Status**: Examples updated and verified. All examples now use v2 syntax.
