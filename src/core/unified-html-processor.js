@@ -1466,10 +1466,21 @@ function mergeHtmlDocumentWithLayout(pageContent, layoutContent, config) {
     // Parse attributes to handle conflicts
     const pageAttrs = parseHtmlAttributes(pageParts.htmlAttributes);
     const layoutAttrs = parseHtmlAttributes(layoutParts.htmlAttributes);
-    
+
     // Merge: page attributes overwrite layout attributes
     const mergedAttrs = { ...layoutAttrs, ...pageAttrs };
+
+    // Remove data-layout attribute (processing directive, not part of final output)
+    delete mergedAttrs['data-layout'];
+
     finalHtmlAttributes = Object.entries(mergedAttrs)
+      .map(([key, value]) => value === true ? key : `${key}="${value}"`)
+      .join(' ');
+  } else if (layoutParts.htmlAttributes) {
+    // Layout only, but still need to remove data-layout if present
+    const layoutAttrs = parseHtmlAttributes(layoutParts.htmlAttributes);
+    delete layoutAttrs['data-layout'];
+    finalHtmlAttributes = Object.entries(layoutAttrs)
       .map(([key, value]) => value === true ? key : `${key}="${value}"`)
       .join(' ');
   }
