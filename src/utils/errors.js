@@ -133,18 +133,18 @@ export class PathTraversalError extends UnifyError {
 }
 
 /**
- * Error thrown when include directive syntax is malformed
+ * Error thrown when include element syntax is malformed
  */
 export class MalformedDirectiveError extends UnifyError {
   constructor(directive, filePath, lineNumber) {
     const suggestions = [
-      'Use correct syntax: <!--#include file="path.html" --> or <!--#include virtual="/path.html" -->',
-      'Ensure quotes around the file path',
-      'Check for typos in "file" or "virtual" keywords',
-      'Verify the directive is properly closed with -->'
+      'Use correct syntax: <include src="/path/to/file.html"></include>',
+      'Ensure quotes around the src attribute',
+      'Use absolute paths (starting with /) or relative paths',
+      'Self-closing format is also supported: <include src="/path.html" />'
     ];
-    
-    super(`Malformed include directive: ${directive}`, filePath, lineNumber, suggestions);
+
+    super(`Malformed include element: ${directive}`, filePath, lineNumber, suggestions);
     this.directive = directive;
   }
 }

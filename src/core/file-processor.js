@@ -1161,11 +1161,8 @@ async function processMarkdownFile(
     logger.debug("No explicit layout specified, will use unified processor layout discovery");
   }
 
-  // Remove any remaining include directives from output
-  finalContent = finalContent.replace(
-    /<!--#include\s+(virtual|file)="[^"]+"\s*-->/gi,
-    ""
-  );
+  // Note: All includes should be processed by unified-html-processor
+  // No cleanup needed for <include> elements as they are fully processed
 
   // Track asset references in the final content
   if (assetTracker) {
@@ -1240,7 +1237,7 @@ async function processHtmlFile(
     throw new FileSystemError("read", filePath, error);
   }
 
-  // Use unified HTML processor that handles both SSI includes and DOM templating
+  // Use unified HTML processor that handles <include> elements and DOM templating
   logger.debug(
     `Processing HTML with unified processor: ${path.relative(
       sourceRoot,
@@ -1710,7 +1707,7 @@ async function processIncludesRecursively(filePath, content, sourceRoot, depth =
   const rewriter = new HTMLRewriter();
   // Add detailed debug logs for include processing
   logger.debug(`Content before processing: ${content.substring(0, 200)}...`);
-  logger.debug(`Content contains <!--#include: ${content.includes('<!--#include')}`);
+  logger.debug(`Content contains <include elements: ${content.includes('<include')}`);
   logger.debug(`Starting include processing for file: ${filePath}, depth: ${depth}`);
 
   rewriter.on('include', {
@@ -1740,34 +1737,5 @@ async function processIncludesRecursively(filePath, content, sourceRoot, depth =
     },
   });
 
-    rewriter.on('comment', {
-      text(comment) {
-        logger.debug(`Found comment: ${comment.text}`);
-        const match = comment.text.match(/#include (file|virtual)="([^"]+)"/);
-        logger.debug(`Found <!--#include--> comment with match: ${JSON.stringify(match)}`);
-        if (match) {
-          const [, type, includePath] = match;
-          const resolvedPath =
-            type === 'virtual'
-              ? path.resolve(sourceRoot, includePath)
-              : path.resolve(path.dirname(filePath), includePath);
-          logger.debug(`Resolved include path for comment: ${resolvedPath}`);
-
-          try {
-            const includeContent = fs.readFileSync(resolvedPath, 'utf-8');
-            logger.debug(`Read content from include path: ${resolvedPath}`);
-            const processedContent = processIncludesRecursively(
-              resolvedPath,
-              includeContent,
-              sourceRoot,
-              depth + 1
-            );
-            comment.replace(processedContent);
-            logger.debug(`Replaced comment with processed content`);
-          } catch (error) {
-            logger.error(`Error processing include comment at path: ${resolvedPath}`, error);
-          }
-        }
-      },
-    });  return rewriter.transform(content).toString();
+  return rewriter.transform(content).toString();
 }
