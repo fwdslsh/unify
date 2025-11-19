@@ -41,7 +41,7 @@ describe('Current Component Include Behavior', () => {
 </head>
 <body>
   <div>
-    <!--#include virtual="/.components/styled-button.html" -->
+    <include src="/.components/styled-button.html" />
   </div>
 </body>
 </html>
@@ -90,7 +90,7 @@ describe('Current Component Include Behavior', () => {
 </head>
 <body>
   <div>
-    <!--#include virtual="/.components/counter.html" -->
+    <include src="/.components/counter.html" />
   </div>
 </body>
 </html>

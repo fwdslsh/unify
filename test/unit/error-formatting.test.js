@@ -51,7 +51,7 @@ describe('Error Message Format Validation', () => {
 
     it('should format build errors according to spec', async () => {
       const structure = {
-        'src/broken.html': '<!--#include file="missing.html" --><p>Content</p>'
+        'src/broken.html': '<include src="missing.html" /><p>Content</p>'
       };
 
       await createTestStructure(tempDir, structure);
@@ -68,7 +68,7 @@ describe('Error Message Format Validation', () => {
 
     it('should format fail-on error mode errors according to spec', async () => {
       const structure = {
-        'src/broken.html': '<!--#include file="missing.html" --><p>Content</p>'
+        'src/broken.html': '<include src="missing.html" /><p>Content</p>'
       };
 
       await createTestStructure(tempDir, structure);
@@ -136,9 +136,9 @@ describe('Error Message Format Validation', () => {
 
     it('should format circular dependency errors clearly', async () => {
       const structure = {
-        'src/circular.html': '<!--#include file="includes/a.html" -->',
-        'src/includes/a.html': '<!--#include file="b.html" -->',
-        'src/includes/b.html': '<!--#include file="a.html" -->' // Circular!
+        'src/circular.html': '<include src="includes/a.html" />',
+        'src/includes/a.html': '<include src="b.html" />',
+        'src/includes/b.html': '<include src="a.html" />' // Circular!
       };
 
       await createTestStructure(tempDir, structure);
@@ -157,7 +157,7 @@ describe('Error Message Format Validation', () => {
 
     it('should format path traversal errors clearly', async () => {
       const structure = {
-        'src/dangerous.html': '<!--#include file="../../../etc/passwd" -->'
+        'src/dangerous.html': '<include src="../../../etc/passwd" />'
       };
 
       await createTestStructure(tempDir, structure);
@@ -210,7 +210,7 @@ describe('Error Message Format Validation', () => {
     it('should use appropriate log levels with consistent formatting', async () => {
       const structure = {
         'src/index.html': '<h1>Content</h1>',
-        'src/warning.html': '<!--#include file="missing.html" --><p>Content</p>'
+        'src/warning.html': '<include src="missing.html" /><p>Content</p>'
       };
 
       await createTestStructure(tempDir, structure);
@@ -261,7 +261,7 @@ describe('Error Message Format Validation', () => {
   describe('Cross-Platform Error Formatting', () => {
     it('should format file paths appropriately for the platform', async () => {
       const structure = {
-        'src/broken.html': '<!--#include file="missing.html" -->'
+        'src/broken.html': '<include src="missing.html" />'
       };
 
       await createTestStructure(tempDir, structure);
@@ -286,7 +286,7 @@ describe('Error Message Format Validation', () => {
 
     it('should handle Unicode and special characters in error messages', async () => {
       const structure = {
-        'src/页面.html': '<!--#include file="missing.html" -->' // Chinese characters
+        'src/页面.html': '<include src="missing.html" />' // Chinese characters
       };
 
       await createTestStructure(tempDir, structure);
@@ -307,7 +307,7 @@ describe('Error Message Format Validation', () => {
     it('should provide actionable suggestions for different error types', async () => {
       // Test suggestion for missing include
       const structure = {
-        'src/page.html': '<!--#include file="missing.html" -->'
+        'src/page.html': '<include src="missing.html" />'
       };
 
       await createTestStructure(tempDir, structure);
@@ -327,7 +327,7 @@ describe('Error Message Format Validation', () => {
 
     it('should suggest using debug mode for complex errors', async () => {
       const structure = {
-        'src/complex-error.html': '<!--#include file="missing.html" -->'
+        'src/complex-error.html': '<include src="missing.html" />'
       };
 
       await createTestStructure(tempDir, structure);

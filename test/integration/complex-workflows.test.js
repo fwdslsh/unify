@@ -29,7 +29,7 @@ describe('Complex Integration Scenarios', () => {
         'src/index.html': `
           <div>
             <h1>Home Page</h1>
-            <!--#include file="includes/nav.html" -->
+            <include src="includes/nav.html" />
             <main>Welcome to the site</main>
           </div>
         `,
@@ -60,7 +60,7 @@ title: About Us
 
 This is our about page.
 
-<!--#include file="includes/contact-info.html" -->`,
+<include src="includes/contact-info.html" />`,
         'src/includes/contact-info.html': `<div class="contact">
   <p>Contact us at: info@example.com</p>
 </div>`,
@@ -136,8 +136,8 @@ This is our about page.
     it('should handle mixed file types in single build with complex dependencies', async () => {
       const structure = {
         // HTML pages with layouts
-        'src/index.html': '<div><h1>Home</h1><!--#include file="includes/sidebar.html" --></div>',
-        'src/products.html': '<div><h1>Products</h1><!--#include file="includes/product-list.html" --></div>',
+        'src/index.html': '<div><h1>Home</h1><include src="includes/sidebar.html" /></div>',
+        'src/products.html': '<div><h1>Products</h1><include src="includes/product-list.html" /></div>',
         
         // Markdown pages with frontmatter
         'src/blog/post-1.md': `---
@@ -149,8 +149,8 @@ tags: [tech, web]
 
 This is our first post.
 
-<!--#include file="../includes/author-bio.html" -->
-<!--#include file="../includes/social-share.html" -->`,
+<include src="../includes/author-bio.html" />
+<include src="../includes/social-share.html" />`,
         'src/blog/post-2.md': `---
 title: Second Post
 date: 2024-01-02
@@ -159,29 +159,29 @@ date: 2024-01-02
 
 Another great post.
 
-<!--#include file="../includes/author-bio.html" -->`,
+<include src="../includes/author-bio.html" />`,
         
         // Layouts
         'src/_includes/layout.html': `<!DOCTYPE html>
 <html>
 <head>
   <title>Site</title>
-  <!--#include file="../includes/meta-tags.html" -->
+  <include src="../includes/meta-tags.html" />
   <link rel="stylesheet" href="/css/main.css">
 </head>
 <body>
-  <!--#include file="../includes/header.html" -->
+  <include src="../includes/header.html" />
   <main><main data-slot="default"></main></main>
-  <!--#include file="../includes/footer.html" -->
+  <include src="../includes/footer.html" />
   <script src="/js/main.js"></script>
 </body>
 </html>`,
         
         // Includes
-        'src/includes/header.html': '<header><h1>My Site</h1><!--#include file="nav.html" --></header>',
+        'src/includes/header.html': '<header><h1>My Site</h1><include src="nav.html" /></header>',
         'src/includes/nav.html': '<nav><a href="/">Home</a><a href="/products.html">Products</a><a href="/blog/">Blog</a></nav>',
         'src/includes/footer.html': '<footer><p>&copy; 2024 My Site</p></footer>',
-        'src/includes/sidebar.html': '<aside><h3>Sidebar</h3><!--#include file="recent-posts.html" --></aside>',
+        'src/includes/sidebar.html': '<aside><h3>Sidebar</h3><include src="recent-posts.html" /></aside>',
         'src/includes/product-list.html': '<ul><li>Product 1</li><li>Product 2</li></ul>',
         'src/includes/author-bio.html': '<div class="author">Written by John Doe</div>',
         'src/includes/social-share.html': '<div class="share">Share this post</div>',
@@ -245,18 +245,18 @@ Another great post.
   describe('Nested Component Dependencies', () => {
     it('should handle complex nested includes with circular detection', async () => {
       const structure = {
-        'src/page.html': '<!--#include file="includes/level1.html" -->',
-        'src/includes/level1.html': 'Level 1: <!--#include file="level2.html" -->',
-        'src/includes/level2.html': 'Level 2: <!--#include file="level3.html" -->',
-        'src/includes/level3.html': 'Level 3: <!--#include file="level4.html" -->',
-        'src/includes/level4.html': 'Level 4: <!--#include file="level5.html" -->',
+        'src/page.html': '<include src="includes/level1.html" />',
+        'src/includes/level1.html': 'Level 1: <include src="level2.html" />',
+        'src/includes/level2.html': 'Level 2: <include src="level3.html" />',
+        'src/includes/level3.html': 'Level 3: <include src="level4.html" />',
+        'src/includes/level4.html': 'Level 4: <include src="level5.html" />',
         'src/includes/level5.html': 'Level 5: Final level',
         
         // Test circular dependency detection
-        'src/circular.html': '<!--#include file="includes/circular-a.html" -->',
-        'src/includes/circular-a.html': 'A: <!--#include file="circular-b.html" -->',
-        'src/includes/circular-b.html': 'B: <!--#include file="circular-c.html" -->',
-        'src/includes/circular-c.html': 'C: <!--#include file="circular-a.html" -->', // Circular!
+        'src/circular.html': '<include src="includes/circular-a.html" />',
+        'src/includes/circular-a.html': 'A: <include src="circular-b.html" />',
+        'src/includes/circular-b.html': 'B: <include src="circular-c.html" />',
+        'src/includes/circular-c.html': 'C: <include src="circular-a.html" />', // Circular!
       };
 
       await createTestStructure(tempDir, structure);
@@ -339,7 +339,7 @@ Another great post.
       const structure = {};
       
       // Main pages
-      structure['src/index.html'] = '<div data-layout="home"><h1>Welcome</h1><!--#include file="includes/recent-posts.html" --></div>';
+      structure['src/index.html'] = '<div data-layout="home"><h1>Welcome</h1><include src="includes/recent-posts.html" /></div>';
       structure['src/about.html'] = '<div data-layout="page"><h1>About</h1></div>';
       structure['src/contact.html'] = '<div data-layout="page"><h1>Contact</h1></div>';
       
@@ -355,25 +355,25 @@ category: ${i % 3 === 0 ? 'tech' : i % 2 === 0 ? 'design' : 'news'}
 
 This is blog post number ${i}.
 
-<!--#include file="../includes/author-info.html" -->
-<!--#include file="../includes/related-posts.html" -->`;
+<include src="../includes/author-info.html" />
+<include src="../includes/related-posts.html" />`;
       }
       
       // Category pages
       const categories = ['tech', 'design', 'news'];
       categories.forEach(cat => {
-        structure[`src/blog/${cat}.html`] = `<div data-layout="category"><h1>${cat}</h1><!--#include file="../includes/${cat}-posts.html" --></div>`;
+        structure[`src/blog/${cat}.html`] = `<div data-layout="category"><h1>${cat}</h1><include src="../includes/${cat}-posts.html" /></div>`;
         structure[`src/includes/${cat}-posts.html`] = `<div class="${cat}-posts">Posts in ${cat}</div>`;
       });
       
       // Layouts
-      structure['src/_includes/home.html'] = '<!DOCTYPE html><html><head><title>Home</title></head><body><!--#include file="../includes/header.html" --><main><main data-slot="default"></main></main><!--#include file="../includes/footer.html" --></body></html>';
-      structure['src/_includes/page.html'] = '<!DOCTYPE html><html><head><title>Page</title></head><body><!--#include file="../includes/header.html" --><main><main data-slot="default"></main></main><!--#include file="../includes/footer.html" --></body></html>';
-      structure['src/_includes/blog.html'] = '<!DOCTYPE html><html><head><title>Blog</title></head><body><!--#include file="../includes/header.html" --><article><main data-slot="default"></main></article><!--#include file="../includes/footer.html" --></body></html>';
-      structure['src/_includes/category.html'] = '<!DOCTYPE html><html><head><title>Category</title></head><body><!--#include file="../includes/header.html" --><section><main data-slot="default"></main></section><!--#include file="../includes/footer.html" --></body></html>';
+      structure['src/_includes/home.html'] = '<!DOCTYPE html><html><head><title>Home</title></head><body><include src="../includes/header.html" /><main><main data-slot="default"></main></main><include src="../includes/footer.html" /></body></html>';
+      structure['src/_includes/page.html'] = '<!DOCTYPE html><html><head><title>Page</title></head><body><include src="../includes/header.html" /><main><main data-slot="default"></main></main><include src="../includes/footer.html" /></body></html>';
+      structure['src/_includes/blog.html'] = '<!DOCTYPE html><html><head><title>Blog</title></head><body><include src="../includes/header.html" /><article><main data-slot="default"></main></article><include src="../includes/footer.html" /></body></html>';
+      structure['src/_includes/category.html'] = '<!DOCTYPE html><html><head><title>Category</title></head><body><include src="../includes/header.html" /><section><main data-slot="default"></main></section><include src="../includes/footer.html" /></body></html>';
       
       // Includes
-      structure['src/includes/header.html'] = '<header><h1>My Blog</h1><!--#include file="nav.html" --></header>';
+      structure['src/includes/header.html'] = '<header><h1>My Blog</h1><include src="nav.html" /></header>';
       structure['src/includes/nav.html'] = '<nav><a href="/">Home</a><a href="/about.html">About</a><a href="/blog/">Blog</a></nav>';
       structure['src/includes/footer.html'] = '<footer><p>&copy; 2024</p></footer>';
       structure['src/includes/recent-posts.html'] = '<div class="recent">Recent posts list</div>';
@@ -424,7 +424,7 @@ This is blog post number ${i}.
       const structure = {
         'src/index.html': `<div>
   <h1>Home</h1>
-  <!--#include file="includes/content.html" -->
+  <include src="includes/content.html" />
   <img src="/images/logo.png" alt="Logo">
 </div>`,
         'src/_includes/layout.html': `<!DOCTYPE html>
@@ -481,7 +481,7 @@ This is blog post number ${i}.
 
     it('should handle fail-on error mode with complex dependencies', async () => {
       const structure = {
-        'src/page.html': '<!--#include file="includes/existing.html" --><!--#include file="includes/missing.html" -->',
+        'src/page.html': '<include src="includes/existing.html" /><include src="includes/missing.html" />',
         'src/includes/existing.html': '<p>This exists</p>'
         // missing.html intentionally not created
       };

@@ -25,7 +25,7 @@ describe("--fail-on Behavior", () => {
 <html>
 <head><title>Test</title></head>
 <body>
-  <!--#include virtual="/nonexistent.html" -->
+  <include src="/nonexistent.html" />
   <h1>Content</h1>
 </body>
 </html>`
@@ -54,7 +54,7 @@ describe("--fail-on Behavior", () => {
 <html>
 <head><title>Test</title></head>
 <body>
-  <!--#include virtual="/missing-file.html" -->
+  <include src="/missing-file.html" />
   <h1>Content</h1>
 </body>
 </html>`

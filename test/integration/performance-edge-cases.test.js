@@ -38,7 +38,7 @@ describe("Performance and Edge Cases", () => {
 ${"<p>This is paragraph content that repeats many times to create a large file. ".repeat(
   15000
 )}
-<!--#include virtual="/components/footer.html" -->
+<include src="/components/footer.html" />
 </body>
 </html>`;
 
@@ -68,7 +68,7 @@ ${"<p>This is paragraph content that repeats many times to create a large file. 
       const structure = {
         "index.html": Array.from(
           { length: 100 },
-          (_, i) => `<!--#include virtual="/components/item-${i}.html" -->`
+          (_, i) => `<include src="/components/item-${i}.html" />`
         ).join("\n"),
       };
 
@@ -104,7 +104,7 @@ ${"<p>This is paragraph content that repeats many times to create a large file. 
       for (let i = 0; i < maxDepth; i++) {
         const nextInclude =
           i < maxDepth - 1
-            ? `<!--#include virtual="/components/level-${i + 1}.html" -->`
+            ? `<include src="/components/level-${i + 1}.html" />`
             : "<p>Final level reached</p>";
 
         structure[`components/level-${i}.html`] = `<div class="level-${i}">
@@ -114,7 +114,7 @@ ${"<p>This is paragraph content that repeats many times to create a large file. 
       }
 
       structure["index.html"] =
-        '<!--#include virtual="/components/level-0.html" -->';
+        '<include src="/components/level-0.html" />';
 
       await createTestStructure(sourceDir, structure);
 
@@ -143,7 +143,7 @@ ${"<p>This is paragraph content that repeats many times to create a large file. 
       for (let page = 0; page < 10; page++) {
         const includes = Array.from({ length: 20 }, (_, i) => {
           const componentId = (page * 20 + i) % numComponents;
-          return `<!--#include virtual="/components/comp-${componentId}.html" -->`;
+          return `<include src="/components/comp-${componentId}.html" />`;
         }).join("\n");
 
         structure[`page-${page}.html`] = `<h1>Page ${page}</h1>\n${includes}`;
@@ -199,7 +199,7 @@ ${"<p>This is paragraph content that repeats many times to create a large file. 
       for (let i = 0; i < numFiles; i++) {
         structure[`page-${i}.html`] = `<h1>Page ${i}</h1>
 <p>Content for page ${i} with some repeated text to make it larger.</p>
-<!--#include virtual="/components/shared.html" -->`;
+<include src="/components/shared.html" />`;
       }
 
       structure["components/shared.html"] =
@@ -239,7 +239,7 @@ ${"<p>This is paragraph content that repeats many times to create a large file. 
         "empty.html": "",
         "components/empty-component.html": "",
         "main.html":
-          '<!--#include virtual="/components/empty-component.html" --><h1>After empty</h1>',
+          '<include src="/components/empty-component.html" /><h1>After empty</h1>',
       };
 
       await createTestStructure(sourceDir, structure);
@@ -256,7 +256,7 @@ ${"<p>This is paragraph content that repeats many times to create a large file. 
     it("should handle binary file includes gracefully", async () => {
       const structure = {
         "index.html":
-          '<!--#include virtual="/assets/image.png" --><p>After binary</p>',
+          '<include src="/assets/image.png" /><p>After binary</p>',
         "assets/image.png": "\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR", // Fake PNG header
       };
 
@@ -276,7 +276,7 @@ ${"<p>This is paragraph content that repeats many times to create a large file. 
       const longPath =
         "components/" + "very-long-directory-name-".repeat(10) + "/file.html";
       const structure = {
-        "index.html": `<!--#include virtual="/${longPath}" -->`,
+        "index.html": `<include src="/${longPath}" />`,
         [longPath]: "<div>Long path content</div>",
       };
 
@@ -294,7 +294,7 @@ ${"<p>This is paragraph content that repeats many times to create a large file. 
     it("should handle files with unusual characters in names", async () => {
       const structure = {
         "index.html":
-          '<!--#include virtual="/components/спасибо.html" --><!--#include virtual="/components/测试.html" -->',
+          '<include src="/components/спасибо.html" /><include src="/components/测试.html" />',
         "components/спасибо.html": "<div>Russian content</div>",
         "components/测试.html": "<div>Chinese content</div>",
       };
@@ -313,7 +313,7 @@ ${"<p>This is paragraph content that repeats many times to create a large file. 
 
     it("should handle files with unicode content", async () => {
       const structure = {
-        "index.html": '<!--#include virtual="/components/unicode.html" -->',
+        "index.html": '<include src="/components/unicode.html" />',
         "components/unicode.html": `<div>
           <p>Emojis: 🚀 🎉 💻 🌟</p>
           <p>Math: ∑ ∆ ∞ ≤ ≥</p>
@@ -341,7 +341,7 @@ ${"<p>This is paragraph content that repeats many times to create a large file. 
         "malformed.html": `<div><p>Unclosed paragraph
 <span>Unclosed span
 <div>Nested unclosed
-<!--#include virtual="/components/good.html" -->
+<include src="/components/good.html" />
 </div>`,
         "components/good.html": "<p>Good content</p>",
       };
@@ -365,7 +365,7 @@ ${"<p>This is paragraph content that repeats many times to create a large file. 
 
       for (let i = 0; i < 20; i++) {
         structure[`page-${i}.html`] = `<h1>Page ${i}</h1>
-<!--#include virtual="/shared-component.html" -->`;
+<include src="/shared-component.html" />`;
       }
 
       await createTestStructure(sourceDir, structure);
@@ -394,12 +394,12 @@ ${"<p>This is paragraph content that repeats many times to create a large file. 
     it("should throw an error for circular dependencies", async () => {
       const structure = {
         "components/circular-a.html":
-          '<!--#include virtual="/components/circular-b.html" -->A',
+          '<include src="/components/circular-b.html" />A',
         "components/circular-b.html":
-          '<!--#include virtual="/components/circular-c.html" -->B',
+          '<include src="/components/circular-c.html" />B',
         "components/circular-c.html":
-          '<!--#include virtual="/components/circular-a.html" -->C',
-        "index.html": '<!--#include virtual="/components/circular-a.html" -->',
+          '<include src="/components/circular-a.html" />C',
+        "index.html": '<include src="/components/circular-a.html" />',
       };
 
       await createTestStructure(sourceDir, structure);
@@ -420,10 +420,10 @@ ${"<p>This is paragraph content that repeats many times to create a large file. 
     it("should handle missing files in nested includes", async () => {
       const structure = {
         "components/existing.html": `<div>Existing content
-<!--#include virtual="/components/missing.html" -->
+<include src="/components/missing.html" />
 <p>After missing</p>
 </div>`,
-        "index.html": '<!--#include virtual="/components/existing.html" -->',
+        "index.html": '<include src="/components/existing.html" />',
       };
 
       await createTestStructure(sourceDir, structure);
@@ -491,14 +491,14 @@ ${"<p>This is paragraph content that repeats many times to create a large file. 
       for (let i = 0; i < maxDepth; i++) {
         const nextInclude =
           i < maxDepth - 1
-            ? `<!--#include virtual="/components/deep-${i + 1}.html" -->`
+            ? `<include src="/components/deep-${i + 1}.html" />`
             : "<p>Maximum depth reached</p>";
 
         structure[`components/deep-${i}.html`] = `Level ${i} ${nextInclude}`;
       }
 
       structure["index.html"] =
-        '<!--#include virtual="/components/deep-0.html" -->';
+        '<include src="/components/deep-0.html" />';
 
       await createTestStructure(sourceDir, structure);
 
@@ -517,7 +517,7 @@ ${"<p>This is paragraph content that repeats many times to create a large file. 
       // Test with very large file (10MB content)
       const largeContent = "X".repeat(10 * 1024 * 1024);
       const structure = {
-        "huge.html": `<html><body>${largeContent}<!--#include virtual="/components/small.html" --></body></html>`,
+        "huge.html": `<html><body>${largeContent}<include src="/components/small.html" /></body></html>`,
         "components/small.html": "<p>Small component</p>",
       };
 
@@ -548,11 +548,11 @@ ${"<p>This is paragraph content that repeats many times to create a large file. 
     it("should continue processing after errors", async () => {
       const structure = {
         "index.html": `
-<!--#include virtual="/components/missing1.html" -->
+<include src="/components/missing1.html" />
 <p>Content 1</p>
-<!--#include virtual="/components/existing.html" -->
+<include src="/components/existing.html" />
 <p>Content 2</p>
-<!--#include virtual="/components/missing2.html" -->
+<include src="/components/missing2.html" />
 <p>Content 3</p>
 `,
         "components/existing.html": "<div>Existing component</div>",
@@ -576,7 +576,7 @@ ${"<p>This is paragraph content that repeats many times to create a large file. 
     it("should handle encoding errors gracefully", async () => {
       const structure = {
         "index.html":
-          '<!--#include virtual="/components/encoded.html" --><p>After include</p>',
+          '<include src="/components/encoded.html" /><p>After include</p>',
         // Create file with invalid UTF-8 sequence
         "components/encoded.html": Buffer.from([
           0xff, 0xfe, 0x48, 0x65, 0x6c, 0x6c, 0x6f,

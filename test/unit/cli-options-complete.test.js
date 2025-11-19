@@ -113,7 +113,7 @@ describe('Complete CLI Options Coverage', () => {
     it('should enable debug logging when --verbose is used', async () => {
       const structure = {
         'src/index.html': '<h1>Verbose Test</h1>',
-        'src/about.html': '<!--#include file="../includes/header.html" --><p>Content</p>',
+        'src/about.html': '<include src="../includes/header.html" /><p>Content</p>',
         'src/includes/header.html': '<header>Header</header>'
       };
 
@@ -167,7 +167,7 @@ describe('Complete CLI Options Coverage', () => {
     it('should work with fail-on error flag', async () => {
       const structure = {
         'src/index.html': '<h1>Verbose + Fail on Error</h1>',
-        'src/broken.html': '<!--#include file="missing.html" --><p>Content</p>'
+        'src/broken.html': '<include src="missing.html" /><p>Content</p>'
       };
 
       await createTestStructure(tempDir, structure);

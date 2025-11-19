@@ -61,7 +61,7 @@ describe('Final Boss Integration Test', () => {
 </head>
 <body>
   <header>
-    <nav><!--#include virtual="/.components/navigation.html" --></nav>
+    <nav><include src="/.components/navigation.html" /></nav>
   </header>
   <main>
     <main data-slot="default"></main>
@@ -92,7 +92,7 @@ describe('Final Boss Integration Test', () => {
   <h1>Welcome to Final Boss Test Site</h1>
   <p>This site tests all major Unify features.</p>
   
-  <!--#include virtual="/.components/card.html" -->
+  <include src="/.components/card.html" />
   
   <h2>Features Tested</h2>
   <ul>
@@ -110,7 +110,7 @@ describe('Final Boss Integration Test', () => {
   <h1>About This Test</h1>
   <p>This is a comprehensive integration test for Unify.</p>
   
-  <!--#include virtual="/.components/card.html" -->
+  <include src="/.components/card.html" />
 </div>`,
 
         'src/features.html': `<div data-layout="_includes/base.html">
@@ -120,7 +120,7 @@ describe('Final Boss Integration Test', () => {
   <h1>Features</h1>
   <p>Here are all the features this test covers:</p>
   
-  <!--#include virtual="/.components/card.html" -->
+  <include src="/.components/card.html" />
 </div>`,
 
         // Assets
@@ -227,29 +227,29 @@ This is a test blog post written in Markdown.
         // Test with missing component (should build but show error)
         'src/test-missing.html': `<div data-layout="default">
   <template data-slot="title">Missing Component Test</template>
-  <!--#include virtual="/.components/missing.html" -->
+  <include src="/.components/missing.html" />
   <p>This page tries to include a missing component.</p>
 </div>`,
 
         // Test with circular dependency protection  
         'src/.components/circular-a.html': `<div>
   Component A
-  <!--#include virtual="/.components/circular-b.html" -->
+  <include src="/.components/circular-b.html" />
 </div>`,
 
         'src/.components/circular-b.html': `<div>
   Component B
-  <!--#include virtual="/.components/circular-c.html" -->
+  <include src="/.components/circular-c.html" />
 </div>`,
 
         'src/.components/circular-c.html': `<div>
   Component C
-  <!--#include virtual="/.components/circular-a.html" -->
+  <include src="/.components/circular-a.html" />
 </div>`,
 
         'src/test-circular.html': `<div data-layout="default">
   <template data-slot="title">Circular Test</template>
-  <!--#include virtual="/.components/circular-a.html" -->
+  <include src="/.components/circular-a.html" />
 </div>`
       };
 
@@ -308,13 +308,13 @@ describe('Final Boss Integration Test', () => {
         // Test missing includes
         'src/components/partial.html': `<div>
   <p>This partial exists</p>
-  <!--#include virtual="/components/missing.html" -->
+  <include src="/components/missing.html" />
 </div>`,
 
         // Test path traversal attempts (should be blocked)
         'src/components/security.html': `<div>
-  <!--#include file="../../../etc/passwd" -->
-  <!--#include virtual="/../sensitive/data.txt" -->
+  <include src="../../../etc/passwd" />
+  <include src="/../sensitive/data.txt" />
   <p>Security test</p>
 </div>`,
 
@@ -330,9 +330,9 @@ describe('Final Boss Integration Test', () => {
         'src/edge-test.html': `<template extends="base.html">
   <template data-slot="content">
     <h1>Edge Case Tests</h1>
-    <!--#include virtual="/components/partial.html" -->
-    <!--#include virtual="/components/security.html" -->
-    <!--#include virtual="/components/nonexistent.html" -->
+    <include src="/components/partial.html" />
+    <include src="/components/security.html" />
+    <include src="/components/nonexistent.html" />
   </template>
 </template>`,
 
@@ -404,7 +404,7 @@ describe('Final Boss Integration Test', () => {
 //       for (let i = 0; i < 1000; i++) {
 //         largeStructure[`src/page-${i}.html`] = `<template extends="base.html">
 //   <template data-slot="content">
-//     <!--#include virtual="/components/header.html" -->
+//     <include src="/components/header.html" />
 //     <h1>Page ${i}</h1>
 //     <p>This is page number ${i}</p>
 //   </template>
@@ -439,7 +439,7 @@ describe('Final Boss Integration Test', () => {
 
       // Create 10 levels of nested includes
       for (let i = 0; i < 10; i++) {
-        const nextInclude = i < 9 ? `<!--#include virtual="/components/level-${i + 1}.html" -->` : '<p>Deep content</p>';
+        const nextInclude = i < 9 ? `<include src="/components/level-${i + 1}.html" />` : '<p>Deep content</p>';
         deepStructure[`src/components/level-${i}.html`] = `<div class="level-${i}">
   <p>Level ${i}</p>
   ${nextInclude}
@@ -448,7 +448,7 @@ describe('Final Boss Integration Test', () => {
 
       deepStructure['src/index.html'] = `<template extends="base.html">
   <template data-slot="content">
-    <!--#include virtual="/components/level-0.html" -->
+    <include src="/components/level-0.html" />
   </template>
 </template>`;
 

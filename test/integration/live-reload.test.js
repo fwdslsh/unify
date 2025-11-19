@@ -98,7 +98,7 @@ describe('Live Reload Functionality', () => {
 
     it('should serve include-processed content correctly', async () => {
       const structure = {
-        'src/index.html': '<!--#include virtual="/includes/header.html" --><p>Main content</p>',
+        'src/index.html': '<include src="/includes/header.html" /><p>Main content</p>',
         'src/includes/header.html': '<h1>Test Header</h1>'
       };
 

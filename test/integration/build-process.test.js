@@ -33,7 +33,7 @@ describe('build-process integration', () => {
     
     await fs.writeFile(
       path.join(sourceDir, '.components', 'header.html'),
-      '<header><h1>Test Site</h1><nav><!--#include file="nav.html" --></nav></header>'
+      '<header><h1>Test Site</h1><nav><include src="nav.html" /></nav></header>'
     );
     
     await fs.writeFile(
@@ -52,15 +52,15 @@ describe('build-process integration', () => {
 <html>
 <head>
   <title>Home - Test Site</title>
-  <!--#include virtual="/.components/head.html" -->
+  <include src="/.components/head.html" />
 </head>
 <body>
-  <!--#include virtual="/.components/header.html" -->
+  <include src="/.components/header.html" />
   <main>
     <h2>Welcome</h2>
     <p>This is the home page.</p>
   </main>
-  <!--#include virtual="/.components/footer.html" -->
+  <include src="/.components/footer.html" />
 </body>
 </html>`
     );
@@ -73,12 +73,12 @@ describe('build-process integration', () => {
   <title>About - Test Site</title>
 </head>
 <body>
-  <!--#include virtual="/.components/header.html" -->
+  <include src="/.components/header.html" />
   <main>
     <h2>About Us</h2>
     <p>This is the about page.</p>
   </main>
-  <!--#include virtual="/.components/footer.html" -->
+  <include src="/.components/footer.html" />
 </body>
 </html>`
     );
@@ -90,12 +90,12 @@ describe('build-process integration', () => {
   <title>Default Layout - Test Site</title>
 </head>
 <body>
-  <!--#include virtual="/.components/header.html" -->
+  <include src="/.components/header.html" />
   <main>
     <h2>About Us</h2>
     <p>This is the about page.</p>
   </main>
-  <!--#include virtual="/.components/footer.html" -->
+  <include src="/.components/footer.html" />
 </body>`
         );
     
@@ -129,7 +129,7 @@ describe('build-process integration', () => {
     expect(indexContent.includes('<li><a href="/about.html">About</a></li></ul>')).toBeTruthy();
     
     // Should not contain any include directives
-    expect(indexContent.includes('<!--#include')).toBeFalsy();
+    expect(indexContent.includes('<include')).toBeFalsy();
   });
   
 
@@ -177,7 +177,7 @@ describe('build-process integration', () => {
     const brokenFilePath = path.join(sourceDir, 'broken.html');
     await fs.writeFile(
       brokenFilePath,
-      '<!DOCTYPE html><html><head></head><body><!--#include file="missing.html" --></body></html>'
+      '<!DOCTYPE html><html><head></head><body><include src="missing.html" /></body></html>'
     );
     
     // Build should succeed but emit a warning when components are missing

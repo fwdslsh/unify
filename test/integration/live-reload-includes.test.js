@@ -39,7 +39,7 @@ describe("Live Reload - Include File Changes", () => {
   it("should trigger rebuild when include file changes", async () => {
     const structure = {
       "src/index.html":
-        '<!--#include virtual="/includes/header.html" --><p>Main content</p>',
+        '<include src="/includes/header.html" /><p>Main content</p>',
       "src/includes/header.html": "<h1>Original Header</h1>",
     };
 
@@ -80,7 +80,7 @@ describe("Live Reload - Include File Changes", () => {
   it("should broadcast reload event when include file changes", async () => {
     const structure = {
       "src/index.html":
-        '<!--#include virtual="/includes/nav.html" --><main>Content</main>',
+        '<include src="/includes/nav.html" /><main>Content</main>',
       "src/includes/nav.html": "<nav>Original Navigation</nav>",
     };
 
