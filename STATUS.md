@@ -316,23 +316,37 @@ All planning and documentation is complete. GitHub issues templates created. Now
 
 **Status**: SSI removal complete. Test cleanup will happen in Week 3.
 
-### Week 1 Day 3-4: Simplify Layout Discovery [IN PROGRESS]
+### Week 1 Day 3-4: Simplify Layout Discovery [COMPLETED]
 
 **Tasks:**
-- [ ] Completely rewrite `src/core/layout-discovery.js`
-- [ ] Delete functions:
-  - resolveShortLayoutName()
-  - searchLayoutHierarchy()
-  - extractLinkLayoutElement()
-  - discoverNamedLayout()
-  - searchIncludesDirectory()
-- [ ] Implement simplified functions:
-  - discoverLayout() - main entry point
-  - extractDataLayoutAttribute() - find data-layout attr
-  - resolveLayoutPath() - unified path resolution
-  - autoDiscoverLayout() - walk up tree for _layout.html
-- [ ] Update test files (defer detailed test updates to Week 3)
-- [ ] Run `bun test` - verify core functionality works
-- [ ] Run `grep -r "shortName\|short.*layout" src/` - verify no short name code remains
+- [x] Completely rewrite `src/core/layout-discovery.js`
+- [x] Delete functions:
+  - resolveShortLayoutName() ✓
+  - findFallbackLayoutInIncludes() ✓
+  - isIncludesLayoutFileName() ✓
+  - All complex search hierarchy code ✓
+- [x] Implement simplified system:
+  - findLayoutForPage() - auto-discovery only
+  - resolveLayoutOverride() - explicit paths only (rejects short names)
+  - getLayoutChain() - nested layouts
+  - Only supports _layout.html (removed _layout.htm, _*.layout.html patterns)
+- [x] Run `grep -r "shortName\|short.*layout" src/` - verified no short name code remains
+- [ ] Update test files (deferred to Week 3 Day 10-11)
+- [ ] Run `bun test` - tests running
 
-**Status**: Starting layout discovery simplification...
+**Results:**
+- Simplified from 5 discovery methods to 2 (auto-discovery + explicit)
+- Reduced layout-discovery.js: 325 lines → 174 lines (-151 lines)
+- Removed short name resolution completely
+- Removed _includes fallback search
+- Only supports _layout.html for auto-discovery
+- resolveLayoutOverride() now rejects short names with clear error message
+- Committed: de27069 - "refactor: Simplify layout discovery system (v2 migration - Day 3-4)"
+
+**Breaking Changes:**
+- Short names no longer supported: `data-layout="blog"` → ERROR
+- Must use explicit paths: `data-layout="/layouts/blog.html"`
+- Only _layout.html supported (no _blog.layout.html, _layout.htm)
+- No _includes directory fallback
+
+**Status**: Layout discovery simplified. Test cleanup will happen in Week 3.
