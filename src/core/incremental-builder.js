@@ -14,6 +14,7 @@ import { FileClassifier } from './file-classifier.js';
 import { BuildCache } from './build-cache.js';
 import { HtmlProcessor } from './html-processor.js';
 import { PathValidator } from './path-validator.js';
+import { processMarkdownForDOMCascade } from './markdown-processor.js';
 import { createLogger } from '../utils/logger.js';
 
 /**
@@ -156,7 +157,7 @@ export class IncrementalBuilder {
    * @param {string} outputRoot - Output root directory
    * @returns {Promise<Object>} Incremental build result
    */
-  async performIncrementalBuild(changedFile, sourceRoot, outputRoot) {
+  async performIncrementalBuild(changedFile, sourceRoot, outputRoot, options = {}) {
     const startTime = Date.now();
     const collectedErrors = []; // Collect recoverable errors to include in result
 
@@ -185,9 +186,9 @@ export class IncrementalBuilder {
         
         // Rebuild each dependent page
         for (const pagePath of dependentPagesCopy) {
-          const outputPath = this._getOutputPath(pagePath, sourceRoot, outputRoot);
+          const outputPath = this._getOutputPath(pagePath, sourceRoot, outputRoot, options);
           try {
-            const pageErrors = await this._rebuildSingleFile(pagePath, outputPath, sourceRoot);
+            const pageErrors = await this._rebuildSingleFile(pagePath, outputPath, sourceRoot, options);
             collectedErrors.push(...pageErrors);
             affectedPages.push(outputPath);
             rebuiltFiles++;
@@ -202,9 +203,9 @@ export class IncrementalBuilder {
       } else if (classification.isPage) {
         // Page changed - rebuild only this page
         this.logger.debug(`Rebuilding single page`, { changedFile });
-        const outputPath = this._getOutputPath(changedFile, sourceRoot, outputRoot);
+        const outputPath = this._getOutputPath(changedFile, sourceRoot, outputRoot, options);
         try {
-          const pageErrors = await this._rebuildSingleFile(changedFile, outputPath, sourceRoot);
+          const pageErrors = await this._rebuildSingleFile(changedFile, outputPath, sourceRoot, options);
           collectedErrors.push(...pageErrors);
           affectedPages.push(outputPath);
           rebuiltFiles = 1;
@@ -215,7 +216,7 @@ export class IncrementalBuilder {
         
       } else if (classification.isAsset) {
         // Asset changed - copy asset to output
-        const outputPath = this._getOutputPath(changedFile, sourceRoot, outputRoot);
+        const outputPath = this._getOutputPath(changedFile, sourceRoot, outputRoot, options);
         await this._copyAsset(changedFile, outputPath);
         assetsCopied.push(outputPath);
         copiedAssets = 1;
@@ -304,7 +305,7 @@ export class IncrementalBuilder {
    * @param {string} outputRoot - Output root directory
    * @returns {Promise<Object>} Result
    */
-  async handleNewFile(newFile, sourceRoot, outputRoot) {
+  async handleNewFile(newFile, sourceRoot, outputRoot, options = {}) {
     const startTime = Date.now();
 
     try {
@@ -312,8 +313,8 @@ export class IncrementalBuilder {
       
       if (classification.isPage) {
         // New page - process it
-        const outputPath = this._getOutputPath(newFile, sourceRoot, outputRoot);
-        await this._rebuildSingleFile(newFile, outputPath, sourceRoot);
+        const outputPath = this._getOutputPath(newFile, sourceRoot, outputRoot, options);
+        await this._rebuildSingleFile(newFile, outputPath, sourceRoot, options);
         
         return {
           success: true,
@@ -322,7 +323,7 @@ export class IncrementalBuilder {
         };
       } else if (classification.isAsset) {
         // New asset - copy it if referenced
-        const outputPath = this._getOutputPath(newFile, sourceRoot, outputRoot);
+        const outputPath = this._getOutputPath(newFile, sourceRoot, outputRoot, options);
         await this._copyAsset(newFile, outputPath);
         
         return {
@@ -355,7 +356,7 @@ export class IncrementalBuilder {
    * @param {string} outputRoot - Output root directory
    * @returns {Promise<Object>} Result
    */
-  async handleDeletedFiles(deletedFiles, sourceRoot, outputRoot) {
+  async handleDeletedFiles(deletedFiles, sourceRoot, outputRoot, options = {}) {
     const startTime = Date.now();
     let cleanedFiles = 0;
 
@@ -363,7 +364,7 @@ export class IncrementalBuilder {
       const { rmSync, existsSync } = await import('fs');
 
       for (const deletedFile of deletedFiles) {
-        const outputPath = this._getOutputPath(deletedFile, sourceRoot, outputRoot);
+        const outputPath = this._getOutputPath(deletedFile, sourceRoot, outputRoot, options);
         
         // Only count files that actually exist and get deleted
         if (existsSync(outputPath)) {
@@ -481,10 +482,18 @@ export class IncrementalBuilder {
    */
   _getOutputPath(sourcePath, sourceRoot, outputRoot, options = {}) {
     const { relative, join, parse, extname } = require('path');
-    const relativePath = relative(sourceRoot, sourcePath);
+    let relativePath = relative(sourceRoot, sourcePath);
+    const extension = extname(sourcePath).toLowerCase();
+    const isMarkdown = extension === '.md' || extension === '.markdown';
     
-    // Check if pretty URLs are enabled and this is an HTML file
-    if (options.prettyUrls && ['.html', '.htm'].includes(extname(sourcePath))) {
+    // Convert markdown to HTML output
+    if (isMarkdown) {
+      const parsed = parse(relativePath);
+      relativePath = join(parsed.dir, `${parsed.name}.html`);
+    }
+    
+    // Check if pretty URLs are enabled and this is an HTML or markdown file
+    if (options.prettyUrls && (['.html', '.htm'].includes(extension) || isMarkdown)) {
       const parsed = parse(relativePath);
       
       // Don't transform index.html files - they stay as is
@@ -509,7 +518,7 @@ export class IncrementalBuilder {
    * @param {string} sourceRoot - Source root directory
    * @returns {Promise<Array>} Array of any recoverable errors encountered
    */
-  async _rebuildSingleFile(sourcePath, outputPath, sourceRoot) {
+  async _rebuildSingleFile(sourcePath, outputPath, sourceRoot, options = {}) {
     const recoverableErrors = []; // Collect recoverable errors to return
     this.logger.debug(`Starting rebuild`, { sourcePath, outputPath });
     try {
@@ -532,6 +541,7 @@ export class IncrementalBuilder {
       if (fileExists) {
         const content = await sourceFile.text();
         const extension = extname(sourcePath).toLowerCase();
+        const isMarkdown = extension === '.md' || extension === '.markdown';
         
         let processedContent = content;
         
@@ -540,10 +550,9 @@ export class IncrementalBuilder {
           // Always rebuild file system map to get latest layout content
           const fileSystem = await this._buildFileSystemMap(sourceRoot);
           
-          
           const processingOptions = {
-            prettyUrls: false,
-            minify: false
+            prettyUrls: options.prettyUrls || false,
+            minify: options.minify || false
           };
           
           // Clear HTML processor cache to ensure fresh layout content
@@ -557,37 +566,37 @@ export class IncrementalBuilder {
             processingOptions
           );
           
-          if (result.success) {
-            processedContent = result.html;
-            
-            // Always track dependencies for HTML files
-            await this.dependencyTracker.trackPageDependencies(sourcePath, content, sourceRoot);
-          } else {
-            // If processing fails, log warning but continue with original content
-            console.warn(`HTML processing failed for ${sourcePath}: ${result.error}`);
-            // Still track dependencies even if processing fails
-            await this.dependencyTracker.trackPageDependencies(sourcePath, content, sourceRoot);
-          }
+          processedContent = result.success && result.html ? result.html : processedContent;
           
-          // Check for recoverable errors and create error for reporting
-          if (result.recoverableErrors && result.recoverableErrors.length > 0) {
-            for (const errorMessage of result.recoverableErrors) {
-              // Collect recoverable errors for inclusion in result
-              recoverableErrors.push({
-                message: errorMessage,
-                file: sourcePath,
-                type: 'RecoverableError',
-                timestamp: Date.now()
-              });
-              
-              // Create a RecoverableError for the watch command to catch and report
-              const recoverableError = new Error(errorMessage);
-              recoverableError.name = 'RecoverableError';
-              recoverableError.isRecoverable = true;
-              recoverableError.file = sourcePath;
-              throw recoverableError;
-            }
-          }
+          // Always track dependencies for HTML files
+          await this.dependencyTracker.trackPageDependencies(sourcePath, content, sourceRoot);
+          
+          this._handleRecoverableErrors(result, sourcePath, recoverableErrors);
+        } else if (isMarkdown) {
+          const processingOptions = {
+            prettyUrls: options.prettyUrls || false,
+            minify: options.minify || false
+          };
+          
+          const markdownResult = await processMarkdownForDOMCascade(content, sourcePath, processingOptions);
+          const fileSystem = await this._buildFileSystemMap(sourceRoot);
+          const htmlForProcessing = this._createHtmlFromMarkdown(markdownResult);
+          
+          this.htmlProcessor.clearCache();
+          
+          const result = await this.htmlProcessor.processFile(
+            sourcePath,
+            htmlForProcessing,
+            fileSystem,
+            sourceRoot,
+            processingOptions
+          );
+          
+          processedContent = result.html || htmlForProcessing;
+          
+          await this.dependencyTracker.trackPageDependencies(sourcePath, htmlForProcessing, sourceRoot);
+          
+          this._handleRecoverableErrors(result, sourcePath, recoverableErrors);
         }
         
         await Bun.write(outputPath, processedContent);
@@ -605,6 +614,128 @@ export class IncrementalBuilder {
       // Re-throw error so it can be caught by caller
       throw error;
     }
+  }
+
+  _handleRecoverableErrors(result, sourcePath, recoverableErrors) {
+    if (result?.recoverableErrors && result.recoverableErrors.length > 0) {
+      for (const errorMessage of result.recoverableErrors) {
+        if (recoverableErrors) {
+          recoverableErrors.push({
+            message: errorMessage,
+            file: sourcePath,
+            type: 'RecoverableError',
+            timestamp: Date.now()
+          });
+        }
+
+        const recoverableError = new Error(errorMessage);
+        recoverableError.name = 'RecoverableError';
+        recoverableError.isRecoverable = true;
+        recoverableError.file = sourcePath;
+        throw recoverableError;
+      }
+    }
+  }
+
+  _createHtmlFromMarkdown(markdownResult) {
+    const htmlAttributes = this._extractHtmlAttributes(markdownResult.frontmatter, 'html');
+    const bodyAttributes = this._extractHtmlAttributes(markdownResult.frontmatter, 'body');
+
+    if (markdownResult.frontmatter?.layout) {
+      const hasAreaClasses = markdownResult.html.includes('class="unify-') ||
+        markdownResult.html.includes("class='unify-") ||
+        markdownResult.html.includes('class=unify-');
+
+      let bodyContent = '';
+      if (hasAreaClasses) {
+        bodyContent = markdownResult.html;
+      } else {
+        const { landmarks, content } = this._extractLandmarksFromHtml(markdownResult.html);
+
+        if (landmarks.length > 0) {
+          bodyContent = landmarks.join('\n');
+          if (content.trim()) {
+            bodyContent += '\n<main>' + content + '</main>';
+          }
+        } else {
+          bodyContent = markdownResult.html;
+        }
+      }
+
+      return `<html${htmlAttributes} data-unify="${markdownResult.frontmatter.layout}">
+<head>
+<title>${markdownResult.title || 'Untitled'}</title>
+${markdownResult.headHtml}
+</head>
+<body${bodyAttributes}>
+${bodyContent}
+</body>
+</html>`;
+    }
+
+    return `<html${htmlAttributes}>
+<head>
+<title>${markdownResult.title || 'Untitled'}</title>
+${markdownResult.headHtml}
+</head>
+<body${bodyAttributes}>
+<main>${markdownResult.html}</main>
+</body>
+</html>`;
+  }
+
+  _extractHtmlAttributes(frontmatter, prefix) {
+    if (!frontmatter || typeof frontmatter !== 'object') {
+      return '';
+    }
+
+    const attributes = [];
+    const prefixPattern = `${prefix}_`;
+
+    for (const [key, value] of Object.entries(frontmatter)) {
+      if (key.startsWith(prefixPattern) && value) {
+        let attrName = key.substring(prefixPattern.length);
+
+        if (attrName.startsWith('data_')) {
+          attrName = attrName.replace('data_', 'data-');
+        }
+
+        const escapedValue = String(value)
+          .replace(/&/g, '&amp;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+
+        attributes.push(`${attrName}="${escapedValue}"`);
+      }
+    }
+
+    return attributes.length > 0 ? ` ${attributes.join(' ')}` : '';
+  }
+
+  _extractLandmarksFromHtml(html) {
+    if (!html || typeof html !== 'string') {
+      return { landmarks: [], content: '' };
+    }
+
+    const landmarks = [];
+    const landmarkTags = ['header', 'nav', 'main', 'aside', 'footer'];
+    let remainingContent = html;
+
+    for (const tag of landmarkTags) {
+      const regex = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'gi');
+      let match;
+
+      while ((match = regex.exec(html)) !== null) {
+        landmarks.push(match[0]);
+        remainingContent = remainingContent.replace(match[0], '');
+      }
+    }
+
+    remainingContent = remainingContent.replace(/\n\s*\n/g, '\n').trim();
+
+    return { landmarks, content: remainingContent };
   }
 
   /**
@@ -817,28 +948,26 @@ export class IncrementalBuilder {
     try {
       const { dirname, extname } = require('path');
       const { mkdirSync } = await import('fs');
-      
+
       // Ensure output directory exists
       mkdirSync(dirname(outputPath), { recursive: true });
-      
-      // Read source file
+
       const sourceFile = Bun.file(sourcePath);
       if (await sourceFile.exists()) {
         const content = await sourceFile.text();
         const extension = extname(sourcePath).toLowerCase();
-        
+        const isMarkdown = extension === '.md' || extension === '.markdown';
+
         let processedContent = content;
-        
-        // Process HTML files through HtmlProcessor to handle data-unify attributes
+
         if (['.html', '.htm'].includes(extension)) {
           const processingOptions = {
             prettyUrls: options.prettyUrls || false,
             minify: options.minify || false
           };
-          
-          // Clear HTML processor cache to ensure fresh layout content
+
           this.htmlProcessor.clearCache();
-          
+
           const result = await this.htmlProcessor.processFile(
             sourcePath,
             content,
@@ -846,47 +975,46 @@ export class IncrementalBuilder {
             sourceRoot,
             processingOptions
           );
-          
-          if (result.success) {
-            processedContent = result.html;
-            
-            // Check for recoverable errors and report them
-            if (result.recoverableErrors && result.recoverableErrors.length > 0) {
-              this.logger.debug('Found recoverable errors', { errors: result.recoverableErrors });
-              for (const recoverableError of result.recoverableErrors) {
-                // Create an error to be thrown so it can be caught by the watch command
-                const error = new Error(recoverableError);
-                error.name = 'RecoverableError';
-                error.isRecoverable = true;
-                error.sourcePath = sourcePath;
-                this.logger.debug('Throwing recoverable error', { message: error.message });
-                throw error;
-              }
-            }
-            
-            // Track asset references in the processed HTML
-            await this.assetTracker.recordAssetReferences(sourcePath, processedContent, sourceRoot);
-          } else {
-            // If processing fails, log warning but continue with original content
-            console.warn(`HTML processing failed for ${sourcePath}: ${result.error}`);
-            
-            // Still track assets in original content
-            await this.assetTracker.recordAssetReferences(sourcePath, content, sourceRoot);
-          }
-        } else {
-          // For non-HTML files, still track asset references if it's a CSS or JS file
-          if (['.css', '.js'].includes(extension)) {
-            await this.assetTracker.trackPageAssets(sourcePath, content, sourceRoot);
-          }
+
+          processedContent = result.success && result.html ? result.html : processedContent;
+
+          this._handleRecoverableErrors(result, sourcePath);
+
+          await this.assetTracker.recordAssetReferences(sourcePath, processedContent, sourceRoot);
+        } else if (isMarkdown) {
+          const processingOptions = {
+            prettyUrls: options.prettyUrls || false,
+            minify: options.minify || false
+          };
+
+          const markdownResult = await processMarkdownForDOMCascade(content, sourcePath, processingOptions);
+          const htmlForProcessing = this._createHtmlFromMarkdown(markdownResult);
+
+          this.htmlProcessor.clearCache();
+
+          const result = await this.htmlProcessor.processFile(
+            sourcePath,
+            htmlForProcessing,
+            fileSystem,
+            sourceRoot,
+            processingOptions
+          );
+
+          processedContent = result.html || htmlForProcessing;
+
+          this._handleRecoverableErrors(result, sourcePath);
+
+          await this.assetTracker.recordAssetReferences(sourcePath, processedContent, sourceRoot);
+        } else if (['.css', '.js'].includes(extension)) {
+          await this.assetTracker.trackPageAssets(sourcePath, content, sourceRoot);
         }
-        
+
         await Bun.write(outputPath, processedContent);
-        
+
         // Update cache with new content
         await this.buildCache.updateFileHash(sourcePath, content);
       }
     } catch (error) {
-      // Re-throw error so it can be caught by caller
       throw error;
     }
   }

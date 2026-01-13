@@ -41,7 +41,13 @@ export class WatchCommand {
       // Perform initial build
       const initialBuildResult = await this.incrementalBuilder.performInitialBuild(
         options.source,
-        options.output
+        options.output,
+        {
+          prettyUrls: options.prettyUrls,
+          minify: options.minify,
+          clean: options.clean,
+          verbose: options.verbose
+        }
       );
 
       if (!initialBuildResult.success) {
@@ -166,7 +172,8 @@ export class WatchCommand {
           const result = await this.incrementalBuilder.performIncrementalBuild(
             event.filePath,
             options.source,
-            options.output
+            options.output,
+            { prettyUrls: options.prettyUrls, minify: options.minify }
           );
           this.logger.debug('Build result', { success: result.success, rebuiltFiles: result.rebuiltFiles });
 

@@ -74,6 +74,7 @@ export class ServeCommand {
         output: serveOptions.output,
         clean: serveOptions.clean,
         verbose: serveOptions.verbose,
+        prettyUrls: serveOptions.prettyUrls,
         minify: false, // Disable minification for development
         failOn: [], // Don't fail on warnings/security in dev server
         logger: this.logger.child('BUILD')
@@ -647,7 +648,8 @@ export class ServeCommand {
           const result = await this.incrementalBuilder.performIncrementalBuild(
             event.filePath,
             options.source,
-            options.output
+            options.output,
+            { prettyUrls: options.prettyUrls, minify: false }
           );
 
           if (result.success) {

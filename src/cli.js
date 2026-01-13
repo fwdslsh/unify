@@ -280,6 +280,9 @@ export class UnifyCLI {
         output: options.output,
         verbose: options.verbose,
         debounceMs: 100,
+        prettyUrls: options.prettyUrls,
+        minify: options.minify,
+        clean: options.clean,
         logger: this.logger.child('WATCH'),
         onBuild: (buildInfo) => {
           // Report build events to console

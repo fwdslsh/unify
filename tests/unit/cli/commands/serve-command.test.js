@@ -118,6 +118,7 @@ describe('ServeCommand', () => {
         output: './dist',
         clean: undefined,
         verbose: undefined,
+        prettyUrls: undefined,
         minify: false,
         failOn: [],
         logger: mockDependencies.logger.child.mock.results[0].value
@@ -145,6 +146,7 @@ describe('ServeCommand', () => {
         output: './custom-dist',
         clean: true,
         verbose: true,
+        prettyUrls: undefined,
         minify: false,
         failOn: [],
         logger: mockDependencies.logger.child.mock.results[0].value
@@ -696,7 +698,8 @@ describe('ServeCommand', () => {
       expect(mockDependencies.incrementalBuilder.performIncrementalBuild).toHaveBeenCalledWith(
         '/test/src/index.html',
         './src', 
-        './dist'
+        './dist',
+        expect.objectContaining({ prettyUrls: undefined, minify: false })
       );
       expect(mockDependencies.logger.info).toHaveBeenCalledWith(
         'File changes detected',
@@ -967,8 +970,7 @@ describe('ServeCommand', () => {
       
       // Create fresh mock factory for this test
       const testFileFactory = mock()
-        .mockReturnValueOnce(mockFile)      // First call for root path
-        .mockReturnValueOnce(mockIndexFile); // Second call for index.html
+        .mockReturnValueOnce(mockIndexFile);
       
       // Temporarily replace the file factory
       const originalFileFactory = serveCommand.fileFactory;
@@ -983,9 +985,9 @@ describe('ServeCommand', () => {
       
       const response = await serveCommand._serveStaticFile('/', './dist');
       
-      // Should call fileFactory for both root path attempt and index.html fallback
-      expect(testFileFactory).toHaveBeenCalledTimes(2);
-      expect(testFileFactory).toHaveBeenNthCalledWith(2, expect.stringContaining('index.html'));
+      // Should check index.html directly for root requests
+      expect(testFileFactory).toHaveBeenCalledTimes(1);
+      expect(testFileFactory).toHaveBeenCalledWith(expect.stringContaining('index.html'));
       expect(serveCommand._createFileResponse).toHaveBeenCalledWith(mockIndexFile, 'index.html');
       expect(response.status).toBe(200);
       
@@ -997,17 +999,15 @@ describe('ServeCommand', () => {
       // Clear previous calls
       mockDependencies.fileFactory.mockClear();
       
-      const mockFile = { exists: mock().mockResolvedValue(false) };
       const mockIndexFile = { exists: mock().mockResolvedValue(false) };
       
       mockDependencies.fileFactory
-        .mockReturnValueOnce(mockFile)      // First call for root path
-        .mockReturnValueOnce(mockIndexFile); // Second call for index.html
+        .mockReturnValueOnce(mockIndexFile);
       
       const response = await serveCommand._serveStaticFile('/', './dist');
       
-      // Should call fileFactory for both root path attempt and index.html fallback
-      expect(mockDependencies.fileFactory).toHaveBeenCalledTimes(2);
+      // Should attempt index.html and return 404 when missing
+      expect(mockDependencies.fileFactory).toHaveBeenCalledTimes(1);
       expect(response.status).toBe(404);
       expect(await response.text()).toBe('Not Found');
     });

@@ -109,7 +109,8 @@ describe('WatchCommand', () => {
 
       expect(mockIncrementalBuilder.performInitialBuild).toHaveBeenCalledWith(
         './src',
-        './dist'
+        './dist',
+        expect.objectContaining({ prettyUrls: undefined, minify: undefined, clean: undefined, verbose: undefined })
       );
 
       expect(mockFileWatcher.startWatching).toHaveBeenCalled();
@@ -306,7 +307,8 @@ describe('WatchCommand', () => {
       expect(mockIncrementalBuilder.performIncrementalBuild).toHaveBeenCalledWith(
         './src/index.html',
         './src',
-        './dist'
+        './dist',
+        expect.objectContaining({ prettyUrls: undefined, minify: undefined })
       );
 
       expect(onBuildCallback).toHaveBeenCalledWith({

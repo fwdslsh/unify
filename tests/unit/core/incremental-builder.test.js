@@ -540,6 +540,20 @@ describe('IncrementalBuilder', () => {
       
       expect(outputPath).toBe(join(outputDir, 'blog/post.html'));
     });
+
+    test('should convert markdown output path', () => {
+      const sourcePath = join(sourceDir, 'guide.md');
+      const outputPath = builder._getOutputPath(sourcePath, sourceDir, outputDir);
+
+      expect(outputPath).toBe(join(outputDir, 'guide.html'));
+    });
+
+    test('should apply pretty URLs for markdown files', () => {
+      const sourcePath = join(sourceDir, 'guides/intro.md');
+      const outputPath = builder._getOutputPath(sourcePath, sourceDir, outputDir, { prettyUrls: true });
+
+      expect(outputPath).toBe(join(outputDir, 'guides/intro/index.html'));
+    });
   });
   
   describe('_rebuildSingleFile', () => {
