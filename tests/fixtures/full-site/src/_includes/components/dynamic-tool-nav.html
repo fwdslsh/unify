@@ -1,0 +1,188 @@
+<div class="tool-nav">
+    <div class="tool-nav-container">
+        <ul class="tool-nav-links">
+            <div data-slot="nav-links">
+                <!-- Default navigation links will be replaced by dynamic content -->
+                <li><a href="index.html">Overview</a></li>
+                <li><a href="getting-started.html">Getting Started</a></li>
+                <li><a href="docs.html">Documentation</a></li>
+                <li><a href="examples.html">Examples</a></li>
+            </div>
+        </ul>
+    </div>
+</div>
+
+<style>
+/* Tool Navigation */
+.tool-nav {
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border);
+    padding: 1rem 0;
+    margin-bottom: 2rem;
+    position: sticky;
+    top: 80px; /* Adjust based on main nav height */
+    z-index: 100;
+    backdrop-filter: blur(10px);
+}
+
+.tool-nav-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 2rem;
+}
+
+.tool-nav-links {
+    display: flex;
+    gap: 2rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.tool-nav-links li {
+    margin: 0;
+}
+
+.tool-nav-links a {
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+    display: block;
+    position: relative;
+}
+
+.tool-nav-links a:hover,
+.tool-nav-links a.active {
+    color: var(--primary);
+    background: rgba(0, 255, 65, 0.1);
+}
+
+.tool-nav-links a.active::after {
+    content: '';
+    position: absolute;
+    bottom: -1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 20px;
+    height: 2px;
+    background: var(--primary);
+}
+
+/* Tool breadcrumb */
+.tool-breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    padding: 0 2rem;
+    max-width: 1200px;
+    margin-left: auto;
+    margin-right: auto;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--text-dim);
+}
+
+.tool-breadcrumb .current-tool {
+    color: var(--primary);
+    font-weight: 600;
+}
+
+.tool-breadcrumb::before {
+    content: '/';
+    color: var(--text-dim);
+    margin-right: 0.25rem;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .tool-nav {
+        position: static;
+    }
+    
+    .tool-nav-links {
+        flex-wrap: wrap;
+        gap: 1rem;
+        justify-content: center;
+    }
+    
+    .tool-nav-links a {
+        font-size: 0.8rem;
+        padding: 0.4rem 0.8rem;
+    }
+
+    .tool-breadcrumb {
+        padding: 0 1rem;
+        justify-content: center;
+    }
+}
+</style>
+
+<script>
+// Dynamic tool navigation initialization
+document.addEventListener('DOMContentLoaded', function() {
+    initializeDynamicToolNav();
+});
+
+function initializeDynamicToolNav() {
+    const currentPath = window.location.pathname;
+    const pathParts = currentPath.split('/').filter(part => part);
+    
+    // Detect current tool from URL
+    const toolName = pathParts[0]; // e.g., 'unify', 'giv', 'inform', 'catalog'
+    
+    if (toolName && ['unify', 'giv', 'inform', 'catalog'].includes(toolName)) {
+        // Add tool breadcrumb
+        addToolBreadcrumb(toolName);
+        
+        // Set active navigation state
+        setActiveToolNavigation();
+        
+        // Update navigation context in main nav
+        updateMainNavContext(toolName);
+    }
+}
+
+function addToolBreadcrumb(toolName) {
+    const toolNav = document.querySelector('.tool-nav');
+    if (toolNav && !document.querySelector('.tool-breadcrumb')) {
+        const breadcrumb = document.createElement('div');
+        breadcrumb.className = 'tool-breadcrumb';
+        breadcrumb.innerHTML = `<span class="current-tool">${toolName}</span>`;
+        toolNav.insertBefore(breadcrumb, toolNav.firstChild);
+    }
+}
+
+function setActiveToolNavigation() {
+    const currentPath = window.location.pathname;
+    const fileName = currentPath.split('/').pop() || 'index.html';
+    
+    document.querySelectorAll('.tool-nav-links a').forEach(link => {
+        const linkHref = link.getAttribute('href');
+        if (linkHref === fileName || 
+            (fileName === '' && linkHref === 'index.html') ||
+            (currentPath.endsWith('/') && linkHref === 'index.html')) {
+            link.classList.add('active');
+        }
+    });
+}
+
+function updateMainNavContext(toolName) {
+    const toolContext = document.querySelector('.tool-context');
+    if (toolContext) {
+        toolContext.innerHTML = `<span class="current-tool">${toolName}</span>`;
+        toolContext.style.display = 'flex';
+    }
+}
+
+// Export for use by other scripts
+window.fwdslsh = window.fwdslsh || {};
+window.fwdslsh.toolNav = {
+    setActive: setActiveToolNavigation,
+    updateContext: updateMainNavContext
+};
+</script>

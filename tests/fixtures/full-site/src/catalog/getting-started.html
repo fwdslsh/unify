@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Getting Started with catalog - AI-Ready Documentation Indexer</title>
+    <meta name="description"
+        content="Learn how to install and use catalog to generate llms.txt and llms-full.txt from Markdown/HTML directories. Complete setup guide for AI-powered documentation workflows.">
+    <meta name="keywords" content="catalog, getting started, llms.txt, documentation indexer, fwdslsh">
+    <meta property="og:title" content="Getting Started with catalog - AI-Ready Documentation Indexer">
+    <meta property="og:description"
+        content="Learn how to install and use catalog to generate llms.txt and llms-full.txt from Markdown/HTML directories. Complete setup guide for AI-powered documentation workflows.">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Getting Started with catalog - AI-Ready Documentation Indexer">
+    <meta name="twitter:description"
+        content="Learn how to install and use catalog to generate llms.txt and llms-full.txt from Markdown/HTML directories. Complete setup guide for AI-powered documentation workflows.">
+    <style>
+        /* Page-specific styles for catalog getting started */
+        .installation-tabs {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            margin-top: 2rem;
+        }
+
+        .tab-buttons {
+            display: flex;
+            background: var(--bg-darker);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .tab-button {
+            flex: 1;
+            padding: 1rem;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .tab-button.active {
+            color: var(--primary);
+            background: var(--bg-card);
+        }
+
+        .tab-content {
+            padding: 2rem;
+        }
+
+        .tab-panel {
+            display: none;
+        }
+
+        .tab-panel.active {
+            display: block;
+        }
+
+        .install-option {
+            text-align: center;
+        }
+
+        .install-icon {
+            width: 60px;
+            height: 60px;
+            margin: 0 auto 1rem;
+            background: var(--gradient-primary);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            color: var(--bg-dark);
+        }
+
+        .llms-example {
+            background: var(--bg-darker);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .llms-header {
+            color: var(--primary);
+            font-family: var(--font-mono);
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+
+        .workflow-steps {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 3rem 0;
+            position: relative;
+        }
+
+        .workflow-step {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            text-align: center;
+            position: relative;
+        }
+
+        .workflow-step::after {
+            content: '→';
+            position: absolute;
+            right: -1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--primary);
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        .workflow-step:last-child::after {
+            display: none;
+        }
+
+        .step-icon {
+            width: 40px;
+            height: 40px;
+            margin: 0 auto 1rem;
+            background: var(--gradient-primary);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-mono);
+            font-weight: bold;
+            color: var(--bg-dark);
+            font-size: 1rem;
+        }
+
+        @media (max-width: 768px) {
+            .tab-buttons {
+                flex-direction: column;
+            }
+
+            .workflow-step::after {
+                content: '↓';
+                right: 50%;
+                top: 100%;
+                transform: translateX(50%);
+                bottom: -1rem;
+            }
+        }
+    </style>
+</head>
+
+<body data-unify="/_includes/tool-page.html">
+
+<!-- Tool-specific navigation links -->
+<ul class="unify-nav-links">
+    <li><a href="/catalog/">Overview</a></li>
+    <li><a href="/catalog/getting-started.html" class="active">Getting Started</a></li>
+    <li><a href="/catalog/docs.html">Documentation</a></li>
+    <li><a href="/catalog/examples.html">Examples</a></li>
+</ul>
+
+<main class="unify-content">
+<section class="tool-hero">
+        <div class="tool-hero-content">
+            <h1>Getting Started with catalog</h1>
+            <div class="tagline">From installation to your first AI-ready documentation index</div>
+            <div class="description">Transform your Markdown and HTML directories into structured llms.txt files for
+                AI-powered workflows. Complete llms.txt standard compliance with enterprise-grade features.</div>
+
+            <div class="hero-buttons">
+                <a href="#installation" class="btn btn-primary">
+                    <span class="btn-icon">📋</span>
+                    Quick Install
+                </a>
+                <a href="#first-index" class="btn btn-secondary">Create Your First Index</a>
+            </div>
+        </div>
+    </section>
+
+
+    <section id="installation" class="tool-section">
+        <div class="section-header">
+            <h2>Installation Options</h2>
+            <p>Choose the installation method that works best for your environment</p>
+        </div>
+
+        <div class="installation-tabs">
+            <div class="tab-buttons">
+                <button class="tab-button active" data-tab="quick-install">Quick Install</button>
+                <button class="tab-button" data-tab="bun-package">Bun Package</button>
+                <button class="tab-button" data-tab="docker">Docker</button>
+                <button class="tab-button" data-tab="manual">Manual Download</button>
+            </div>
+
+            <div class="tab-content">
+                <div class="tab-panel active" data-tab="quick-install">
+                    <div class="install-option">
+                        <div class="install-icon">⚡</div>
+                        <h3>One-Line Install Script</h3>
+                        <div class="code-block">
+                            <code># Automatically detects your platform and installs the binary
+curl -fsSL https://raw.githubusercontent.com/fwdslsh/catalog/main/install.sh | bash
+
+# Verify installation
+catalog --version
+
+# Start indexing immediately
+catalog --validate</code>
+                        </div>
+                        <p>The install script automatically detects your platform (Linux, macOS, Windows) and downloads
+                            the appropriate binary. Zero dependencies required!</p>
+                    </div>
+                </div>
+
+                <div class="tab-panel" data-tab="bun-package">
+                    <div class="install-option">
+                        <div class="install-icon">📦</div>
+                        <h3>Install with Bun</h3>
+                        <div class="code-block">
+                            <code># Install globally with Bun
+bun install -g @fwdslsh/catalog
+
+# Or add to project
+bun add @fwdslsh/catalog
+
+# Run catalog
+catalog --help</code>
+                        </div>
+                        <p>Native Bun package for maximum performance and built-in optimizations. Requires Bun v1.0.0 or
+                            higher.</p>
+                    </div>
+                </div>
+
+                <div class="tab-panel" data-tab="docker">
+                    <div class="install-option">
+                        <div class="install-icon">🐳</div>
+                        <h3>Docker Container</h3>
+                        <div class="code-block">
+                            <code># Pull latest image
+docker pull fwdslsh/catalog:latest
+
+# Run catalog with mounted directories
+docker run --rm -v $(pwd)/docs:/input -v $(pwd)/output:/output \
+  fwdslsh/catalog --input /input --output /output
+
+# Or use interactive shell
+docker run -it fwdslsh/catalog bash</code>
+                        </div>
+                        <p>Containerized for consistent environments and CI/CD pipelines. Perfect for automated
+                            documentation processing workflows.</p>
+                    </div>
+                </div>
+
+                <div class="tab-panel" data-tab="manual">
+                    <div class="install-option">
+                        <div class="install-icon">📥</div>
+                        <h3>Manual Download</h3>
+                        <div class="code-block">
+                            <code># Download from GitHub Releases
+# Visit: https://github.com/fwdslsh/catalog/releases
+
+# Linux
+wget https://github.com/fwdslsh/catalog/releases/latest/download/catalog-linux
+chmod +x catalog-linux
+./catalog-linux --help
+
+# macOS  
+curl -L -o catalog-mac https://github.com/fwdslsh/catalog/releases/latest/download/catalog-mac
+chmod +x catalog-mac
+./catalog-mac --help
+
+# Windows
+# Download catalog-win.exe and run from command prompt</code>
+                        </div>
+                        <p>Download pre-built binaries directly. Each release includes binaries for Linux, macOS, and
+                            Windows with ARM64 support.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="first-index" class="tool-section alt-bg">
+        <div class="section-header">
+            <h2>Create Your First Documentation Index</h2>
+            <p>Learn the basics with hands-on examples</p>
+        </div>
+
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">📋</div>
+                <h3>Basic Index Generation</h3>
+                <p>Generate llms.txt from your current directory</p>
+                <div class="code-block">
+                    <code># Generate basic llms.txt in current directory
+catalog
+
+# Or specify input and output directories
+catalog --input docs --output build</code>
+                </div>
+                <p><strong>Result:</strong> Creates llms.txt and llms-full.txt with proper H1 → blockquote → sections
+                    format.</p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">🌐</div>
+                <h3>SEO-Optimized Output</h3>
+                <p>Generate with sitemaps and absolute URLs</p>
+                <div class="code-block">
+                    <code># Generate with sitemap and absolute URLs
+catalog --input docs --output build \
+  --base-url https://docs.example.com \
+  --sitemap</code>
+                </div>
+                <p><strong>Result:</strong> Creates llms.txt with absolute links plus sitemap.xml for search engine
+                    optimization.</p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">✅</div>
+                <h3>Validated Compliance</h3>
+                <p>Ensure llms.txt standard compliance with validation</p>
+                <div class="code-block">
+                    <code># Generate and validate compliance
+catalog --input docs --output build \
+  --validate \
+  --index</code>
+                </div>
+                <p><strong>Result:</strong> Validates H1 → blockquote → sections format and generates navigation
+                    metadata.</p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">🎯</div>
+                <h3>Optional Content Patterns</h3>
+                <p>Mark supplementary content as optional</p>
+                <div class="code-block">
+                    <code># Mark draft content as optional
+catalog --input docs --output build \
+  --optional "drafts/**/*" \
+  --optional "**/CHANGELOG.md"</code>
+                </div>
+                <p><strong>Result:</strong> Creates llms-ctx.txt without optional content for context-limited AI
+                    systems.</p>
+            </div>
+        </div>
+    </section>
+
+    <section id="understanding-output" class="tool-section">
+        <div class="section-header">
+            <h2>Understanding Output Files</h2>
+            <p>Learn what catalog generates and how to use each format</p>
+        </div>
+
+        <div class="output-examples">
+            <div class="output-section">
+                <h3>📋 llms.txt (Structured Index)</h3>
+                <p>Standard-compliant structured index with H1 → blockquote → sections format:</p>
+
+                <div class="code-block">
+                    <code># Documentation Project
+> Complete API and user guide documentation
+
+## Core Documentation
+- [index.md](index.md) - Project overview and introduction
+- [getting-started.md](getting-started.md) - Quick start guide
+- [tutorial.md](tutorial.md) - Step-by-step tutorial
+
+## API Reference
+- [api/authentication.md](api/authentication.md) - Authentication methods
+- [api/endpoints.md](api/endpoints.md) - API endpoints reference
+- [api/errors.md](api/errors.md) - Error handling guide
+
+## Optional
+- [drafts/future-plans.md](drafts/future-plans.md) - Future development plans
+- [archive/changelog.md](archive/changelog.md) - Historical changes</code>
+                </div>
+            </div>
+
+            <div class="output-section">
+                <h3>📚 llms-full.txt (Complete Content)</h3>
+                <p>Full concatenated content with clear separators for comprehensive AI analysis:</p>
+
+                <div class="code-block">
+                    <code># Documentation Project
+> Complete API and user guide documentation
+
+## index.md
+# Welcome to Our Documentation
+
+This is the main overview with complete content including all text, 
+code examples, and formatting preserved.
+
+---
+## getting-started.md
+# Getting Started Guide
+
+Step-by-step instructions with full content preserved...
+
+---
+## api/authentication.md
+# Authentication
+
+Complete authentication documentation with examples...
+
+[Content continues for all files]</code>
+                </div>
+            </div>
+
+            <div class="output-section">
+                <h3>🎯 llms-ctx.txt (Context-Only)</h3>
+                <p>Structured index without optional sections, optimized for context-limited AI systems:</p>
+
+                <div class="code-block">
+                    <code># Documentation Project
+> Complete API and user guide documentation
+
+## Core Documentation
+- [index.md](index.md) - Project overview and introduction
+- [getting-started.md](getting-started.md) - Quick start guide
+- [tutorial.md](tutorial.md) - Step-by-step tutorial
+
+## API Reference
+- [api/authentication.md](api/authentication.md) - Authentication methods
+- [api/endpoints.md](api/endpoints.md) - API endpoints reference
+- [api/errors.md](api/errors.md) - Error handling guide
+
+# Note: Optional sections excluded for context optimization</code>
+                </div>
+            </div>
+
+            <div class="output-section">
+                <h3>🗺️ sitemap.xml (SEO Optimization)</h3>
+                <p>XML sitemap with intelligent priority assignment and change frequencies:</p>
+
+                <div class="code-block">
+                    <code>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"&gt;
+  &lt;url&gt;
+    &lt;loc&gt;https://docs.example.com/&lt;/loc&gt;
+    &lt;lastmod&gt;2024-01-15T10:30:00Z&lt;/lastmod&gt;
+    &lt;changefreq&gt;weekly&lt;/changefreq&gt;
+    &lt;priority&gt;1.0&lt;/priority&gt;
+  &lt;/url&gt;
+  &lt;url&gt;
+    &lt;loc&gt;https://docs.example.com/getting-started&lt;/loc&gt;
+    &lt;lastmod&gt;2024-01-15T10:30:00Z&lt;/lastmod&gt;
+    &lt;changefreq&gt;monthly&lt;/changefreq&gt;
+    &lt;priority&gt;0.8&lt;/priority&gt;
+  &lt;/url&gt;
+&lt;/urlset&gt;</code>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="common-patterns" class="tool-section alt-bg">
+        <div class="section-header">
+            <h2>Common Usage Patterns</h2>
+            <p>Real-world workflows for different documentation scenarios</p>
+        </div>
+
+        <div class="pattern-cards">
+            <div class="pattern-card">
+                <div class="pattern-header">
+                    <span class="pattern-icon">🤖</span>
+                    <h3>AI Training Data</h3>
+                    <span class="time-badge">2 minutes</span>
+                </div>
+                <p>Prepare documentation for AI model training or fine-tuning</p>
+                <div class="code-block">
+                    <code># Generate AI-optimized documentation
+catalog --input docs --output ai-training \
+  --optional "examples/**/*" \
+  --optional "appendix/**/*" \
+  --validate
+
+# Results in:
+# - llms.txt: Structured index for AI context
+# - llms-full.txt: Complete content for training
+# - llms-ctx.txt: Essential content only</code>
+                </div>
+                <div class="pattern-links">
+                    <a href="/catalog/examples#ai-training" class="quick-link">
+                        <span class="link-icon">🤖</span>
+                        <div>
+                            <strong>AI Training Examples</strong>
+                            <span>Complete AI workflows</span>
+                        </div>
+                    </a>
+                </div>
+            </div>
+
+            <div class="pattern-card">
+                <div class="pattern-header">
+                    <span class="pattern-icon">🔍</span>
+                    <h3>Knowledge Base Creation</h3>
+                    <span class="time-badge">3 minutes</span>
+                </div>
+                <p>Create searchable knowledge bases with comprehensive indexing</p>
+                <div class="code-block">
+                    <code># Generate comprehensive knowledge base
+catalog --input knowledge --output kb-site \
+  --index \
+  --sitemap \
+  --base-url https://kb.company.com \
+  --validate
+
+# Include internal documentation as optional
+catalog --input knowledge --output kb-site \
+  --optional "internal/**/*" \
+  --optional "drafts/**/*"</code>
+                </div>
+                <div class="pattern-links">
+                    <a href="/catalog/examples#knowledge-base" class="quick-link">
+                        <span class="link-icon">📚</span>
+                        <div>
+                            <strong>Knowledge Base Examples</strong>
+                            <span>Internal documentation workflows</span>
+                        </div>
+                    </a>
+                </div>
+            </div>
+
+            <div class="pattern-card">
+                <div class="pattern-header">
+                    <span class="pattern-icon">🌐</span>
+                    <h3>Documentation Website</h3>
+                    <span class="time-badge">4 minutes</span>
+                </div>
+                <p>Generate SEO-optimized sitemaps for documentation websites</p>
+                <div class="code-block">
+                    <code># Generate for static site generators
+catalog --input docs --output build \
+  --sitemap \
+  --sitemap-no-extensions \
+  --base-url https://docs.example.com \
+  --index
+
+# Clean URLs without .html extensions
+# Perfect for Hugo, Jekyll, or unify integration</code>
+                </div>
+                <div class="pattern-links">
+                    <a href="/catalog/examples#documentation-sites" class="quick-link">
+                        <span class="link-icon">🏗️</span>
+                        <div>
+                            <strong>Documentation Sites</strong>
+                            <span>Static site integration patterns</span>
+                        </div>
+                    </a>
+                </div>
+            </div>
+
+            <div class="pattern-card">
+                <div class="pattern-header">
+                    <span class="pattern-icon">🔄</span>
+                    <h3>CI/CD Pipeline</h3>
+                    <span class="time-badge">1 minute</span>
+                </div>
+                <p>Automate documentation processing in continuous integration</p>
+                <div class="code-block">
+                    <code># Automated documentation pipeline
+catalog --input docs --output dist \
+  --validate \
+  --sitemap \
+  --base-url https://docs.company.com
+
+# Exit with error code if validation fails
+# Perfect for automated quality checks</code>
+                </div>
+                <div class="pattern-links">
+                    <a href="/catalog/examples#ci-cd" class="quick-link">
+                        <span class="link-icon">⚙️</span>
+                        <div>
+                            <strong>CI/CD Integration</strong>
+                            <span>Automated processing workflows</span>
+                        </div>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="integration" class="tool-section">
+        <div class="section-header">
+            <h2>Integration with fwdslsh Ecosystem</h2>
+            <p>Combine catalog with other tools for powerful documentation workflows</p>
+        </div>
+
+        <div class="integration-workflow">
+            <div class="workflow-step">
+                <div class="step-icon">i</div>
+                <div class="step-content">
+                    <h3>inform</h3>
+                    <p>Extract web content</p>
+                    <div class="step-code">inform https://docs.site.com --output-dir docs</div>
+                </div>
+                <div class="step-arrow">→</div>
+            </div>
+
+            <div class="workflow-step">
+                <div class="step-icon">c</div>
+                <div class="step-content">
+                    <h3>catalog</h3>
+                    <p>Generate AI-ready indexes</p>
+                    <div class="step-code">catalog --input docs --output indexed --sitemap</div>
+                </div>
+                <div class="step-arrow">→</div>
+            </div>
+
+            <div class="workflow-step">
+                <div class="step-icon">u</div>
+                <div class="step-content">
+                    <h3>unify</h3>
+                    <p>Build static sites</p>
+                    <div class="step-code">unify build --input indexed --output dist</div>
+                </div>
+                <div class="step-arrow">→</div>
+            </div>
+
+            <div class="workflow-step">
+                <div class="step-icon">g</div>
+                <div class="step-content">
+                    <h3>giv</h3>
+                    <p>Generate commit messages</p>
+                    <div class="step-code">giv message</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="integration-examples">
+            <h3>🔄 Complete Documentation Pipeline</h3>
+            <div class="code-block">
+                <code># Extract content from multiple sources
+inform https://docs.example.com --output-dir docs
+inform https://api.example.com --output-dir api-docs --include "*/reference/*"
+
+# Combine and index all content
+mkdir -p combined-docs
+cp -r docs/* combined-docs/
+cp -r api-docs/* combined-docs/api/
+
+# Generate comprehensive indexes with validation
+catalog --input combined-docs --output production \
+  --base-url https://docs.company.com \
+  --optional "archive/**/*" \
+  --sitemap --validate --index
+
+# Build final site
+unify build --input production --output public
+
+# Professional commit with AI
+giv message
+# "docs: integrate API and user documentation with comprehensive indexing"</code>
+            </div>
+        </div>
+
+        <div class="integration-links">
+            <a href="/ecosystem/" class="quick-link">
+                <span class="link-icon">🔄</span>
+                <div>
+                    <strong>Complete Ecosystem</strong>
+                    <span>See how all tools work together</span>
+                </div>
+            </a>
+            <a href="/catalog/examples#integration" class="quick-link">
+                <span class="link-icon">🛠️</span>
+                <div>
+                    <strong>Integration Examples</strong>
+                    <span>Real-world workflow patterns</span>
+                </div>
+            </a>
+        </div>
+    </section>
+
+    <section id="pattern-matching" class="tool-section alt-bg">
+        <div class="section-header">
+            <h2>Pattern Matching and Filtering</h2>
+            <p>Advanced content selection with include, exclude, and optional patterns</p>
+        </div>
+
+        <div class="pattern-examples">
+            <div class="pattern-example">
+                <h3>📌 Include Patterns (Whitelist)</h3>
+                <div class="code-block">
+                    <code># Include only specific file types
+catalog --include "*.md" --include "*.html"
+
+# Include specific directories
+catalog --include "docs/*.md" --include "guides/*.html"
+
+# Complex patterns
+catalog --include "**/{docs,guides}/**/*.{md,html}"</code>
+                </div>
+                <p>Use include patterns to specify exactly which files should be processed.</p>
+            </div>
+
+            <div class="pattern-example">
+                <h3>🚫 Exclude Patterns (Blacklist)</h3>
+                <div class="code-block">
+                    <code># Exclude draft files
+catalog --exclude "*.draft.md" --exclude "*draft*"
+
+# Exclude temporary directories
+catalog --exclude "temp/*" --exclude "backup/*"
+
+# Exclude test files
+catalog --exclude "**/*test*" --exclude "**/*.spec.md"</code>
+                </div>
+                <p>Use exclude patterns to filter out unwanted content during processing.</p>
+            </div>
+
+            <div class="pattern-example">
+                <h3>📋 Optional Patterns (Supplementary)</h3>
+                <div class="code-block">
+                    <code># Mark content as optional for AI contexts
+catalog --optional "drafts/**/*" --optional "archive/**/*"
+
+# Mark reference material as optional
+catalog --optional "**/CHANGELOG.md" --optional "**/LICENSE.md"
+
+# Multiple optional categories
+catalog --optional "examples/**/*" --optional "appendix/**/*"</code>
+                </div>
+                <p>Optional patterns create separate sections in llms.txt and are excluded from llms-ctx.txt for
+                    context-limited scenarios.</p>
+            </div>
+        </div>
+
+        <div class="pattern-benefits">
+            <h3>Pattern Matching Benefits</h3>
+            <div class="benefits-grid">
+                <div class="benefit-item">
+                    <span class="benefit-icon">🎯</span>
+                    <div>
+                        <h4>Precise Control</h4>
+                        <p>Target exactly the content you need with sophisticated glob patterns</p>
+                    </div>
+                </div>
+                <div class="benefit-item">
+                    <span class="benefit-icon">🧹</span>
+                    <div>
+                        <h4>Clean Output</h4>
+                        <p>Exclude drafts, temporary files, and noise automatically</p>
+                    </div>
+                </div>
+                <div class="benefit-item">
+                    <span class="benefit-icon">📊</span>
+                    <div>
+                        <h4>Content Organization</h4>
+                        <p>Organize content by importance with core and optional sections</p>
+                    </div>
+                </div>
+                <div class="benefit-item">
+                    <span class="benefit-icon">🤖</span>
+                    <div>
+                        <h4>AI Optimization</h4>
+                        <p>Create context-optimized versions for different AI use cases</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="next-steps" class="tool-section">
+        <div class="section-header">
+            <h2>What's Next?</h2>
+            <p>Continue your catalog journey</p>
+        </div>
+
+        <div class="next-steps-grid">
+            <a href="/catalog/docs" class="next-step-card">
+                <div class="card-icon">📚</div>
+                <h3>Complete Documentation</h3>
+                <p>Master all catalog features with comprehensive guides and CLI reference</p>
+                <span class="card-arrow">→</span>
+            </a>
+
+            <a href="/catalog/examples" class="next-step-card">
+                <div class="card-icon">🎯</div>
+                <h3>Real-World Examples</h3>
+                <p>Explore practical use cases, integration workflows, and automation patterns</p>
+                <span class="card-arrow">→</span>
+            </a>
+
+            <a href="https://github.com/fwdslsh/catalog/releases" class="next-step-card">
+                <div class="card-icon">📥</div>
+                <h3>Download Binary</h3>
+                <p>Get the latest release with pre-built binaries for all platforms</p>
+                <span class="card-arrow">→</span>
+            </a>
+        </div>
+    </section>
+
+    <script>
+        // Tab functionality
+        document.querySelectorAll('.tab-button').forEach(button => {
+            button.addEventListener('click', () => {
+                const tabName = button.dataset.tab;
+
+                // Update active tab button
+                document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+
+                // Update active tab panel
+                document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
+                document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+            });
+        });
+    </script>
+
+</body>
+
+</html>

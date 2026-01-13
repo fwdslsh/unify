@@ -1,324 +1,669 @@
-import { UnifyError } from "../utils/errors.js";
+/**
+ * CLI Arguments Parser
+ * Parses command line arguments for Unify CLI
+ */
+
+import { ValidationError } from "../core/errors.js";
 
 /**
- * Calculate Levenshtein distance between two strings
- * @param {string} a First string
- * @param {string} b Second string
- * @returns {number} Edit distance
+ * ArgsParser handles CLI argument parsing and validation
  */
-function levenshteinDistance(a, b) {
-  const matrix = [];
-  for (let i = 0; i <= b.length; i++) {
-    matrix[i] = [i];
+export class ArgsParser {
+  constructor() {
+    this.commands = new Set(['build', 'serve', 'watch', 'init']);
+    this.options = {
+      // Basic options
+      source: { short: 's', hasValue: true, default: '.' },
+      output: { short: 'o', hasValue: true, default: 'dist' },
+      clean: { short: 'c', hasValue: false, default: false },
+      verbose: { short: 'v', hasValue: false, default: false },
+      help: { short: 'h', hasValue: false, default: false },
+      version: { short: 'V', hasValue: false, default: false },
+      
+      // Glob pattern options
+      copy: { short: null, hasValue: true, default: [], isArray: true },
+      ignore: { short: null, hasValue: true, default: [], isArray: true },
+      ignoreRender: { short: null, hasValue: true, default: [], isArray: true, longName: 'ignore-render' },
+      ignoreCopy: { short: null, hasValue: true, default: [], isArray: true, longName: 'ignore-copy' },
+      render: { short: null, hasValue: true, default: [], isArray: true },
+      autoIgnore: { short: null, hasValue: true, default: true, longName: 'auto-ignore' },
+      defaultLayout: { short: null, hasValue: true, default: [], isArray: true, longName: 'default-layout' },
+      dryRun: { short: null, hasValue: false, default: false, longName: 'dry-run' },
+      prettyUrls: { short: null, hasValue: false, default: false, longName: 'pretty-urls' },
+      minify: { short: null, hasValue: false, default: false },
+      
+      // Build failure options
+      failOn: { short: null, hasValue: true, default: [], isArray: true, longName: 'fail-on' },
+      
+      // Logging options
+      logLevel: { short: null, hasValue: true, default: 'info', longName: 'log-level' },
+      
+      // Server options (for serve command)
+      port: { short: 'p', hasValue: true, default: 3000 },
+      host: { short: null, hasValue: true, default: 'localhost' },
+
+      // Init command options
+      template: { short: 't', hasValue: true, default: 'default' },
+      target: { short: null, hasValue: true, default: null }
+    };
   }
-  for (let j = 0; j <= a.length; j++) {
-    matrix[0][j] = j;
-  }
-  for (let i = 1; i <= b.length; i++) {
-    for (let j = 1; j <= a.length; j++) {
-      if (b.charAt(i - 1) === a.charAt(j - 1)) {
-        matrix[i][j] = matrix[i - 1][j - 1];
-      } else {
-        matrix[i][j] = Math.min(
-          matrix[i - 1][j - 1] + 1,
-          matrix[i][j - 1] + 1,
-          matrix[i - 1][j] + 1
-        );
+
+  /**
+   * Parse command line arguments
+   * @param {string[]} args - Command line arguments
+   * @returns {ParseResult} Parsed arguments and options
+   */
+  parse(args) {
+    const result = {
+      command: 'build', // Default command
+      options: {},
+      errors: [],
+      warnings: []
+    };
+
+    try {
+      // Set default values
+      for (const [name, config] of Object.entries(this.options)) {
+        result[name] = Array.isArray(config.default) ? [...config.default] : config.default;
       }
-    }
-  }
-  return matrix[b.length][a.length];
-}
 
-/**
- * Find the closest command suggestion for a typo
- * @param {string} input The user's input
- * @param {string[]} commands Available commands
- * @returns {string|null} Closest command or null if no good match
- */
-function findClosestCommand(input, commands) {
-  const maxDistance = 2; // Only suggest if edit distance is 2 or less
-  let bestMatch = null;
-  let bestDistance = Infinity;
+      // Handle environment variable overrides
+      this._applyEnvironmentVariables(result);
 
-  for (const command of commands) {
-    const distance = levenshteinDistance(input.toLowerCase(), command.toLowerCase());
-    if (distance < bestDistance && distance <= maxDistance) {
-      bestDistance = distance;
-      bestMatch = command;
-    }
-  }
+      if (args.length === 0) {
+        return result; // Use all defaults
+      }
 
-  return bestMatch;
-}
+      let i = 0;
 
-/**
- * Command-line argument parser for unify
- * Handles parsing of CLI arguments and options
- */
-
-export function parseArgs(argv) {
-  const args = {
-    command: null,
-    source: "src",
-    output: "dist",
-    port: 3000,
-    host: "localhost",
-    prettyUrls: false,
-    baseUrl: "https://example.com",
-    clean: false,
-    sitemap: true,
-    failOn: null, // Can be 'warning', 'error', or null (default: null = only fail on fatal errors)
-    minify: false,
-    verbose: false,
-    help: false,
-    version: false,
-    copy: null,
-    layouts: null,
-    template: null, // For init command - which starter template to use
-  };
-
-  // Only the first non-option argument is considered a command
-  let commandFound = false;
-  let i = 0;
-  const validCommands = ['build', 'watch', 'serve', 'init'];
-  while (i < argv.length) {
-    const arg = argv[i];
-    const nextArg = argv[i + 1];
-
-    // Help/version flags should always be recognized
-    if (arg === '--help' || arg === '-h') {
-      args.help = true;
-      i++;
-      continue;
-    }
-    if (arg === '--version' || arg === '-v') {
-      args.version = true;
-      i++;
-      continue;
-    }
-
-    // If not a flag/option, and command not yet found, treat as command or error
-    if (!arg.startsWith('-') && !commandFound) {
-      if (validCommands.includes(arg)) {
-        args.command = arg;
-        commandFound = true;
+      // Parse command (first argument if it's a known command)
+      if (i < args.length && this.commands.has(args[i])) {
+        result.command = args[i];
         i++;
-        continue;
-      } else {
-        // If help/version is set, don't throw error
-        if (args.help || args.version) {
+      }
+
+      // Parse options
+      while (i < args.length) {
+        const arg = args[i];
+
+        if (arg.startsWith('--')) {
+          // Long option
+          const optionName = arg.substring(2);
+          i += this._parseLongOption(args, i, optionName, result);
+        } else if (arg.startsWith('-')) {
+          // Short option
+          const shortOption = arg.substring(1);
+          i += this._parseShortOption(args, i, shortOption, result);
+        } else {
+          // Positional argument (treat as source if no source set)
+          if (result.source === '.') {
+            result.source = arg;
+          } else {
+            result.warnings.push(`Ignoring unexpected argument: ${arg}`);
+          }
           i++;
-          continue;
         }
-        const suggestion = findClosestCommand(arg, validCommands);
-        const suggestions = [];
-        if (suggestion) {
-          suggestions.push(`Did you mean "${suggestion}"?`);
-        }
-        suggestions.push(
-          'Use --help to see valid options',
-          'Check for typos in the command name',
-          'Check the documentation for supported commands'
-        );
-        const error = new UnifyError(
-          `Unknown command: ${arg}`,
-          null,
-          null,
-          suggestions
-        );
-        error.errorType = 'UsageError';
-        throw error;
       }
-    }
-    // If not a flag/option, and command already found
-    if (!arg.startsWith('-') && commandFound) {
-      // For init command, the first non-flag argument is the template name
-      if (args.command === 'init' && !args.template) {
-        args.template = arg;
-        i++;
-        continue;
-      }
-      // Otherwise treat as unknown option
-      const error = new UnifyError(
-        `Unknown option: ${arg}`,
-        null,
-        null,
-        [
-          'Use --help to see valid options',
-          'Check for typos in the argument'
-        ]
-      );
-      error.errorType = 'UsageError';
-      throw error;
+
+    } catch (error) {
+      result.errors.push(error.message);
     }
 
-    // Options with values
-    if ((arg === '--source' || arg === '-s') && nextArg && !nextArg.startsWith('-')) {
-      args.source = nextArg;
-      i += 2;
-      continue;
+    return result;
+  }
+
+  /**
+   * Parse long option (--option)
+   * @private
+   */
+  _parseLongOption(args, index, optionName, result) {
+    // Handle equals syntax (--option=value)
+    let value = null;
+    if (optionName.includes('=')) {
+      const parts = optionName.split('=', 2);
+      optionName = parts[0];
+      value = parts[1];
     }
-    if ((arg === '--output' || arg === '-o') && nextArg && !nextArg.startsWith('-')) {
-      args.output = nextArg;
-      i += 2;
-      continue;
-    }
-    if ((arg === '--copy') && nextArg && !nextArg.startsWith('-')) {
-      args.copy = nextArg;
-      i += 2;
-      continue;
-    }
-    // Handle --copy without value
-    if (arg === '--copy') {
-      const error = new UnifyError(
-        'The --copy option requires a glob pattern value',
-        null,
-        null,
-        [
-          'Provide a glob pattern like: --copy "./assets/**/*.*"',
-          'Use quotes around patterns with special characters',
-          'Check the documentation for glob pattern examples'
-        ]
-      );
-      error.errorType = 'UsageError';
-      throw error;
-    }
-    if ((arg === '--port' || arg === '-p') && nextArg && !nextArg.startsWith('-')) {
-      args.port = parseInt(nextArg, 10);
-      if (isNaN(args.port) || args.port < 1 || args.port > 65535) {
-        throw new UnifyError(
-          'Port must be a number between 1 and 65535',
-          null,
-          null,
-          [
-            'Use a port number like 3000, 8080, or 8000',
-            'Check that the port is not already in use',
-            'Valid port range is 1-65535'
-          ]
-        );
+    
+    // Handle hyphenated option names
+    let option = this.options[optionName];
+    let optionKey = optionName;
+    
+    // Check if it's a hyphenated option
+    if (!option) {
+      for (const [name, config] of Object.entries(this.options)) {
+        if (config.longName === optionName) {
+          option = config;
+          optionKey = name;
+          break;
+        }
       }
-      i += 2;
-      continue;
     }
-    if (arg === '--host' && nextArg && !nextArg.startsWith('-')) {
-      args.host = nextArg;
-      i += 2;
-      continue;
+    
+    if (!option) {
+      result.errors.push(`Unknown option: --${optionName}`);
+      return 1;
     }
-    if (arg === '--pretty-urls' || arg === '-u') {
-      args.prettyUrls = true;
-      i++;
-      continue;
-    }
-    if (arg === '--base-url' && nextArg && !nextArg.startsWith('-')) {
-      args.baseUrl = nextArg;
-      i += 2;
-      continue;
-    }
-    if (arg === '--clean') {
-      args.clean = true;
-      i++;
-      continue;
-    }
-    if (arg === '--no-sitemap') {
-      args.sitemap = false;
-      i++;
-      continue;
-    }
-    if (arg === '--fail-on' && nextArg && !nextArg.startsWith('-')) {
-      const validLevels = ['warning', 'error'];
-      if (validLevels.includes(nextArg)) {
-        args.failOn = nextArg;
-        i += 2;
-        continue;
+
+    if (option.hasValue) {
+      // Use value from equals syntax if available, otherwise get from next argument
+      if (value === null) {
+        if (index + 1 >= args.length) {
+          result.errors.push(`Option --${optionName} requires a value`);
+          return 1;
+        }
+        value = args[index + 1];
+      }
+      
+      // Handle special validation for auto-ignore
+      if (optionKey === 'autoIgnore') {
+        if (value !== 'true' && value !== 'false') {
+          result.errors.push(`Option --${optionName} must be true or false`);
+          return 2;
+        }
+        result[optionKey] = value === 'true';
+      } else if (optionKey === 'logLevel') {
+        // Validate log level
+        const validationError = this._validateLogLevel(value);
+        if (validationError) {
+          result.errors.push(validationError);
+          return 2;
+        }
+        const normalized = this._normalizeLogLevel(value);
+        result[optionKey] = normalized || 'info';
+      } else if (optionKey === 'port') {
+        // Validate port number
+        const portNum = parseInt(value, 10);
+        if (isNaN(portNum) || portNum < 1 || portNum > 65535) {
+          result.errors.push(`Invalid port number: ${value}. Must be between 1 and 65535.`);
+          return 2;
+        }
+        result[optionKey] = portNum;
+      } else if (option.isArray) {
+        // Validate glob patterns
+        if (this._isGlobOption(optionKey)) {
+          const validationError = this._validateGlobPattern(value);
+          if (validationError) {
+            result.errors.push(validationError);
+            return 2;
+          }
+          
+          // Check for performance warnings
+          const performanceWarning = this._checkPatternPerformance(value);
+          if (performanceWarning) {
+            result.warnings.push(performanceWarning);
+          }
+        }
+
+        // Validate default layout patterns
+        if (optionKey === 'defaultLayout') {
+          const validationError = this._validateDefaultLayoutPattern(value);
+          if (validationError) {
+            result.errors.push(validationError);
+            return 2;
+          }
+          
+          // Check for performance warnings in default layout patterns
+          const performanceWarning = this._checkDefaultLayoutPatternPerformance(value);
+          if (performanceWarning) {
+            result.warnings.push(performanceWarning);
+          }
+        }
+
+        // Validate fail-on option values
+        if (optionKey === 'failOn') {
+          const validationError = this._validateFailOnValue(value);
+          if (validationError) {
+            result.errors.push(validationError);
+            return 2;
+          }
+        }
+        
+        result[optionKey].push(value);
       } else {
-        const error = new UnifyError(
-          `Invalid --fail-on level: ${nextArg}`,
-          null,
-          null,
-          [
-            'Valid levels are: warning, error',
-            'Use --fail-on warning to fail on any warning or error',
-            'Use --fail-on error to fail only on errors (default behavior)',
-            'Omit --fail-on to only fail on fatal build errors'
-          ]
-        );
-        error.errorType = 'UsageError';
-        throw error;
+        result[optionKey] = value;
       }
-    }
-    if (arg === '--fail-on') {
-      const error = new UnifyError(
-        'The --fail-on option requires a level value',
-        null,
-        null,
-        [
-          'Valid levels are: warning, error',
-          'Use --fail-on warning to fail on any warning or error',
-          'Use --fail-on error to fail only on errors',
-          'Omit --fail-on to only fail on fatal build errors'
-        ]
-      );
-      error.errorType = 'UsageError';
-      throw error;
-    }
-    if (arg === '--minify' || arg === '-m') {
-      args.minify = true;
-      i++;
-      continue;
-    }
-    if (arg === '--verbose' || arg === '-V') {
-      args.verbose = true;
-      i++;
-      continue;
-    }
-
-    // Unknown arguments
-    if (arg.startsWith('-')) {
-      const validOptions = [
-        '--help', '-h', '--version', '-v', '--source', '-s', '--output', '-o',
-        '--copy', '--port', '-p', '--host', '--layouts', '-l', '--templates',
-        '--pretty-urls', '--base-url', '--clean', '--no-sitemap', 
-        '--fail-on', '--minify', '--verbose', '-u', '-m', '-V'
-      ];
-      const suggestion = findClosestCommand(arg, validOptions);
-      const suggestions = [];
-      if (suggestion) {
-        suggestions.push(`Did you mean "${suggestion}"?`);
-      }
-      suggestions.push(
-        'Use --help to see valid options',
-        'Check for typos in the option name',
-        'Check the documentation for supported flags'
-      );
-      const error = new UnifyError(
-        `Unknown option: ${arg}`,
-        null,
-        null,
-        suggestions
-      );
-      error.errorType = 'UsageError';
-      throw error;
+      
+      // Return 1 if we used equals syntax (only consumed current arg), 2 if we consumed next arg too
+      return value === args[index + 1] ? 2 : 1;
     } else {
-      // Non-option argument that's not a command
-      const error = new UnifyError(
-        `Unknown option: ${arg}`,
-        null,
-        null,
-        [
-          'Use --help to see valid options',
-          'Check for typos in the argument'
-        ]
-      );
-      error.errorType = 'UsageError';
-      throw error;
+      result[optionKey] = true;
+      return 1; // Consumed option only
     }
   }
 
-  if (!args.command && !args.help && !args.version) {
-    // Default to build if no command found and not help/version
-    args.command = 'build';
+  /**
+   * Parse short option (-o)
+   * @private
+   */
+  _parseShortOption(args, index, shortOption, result) {
+    // Find option by short name
+    const optionName = Object.keys(this.options).find(name =>
+      this.options[name].short === shortOption
+    );
+
+    if (!optionName) {
+      result.errors.push(`Unknown option: -${shortOption}`);
+      return 1;
+    }
+
+    const option = this.options[optionName];
+
+    if (option.hasValue) {
+      if (index + 1 >= args.length) {
+        result.errors.push(`Option -${shortOption} requires a value`);
+        return 1;
+      }
+      result[optionName] = args[index + 1];
+      return 2; // Consumed option and value
+    } else {
+      result[optionName] = true;
+      return 1; // Consumed option only
+    }
   }
-  return args;
+
+  /**
+   * Validate parsed arguments
+   * @param {ParseResult} parsed - Parsed arguments
+   * @returns {ValidationResult} Validation results
+   */
+  validate(parsed) {
+    const validation = {
+      isValid: true,
+      errors: [...parsed.errors],
+      warnings: [...parsed.warnings]
+    };
+
+    // If there were parse-time errors, validation is not valid
+    if (parsed.errors && parsed.errors.length > 0) {
+      validation.isValid = false;
+    }
+
+    // Validate command
+    if (!this.commands.has(parsed.command)) {
+      validation.errors.push(`Invalid command: ${parsed.command}`);
+      validation.isValid = false;
+    }
+
+    // Validate paths
+    if (parsed.source && typeof parsed.source !== 'string') {
+      validation.errors.push('Source path must be a string');
+      validation.isValid = false;
+    }
+
+    if (parsed.output && typeof parsed.output !== 'string') {
+      validation.errors.push('Output path must be a string');
+      validation.isValid = false;
+    }
+
+    // Check for required options based on command
+    if (parsed.command === 'build') {
+      if (!parsed.source) {
+        validation.errors.push('Build command requires source directory');
+        validation.isValid = false;
+      }
+      if (!parsed.output) {
+        validation.errors.push('Build command requires output directory');
+        validation.isValid = false;
+      }
+    }
+
+    // Validate glob patterns (additional validation beyond parse-time checks)
+    for (const [optionKey, patterns] of Object.entries(parsed)) {
+      if (this._isGlobOption(optionKey) && Array.isArray(patterns)) {
+        for (const pattern of patterns) {
+          const error = this._validateGlobPattern(pattern);
+          if (error) {
+            validation.errors.push(error);
+            validation.isValid = false;
+          }
+        }
+      }
+    }
+
+    // Validate default layout patterns (additional validation beyond parse-time checks)
+    if (parsed.defaultLayout && Array.isArray(parsed.defaultLayout)) {
+      for (const pattern of parsed.defaultLayout) {
+        const error = this._validateDefaultLayoutPattern(pattern);
+        if (error) {
+          validation.errors.push(error);
+          validation.isValid = false;
+        }
+      }
+    }
+
+    // Validate auto-ignore value if set
+    if (parsed.autoIgnore !== undefined && typeof parsed.autoIgnore !== 'boolean') {
+      validation.errors.push('Auto-ignore option must be true or false');
+      validation.isValid = false;
+    }
+
+    // Validate log level if set
+    if (parsed.logLevel !== undefined) {
+      const logLevelError = this._validateLogLevel(parsed.logLevel);
+      if (logLevelError) {
+        validation.errors.push(logLevelError);
+        validation.isValid = false;
+      }
+    }
+
+    // Warn about glob options being ignored for init command
+    if (parsed.command === 'init') {
+      const globOptionsUsed = ['copy', 'ignore', 'ignoreRender', 'ignoreCopy', 'render', 'defaultLayout']
+        .some(key => parsed[key] && parsed[key].length > 0);
+      
+      const buildOptionsUsed = (parsed.source && parsed.source !== '.') || 
+                              (parsed.output && parsed.output !== 'dist');
+      
+      if (globOptionsUsed || parsed.dryRun || parsed.config || buildOptionsUsed) {
+        validation.warnings.push('Config and glob pattern options are ignored for init command');
+      }
+    }
+
+    return validation;
+  }
+
+  /**
+   * Get help text for CLI
+   * @returns {string} Help text
+   */
+  getHelpText() {
+    return `
+Unify Static Site Generator
+
+Usage:
+  unify [command] [options]
+
+Commands:
+  build    Build static site (default)
+  serve    Start development server
+  watch    Watch files and rebuild
+  init     Initialize new project
+
+Basic Options:
+  -s, --source <dir>     Source directory (default: .)
+  -o, --output <dir>     Output directory (default: dist)
+  -c, --clean            Clean output directory before build
+  -v, --verbose          Enable verbose logging
+  -h, --help             Show this help
+  -V, --version          Show version
+  --log-level <level>    Set logging verbosity level (error|warn|info|debug|trace, default: info)
+  --pretty-urls          Transform HTML links to pretty URL structure
+  --minify               Enable HTML minification for production builds
+
+Glob Pattern Options:
+  --copy <pattern>       Copy matching files to output
+  --ignore <pattern>     Ignore for both render and copy
+  --ignore-render <pat>  Ignore only for rendering
+  --ignore-copy <pat>    Ignore only for copying
+  --render <pattern>     Force render matching files
+  --auto-ignore <bool>   Respect .gitignore and auto-ignore (default: true)
+  --default-layout <val> Set default layout (filename or glob=layout)
+  --dry-run              Show classification without writing files
+  --fail-on <types>      Fail build on specific issue types (security,warning,error,U001-U008)
+
+Server Options (serve command):
+  -p, --port <number>    Development server port (default: 3000)
+  --host <hostname>      Development server host (default: localhost)
+
+Init Options:
+  -t, --template <name>  Template to use (default, basic, blog, docs, portfolio)
+  --target <dir>         Target directory for initialization
+
+Examples:
+  unify                                    # Build current directory to dist/
+  unify build -s src -o build             # Build src/ to build/
+  unify serve                              # Start development server on port 3000
+  unify serve -p 8080 --host 0.0.0.0     # Serve on port 8080, all interfaces
+  unify watch                              # Watch files and rebuild on changes
+  unify watch -s src -o build             # Watch src/ directory, output to build/
+  unify --copy "assets/**" --ignore "temp/**"  # Copy assets, ignore temp
+  unify --render "experiments/**"         # Force render experiments
+  unify --pretty-urls                     # Transform links to pretty URLs
+  unify --minify                          # Minify HTML for production
+  unify --fail-on security               # Fail build on security issues
+  unify --fail-on security,warning       # Fail on security and warnings
+  unify --dry-run                         # Show what would be processed
+  unify --log-level debug                 # Enable debug logging
+  DEBUG=1 unify build                     # Enable debug via environment
+  unify init                              # Initialize with default template
+  unify init --template blog              # Initialize with blog template
+  unify init --target my-site             # Initialize in my-site directory
+  unify --help                            # Show this help
+
+Pattern Examples:
+  "assets/**"         # All files in assets directory
+  "*.html"           # All HTML files in current directory
+  "docs/**/*.{md,pdf}" # All .md and .pdf files in docs
+  "!temp/**"         # Exclude temp directory (negation)
+
+For more information, visit: https://github.com/fwdslsh/unify
+`;
+  }
+
+  /**
+   * Get version information
+   * @returns {string} Version text
+   */
+  getVersionText() {
+    return 'Unify v0.6.0 - DOM Cascade Static Site Generator';
+  }
+
+  /**
+   * Check if option is a glob pattern option
+   * @param {string} optionKey - Option key
+   * @returns {boolean} True if it's a glob option
+   * @private
+   */
+  _isGlobOption(optionKey) {
+    const globOptions = ['copy', 'ignore', 'ignoreRender', 'ignoreCopy', 'render'];
+    return globOptions.includes(optionKey);
+  }
+
+  /**
+   * Validate glob pattern
+   * @param {string} pattern - Glob pattern to validate
+   * @returns {string|null} Error message or null if valid
+   * @private
+   */
+  _validateGlobPattern(pattern) {
+    if (!pattern || typeof pattern !== 'string' || pattern.trim() === '') {
+      return 'Empty glob pattern not allowed';
+    }
+
+    // Basic validation - more detailed validation happens in GlobPatternProcessor
+    if (pattern.includes('\\')) {
+      return 'Use forward slashes in glob patterns for cross-platform compatibility';
+    }
+
+    return null;
+  }
+
+  /**
+   * Check pattern for performance issues
+   * @param {string} pattern - Glob pattern to check
+   * @returns {string|null} Warning message or null
+   * @private
+   */
+  _checkPatternPerformance(pattern) {
+    if (pattern === '**/*' || pattern === '**') {
+      return `Pattern '${pattern}' may have performance impact on large file sets`;
+    }
+    return null;
+  }
+
+  /**
+   * Validate default layout pattern
+   * @param {string} pattern - Default layout pattern to validate
+   * @returns {string|null} Error message or null if valid
+   * @private
+   */
+  _validateDefaultLayoutPattern(pattern) {
+    if (!pattern || typeof pattern !== 'string' || pattern.trim() === '') {
+      return 'Empty glob pattern not allowed';
+    }
+
+    const trimmedPattern = pattern.trim();
+
+    // Check for backslashes (should use forward slashes for cross-platform compatibility)
+    if (trimmedPattern.includes('\\')) {
+      return 'Use forward slashes in glob patterns for cross-platform compatibility';
+    }
+
+    // If it contains '=', validate both parts
+    if (trimmedPattern.includes('=')) {
+      const [globPart, layoutPart] = trimmedPattern.split('=', 2);
+      
+      if (!globPart || globPart.trim() === '') {
+        return 'Empty glob pattern not allowed before = in default layout rule';
+      }
+      
+      if (!layoutPart || layoutPart.trim() === '') {
+        return 'Empty layout path not allowed after = in default layout rule';
+      }
+      
+      // Validate glob part
+      const globError = this._validateGlobPattern(globPart.trim());
+      if (globError) {
+        return globError;
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Check default layout pattern for performance issues
+   * @param {string} pattern - Default layout pattern to check
+   * @returns {string|null} Warning message or null
+   * @private
+   */
+  _checkDefaultLayoutPatternPerformance(pattern) {
+    if (!pattern || typeof pattern !== 'string') {
+      return null;
+    }
+
+    // Extract glob part if it's a pattern rule
+    let globPart = pattern;
+    if (pattern.includes('=')) {
+      globPart = pattern.split('=', 2)[0].trim();
+    }
+
+    // Check for overly broad patterns
+    if (globPart === '**' || globPart === '**/*') {
+      return `Pattern '${globPart}' may have performance impact on large file sets`;
+    }
+
+    return null;
+  }
+
+  /**
+   * Validate --fail-on option value
+   * @param {string} value - Fail-on value to validate
+   * @returns {string|null} Error message or null if valid
+   * @private
+   */
+  _validateFailOnValue(value) {
+    if (!value || typeof value !== 'string' || value.trim() === '') {
+      return 'Empty fail-on value not allowed';
+    }
+
+    const trimmedValue = value.trim();
+    
+    // Valid fail-on values
+    const validValues = [
+      'security', 'warning', 'error',
+      'U001', 'U002', 'U003', 'U004', 'U005', 'U006', 'U008'
+    ];
+
+    // Split by comma and validate each value
+    const values = trimmedValue.split(',').map(v => v.trim());
+    
+    for (const val of values) {
+      if (!validValues.includes(val)) {
+        return `Invalid fail-on value: '${val}'. Valid values are: ${validValues.join(', ')}`;
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Apply environment variable overrides to result
+   * @param {Object} result - Parsed result object to modify
+   * @private
+   */
+  _applyEnvironmentVariables(result) {
+    // Handle log level environment variables
+    const debugMode = process.env?.DEBUG === '1' || process.env?.UNIFY_DEBUG === '1';
+    if (debugMode) {
+      result.logLevel = 'debug';
+    } else if (process.env?.LOG_LEVEL) {
+      const originalValue = process.env?.LOG_LEVEL;
+      const envLogLevel = this._normalizeLogLevel(originalValue);
+      const validLevels = ['error', 'warn', 'info', 'debug', 'trace'];
+      
+      // Check if normalization actually found a valid level
+      if (envLogLevel && validLevels.includes(envLogLevel)) {
+        result.logLevel = envLogLevel;
+      } else {
+        result.warnings.push(`Invalid LOG_LEVEL environment variable: '${originalValue}'. Using default 'info'.`);
+      }
+    }
+  }
+
+  /**
+   * Validate log level value
+   * @param {string} value - Log level value to validate
+   * @returns {string|null} Error message or null if valid
+   * @private
+   */
+  _validateLogLevel(value) {
+    if (!value || typeof value !== 'string' || value.trim() === '') {
+      return 'Empty log level not allowed';
+    }
+
+    const normalized = this._normalizeLogLevel(value);
+    const validLevels = ['error', 'warn', 'info', 'debug'];
+    
+    if (!validLevels.includes(normalized)) {
+      return `Invalid log level: '${value}'. Valid levels are: ${validLevels.join(', ')}`;
+    }
+
+    return null;
+  }
+
+  /**
+   * Normalize log level to valid value
+   * @param {string} level - Input log level
+   * @returns {string} Normalized log level
+   * @private
+   */
+  _normalizeLogLevel(level) {
+    if (typeof level !== 'string') {
+      return 'info';
+    }
+    
+    const normalized = level.toLowerCase().trim();
+    const validLevels = ['error', 'warn', 'info', 'debug', 'trace'];
+    
+    // Support abbreviated forms
+    const abbreviations = {
+      'e': 'error',
+      'w': 'warn', 
+      'i': 'info',
+      'd': 'debug'
+    };
+    
+    if (abbreviations[normalized]) {
+      return abbreviations[normalized];
+    }
+    
+    if (validLevels.includes(normalized)) {
+      return normalized;
+    }
+    
+    // Return null for invalid levels instead of defaulting
+    return null;
+  }
 }

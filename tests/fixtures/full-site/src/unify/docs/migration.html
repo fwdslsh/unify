@@ -1,0 +1,1082 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Migration Guide - unify Documentation</title>
+    <meta name="description" content="Migrate from Jekyll, Hugo, Gatsby, 11ty and other static site generators to unify. Complete migration examples and patterns.">
+    <link rel="stylesheet" href="/assets/styles.css">
+    <style>
+        /* Documentation Layout - Page specific */
+        .docs-layout {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar - Page specific */
+        .sidebar {
+            width: 280px;
+            background: var(--bg-darker);
+            border-right: 1px solid var(--border);
+            padding: 2rem 0;
+            position: fixed;
+            height: calc(100vh - 80px);
+            overflow-y: auto;
+            z-index: 100;
+        }
+
+        .sidebar-content {
+            padding: 0 2rem;
+        }
+
+        .sidebar-section {
+            margin-bottom: 2rem;
+        }
+
+        .sidebar-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-family: var(--font-mono);
+        }
+
+        .sidebar-nav {
+            list-style: none;
+        }
+
+        .sidebar-nav li {
+            margin-bottom: 0.5rem;
+        }
+
+        .sidebar-nav a {
+            color: var(--text-dim);
+            text-decoration: none;
+            font-size: 0.9rem;
+            display: block;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+            font-family: var(--font-mono);
+        }
+
+        .sidebar-nav a:hover {
+            color: var(--text-primary);
+            background: var(--bg-card);
+        }
+
+        .sidebar-nav a.active {
+            color: var(--primary);
+            background: rgba(0, 255, 65, 0.1);
+            border-left: 3px solid var(--primary);
+        }
+
+        /* Main Content - Page specific */
+        .main-content {
+            flex: 1;
+            margin-left: 280px;
+            padding: 2rem 4rem;
+            max-width: calc(100vw - 280px);
+        }
+
+        .content-wrapper {
+            max-width: 800px;
+        }
+
+        /* Typography - Page specific */
+        .content h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+            line-height: 1.2;
+        }
+
+        .content h2 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin: 3rem 0 1.5rem 0;
+            color: var(--text-primary);
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 0.5rem;
+        }
+
+        .content h3 {
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin: 2rem 0 1rem 0;
+            color: var(--text-primary);
+        }
+
+        .content h4 {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin: 1.5rem 0 0.75rem 0;
+            color: var(--text-secondary);
+        }
+
+        .content p {
+            margin-bottom: 1.5rem;
+            color: var(--text-secondary);
+            line-height: 1.7;
+        }
+
+        .content ul,
+        .content ol {
+            margin-bottom: 1.5rem;
+            padding-left: 2rem;
+        }
+
+        .content li {
+            margin-bottom: 0.5rem;
+            color: var(--text-secondary);
+        }
+
+        .content li strong {
+            color: var(--text-primary);
+        }
+
+        /* Navigation buttons - Page specific */
+        .page-nav {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 4rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .nav-btn {
+            display: flex;
+            flex-direction: column;
+            text-decoration: none;
+            color: var(--text-secondary);
+            transition: all 0.3s ease;
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--bg-card);
+        }
+
+        .nav-btn:hover {
+            color: var(--primary);
+            border-color: var(--primary);
+            transform: translateY(-2px);
+        }
+
+        .nav-btn-label {
+            font-size: 0.8rem;
+            font-family: var(--font-mono);
+            margin-bottom: 0.25rem;
+        }
+
+        .nav-btn-title {
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        /* Responsive - Page specific */
+        @media (max-width: 1024px) {
+            .sidebar {
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+
+            .main-content {
+                margin-left: 0;
+                max-width: 100vw;
+                padding: 2rem;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                padding: 1rem;
+            }
+
+            .content h1 {
+                font-size: 2rem;
+            }
+
+            .content h2 {
+                font-size: 1.5rem;
+            }
+
+            .page-nav {
+                flex-direction: column;
+                gap: 1rem;
+            }
+        }
+
+        /* Migration specific styles */
+        .migration-comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin: 2rem 0;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .migration-before,
+        .migration-after {
+            padding: 2rem;
+        }
+
+        .migration-before {
+            background: var(--bg-darker);
+            border-right: 1px solid var(--border);
+        }
+
+        .migration-after {
+            background: var(--bg-card);
+        }
+
+        .migration-label {
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .migration-before .migration-label {
+            color: #f59e0b;
+        }
+
+        .migration-after .migration-label {
+            color: var(--primary);
+        }
+
+        @media (max-width: 768px) {
+            .migration-comparison {
+                grid-template-columns: 1fr;
+            }
+
+            .migration-before {
+                border-right: none;
+                border-bottom: 1px solid var(--border);
+            }
+        }
+    </style>
+</head>
+
+<body data-unify="/_includes/tool-page.html">
+   
+    <!-- Tool-specific navigation links -->
+    <ul class="unify-nav-links">
+        <li><a href="/unify/">Overview</a></li>
+        <li><a href="/unify/getting-started.html">Getting Started</a></li>
+        <li><a href="/unify/docs.html">Documentation</a></li>
+        <li><a href="/unify/examples.html">Examples</a></li>
+    </ul>
+
+    <div class="unify-content docs-layout">
+        <aside class="sidebar">
+            <div class="sidebar-content">
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Getting Started</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs">Quick Start</a></li>
+                        <li><a href="/unify/docs/installation">Installation</a></li>
+                        <li><a href="/unify/docs/project-structure">Project Structure</a></li>
+                        <li><a href="/unify/docs/first-site">Your First Site</a></li>
+                    </ul>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Core Concepts</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs/includes">Server-Side Includes</a></li>
+                        <li><a href="/unify/docs/components">Components</a></li>
+                        <li><a href="/unify/docs/markdown">Markdown</a></li>
+                        <li><a href="/unify/docs/assets">Static Assets</a></li>
+                    </ul>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">CLI Reference</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs/cli-build">unify build</a></li>
+                        <li><a href="/unify/docs/cli-serve">unify serve</a></li>
+                        <li><a href="/unify/docs/cli-watch">unify watch</a></li>
+                        <li><a href="/unify/docs/configuration">Configuration</a></li>
+                    </ul>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Deployment</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs/deployment">Static Hosting</a></li>
+                        <li><a href="/unify/docs/docker">Docker</a></li>
+                        <li><a href="/unify/docs/ci-cd">CI/CD</a></li>
+                    </ul>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Advanced</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs/performance">Performance</a></li>
+                        <li><a href="/unify/docs/security">Security</a></li>
+                        <li><a href="/unify/docs/migration" class="active">Migration Guide</a></li>
+                        <li><a href="/unify/docs/troubleshooting">Troubleshooting</a></li>
+                    </ul>
+                </div>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <div class="content-wrapper">
+                <div class="content">
+                    <h1>Migration Guide</h1>
+
+                    <p>Migrating from other static site generators to unify is straightforward thanks to unify's emphasis on standard HTML and CSS. This guide provides practical examples for migrating from popular SSGs to unify's DOM Cascade system.</p>
+
+                    <div class="callout callout-info">
+                        <div class="callout-title">🔄 Migration Philosophy</div>
+                        <p>unify prioritizes standard HTML over proprietary templating languages, making migrations simpler and more predictable. Most templates can be converted by replacing template syntax with DOM Cascade area targeting.</p>
+                    </div>
+
+                    <h2>Migration Overview</h2>
+
+                    <p>The general migration process involves three main steps:</p>
+
+                    <ol>
+                        <li><strong>Convert layouts</strong>: Transform template layouts to unify layouts with public areas</li>
+                        <li><strong>Update content</strong>: Replace template syntax with DOM Cascade area targeting</li>
+                        <li><strong>Migrate configuration</strong>: Convert build settings to unify.config.yaml</li>
+                    </ol>
+
+                    <h2>Jekyll → unify</h2>
+
+                    <p>Jekyll uses Liquid templates and YAML frontmatter. Here's how to convert common patterns:</p>
+
+                    <h3>Layout Conversion</h3>
+
+                    <div class="migration-comparison">
+                        <div class="migration-before">
+                            <div class="migration-label">Jekyll Layout</div>
+                            <div class="code-block">
+                                <pre>&lt;!-- _layouts/default.html --&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+  &lt;title&gt;{{ page.title }} | {{ site.title }}&lt;/title&gt;
+  &lt;meta name="description" content="{{ page.description }}"&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  {% include header.html %}
+  
+  &lt;main&gt;
+    {{ content }}
+  &lt;/main&gt;
+  
+  {% include footer.html %}
+&lt;/body&gt;
+&lt;/html&gt;</pre>
+                            </div>
+                        </div>
+                        
+                        <div class="migration-after">
+                            <div class="migration-label">unify Layout</div>
+                            <div class="code-block">
+                                <pre>&lt;!-- _includes/_layout.html --&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+  &lt;style data-unify-docs="v1"&gt;
+    /* Public areas */
+    .unify-header { /* Site header */ }
+    .unify-content { /* Main content */ }
+    .unify-footer { /* Site footer */ }
+  &lt;/style&gt;
+  &lt;title&gt;My Site&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;header class="unify-header"&gt;
+    &lt;!-- Default header --&gt;
+  &lt;/header&gt;
+  
+  &lt;main class="unify-content"&gt;
+    &lt;!-- Default content --&gt;
+  &lt;/main&gt;
+  
+  &lt;footer class="unify-footer"&gt;
+    &lt;!-- Default footer --&gt;
+  &lt;/footer&gt;
+&lt;/body&gt;
+&lt;/html&gt;</pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3>Page Conversion</h3>
+
+                    <div class="migration-comparison">
+                        <div class="migration-before">
+                            <div class="migration-label">Jekyll Page</div>
+                            <div class="code-block">
+                                <pre>---
+layout: default
+title: About Us
+description: Learn about our company
+---
+
+&lt;h1&gt;{{ page.title }}&lt;/h1&gt;
+&lt;p&gt;This is the about page content.&lt;/p&gt;
+
+{% for post in site.posts limit:3 %}
+  &lt;h2&gt;{{ post.title }}&lt;/h2&gt;
+  &lt;p&gt;{{ post.excerpt }}&lt;/p&gt;
+{% endfor %}</pre>
+                            </div>
+                        </div>
+                        
+                        <div class="migration-after">
+                            <div class="migration-label">unify Page</div>
+                            <div class="code-block">
+                                <pre>&lt;head&gt;
+  &lt;title&gt;About Us | My Site&lt;/title&gt;
+  &lt;meta name="description" content="Learn about our company"&gt;
+&lt;/head&gt;
+
+&lt;body data-unify="/_includes/_layout.html"&gt;
+  &lt;main class="unify-content"&gt;
+    &lt;h1&gt;About Us&lt;/h1&gt;
+    &lt;p&gt;This is the about page content.&lt;/p&gt;
+    
+    &lt;!-- Recent posts would be handled via a fragment --&gt;
+    &lt;div data-unify="/fragments/recent-posts.html"&gt;&lt;/div&gt;
+  &lt;/main&gt;
+&lt;/body&gt;</pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3>Configuration Migration</h3>
+
+                    <div class="migration-comparison">
+                        <div class="migration-before">
+                            <div class="migration-label">Jekyll _config.yml</div>
+                            <div class="code-block">
+                                <pre>title: My Jekyll Site
+description: A great Jekyll site
+url: "https://example.com"
+baseurl: "/blog"
+
+markdown: kramdown
+highlighter: rouge
+permalink: /:categories/:year/:month/:day/:title/
+
+plugins:
+  - jekyll-feed
+  - jekyll-sitemap
+
+exclude:
+  - Gemfile
+  - README.md</pre>
+                            </div>
+                        </div>
+                        
+                        <div class="migration-after">
+                            <div class="migration-label">unify.config.yaml</div>
+                            <div class="code-block">
+                                <pre># Basic site configuration
+source: .
+output: _site
+clean: true
+
+# Build options
+pretty-urls: true
+minify: true
+verbose: false
+
+# Development server
+port: 4000
+host: localhost
+
+# Asset handling automatically included
+# No plugins needed - unify is batteries-included</pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h2>Hugo → unify</h2>
+
+                    <p>Hugo uses Go templates and directory-based organization. Here's how to migrate:</p>
+
+                    <h3>Template Conversion</h3>
+
+                    <div class="migration-comparison">
+                        <div class="migration-before">
+                            <div class="migration-label">Hugo Layout</div>
+                            <div class="code-block">
+                                <pre>&lt;!-- layouts/_default/baseof.html --&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+  &lt;title&gt;{{ .Title }} | {{ .Site.Title }}&lt;/title&gt;
+  {{ block "head" . }}{{ end }}
+&lt;/head&gt;
+&lt;body&gt;
+  {{ partial "header.html" . }}
+  
+  &lt;main&gt;
+    {{ block "main" . }}{{ end }}
+  &lt;/main&gt;
+  
+  {{ block "sidebar" . }}
+    {{ partial "sidebar.html" . }}
+  {{ end }}
+  
+  {{ partial "footer.html" . }}
+&lt;/body&gt;
+&lt;/html&gt;</pre>
+                            </div>
+                        </div>
+                        
+                        <div class="migration-after">
+                            <div class="migration-label">unify Layout</div>
+                            <div class="code-block">
+                                <pre>&lt;!-- _includes/_layout.html --&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+  &lt;style data-unify-docs="v1"&gt;
+    /* Public areas - blocks become areas */
+    .unify-header { /* Site header */ }
+    .unify-content { /* Main content (block "main") */ }
+    .unify-sidebar { /* Sidebar (block "sidebar") */ }
+    .unify-footer { /* Site footer */ }
+  &lt;/style&gt;
+  &lt;title&gt;My Site&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;header class="unify-header"&gt;
+    &lt;!-- Header content --&gt;
+  &lt;/header&gt;
+  
+  &lt;main class="unify-content"&gt;
+    &lt;!-- Default main content --&gt;
+  &lt;/main&gt;
+  
+  &lt;aside class="unify-sidebar"&gt;
+    &lt;!-- Default sidebar --&gt;
+  &lt;/aside&gt;
+  
+  &lt;footer class="unify-footer"&gt;
+    &lt;!-- Footer content --&gt;
+  &lt;/footer&gt;
+&lt;/body&gt;
+&lt;/html&gt;</pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3>Content Files</h3>
+
+                    <div class="migration-comparison">
+                        <div class="migration-before">
+                            <div class="migration-label">Hugo Markdown</div>
+                            <div class="code-block">
+                                <pre>---
+title: "My Hugo Post"
+date: 2024-01-15T10:30:00Z
+draft: false
+tags: ["web", "hugo"]
+categories: ["blog"]
+---
+
+# {{ .Title }}
+
+This is a Hugo post with **markdown** content.
+
+{{&lt; shortcode param="value" &gt;}}
+
+{{ .Content }}</pre>
+                            </div>
+                        </div>
+                        
+                        <div class="migration-after">
+                            <div class="migration-label">unify Markdown</div>
+                            <div class="code-block">
+                                <pre>---
+title: "My unify Post"
+date: "2024-01-15"
+tags: ["web", "unify"]
+categories: ["blog"]
+layout: "post"
+---
+
+# My unify Post
+
+This is a unify post with **markdown** content.
+
+&lt;!-- Components replace shortcodes --&gt;
+&lt;div data-unify="/components/custom-widget.html"&gt;&lt;/div&gt;
+
+Regular markdown content continues here...</pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h2>Gatsby → unify</h2>
+
+                    <p>Gatsby uses React components and GraphQL. Migration involves converting JSX to HTML:</p>
+
+                    <h3>Component to Layout</h3>
+
+                    <div class="migration-comparison">
+                        <div class="migration-before">
+                            <div class="migration-label">Gatsby Layout</div>
+                            <div class="code-block">
+                                <pre>// src/components/layout.js
+import React from "react"
+import { useStaticQuery, graphql } from "gatsby"
+import Header from "./header"
+import Footer from "./footer"
+
+const Layout = ({ children }) =&gt; {
+  const data = useStaticQuery(graphql`
+    query SiteTitleQuery {
+      site {
+        siteMetadata {
+          title
+        }
+      }
+    }
+  `)
+
+  return (
+    &lt;&gt;
+      &lt;Header siteTitle={data.site.siteMetadata?.title || `Title`} /&gt;
+      &lt;main&gt;{children}&lt;/main&gt;
+      &lt;Footer /&gt;
+    &lt;/&gt;
+  )
+}
+
+export default Layout</pre>
+                            </div>
+                        </div>
+                        
+                        <div class="migration-after">
+                            <div class="migration-label">unify Layout</div>
+                            <div class="code-block">
+                                <pre>&lt;!-- _includes/_layout.html --&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+  &lt;style data-unify-docs="v1"&gt;
+    /* Public areas replace props */
+    .unify-header { /* Header component area */ }
+    .unify-content { /* children prop becomes content area */ }
+    .unify-footer { /* Footer component area */ }
+  &lt;/style&gt;
+  &lt;title&gt;My Site&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;header class="unify-header"&gt;
+    &lt;h1&gt;Default Site Title&lt;/h1&gt;
+  &lt;/header&gt;
+  
+  &lt;main class="unify-content"&gt;
+    &lt;!-- children content goes here --&gt;
+  &lt;/main&gt;
+  
+  &lt;footer class="unify-footer"&gt;
+    &lt;p&gt;Default footer content&lt;/p&gt;
+  &lt;/footer&gt;
+&lt;/body&gt;
+&lt;/html&gt;</pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3>Page Conversion</h3>
+
+                    <div class="migration-comparison">
+                        <div class="migration-before">
+                            <div class="migration-label">Gatsby Page</div>
+                            <div class="code-block">
+                                <pre>// src/pages/about.js
+import React from "react"
+import { Link } from "gatsby"
+import Layout from "../components/layout"
+import SEO from "../components/seo"
+
+const AboutPage = () =&gt; (
+  &lt;Layout&gt;
+    &lt;SEO title="About" description="About our company" /&gt;
+    &lt;h1&gt;About Us&lt;/h1&gt;
+    &lt;p&gt;Welcome to our company!&lt;/p&gt;
+    &lt;Link to="/"&gt;Go back to the homepage&lt;/Link&gt;
+  &lt;/Layout&gt;
+)
+
+export default AboutPage</pre>
+                            </div>
+                        </div>
+                        
+                        <div class="migration-after">
+                            <div class="migration-label">unify Page</div>
+                            <div class="code-block">
+                                <pre>&lt;!-- about.html --&gt;
+&lt;head&gt;
+  &lt;title&gt;About | My Site&lt;/title&gt;
+  &lt;meta name="description" content="About our company"&gt;
+&lt;/head&gt;
+
+&lt;body data-unify="/_includes/_layout.html"&gt;
+  &lt;main class="unify-content"&gt;
+    &lt;h1&gt;About Us&lt;/h1&gt;
+    &lt;p&gt;Welcome to our company!&lt;/p&gt;
+    &lt;a href="/"&gt;Go back to the homepage&lt;/a&gt;
+  &lt;/main&gt;
+&lt;/body&gt;</pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h2>11ty → unify</h2>
+
+                    <p>Eleventy supports multiple template languages. Here's how to migrate from Nunjucks:</p>
+
+                    <h3>Template Conversion</h3>
+
+                    <div class="migration-comparison">
+                        <div class="migration-before">
+                            <div class="migration-label">11ty Nunjucks</div>
+                            <div class="code-block">
+                                <pre>&lt;!-- _includes/base.njk --&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="{{ site.lang or 'en' }}"&gt;
+&lt;head&gt;
+  &lt;title&gt;{{ title }} | {{ site.name }}&lt;/title&gt;
+  &lt;meta name="description" content="{{ description or site.description }}"&gt;
+  {% block head %}{% endblock %}
+&lt;/head&gt;
+&lt;body&gt;
+  {% include "header.njk" %}
+  
+  &lt;main&gt;
+    {% block content %}
+      {{ content | safe }}
+    {% endblock %}
+  &lt;/main&gt;
+  
+  {% block sidebar %}
+    {% include "sidebar.njk" %}
+  {% endblock %}
+  
+  {% include "footer.njk" %}
+&lt;/body&gt;
+&lt;/html&gt;</pre>
+                            </div>
+                        </div>
+                        
+                        <div class="migration-after">
+                            <div class="migration-label">unify Layout</div>
+                            <div class="code-block">
+                                <pre>&lt;!-- _includes/_layout.html --&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html lang="en"&gt;
+&lt;head&gt;
+  &lt;style data-unify-docs="v1"&gt;
+    /* Blocks become public areas */
+    .unify-header { /* Header include */ }
+    .unify-content { /* Content block */ }  
+    .unify-sidebar { /* Sidebar block */ }
+    .unify-footer { /* Footer include */ }
+  &lt;/style&gt;
+  &lt;title&gt;My Site&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;header class="unify-header"&gt;
+    &lt;!-- Header content --&gt;
+  &lt;/header&gt;
+  
+  &lt;main class="unify-content"&gt;
+    &lt;!-- Default content --&gt;
+  &lt;/main&gt;
+  
+  &lt;aside class="unify-sidebar"&gt;
+    &lt;!-- Default sidebar --&gt;
+  &lt;/aside&gt;
+  
+  &lt;footer class="unify-footer"&gt;
+    &lt;!-- Footer content --&gt;
+  &lt;/footer&gt;
+&lt;/body&gt;
+&lt;/html&gt;</pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3>Frontmatter and Content</h3>
+
+                    <div class="migration-comparison">
+                        <div class="migration-before">
+                            <div class="migration-label">11ty Markdown</div>
+                            <div class="code-block">
+                                <pre>---
+layout: base.njk
+title: "My 11ty Post"
+description: "A blog post about 11ty"
+date: 2024-01-15
+tags: ["eleventy", "jamstack"]
+---
+
+# {{ title }}
+
+This is content with {{ site.name }} variables.
+
+{% for tag in tags %}
+  &lt;span class="tag"&gt;{{ tag }}&lt;/span&gt;
+{% endfor %}
+
+{{ content | markdownify }}</pre>
+                            </div>
+                        </div>
+                        
+                        <div class="migration-after">
+                            <div class="migration-label">unify Markdown</div>
+                            <div class="code-block">
+                                <pre>---
+title: "My unify Post"
+description: "A blog post about unify"  
+date: "2024-01-15"
+tags: ["unify", "static-sites"]
+layout: "_layout"
+---
+
+# My unify Post
+
+This is content with standard HTML.
+
+&lt;!-- Tags handled by a component --&gt;
+&lt;div class="tags"&gt;
+  &lt;span class="tag"&gt;unify&lt;/span&gt;
+  &lt;span class="tag"&gt;static-sites&lt;/span&gt;
+&lt;/div&gt;
+
+Standard markdown content continues here...</pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h2>General Migration Tips</h2>
+
+                    <h3>Template Language Mapping</h3>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Concept</th>
+                                <th>Other SSGs</th>
+                                <th>unify</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Layouts</td>
+                                <td>Template inheritance</td>
+                                <td>DOM Cascade areas</td>
+                            </tr>
+                            <tr>
+                                <td>Includes</td>
+                                <td><code>{% include %}</code>, <code>{{ partial }}</code></td>
+                                <td><code>data-unify</code> attributes</td>
+                            </tr>
+                            <tr>
+                                <td>Variables</td>
+                                <td><code>{{ variable }}</code>, <code>{{ .Param }}</code></td>
+                                <td>Standard HTML + frontmatter</td>
+                            </tr>
+                            <tr>
+                                <td>Loops</td>
+                                <td><code>{% for %}</code>, <code>{{ range }}</code></td>
+                                <td>Components with data attributes</td>
+                            </tr>
+                            <tr>
+                                <td>Conditionals</td>
+                                <td><code>{% if %}</code>, <code>{{ if }}</code></td>
+                                <td>CSS classes + JavaScript (client-side)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <h3>Common Patterns</h3>
+
+                    <h4>Navigation Menus</h4>
+                    <p>Replace template loops with static HTML or JavaScript-generated menus:</p>
+
+                    <div class="code-block">
+                        <div class="language-label">html</div>
+                        <pre>&lt;!-- Instead of template loops, use static HTML --&gt;
+&lt;nav class="unify-navigation"&gt;
+  &lt;a href="/" class="nav-link"&gt;Home&lt;/a&gt;
+  &lt;a href="/about" class="nav-link"&gt;About&lt;/a&gt;
+  &lt;a href="/blog" class="nav-link"&gt;Blog&lt;/a&gt;
+  &lt;a href="/contact" class="nav-link"&gt;Contact&lt;/a&gt;
+&lt;/nav&gt;
+
+&lt;!-- Or use JavaScript for dynamic highlighting --&gt;
+&lt;script&gt;
+  // Highlight current page
+  const currentPath = window.location.pathname;
+  document.querySelectorAll('.nav-link').forEach(link =&gt; {
+    if (link.getAttribute('href') === currentPath) {
+      link.classList.add('active');
+    }
+  });
+&lt;/script&gt;</pre>
+                    </div>
+
+                    <h4>Blog Post Lists</h4>
+                    <p>Create dedicated components for dynamic content:</p>
+
+                    <div class="code-block">
+                        <div class="language-label">html</div>
+                        <pre>&lt;!-- _includes/post-list.html --&gt;
+&lt;div class="post-list"&gt;
+  &lt;article class="post-item"&gt;
+    &lt;h2&gt;&lt;a href="/blog/post-1"&gt;First Post&lt;/a&gt;&lt;/h2&gt;
+    &lt;time&gt;2024-01-15&lt;/time&gt;
+    &lt;p&gt;Post excerpt...&lt;/p&gt;
+  &lt;/article&gt;
+  &lt;!-- Additional posts... --&gt;
+&lt;/div&gt;
+
+&lt;!-- Use in pages --&gt;
+&lt;div data-unify="/_includes/post-list.html"&gt;&lt;/div&gt;</pre>
+                    </div>
+
+                    <h3>Migration Checklist</h3>
+
+                    <div class="callout">
+                        <div class="callout-title">✅ Migration Steps</div>
+                        <ol>
+                            <li><strong>Identify layouts</strong>: Map template inheritance to DOM Cascade areas</li>
+                            <li><strong>Convert includes</strong>: Replace template includes with <code>data-unify</code> fragments</li>
+                            <li><strong>Update frontmatter</strong>: Simplify YAML frontmatter, remove template-specific fields</li>
+                            <li><strong>Replace loops</strong>: Convert template loops to static HTML or JavaScript</li>
+                            <li><strong>Handle conditionals</strong>: Move logic to CSS classes or client-side JavaScript</li>
+                            <li><strong>Test build</strong>: Use <code>unify build</code> to verify output</li>
+                            <li><strong>Update configuration</strong>: Migrate build settings to <code>unify.config.yaml</code></li>
+                            <li><strong>Deploy</strong>: Update deployment scripts for unify output</li>
+                        </ol>
+                    </div>
+
+                    <h2>Migration Tools</h2>
+
+                    <h3>Automated Helpers</h3>
+
+                    <div class="code-block">
+                        <div class="language-label">bash</div>
+                        <pre># Convert Jekyll includes to unify data-unify
+find . -name "*.html" -exec sed -i 's/{%\s*include\s*\([^%]*\)%}/data-unify="\/_includes\/\1"/g' {} \;
+
+# Remove common template tags (review changes first!)
+find . -name "*.html" -exec sed -i 's/{{[^}]*}}//g' {} \;
+
+# Convert layout frontmatter
+find . -name "*.md" -exec sed -i 's/layout: \(.*\)/layout: "_\1.layout.html"/g' {} \;</pre>
+                    </div>
+
+                    <div class="callout callout-warning">
+                        <div class="callout-title">⚠️ Review Automated Changes</div>
+                        <p>Always review and test automated conversions. These scripts provide a starting point but may need manual refinement for complex templates.</p>
+                    </div>
+
+                    <div class="callout callout-success">
+                        <div class="callout-title">🚀 Migration Complete</div>
+                        <p>Once migrated, you'll benefit from unify's simplicity: no template language to learn, predictable DOM Cascade behavior, and standard HTML/CSS that works everywhere.</p>
+                    </div>
+
+                    <div class="page-nav">
+                        <a href="/unify/docs/security" class="nav-btn">
+                            <span class="nav-btn-label">← Previous</span>
+                            <span class="nav-btn-title">Security</span>
+                        </a>
+                        <a href="/unify/docs/troubleshooting" class="nav-btn">
+                            <span class="nav-btn-label">Next →</span>
+                            <span class="nav-btn-title">Troubleshooting</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Mobile sidebar toggle
+        const sidebarToggle = document.createElement('button');
+        sidebarToggle.innerHTML = '☰';
+        sidebarToggle.style.cssText = `
+            display: none;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 0.5rem;
+            border-radius: 4px;
+            font-size: 1.2rem;
+            cursor: pointer;
+        `;
+
+        // Add toggle button on mobile
+        if (window.innerWidth <= 1024) {
+            sidebarToggle.style.display = 'block';
+            document.querySelector('.nav-links').prepend(sidebarToggle);
+        }
+
+        sidebarToggle.addEventListener('click', () => {
+            document.querySelector('.sidebar').classList.toggle('open');
+        });
+
+        // Close sidebar when clicking outside on mobile
+        document.addEventListener('click', (e) => {
+            const sidebar = document.querySelector('.sidebar');
+            const toggle = sidebarToggle;
+
+            if (!sidebar.contains(e.target) && !toggle.contains(e.target)) {
+                sidebar.classList.remove('open');
+            }
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            if (window.innerWidth <= 1024) {
+                sidebarToggle.style.display = 'block';
+            } else {
+                sidebarToggle.style.display = 'none';
+                document.querySelector('.sidebar').classList.remove('open');
+            }
+        });
+
+        // Smooth scrolling for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+
+</html>

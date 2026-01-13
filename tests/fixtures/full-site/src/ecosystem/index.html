@@ -1,0 +1,818 @@
+<head data-unify="head-content">
+    <template data-slot="title">fwdslsh Ecosystem - Complete Development Toolkit</template>
+    <meta name="description"
+        content="The complete fwdslsh ecosystem: unify for static sites, giv for AI Git workflows, inform for web crawling, and catalog for documentation indexing.">
+    <style>
+        /* Page-specific styles for ecosystem */
+        .ecosystem-hero {
+            background: linear-gradient(135deg,
+                    rgba(0, 255, 65, 0.03) 0%,
+                    rgba(59, 130, 246, 0.03) 50%,
+                    rgba(245, 158, 11, 0.03) 100%);
+        }
+
+        .workflow-visualization {
+            background: var(--bg-darker);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 3rem 2rem;
+            margin: 2rem 0;
+            max-width: 1000px;
+            position: relative;
+        }
+
+        .workflow-steps {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 2rem;
+            position: relative;
+        }
+
+        .workflow-step {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 2rem 1.5rem;
+            text-align: center;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .workflow-step:hover {
+            border-color: var(--primary);
+            transform: translateY(-5px);
+        }
+
+        .workflow-step::after {
+            content: '→';
+            position: absolute;
+            right: -1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--primary);
+            font-size: 1.5rem;
+            font-weight: bold;
+            z-index: 1;
+        }
+
+        .workflow-step:last-child::after {
+            display: none;
+        }
+
+        .step-tool {
+            width: 60px;
+            height: 60px;
+            margin: 0 auto 1rem;
+            background: var(--gradient-primary);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-mono);
+            font-weight: bold;
+            color: var(--bg-dark);
+            font-size: 1.5rem;
+        }
+
+        .step-title {
+            color: var(--text-primary);
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .step-description {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .integration-matrix {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 4rem;
+        }
+
+        .integration-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem;
+            transition: all 0.3s ease;
+        }
+
+        .integration-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+        }
+
+        .integration-tools {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .integration-tool-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--gradient-primary);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-mono);
+            font-weight: bold;
+            color: var(--bg-dark);
+            font-size: 1rem;
+        }
+
+        .integration-arrow {
+            color: var(--primary);
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+
+        .use-case-scenarios {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 2rem;
+            margin-top: 4rem;
+        }
+
+        .scenario-card {
+            background: linear-gradient(135deg, rgba(0, 255, 65, 0.05) 0%, rgba(59, 130, 246, 0.05) 100%);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .scenario-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: var(--gradient-primary);
+        }
+
+        .scenario-title {
+            color: var(--text-primary);
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .scenario-icon {
+            font-size: 1.5rem;
+        }
+
+        .scenario-tools {
+            display: flex;
+            gap: 0.5rem;
+            margin: 1rem 0;
+        }
+
+        .scenario-tool-badge {
+            background: var(--gradient-primary);
+            color: var(--bg-dark);
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .philosophy-section {
+            background: linear-gradient(135deg, rgba(168, 255, 96, 0.05) 0%, rgba(245, 158, 11, 0.05) 100%);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 3rem;
+            margin-top: 4rem;
+            text-align: center;
+        }
+
+        .philosophy-principles {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+            text-align: left;
+        }
+
+        .principle {
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+        }
+
+        .principle-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--gradient-primary);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            color: var(--bg-dark);
+            flex-shrink: 0;
+        }
+
+        .principle-content h4 {
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .principle-content p {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .quick-start-section {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem;
+            margin-top: 4rem;
+        }
+
+        .quick-start-tabs {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .quick-start-tab {
+            padding: 0.75rem 1.5rem;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .quick-start-tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        .quick-start-content {
+            display: none;
+        }
+
+        .quick-start-content.active {
+            display: block;
+        }
+
+        @media (max-width: 768px) {
+            .workflow-step::after {
+                content: '↓';
+                right: 50%;
+                top: 100%;
+                transform: translateX(50%);
+                bottom: -1rem;
+            }
+
+            .workflow-step:last-child::after {
+                display: none;
+            }
+
+            .integration-tools {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .integration-arrow {
+                transform: rotate(90deg);
+            }
+
+            .quick-start-tabs {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+        }
+    </style>
+</head>
+<main>
+    <!-- Page metadata -->
+
+    <!-- Hero content -->
+    <template data-slot="tool-name">fwdslsh Ecosystem</template>
+    <template data-slot="tagline">Complete toolkit for modern development</template>
+    <template data-slot="description">
+        Four focused tools that work together seamlessly. Build static sites, manage Git workflows with AI,
+        crawl web content, and index documentation - all with zero dependencies and maximum performance.
+    </template>
+    <template data-slot="cta-buttons">
+        <a href="#workflow" class="btn btn-primary">
+            <span>🔄</span> See the Workflow
+        </a>
+        <a href="#quick-start" class="btn btn-secondary">
+            Quick Start Guide
+        </a>
+    </template>
+    <template data-slot="demo">
+        <!-- Demo section will be handled by additional content -->
+    </template>
+
+    <!-- Features Section -->
+    <template data-slot="features-section">
+        <section id="workflow" class="tool-section">
+            <div class="section-header">
+                <h2>Complete Development Workflow</h2>
+                <p>From content to deployment in one seamless pipeline</p>
+            </div>
+
+            <div class="workflow-visualization">
+                <div class="workflow-steps">
+                    <div class="workflow-step">
+                        <div class="step-tool">i</div>
+                        <div class="step-title">Crawl Content</div>
+                        <div class="step-description">Use inform to extract content from websites and convert to
+                            clean Markdown</div>
+                    </div>
+
+                    <div class="workflow-step">
+                        <div class="step-tool">c</div>
+                        <div class="step-title">Index Documentation</div>
+                        <div class="step-description">catalog generates llms.txt files and sitemaps for AI-ready
+                            documentation</div>
+                    </div>
+
+                    <div class="workflow-step">
+                        <div class="step-tool">u</div>
+                        <div class="step-title">Build Sites</div>
+                        <div class="step-description">unify creates fast static sites with zero configuration
+                            required</div>
+                    </div>
+
+                    <div class="workflow-step">
+                        <div class="step-tool">g</div>
+                        <div class="step-title">Commit & Deploy</div>
+                        <div class="step-description">giv generates professional commit messages and documentation
+                            with AI</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="code-block">
+                <pre># Complete workflow in 4 commands
+inform https://docs.example.com --output-dir content
+catalog --input content --output indexed --sitemap --base-url https://mysite.com
+unify build --input indexed --output dist
+giv message && git push</pre>
+            </div>
+        </section>
+    </template>
+
+    <!-- Installation Section -->
+    <template data-slot="install-section">
+        <section id="quick-start" class="tool-section">
+            <div class="section-header">
+                <h2>Quick Start Guide</h2>
+                <p>Get the entire ecosystem running in minutes</p>
+            </div>
+
+            <div class="quick-start-section">
+                <div class="quick-start-tabs">
+                    <button class="quick-start-tab active" onclick="showQuickStartTab('install')">Installation</button>
+                    <button class="quick-start-tab" onclick="showQuickStartTab('workflow')">First Workflow</button>
+                    <button class="quick-start-tab" onclick="showQuickStartTab('automation')">Automation</button>
+                </div>
+
+                <div id="install-content" class="quick-start-content active">
+                    <h4>Install All Tools</h4>
+                    <div class="code-block">
+                        <pre># Install all fwdslsh tools at once
+curl -fsSL https://raw.githubusercontent.com/fwdslsh/toolkit/main/install.sh | sh
+
+# Or install individually
+curl -fsSL https://raw.githubusercontent.com/fwdslsh/inform/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/fwdslsh/catalog/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/fwdslsh/unify/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/fwdslsh/giv/main/install.sh | sh
+
+# Verify installation
+inform --version && catalog --version && unify --version && giv --version</pre>
+                    </div>
+                    <p>All tools are distributed as self-contained binaries with no dependencies required.</p>
+                </div>
+
+                <div id="workflow-content" class="quick-start-content">
+                    <h4>Your First Complete Workflow</h4>
+                    <div class="code-block">
+                        <pre># 1. Set up AI for giv (choose one)
+export OPENAI_API_KEY="your-key"  # OpenAI
+export ANTHROPIC_API_KEY="your-key"  # Anthropic
+# Or use local: ollama pull llama3.2
+
+# 2. Create a project
+mkdir my-docs && cd my-docs
+git init
+
+# 3. Crawl some documentation
+inform https://docs.example.com --output-dir content
+
+# 4. Generate documentation index
+catalog --input content --output build --sitemap --validate
+
+# 5. Build static site
+unify build --input build --output dist
+
+# 6. Commit with AI-generated message
+git add . && giv message</pre>
+                    </div>
+                    <p>This creates a complete documentation pipeline from crawling to deployment.</p>
+                </div>
+
+                <div id="automation-content" class="quick-start-content">
+                    <h4>Automate with Scripts</h4>
+                    <div class="code-block">
+                        <pre># Create docs-pipeline.sh
+#!/bin/bash
+set -e
+
+echo "📡 Crawling documentation..."
+inform $1 --output-dir temp/content
+
+echo "📋 Generating indexes..."
+catalog --input temp/content --output temp/build \
+  --sitemap --base-url $2 --validate
+
+echo "🏗️ Building site..."
+unify build --input temp/build --output dist
+
+echo "📝 Committing changes..."
+git add dist/ && giv message
+
+echo "✅ Documentation pipeline complete!"
+
+# Usage: ./docs-pipeline.sh https://docs.site.com https://my-site.com</pre>
+                    </div>
+                    <p>Create reusable scripts for common workflows and integrate with CI/CD systems.</p>
+                </div>
+            </div>
+        </section>
+    </template>
+
+    <!-- Additional content for integrations, use cases, and philosophy -->
+    <template data-slot="additional-content">
+        <section class="tool-section alt-bg">
+            <div class="section-header">
+                <h2>Tool Integrations</h2>
+                <p>Each tool complements the others perfectly</p>
+            </div>
+
+            <div class="integration-matrix">
+                <div class="integration-card">
+                    <div class="integration-tools">
+                        <div class="integration-tool-icon">i</div>
+                        <div class="integration-arrow">→</div>
+                        <div class="integration-tool-icon">c</div>
+                    </div>
+                    <h4>inform → catalog</h4>
+                    <p>Crawl websites and automatically generate AI-ready documentation indexes. Perfect for
+                        migrating documentation or creating knowledge bases.</p>
+                    <div class="code-snippet">inform docs.site.com | catalog --stdin --validate</div>
+                </div>
+
+                <div class="integration-card">
+                    <div class="integration-tools">
+                        <div class="integration-tool-icon">c</div>
+                        <div class="integration-arrow">→</div>
+                        <div class="integration-tool-icon">u</div>
+                    </div>
+                    <h4>catalog → unify</h4>
+                    <p>Generate documentation indexes and build them into beautiful static sites with navigation and
+                        SEO optimization.</p>
+                    <div class="code-snippet">catalog --sitemap --index | unify build</div>
+                </div>
+
+                <div class="integration-card">
+                    <div class="integration-tools">
+                        <div class="integration-tool-icon">u</div>
+                        <div class="integration-arrow">→</div>
+                        <div class="integration-tool-icon">g</div>
+                    </div>
+                    <h4>unify → giv</h4>
+                    <p>Build your static site and generate professional commit messages and release notes
+                        automatically with AI assistance.</p>
+                    <div class="code-snippet">unify build && giv message --format conventional</div>
+                </div>
+
+                <div class="integration-card">
+                    <div class="integration-tools">
+                        <div class="integration-tool-icon">g</div>
+                        <div class="integration-arrow">→</div>
+                        <div class="integration-tool-icon">i</div>
+                    </div>
+                    <h4>giv → inform</h4>
+                    <p>Track documentation changes and automatically crawl updated content for continuous
+                        integration workflows.</p>
+                    <div class="code-snippet">giv summary --since="1 week" | inform --changed-urls</div>
+                </div>
+            </div>
+        </section>
+
+        <section class="tool-section">
+            <div class="section-header">
+                <h2>Use Case Scenarios</h2>
+                <p>Real-world applications of the fwdslsh ecosystem</p>
+            </div>
+
+            <div class="use-case-scenarios">
+                <div class="scenario-card">
+                    <div class="scenario-title">
+                        <span class="scenario-icon">📚</span>
+                        Documentation Migration
+                    </div>
+                    <div class="scenario-tools">
+                        <span class="scenario-tool-badge">inform</span>
+                        <span class="scenario-tool-badge">catalog</span>
+                        <span class="scenario-tool-badge">unify</span>
+                    </div>
+                    <p>Migrate documentation from legacy systems to modern static sites. Extract content, generate
+                        indexes, and build beautiful documentation sites.</p>
+                    <div class="code-snippet">
+                        # Migrate docs from old system
+                        inform https://legacy-docs.com --output legacy-content
+                        catalog --input legacy-content --output structured --validate
+                        unify build --input structured --output new-docs
+                    </div>
+                </div>
+
+                <div class="scenario-card">
+                    <div class="scenario-title">
+                        <span class="scenario-icon">🤖</span>
+                        AI Training Pipeline
+                    </div>
+                    <div class="scenario-tools">
+                        <span class="scenario-tool-badge">inform</span>
+                        <span class="scenario-tool-badge">catalog</span>
+                        <span class="scenario-tool-badge">giv</span>
+                    </div>
+                    <p>Create AI training datasets from web content. Crawl, structure, and version control your AI
+                        training data with proper documentation.</p>
+                    <div class="code-snippet">
+                        # Build AI training dataset
+                        inform https://knowledge-base.com --include "*.md"
+                        catalog --optional "examples/**" --output ai-dataset --validate
+                        giv message "dataset: add new training content for v2.0"
+                    </div>
+                </div>
+
+                <div class="scenario-card">
+                    <div class="scenario-title">
+                        <span class="scenario-icon">🚀</span>
+                        Continuous Deployment
+                    </div>
+                    <div class="scenario-tools">
+                        <span class="scenario-tool-badge">unify</span>
+                        <span class="scenario-tool-badge">giv</span>
+                        <span class="scenario-tool-badge">catalog</span>
+                    </div>
+                    <p>Automated deployment pipeline with AI-generated documentation. Build, version, and deploy
+                        with professional commit messages.</p>
+                    <div class="code-snippet">
+                        # CI/CD Pipeline
+                        unify build --production
+                        catalog --input build --sitemap --base-url https://production.com
+                        giv changelog v1.0.0..HEAD --output CHANGELOG.md
+                        giv message && git push origin main
+                    </div>
+                </div>
+
+                <div class="scenario-card">
+                    <div class="scenario-title">
+                        <span class="scenario-icon">🔍</span>
+                        Knowledge Base Creation
+                    </div>
+                    <div class="scenario-tools">
+                        <span class="scenario-tool-badge">inform</span>
+                        <span class="scenario-tool-badge">catalog</span>
+                        <span class="scenario-tool-badge">unify</span>
+                        <span class="scenario-tool-badge">giv</span>
+                    </div>
+                    <p>Complete knowledge base workflow. Aggregate content from multiple sources, index for search,
+                        and maintain with version control.</p>
+                    <div class="code-snippet">
+                        # Full knowledge base setup
+                        inform https://wiki.company.com --output kb-content
+                        catalog --input kb-content --index --sitemap --base-url https://kb.company.com
+                        unify build --input kb-content --output public
+                        giv init && giv message "docs: initialize company knowledge base"
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="tool-section alt-bg">
+            <div class="philosophy-section">
+                <h2>The fwdslsh Philosophy</h2>
+                <p>Focused tools that compose beautifully</p>
+
+                <div class="philosophy-principles">
+                    <div class="principle">
+                        <div class="principle-icon">🎯</div>
+                        <div class="principle-content">
+                            <h4>Single Purpose</h4>
+                            <p>Each tool does one thing exceptionally well. No feature creep, no kitchen sinks.</p>
+                        </div>
+                    </div>
+
+                    <div class="principle">
+                        <div class="principle-icon">🔗</div>
+                        <div class="principle-content">
+                            <h4>Composable</h4>
+                            <p>Tools work together seamlessly but remain independent. Mix and match as needed.</p>
+                        </div>
+                    </div>
+
+                    <div class="principle">
+                        <div class="principle-icon">⚡</div>
+                        <div class="principle-content">
+                            <h4>Performance First</h4>
+                            <p>Built with Bun and modern runtimes for maximum speed with minimal resource usage.</p>
+                        </div>
+                    </div>
+
+                    <div class="principle">
+                        <div class="principle-icon">📦</div>
+                        <div class="principle-content">
+                            <h4>Zero Dependencies</h4>
+                            <p>Self-contained binaries with no external dependencies. Download and run anywhere.</p>
+                        </div>
+                    </div>
+
+                    <div class="principle">
+                        <div class="principle-icon">🛠️</div>
+                        <div class="principle-content">
+                            <h4>Developer Experience</h4>
+                            <p>Intuitive CLIs, sensible defaults, and helpful error messages. Tools that feel good
+                                to use.</p>
+                        </div>
+                    </div>
+
+                    <div class="principle">
+                        <div class="principle-icon">🌐</div>
+                        <div class="principle-content">
+                            <h4>Cross-Platform</h4>
+                            <p>Works consistently across Linux, macOS, and Windows. Same experience everywhere.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </template>
+
+    <!-- Stats Section -->
+    <template data-slot="stats-section">
+        <section class="stats-section">
+            <div class="stats-container">
+                <div class="section-header">
+                    <h2>Ecosystem Metrics</h2>
+                    <p>Built for performance and reliability</p>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-number">4</div>
+                        <div class="stat-label">Focused Tools</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number">0</div>
+                        <div class="stat-label">Runtime Dependencies</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number">3</div>
+                        <div class="stat-label">Platforms Supported</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number">100%</div>
+                        <div class="stat-label">Self-Contained</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </template>
+
+    <!-- CTA Section -->
+    <template data-slot="cta-section">
+        <section class="tool-section alt-bg">
+            <div class="section-header">
+                <h2>Ready to Build?</h2>
+                <p>Start with any tool and expand your workflow</p>
+            </div>
+
+            <div class="cta-buttons">
+                <a href="/unify/getting-started" class="btn btn-primary">
+                    🏗️ Start with Static Sites
+                </a>
+                <a href="/giv/getting-started" class="btn btn-secondary">
+                    🤖 Start with AI Git
+                </a>
+                <a href="/inform/getting-started" class="btn btn-secondary">
+                    🌐 Start with Web Crawling
+                </a>
+                <a href="/catalog/getting-started" class="btn btn-secondary">
+                    📋 Start with Documentation
+                </a>
+            </div>
+
+            <div class="quick-links">
+                <a href="https://github.com/fwdslsh" class="quick-link">
+                    <span class="quick-link-icon">🔗</span>
+                    <div class="quick-link-content">
+                        <h4>GitHub Organization</h4>
+                        <p>All tools, examples, and documentation</p>
+                    </div>
+                </a>
+
+                <a href="https://hub.docker.com/u/fwdslsh" class="quick-link">
+                    <span class="quick-link-icon">🐳</span>
+                    <div class="quick-link-content">
+                        <h4>Docker Hub</h4>
+                        <p>Containerized versions of all tools</p>
+                    </div>
+                </a>
+
+                <a href="https://npmjs.com/org/fwdslsh" class="quick-link">
+                    <span class="quick-link-icon">📦</span>
+                    <div class="quick-link-content">
+                        <h4>NPM Packages</h4>
+                        <p>Install with your favorite package manager</p>
+                    </div>
+                </a>
+            </div>
+        </section>
+    </template>
+
+    <!-- Scripts -->
+    <template data-slot="scripts">
+        <script>
+            function showQuickStartTab(tabName) {
+                // Hide all content
+                document.querySelectorAll('.quick-start-content').forEach(content => {
+                    content.classList.remove('active');
+                });
+
+                // Remove active class from all tabs
+                document.querySelectorAll('.quick-start-tab').forEach(tab => {
+                    tab.classList.remove('active');
+                });
+
+                // Show selected content and activate tab
+                document.getElementById(tabName + '-content').classList.add('active');
+                event.target.classList.add('active');
+            }
+
+            // Animate workflow steps on scroll
+            const workflowObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const steps = entry.target.querySelectorAll('.workflow-step');
+                        steps.forEach((step, index) => {
+                            setTimeout(() => {
+                                step.style.animation = 'fadeInUp 0.6s ease-out forwards';
+                            }, index * 200);
+                        });
+                    }
+                });
+            });
+
+            const workflowViz = document.querySelector('.workflow-visualization');
+            if (workflowViz) {
+                workflowObserver.observe(workflowViz);
+            }
+
+            // Animate integration cards
+            const integrationObserver = new IntersectionObserver((entries) => {
+                entries.forEach((entry, index) => {
+                    if (entry.isIntersecting) {
+                        setTimeout(() => {
+                            entry.target.style.animation = 'fadeInUp 0.5s ease-out forwards';
+                        }, index * 100);
+                    }
+                });
+            });
+
+            document.querySelectorAll('.integration-card, .scenario-card').forEach(card => {
+                card.style.opacity = '0';
+                integrationObserver.observe(card);
+            });
+        </script>
+    </template>
+    </div>

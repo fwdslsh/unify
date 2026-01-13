@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Components - unify Documentation</title>
+    <meta name="description" content="Learn how to create, organize, and use reusable components in unify with DOM Cascade composition patterns and best practices.">
+    <link rel="stylesheet" href="/assets/styles.css">
+    <style>
+        .docs-layout { display: flex; min-height: 100vh; }
+        .sidebar { width: 280px; background: var(--bg-darker); border-right: 1px solid var(--border); padding: 2rem 0; position: fixed; height: calc(100vh - 80px); overflow-y: auto; z-index: 100; }
+        .sidebar-content { padding: 0 2rem; }
+        .sidebar-section { margin-bottom: 2rem; }
+        .sidebar-title { font-size: 0.9rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 0.05em; font-family: var(--font-mono); }
+        .sidebar-nav { list-style: none; }
+        .sidebar-nav li { margin-bottom: 0.5rem; }
+        .sidebar-nav a { color: var(--text-dim); text-decoration: none; font-size: 0.9rem; display: block; padding: 0.5rem 1rem; border-radius: 6px; transition: all 0.3s ease; font-family: var(--font-mono); }
+        .sidebar-nav a:hover { color: var(--text-primary); background: var(--bg-card); }
+        .sidebar-nav a.active { color: var(--primary); background: rgba(0, 255, 65, 0.1); border-left: 3px solid var(--primary); }
+        .main-content { flex: 1; margin-left: 280px; padding: 2rem 4rem; max-width: calc(100vw - 280px); }
+        .content-wrapper { max-width: 800px; }
+        .content h1 { font-size: 2.5rem; font-weight: 800; margin-bottom: 1rem; color: var(--text-primary); line-height: 1.2; }
+        .content p { margin-bottom: 1.5rem; color: var(--text-secondary); line-height: 1.7; }
+        @media (max-width: 1024px) {
+            .sidebar { transform: translateX(-100%); transition: transform 0.3s ease; }
+            .sidebar.open { transform: translateX(0); }
+            .main-content { margin-left: 0; max-width: 100vw; padding: 2rem; }
+        }
+    </style>
+</head>
+<body data-unify="/_includes/tool-page.html">
+    <ul class="unify-nav-links">
+        <li><a href="/unify/">Overview</a></li>
+        <li><a href="/unify/getting-started.html">Getting Started</a></li>
+        <li><a href="/unify/docs.html">Documentation</a></li>
+        <li><a href="/unify/examples.html">Examples</a></li>
+    </ul>
+    <div class="unify-content docs-layout">
+        <aside class="sidebar">
+            <div class="sidebar-content">
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Getting Started</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs">Quick Start</a></li>
+                        <li><a href="/unify/docs/installation">Installation</a></li>
+                        <li><a href="/unify/docs/project-structure">Project Structure</a></li>
+                        <li><a href="/unify/docs/first-site">Your First Site</a></li>
+                    </ul>
+                </div>
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Core Concepts</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs/includes">Server-Side Includes</a></li>
+                        <li><a href="/unify/docs/components" class="active">Components</a></li>
+                        <li><a href="/unify/docs/markdown">Markdown</a></li>
+                        <li><a href="/unify/docs/assets">Static Assets</a></li>
+                    </ul>
+                </div>
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">CLI Reference</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs/cli-build">unify build</a></li>
+                        <li><a href="/unify/docs/cli-serve">unify serve</a></li>
+                        <li><a href="/unify/docs/cli-watch">unify watch</a></li>
+                        <li><a href="/unify/docs/configuration">Configuration</a></li>
+                    </ul>
+                </div>
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Deployment</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs/deployment">Static Hosting</a></li>
+                        <li><a href="/unify/docs/docker">Docker</a></li>
+                        <li><a href="/unify/docs/ci-cd">CI/CD</a></li>
+                    </ul>
+                </div>
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Advanced</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs/performance">Performance</a></li>
+                        <li><a href="/unify/docs/security">Security</a></li>
+                        <li><a href="/unify/docs/migration">Migration Guide</a></li>
+                        <li><a href="/unify/docs/troubleshooting">Troubleshooting</a></li>
+                    </ul>
+                </div>
+            </div>
+        </aside>
+        <main class="main-content">
+            <div class="content-wrapper">
+                <div class="content">
+                    <h1>Components</h1>
+                    
+                    <p>Components are reusable HTML fragments that can be imported and composed into pages and layouts. Unify's component system is built on DOM Cascade, providing powerful area-based composition with predictable semantics.</p>
+
+                    <div class="callout callout-info">
+                        <h3>📝 What You'll Learn</h3>
+                        <p>This guide covers component creation, organization, composition patterns, and best practices for building maintainable component libraries.</p>
+                    </div>
+
+                    <h2>Component Fundamentals</h2>
+                    
+                    <h3>What Are Components?</h3>
+                    <p>Components are HTML fragments designed for reuse across multiple pages. They:</p>
+                    <ul>
+                        <li>Encapsulate structure, styling, and behavior</li>
+                        <li>Expose public areas for customization</li>
+                        <li>Can be parameterized through area-based composition</li>
+                        <li>Support both standalone and nested usage</li>
+                    </ul>
+
+                    <h3>Component vs Layout</h3>
+                    <p>Understanding the difference between components and layouts:</p>
+                    
+                    <div class="comparison-table">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Aspect</th>
+                                    <th>Components</th>
+                                    <th>Layouts</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>Import Target</strong></td>
+                                    <td>Any element</td>
+                                    <td><code>&lt;html&gt;</code> or <code>&lt;body&gt;</code></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Scope</strong></td>
+                                    <td>Component root element</td>
+                                    <td>Layout body element</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Purpose</strong></td>
+                                    <td>Reusable UI elements</td>
+                                    <td>Page structure and chrome</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Composition</strong></td>
+                                    <td>Inline at import point</td>
+                                    <td>Wraps entire page content</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h2>Creating Components</h2>
+                    
+                    <h3>Basic Component Structure</h3>
+                    <p>A simple component follows this pattern:</p>
+
+                    <pre><code>&lt;!-- _includes/button.html --&gt;
+&lt;!-- Contract documentation --&gt;
+&lt;head&gt;
+    &lt;style data-unify-docs="v1"&gt;
+        /* Public areas */
+        .unify-label {
+            /* Button text content */
+        }
+        
+        /* Optional state classes */
+        .is-primary {
+            /* Primary button variant */
+        }
+        .is-large {
+            /* Large size variant */
+        }
+    &lt;/style&gt;
+&lt;/head&gt;
+
+&lt;!-- Component implementation --&gt;
+&lt;button class="btn" type="button"&gt;
+    &lt;span class="unify-label"&gt;Click Me&lt;/span&gt;
+&lt;/button&gt;</code></pre>
+
+                    <h3>Component Naming Conventions</h3>
+                    <p>Follow these conventions for maintainable components:</p>
+                    
+                    <ul>
+                        <li><strong>File naming:</strong> Use descriptive names with <code>_</code> prefix: <code>_card.html</code>, <code>_navigation.html</code></li>
+                        <li><strong>Directory organization:</strong> Group in <code>_includes/</code> or <code>_components/</code></li>
+                        <li><strong>Area classes:</strong> Use semantic names: <code>.unify-title</code>, <code>.unify-actions</code></li>
+                        <li><strong>State classes:</strong> Use <code>is-</code> prefix: <code>.is-active</code>, <code>.is-loading</code></li>
+                    </ul>
+
+                    <h3>Complex Component Example</h3>
+                    <p>Here's a more sophisticated card component:</p>
+
+                    <pre><code>&lt;!-- _includes/card.html --&gt;
+&lt;head&gt;
+    &lt;style data-unify-docs="v1"&gt;
+        /* Public areas */
+        .unify-image {
+            /* Card hero image */
+        }
+        .unify-title {
+            /* Card headline */
+        }
+        .unify-body {
+            /* Main card content */
+        }
+        .unify-meta {
+            /* Metadata like author, date */
+        }
+        .unify-actions {
+            /* Call-to-action buttons */
+        }
+        
+        /* State variants */
+        .is-featured {
+            /* Featured card styling */
+        }
+        .is-horizontal {
+            /* Side-by-side layout */
+        }
+    &lt;/style&gt;
+&lt;/head&gt;
+
+&lt;article class="card"&gt;
+    &lt;div class="unify-image"&gt;
+        &lt;img src="/assets/placeholder.jpg" alt="Default image" /&gt;
+    &lt;/div&gt;
+    
+    &lt;div class="card-content"&gt;
+        &lt;h3 class="unify-title"&gt;Default Title&lt;/h3&gt;
+        
+        &lt;div class="unify-meta"&gt;
+            &lt;time datetime="2024-01-01"&gt;January 1, 2024&lt;/time&gt;
+        &lt;/div&gt;
+        
+        &lt;div class="unify-body"&gt;
+            &lt;p&gt;Default card content goes here...&lt;/p&gt;
+        &lt;/div&gt;
+        
+        &lt;div class="unify-actions"&gt;
+            &lt;a href="#" class="btn"&gt;Learn More&lt;/a&gt;
+        &lt;/div&gt;
+    &lt;/div&gt;
+&lt;/article&gt;</code></pre>
+
+                    <h2>Using Components</h2>
+                    
+                    <h3>Basic Component Import</h3>
+                    <p>Import components using <code>data-unify</code> on any element:</p>
+
+                    <pre><code>&lt;!-- Simple button usage --&gt;
+&lt;div data-unify="/_includes/button.html"&gt;
+    &lt;span class="unify-label"&gt;Subscribe Now&lt;/span&gt;
+&lt;/div&gt;
+
+&lt;!-- With state classes --&gt;
+&lt;div data-unify="/_includes/button.html" class="is-primary is-large"&gt;
+    &lt;span class="unify-label"&gt;Get Started&lt;/span&gt;
+&lt;/div&gt;</code></pre>
+
+                    <h3>Advanced Component Usage</h3>
+                    <p>Using the complex card component:</p>
+
+                    <pre><code>&lt;!-- Featured product card --&gt;
+&lt;div data-unify="/_includes/card.html" class="is-featured"&gt;
+    &lt;div class="unify-image"&gt;
+        &lt;img src="/products/laptop.jpg" alt="Pro Laptop" /&gt;
+    &lt;/div&gt;
+    
+    &lt;h3 class="unify-title"&gt;Pro Laptop 2024&lt;/h3&gt;
+    
+    &lt;div class="unify-meta"&gt;
+        &lt;span class="price"&gt;$1,299&lt;/span&gt;
+        &lt;span class="rating"&gt;★★★★★&lt;/span&gt;
+    &lt;/div&gt;
+    
+    &lt;div class="unify-body"&gt;
+        &lt;p&gt;Professional-grade laptop with cutting-edge performance for creators and developers.&lt;/p&gt;
+        &lt;ul&gt;
+            &lt;li&gt;M3 Pro chip&lt;/li&gt;
+            &lt;li&gt;16GB unified memory&lt;/li&gt;
+            &lt;li&gt;1TB SSD storage&lt;/li&gt;
+        &lt;/ul&gt;
+    &lt;/div&gt;
+    
+    &lt;div class="unify-actions"&gt;
+        &lt;a href="/products/laptop" class="btn btn-primary"&gt;View Details&lt;/a&gt;
+        &lt;button class="btn btn-secondary" data-cart-add="laptop-pro"&gt;Add to Cart&lt;/button&gt;
+    &lt;/div&gt;
+&lt;/div&gt;</code></pre>
+
+                    <h3>Component Path Resolution</h3>
+                    <p>Components support the same path resolution as layouts:</p>
+                    
+                    <ul>
+                        <li><strong>Absolute:</strong> <code>data-unify="/_includes/card.html"</code></li>
+                        <li><strong>Relative:</strong> <code>data-unify="../shared/button.html"</code></li>
+                        <li><strong>Short names:</strong> <code>data-unify="card"</code> → finds <code>_card.html</code></li>
+                    </ul>
+
+                    <h2>Component Organization</h2>
+                    
+                    <h3>Directory Structure</h3>
+                    <p>Organize components for scalability and maintainability:</p>
+
+                    <pre><code>src/
+├── _includes/              # Global components
+│   ├── _button.html         # Basic button
+│   ├── _card.html           # Content card
+│   ├── _navigation.html     # Site navigation
+│   └── _footer.html         # Site footer
+│
+├── _components/            # Complex components
+│   ├── forms/
+│   │   ├── _contact-form.html
+│   │   └── _newsletter.html
+│   ├── layout/
+│   │   ├── _header.html
+│   │   └── _sidebar.html
+│   └── widgets/
+│       ├── _testimonial.html
+│       └── _pricing-table.html
+│
+└── blog/
+    ├── _post-card.html      # Section-specific components
+    └── _author-bio.html</code></pre>
+
+                    <h3>Component Libraries</h3>
+                    <p>For larger projects, consider organizing components into libraries:</p>
+                    
+                    <ul>
+                        <li><strong>Core components:</strong> Basic UI elements (buttons, forms, cards)</li>
+                        <li><strong>Layout components:</strong> Headers, footers, navigation</li>
+                        <li><strong>Content components:</strong> Blog posts, product listings, testimonials</li>
+                        <li><strong>Utility components:</strong> Alerts, modals, loading states</li>
+                    </ul>
+
+                    <h2>Composition Patterns</h2>
+                    
+                    <h3>Nested Components</h3>
+                    <p>Components can import other components:</p>
+
+                    <pre><code>&lt;!-- _includes/hero-section.html --&gt;
+&lt;section class="hero"&gt;
+    &lt;div class="hero-content"&gt;
+        &lt;h1 class="unify-title"&gt;Default Hero Title&lt;/h1&gt;
+        &lt;p class="unify-subtitle"&gt;Default subtitle text&lt;/p&gt;
+        
+        &lt;div class="unify-actions"&gt;
+            &lt;!-- Nested button component --&gt;
+            &lt;div data-unify="/_includes/button.html" class="is-primary is-large"&gt;
+                &lt;span class="unify-label"&gt;Get Started&lt;/span&gt;
+            &lt;/div&gt;
+        &lt;/div&gt;
+    &lt;/div&gt;
+&lt;/section&gt;</code></pre>
+
+                    <h3>Component Composition</h3>
+                    <p>Compose multiple components for complex interfaces:</p>
+
+                    <pre><code>&lt;!-- Product listing page --&gt;
+&lt;main&gt;
+    &lt;!-- Hero with search --&gt;
+    &lt;div data-unify="/_includes/hero-section.html"&gt;
+        &lt;h1 class="unify-title"&gt;Our Products&lt;/h1&gt;
+        &lt;p class="unify-subtitle"&gt;Find the perfect solution for your needs&lt;/p&gt;
+        &lt;div class="unify-actions"&gt;
+            &lt;div data-unify="/_includes/search-form.html"&gt;
+                &lt;input class="unify-input" placeholder="Search products..." /&gt;
+            &lt;/div&gt;
+        &lt;/div&gt;
+    &lt;/div&gt;
+    
+    &lt;!-- Product grid --&gt;
+    &lt;section class="product-grid"&gt;
+        &lt;div data-unify="/_includes/card.html"&gt;
+            &lt;!-- Product 1 content --&gt;
+        &lt;/div&gt;
+        
+        &lt;div data-unify="/_includes/card.html"&gt;
+            &lt;!-- Product 2 content --&gt;
+        &lt;/div&gt;
+        
+        &lt;div data-unify="/_includes/card.html"&gt;
+            &lt;!-- Product 3 content --&gt;
+        &lt;/div&gt;
+    &lt;/section&gt;
+&lt;/main&gt;</code></pre>
+
+                    <h3>Conditional Components</h3>
+                    <p>Use CSS and JavaScript to conditionally show components:</p>
+
+                    <pre><code>&lt;!-- Show different components based on state --&gt;
+&lt;div class="user-section"&gt;
+    &lt;div data-unify="/_includes/login-form.html" class="show-when-logged-out"&gt;
+        &lt;!-- Login form content --&gt;
+    &lt;/div&gt;
+    
+    &lt;div data-unify="/_includes/user-profile.html" class="show-when-logged-in"&gt;
+        &lt;!-- User profile content --&gt;
+    &lt;/div&gt;
+&lt;/div&gt;</code></pre>
+
+                    <h2>Best Practices</h2>
+                    
+                    <div class="callout callout-success">
+                        <h3>✅ Component Design Guidelines</h3>
+                        <ul>
+                            <li><strong>Single Responsibility:</strong> Each component should have one clear purpose</li>
+                            <li><strong>Semantic HTML:</strong> Use proper HTML5 elements and ARIA attributes</li>
+                            <li><strong>Progressive Enhancement:</strong> Ensure components work without JavaScript</li>
+                            <li><strong>Responsive Design:</strong> Components should adapt to different screen sizes</li>
+                        </ul>
+                    </div>
+
+                    <h3>API Design</h3>
+                    <ul>
+                        <li><strong>Document all public areas</strong> in contract blocks</li>
+                        <li><strong>Use semantic area names</strong> that describe content, not layout</li>
+                        <li><strong>Provide sensible defaults</strong> for all areas</li>
+                        <li><strong>Keep area classes unique</strong> within each component scope</li>
+                        <li><strong>Support optional variants</strong> through state classes</li>
+                    </ul>
+
+                    <h3>Styling Strategy</h3>
+                    <ul>
+                        <li><strong>Use CSS custom properties</strong> for themeable components</li>
+                        <li><strong>Scope styles appropriately</strong> with <code>@scope</code> or CSS nesting</li>
+                        <li><strong>Avoid overly specific selectors</strong> in contract documentation</li>
+                        <li><strong>Support utility classes</strong> for quick modifications</li>
+                    </ul>
+
+                    <h3>Performance Considerations</h3>
+                    <ul>
+                        <li><strong>Minimize nested imports</strong> to reduce build complexity</li>
+                        <li><strong>Use efficient asset references</strong> in component styles</li>
+                        <li><strong>Consider lazy loading</strong> for heavy interactive components</li>
+                        <li><strong>Optimize component styles</strong> for critical rendering path</li>
+                    </ul>
+
+                    <h2>Testing Components</h2>
+                    
+                    <h3>Development Testing</h3>
+                    <p>Test components during development:</p>
+                    
+                    <pre><code># Create a test page for your component
+# test-pages/button-tests.html
+&lt;body&gt;
+    &lt;h1&gt;Button Component Tests&lt;/h1&gt;
+    
+    &lt;!-- Default state --&gt;
+    &lt;div data-unify="/_includes/button.html"&gt;
+        &lt;span class="unify-label"&gt;Default Button&lt;/span&gt;
+    &lt;/div&gt;
+    
+    &lt;!-- Primary variant --&gt;
+    &lt;div data-unify="/_includes/button.html" class="is-primary"&gt;
+        &lt;span class="unify-label"&gt;Primary Button&lt;/span&gt;
+    &lt;/div&gt;
+    
+    &lt;!-- Large size --&gt;
+    &lt;div data-unify="/_includes/button.html" class="is-large"&gt;
+        &lt;span class="unify-label"&gt;Large Button&lt;/span&gt;
+    &lt;/div&gt;
+&lt;/body&gt;</code></pre>
+
+                    <h3>Linting Components</h3>
+                    <p>Use unify's built-in linting to validate components:</p>
+                    
+                    <pre><code># Validate component contracts
+unify build --fail-on U001,U002,U004
+
+# Check for common issues
+# U001: Contract documentation present
+# U002: Area classes unique in scope
+# U004: All areas documented</code></pre>
+
+                    <h2>Common Patterns</h2>
+                    
+                    <h3>Form Components</h3>
+                    <pre><code>&lt;!-- _includes/form-field.html --&gt;
+&lt;div class="form-field"&gt;
+    &lt;label class="unify-label" for="field-id"&gt;Field Label&lt;/label&gt;
+    &lt;div class="unify-input"&gt;
+        &lt;input type="text" id="field-id" name="field-name" /&gt;
+    &lt;/div&gt;
+    &lt;div class="unify-help"&gt;
+        &lt;p&gt;Helper text goes here&lt;/p&gt;
+    &lt;/div&gt;
+    &lt;div class="unify-error"&gt;
+        &lt;!-- Error messages --&gt;
+    &lt;/div&gt;
+&lt;/div&gt;</code></pre>
+
+                    <h3>Navigation Components</h3>
+                    <pre><code>&lt;!-- _includes/breadcrumb.html --&gt;
+&lt;nav class="breadcrumb" aria-label="Breadcrumb"&gt;
+    &lt;ol class="unify-items"&gt;
+        &lt;li&gt;&lt;a href="/"&gt;Home&lt;/a&gt;&lt;/li&gt;
+        &lt;li&gt;&lt;a href="/products"&gt;Products&lt;/a&gt;&lt;/li&gt;
+        &lt;li aria-current="page"&gt;Current Page&lt;/li&gt;
+    &lt;/ol&gt;
+&lt;/nav&gt;</code></pre>
+
+                    <h3>Content Components</h3>
+                    <pre><code>&lt;!-- _includes/testimonial.html --&gt;
+&lt;blockquote class="testimonial"&gt;
+    &lt;div class="unify-quote"&gt;
+        &lt;p&gt;Default testimonial text goes here...&lt;/p&gt;
+    &lt;/div&gt;
+    &lt;footer class="testimonial-footer"&gt;
+        &lt;div class="unify-author"&gt;
+            &lt;strong&gt;John Doe&lt;/strong&gt;
+        &lt;/div&gt;
+        &lt;div class="unify-title"&gt;
+            &lt;span&gt;CEO, Company Name&lt;/span&gt;
+        &lt;/div&gt;
+    &lt;/footer&gt;
+&lt;/blockquote&gt;</code></pre>
+
+                    <div class="callout callout-warning">
+                        <h3>⚠️ Common Pitfalls</h3>
+                        <ul>
+                            <li><strong>Duplicate area classes</strong> within the same component scope</li>
+                            <li><strong>Overly specific CSS selectors</strong> in contract documentation</li>
+                            <li><strong>Missing fallback content</strong> for all public areas</li>
+                            <li><strong>Circular component dependencies</strong> causing build errors</li>
+                            <li><strong>Undocumented areas</strong> leading to maintenance issues</li>
+                        </ul>
+                    </div>
+
+                    <h2>Next Steps</h2>
+                    
+                    <p>Now that you understand component patterns:</p>
+                    <ul>
+                        <li><a href="/unify/docs/includes">Review DOM Cascade composition rules</a></li>
+                        <li><a href="/unify/docs/markdown">Learn about Markdown components</a></li>
+                        <li><a href="/unify/docs/assets">Understand asset management in components</a></li>
+                        <li><a href="/unify/docs/performance">Optimize component performance</a></li>
+                    </ul>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

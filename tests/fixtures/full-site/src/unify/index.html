@@ -1,0 +1,290 @@
+<html lang="en" data-unify="/_includes/tool-page.html">
+
+<head>
+    <title>unify - Static sites for people who remember HTML</title>
+    <meta name="description"
+        content="Build maintainable static sites using Apache SSI syntax and modern tooling. No JSX, no build step hell, no framework lock-in.">
+    <style>
+        /* Page-specific styles for unify */
+        .tool-hero {
+            background: linear-gradient(135deg, rgba(0, 255, 65, 0.05) 0%, transparent 50%);
+        }
+
+        .install-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .install-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .install-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+        }
+
+        .install-icon {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+        }
+
+        .install-code {
+            background: var(--bg-darker);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 1rem;
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--primary);
+            margin: 1rem 0;
+            text-align: left;
+            white-space: pre-line;
+        }
+    </style>
+</head>
+
+<body>
+
+<!-- Tool-specific navigation links -->
+<ul class="unify-nav-links">
+    <li><a href="/unify/">Overview</a></li>
+    <li><a href="/unify/getting-started.html">Getting Started</a></li>                
+    <li><a href="/unify/docs.html">Documentation</a></li>
+    <li><a href="/unify/examples.html">Examples</a></li>
+</ul>
+
+<main class="unify-content">
+<!-- Hero Section -->
+<section class="tool-hero">
+    <div class="tool-hero-content">
+        <h1>unify</h1>
+        <div class="tagline">Static sites for people who remember HTML</div>
+        <div class="description">
+            Build maintainable sites with Apache SSI syntax and modern tooling.
+            No JSX, no build step hell, no framework lock-in. Just fast sites that ship.
+        </div>
+        <div class="cta-buttons">
+            <a href="#install" class="btn btn-primary">
+                <span>⚡</span> Get Started
+            </a>
+            <a href="https://github.com/fwdslsh/unify" class="btn btn-secondary">
+                View Source
+            </a>
+        </div>
+    </div>
+    <div class="tool-demo">
+        <div class="code-editor">
+            <div class="editor-header">
+                <div class="editor-dot dot-red"></div>
+                <div class="editor-dot dot-yellow"></div>
+                <div class="editor-dot dot-green"></div>
+                <div class="editor-title">src/index.html</div>
+            </div>
+            <div class="editor-content">
+                <div class="code-line">
+                    <span class="line-number">1</span>
+                    <span class="html-comment">&lt;!-- No build step, no bundler --&gt;</span>
+                </div>
+                <div class="code-line">
+                    <span class="line-number">2</span>
+                    <span class="html-tag">&lt;!--#include</span> <span class="html-attr">virtual</span>=<span
+                        class="html-string">"/_includes/header.html"</span> <span class="html-tag">--&gt;</span>
+                </div>
+                <div class="code-line">
+                    <span class="line-number">3</span>
+                </div>
+                <div class="code-line">
+                    <span class="line-number">4</span>
+                    <span class="html-tag">&lt;main&gt;</span>
+                </div>
+                <div class="code-line">
+                    <span class="line-number">5</span>
+                    &nbsp;&nbsp;<span class="html-tag">&lt;h1&gt;</span>Welcome!<span
+                        class="html-tag">&lt;/h1&gt;</span>
+                </div>
+                <div class="code-line">
+                    <span class="line-number">6</span>
+                    &nbsp;&nbsp;<span class="html-tag">&lt;p&gt;</span>Built with HTML you already know<span
+                        class="html-tag">&lt;/p&gt;</span>
+                </div>
+                <div class="code-line">
+                    <span class="line-number">7</span>
+                    <span class="html-tag">&lt;/main&gt;</span>
+                </div>
+                <div class="code-line">
+                    <span class="line-number">8</span>
+                </div>
+                <div class="code-line">
+                    <span class="line-number">9</span>
+                    <span class="html-tag">&lt;!--#include</span> <span class="html-attr">virtual</span>=<span
+                        class="html-string">"/_includes/footer.html"</span> <span class="html-tag">--&gt;</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Installation Section -->
+        <section id="install" class="install-section">
+            <div class="install-container">
+                <div class="section-header">
+                    <h2>Get Running in 30 Seconds</h2>
+                    <p>One command, zero config ceremony</p>
+                </div>
+
+                <div class="install-grid">
+                    <div class="install-card">
+                        <div class="install-icon">🚀</div>
+                        <h3>Quick Start</h3>
+                        <div class="install-code">
+                            # Install Bun (if needed)
+                            curl -fsSL https://bun.sh/install | bash
+
+                            # Install unify globally
+                            bun add -g @fwdslsh/unify
+
+                            # Build your site
+                            unify build
+                        </div>
+                        <p>Zero dependencies, instant setup</p>
+                    </div>
+
+                    <div class="install-card">
+                        <div class="install-icon">⚡</div>
+                        <h3>Dev Server</h3>
+                        <div class="install-code">
+                            # Start dev server with live reload
+                            unify serve
+
+                            # Watch for changes
+                            unify watch
+
+                            # Custom port
+                            unify serve --port 8080
+                        </div>
+                        <p>Live reload via Server-Sent Events</p>
+                    </div>
+
+                    <div class="install-card">
+                        <div class="install-icon">📦</div>
+                        <h3>Standalone Binary</h3>
+                        <div class="install-code">
+                            # Create executable
+                            bun run build:executable
+
+                            # Run anywhere
+                            ./unify build
+                            ./unify serve
+                        </div>
+                        <p>Deploy without runtime dependencies</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+<!-- Features Section -->
+        <section class="tool-section">
+            <div class="section-header">
+                <h2>Built for Speed and Simplicity</h2>
+                <p>Modern tooling with timeless principles</p>
+            </div>
+
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🌐</div>
+                    <h3>Apache SSI Syntax</h3>
+                    <p>Use familiar server-side includes that have worked for decades. No new templating language to
+                        learn.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Bun-Powered Performance</h3>
+                    <p>Native HTMLRewriter, fs.watch, and Bun.serve APIs deliver ultra-fast builds and live development.
+                    </p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">🔧</div>
+                    <h3>Component Architecture</h3>
+                    <p>Build maintainable sites with reusable components. No more copy-pasting headers and footers.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">📝</div>
+                    <h3>Markdown + Frontmatter</h3>
+                    <p>Write content in Markdown with YAML frontmatter. Perfect for blogs, docs, and content sites.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">🛡️</div>
+                    <h3>Security First</h3>
+                    <p>Path traversal prevention, input validation, and secure serving. Static output means no runtime
+                        vulnerabilities.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">🌍</div>
+                    <h3>Cross-Platform</h3>
+                    <p>Runs on Node.js, Deno, and Bun. Compile to standalone executables for any platform.</p>
+                </div>
+            </div>
+        </section>
+
+<!-- Stats Section -->
+        <section class="stats-section">
+            <div class="stats-container">
+                <div class="section-header">
+                    <h2>Performance That Matters</h2>
+                    <p>Benchmarks from real-world usage</p>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-number">~800ms</div>
+                        <div class="stat-label">Cold Start Time</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number">&lt;100ms</div>
+                        <div class="stat-label">Hot Rebuild</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number">0</div>
+                        <div class="stat-label">Runtime Dependencies</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number">1</div>
+                        <div class="stat-label">Config Files Needed</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+<!-- CTA Section -->
+        <section class="cta-section">
+            <div class="section-header">
+                <h2>Ready to Build?</h2>
+                <p>Get started with unify today</p>
+            </div>
+
+            <div class="cta-buttons">
+                <a href="/docs/getting-started" class="btn btn-primary">
+                    📚 Read the Docs
+                </a>
+                <a href="/examples" class="btn btn-secondary">
+                    🎯 View Examples
+                </a>
+                <a href="https://github.com/fwdslsh/unify-starter" class="btn btn-secondary">
+                    🚀 Starter Template
+                </a>
+            </div>
+        </section>
+</main>

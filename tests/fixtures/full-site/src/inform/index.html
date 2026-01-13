@@ -1,0 +1,707 @@
+<html lang="en" data-unify="/_includes/tool-page.html">
+
+<head>
+    <title>inform - High-Performance Web Content Crawler</title>
+    <meta name="description"
+        content="Crawl websites, extract main content, and convert to clean Markdown. Powered by Bun for maximum performance with zero dependencies.">
+    <style>
+        /* Page-specific styles for inform */
+        .tool-hero {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, transparent 50%);
+        }
+
+        .inform-icon {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+        }
+
+        .crawler-demo {
+            background: var(--bg-darker);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            margin: 2rem 0;
+            max-width: 800px;
+            overflow: hidden;
+        }
+
+        .crawler-progress {
+            padding: 1.5rem;
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            background: var(--bg-darker);
+        }
+
+        .progress-line {
+            display: flex;
+            align-items: center;
+            margin-bottom: 0.5rem;
+            color: var(--text-secondary);
+        }
+
+        .progress-status {
+            color: var(--success);
+            margin-right: 1rem;
+            font-weight: bold;
+        }
+
+        .progress-url {
+            color: var(--primary);
+            flex: 1;
+        }
+
+        .progress-size {
+            color: var(--text-dim);
+            font-size: 0.8rem;
+        }
+
+        .crawler-stats {
+            padding: 1.5rem;
+            background: var(--bg-card);
+            border-top: 1px solid var(--border);
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 1rem;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--primary);
+            font-family: var(--font-mono);
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .source-types {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-top: 3rem;
+        }
+
+        .source-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .source-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+        }
+
+        .source-icon {
+            width: 50px;
+            height: 50px;
+            margin: 0 auto 1rem;
+            background: var(--gradient-primary);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            color: var(--bg-dark);
+        }
+
+        .performance-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .performance-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .performance-number {
+            font-size: 2rem;
+            font-weight: 900;
+            color: var(--primary);
+            font-family: var(--font-mono);
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        .performance-label {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 2rem;
+            background: var(--bg-card);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .comparison-table th,
+        .comparison-table td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .comparison-table th {
+            background: var(--bg-darker);
+            color: var(--text-primary);
+            font-weight: 600;
+            font-family: var(--font-mono);
+        }
+
+        .comparison-table td {
+            color: var(--text-secondary);
+        }
+
+        .comparison-table .check {
+            color: var(--success);
+            font-weight: bold;
+        }
+
+        .comparison-table .cross {
+            color: #ff5555;
+            font-weight: bold;
+        }
+
+        .integration-flow {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 3rem;
+            position: relative;
+        }
+
+        .flow-step {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            text-align: center;
+            position: relative;
+        }
+
+        .flow-step::after {
+            content: '→';
+            position: absolute;
+            right: -1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--primary);
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        .flow-step:last-child::after {
+            display: none;
+        }
+
+        .flow-icon {
+            width: 40px;
+            height: 40px;
+            margin: 0 auto 1rem;
+            background: var(--gradient-primary);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            color: var(--bg-dark);
+            font-weight: bold;
+        }
+
+        @media (max-width: 768px) {
+            .flow-step::after {
+                content: '↓';
+                right: 50%;
+                top: 100%;
+                transform: translateX(50%);
+                bottom: -1rem;
+            }
+
+            .flow-step:last-child::after {
+                display: none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<!-- Tool-specific navigation links -->
+<ul class="unify-nav-links">
+    <li><a href="/inform/">Overview</a></li>
+    <li><a href="/inform/getting-started.html">Getting Started</a></li>                
+    <li><a href="/inform/docs.html">Documentation</a></li>
+    <li><a href="/inform/examples.html">Examples</a></li>
+</ul>
+
+<main class="unify-content">
+
+<!-- Hero Section -->
+<section class="tool-hero">
+    <div class="tool-hero-content">
+        <h1>inform</h1>
+        <div class="tagline">High-Performance Web Content Crawler</div>
+        <div class="description">
+            Crawl websites, extract main content, and convert to clean Markdown. Powered by Bun for maximum
+            performance with concurrent processing and zero dependencies.
+        </div>
+        <div class="cta-buttons">
+            <a href="#install" class="btn btn-primary">
+                <span>⚡</span> Get Started
+            </a>
+            <a href="https://github.com/fwdslsh/inform" class="btn btn-secondary">
+                View Source
+            </a>
+        </div>
+    </div>
+    <div class="tool-demo">
+        <div class="crawler-demo">
+            <div class="crawler-progress">
+                <div class="progress-line">
+                    <span class="progress-status">✓</span>
+                    <span class="progress-url">https://docs.example.com/</span>
+                    <span class="progress-size">12.3KB</span>
+                </div>
+                <div class="progress-line">
+                    <span class="progress-status">✓</span>
+                    <span class="progress-url">https://docs.example.com/api/auth</span>
+                    <span class="progress-size">8.7KB</span>
+                </div>
+                <div class="progress-line">
+                    <span class="progress-status">✓</span>
+                    <span class="progress-url">https://docs.example.com/guides/setup</span>
+                    <span class="progress-size">15.2KB</span>
+                </div>
+                <div class="progress-line">
+                    <span class="progress-status">⏳</span>
+                    <span class="progress-url">https://docs.example.com/tutorials/</span>
+                    <span class="progress-size">crawling...</span>
+                </div>
+            </div>
+            <div class="crawler-stats">
+                <div class="stat-item">
+                    <div class="stat-value">42</div>
+                    <div class="stat-label">Pages Crawled</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">2.3MB</div>
+                    <div class="stat-label">Content Extracted</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">847ms</div>
+                    <div class="stat-label">Total Time</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">5</div>
+                    <div class="stat-label">Concurrent</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+    <!-- Features Section -->
+        <section class="tool-section">
+            <div class="section-header">
+                <h2>Built for Speed and Reliability</h2>
+                <p>Modern web crawling without the complexity</p>
+            </div>
+
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🚀</div>
+                    <h3>Powered by Bun</h3>
+                    <p>Significantly faster than Node.js with built-in optimizations. Native DOM parsing and
+                        zero-dependency
+                        HTML processing for maximum performance.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Concurrent Crawling</h3>
+                    <p>Process multiple pages simultaneously with configurable concurrency limits. Intelligent rate
+                        limiting
+                        and backoff strategies.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">🎯</div>
+                    <h3>Smart Content Extraction</h3>
+                    <p>Intelligently identifies main content by removing navigation, ads, and other non-content
+                        elements.
+                        Preserves structure and formatting.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">📝</div>
+                    <h3>Clean Markdown Output</h3>
+                    <p>Converts HTML to properly formatted Markdown. Code examples become code blocks, maintains heading
+                        hierarchy and link structure.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">🗂️</div>
+                    <h3>Structure Preservation</h3>
+                    <p>Maintains original folder structure from URLs. /docs/api/ becomes docs/api.md with meaningful
+                        filenames based on content.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">🔧</div>
+                    <h3>Flexible Configuration</h3>
+                    <p>Configurable delays, concurrency limits, include/exclude patterns, and output formats. Works with
+                        any
+                        website structure.</p>
+                </div>
+            </div>
+        </section>
+
+    <!-- Installation Section -->
+        <section id="install" class="tool-section">
+            <div class="section-header">
+                <h2>Installation</h2>
+                <p>Get inform running in seconds</p>
+            </div>
+
+            <div class="install-grid">
+                <div class="install-card">
+                    <div class="install-icon">⚡</div>
+                    <h3>Quick Install</h3>
+                    <div class="install-code">
+                        # One-line install script
+                        curl -fsSL https://raw.githubusercontent.com/fwdslsh/inform/main/install.sh | sh
+
+                        # Start crawling immediately
+                        inform https://docs.example.com
+                    </div>
+                    <p>Automatically downloads the right binary for your platform</p>
+                </div>
+
+                <div class="install-card">
+                    <div class="install-icon">📦</div>
+                    <h3>Bun Package</h3>
+                    <div class="install-code">
+                        # Install globally with Bun
+                        bun install -g @fwdslsh/inform
+
+                        # Or add to project
+                        bun add @fwdslsh/inform
+                    </div>
+                    <p>Use with Bun's superior performance and built-in features</p>
+                </div>
+
+                <div class="install-card">
+                    <div class="install-icon">🐳</div>
+                    <h3>Docker</h3>
+                    <div class="install-code">
+                        # Pull latest image
+                        docker pull fwdslsh/inform:latest
+
+                        # Run crawler
+                        docker run --rm fwdslsh/inform https://docs.example.com
+                    </div>
+                    <p>Containerized for consistent environments and CI/CD</p>
+                </div>
+            </div>
+        </section>
+
+    <!-- Additional content for sources and performance -->
+        <section id="sources" class="tool-section alt-bg">
+            <div class="section-header">
+                <h2>Multiple Content Sources</h2>
+                <p>Crawl from websites, Git repositories, and more</p>
+            </div>
+
+            <div class="source-types">
+                <div class="source-card">
+                    <div class="source-icon">🌐</div>
+                    <h4>Website Crawling</h4>
+                    <div class="code-snippet">inform https://docs.example.com</div>
+                    <p>Crawl any website with automatic link discovery and same-domain restriction</p>
+                </div>
+
+                <div class="source-card">
+                    <div class="source-icon">📂</div>
+                    <h4>Git Repository Downloads</h4>
+                    <div class="code-snippet">inform github.com/owner/repo/tree/main/docs</div>
+                    <p>Download specific directories from GitHub repositories without cloning the entire repo</p>
+                </div>
+
+                <div class="source-card">
+                    <div class="source-icon">🎯</div>
+                    <h4>Pattern-Based Filtering</h4>
+                    <div class="code-snippet">inform site.com --include "*.md" --exclude "temp/*"</div>
+                    <p>Use glob patterns to include or exclude specific content during crawling</p>
+                </div>
+
+                <div class="source-card">
+                    <div class="source-icon">🔧</div>
+                    <h4>Custom Configuration</h4>
+                    <div class="code-snippet">inform site.com --concurrency 10 --delay 100</div>
+                    <p>Fine-tune performance with custom concurrency limits and request delays</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="tool-section alt-bg">
+            <div class="section-header">
+                <h2>Performance Comparison</h2>
+                <p>Why inform is the fastest choice for web crawling</p>
+            </div>
+
+            <div class="performance-grid">
+                <div class="performance-card">
+                    <span class="performance-number">3x</span>
+                    <div class="performance-label">Faster than Node.js crawlers</div>
+                </div>
+                <div class="performance-card">
+                    <span class="performance-number">0</span>
+                    <div class="performance-label">External dependencies</div>
+                </div>
+                <div class="performance-card">
+                    <span class="performance-number">95%</span>
+                    <div class="performance-label">Content extraction accuracy</div>
+                </div>
+                <div class="performance-card">
+                    <span class="performance-number">5MB</span>
+                    <div class="performance-label">Binary size</div>
+                </div>
+            </div>
+
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Feature</th>
+                        <th>inform</th>
+                        <th>Puppeteer</th>
+                        <th>Scrapy</th>
+                        <th>wget</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Content Extraction</td>
+                        <td class="check">✓ Smart</td>
+                        <td class="check">✓ Full</td>
+                        <td class="check">✓ Custom</td>
+                        <td class="cross">✗ Raw Only</td>
+                    </tr>
+                    <tr>
+                        <td>Markdown Output</td>
+                        <td class="check">✓ Built-in</td>
+                        <td class="cross">✗ Manual</td>
+                        <td class="cross">✗ Manual</td>
+                        <td class="cross">✗ None</td>
+                    </tr>
+                    <tr>
+                        <td>Concurrent Processing</td>
+                        <td class="check">✓ Native</td>
+                        <td class="check">✓ Heavy</td>
+                        <td class="check">✓ Yes</td>
+                        <td class="cross">✗ Sequential</td>
+                    </tr>
+                    <tr>
+                        <td>Memory Usage</td>
+                        <td class="check">✓ Low</td>
+                        <td class="cross">✗ High</td>
+                        <td class="check">✓ Medium</td>
+                        <td class="check">✓ Low</td>
+                    </tr>
+                    <tr>
+                        <td>Setup Complexity</td>
+                        <td class="check">✓ Zero</td>
+                        <td class="cross">✗ Complex</td>
+                        <td class="cross">✗ Complex</td>
+                        <td class="check">✓ Simple</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="tool-section">
+            <div class="section-header">
+                <h2>Integration Workflow</h2>
+                <p>Perfect for documentation pipelines and content management</p>
+            </div>
+
+            <div class="integration-flow">
+                <div class="flow-step">
+                    <div class="flow-icon">🌐</div>
+                    <h4>Crawl Content</h4>
+                    <p>Extract content from websites or repositories</p>
+                </div>
+
+                <div class="flow-step">
+                    <div class="flow-icon">📋</div>
+                    <h4>Generate Index</h4>
+                    <p>Use catalog to create llms.txt files</p>
+                </div>
+
+                <div class="flow-step">
+                    <div class="flow-icon">🏗️</div>
+                    <h4>Build Site</h4>
+                    <p>Create static sites with unify</p>
+                </div>
+
+                <div class="flow-step">
+                    <div class="flow-icon">🚀</div>
+                    <h4>Deploy</h4>
+                    <p>Publish to your hosting platform</p>
+                </div>
+            </div>
+
+            <div class="code-block">
+                <pre># Complete documentation workflow
+inform https://docs.example.com --output-dir docs
+catalog --input docs --output build --sitemap --base-url https://docs.example.com
+unify build --input build --output dist
+giv message # AI-powered commit for the updates</pre>
+            </div>
+
+            <div class="quick-links">
+                <a href="/ecosystem/" class="quick-link">
+                    <span class="quick-link-icon">🔄</span>
+                    <div class="quick-link-content">
+                        <h4>Complete Workflow</h4>
+                        <p>See how all fwdslsh tools work together</p>
+                    </div>
+                </a>
+
+                <a href="/inform/examples" class="quick-link">
+                    <span class="quick-link-icon">📚</span>
+                    <div class="quick-link-content">
+                        <h4>Real-World Examples</h4>
+                        <p>Common crawling patterns and use cases</p>
+                    </div>
+                </a>
+
+                <a href="/inform/getting-started" class="quick-link">
+                    <span class="quick-link-icon">🚀</span>
+                    <div class="quick-link-content">
+                        <h4>Getting Started Guide</h4>
+                        <p>From installation to your first crawl</p>
+                    </div>
+                </a>
+            </div>
+        </section>
+
+    <!-- Stats Section -->
+        <section class="stats-section">
+            <div class="stats-container">
+                <div class="section-header">
+                    <h2>Performance Metrics</h2>
+                    <p>Real-world crawling statistics</p>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-number">847ms</div>
+                        <div class="stat-label">Average Site Crawl</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number">95%</div>
+                        <div class="stat-label">Content Accuracy</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number">5MB</div>
+                        <div class="stat-label">Binary Size</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number">0</div>
+                        <div class="stat-label">Dependencies</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    <!-- CTA Section -->
+        <section class="tool-section alt-bg">
+            <div class="section-header">
+                <h2>Ready to Start Crawling?</h2>
+                <p>Transform web content into clean, usable Markdown</p>
+            </div>
+
+            <div class="cta-buttons">
+                <a href="/inform/getting-started" class="btn btn-primary">
+                    🚀 Getting Started Guide
+                </a>
+                <a href="/inform/examples" class="btn btn-secondary">
+                    📚 View Examples
+                </a>
+                <a href="https://github.com/fwdslsh/inform/releases" class="btn btn-secondary">
+                    📥 Download Binary
+                </a>
+            </div>
+        </section>
+
+    <!-- Scripts -->
+        <script>
+            // Animate crawler demo
+            const progressLines = document.querySelectorAll('.progress-line');
+            const stats = document.querySelector('.crawler-stats');
+
+            const animateCrawler = () => {
+                progressLines.forEach((line, index) => {
+                    setTimeout(() => {
+                        line.style.animation = 'fadeInUp 0.5s ease-out forwards';
+                    }, index * 300);
+                });
+
+                setTimeout(() => {
+                    stats.style.animation = 'fadeInUp 0.6s ease-out forwards';
+                }, progressLines.length * 300 + 200);
+            };
+
+            // Start animation when demo comes into view
+            const crawlerObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        animateCrawler();
+                        crawlerObserver.unobserve(entry.target);
+                    }
+                });
+            });
+
+            const crawlerDemo = document.querySelector('.crawler-demo');
+            if (crawlerDemo) {
+                crawlerObserver.observe(crawlerDemo);
+            }
+
+            // Performance stats animation
+            const perfObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const numbers = entry.target.querySelectorAll('.performance-number');
+                        numbers.forEach((num, index) => {
+                            setTimeout(() => {
+                                num.style.animation = 'fadeInUp 0.6s ease-out forwards';
+                            }, index * 100);
+                        });
+                    }
+                });
+            });
+
+            const perfGrid = document.querySelector('.performance-grid');
+            if (perfGrid) {
+                perfObserver.observe(perfGrid);
+            }
+        </script>
+    </main>
+</body>
+</html>

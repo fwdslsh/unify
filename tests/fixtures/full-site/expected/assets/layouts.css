@@ -1,0 +1,389 @@
+/* Layout Styles for fwdslsh Website */
+
+/* ===== BASE LAYOUT ===== */
+.site-container {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.site-main {
+    flex: 1;
+    padding-top: 80px; /* Account for fixed nav */
+}
+
+/* ===== NAVIGATION ENHANCEMENTS ===== */
+nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    transition: background 0.3s ease;
+    backdrop-filter: blur(10px);
+}
+
+.nav-container {
+    position: relative;
+}
+
+/* Tool context in navigation */
+.tool-context {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-left: auto;
+    margin-right: 2rem;
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.tool-context .current-tool {
+    color: var(--primary);
+    font-weight: 600;
+}
+
+.tool-context::before {
+    content: '/';
+    color: var(--text-dim);
+    margin-right: 0.25rem;
+}
+
+/* ===== TOOL LAYOUTS ===== */
+
+/* Tool Hero Sections */
+.tool-hero {
+    min-height: 80vh;
+    display: flex;
+    align-items: center;
+    padding: 8rem 2rem 4rem;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.tool-hero-content {
+    flex: 1;
+    max-width: 600px;
+    animation: fadeInLeft 1s ease-out;
+}
+
+.tool-hero h1 {
+    font-size: clamp(3rem, 6vw, 4.5rem);
+    font-weight: 900;
+    margin-bottom: 1rem;
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1.1;
+}
+
+.tool-hero .tagline {
+    font-size: clamp(1.2rem, 2.5vw, 1.6rem);
+    color: var(--text-secondary);
+    margin-bottom: 2rem;
+    font-family: var(--font-mono);
+}
+
+.tool-hero .description {
+    font-size: 1.2rem;
+    color: var(--text-dim);
+    margin-bottom: 3rem;
+    line-height: 1.7;
+}
+
+.tool-demo {
+    flex: 1;
+    margin-left: 4rem;
+    animation: fadeInRight 1s ease-out 0.3s both;
+}
+
+/* Tool Navigation */
+.tool-nav {
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border);
+    padding: 1rem 0;
+    margin-bottom: 2rem;
+    position: sticky;
+    top: 80px;
+    z-index: 100;
+    backdrop-filter: blur(10px);
+}
+
+.tool-nav-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 2rem;
+}
+
+.tool-nav-links {
+    display: flex;
+    gap: 2rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.tool-nav-links li {
+    margin: 0;
+}
+
+.tool-nav-links a {
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+    display: block;
+    position: relative;
+}
+
+.tool-nav-links a:hover,
+.tool-nav-links a.active {
+    color: var(--primary);
+    background: rgba(0, 255, 65, 0.1);
+}
+
+.tool-nav-links a.active::after {
+    content: '';
+    position: absolute;
+    bottom: -1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 20px;
+    height: 2px;
+    background: var(--primary);
+}
+
+/* Tool Sections */
+.tool-section {
+    padding: 6rem 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.tool-section.alt-bg {
+    background: var(--bg-darker);
+    margin-left: calc(-50vw + 50%);
+    margin-right: calc(-50vw + 50%);
+    padding-left: calc(50vw - 50%);
+    padding-right: calc(50vw - 50%);
+    max-width: none;
+}
+
+.tool-section.full-width {
+    max-width: none;
+    margin-left: -2rem;
+    margin-right: -2rem;
+    padding-left: 4rem;
+    padding-right: 4rem;
+}
+
+/* ===== HOMEPAGE LAYOUTS ===== */
+.homepage-hero {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 8rem 2rem 4rem;
+    position: relative;
+}
+
+.homepage-hero::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: 
+        radial-gradient(circle at 25% 25%, rgba(0, 255, 65, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 75% 75%, rgba(59, 130, 246, 0.1) 0%, transparent 50%);
+    z-index: -1;
+}
+
+/* ===== ECOSYSTEM LAYOUTS ===== */
+.ecosystem-hero {
+    background: linear-gradient(135deg, 
+        rgba(0, 255, 65, 0.03) 0%, 
+        rgba(59, 130, 246, 0.03) 50%, 
+        rgba(245, 158, 11, 0.03) 100%);
+}
+
+.workflow-visualization {
+    background: var(--bg-darker);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 3rem 2rem;
+    margin: 4rem auto;
+    max-width: 1000px;
+    position: relative;
+}
+
+.workflow-steps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 2rem;
+    position: relative;
+}
+
+.workflow-step {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 2rem 1.5rem;
+    text-align: center;
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.workflow-step:hover {
+    border-color: var(--primary);
+    transform: translateY(-5px);
+}
+
+.workflow-step::after {
+    content: '→';
+    position: absolute;
+    right: -1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--primary);
+    font-size: 1.5rem;
+    font-weight: bold;
+    z-index: 1;
+}
+
+.workflow-step:last-child::after {
+    display: none;
+}
+
+/* ===== RESPONSIVE LAYOUTS ===== */
+@media (max-width: 968px) {
+    .tool-hero {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .tool-demo {
+        margin-left: 0;
+        margin-top: 3rem;
+        max-width: 500px;
+    }
+
+    .tool-section.alt-bg {
+        margin-left: calc(-50vw + 50%);
+        margin-right: calc(-50vw + 50%);
+        padding-left: 2rem;
+        padding-right: 2rem;
+    }
+
+    .tool-section.full-width {
+        margin-left: 0;
+        margin-right: 0;
+        padding-left: 2rem;
+        padding-right: 2rem;
+    }
+
+    .workflow-step::after {
+        content: '↓';
+        right: 50%;
+        top: 100%;
+        transform: translateX(50%);
+        bottom: -1rem;
+    }
+
+    .workflow-step:last-child::after {
+        display: none;
+    }
+}
+
+@media (max-width: 768px) {
+    .tool-nav {
+        position: static;
+    }
+    
+    .tool-nav-links {
+        flex-wrap: wrap;
+        gap: 1rem;
+        justify-content: center;
+    }
+    
+    .tool-nav-links a {
+        font-size: 0.8rem;
+        padding: 0.4rem 0.8rem;
+    }
+
+    .tool-context {
+        display: none;
+    }
+
+    .site-main {
+        padding-top: 0;
+    }
+
+    .workflow-steps {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    .tool-hero {
+        padding: 6rem 1rem 2rem;
+    }
+
+    .tool-section {
+        padding: 4rem 1rem;
+    }
+
+    .workflow-visualization {
+        padding: 2rem 1rem;
+        margin: 2rem auto;
+    }
+
+    .workflow-step {
+        padding: 1.5rem 1rem;
+    }
+}
+
+/* ===== LAYOUT UTILITIES ===== */
+.layout-constrained {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 2rem;
+}
+
+.layout-narrow {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 0 2rem;
+}
+
+.layout-wide {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 2rem;
+}
+
+.layout-full {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+/* Vertical spacing */
+.layout-section {
+    padding: 6rem 0;
+}
+
+.layout-section-small {
+    padding: 4rem 0;
+}
+
+.layout-section-large {
+    padding: 8rem 0;
+}

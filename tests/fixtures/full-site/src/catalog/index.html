@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>catalog - AI-Ready Documentation Indexer</title>
+    <meta name="description"
+        content="Generate llms.txt and llms-full.txt from Markdown/HTML directories. Perfect for AI-powered documentation workflows and searchable knowledge bases.">
+    <style>
+        /* Page-specific styles */
+        .tool-hero {
+            background: linear-gradient(135deg, rgba(168, 255, 96, 0.05) 0%, transparent 50%);
+        }
+
+        .catalog-icon {
+            background: linear-gradient(135deg, #a8ff60 0%, #64ff4a 100%);
+        }
+
+        .indexing-demo {
+            background: var(--bg-darker);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            margin: 4rem auto;
+            max-width: 900px;
+            overflow: hidden;
+        }
+
+        .demo-tabs {
+            display: flex;
+            background: var(--border);
+        }
+
+        .demo-tab {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            transition: all 0.3s ease;
+        }
+
+        .demo-tab.active {
+            background: var(--bg-darker);
+            color: var(--primary);
+        }
+
+        .demo-content {
+            display: none;
+            padding: 1.5rem;
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .demo-content.active {
+            display: block;
+        }
+
+        .demo-content h4 {
+            color: var(--primary);
+            margin-bottom: 1rem;
+            font-size: 1rem;
+        }
+
+        .llms-section {
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+        }
+
+        .llms-title {
+            color: var(--primary);
+            font-weight: bold;
+        }
+
+        .llms-description {
+            color: var(--text-dim);
+            font-style: italic;
+        }
+
+        .llms-link {
+            color: var(--secondary);
+            text-decoration: none;
+        }
+
+        .llms-link:hover {
+            text-decoration: underline;
+        }
+
+        .format-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .format-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 2rem;
+            transition: all 0.3s ease;
+        }
+
+        .format-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+        }
+
+        .format-icon {
+            width: 50px;
+            height: 50px;
+            background: var(--gradient-primary);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1rem;
+            font-size: 1.2rem;
+            color: var(--bg-dark);
+        }
+
+        .compliance-section {
+            background: linear-gradient(135deg, rgba(0, 255, 65, 0.05) 0%, rgba(59, 130, 246, 0.05) 100%);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem;
+            margin-top: 3rem;
+        }
+
+        .compliance-features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .compliance-feature {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .compliance-check {
+            color: var(--success);
+            font-weight: bold;
+        }
+
+        .workflow-diagram {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-top: 3rem;
+            position: relative;
+        }
+
+        .workflow-step {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            text-align: center;
+            position: relative;
+        }
+
+        .workflow-step::after {
+            content: '→';
+            position: absolute;
+            right: -0.5rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--primary);
+            font-size: 1.2rem;
+            font-weight: bold;
+            z-index: 1;
+        }
+
+        .workflow-step:last-child::after {
+            display: none;
+        }
+
+        .workflow-icon {
+            width: 40px;
+            height: 40px;
+            margin: 0 auto 1rem;
+            background: var(--gradient-primary);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            color: var(--bg-dark);
+        }
+
+        .use-cases {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minMax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .use-case {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 2rem;
+        }
+
+        .use-case-icon {
+            width: 50px;
+            height: 50px;
+            background: var(--gradient-primary);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1rem;
+            font-size: 1.2rem;
+            color: var(--bg-dark);
+        }
+
+        .ai-integration {
+            background: linear-gradient(135deg, rgba(168, 255, 96, 0.05) 0%, rgba(245, 158, 11, 0.05) 100%);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem;
+            margin-top: 3rem;
+        }
+
+        @media (max-width: 768px) {
+            .workflow-step::after {
+                content: '↓';
+                right: 50%;
+                top: 100%;
+                transform: translateX(50%);
+                bottom: -1rem;
+            }
+
+            .workflow-step:last-child::after {
+                display: none;
+            }
+        }
+    </style>
+</head>
+
+<body data-unify="/_includes/tool-page.html">
+
+<!-- Tool-specific navigation links -->
+<ul class="unify-nav-links">
+    <li><a href="/catalog/">Overview</a></li>
+    <li><a href="/catalog/getting-started.html">Getting Started</a></li>                
+    <li><a href="/catalog/docs.html">Documentation</a></li>
+    <li><a href="/catalog/examples.html">Examples</a></li>
+</ul>
+
+<main class="unify-content">
+<section class="tool-hero">
+        <div class="tool-hero-content">
+            <h1>catalog</h1>
+            <p class="tagline">AI-Ready Documentation Indexer</p>
+            <p class="description">
+                Generate llms.txt and llms-full.txt from Markdown/HTML directories. Complete llms.txt standard
+                compliance with enterprise-grade features for AI-powered documentation workflows.
+            </p>
+            <div class="cta-buttons">
+                <a href="#install" class="btn btn-primary">
+                    <span>📋</span> Get Started
+                </a>
+                <a href="https://github.com/fwdslsh/catalog" class="btn btn-secondary">
+                    View Source
+                </a>
+            </div>
+        </div>
+        <div class="tool-demo">
+            <div class="indexing-demo">
+                <div class="demo-tabs">
+                    <button class="demo-tab active" onclick="showDemoTab('llms-txt')">llms.txt</button>
+                    <button class="demo-tab" onclick="showDemoTab('llms-full')">llms-full.txt</button>
+                    <button class="demo-tab" onclick="showDemoTab('sitemap')">sitemap.xml</button>
+                </div>
+
+                <div id="llms-txt-demo" class="demo-content active">
+                    <h4>Generated llms.txt (Structured Index)</h4>
+                    <div class="llms-section">
+                        <div class="llms-title"># Documentation Project</div>
+                        <div class="llms-description">&gt; Complete API and user guide documentation</div>
+                        <br>
+                        <div class="llms-title">## Core Documentation</div>
+                        <div>- <a href="#" class="llms-link">index.md</a> - Project overview and introduction</div>
+                        <div>- <a href="#" class="llms-link">getting-started.md</a> - Quick start guide</div>
+                        <div>- <a href="#" class="llms-link">tutorial.md</a> - Step-by-step tutorial</div>
+                        <br>
+                        <div class="llms-title">## API Reference</div>
+                        <div>- <a href="#" class="llms-link">api/authentication.md</a> - Authentication methods</div>
+                        <div>- <a href="#" class="llms-link">api/endpoints.md</a> - API endpoints reference</div>
+                        <div>- <a href="#" class="llms-link">api/errors.md</a> - Error handling guide</div>
+                        <br>
+                        <div class="llms-title">## Optional</div>
+                        <div>- <a href="#" class="llms-link">drafts/future-plans.md</a> - Future development plans</div>
+                        <div>- <a href="#" class="llms-link">archive/changelog.md</a> - Historical changes</div>
+                    </div>
+                </div>
+
+                <div id="llms-full-demo" class="demo-content">
+                    <h4>Generated llms-full.txt (Complete Content)</h4>
+                    <div class="llms-section">
+                        <div class="llms-title"># Documentation Project</div>
+                        <div class="llms-description">&gt; Complete API and user guide documentation</div>
+                        <br>
+                        <div class="llms-title">## index.md</div>
+                        <div>Welcome to our documentation! This project provides...</div>
+                        <div style="color: var(--text-dim);">---</div>
+                        <div class="llms-title">## getting-started.md</div>
+                        <div>To get started with our API, first install the SDK...</div>
+                        <div style="color: var(--text-dim);">---</div>
+                        <div class="llms-title">## api/authentication.md</div>
+                        <div>Authentication is handled via API keys. Generate a new key...</div>
+                        <div style="color: var(--text-dim);">[Full content continues for all files...]</div>
+                    </div>
+                </div>
+
+                <div id="sitemap-demo" class="demo-content">
+                    <h4>Generated sitemap.xml (SEO Optimization)</h4>
+                    <div class="llms-section">
+                        <div>&lt;?xml version="1.0" encoding="UTF-8"?&gt;</div>
+                        <div>&lt;urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"&gt;</div>
+                        <div>&nbsp;&nbsp;&lt;url&gt;</div>
+                        <div>&nbsp;&nbsp;&nbsp;&nbsp;&lt;loc&gt;https://docs.example.com/&lt;/loc&gt;</div>
+                        <div>&nbsp;&nbsp;&nbsp;&nbsp;&lt;lastmod&gt;2024-01-01T00:00:00Z&lt;/lastmod&gt;</div>
+                        <div>&nbsp;&nbsp;&nbsp;&nbsp;&lt;changefreq&gt;weekly&lt;/changefreq&gt;</div>
+                        <div>&nbsp;&nbsp;&nbsp;&nbsp;&lt;priority&gt;1.0&lt;/priority&gt;</div>
+                        <div>&nbsp;&nbsp;&lt;/url&gt;</div>
+                        <div>&nbsp;&nbsp;&lt;url&gt;</div>
+                        <div>&nbsp;&nbsp;&nbsp;&nbsp;&lt;loc&gt;https://docs.example.com/getting-started&lt;/loc&gt;
+                        </div>
+                        <div>&nbsp;&nbsp;&nbsp;&nbsp;&lt;priority&gt;0.8&lt;/priority&gt;</div>
+                        <div>&nbsp;&nbsp;&lt;/url&gt;</div>
+                        <div>&lt;/urlset&gt;</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="tool-nav">
+        <div class="tool-nav-container">
+            <ul class="tool-nav-links">
+                <li><a href="/catalog/" class="active">Overview</a></li>
+                <li><a href="getting-started.html">Getting Started</a></li>
+                <li><a href="docs.html">Documentation</a></li>
+                <li><a href="./examples.html">Examples</a></li>
+            </ul>
+        </div>
+    </section>
+
+    <section id="features" class="tool-section">
+        <div class="section-header">
+            <h2>Enterprise-Grade Documentation Processing</h2>
+            <p>Complete llms.txt standard compliance with advanced features</p>
+        </div>
+
+        <div class="feature-grid">
+            <div class="feature-card">
+                <div class="feature-icon">📋</div>
+                <h3>llms.txt Standard Compliance</h3>
+                <p>Complete H1 → blockquote → sections format. Validates output compliance and ensures proper
+                    structure for AI consumption.</p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">🌐</div>
+                <h3>HTML Processing</h3>
+                <p>Full support for HTML files with automatic conversion to Markdown. Extracts metadata from HTML meta
+                    tags and preserves content structure.</p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">🗺️</div>
+                <h3>Sitemap Generation</h3>
+                <p>XML sitemaps for SEO optimization with intelligent priority assignment and change frequency
+                    detection based on content type.</p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">📊</div>
+                <h3>Performance Monitoring</h3>
+                <p>Real-time performance and memory usage tracking. Concurrent processing utilities with graceful
+                    degradation for large document sets.</p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">🛡️</div>
+                <h3>Security Enhancements</h3>
+                <p>Path validation, file scanning, input sanitization, and comprehensive security auditing with issue
+                    categorization.</p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">🎯</div>
+                <h3>Pattern-Based Processing</h3>
+                <p>Advanced glob pattern support for include/exclude/optional content. Intelligent document ordering
+                    with path-based section generation.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="tool-section alt-bg">
+        <div class="section-header">
+            <h2>Output Formats</h2>
+            <p>Multiple formats for different use cases</p>
+        </div>
+
+        <div class="format-grid">
+            <div class="format-card">
+                <div class="format-icon">📋</div>
+                <h4>llms.txt</h4>
+                <p>Structured index with H1 → blockquote → sections format. Perfect for AI context windows with clear
+                    organization.</p>
+                <div class="code-snippet">catalog --validate</div>
+            </div>
+
+            <div class="format-card">
+                <div class="format-icon">📚</div>
+                <h4>llms-full.txt</h4>
+                <p>Complete concatenated content with clear separators. Full document content for comprehensive AI
+                    analysis.</p>
+                <div class="code-snippet">catalog --input docs</div>
+            </div>
+
+            <div class="format-card">
+                <div class="format-icon">🎯</div>
+                <h4>llms-ctx.txt</h4>
+                <p>Context-only without optional sections. Optimized for AI systems with limited context windows.</p>
+                <div class="code-snippet">catalog --optional "drafts/**/*"</div>
+            </div>
+
+            <div class="format-card">
+                <div class="format-icon">🗺️</div>
+                <h4>sitemap.xml</h4>
+                <p>SEO-optimized XML sitemap with metadata-based priorities and change frequencies for search engines.
+                </p>
+                <div class="code-snippet">catalog --sitemap --base-url https://docs.example.com</div>
+            </div>
+
+            <div class="format-card">
+                <div class="format-icon">📊</div>
+                <h4>index.json</h4>
+                <p>Navigation metadata for programmatic access. Comprehensive directory and file metadata with
+                    statistics.</p>
+                <div class="code-snippet">catalog --index</div>
+            </div>
+        </div>
+    </section>
+
+    <section class="tool-section">
+        <div class="compliance-section">
+            <h3>🏆 llms.txt Standard Compliance</h3>
+            <p>Full compliance with the llms.txt standard for AI-ready documentation indexing</p>
+
+            <div class="compliance-features">
+                <div class="compliance-feature">
+                    <span class="compliance-check">✓</span>
+                    <span>H1 → blockquote → sections format</span>
+                </div>
+                <div class="compliance-feature">
+                    <span class="compliance-check">✓</span>
+                    <span>Proper section hierarchy validation</span>
+                </div>
+                <div class="compliance-feature">
+                    <span class="compliance-check">✓</span>
+                    <span>Markdown link syntax compliance</span>
+                </div>
+                <div class="compliance-feature">
+                    <span class="compliance-check">✓</span>
+                    <span>Intelligent document ordering</span>
+                </div>
+                <div class="compliance-feature">
+                    <span class="compliance-check">✓</span>
+                    <span>Path-based section generation</span>
+                </div>
+                <div class="compliance-feature">
+                    <span class="compliance-check">✓</span>
+                    <span>Optional content categorization</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="install" class="tool-section alt-bg">
+        <div class="section-header">
+            <h2>Installation</h2>
+            <p>Get catalog running in seconds</p>
+        </div>
+
+        <div class="install-grid">
+            <div class="install-card">
+                <div class="install-icon">⚡</div>
+                <h3>Quick Install</h3>
+                <div class="install-code">
+                    # One-line install script
+                    curl -fsSL https://raw.githubusercontent.com/fwdslsh/catalog/main/install.sh | bash
+
+                    # Start indexing
+                    catalog --validate
+                </div>
+                <p>Automatically downloads the right binary for your platform</p>
+            </div>
+
+            <div class="install-card">
+                <div class="install-icon">📦</div>
+                <h3>Bun Package</h3>
+                <div class="install-code">
+                    # Install with Bun
+                    bun install -g @fwdslsh/catalog
+
+                    # Or add to project
+                    bun add @fwdslsh/catalog
+                </div>
+                <p>Native Bun package for maximum performance</p>
+            </div>
+
+            <div class="install-card">
+                <div class="install-icon">🐳</div>
+                <h3>Docker</h3>
+                <div class="install-code">
+                    # Pull latest image
+                    docker pull fwdslsh/catalog:latest
+
+                    # Run catalog
+                    docker run --rm fwdslsh/catalog --help
+                </div>
+                <p>Containerized for consistent environments</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="tool-section">
+        <div class="section-header">
+            <h2>Use Cases</h2>
+            <p>Perfect for various documentation workflows</p>
+        </div>
+
+        <div class="use-cases">
+            <div class="use-case">
+                <div class="use-case-icon">🤖</div>
+                <h4>AI Training Data</h4>
+                <p>Prepare documentation for AI model training or fine-tuning with properly structured and indexed
+                    content.</p>
+                <div class="code-snippet">catalog --optional "examples/**/*" --validate</div>
+            </div>
+
+            <div class="use-case">
+                <div class="use-case-icon">🔍</div>
+                <h4>Knowledge Bases</h4>
+                <p>Create searchable knowledge bases with comprehensive indexing and metadata for internal tools.</p>
+                <div class="code-snippet">catalog --index --sitemap --base-url https://kb.company.com</div>
+            </div>
+
+            <div class="use-case">
+                <div class="use-case-icon">📖</div>
+                <h4>Documentation Sites</h4>
+                <p>Generate navigation and SEO-optimized sitemaps for documentation websites and static site generators.
+                </p>
+                <div class="code-snippet">catalog --sitemap --sitemap-no-extensions --base-url https://docs.example.com
+                </div>
+            </div>
+
+            <div class="use-case">
+                <div class="use-case-icon">🔄</div>
+                <h4>CI/CD Pipelines</h4>
+                <p>Automate documentation processing in continuous integration with validation and compliance checking.
+                </p>
+                <div class="code-snippet">catalog --validate --performance-report --exit-on-error</div>
+            </div>
+        </div>
+    </section>
+
+    <section class="tool-section alt-bg">
+        <div class="section-header">
+            <h2>Integration Workflow</h2>
+            <p>Works seamlessly with the fwdslsh ecosystem</p>
+        </div>
+
+        <div class="workflow-diagram">
+            <div class="workflow-step">
+                <div class="workflow-icon">🌐</div>
+                <h4>Crawl</h4>
+                <p>Use inform to extract web content</p>
+            </div>
+
+            <div class="workflow-step">
+                <div class="workflow-icon">📋</div>
+                <h4>Index</h4>
+                <p>catalog generates llms.txt files</p>
+            </div>
+
+            <div class="workflow-step">
+                <div class="workflow-icon">🏗️</div>
+                <h4>Build</h4>
+                <p>unify creates static sites</p>
+            </div>
+
+            <div class="workflow-step">
+                <div class="workflow-icon">📝</div>
+                <h4>Commit</h4>
+                <p>giv generates commit messages</p>
+            </div>
+        </div>
+
+        <div class="code-block">
+            <pre># Complete documentation pipeline
+inform https://docs.example.com --output-dir docs
+catalog --input docs --output build --base-url https://docs.example.com \
+  --optional "archive/**/*" --sitemap --validate --index
+unify build --input build --output dist
+giv message</pre>
+        </div>
+
+        <div class="ai-integration">
+            <h3>🧠 AI Integration Ready</h3>
+            <p>catalog is specifically designed for AI workflows:</p>
+            <ul>
+                <li><strong>Context Optimization:</strong> llms-ctx.txt for context-limited AI systems</li>
+                <li><strong>Structured Format:</strong> Clean, parseable format for RAG applications</li>
+                <li><strong>Metadata Extraction:</strong> Rich metadata for vector database indexing</li>
+                <li><strong>Content Validation:</strong> Ensures high-quality AI training data</li>
+            </ul>
+        </div>
+    </section>
+
+    <section class="tool-section">
+        <div class="section-header">
+            <h2>Ready to Index Your Documentation?</h2>
+            <p>Transform your content into AI-ready knowledge bases</p>
+        </div>
+
+        <div class="cta-buttons">
+            <a href="/catalog/getting-started" class="btn btn-primary">
+                🚀 Getting Started Guide
+            </a>
+            <a href="/catalog/examples" class="btn btn-secondary">
+                📚 View Examples
+            </a>
+            <a href="https://github.com/fwdslsh/catalog/releases" class="btn btn-secondary">
+                📥 Download Binary
+            </a>
+        </div>
+
+        <div class="quick-links">
+            <a href="https://github.com/fwdslsh/catalog" class="quick-link">
+                <span class="quick-link-icon">📂</span>
+                <div class="quick-link-content">
+                    <h4>Source Code</h4>
+                    <p>View on GitHub, report issues, contribute</p>
+                </div>
+            </a>
+
+            <a href="/ecosystem/" class="quick-link">
+                <span class="quick-link-icon">🔄</span>
+                <div class="quick-link-content">
+                    <h4>Ecosystem Overview</h4>
+                    <p>See how all fwdslsh tools work together</p>
+                </div>
+            </a>
+
+            <a href="https://llmstxt.org" class="quick-link">
+                <span class="quick-link-icon">📋</span>
+                <div class="quick-link-content">
+                    <h4>llms.txt Standard</h4>
+                    <p>Learn about the llms.txt standard</p>
+                </div>
+            </a>
+        </div>
+    </section>
+    </div>
+
+    <script>
+        function showDemoTab(tabName) {
+            // Hide all demo content
+            document.querySelectorAll('.demo-content').forEach(content => {
+                content.classList.remove('active');
+            });
+
+            // Remove active class from all tabs
+            document.querySelectorAll('.demo-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            // Show selected content and activate tab
+            document.getElementById(tabName + '-demo').classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // Animate demo on scroll
+        const demoObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const demoContent = entry.target.querySelector('.demo-content.active');
+                    if (demoContent) {
+                        demoContent.style.animation = 'fadeInUp 0.6s ease-out forwards';
+                    }
+                }
+            });
+        });
+
+        const indexingDemo = document.querySelector('.indexing-demo');
+        if (indexingDemo) {
+            demoObserver.observe(indexingDemo);
+        }
+
+        // Animate workflow steps
+        const workflowObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const steps = entry.target.querySelectorAll('.workflow-step');
+                    steps.forEach((step, index) => {
+                        setTimeout(() => {
+                            step.style.animation = 'fadeInUp 0.5s ease-out forwards';
+                        }, index * 200);
+                    });
+                }
+            });
+        });
+
+        const workflowDiagram = document.querySelector('.workflow-diagram');
+        if (workflowDiagram) {
+            workflowObserver.observe(workflowDiagram);
+        }
+    </script>
+
+</main>
+
+</body>
+
+</html>

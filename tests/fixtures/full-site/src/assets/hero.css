@@ -1,0 +1,70 @@
+/* Tool Hero Section - Scoped Component Styles */
+.tool-hero {
+    min-height: 80vh;
+    display: flex;
+    align-items: center;
+    padding: 8rem 2rem 4rem;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.tool-hero-content {
+    flex: 1;
+    max-width: 600px;
+    animation: fadeInLeft 1s ease-out;
+}
+
+.tool-hero h1 {
+    font-size: clamp(3rem, 6vw, 4.5rem);
+    font-weight: 900;
+    margin-bottom: 1rem;
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1.1;
+}
+
+.tool-hero .tagline {
+    font-size: clamp(1.2rem, 2.5vw, 1.6rem);
+    color: var(--text-secondary);
+    margin-bottom: 2rem;
+    font-family: var(--font-mono);
+}
+
+.tool-hero .description {
+    font-size: 1.2rem;
+    color: var(--text-dim);
+    margin-bottom: 3rem;
+    line-height: 1.7;
+}
+
+.tool-demo {
+    flex: 1;
+    margin-left: 4rem;
+    animation: fadeInRight 1s ease-out 0.3s both;
+}
+
+.cta-buttons {
+    display: flex;
+    gap: 1rem;
+    margin-top: 2rem;
+}
+
+/* Responsive design */
+@media (max-width: 968px) {
+    .tool-hero {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .tool-demo {
+        margin-left: 0;
+        margin-top: 3rem;
+        max-width: 500px;
+    }
+
+    .cta-buttons {
+        justify-content: center;
+    }
+}

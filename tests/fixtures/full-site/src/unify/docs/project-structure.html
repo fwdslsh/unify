@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Structure - unify Documentation</title>
+    <meta name="description" content="Learn how to organize your unify projects with proper directory conventions, file naming patterns, and scalable architecture.">
+    <link rel="stylesheet" href="/assets/styles.css">
+    <style>
+        /* Documentation Layout - Page specific */
+        .docs-layout {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar - Page specific */
+        .sidebar {
+            width: 280px;
+            background: var(--bg-darker);
+            border-right: 1px solid var(--border);
+            padding: 2rem 0;
+            position: fixed;
+            height: calc(100vh - 80px);
+            overflow-y: auto;
+            z-index: 100;
+        }
+
+        .sidebar-content {
+            padding: 0 2rem;
+        }
+
+        .sidebar-section {
+            margin-bottom: 2rem;
+        }
+
+        .sidebar-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-family: var(--font-mono);
+        }
+
+        .sidebar-nav {
+            list-style: none;
+        }
+
+        .sidebar-nav li {
+            margin-bottom: 0.5rem;
+        }
+
+        .sidebar-nav a {
+            color: var(--text-dim);
+            text-decoration: none;
+            font-size: 0.9rem;
+            display: block;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+            font-family: var(--font-mono);
+        }
+
+        .sidebar-nav a:hover {
+            color: var(--text-primary);
+            background: var(--bg-card);
+        }
+
+        .sidebar-nav a.active {
+            color: var(--primary);
+            background: rgba(0, 255, 65, 0.1);
+            border-left: 3px solid var(--primary);
+        }
+
+        /* Main Content - Page specific */
+        .main-content {
+            flex: 1;
+            margin-left: 280px;
+            padding: 2rem 4rem;
+            max-width: calc(100vw - 280px);
+        }
+
+        .content-wrapper {
+            max-width: 800px;
+        }
+
+        /* Typography - Page specific */
+        .content h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+            line-height: 1.2;
+        }
+
+        .content h2 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin: 3rem 0 1.5rem 0;
+            color: var(--text-primary);
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 0.5rem;
+        }
+
+        .content h3 {
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin: 2rem 0 1rem 0;
+            color: var(--text-primary);
+        }
+
+        .content h4 {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin: 1.5rem 0 0.75rem 0;
+            color: var(--text-secondary);
+        }
+
+        .content p {
+            margin-bottom: 1.5rem;
+            color: var(--text-secondary);
+            line-height: 1.7;
+        }
+
+        .content ul,
+        .content ol {
+            margin-bottom: 1.5rem;
+            padding-left: 2rem;
+        }
+
+        .content li {
+            margin-bottom: 0.5rem;
+            color: var(--text-secondary);
+        }
+
+        .content li strong {
+            color: var(--text-primary);
+        }
+
+        /* Navigation buttons - Page specific */
+        .page-nav {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 4rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .nav-btn {
+            display: flex;
+            flex-direction: column;
+            text-decoration: none;
+            color: var(--text-secondary);
+            transition: all 0.3s ease;
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--bg-card);
+        }
+
+        .nav-btn:hover {
+            color: var(--primary);
+            border-color: var(--primary);
+            transform: translateY(-2px);
+        }
+
+        .nav-btn-label {
+            font-size: 0.8rem;
+            font-family: var(--font-mono);
+            margin-bottom: 0.25rem;
+        }
+
+        .nav-btn-title {
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        /* Responsive - Page specific */
+        @media (max-width: 1024px) {
+            .sidebar {
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+
+            .main-content {
+                margin-left: 0;
+                max-width: 100vw;
+                padding: 2rem;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                padding: 1rem;
+            }
+
+            .content h1 {
+                font-size: 2rem;
+            }
+
+            .content h2 {
+                font-size: 1.5rem;
+            }
+
+            .page-nav {
+                flex-direction: column;
+                gap: 1rem;
+            }
+        }
+    </style>
+</head>
+
+<body data-unify="/_includes/tool-page.html">
+   
+    <!-- Tool-specific navigation links -->
+    <ul class="unify-nav-links">
+        <li><a href="/unify/">Overview</a></li>
+        <li><a href="/unify/getting-started.html">Getting Started</a></li>
+        <li><a href="/unify/docs.html">Documentation</a></li>
+        <li><a href="/unify/examples.html">Examples</a></li>
+    </ul>
+
+    <div class="unify-content docs-layout">
+        <aside class="sidebar">
+            <div class="sidebar-content">
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Getting Started</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs">Quick Start</a></li>
+                        <li><a href="/unify/docs/installation">Installation</a></li>
+                        <li><a href="/unify/docs/project-structure" class="active">Project Structure</a></li>
+                        <li><a href="/unify/docs/first-site">Your First Site</a></li>
+                    </ul>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Core Concepts</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs/includes">Server-Side Includes</a></li>
+                        <li><a href="/unify/docs/components">Components</a></li>
+                        <li><a href="/unify/docs/markdown">Markdown</a></li>
+                        <li><a href="/unify/docs/assets">Static Assets</a></li>
+                    </ul>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">CLI Reference</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs/cli-build">unify build</a></li>
+                        <li><a href="/unify/docs/cli-serve">unify serve</a></li>
+                        <li><a href="/unify/docs/cli-watch">unify watch</a></li>
+                        <li><a href="/unify/docs/configuration">Configuration</a></li>
+                    </ul>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Deployment</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs/deployment">Static Hosting</a></li>
+                        <li><a href="/unify/docs/docker">Docker</a></li>
+                        <li><a href="/unify/docs/ci-cd">CI/CD</a></li>
+                    </ul>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Advanced</h3>
+                    <ul class="sidebar-nav">
+                        <li><a href="/unify/docs/performance">Performance</a></li>
+                        <li><a href="/unify/docs/security">Security</a></li>
+                        <li><a href="/unify/docs/migration">Migration Guide</a></li>
+                        <li><a href="/unify/docs/troubleshooting">Troubleshooting</a></li>
+                    </ul>
+                </div>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <div class="content-wrapper">
+                <div class="content">
+                    <h1>Project Structure</h1>
+
+                    <p>Understanding unify's project structure conventions is key to building maintainable static sites. unify follows a flexible, convention-over-configuration approach that scales from simple personal sites to complex multi-site deployments.</p>
+
+                    <div class="callout callout-info">
+                        <div class="callout-title">🏗️ Core Principle</div>
+                        <p>unify uses DOM Cascade for composition - layouts and components expose public areas via CSS classes, and pages target these areas for content placement.</p>
+                    </div>
+
+                    <h2>Basic Project Layout</h2>
+
+                    <p>A minimal unify project follows this structure:</p>
+
+                    <div class="code-block">
+                        <div class="language-label">text</div>
+                        <pre>my-site/
+├── src/                    # Source files (configurable)
+│   ├── index.html         # Homepage
+│   ├── about.html         # Pages
+│   ├── _includes/         # Fragments and layouts
+│   │   ├── _layout.html   # Default layout
+│   │   ├── header.html    # Header fragment
+│   │   └── footer.html    # Footer fragment
+│   └── assets/           # Static assets
+│       ├── css/
+│       ├── js/
+│       └── images/
+├── dist/                 # Build output (configurable)
+└── unify.config.yaml     # Configuration (optional)</pre>
+                    </div>
+
+                    <h2>Directory Conventions</h2>
+
+                    <h3>Source Directory (src/)</h3>
+
+                    <p>The source directory contains all your site's source files. This is where you author content and organize your project structure.</p>
+
+                    <h4>Pages</h4>
+                    <p>HTML and Markdown files in the root of src/ become pages:</p>
+
+                    <div class="code-block">
+                        <div class="language-label">text</div>
+                        <pre>src/
+├── index.html        # → /index.html
+├── about.html        # → /about.html
+├── contact.md        # → /contact.html
+└── blog/
+    ├── index.html    # → /blog/index.html
+    └── post-1.md     # → /blog/post-1.html</pre>
+                    </div>
+
+                    <h4>Fragments Directory (_includes/)</h4>
+                    <p>The <code>_includes/</code> directory contains reusable fragments, layouts, and components:</p>
+
+                    <ul>
+                        <li><strong>Layouts</strong>: Files starting with <code>_</code> or ending with <code>.layout.html</code></li>
+                        <li><strong>Fragments</strong>: Reusable HTML components</li>
+                        <li><strong>Partials</strong>: Content snippets for inclusion</li>
+                    </ul>
+
+                    <div class="code-block">
+                        <div class="language-label">text</div>
+                        <pre>src/_includes/
+├── _layout.html           # Default layout (auto-discovered)
+├── _blog.layout.html      # Named layout for blog pages
+├── _article.layout.html   # Named layout for articles
+├── header.html            # Site header fragment
+├── footer.html            # Site footer fragment
+├── nav.html              # Navigation component
+├── card.html             # Reusable card component
+└── components/           # Organized components
+    ├── hero.html
+    ├── pricing-table.html
+    └── testimonials.html</pre>
+                    </div>
+
+                    <h4>Assets Directory</h4>
+                    <p>Static assets are organized by type and automatically copied to the output:</p>
+
+                    <div class="code-block">
+                        <div class="language-label">text</div>
+                        <pre>src/assets/
+├── css/
+│   ├── main.css          # Main stylesheet
+│   ├── components.css    # Component styles
+│   └── utilities.css     # Utility classes
+├── js/
+│   ├── main.js          # Main JavaScript
+│   ├── components.js    # Component scripts
+│   └── vendor/          # Third-party libraries
+├── images/
+│   ├── logo.png
+│   ├── hero-bg.jpg
+│   └── icons/
+└── fonts/
+    ├── custom-font.woff2
+    └── custom-font.woff</pre>
+                    </div>
+
+                    <h2>Layout Discovery</h2>
+
+                    <p>unify provides multiple ways to discover and apply layouts, following a precedence order:</p>
+
+                    <h3>1. Explicit Layout Reference</h3>
+                    <p>Use <code>data-unify</code> attribute to specify a layout directly:</p>
+
+                    <div class="code-block">
+                        <div class="language-label">html</div>
+                        <pre>&lt;!-- In your page --&gt;
+&lt;body data-unify="/_includes/_blog.layout.html"&gt;
+  &lt;main class="unify-content"&gt;
+    &lt;h1&gt;Blog Post Title&lt;/h1&gt;
+    &lt;p&gt;Content goes here...&lt;/p&gt;
+  &lt;/main&gt;
+&lt;/body&gt;</pre>
+                    </div>
+
+                    <h3>2. Automatic Layout Discovery</h3>
+                    <p>Place <code>_layout.html</code> files in directories to automatically apply them:</p>
+
+                    <div class="code-block">
+                        <div class="language-label">text</div>
+                        <pre>src/
+├── _layout.html          # Applied to all pages
+├── blog/
+│   ├── _layout.html      # Applied to blog pages only
+│   ├── index.html        # Uses blog/_layout.html
+│   └── post-1.md         # Uses blog/_layout.html
+└── docs/
+    ├── _layout.html      # Applied to docs pages only
+    └── guide.html        # Uses docs/_layout.html</pre>
+                    </div>
+
+                    <h3>3. Short Name Layouts</h3>
+                    <p>Reference layouts by short names for cleaner syntax:</p>
+
+                    <div class="code-block">
+                        <div class="language-label">html</div>
+                        <pre>&lt;!-- _includes/_article.layout.html can be referenced as "article" --&gt;
+&lt;body data-unify="article"&gt;
+  &lt;!-- Page content --&gt;
+&lt;/body&gt;</pre>
+                    </div>
+
+                    <h2>File Naming Conventions</h2>
+
+                    <h3>Layouts</h3>
+                    <ul>
+                        <li><code>_layout.html</code> - Default layout for directory</li>
+                        <li><code>_[name].layout.html</code> - Named layouts (e.g., <code>_blog.layout.html</code>)</li>
+                        <li><code>[name].layout.html</code> - Alternative naming</li>
+                    </ul>
+
+                    <h3>Fragments and Components</h3>
+                    <ul>
+                        <li><code>[name].html</code> - Standard HTML fragments</li>
+                        <li><code>_[name].html</code> - Private/internal fragments</li>
+                        <li><code>[name].component.html</code> - Explicit component designation</li>
+                    </ul>
+
+                    <h3>Pages</h3>
+                    <ul>
+                        <li><code>[name].html</code> - HTML pages</li>
+                        <li><code>[name].md</code> - Markdown pages</li>
+                        <li><code>index.html</code> - Directory index pages</li>
+                    </ul>
+
+                    <h2>DOM Cascade Architecture</h2>
+
+                    <p>unify's DOM Cascade system provides predictable composition rules:</p>
+
+                    <h3>Public Areas</h3>
+                    <p>Layouts and components expose content areas via CSS classes:</p>
+
+                    <div class="code-block">
+                        <div class="language-label">html</div>
+                        <pre>&lt;!-- Layout with public areas --&gt;
+&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+  &lt;style data-unify-docs="v1"&gt;
+    /* Public areas - document the contract */
+    .unify-header { /* Site header area */ }
+    .unify-content { /* Main content area */ }
+    .unify-sidebar { /* Optional sidebar */ }
+    .unify-footer { /* Site footer area */ }
+  &lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;header class="unify-header"&gt;
+    &lt;h1&gt;Default Site Title&lt;/h1&gt;
+  &lt;/header&gt;
+  
+  &lt;main class="unify-content"&gt;
+    &lt;p&gt;Default content&lt;/p&gt;
+  &lt;/main&gt;
+  
+  &lt;aside class="unify-sidebar"&gt;
+    &lt;p&gt;Default sidebar&lt;/p&gt;
+  &lt;/aside&gt;
+  
+  &lt;footer class="unify-footer"&gt;
+    &lt;p&gt;© 2024 Default Footer&lt;/p&gt;
+  &lt;/footer&gt;
+&lt;/body&gt;
+&lt;/html&gt;</pre>
+                    </div>
+
+                    <h3>Page Targeting</h3>
+                    <p>Pages target layout areas by using matching class names:</p>
+
+                    <div class="code-block">
+                        <div class="language-label">html</div>
+                        <pre>&lt;body data-unify="/_includes/_layout.html"&gt;
+  &lt;header class="unify-header"&gt;
+    &lt;h1&gt;My Custom Page Title&lt;/h1&gt;
+    &lt;nav&gt;
+      &lt;a href="/"&gt;Home&lt;/a&gt;
+      &lt;a href="/about"&gt;About&lt;/a&gt;
+    &lt;/nav&gt;
+  &lt;/header&gt;
+  
+  &lt;main class="unify-content"&gt;
+    &lt;h2&gt;Page Content&lt;/h2&gt;
+    &lt;p&gt;This replaces the default content.&lt;/p&gt;
+  &lt;/main&gt;
+  
+  &lt;!-- unify-sidebar not provided, uses layout default --&gt;
+  &lt;!-- unify-footer not provided, uses layout default --&gt;
+&lt;/body&gt;</pre>
+                    </div>
+
+                    <h2>Scalable Project Patterns</h2>
+
+                    <h3>Multi-Site Architecture</h3>
+                    <p>For managing multiple related sites:</p>
+
+                    <div class="code-block">
+                        <div class="language-label">text</div>
+                        <pre>project/
+├── shared/
+│   ├── _includes/        # Shared layouts and components
+│   └── assets/          # Shared assets
+├── marketing-site/
+│   ├── src/
+│   │   ├── _includes/   # Site-specific components
+│   │   └── pages/
+│   └── unify.config.yaml
+├── docs-site/
+│   ├── src/
+│   └── unify.config.yaml
+└── blog-site/
+    ├── src/
+    └── unify.config.yaml</pre>
+                    </div>
+
+                    <h3>Component Library Pattern</h3>
+                    <p>Organize reusable components systematically:</p>
+
+                    <div class="code-block">
+                        <div class="language-label">text</div>
+                        <pre>src/_includes/
+├── layouts/
+│   ├── _base.layout.html
+│   ├── _page.layout.html
+│   └── _article.layout.html
+├── components/
+│   ├── ui/
+│   │   ├── button.html
+│   │   ├── card.html
+│   │   └── modal.html
+│   ├── sections/
+│   │   ├── hero.html
+│   │   ├── features.html
+│   │   └── testimonials.html
+│   └── navigation/
+│       ├── header.html
+│       ├── footer.html
+│       └── breadcrumbs.html
+└── partials/
+    ├── head-meta.html
+    ├── analytics.html
+    └── social-links.html</pre>
+                    </div>
+
+                    <h3>Content-Heavy Site Pattern</h3>
+                    <p>Structure for blogs, documentation, and content sites:</p>
+
+                    <div class="code-block">
+                        <div class="language-label">text</div>
+                        <pre>src/
+├── _includes/
+│   ├── _layout.html          # Base layout
+│   ├── _article.layout.html  # Article layout
+│   └── components/
+├── blog/
+│   ├── _layout.html          # Blog-specific layout
+│   ├── index.html           # Blog index
+│   ├── 2024/
+│   │   ├── 01/
+│   │   │   ├── post-1.md
+│   │   │   └── post-2.md
+│   │   └── 02/
+│   └── tags/
+│       ├── javascript.html
+│       └── css.html
+├── docs/
+│   ├── _layout.html
+│   ├── guide/
+│   └── api/
+└── assets/</pre>
+                    </div>
+
+                    <h2>Configuration Options</h2>
+
+                    <p>Customize project structure via <code>unify.config.yaml</code>:</p>
+
+                    <div class="code-block">
+                        <div class="language-label">yaml</div>
+                        <pre># unify.config.yaml
+source: src                 # Source directory
+output: dist               # Output directory  
+clean: true                # Clean output before build
+
+# Custom paths
+includes: _components      # Custom fragments directory
+assets: static            # Custom assets directory
+
+# Build options
+pretty-urls: true         # Generate pretty URLs
+minify: false            # Minify HTML output
+verbose: false           # Verbose build logging
+
+# Development server
+port: 3000               # Dev server port
+host: localhost          # Dev server host</pre>
+                    </div>
+
+                    <div class="callout callout-success">
+                        <div class="callout-title">🎯 Best Practices</div>
+                        <ul>
+                            <li><strong>Keep it simple</strong>: Start with basic structure, add complexity as needed</li>
+                            <li><strong>Use clear naming</strong>: Make file purposes obvious from their names</li>
+                            <li><strong>Document public areas</strong>: Always use <code>data-unify-docs</code> blocks in layouts</li>
+                            <li><strong>Organize by feature</strong>: Group related components and layouts together</li>
+                            <li><strong>Leverage conventions</strong>: Use automatic layout discovery for cleaner code</li>
+                        </ul>
+                    </div>
+
+                    <div class="page-nav">
+                        <a href="/unify/docs/installation" class="nav-btn">
+                            <span class="nav-btn-label">← Previous</span>
+                            <span class="nav-btn-title">Installation</span>
+                        </a>
+                        <a href="/unify/docs/first-site" class="nav-btn">
+                            <span class="nav-btn-label">Next →</span>
+                            <span class="nav-btn-title">Your First Site</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Mobile sidebar toggle
+        const sidebarToggle = document.createElement('button');
+        sidebarToggle.innerHTML = '☰';
+        sidebarToggle.style.cssText = `
+            display: none;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 0.5rem;
+            border-radius: 4px;
+            font-size: 1.2rem;
+            cursor: pointer;
+        `;
+
+        // Add toggle button on mobile
+        if (window.innerWidth <= 1024) {
+            sidebarToggle.style.display = 'block';
+            document.querySelector('.nav-links').prepend(sidebarToggle);
+        }
+
+        sidebarToggle.addEventListener('click', () => {
+            document.querySelector('.sidebar').classList.toggle('open');
+        });
+
+        // Close sidebar when clicking outside on mobile
+        document.addEventListener('click', (e) => {
+            const sidebar = document.querySelector('.sidebar');
+            const toggle = sidebarToggle;
+
+            if (!sidebar.contains(e.target) && !toggle.contains(e.target)) {
+                sidebar.classList.remove('open');
+            }
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            if (window.innerWidth <= 1024) {
+                sidebarToggle.style.display = 'block';
+            } else {
+                sidebarToggle.style.display = 'none';
+                document.querySelector('.sidebar').classList.remove('open');
+            }
+        });
+
+        // Smooth scrolling for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+
+</html>

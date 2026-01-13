@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description"
+    content="Sharp tools for hackers who remember when software didn't fight you. Zero deps, instant setup, no frameworks to babysit.">
+  <link rel="stylesheet" href="https://unpkg.com/augmented-ui@2/augmented-ui.min.css">
+  <link rel="stylesheet" href="assets/styles.css">
+  <style>
+    .protest-revolution-regular {
+      font-family: "Protest Revolution", sans-serif;
+      font-weight: 400;
+      font-style: normal;
+    }
+
+
+
+
+    /* Hero Section - Page specific */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 2rem;
+      position: relative;
+      background-image: url("assets/cables-bg.png");
+      background-repeat: no-repeat;
+      background-position: center;
+      background-size: contain;
+    }
+
+    .hero-content {
+      max-width: 800px;
+      animation: fadeInUp 1s ease-out;
+    }
+
+    .hero h1 {
+      font-size: clamp(3rem, 8vw, 6rem);
+      font-weight: 900;
+      margin-bottom: 1rem;
+      background: var(--gradient-1);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      line-height: 1.1;
+      display: inline;
+      justify-content: center;
+      align-items: center;
+      text-transform: lowercase;
+      font-family: 'Protest Revolution';
+    }
+
+    .hero img {
+      height: clamp(3rem, 8vw, 6rem);
+    }
+
+    .hero .tagline {
+      font-size: clamp(1.2rem, 3vw, 1.8rem);
+      color: var(--text-secondary);
+      margin-bottom: 2rem;
+      font-family: var(--font-mono);
+    }
+
+    .hero .description {
+      font-size: 1.2rem;
+      color: var(--text-dim);
+      margin-bottom: 3rem;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    /* Tools Preview Section - Page specific */
+    .tools-preview {
+      padding: 8rem 2rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .tools-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+      gap: 2rem;
+      margin-top: 4rem;
+    }
+
+    .tool-card {
+      background: var(--gradient-2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2rem;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .tool-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 2px;
+      background: var(--gradient-1);
+      transform: scaleX(0);
+      transition: transform 0.3s ease;
+    }
+
+    .tool-card:hover::before {
+      transform: scaleX(1);
+    }
+
+    .tool-card:hover {
+      transform: translateY(-5px);
+      border-color: var(--primary);
+    }
+
+    .tool-header {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .tool-icon {
+      width: 40px;
+      height: 40px;
+      background: var(--gradient-1);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-weight: bold;
+      color: var(--bg-dark);
+    }
+
+    .tool-card h3 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      font-family: var(--font-mono);
+    }
+
+    .tool-card .subtitle {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+    }
+
+    .tool-card p {
+      color: var(--text-dim);
+      margin-bottom: 1.5rem;
+      line-height: 1.6;
+    }
+
+    .tool-links {
+      display: flex;
+      gap: 1rem;
+      margin-top: 1.5rem;
+    }
+
+    .tool-links a {
+      color: var(--primary);
+      text-decoration: none;
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      font-weight: 600;
+      transition: all 0.3s ease;
+    }
+
+    .tool-links a:hover {
+      color: var(--primary-dim);
+      text-decoration: underline;
+    }
+
+    /* Responsive Design - Page specific */
+    @media (max-width: 768px) {
+      .tools-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .tool-card {
+        padding: 1.5rem;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="page-bg"></div>
+
+  <nav>
+    <div class="nav-container">
+      <div class="nav-logo-container">
+        <a href="/" class="logo">/</a>
+      </div>
+      <ul class="nav-links">
+        <li class="nav-dropdown">
+          <a href="/#tools" title="Tools">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-tools"
+              viewBox="0 0 16 16">
+              <path
+                d="M1 0 0 1l2.2 3.081a1 1 0 0 0 .815.419h.07a1 1 0 0 1 .708.293l2.675 2.675-2.617 2.654A3.003 3.003 0 0 0 0 13a3 3 0 1 0 5.878-.851l2.654-2.617.968.968-.305.914a1 1 0 0 0 .242 1.023l3.27 3.27a.997.997 0 0 0 1.414 0l1.586-1.586a.997.997 0 0 0 0-1.414l-3.27-3.27a1 1 0 0 0-1.023-.242L10.5 9.5l-.96-.96 2.68-2.643A3.005 3.005 0 0 0 16 3q0-.405-.102-.777l-2.14 2.141L12 4l-.364-1.757L13.777.102a3 3 0 0 0-3.675 3.68L7.462 6.46 4.793 3.793a1 1 0 0 1-.293-.707v-.071a1 1 0 0 0-.419-.814zm9.646 10.646a.5.5 0 0 1 .708 0l2.914 2.915a.5.5 0 0 1-.707.707l-2.915-2.914a.5.5 0 0 1 0-.708M3 11l.471.242.529.026.287.445.445.287.026.529L5 13l-.242.471-.026.529-.445.287-.287.445-.529.026L3 15l-.471-.242L2 14.732l-.287-.445L1.268 14l-.026-.529L1 13l.242-.471.026-.529.445-.287.287-.445.529-.026z" />
+            </svg>
+          </a>
+          <div class="nav-dropdown-content">
+            <div class="nav-dropdown-section">
+              <a href="/unify/" class="nav-tool-link">
+                <span class="nav-tool-icon">u</span>
+                <div>
+                  <div class="nav-tool-name">unify</div>
+                  <div class="nav-tool-desc">Static site generator</div>
+                </div>
+              </a>
+              <a href="/giv/" class="nav-tool-link">
+                <span class="nav-tool-icon">g</span>
+                <div>
+                  <div class="nav-tool-name">giv</div>
+                  <div class="nav-tool-desc">AI Git assistant</div>
+                </div>
+              </a>
+              <a href="/inform/" class="nav-tool-link">
+                <span class="nav-tool-icon">i</span>
+                <div>
+                  <div class="nav-tool-name">inform</div>
+                  <div class="nav-tool-desc">Web crawler</div>
+                </div>
+              </a>
+              <a href="/catalog/" class="nav-tool-link">
+                <span class="nav-tool-icon">c</span>
+                <div>
+                  <div class="nav-tool-name">catalog</div>
+                  <div class="nav-tool-desc">Documentation indexer</div>
+                </div>
+              </a>
+            </div>
+          </div>
+        </li>
+        <li>
+          <a href="/#about" title="About">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor"
+              class="bi bi-question-circle" viewBox="0 0 16 16">
+              <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16" />
+              <path
+                d="M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286m1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.94-1.029-.94-.584 0-1.009.388-1.009.94" />
+            </svg>
+          </a>
+        </li>
+        <li>
+          <a href="https://github.com/fwdslsh" title="GitHub" target="_blank">
+            <svg height="24" fill="currentcolor" viewBox="3 3 18 18">
+              <path
+                d="M12 3C7.0275 3 3 7.12937 3 12.2276c0 4.0833 2.57625 7.5321 6.15374 8.7548C9.60374 21.0631 9.77249 20.7863 9.77249 20.5441 9.77249 20.3249 9.76125 19.5982 9.76125 18.8254 7.5 19.2522 6.915 18.2602 6.735 17.7412 6.63375 17.4759 6.19499 16.6569 5.8125 16.4378 5.4975 16.2647 5.0475 15.838 5.80124 15.8264 6.51 15.8149 7.01625 16.4954 7.18499 16.7723 7.99499 18.1679 9.28875 17.7758 9.80625 17.5335 9.885 16.9337 10.1212 16.53 10.38 16.2993 8.3775 16.0687 6.285 15.2728 6.285 11.7432c0-1.0035.34875-1.834.92249-2.47994C7.1175 9.03257 6.8025 8.08674 7.2975 6.81794c0 0 .753749999999999-.24223 2.47499.94583.72001-.20762 1.48501-.31143 2.25001-.31143C12.7875 7.45234 13.5525 7.55615 14.2725 7.76377c1.7212-1.19959 2.475-.94583 2.475-.94583C17.2424 8.08674 16.9275 9.03257 16.8375 9.26326 17.4113 9.9092 17.76 10.7281 17.76 11.7432c0 3.5411-2.1037 4.3255-4.1063 4.5561C13.98 16.5877 14.2613 17.1414 14.2613 18.0065 14.2613 19.2407 14.25 20.2326 14.25 20.5441 14.25 20.7863 14.4188 21.0746 14.8688 20.9824 16.6554 20.364 18.2079 19.1866 19.3078 17.6162c1.0999-1.5705 1.6917-3.4551 1.6922-5.3886C21 7.12937 16.9725 3 12 3z">
+              </path>
+            </svg>
+          </a>
+        </li>
+        <li><a href="https://hub.docker.com/u/fwdslsh" title="Docker Hub" target="_blank">
+
+            <svg viewBox="0 0 24 18" xmlns="http://www.w3.org/2000/svg" color="currentColor" fill="currentColor"
+              width="24" height="24">
+              <path
+                d="M23.6096 7.78281C23.0211 7.38668 21.4751 7.21752 20.3513 7.52051C20.291 6.40098 19.7132 5.45739 18.6572 4.63407L18.2664 4.37177L18.0059 4.7654C17.4937 5.54269 17.2778 6.5787 17.3542 7.52051C17.4145 8.10079 17.6162 8.75281 18.0059 9.22603C16.543 10.0747 15.1944 9.88197 9.22236 9.88197H0.00204151C-0.0247244 11.2306 0.191901 13.8244 1.84139 15.9361C2.02376 16.1695 2.22326 16.395 2.44024 16.6124C3.78139 17.9553 5.80775 18.9403 8.83765 18.9428C13.4603 18.9471 17.4206 16.4482 19.8299 10.4069C20.6225 10.4198 22.7152 10.549 23.7395 8.57009C23.7645 8.5369 24 8.04548 24 8.04548L23.6096 7.78317V7.78281ZM6.01938 6.5498H3.42665V9.14252H6.01938V6.5498ZM9.36868 6.5498H6.77596V9.14252H9.36868V6.5498ZM12.7183 6.5498H10.1256V9.14252H12.7183V6.5498ZM16.068 6.5498H13.4753V9.14252H16.068V6.5498ZM2.66971 6.5498H0.0769861V9.14252H2.66971V6.5498ZM6.01938 3.27508H3.42665V5.8678H6.01938V3.27508ZM9.36868 3.27508H6.77596V5.8678H9.36868V3.27508ZM12.7183 3.27508H10.1256V5.8678H12.7183V3.27508ZM12.7183 0H10.1256V2.59272H12.7183V0Z">
+              </path>
+            </svg>
+          </a>
+        </li>
+        <li>
+          <a href="https://www.npmjs.com/org/fwdslsh" target="_blank" title="npm">
+            <svg fill="currentColor" width="24" height="24" viewBox="0 0 32 32" version="1.1"
+              xmlns="http://www.w3.org/2000/svg">
+              <title>npm</title>
+              <path
+                d="M7.415 7.656l17.291 0.024-0.011 17.29h-4.329l0.012-12.974h-4.319l-0.010 12.964h-8.656zM3.207 1.004c-0.002 0-0.003 0-0.005 0-1.214 0-2.198 0.984-2.198 2.198 0 0.002 0 0.004 0 0.006v-0 25.585c0 0.002 0 0.003 0 0.005 0 1.214 0.984 2.198 2.198 2.198 0.002 0 0.004 0 0.006 0h25.585c0.002 0 0.003 0 0.005 0 1.214 0 2.198-0.984 2.198-2.198 0-0.002 0-0.004 0-0.006v0-25.585c0-0.002 0-0.003 0-0.005 0-1.214-0.984-2.198-2.198-2.198-0.002 0-0.004 0-0.006 0h0z">
+              </path>
+            </svg>
+          </a>
+        </li>
+        <li>
+          <a href="https://bsky.app/profile/fwdslsh.dev" title="Bluesky" target="_blank">
+            <svg height="24" viewBox="0 0 600 530">
+              <path fill="currentcolor"
+                d="M136 44c66 50 138 151 164 205 26-54 98-155 164-205 48-36 126-64 126 25 0 18-10 149-16 170-21 74-96 93-163 81 117 20 147 86 82 153-122 125-176-32-189-72-3-8-4-11-4-8 0-3-1 0-4 8-13 40-67 197-189 72-65-67-35-133 82-153-67 12-142-7-163-81-6-21-16-152-16-170 0-89 78-61 126-25z">
+              </path>
+            </svg>
+          </a>
+        </li>
+      </ul>
+    </div>
+  </nav>
+
+  <main>
+    <div>
+      <title>fwdslsh - Slash a path through the bloat</title>
+      <meta name="description"
+        content="Sharp tools for hackers who remember when software didn't fight you. Zero deps, instant setup, no frameworks to babysit.">
+
+
+
+
+      <div>
+        <section class="hero">
+          <div class="hero-content">
+            <h1 class="logo" style="display: none;">/</h1>
+            <h1>
+              fwdslsh
+            </h1>
+            <p class="tagline">Slash a path through the bloat</p>
+            <p class="description">
+              Sharp tools for hackers who remember when software didn't fight you.
+              Zero deps, instant setup, no frameworks to babysit.
+            </p>
+            <div class="cta-buttons">
+              <a href="#tools" class="btn btn-primary">
+                <span>/tools</span>
+              </a>
+              <a href="https://github.com/fwdslsh" class="btn btn-secondary">
+                /GitHub
+              </a>
+            </div>
+          </div>
+        </section>
+
+        <section id="tools" class="tools-preview">
+          <div class="section-header">
+            <h2>Built for the Command Line</h2>
+            <p>Small, sharp programs that do one thing well</p>
+          </div>
+
+          <div class="terminal-demo">
+            <div class="terminal-header">
+              <div class="terminal-dot dot-red"></div>
+              <div class="terminal-dot dot-yellow"></div>
+              <div class="terminal-dot dot-green"></div>
+              <div class="terminal-title">~/project</div>
+            </div>
+            <div class="terminal-content">
+              <div class="terminal-line">
+                <span class="prompt">$</span> <span class="command">inform https://docs.example.com</span>
+                <span class="comment"> # Crawl documentation site</span>
+              </div>
+              <div class="terminal-line output">
+                ✓ Crawled 42 pages, saved as Markdown
+              </div>
+              <div class="terminal-line">
+                <span class="prompt">$</span> <span class="command">catalog --input docs --output build --sitemap</span>
+                <span class="comment"> # Generate llms.txt index</span>
+              </div>
+              <div class="terminal-line output">
+                ✓ Generated llms.txt with 42 files indexed
+              </div>
+              <div class="terminal-line">
+                <span class="prompt">$</span> <span class="command">unify build</span>
+                <span class="comment"> # Static site, zero config</span>
+              </div>
+              <div class="terminal-line output">
+                ✓ Built 23 pages in 847ms
+              </div>
+              <div class="terminal-line">
+                <span class="prompt">$</span> <span class="command">git add . && giv message</span>
+                <span class="comment"> # AI-powered commit</span>
+              </div>
+              <div class="terminal-line output">
+                ✓ Generated: "feat: add documentation with automated indexing"
+              </div>
+            </div>
+          </div>
+
+          <div class="tools-grid">
+            <div class="tool-card">
+              <div class="tool-header">
+                <div class="tool-icon">g</div>
+                <div>
+                  <h3>giv</h3>
+                  <div class="subtitle">Git workflows on autopilot</div>
+                </div>
+              </div>
+              <p>AI-powered commit messages, changelogs, and release notes. Ships as a static binary, talks to any LLM
+                backend, doesn't break your flow.</p>
+
+              <div class="code-snippet">$ giv message
+                $ giv changelog v1.0.0..HEAD
+                $ giv release-notes --format markdown</div>
+
+              <p><strong>Why we built it:</strong> Writing commit messages is grunt work. Let the machine do grunt work
+                while you build.</p>
+
+              <div class="tool-links">
+                <a href="/giv">Documentation →</a>
+                <a href="https://github.com/fwdslsh/giv">GitHub →</a>
+              </div>
+            </div>
+
+            <div class="tool-card">
+              <div class="tool-header">
+                <div class="tool-icon">u</div>
+                <div>
+                  <h3>unify</h3>
+                  <div class="subtitle">Static sites for people who remember HTML</div>
+                </div>
+              </div>
+              <p>Build sites with Apache SSI syntax and modern tooling. No JSX, no build step hell, no framework
+                lock-in.
+                Just fast sites that ship.</p>
+
+              <div class="code-snippet">$ unify build
+                $ unify serve
+                $ unify watch</div>
+
+              <p><strong>Why we built it:</strong> Static site generators became more complex than the sites they build.
+                We
+                fixed that.</p>
+
+              <div class="tool-links">
+                <a href="/unify">Documentation →</a>
+                <a href="https://github.com/fwdslsh/unify">GitHub →</a>
+              </div>
+            </div>
+
+            <div class="tool-card">
+              <div class="tool-header">
+                <div class="tool-icon">i</div>
+                <div>
+                  <h3>inform</h3>
+                  <div class="subtitle">High-performance web content crawler</div>
+                </div>
+              </div>
+              <p>Crawl websites, extract main content, and convert to clean Markdown. Powered by Bun for maximum
+                performance with zero dependencies.</p>
+
+              <div class="code-snippet">$ inform https://docs.example.com
+                $ inform github.com/owner/repo/tree/main/docs
+                $ inform --include "*.md" --exclude "temp/*"</div>
+
+              <p><strong>Why we built it:</strong> Documentation migration and content extraction shouldn't require
+                heavy frameworks. Fast, focused, effective.</p>
+
+              <div class="tool-links">
+                <a href="/inform">Documentation →</a>
+                <a href="https://github.com/fwdslsh/inform">GitHub →</a>
+              </div>
+            </div>
+
+            <div class="tool-card">
+              <div class="tool-header">
+                <div class="tool-icon">c</div>
+                <div>
+                  <h3>catalog</h3>
+                  <div class="subtitle">AI-ready documentation indexer</div>
+                </div>
+              </div>
+              <p>Generate llms.txt and llms-full.txt from Markdown/HTML directories. Perfect for AI-powered
+                documentation workflows and searchable knowledge bases.</p>
+
+              <div class="code-snippet">$ catalog --input docs --output build
+                $ catalog --sitemap --base-url https://docs.example.com
+                $ catalog --optional "drafts/**/*" --validate</div>
+
+              <p><strong>Why we built it:</strong> AI tools need structured, indexed content. We made it trivial to
+                prepare documentation for AI consumption.</p>
+
+              <div class="tool-links">
+                <a href="/catalog">Documentation →</a>
+                <a href="https://github.com/fwdslsh/catalog">GitHub →</a>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="about" class="tools-preview">
+          <div class="section-header">
+            <h2>The Path Forward</h2>
+            <p>Old-school principles, new-school execution</p>
+          </div>
+
+          <div
+            style="max-width: 600px; margin: 0 auto; text-align: left; color: var(--text-secondary); font-size: 1.1rem; line-height: 1.8;">
+            <p style="margin-bottom: 1.5rem;">
+              We're not building the next unicorn framework. We're building tools for hackers who value craft over hype.
+            </p>
+
+            <p style="margin-bottom: 1.5rem;">
+              <strong style="color: var(--primary);">Ship binaries, not ecosystems:</strong> Download once, run
+              everywhere.
+              No package manager roulette or dependency hell.
+            </p>
+
+            <p style="margin-bottom: 1.5rem;">
+              <strong style="color: var(--primary);">Hack with the grain:</strong> Work with web standards and POSIX
+              conventions instead of reinventing everything.
+            </p>
+
+            <p style="margin-bottom: 1.5rem;">
+              <strong style="color: var(--primary);">Performance starts in your head:</strong> Tools should amplify
+              human
+              intelligence, not fight it with ceremony and complexity.
+            </p>
+
+            <p
+              style="color: var(--text-primary); text-align: center; font-family: var(--font-mono); font-style: italic; margin-top: 2rem;">
+              The <span style="color: var(--primary); font-weight: bold;">/</span> isn't just our logo - it's a
+              commitment
+              to cutting through the cruft.
+            </p>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="footer-content">
+      <div class="footer-links">
+        <a href="https://github.com/fwdslsh">GitHub</a>
+        <a href="https://npmjs.com/org/fwdslsh">NPM</a>
+        <a href="/#tools">Tools</a>
+        <a href="/#about">About</a>
+      </div>
+      <p>A simpler path forward.</p>
+      <p style="font-size: 0.8rem; margin-top: 1rem;">
+        Built with <span style="color: var(--primary);">unify</span> •
+        Commits generated with <span style="color: var(--primary);">giv</span>
+      </p>
+    </div>
+  </footer>
+
+  <script>
+    // Smooth scrolling for anchor links
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function (e) {
+        e.preventDefault();
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+          target.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start'
+          });
+        }
+      });
+    });
+
+    // Add scroll effect to navigation
+    window.addEventListener('scroll', () => {
+      const nav = document.querySelector('nav');
+      if (window.scrollY > 50) {
+        nav.style.background = 'rgba(10, 14, 10, 0.95)';
+      } else {
+        nav.style.background = 'rgba(10, 14, 10, 0.9)';
+      }
+    });
+
+    // Terminal typing animation (optional enhancement)
+    const terminalLines = document.querySelectorAll('.terminal-line');
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.style.animation = 'fadeInUp 0.5s ease-out forwards';
+        }
+      });
+    });
+
+    terminalLines.forEach((line, index) => {
+      line.style.opacity = '0';
+      line.style.animationDelay = `${index * 0.2}s`;
+      observer.observe(line);
+    });
+  </script>
+  <script>
+    // Smooth scrolling for anchor links
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function (e) {
+        e.preventDefault();
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+          target.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start'
+          });
+        }
+      });
+    });
+
+    // Add scroll effect to navigation
+    window.addEventListener('scroll', () => {
+      const nav = document.querySelector('nav');
+      if (window.scrollY > 50) {
+        nav.style.background = 'rgba(10, 14, 10, 0.95)';
+      } else {
+        nav.style.background = 'rgba(10, 14, 10, 0.9)';
+      }
+    });
+
+    // Terminal typing animation (optional enhancement)
+    const terminalLines = document.querySelectorAll('.terminal-line');
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.style.animation = 'fadeInUp 0.5s ease-out forwards';
+        }
+      });
+    });
+
+    terminalLines.forEach((line, index) => {
+      line.style.opacity = '0';
+      line.style.animationDelay = `${index * 0.2}s`;
+      observer.observe(line);
+    });
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,1085 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>inform Examples - Real-World Web Content Extraction</title>
+    <meta name="description" content="Real-world examples and patterns for using inform to extract web content. Migration workflows, crawling strategies, and integration patterns.">
+    <meta name="keywords" content="inform, web crawler, content extraction, HTML to Markdown, web scraping, fwdslsh">
+    <meta property="og:title" content="inform Examples - Real-World Web Content Extraction">
+    <meta property="og:description" content="Real-world examples and patterns for using inform to extract web content. Migration workflows, crawling strategies, and integration patterns.">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="inform Examples - Real-World Web Content Extraction">
+    <meta name="twitter:description" content="Real-world examples and patterns for using inform to extract web content. Migration workflows, crawling strategies, and integration patterns.">
+    <style>
+        /* Page-specific styles for examples */
+        .migration-examples,
+        .crawling-strategies,
+        .integration-examples {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .example-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem;
+            transition: all 0.3s ease;
+        }
+
+        .example-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+        }
+
+        .example-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .example-icon {
+            font-size: 1.5rem;
+        }
+
+        .difficulty-badge {
+            background: var(--gradient-primary);
+            color: var(--bg-dark);
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-left: auto;
+        }
+
+        .example-scenario {
+            background: var(--bg-darker);
+            border-left: 3px solid var(--primary);
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 0 6px 6px 0;
+        }
+
+        .scenario-label {
+            color: var(--primary);
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .performance-comparison {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+
+        .performance-metric {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 1.5rem;
+            font-weight: 900;
+            color: var(--primary);
+            font-family: var(--font-mono);
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-label {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .troubleshooting-tips {
+            background: var(--bg-darker);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .tip-list {
+            display: grid;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .tip-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.8rem;
+        }
+
+        .tip-icon {
+            color: var(--primary);
+            font-size: 1.2rem;
+            margin-top: 0.2rem;
+        }
+
+        @media (max-width: 768px) {
+            .migration-examples,
+            .crawling-strategies,
+            .integration-examples {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body data-unify="/_includes/tool-page.html">
+
+<!-- Tool-specific navigation links -->
+<ul class="unify-nav-links">
+    <li><a href="/inform/">Overview</a></li>
+    <li><a href="/inform/getting-started.html">Getting Started</a></li>
+    <li><a href="/inform/docs.html">Documentation</a></li>
+    <li><a href="/inform/examples.html">Examples</a></li>
+</ul>
+
+<main class="unify-content">
+
+<section class="tool-hero">
+    <div class="tool-hero-content">
+        <h1>inform Examples</h1>
+        <div class="tagline">Real-world patterns for web content extraction</div>
+        <div class="description">Practical examples, proven workflows, and integration patterns for extracting, converting, and organizing web content with inform.</div>
+        
+        <div class="hero-buttons">
+            <a href="#migration-examples" class="btn btn-primary">
+                <span class="btn-icon">📚</span>
+                Migration Patterns
+            </a>
+            <a href="#integration-workflows" class="btn btn-secondary">Integration Workflows</a>
+        </div>
+    </div>
+</section>
+
+
+<section id="migration-examples" class="tool-section">
+                <div class="section-header">
+                    <h2>Documentation Migration Patterns</h2>
+                    <p>Proven workflows for migrating documentation between platforms</p>
+                </div>
+
+                <div class="migration-examples">
+                    <div class="example-card">
+                        <div class="example-header">
+                            <span class="example-icon">📖</span>
+                            <h3>Legacy Platform Migration</h3>
+                            <span class="difficulty-badge">Intermediate</span>
+                        </div>
+                        
+                        <div class="example-description">
+                            <p>Complete workflow for migrating documentation from an old platform to a modern static site generator.</p>
+                        </div>
+
+                        <div class="example-workflow">
+                            <h4>Step 1: Analysis and Planning</h4>
+                            <div class="code-block">
+                                <code># Analyze the current site structure
+inform https://old-docs.company.com \
+  --max-pages 5 \
+  --verbose \
+  --output-dir analysis
+
+# Review extracted content structure
+ls analysis/
+head -20 analysis/index.md</code>
+                            </div>
+
+                            <h4>Step 2: Full Content Extraction</h4>
+                            <div class="code-block">
+                                <code># Extract all documentation with conservative settings
+inform https://old-docs.company.com \
+  --output-dir migrated-docs \
+  --max-pages 200 \
+  --delay 2000 \
+  --concurrency 2 \
+  --include "*/docs/*" \
+  --include "*/guide/*" \
+  --exclude "*/internal/*" \
+  --exclude "*/admin/*"</code>
+                            </div>
+
+                            <h4>Step 3: Content Organization</h4>
+                            <div class="code-block">
+                                <code># Organize content for new platform
+mkdir -p new-docs-site/content/{guides,api,tutorials}
+
+# Move content to appropriate sections
+mv migrated-docs/guide/* new-docs-site/content/guides/
+mv migrated-docs/api/* new-docs-site/content/api/
+mv migrated-docs/tutorial/* new-docs-site/content/tutorials/
+
+# Generate index files
+catalog --input new-docs-site/content \
+  --output new-docs-site/indexed \
+  --sitemap \
+  --base-url https://docs.company.com</code>
+                            </div>
+
+                            <h4>Step 4: Build and Deploy</h4>
+                            <div class="code-block">
+                                <code># Build with unify
+cd new-docs-site
+unify build --input indexed --output dist
+
+# Generate professional commit message
+giv message
+# "docs: migrate legacy documentation to modern platform"
+
+# Deploy
+git add . && git commit -m "$(giv message)"
+git push origin main</code>
+                            </div>
+                        </div>
+
+                        <div class="example-results">
+                            <h4>Expected Results</h4>
+                            <ul>
+                                <li>Organized content structure preserving original hierarchy</li>
+                                <li>Clean Markdown files with proper metadata</li>
+                                <li>Generated sitemap and navigation structure</li>
+                                <li>Professional deployment with AI-generated commit messages</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="example-card">
+                        <div class="example-header">
+                            <span class="example-icon">🔄</span>
+                            <h3>Multi-Source Consolidation</h3>
+                            <span class="difficulty-badge">Advanced</span>
+                        </div>
+                        
+                        <div class="example-description">
+                            <p>Combine documentation from multiple sources into a unified knowledge base.</p>
+                        </div>
+
+                        <div class="example-workflow">
+                            <h4>Extract from Multiple Sources</h4>
+                            <div class="code-block">
+                                <code># Extract from primary documentation
+inform https://docs.mainproduct.com \
+  --output-dir sources/main-docs \
+  --max-pages 150 \
+  --delay 1000
+
+# Extract API documentation  
+inform https://api.mainproduct.com/docs \
+  --output-dir sources/api-docs \
+  --max-pages 50 \
+  --include "*/reference/*" \
+  --include "*/endpoints/*"
+
+# Extract community tutorials
+inform https://community.mainproduct.com \
+  --output-dir sources/community \
+  --max-pages 100 \
+  --include "*/tutorial/*" \
+  --include "*/howto/*"
+
+# Extract GitHub repository docs
+inform https://github.com/company/product/tree/main/docs \
+  --output-dir sources/github-docs \
+  --include "*.md"</code>
+                            </div>
+
+                            <h4>Consolidate and Structure</h4>
+                            <div class="code-block">
+                                <code># Create unified structure
+mkdir -p consolidated/{core,api,tutorials,community}
+
+# Organize by content type
+cp -r sources/main-docs/* consolidated/core/
+cp -r sources/api-docs/* consolidated/api/
+cp -r sources/community/* consolidated/community/
+cp -r sources/github-docs/* consolidated/core/
+
+# Generate comprehensive index
+catalog --input consolidated \
+  --output unified-knowledge-base \
+  --index \
+  --sitemap \
+  --validate \
+  --base-url https://knowledge.company.com</code>
+                            </div>
+
+                            <h4>Create Cross-References</h4>
+                            <div class="code-block">
+                                <code># Generate relationship mapping
+find consolidated -name "*.md" | while read file; do
+  echo "Processing: $file"
+  # Add cross-reference metadata
+  # (Custom script to identify related content)
+done
+
+# Build final knowledge base
+unify build --input unified-knowledge-base --output kb-site</code>
+                            </div>
+                        </div>
+
+                        <div class="example-benefits">
+                            <h4>Benefits</h4>
+                            <ul>
+                                <li>Comprehensive documentation coverage</li>
+                                <li>Consistent formatting across sources</li>
+                                <li>Unified search and navigation</li>
+                                <li>Automated cross-referencing</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+<section id="research-patterns" class="tool-section alt-bg">
+                <div class="section-header">
+                    <h2>Content Research Patterns</h2>
+                    <p>Intelligence gathering and competitive analysis workflows</p>
+                </div>
+
+                <div class="research-examples">
+                    <div class="example-card">
+                        <div class="example-header">
+                            <span class="example-icon">🔍</span>
+                            <h3>Competitive Analysis</h3>
+                            <span class="difficulty-badge">Intermediate</span>
+                        </div>
+                        
+                        <div class="research-workflow">
+                            <h4>Multi-Competitor Intelligence</h4>
+                            <div class="code-block">
+                                <code>#!/bin/bash
+# competitive-research.sh
+
+competitors=(
+  "https://competitor1.com/docs"
+  "https://competitor2.com/help"  
+  "https://competitor3.com/guides"
+  "https://competitor4.com/api"
+)
+
+# Extract from each competitor
+for url in "${competitors[@]}"; do
+  domain=$(echo $url | sed 's/https:\/\///' | sed 's/\/.*$//')
+  echo "Analyzing $domain..."
+  
+  inform "$url" \
+    --output-dir "research/$domain" \
+    --max-pages 30 \
+    --delay 2000 \
+    --include "*/docs/*" \
+    --include "*/guide/*" \
+    --include "*/api/*"
+    
+  echo "Completed $domain analysis"
+  sleep 60  # Respectful delay between competitors
+done
+
+# Generate comparative analysis
+catalog --input research \
+  --output competitive-analysis \
+  --index \
+  --validate
+
+echo "Competitive research complete!"
+echo "Review results in: competitive-analysis/"</code>
+                            </div>
+
+                            <h4>Analysis and Insights</h4>
+                            <div class="code-block">
+                                <code># Generate content comparison
+find research -name "*.md" | head -20 | xargs wc -w > word-counts.txt
+
+# Create feature comparison matrix
+# (Custom analysis script)
+python analyze-features.py research/ > feature-matrix.csv
+
+# Generate summary report
+echo "# Competitive Analysis Report" > analysis-report.md
+echo "" >> analysis-report.md
+echo "## Content Volume Analysis" >> analysis-report.md
+cat word-counts.txt >> analysis-report.md
+
+echo "" >> analysis-report.md  
+echo "## Feature Coverage Matrix" >> analysis-report.md
+cat feature-matrix.csv >> analysis-report.md</code>
+                            </div>
+                        </div>
+
+                        <div class="research-insights">
+                            <h4>Research Insights</h4>
+                            <ul>
+                                <li>Content structure and organization comparison</li>
+                                <li>Feature coverage and documentation depth</li>
+                                <li>User experience and information architecture</li>
+                                <li>Messaging and positioning analysis</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="example-card">
+                        <div class="example-header">
+                            <span class="example-icon">📊</span>
+                            <h3>Industry Knowledge Mining</h3>
+                            <span class="difficulty-badge">Advanced</span>
+                        </div>
+                        
+                        <div class="mining-workflow">
+                            <h4>Domain-Specific Content Extraction</h4>
+                            <div class="code-block">
+                                <code># Industry-specific sources
+industry_sources=(
+  "https://techblog.company1.com"
+  "https://engineering.company2.com"  
+  "https://blog.company3.com"
+  "https://medium.com/@industry-expert"
+)
+
+# Extract industry insights
+for source in "${industry_sources[@]}"; do
+  domain=$(echo $source | sed 's/https:\/\///' | sed 's/\/.*$//')
+  
+  inform "$source" \
+    --output-dir "industry-insights/$domain" \
+    --max-pages 50 \
+    --delay 1500 \
+    --include "*technical*" \
+    --include "*engineering*" \
+    --include "*architecture*" \
+    --exclude "*job*" \
+    --exclude "*hiring*"
+done
+
+# Process and categorize content
+catalog --input industry-insights \
+  --output processed-insights \
+  --optional "drafts/**/*" \
+  --validate</code>
+                            </div>
+
+                            <h4>Content Processing and Analysis</h4>
+                            <div class="code-block">
+                                <code># Generate topic clustering
+# (Requires additional analysis tools)
+python cluster-topics.py processed-insights/ > topic-clusters.json
+
+# Extract technical patterns
+grep -r "architecture\|design pattern\|best practice" processed-insights/ > technical-patterns.txt
+
+# Create trending analysis
+python analyze-trends.py processed-insights/ > trend-analysis.json
+
+# Generate final report
+python generate-industry-report.py \
+  --topics topic-clusters.json \
+  --patterns technical-patterns.txt \
+  --trends trend-analysis.json \
+  --output industry-knowledge-report.md</code>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+<section id="integration-workflows" class="tool-section">
+                <div class="section-header">
+                    <h2>Integration Workflows</h2>
+                    <p>Combining inform with other fwdslsh tools for powerful pipelines</p>
+                </div>
+
+                <div class="integration-examples">
+                    <div class="workflow-example">
+                        <div class="workflow-header">
+                            <h3>🔄 Complete Documentation Pipeline</h3>
+                            <p>End-to-end workflow from web crawling to deployment</p>
+                        </div>
+
+                        <div class="pipeline-steps">
+                            <div class="pipeline-step">
+                                <div class="step-icon">i</div>
+                                <div class="step-content">
+                                    <h4>Content Extraction</h4>
+                                    <div class="code-block">
+                                        <code># Extract from multiple documentation sources
+inform https://old-docs.example.com \
+  --output-dir raw-content \
+  --max-pages 100 \
+  --delay 1000
+
+inform https://api-docs.example.com \
+  --output-dir raw-content/api \
+  --max-pages 50 \
+  --include "*/reference/*"</code>
+                                    </div>
+                                </div>
+                                <div class="step-arrow">→</div>
+                            </div>
+
+                            <div class="pipeline-step">
+                                <div class="step-icon">c</div>
+                                <div class="step-content">
+                                    <h4>Content Indexing</h4>
+                                    <div class="code-block">
+                                        <code># Generate structured indexes and navigation
+catalog --input raw-content \
+  --output structured-content \
+  --sitemap \
+  --index \
+  --base-url https://new-docs.example.com \
+  --validate</code>
+                                    </div>
+                                </div>
+                                <div class="step-arrow">→</div>
+                            </div>
+
+                            <div class="pipeline-step">
+                                <div class="step-icon">u</div>
+                                <div class="step-content">
+                                    <h4>Site Generation</h4>
+                                    <div class="code-block">
+                                        <code># Build modern static site with navigation
+unify build \
+  --input structured-content \
+  --output production-site \
+  --optimize</code>
+                                    </div>
+                                </div>
+                                <div class="step-arrow">→</div>
+                            </div>
+
+                            <div class="pipeline-step">
+                                <div class="step-icon">g</div>
+                                <div class="step-content">
+                                    <h4>Version Control</h4>
+                                    <div class="code-block">
+                                        <code># Professional commit with AI assistance
+git add .
+giv message
+# "docs: migrate and modernize documentation platform"
+
+git push origin main</code>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="pipeline-benefits">
+                            <h4>Pipeline Benefits</h4>
+                            <ul>
+                                <li>Automated content migration and structuring</li>
+                                <li>SEO-optimized site generation with navigation</li>
+                                <li>Professional version control and documentation</li>
+                                <li>Repeatable and scalable process</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="workflow-example">
+                        <div class="workflow-header">
+                            <h3>🤖 AI-Ready Content Pipeline</h3>
+                            <p>Prepare content for AI training and RAG applications</p>
+                        </div>
+
+                        <div class="ai-workflow">
+                            <h4>High-Quality Content Extraction</h4>
+                            <div class="code-block">
+                                <code># Extract comprehensive, high-quality content
+inform https://comprehensive-docs.example.com \
+  --output-dir ai-training-content \
+  --max-pages 500 \
+  --delay 800 \
+  --include "*/docs/*" \
+  --include "*/guide/*" \
+  --include "*/tutorial/*" \
+  --include "*/reference/*" \
+  --exclude "*/blog/*" \
+  --exclude "*/news/*"</code>
+                            </div>
+
+                            <h4>Content Structuring and Validation</h4>
+                            <div class="code-block">
+                                <code># Generate AI-optimized indexes with validation
+catalog --input ai-training-content \
+  --output ai-ready-content \
+  --validate \
+  --optional "examples/**/*" \
+  --optional "advanced/**/*"
+
+# Quality check the content
+find ai-ready-content -name "*.md" | xargs wc -w | tail -1
+echo "Content validation complete"</code>
+                            </div>
+
+                            <h4>AI Integration Preparation</h4>
+                            <div class="code-block">
+                                <code># Create training data sets
+mkdir -p ai-datasets/{training,validation,context}
+
+# Split content for different AI purposes
+cp ai-ready-content/llms.txt ai-datasets/context/
+cp ai-ready-content/llms-full.txt ai-datasets/training/
+cp ai-ready-content/llms-ctx.txt ai-datasets/validation/
+
+# Generate metadata for AI systems
+echo "AI-ready content prepared with structured indexes"
+ls -la ai-datasets/*/</code>
+                            </div>
+                        </div>
+
+                        <div class="ai-features">
+                            <h4>AI-Optimized Features</h4>
+                            <ul>
+                                <li>Clean, structured content without noise</li>
+                                <li>Consistent formatting for AI processing</li>
+                                <li>Hierarchical organization for context</li>
+                                <li>Quality validation and completeness checks</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+<section id="specialized-patterns" class="tool-section alt-bg">
+                <div class="section-header">
+                    <h2>Specialized Extraction Patterns</h2>
+                    <p>Advanced techniques for specific content types and platforms</p>
+                </div>
+
+                <div class="specialized-examples">
+                    <div class="example-card">
+                        <div class="example-header">
+                            <span class="example-icon">📱</span>
+                            <h3>GitHub Repository Documentation</h3>
+                            <span class="difficulty-badge">Beginner</span>
+                        </div>
+                        
+                        <div class="github-workflow">
+                            <h4>Repository Documentation Extraction</h4>
+                            <div class="code-block">
+                                <code># Extract documentation from GitHub repositories
+inform https://github.com/facebook/react/tree/main/docs \
+  --output-dir react-docs \
+  --include "*.md" \
+  --include "*.mdx"
+
+# Extract from multiple open source projects
+projects=(
+  "https://github.com/vuejs/vue/tree/dev/docs"
+  "https://github.com/angular/angular/tree/main/docs"
+  "https://github.com/sveltejs/svelte/tree/master/site/content/docs"
+)
+
+for project in "${projects[@]}"; do
+  project_name=$(echo $project | sed 's/.*github.com\/\([^\/]*\)\/\([^\/]*\)\/.*/\1-\2/')
+  inform "$project" \
+    --output-dir "oss-docs/$project_name" \
+    --include "*.md" \
+    --include "*.mdx"
+done</code>
+                            </div>
+
+                            <h4>Documentation Comparison</h4>
+                            <div class="code-block">
+                                <code># Generate comparative documentation analysis
+catalog --input oss-docs \
+  --output framework-comparison \
+  --index \
+  --sitemap \
+  --base-url https://framework-docs-comparison.dev
+
+# Build comparison site
+unify build \
+  --input framework-comparison \
+  --output comparison-site</code>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="example-card">
+                        <div class="example-header">
+                            <span class="example-icon">🛒</span>
+                            <h3>E-commerce Content Mining</h3>
+                            <span class="difficulty-badge">Advanced</span>
+                        </div>
+                        
+                        <div class="ecommerce-workflow">
+                            <h4>Product Information Extraction</h4>
+                            <div class="code-block">
+                                <code># Extract product documentation and guides
+inform https://help.shopify.com \
+  --output-dir ecommerce-content/shopify \
+  --max-pages 200 \
+  --include "*/manual/*" \
+  --include "*/themes/*" \
+  --exclude "*/billing/*"
+
+inform https://docs.woocommerce.com \
+  --output-dir ecommerce-content/woocommerce \
+  --max-pages 150 \
+  --include "*/document/*" \
+  --include "*/tutorial/*"
+
+# Extract best practices and guides
+inform https://ecommerce-platforms.com \
+  --output-dir ecommerce-content/best-practices \
+  --max-pages 100 \
+  --include "*/guide/*" \
+  --include "*/best-practice/*"</code>
+                            </div>
+
+                            <h4>Content Organization</h4>
+                            <div class="code-block">
+                                <code># Organize by platform and topic
+mkdir -p ecommerce-knowledge/{platforms,guides,tutorials}
+
+# Categorize content
+cp -r ecommerce-content/shopify/* ecommerce-knowledge/platforms/shopify/
+cp -r ecommerce-content/woocommerce/* ecommerce-knowledge/platforms/woocommerce/
+cp -r ecommerce-content/best-practices/* ecommerce-knowledge/guides/
+
+# Generate comprehensive e-commerce knowledge base
+catalog --input ecommerce-knowledge \
+  --output ecommerce-kb \
+  --index \
+  --sitemap \
+  --validate \
+  --base-url https://ecommerce-knowledge.dev</code>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="example-card">
+                        <div class="example-header">
+                            <span class="example-icon">🔬</span>
+                            <h3>Technical Blog Aggregation</h3>
+                            <span class="difficulty-badge">Intermediate</span>
+                        </div>
+                        
+                        <div class="blog-aggregation">
+                            <h4>Engineering Blog Extraction</h4>
+                            <div class="code-block">
+                                <code># Extract from major tech company blogs
+tech_blogs=(
+                                  "https://engineering.fb.com"
+  "https://blog.google/technology"
+  "https://eng.uber.com"
+  "https://medium.engineering"
+  "https://netflixtechblog.com"
+)
+
+for blog in "${tech_blogs[@]}"; do
+  domain=$(echo $blog | sed 's/https:\/\///' | sed 's/\/.*$//' | sed 's/\./-/g')
+  
+  inform "$blog" \
+    --output-dir "tech-blogs/$domain" \
+    --max-pages 50 \
+    --delay 2000 \
+    --include "*engineering*" \
+    --include "*technical*" \
+    --include "*architecture*" \
+    --exclude "*job*" \
+    --exclude "*career*"
+done</code>
+                            </div>
+
+                            <h4>Content Aggregation and Analysis</h4>
+                            <div class="code-block">
+                                <code># Create unified tech blog archive
+catalog --input tech-blogs \
+  --output tech-insights \
+  --index \
+  --validate
+
+# Generate trend analysis
+find tech-blogs -name "*.md" -exec grep -l "microservices\|kubernetes\|serverless" {} \; > trending-topics.txt
+
+# Create searchable archive
+unify build \
+  --input tech-insights \
+  --output tech-blog-archive
+
+echo "Tech blog aggregation complete!"
+echo "Archive available in: tech-blog-archive/"</code>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+<section id="automation-scripts" class="tool-section">
+                <div class="section-header">
+                    <h2>Automation Scripts</h2>
+                    <p>Ready-to-use scripts for common inform workflows</p>
+                </div>
+
+                <div class="automation-examples">
+                    <div class="script-card">
+                        <div class="script-header">
+                            <h3>📅 Scheduled Content Monitoring</h3>
+                            <p>Monitor websites for content changes and updates</p>
+                        </div>
+                        
+                        <div class="code-block">
+                            <code>#!/bin/bash
+# content-monitor.sh - Monitor websites for changes
+
+# Configuration
+SITES=(
+  "https://docs.example.com"
+  "https://api.example.com/docs"
+  "https://help.example.com"
+)
+
+BACKUP_DIR="/backup/content-monitoring"
+DATE=$(date +%Y-%m-%d)
+
+# Create daily backup directory
+mkdir -p "$BACKUP_DIR/$DATE"
+
+# Monitor each site
+for site in "${SITES[@]}"; do
+  site_name=$(echo $site | sed 's/https:\/\///' | sed 's/\/.*$//' | sed 's/\./-/g')
+  
+  echo "Monitoring: $site"
+  
+  # Extract current content
+  inform "$site" \
+    --output-dir "$BACKUP_DIR/$DATE/$site_name" \
+    --max-pages 50 \
+    --delay 1000
+  
+  # Compare with previous day if exists
+  previous_date=$(date -d "yesterday" +%Y-%m-%d)
+  if [ -d "$BACKUP_DIR/$previous_date/$site_name" ]; then
+    echo "Comparing with previous extraction..."
+    diff -r "$BACKUP_DIR/$previous_date/$site_name" "$BACKUP_DIR/$DATE/$site_name" > "$BACKUP_DIR/$DATE/$site_name-changes.txt"
+    
+    if [ -s "$BACKUP_DIR/$DATE/$site_name-changes.txt" ]; then
+      echo "Changes detected in $site_name!"
+      # Send notification (email, Slack, etc.)
+      # notify-send "Content Changes" "Changes detected in $site_name"
+    fi
+  fi
+done
+
+echo "Content monitoring complete for $DATE"</code>
+                        </div>
+                    </div>
+
+                    <div class="script-card">
+                        <div class="script-header">
+                            <h3>🔄 Automated Documentation Sync</h3>
+                            <p>Keep local documentation in sync with web sources</p>
+                        </div>
+                        
+                        <div class="code-block">
+                            <code>#!/bin/bash
+# doc-sync.sh - Automated documentation synchronization
+
+# Configuration
+SOURCE_URL="https://docs.upstream.com"
+LOCAL_DOCS="./docs"
+BACKUP_DIR="./docs-backup"
+SYNC_LOG="./sync.log"
+
+echo "$(date): Starting documentation sync" >> $SYNC_LOG
+
+# Create backup of current docs
+if [ -d "$LOCAL_DOCS" ]; then
+  echo "Creating backup..."
+  cp -r "$LOCAL_DOCS" "$BACKUP_DIR-$(date +%Y%m%d-%H%M%S)"
+fi
+
+# Extract latest documentation
+echo "Extracting latest documentation..."
+inform "$SOURCE_URL" \
+  --output-dir "$LOCAL_DOCS-new" \
+  --max-pages 200 \
+  --delay 1000 \
+  --include "*/docs/*" \
+  --include "*/guide/*"
+
+# Check if extraction was successful
+if [ $? -eq 0 ]; then
+  echo "Extraction successful, updating local docs..."
+  
+  # Replace old docs with new
+  rm -rf "$LOCAL_DOCS"
+  mv "$LOCAL_DOCS-new" "$LOCAL_DOCS"
+  
+  # Generate index
+  catalog --input "$LOCAL_DOCS" \
+    --output "$LOCAL_DOCS-indexed" \
+    --sitemap \
+    --index
+  
+  # Build site
+  unify build \
+    --input "$LOCAL_DOCS-indexed" \
+    --output "./public"
+  
+  # Commit changes with giv
+  git add .
+  commit_message=$(giv message)
+  git commit -m "$commit_message"
+  
+  echo "$(date): Sync completed successfully" >> $SYNC_LOG
+else
+  echo "$(date): Sync failed during extraction" >> $SYNC_LOG
+  exit 1
+fi</code>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+<section id="troubleshooting-examples" class="tool-section alt-bg">
+                <div class="section-header">
+                    <h2>Troubleshooting Examples</h2>
+                    <p>Solutions for common inform challenges and edge cases</p>
+                </div>
+
+                <div class="troubleshooting-examples">
+                    <div class="trouble-example">
+                        <h3>🚫 Handling Rate-Limited Sites</h3>
+                        <div class="code-block">
+                            <code># Conservative crawling for rate-sensitive sites
+inform https://rate-limited-site.com \
+  --delay 5000 \
+  --concurrency 1 \
+  --max-pages 25 \
+  --verbose
+
+# Multi-session approach for large sites
+sessions=(
+  "*/docs/*"
+  "*/api/*" 
+  "*/guide/*"
+)
+
+for session in "${sessions[@]}"; do
+  echo "Processing session: $session"
+  inform https://large-site.com \
+    --include "$session" \
+    --output-dir "./content/$(echo $session | sed 's/[^a-zA-Z0-9]//g')" \
+    --delay 3000 \
+    --max-pages 50
+  
+  echo "Waiting 10 minutes before next session..."
+  sleep 600
+done</code>
+                        </div>
+                    </div>
+
+                    <div class="trouble-example">
+                        <h3>🔧 Custom Content Detection</h3>
+                        <div class="code-block">
+                            <code># When standard content detection fails
+# Test with smaller sample first
+inform https://unusual-site.com/sample-page \
+  --max-pages 1 \
+  --verbose
+
+# Review extracted content
+head -50 crawled-pages/sample-page.md
+
+# Adjust strategy based on results
+# (Future: Custom selector support)
+inform https://unusual-site.com \
+  --output-dir custom-extraction \
+  --max-pages 20 \
+  --delay 2000</code>
+                        </div>
+                    </div>
+
+                    <div class="trouble-example">
+                        <h3>📦 Large-Scale Content Processing</h3>
+                        <div class="code-block">
+                            <code># Handling very large sites efficiently
+#!/bin/bash
+# large-scale-crawl.sh
+
+BASE_URL="https://massive-docs.com"
+BATCH_SIZE=50
+MAX_BATCHES=20
+
+for ((i=1; i<=MAX_BATCHES; i++)); do
+  echo "Processing batch $i of $MAX_BATCHES"
+  
+  inform "$BASE_URL" \
+    --max-pages $BATCH_SIZE \
+    --output-dir "batches/batch-$i" \
+    --delay 1000 \
+    --concurrency 3
+  
+  # Process batch immediately
+  catalog --input "batches/batch-$i" \
+    --output "processed/batch-$i" \
+    --validate
+  
+  echo "Batch $i complete. Waiting 2 minutes..."
+  sleep 120
+done
+
+# Combine all batches
+echo "Combining all batches..."
+mkdir -p final-output
+cp -r processed/batch-*/* final-output/
+
+# Generate final index
+catalog --input final-output \
+  --output complete-site \
+  --sitemap \
+  --index \
+  --base-url https://docs.example.com</code>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+<section id="next-steps" class="tool-section">
+                <div class="section-header">
+                    <h2>Continue Exploring</h2>
+                    <p>Dive deeper into inform capabilities and related tools</p>
+                </div>
+
+                <div class="next-steps-grid">
+                    <a href="/inform/docs" class="next-step-card">
+                        <div class="card-icon">📚</div>
+                        <h3>Complete Documentation</h3>
+                        <p>Comprehensive guides, CLI reference, and advanced features for mastering inform</p>
+                        <span class="card-arrow">→</span>
+                    </a>
+
+                    <a href="/ecosystem/" class="next-step-card">
+                        <div class="card-icon">🔄</div>
+                        <h3>Ecosystem Integration</h3>
+                        <p>See how inform combines with catalog, unify, and giv for complete workflows</p>
+                        <span class="card-arrow">→</span>
+                    </a>
+
+                    <a href="https://github.com/fwdslsh/inform" class="next-step-card">
+                        <div class="card-icon">📂</div>
+                        <h3>Source Code & Issues</h3>
+                        <p>View source code, report issues, or contribute to inform development</p>
+                        <span class="card-arrow">→</span>
+                    </a>
+                </div>
+            </section>
+
+</main>
+</body>
+</html>

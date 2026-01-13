@@ -1,16 +1,21 @@
 /**
- * Asset Reference Tracker for unify
- * Tracks which assets are actually referenced in HTML content
+ * Asset Reference Tracker for Unify
+ * Implements US-009: Asset Copying and Management
+ * 
+ * Tracks which assets are referenced in HTML/CSS content and provides
+ * secure path resolution and reference management functionality.
  */
 
-import path from 'path';
+import { join, resolve, relative, normalize, dirname, isAbsolute } from 'path';
+import { existsSync } from 'fs';
+import { PathValidator } from './path-validator.js';
 import { logger } from '../utils/logger.js';
 
 /**
- * Asset tracker for managing asset references and dependencies
+ * AssetTracker class for managing asset references and dependencies
  */
 export class AssetTracker {
-  constructor() {
+  constructor(options = {}) {
     // Maps asset file path to array of pages that reference it
     this.assetReferences = new Map();
     
@@ -19,6 +24,14 @@ export class AssetTracker {
     
     // Cache of parsed asset references from HTML content
     this.htmlAssetCache = new Map();
+    
+    // Path validator for security
+    this.pathValidator = new PathValidator();
+    
+    // Configuration options
+    this.sourceDir = options.sourceDir || process.cwd();
+    this.outputDir = options.outputDir || 'dist';
+    this.logger = options.logger || logger;
   }
 
   /**
@@ -29,20 +42,27 @@ export class AssetTracker {
    * @returns {string[]} Array of referenced asset paths
    */
   extractAssetReferences(htmlContent, pagePath, sourceRoot) {
+    if (!htmlContent || typeof htmlContent !== 'string') {
+      return [];
+    }
+
     const references = new Set();
     
     // Patterns to match asset references
     const patterns = [
-      // CSS files
+      // CSS files in link tags
       /<link[^>]+href=["']([^"']+\.css)["']/gi,
       // JavaScript files
       /<script[^>]+src=["']([^"']+\.js)["']/gi,
       // Images in img tags
       /<img[^>]+src=["']([^"']+\.(png|jpg|jpeg|gif|svg|webp|ico))["']/gi,
       // Link icons (favicon, apple-icon, etc.)
-      /<link[^>]+(?:rel=["'](?:icon|apple-touch-icon|shortcut icon)["'][^>]*href=["']([^"']+\.[^"']+)["']|href=["']([^"']+\.[^"']+)["'][^>]*rel=["'](?:icon|apple-touch-icon|shortcut icon)["'])/gi,
+      /<link[^>]+rel=["'](?:icon|apple-touch-icon|shortcut icon)["'][^>]*href=["']([^"']+)["']/gi,
+      /<link[^>]+href=["']([^"']+)["'][^>]*rel=["'](?:icon|apple-touch-icon|shortcut icon)["']/gi,
       // Background images in style attributes
       /style=["'][^"']*background-image:\s*url\(["']?([^"')]+)["']?\)/gi,
+      // CSS url() references in style blocks
+      /url\(["']?([^"')]+\.(png|jpg|jpeg|gif|svg|webp|ico|woff2?|ttf|eot|otf))["']?\)/gi,
       // Fonts in link tags
       /<link[^>]+href=["']([^"']+\.(woff2?|ttf|eot|otf))["']/gi,
       // Video/audio sources
@@ -59,14 +79,13 @@ export class AssetTracker {
       let match;
       while ((match = pattern.exec(htmlContent)) !== null) {
         // Handle different capture groups - some patterns have multiple groups
-        let assetPath = match[1] || match[2] || match[3];
+        let assetPath = match[1] || match[2];
         
         if (!assetPath) continue;
         
+        
         // Skip external URLs
-        if (assetPath.startsWith('http://') || 
-            assetPath.startsWith('https://') || 
-            assetPath.startsWith('//')) {
+        if (this._isExternalUrl(assetPath)) {
           continue;
         }
         
@@ -94,6 +113,10 @@ export class AssetTracker {
    * @returns {string[]} Array of referenced asset paths
    */
   extractCssAssetReferences(cssContent, cssPath, sourceRoot) {
+    if (!cssContent || typeof cssContent !== 'string') {
+      return [];
+    }
+
     const references = new Set();
     
     // Match all url() references (background, src, etc.)
@@ -102,13 +125,13 @@ export class AssetTracker {
     while ((match = urlPattern.exec(cssContent)) !== null) {
       const assetPath = match[1];
       if (!assetPath) continue;
-      if (assetPath.startsWith('http://') || assetPath.startsWith('https://') || assetPath.startsWith('//')) continue;
+      if (this._isExternalUrl(assetPath)) continue;
       if (assetPath.startsWith('data:')) continue;
       if (assetPath.startsWith('#')) continue;
+      
       const resolvedPath = this.resolveAssetPath(assetPath, cssPath, sourceRoot);
       if (resolvedPath) {
         references.add(resolvedPath);
-        logger.debug(`Extracted URL reference: ${resolvedPath}`);
       }
     }
 
@@ -122,13 +145,13 @@ export class AssetTracker {
       while ((srcMatch = srcUrlPattern.exec(srcValue)) !== null) {
         const assetPath = srcMatch[1];
         if (!assetPath) continue;
-        if (assetPath.startsWith('http://') || assetPath.startsWith('https://') || assetPath.startsWith('//')) continue;
+        if (this._isExternalUrl(assetPath)) continue;
         if (assetPath.startsWith('data:')) continue;
         if (assetPath.startsWith('#')) continue;
+        
         const resolvedPath = this.resolveAssetPath(assetPath, cssPath, sourceRoot);
         if (resolvedPath) {
           references.add(resolvedPath);
-          logger.debug(`Extracted font-face reference: ${resolvedPath}`);
         }
       }
     }
@@ -138,13 +161,13 @@ export class AssetTracker {
     while ((match = importPattern.exec(cssContent)) !== null) {
       const assetPath = match[1];
       if (!assetPath) continue;
-      if (assetPath.startsWith('http://') || assetPath.startsWith('https://') || assetPath.startsWith('//')) continue;
+      if (this._isExternalUrl(assetPath)) continue;
       if (assetPath.startsWith('data:')) continue;
       if (assetPath.startsWith('#')) continue;
+      
       const resolvedPath = this.resolveAssetPath(assetPath, cssPath, sourceRoot);
       if (resolvedPath) {
         references.add(resolvedPath);
-        logger.debug(`Extracted import reference: ${resolvedPath}`);
       }
     }
 
@@ -159,29 +182,40 @@ export class AssetTracker {
    * @returns {string|null} Resolved asset path or null if invalid
    */
   resolveAssetPath(assetPath, pagePath, sourceRoot) {
-    
+    if (!assetPath || typeof assetPath !== 'string') {
+      return null;
+    }
+
     try {
+      // First, validate the input for security
+      if (!this._validateAssetPath(assetPath)) {
+        return null;
+      }
+
       let resolvedPath;
       
       if (assetPath.startsWith('/')) {
         // Absolute path from source root
-        resolvedPath = path.join(sourceRoot, assetPath.slice(1));
+        resolvedPath = join(sourceRoot, assetPath.slice(1));
       } else {
-        // Relative path from current page
-        const pageDir = path.dirname(pagePath);
-        resolvedPath = path.resolve(pageDir, assetPath);
+        // Relative path from current page  
+        const pageDir = dirname(pagePath);
+        // Normalize asset path separators first
+        const normalizedAssetPath = assetPath.replace(/\\/g, '/');
+        resolvedPath = resolve(pageDir, normalizedAssetPath);
       }
       
-      // Ensure the resolved path is within source root
-      const relativePath = path.relative(sourceRoot, resolvedPath);
-      if (relativePath.startsWith('../')) {
-        logger.debug(`Asset path outside source root: ${assetPath}`);
+      // Normalize the path to handle platform differences
+      resolvedPath = normalize(resolvedPath);
+      
+      // Ensure the resolved path is within source root using path validator
+      try {
+        this.pathValidator.validatePath(resolvedPath, sourceRoot);
+        return resolvedPath;
+      } catch (error) {
         return null;
       }
-      
-      return resolvedPath;
     } catch (error) {
-      logger.debug(`Could not resolve asset path: ${assetPath} from ${pagePath}`);
       return null;
     }
   }
@@ -201,33 +235,53 @@ export class AssetTracker {
     
     // Process CSS files recursively to handle @import chains
     const cssAssets = new Set();
-    const processedCssFiles = new Set(); // Prevent infinite loops in case of circular imports
+    const processedCssFiles = new Set(); // Prevent infinite loops
     
-    const processCssFile = async (cssPath) => {
+    const processCssFile = async (cssPath, depth = 0, referringFile = pagePath) => {
+      // Prevent infinite recursion with max depth
+      const MAX_CSS_IMPORT_DEPTH = 10;
+      if (depth > MAX_CSS_IMPORT_DEPTH) {
+        logger.warn(`Maximum CSS import depth (${MAX_CSS_IMPORT_DEPTH}) exceeded at ${cssPath}`);
+        return;
+      }
+      
       if (processedCssFiles.has(cssPath)) {
         logger.debug(`Skipping already processed CSS file: ${cssPath}`);
         return; // Already processed this CSS file
       }
-      logger.debug(`Processing CSS file: ${cssPath}`);
       processedCssFiles.add(cssPath);
+      
+      // Validate CSS file exists before processing
+      if (!existsSync(cssPath)) {
+        logger.warn(`CSS file not found: ${cssPath} [referenced by: ${referringFile}]`);
+        return;
+      }
 
       try {
-        const fs = await import('fs/promises');
-        const cssContent = await fs.default.readFile(cssPath, 'utf-8');
+        const cssContent = await Bun.file(cssPath).text();
         const cssReferences = this.extractCssAssetReferences(cssContent, cssPath, sourceRoot);
+        
+        logger.debug(`Found ${cssReferences.length} asset references in CSS file: ${cssPath}`);
 
         for (const cssRef of cssReferences) {
           cssAssets.add(cssRef);
 
           // If this reference is another CSS file, process it recursively
           if (cssRef.endsWith('.css')) {
-            logger.debug(`Found nested CSS import: ${cssRef}`);
-            await processCssFile(cssRef);
+            // Check for circular import before recursing
+            if (processedCssFiles.has(cssRef)) {
+              logger.warn(`Circular CSS import detected: ${cssPath} -> ${cssRef}`);
+              continue;
+            }
+            await processCssFile(cssRef, depth + 1, cssPath);
           }
         }
       } catch (error) {
-        // CSS file might not exist or be readable, continue without error
-        logger.debug(`Could not read CSS file for asset extraction: ${cssPath}`);
+        // Log the error with context
+        logger.error(`Failed to process CSS file ${cssPath}: ${error.message}`);
+        
+        // Continue processing other files
+        // CSS processing errors shouldn't break the build
       }
     };
     
@@ -252,10 +306,6 @@ export class AssetTracker {
     
     // Cache for this page (include both HTML and CSS references)
     this.htmlAssetCache.set(pagePath, allAssets);
-    
-    if (allAssets.length > 0) {
-      logger.debug(`Found ${allAssets.length} asset references in ${pagePath}`);
-    }
   }
 
   /**
@@ -327,7 +377,6 @@ export class AssetTracker {
    */
   removePage(pagePath) {
     this.clearPageAssetReferences(pagePath);
-    logger.debug(`Removed page from asset tracking: ${pagePath}`);
   }
 
   /**
@@ -350,38 +399,218 @@ export class AssetTracker {
     this.assetReferences.clear();
     this.referencedAssets.clear();
     this.htmlAssetCache.clear();
-    logger.debug('Cleared all asset reference data');
   }
 
   /**
-   * Export asset reference data for debugging or persistence
-   * @returns {Object} Serializable asset reference data
+   * Process a CSS file to extract and track asset references
+   * @param {string} cssPath - Path to the CSS file to process
+   * @param {number} depth - Recursion depth (for preventing infinite loops)
+   * @param {string} referringFile - Optional path to file that referenced this CSS
+   * @returns {Promise<void>}
    */
-  export() {
-    return {
-      assetReferences: Object.fromEntries(this.assetReferences),
-      referencedAssets: Array.from(this.referencedAssets),
-      htmlAssetCache: Object.fromEntries(this.htmlAssetCache)
-    };
+  async processCssFile(cssPath, depth = 0, referringFile = null) {
+    // Prevent infinite recursion with max depth
+    const MAX_CSS_IMPORT_DEPTH = 10;
+    if (depth > MAX_CSS_IMPORT_DEPTH) {
+      this.logger.warn(`Maximum CSS import depth (${MAX_CSS_IMPORT_DEPTH}) exceeded at ${cssPath}`);
+      return;
+    }
+    
+    // Set to track processed files in this call chain
+    if (!this._processedCssFiles) {
+      this._processedCssFiles = new Set();
+    }
+    
+    if (this._processedCssFiles.has(cssPath)) {
+      this.logger.debug(`Skipping already processed CSS file: ${cssPath}`);
+      return; // Already processed this CSS file
+    }
+    this._processedCssFiles.add(cssPath);
+    
+    // Validate CSS file exists before processing
+    if (!existsSync(cssPath)) {
+      const referenceInfo = referringFile ? ` [referenced by: ${referringFile}]` : '';
+      this.logger.error(`CSS file not found: ${cssPath}${referenceInfo}`);
+      return;
+    }
+
+    try {
+      const cssContent = await Bun.file(cssPath).text();
+      const cssReferences = this.extractCssAssetReferences(cssContent, cssPath, this.sourceDir);
+      
+      this.logger.debug(`Found ${cssReferences.length} asset references in CSS file: ${cssPath}`);
+
+      for (const cssRef of cssReferences) {
+        // Validate that referenced assets exist
+        if (!existsSync(cssRef)) {
+          this.logger.warn(`Referenced asset not found in ${cssPath}: ${cssRef}`);
+        }
+        
+        // If this reference is another CSS file, process it recursively
+        if (cssRef.endsWith('.css')) {
+          // Check for circular import before recursing
+          if (this._processedCssFiles.has(cssRef)) {
+            this.logger.warn(`Circular CSS import detected: ${cssPath} -> ${cssRef}`);
+            continue;
+          }
+          await this.processCssFile(cssRef, depth + 1, cssPath);
+        }
+      }
+    } catch (error) {
+      // Log the error with context - including file path for debugging
+      this.logger.error(`Failed to process CSS file ${cssPath}: ${error.message}`);
+      
+      // Continue processing other files
+      // CSS processing errors shouldn't break the build
+    }
   }
 
   /**
-   * Import asset reference data
-   * @param {Object} data - Asset reference data to import
+   * Check if URL is external
+   * @private
+   * @param {string} url - URL to check
+   * @returns {boolean} True if external
    */
-  import(data) {
-    this.clear();
+  _isExternalUrl(url) {
+    return url.startsWith('http://') || 
+           url.startsWith('https://') || 
+           url.startsWith('//');
+  }
+
+  /**
+   * Validate asset path for basic security issues
+   * @private
+   * @param {string} assetPath - Asset path to validate
+   * @returns {boolean} True if path is safe
+   */
+  _validateAssetPath(assetPath) {
+    if (!assetPath || typeof assetPath !== 'string') {
+      return false;
+    }
+
+    // Enhanced protocol blocking with comprehensive dangerous schemes
+    const dangerousProtocols = [
+      'javascript:', 'vbscript:', 'data:', 'file:', 'about:', 'blob:',
+      'chrome:', 'chrome-extension:', 'ms-', 'moz-', 'opera-', 'safari-',
+      'jar:', 'gopher:', 'telnet:', 'ssh:', 'ftp:', 'ldap:', 'mailto:'
+    ];
     
-    if (data.assetReferences) {
-      this.assetReferences = new Map(Object.entries(data.assetReferences));
+    const lowerPath = assetPath.toLowerCase();
+    for (const protocol of dangerousProtocols) {
+      if (lowerPath.includes(protocol)) {
+        logger.warn(`Blocked dangerous protocol in asset path: ${assetPath}`);
+        return false;
+      }
+    }
+
+    // Block protocol-relative URLs
+    if (assetPath.includes('://')) {
+      return false;
+    }
+
+    // Block UNC paths (Windows network shares)
+    if (assetPath.startsWith('\\\\') || assetPath.startsWith('//')) {
+      return false;
+    }
+
+    // Block drive letters (Windows absolute paths)
+    if (/^[a-zA-Z]:/.test(assetPath)) {
+      return false;
+    }
+
+    // Enhanced encoded sequence detection with multiple encoding levels
+    try {
+      let decodedPath = assetPath;
+      let previousDecoded = '';
+      let decodeDepth = 0;
+      const MAX_DECODE_DEPTH = 3;
+      
+      // Decode multiple levels to catch double/triple encoding
+      while (previousDecoded !== decodedPath && decodeDepth < MAX_DECODE_DEPTH) {
+        previousDecoded = decodedPath;
+        decodedPath = decodeURIComponent(decodedPath);
+        decodeDepth++;
+      }
+      
+      // Check for null bytes (path truncation attacks)
+      if (decodedPath.includes('\0') || decodedPath.includes('%00')) {
+        logger.warn(`Blocked null byte in asset path: ${assetPath}`);
+        return false;
+      }
+      
+      // Check for various encoded traversal patterns
+      const encodedPatterns = [
+        '%2e%2e', '%2E%2E', // encoded ..
+        '%252e%252e', '%252E%252E', // double encoded ..
+        '..%2f', '..%2F', '%2e%2e/', '%2E%2E/', // encoded ../
+        '..%5c', '..%5C', '%2e%2e\\', '%2E%2E\\', // encoded ..\\
+        '%c0%ae', '%c1%9c' // Unicode encoding tricks
+      ];
+      
+      for (const pattern of encodedPatterns) {
+        if (lowerPath.includes(pattern) || decodedPath.toLowerCase().includes(pattern)) {
+          logger.warn(`Blocked encoded traversal pattern in asset path: ${assetPath}`);
+          return false;
+        }
+      }
+    } catch (error) {
+      // If decoding fails, path might be corrupted - be cautious
+      logger.debug(`Failed to decode asset path, treating as suspicious: ${assetPath}`);
+      return false;
+    }
+
+    // Enhanced dangerous pattern detection
+    const dangerousPatterns = [
+      /^\.\.$/,         // Just ".." alone
+      /\.\.\.+/,        // Multiple dots like "..." or "...."  
+      /\/\.\.$/,        // Ending with "/.."
+      /\\\.\.$/,        // Ending with "\.."
+      /\.\.\x00/,       // Null byte after ..
+      /\.\.%00/,        // Encoded null byte after ..
+      /[<>:"|?*]/       // Windows forbidden characters (when not in query string)
+    ];
+
+    // Check for forbidden patterns (but allow Windows chars in query strings)
+    const pathWithoutQuery = assetPath.split('?')[0];
+    for (const pattern of dangerousPatterns) {
+      if (pattern.test(pathWithoutQuery)) {
+        logger.debug(`Blocked dangerous pattern in asset path: ${assetPath}`);
+        return false;
+      }
     }
     
-    if (data.referencedAssets) {
-      this.referencedAssets = new Set(data.referencedAssets);
-    }
+    // Check for suspicious file extensions (potential web shells or executables)
+    const suspiciousExtensions = [
+      '.exe', '.bat', '.cmd', '.com', '.scr', '.vbs', '.vbe', '.jar',
+      '.app', '.dmg', '.pkg', '.deb', '.rpm', '.msi', '.dll', '.so',
+      '.php.jpg', '.asp.gif', '.jsp.png', '.aspx.jpeg' // Double extension attacks
+    ];
     
-    if (data.htmlAssetCache) {
-      this.htmlAssetCache = new Map(Object.entries(data.htmlAssetCache));
+    const pathLower = assetPath.toLowerCase();
+    for (const ext of suspiciousExtensions) {
+      if (pathLower.endsWith(ext) || pathLower.includes(ext + '?')) {
+        logger.warn(`Blocked suspicious file extension in asset path: ${assetPath}`);
+        return false;
+      }
     }
+
+    // Block dangerous absolute paths
+    if (assetPath.startsWith('/')) {
+      // Block system paths
+      const dangerousAbsolutePaths = [
+        '/etc/', '/var/', '/usr/', '/bin/', '/sbin/', '/root/', '/home/',
+        '/proc/', '/sys/', '/dev/', '/tmp/', '/opt/', '/mnt/', '/media/',
+        '/boot/', '/lib/', '/srv/', '/run/', '/lost+found'
+      ];
+      
+      for (const dangerousPath of dangerousAbsolutePaths) {
+        if (assetPath.startsWith(dangerousPath)) {
+          logger.warn(`Blocked system path access: ${assetPath}`);
+          return false;
+        }
+      }
+    }
+
+    return true;
   }
 }

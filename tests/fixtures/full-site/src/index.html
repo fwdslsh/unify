@@ -1,0 +1,436 @@
+<html lang="en" data-unify="_includes/layout.html">
+
+<head>
+  <title>fwdslsh - Slash a path through the bloat</title>
+  <meta name="description"
+    content="Sharp tools for hackers who remember when software didn't fight you. Zero deps, instant setup, no frameworks to babysit.">
+
+  <style>
+    .protest-revolution-regular {
+      font-family: "Protest Revolution", sans-serif;
+      font-weight: 400;
+      font-style: normal;
+    }
+
+    /* Hero Section - Page specific */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 2rem;
+      position: relative;
+      background-image: url("assets/cables-bg.png");
+      background-repeat: no-repeat;
+      background-position: center;
+      background-size: contain;
+    }
+
+    .hero-content {
+      max-width: 800px;
+      animation: fadeInUp 1s ease-out;
+    }
+
+    .hero h1 {
+      font-size: clamp(3rem, 8vw, 6rem);
+      font-weight: 900;
+      margin-bottom: 1rem;
+      background: var(--gradient-1);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      line-height: 1.1;
+      display: inline;
+      justify-content: center;
+      align-items: center;
+      text-transform: lowercase;
+      font-family: 'Protest Revolution';
+    }
+
+    .hero img {
+      height: clamp(3rem, 8vw, 6rem);
+    }
+
+    .hero .tagline {
+      font-size: clamp(1.2rem, 3vw, 1.8rem);
+      color: var(--text-secondary);
+      margin-bottom: 2rem;
+      font-family: var(--font-mono);
+    }
+
+    .hero .description {
+      font-size: 1.2rem;
+      color: var(--text-dim);
+      margin-bottom: 3rem;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    /* Tools Preview Section - Page specific */
+    .tools-preview {
+      padding: 8rem 2rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .tools-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 2rem;
+      margin-top: 4rem;
+    }
+
+    /* Responsive even distribution for tools grid */
+    @media (min-width: 1200px) {
+      .tools-grid {
+        grid-template-columns: repeat(4, 1fr);
+      }
+    }
+
+    .tool-card {
+      background: var(--gradient-2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2rem;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .tool-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 2px;
+      background: var(--gradient-1);
+      transform: scaleX(0);
+      transition: transform 0.3s ease;
+    }
+
+    .tool-card:hover::before {
+      transform: scaleX(1);
+    }
+
+    .tool-card:hover {
+      transform: translateY(-5px);
+      border-color: var(--primary);
+    }
+
+    .tool-header {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .tool-icon {
+      width: 40px;
+      height: 40px;
+      background: var(--gradient-1);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-weight: bold;
+      color: var(--bg-dark);
+    }
+
+    .tool-card h3 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      font-family: var(--font-mono);
+    }
+
+    .tool-card .subtitle {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+    }
+
+    .tool-card p {
+      color: var(--text-dim);
+      margin-bottom: 1.5rem;
+      line-height: 1.6;
+    }
+
+    .tool-links {
+      display: flex;
+      gap: 1rem;
+      margin-top: 1.5rem;
+    }
+
+    .tool-links a {
+      color: var(--primary);
+      text-decoration: none;
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      font-weight: 600;
+      transition: all 0.3s ease;
+    }
+
+    .tool-links a:hover {
+      color: var(--primary-dim);
+      text-decoration: underline;
+    }
+
+    /* Responsive Design - Page specific */
+    @media (max-width: 768px) {
+      .tools-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .tool-card {
+        padding: 1.5rem;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="unify-content">
+    <section class="hero">
+      <div class="hero-content">
+        <h1>
+          fwdslsh
+        </h1>
+        <p class="tagline">Slash a path through the bloat</p>
+        <p class="description">
+          Sharp tools for hackers who remember when software didn't fight you.
+          Zero deps, instant setup, no frameworks to babysit.
+        </p>
+        <div class="cta-buttons">
+          <a href="#tools" class="btn btn-primary">
+            <span>/tools</span>
+          </a>
+          <a href="https://github.com/fwdslsh" class="btn btn-secondary">
+            /GitHub
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <section id="tools" class="tools-preview">
+      <div class="section-header">
+        <h2>Built for the Command Line</h2>
+        <p>Small, sharp programs that do one thing well</p>
+      </div>
+
+      <div class="terminal-demo">
+        <div class="terminal-header">
+          <div class="terminal-dot dot-red"></div>
+          <div class="terminal-dot dot-yellow"></div>
+          <div class="terminal-dot dot-green"></div>
+          <div class="terminal-title">~/project</div>
+        </div>
+        <div class="terminal-content">
+          <div class="terminal-line">
+            <span class="prompt">$</span> <span class="command">inform https://docs.example.com</span>
+            <span class="comment"> # Crawl documentation site</span>
+          </div>
+          <div class="terminal-line output">
+            ✓ Crawled 42 pages, saved as Markdown
+          </div>
+          <div class="terminal-line">
+            <span class="prompt">$</span> <span class="command">catalog --input docs --output build --sitemap</span>
+            <span class="comment"> # Generate llms.txt index</span>
+          </div>
+          <div class="terminal-line output">
+            ✓ Generated llms.txt with 42 files indexed
+          </div>
+          <div class="terminal-line">
+            <span class="prompt">$</span> <span class="command">unify build</span>
+            <span class="comment"> # Static site, zero config</span>
+          </div>
+          <div class="terminal-line output">
+            ✓ Built 23 pages in 847ms
+          </div>
+          <div class="terminal-line">
+            <span class="prompt">$</span> <span class="command">git add . && giv message</span>
+            <span class="comment"> # AI-powered commit</span>
+          </div>
+          <div class="terminal-line output">
+            ✓ Generated: "feat: add documentation with automated indexing"
+          </div>
+        </div>
+      </div>
+
+      <div class="tools-grid">
+        <div class="tool-card">
+          <div class="tool-header">
+            <div class="tool-icon">g</div>
+            <div>
+              <h3>giv</h3>
+              <div class="subtitle">Git workflows on autopilot</div>
+            </div>
+          </div>
+          <p>AI-powered commit messages, changelogs, and release notes. Ships as a static binary, talks to any LLM
+            backend, doesn't break your flow.</p>
+
+          <pre class="code-snippet">$ giv message
+$ giv changelog v1.0.0..HEAD
+$ giv release-notes --format markdown</pre>
+
+          <p><strong>Why we built it:</strong> Writing commit messages is grunt work. Let the machine do grunt work
+            while you build.</p>
+
+          <div class="tool-links">
+            <a href="/giv">Documentation →</a>
+            <a href="https://github.com/fwdslsh/giv">GitHub →</a>
+          </div>
+        </div>
+
+        <div class="tool-card">
+          <div class="tool-header">
+            <div class="tool-icon">u</div>
+            <div>
+              <h3>unify</h3>
+              <div class="subtitle">Static sites for people who remember HTML</div>
+            </div>
+          </div>
+          <p>Build sites with Apache SSI syntax and modern tooling. No JSX, no build step hell, no framework lock-in.
+            Just fast sites that ship.</p>
+
+          <pre class="code-snippet">$ unify build
+$ unify serve
+$ unify watch</pre>
+
+          <p><strong>Why we built it:</strong> Static site generators became more complex than the sites they build. We
+            fixed that.</p>
+
+          <div class="tool-links">
+            <a href="/unify">Documentation →</a>
+            <a href="https://github.com/fwdslsh/unify">GitHub →</a>
+          </div>
+        </div>
+
+        <div class="tool-card">
+          <div class="tool-header">
+            <div class="tool-icon">i</div>
+            <div>
+              <h3>inform</h3>
+              <div class="subtitle">High-performance web content crawler</div>
+            </div>
+          </div>
+          <p>Crawl websites, extract main content, and convert to clean Markdown. Powered by Bun for maximum performance with zero dependencies.</p>
+
+          <pre class="code-snippet">$ inform https://docs.example.com
+$ inform github.com/owner/repo/tree/main/docs
+$ inform --include "*.md" --exclude "temp/*"</pre>
+
+          <p><strong>Why we built it:</strong> Documentation migration and content extraction shouldn't require heavy frameworks. Fast, focused, effective.</p>
+
+          <div class="tool-links">
+            <a href="/inform">Documentation →</a>
+            <a href="https://github.com/fwdslsh/inform">GitHub →</a>
+          </div>
+        </div>
+
+        <div class="tool-card">
+          <div class="tool-header">
+            <div class="tool-icon">c</div>
+            <div>
+              <h3>catalog</h3>
+              <div class="subtitle">AI-ready documentation indexer</div>
+            </div>
+          </div>
+          <p>Generate llms.txt and llms-full.txt from Markdown/HTML directories. Perfect for AI-powered documentation workflows and searchable knowledge bases.</p>
+
+          <pre class="code-snippet">$ catalog --input docs --output build
+$ catalog --sitemap --base-url https://docs.example.com
+$ catalog --optional "drafts/**/*" --validate</pre>
+
+          <p><strong>Why we built it:</strong> AI tools need structured, indexed content. We made it trivial to prepare documentation for AI consumption.</p>
+
+          <div class="tool-links">
+            <a href="/catalog">Documentation →</a>
+            <a href="https://github.com/fwdslsh/catalog">GitHub →</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="about" class="tools-preview">
+      <div class="section-header">
+        <h2>The Path Forward</h2>
+        <p>Old-school principles, new-school execution</p>
+      </div>
+
+      <div
+        style="max-width: 600px; margin: 0 auto; text-align: left; color: var(--text-secondary); font-size: 1.1rem; line-height: 1.8;">
+        <p style="margin-bottom: 1.5rem;">
+          We're not building the next unicorn framework. We're building tools for hackers who value craft over hype.
+        </p>
+
+        <p style="margin-bottom: 1.5rem;">
+          <strong style="color: var(--primary);">Ship binaries, not ecosystems:</strong> Download once, run everywhere.
+          No package manager roulette or dependency hell.
+        </p>
+
+        <p style="margin-bottom: 1.5rem;">
+          <strong style="color: var(--primary);">Hack with the grain:</strong> Work with web standards and POSIX
+          conventions instead of reinventing everything.
+        </p>
+
+        <p style="margin-bottom: 1.5rem;">
+          <strong style="color: var(--primary);">Performance starts in your head:</strong> Tools should amplify human
+          intelligence, not fight it with ceremony and complexity.
+        </p>
+
+        <p
+          style="color: var(--text-primary); text-align: center; font-family: var(--font-mono); font-style: italic; margin-top: 2rem;">
+          The <span style="color: var(--primary); font-weight: bold;">/</span> isn't just our logo - it's a commitment
+          to cutting through the cruft.
+        </p>
+      </div>
+    </section>
+  </main>
+</body>
+
+
+<script>
+  // Smooth scrolling for anchor links
+  document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+    anchor.addEventListener('click', function (e) {
+      e.preventDefault();
+      const target = document.querySelector(this.getAttribute('href'));
+      if (target) {
+        target.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start'
+        });
+      }
+    });
+  });
+
+  // Add scroll effect to navigation
+  window.addEventListener('scroll', () => {
+    const nav = document.querySelector('nav');
+    if (window.scrollY > 50) {
+      nav.style.background = 'rgba(10, 14, 10, 0.95)';
+    } else {
+      nav.style.background = 'rgba(10, 14, 10, 0.9)';
+    }
+  });
+
+  // Terminal typing animation (optional enhancement)
+  const terminalLines = document.querySelectorAll('.terminal-line');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.style.animation = 'fadeInUp 0.5s ease-out forwards';
+      }
+    });
+  });
+
+  terminalLines.forEach((line, index) => {
+    line.style.opacity = '0';
+    line.style.animationDelay = `${index * 0.2}s`;
+    observer.observe(line);
+  });
+</script>

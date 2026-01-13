@@ -1,0 +1,513 @@
+<head>
+    <title>giv - AI-Powered Git History Assistant</title>
+    <meta name="description"
+        content="Transform your Git history into polished commit messages, changelogs, and release notes with AI. Zero dependencies, self-contained binary.">
+    <style>
+            /* Page-specific styles for giv */
+            .giv-hero {
+                background: linear-gradient(135deg, rgba(0, 255, 65, 0.05) 0%, transparent 50%);
+            }
+
+            .giv-icon {
+                background: linear-gradient(135deg, #ff6b35 0%, #f59e0b 100%);
+            }
+
+            .ai-demo {
+                background: var(--bg-darker);
+                border: 1px solid var(--border);
+                border-radius: 12px;
+                margin: 2rem 0;
+                max-width: 700px;
+                overflow: hidden;
+            }
+
+            .git-diff {
+                background: var(--bg-darker);
+                padding: 1.5rem;
+                font-family: var(--font-mono);
+                font-size: 0.85rem;
+                color: var(--text-secondary);
+                border-bottom: 1px solid var(--border);
+            }
+
+            .diff-line.added {
+                color: #22c55e;
+            }
+
+            .diff-line.removed {
+                color: #ff5555;
+            }
+
+            .diff-line.header {
+                color: var(--primary);
+                font-weight: bold;
+            }
+
+            .ai-output {
+                padding: 1.5rem;
+                background: var(--bg-card);
+            }
+
+            .ai-output h4 {
+                color: var(--primary);
+                margin-bottom: 1rem;
+                font-family: var(--font-mono);
+            }
+
+            .commit-message {
+                background: var(--bg-darker);
+                border: 1px solid var(--border);
+                border-radius: 6px;
+                padding: 1rem;
+                font-family: var(--font-mono);
+                color: var(--text-primary);
+                margin-bottom: 1rem;
+            }
+
+            .provider-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 1.5rem;
+                margin-top: 2rem;
+            }
+
+            .provider-card {
+                background: var(--bg-card);
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                padding: 1.5rem;
+                text-align: center;
+                transition: all 0.3s ease;
+            }
+
+            .provider-card:hover {
+                border-color: var(--primary);
+                transform: translateY(-2px);
+            }
+
+            .provider-logo {
+                width: 40px;
+                height: 40px;
+                margin: 0 auto 1rem;
+                background: var(--gradient-primary);
+                border-radius: 8px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-weight: bold;
+                color: var(--bg-dark);
+            }
+
+            .workflow-steps {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                gap: 2rem;
+                margin-top: 3rem;
+            }
+
+            .workflow-step {
+                background: var(--bg-card);
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                padding: 1.5rem;
+                position: relative;
+            }
+
+            .step-number {
+                position: absolute;
+                top: -10px;
+                left: 1.5rem;
+                background: var(--primary);
+                color: var(--bg-dark);
+                width: 24px;
+                height: 24px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-weight: bold;
+                font-size: 0.8rem;
+            }
+
+            .workflow-step h4 {
+                color: var(--text-primary);
+                margin-bottom: 0.5rem;
+                margin-top: 0.5rem;
+            }
+
+            .workflow-step p {
+                color: var(--text-secondary);
+                font-size: 0.9rem;
+                margin: 0;
+            }
+        </style>
+</head>
+
+<body data-layout="/_includes/tool-page.layout.html">
+
+<!-- Hero Section -->
+<section class="tool-hero giv-hero">
+    <div class="tool-hero-content">
+        <h1>giv</h1>
+        <div class="tagline">AI-Powered Git History Assistant</div>
+        <div class="description">
+            Transform raw Git history into polished commit messages, summaries, changelogs, and release notes.
+            Self-contained binaries with zero dependencies and multiple AI backend support.
+        </div>
+        <div class="cta-buttons">
+            <a href="#install" class="btn btn-primary">
+                <span>🚀</span> Get Started
+            </a>
+            <a href="https://github.com/fwdslsh/giv" class="btn btn-secondary">
+                View Source
+            </a>
+        </div>
+    </div>
+    <div class="tool-demo">
+        <div class="ai-demo">
+            <div class="git-diff">
+                <div class="diff-line header">diff --git a/auth.py b/auth.py</div>
+                <div class="diff-line">@@ -1,8 +1,15 @@</div>
+                <div class="diff-line added">+import jwt</div>
+                <div class="diff-line added">+from datetime import datetime, timedelta</div>
+                <div class="diff-line">
+                </div>
+                <div class="diff-line"> def authenticate_user(username, password):</div>
+                <div class="diff-line removed">-    # TODO: implement authentication</div>
+                <div class="diff-line removed">-    return False</div>
+                <div class="diff-line added">+    if verify_credentials(username, password):</div>
+                <div class="diff-line added">+        token = jwt.encode({</div>
+                <div class="diff-line added">+            'user': username,</div>
+                <div class="diff-line added">+            'exp': datetime.utcnow() + timedelta(hours=24)</div>
+                <div class="diff-line added">+        }, SECRET_KEY)</div>
+                <div class="diff-line added">+        return token</div>
+                <div class="diff-line added">+    return None</div>
+            </div>
+            <div class="ai-output">
+                <h4>$ giv message</h4>
+                <div class="commit-message">
+                    feat: implement JWT-based user authentication
+
+                    - Add JWT token generation for authenticated users
+                    - Replace placeholder authentication with real implementation
+                    - Set 24-hour token expiration for security
+                    - Return signed JWT token on successful authentication
+                </div>
+                <div style="color: var(--success); font-family: var(--font-mono); font-size: 0.9rem;">
+                    ✓ Generated in 2.3 seconds
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Features Section -->
+        <section class="tool-section">
+            <div class="section-header">
+                <h2>AI-Powered Git Workflows</h2>
+                <p>Professional documentation from your Git history</p>
+            </div>
+
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🤖</div>
+                    <h3>Multiple AI Backends</h3>
+                    <p>Works with OpenAI, Anthropic, Ollama, and any OpenAI-compatible API. Switch providers or run
+                        completely offline with local models.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">📦</div>
+                    <h3>Self-Contained Binaries</h3>
+                    <p>Download once, run everywhere. No Python installation required. Cross-platform binaries for Linux,
+                        macOS, and Windows.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Rich Command Suite</h3>
+                    <p>Generate commit messages, summaries, changelogs, release notes, and marketing announcements from your
+                        Git history.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">🎯</div>
+                    <h3>Smart Git Integration</h3>
+                    <p>Support for revision ranges, pathspecs, staged changes, and full gitrevisions syntax. Works with your
+                        existing Git workflow.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">🔧</div>
+                    <h3>Template System</h3>
+                    <p>Customizable prompts for all output types. Project and user-level settings with inheritance and
+                        variable substitution.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">📊</div>
+                    <h3>Version Intelligence</h3>
+                    <p>Automatic SemVer detection, changelog management, and release note generation with proper version
+                        bumping.</p>
+                </div>
+            </div>
+        </section>
+
+<!-- Installation Section -->
+        <section id="install" class="tool-section alt-bg">
+            <div class="section-header">
+                <h2>Installation</h2>
+                <p>Get giv running in seconds</p>
+            </div>
+
+            <div class="install-grid">
+                <div class="install-card">
+                    <div class="install-icon">⚡</div>
+                    <h3>Quick Install</h3>
+                    <div class="install-code">
+                        # One-line install script
+                        curl -fsSL https://raw.githubusercontent.com/fwdslsh/giv/main/install.sh | sh
+
+                        # Start using immediately
+                        giv init
+                        giv message
+                    </div>
+                    <p>Automatically detects your platform and installs the binary</p>
+                </div>
+
+                <div class="install-card">
+                    <div class="install-icon">🐍</div>
+                    <h3>Python Package</h3>
+                    <div class="install-code">
+                        # Install via pip
+                        pip install giv
+
+                        # Or use pipx for isolation
+                        pipx install giv
+                    </div>
+                    <p>Available on PyPI for Python 3.9+</p>
+                </div>
+
+                <div class="install-card">
+                    <div class="install-icon">🐳</div>
+                    <h3>Docker</h3>
+                    <div class="install-code">
+                        # Pull latest image
+                        docker pull fwdslsh/giv:latest
+
+                        # Run commands
+                        docker run --rm fwdslsh/giv message
+                    </div>
+                    <p>Containerized for reproducible builds</p>
+                </div>
+            </div>
+        </section>
+
+<!-- Additional content for AI providers and workflow -->
+        <section class="tool-section">
+            <div class="section-header">
+                <h2>Supported AI Providers</h2>
+                <p>Use your preferred AI service or run completely offline</p>
+            </div>
+
+            <div class="provider-grid">
+                <div class="provider-card">
+                    <div class="provider-logo">🤖</div>
+                    <h4>OpenAI</h4>
+                    <p>GPT-4, GPT-3.5-turbo</p>
+                </div>
+
+                <div class="provider-card">
+                    <div class="provider-logo">🧠</div>
+                    <h4>Anthropic</h4>
+                    <p>Claude 3.5 Sonnet, Claude 3 Opus</p>
+                </div>
+
+                <div class="provider-card">
+                    <div class="provider-logo">🏠</div>
+                    <h4>Ollama (Local)</h4>
+                    <p>Llama 3.2, Code Llama, Mistral</p>
+                </div>
+
+                <div class="provider-card">
+                    <div class="provider-logo">🔧</div>
+                    <h4>Custom API</h4>
+                    <p>Any OpenAI-compatible endpoint</p>
+                </div>
+            </div>
+
+            <div class="quick-links">
+                <a href="/giv/getting-started#configuration" class="quick-link">
+                    <span class="quick-link-icon">⚙️</span>
+                    <div class="quick-link-content">
+                        <h4>Configuration Guide</h4>
+                        <p>Set up your preferred AI provider</p>
+                    </div>
+                </a>
+
+                <a href="/giv/examples#providers" class="quick-link">
+                    <span class="quick-link-icon">📖</span>
+                    <div class="quick-link-content">
+                        <h4>Provider Examples</h4>
+                        <p>See configuration for each provider</p>
+                    </div>
+                </a>
+            </div>
+        </section>
+
+        <section class="tool-section alt-bg">
+            <div class="section-header">
+                <h2>How It Works</h2>
+                <p>From Git history to professional documentation</p>
+            </div>
+
+            <div class="workflow-steps">
+                <div class="workflow-step">
+                    <div class="step-number">1</div>
+                    <h4>Extract Git History</h4>
+                    <p>Analyzes commits, diffs, and metadata using Git revision syntax</p>
+                </div>
+
+                <div class="workflow-step">
+                    <div class="step-number">2</div>
+                    <h4>AI Processing</h4>
+                    <p>Sends context to your configured AI provider with custom prompts</p>
+                </div>
+
+                <div class="workflow-step">
+                    <div class="step-number">3</div>
+                    <h4>Generate Content</h4>
+                    <p>Creates commit messages, changelogs, or release notes based on changes</p>
+                </div>
+
+                <div class="workflow-step">
+                    <div class="step-number">4</div>
+                    <h4>Apply & Format</h4>
+                    <p>Outputs ready-to-use content in your preferred format and location</p>
+                </div>
+            </div>
+        </section>
+
+<!-- Stats Section -->
+        <section class="stats-section">
+            <div class="stats-container">
+                <div class="section-header">
+                    <h2>Performance Metrics</h2>
+                    <p>Real-world usage statistics</p>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-number">2.3s</div>
+                        <div class="stat-label">Average Generation Time</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number">4</div>
+                        <div class="stat-label">AI Providers Supported</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number">0</div>
+                        <div class="stat-label">Runtime Dependencies</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number">5</div>
+                        <div class="stat-label">Output Formats</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+<!-- CTA Section -->
+        <section class="tool-section">
+            <div class="section-header">
+                <h2>Ready to Transform Your Git Workflow?</h2>
+                <p>Get started with giv today</p>
+            </div>
+
+            <div class="cta-buttons">
+                <a href="/giv/getting-started" class="btn btn-primary">
+                    🚀 Getting Started Guide
+                </a>
+                <a href="/giv/examples" class="btn btn-secondary">
+                    📚 View Examples
+                </a>
+                <a href="https://github.com/fwdslsh/giv/releases" class="btn btn-secondary">
+                    📥 Download Binary
+                </a>
+            </div>
+
+            <div class="quick-links">
+                <a href="https://github.com/fwdslsh/giv" class="quick-link">
+                    <span class="quick-link-icon">📂</span>
+                    <div class="quick-link-content">
+                        <h4>Source Code</h4>
+                        <p>View on GitHub, report issues, contribute</p>
+                    </div>
+                </a>
+
+                <a href="https://pypi.org/project/giv/" class="quick-link">
+                    <span class="quick-link-icon">🐍</span>
+                    <div class="quick-link-content">
+                        <h4>PyPI Package</h4>
+                        <p>Install via pip, view release history</p>
+                    </div>
+                </a>
+
+                <a href="https://hub.docker.com/r/fwdslsh/giv" class="quick-link">
+                    <span class="quick-link-icon">🐳</span>
+                    <div class="quick-link-content">
+                        <h4>Docker Hub</h4>
+                        <p>Pull container images, view tags</p>
+                    </div>
+                </a>
+            </div>
+        </section>
+
+<!-- Scripts -->
+        <script>
+            // Animate the AI demo
+            const diffLines = document.querySelectorAll('.diff-line');
+            const outputSection = document.querySelector('.ai-output');
+
+            const animateDemo = () => {
+                diffLines.forEach((line, index) => {
+                    line.style.animation = `fadeInUp 0.3s ease-out ${index * 0.1}s both`;
+                });
+
+                setTimeout(() => {
+                    outputSection.style.animation = 'fadeInUp 0.6s ease-out forwards';
+                }, diffLines.length * 100 + 500);
+            };
+
+            // Start animation when the demo comes into view
+            const demoObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        animateDemo();
+                        demoObserver.unobserve(entry.target);
+                    }
+                });
+            });
+
+            const aiDemo = document.querySelector('.ai-demo');
+            if (aiDemo) {
+                demoObserver.observe(aiDemo);
+            }
+
+            // Stats counter animation
+            const statsObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const statNumbers = entry.target.querySelectorAll('.stat-number');
+                        statNumbers.forEach(stat => {
+                            stat.style.animation = 'fadeInUp 0.6s ease-out forwards';
+                        });
+                    }
+                });
+            });
+
+            const statsGrid = document.querySelector('.stats-grid');
+            if (statsGrid) {
+                statsObserver.observe(statsGrid);
+            }
+        </script>

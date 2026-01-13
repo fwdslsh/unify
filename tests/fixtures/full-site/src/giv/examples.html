@@ -1,0 +1,1176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>giv Examples - Real-World AI-Powered Git Workflows</title>
+    <meta name="description" content="Real-world examples and workflow patterns for using giv - the AI-powered Git history assistant. Team collaboration, automation, and professional Git workflows.">
+    <meta name="keywords" content="giv, AI Git assistant, commit messages, changelog generation, Git workflows, fwdslsh">
+    <meta property="og:title" content="giv Examples - Real-World AI-Powered Git Workflows">
+    <meta property="og:description" content="Real-world examples and workflow patterns for using giv - the AI-powered Git history assistant. Team collaboration, automation, and professional Git workflows.">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="giv Examples - Real-World AI-Powered Git Workflows">
+    <meta name="twitter:description" content="Real-world examples and workflow patterns for using giv - the AI-powered Git history assistant. Team collaboration, automation, and professional Git workflows.">
+</head>
+
+<body data-unify="tool-page">
+
+<include src="../_includes/components/hero-section.html">
+    <div class="unify-hero-content">
+        <h1>giv Examples</h1>
+        <div class="tagline">Real-world AI-powered Git workflows in action</div>
+        <div class="description">Discover practical examples, team collaboration patterns, automation scripts, and advanced workflow integrations that showcase giv's capabilities in professional development environments.</div>
+        
+        <div class="cta-buttons">
+            <a href="#team-workflows" class="btn btn-primary">
+                <span class="btn-icon">👥</span>
+                Team Workflows
+            </a>
+            <a href="#automation-examples" class="btn btn-secondary">Automation Scripts</a>
+        </div>
+    </div>
+</include>
+
+<section id="team-workflows" class="tool-section">
+                <div class="section-header">
+                    <h2>Team Collaboration Workflows</h2>
+                    <p>Professional team patterns for consistent, high-quality Git documentation</p>
+                </div>
+
+                <div class="team-examples">
+                    <div class="example-card">
+                        <div class="example-header">
+                            <span class="example-icon">🚀</span>
+                            <h3>Feature Development Workflow</h3>
+                            <span class="difficulty-badge">Beginner</span>
+                        </div>
+                        
+                        <div class="example-description">
+                            <p>Complete feature development lifecycle using giv for consistent commit messages, branch summaries, and release documentation.</p>
+                        </div>
+
+                        <div class="workflow-steps">
+                            <div class="workflow-step">
+                                <h4>1. Feature Branch Creation</h4>
+                                <div class="code-block">
+                                    <code># Create feature branch
+git checkout -b feature/user-authentication
+
+# Work on feature, make incremental changes
+git add src/auth/login.py
+giv message --cached
+# Output: "feat: implement user login validation with JWT tokens"
+
+git commit -m "$(giv message --cached --output-mode none)"</code>
+                                </div>
+                            </div>
+
+                            <div class="workflow-step">
+                                <h4>2. Feature Progress Summary</h4>
+                                <div class="code-block">
+                                    <code># Summarize feature branch progress for team standup
+giv summary main..feature/user-authentication
+
+# Output: Professional summary of authentication implementation,
+# including security measures, API changes, and test coverage</code>
+                                </div>
+                            </div>
+
+                            <div class="workflow-step">
+                                <h4>3. Pull Request Documentation</h4>
+                                <div class="code-block">
+                                    <code># Generate comprehensive PR description
+giv summary main..HEAD --output-file PR_DESCRIPTION.md
+
+# Create release notes for the feature
+giv release-notes main..HEAD --output-version "feature-auth" \
+  --output-file FEATURE_NOTES.md</code>
+                                </div>
+                            </div>
+
+                            <div class="workflow-step">
+                                <h4>4. Post-Merge Documentation</h4>
+                                <div class="code-block">
+                                    <code># After feature merge, update main branch changelog
+git checkout main
+git pull origin main
+
+giv changelog v1.2.0..HEAD --output-mode prepend \
+  --output-file CHANGELOG.md</code>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="workflow-benefits">
+                            <h4>Benefits for Teams</h4>
+                            <ul>
+                                <li>Consistent commit message format across team members</li>
+                                <li>Professional PR descriptions that save review time</li>
+                                <li>Automated feature documentation for stakeholders</li>
+                                <li>Standardized changelog maintenance</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="example-card">
+                        <div class="example-header">
+                            <span class="example-icon">🔄</span>
+                            <h3>Code Review Enhancement</h3>
+                            <span class="difficulty-badge">Intermediate</span>
+                        </div>
+                        
+                        <div class="code-review-workflow">
+                            <h4>AI-Enhanced Code Review Process</h4>
+                            <div class="code-block">
+                                <code># Before submitting for review
+git add .
+giv message --cached --prompt-file .giv/templates/review-ready.md
+
+# Custom template focuses on:
+# - What changed and why
+# - Potential impact on existing features  
+# - Testing approach and coverage
+# - Breaking changes or migrations needed
+
+git commit -m "$(giv message --cached --output-mode none)"
+
+# Generate reviewer-focused summary
+giv summary HEAD~3..HEAD --prompt-file .giv/templates/reviewer-guide.md \
+  --output-file REVIEW_GUIDE.md</code>
+                            </div>
+
+                            <h4>Post-Review Documentation</h4>
+                            <div class="code-block">
+                                <code># After addressing review feedback
+git add .
+giv message --cached
+
+# Generates messages like:
+# "refactor: extract authentication logic per review feedback"
+# "fix: handle edge case in password validation as suggested"
+# "docs: update API documentation based on team discussion"
+
+# Summarize entire review cycle
+giv summary pr-base..HEAD --output-file REVIEW_SUMMARY.md</code>
+                            </div>
+
+                            <h4>Team Review Templates</h4>
+                            <div class="code-block">
+                                <code># .giv/templates/review-ready.md
+Generate a commit message for these changes that helps code reviewers:
+
+{DIFF}
+
+Focus on:
+- What functionality is being added/modified/removed
+- Why this approach was chosen
+- Any potential risks or side effects
+- Testing strategy used
+
+Use conventional commit format with detailed body for complex changes.</code>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="example-card">
+                        <div class="example-header">
+                            <span class="example-icon">📋</span>
+                            <h3>Sprint and Release Management</h3>
+                            <span class="difficulty-badge">Advanced</span>
+                        </div>
+                        
+                        <div class="sprint-workflow">
+                            <h4>Sprint Retrospective Documentation</h4>
+                            <div class="code-block">
+                                <code># Weekly sprint summary for stakeholders
+SPRINT_START="2024-01-15"
+SPRINT_END="2024-01-22"
+
+# Generate sprint summary using date ranges
+giv summary --since="$SPRINT_START" --until="$SPRINT_END" \
+  --prompt-file .giv/templates/sprint-summary.md \
+  --output-file "sprint-$(date +%Y-week-%U)-summary.md"
+
+# Output includes:
+# - Features completed
+# - Bug fixes implemented  
+# - Technical debt addressed
+# - Performance improvements
+# - Team velocity insights</code>
+                            </div>
+
+                            <h4>Release Planning and Documentation</h4>
+                            <div class="code-block">
+                                <code># Prepare for upcoming release
+LAST_RELEASE="v2.1.0"
+NEXT_RELEASE="v2.2.0"
+
+# Generate comprehensive release notes
+giv release-notes $LAST_RELEASE..HEAD \
+  --output-version "$NEXT_RELEASE" \
+  --output-file "RELEASE_NOTES_$NEXT_RELEASE.md"
+
+# Create marketing announcement
+giv announcement $LAST_RELEASE..HEAD \
+  --output-version "$NEXT_RELEASE" \
+  --prompt-file .giv/templates/marketing-announcement.md \
+  --output-file "ANNOUNCEMENT_$NEXT_RELEASE.md"
+
+# Update main changelog
+giv changelog $LAST_RELEASE..HEAD \
+  --output-mode prepend \
+  --output-file CHANGELOG.md</code>
+                            </div>
+
+                            <h4>Multi-Team Coordination</h4>
+                            <div class="code-block">
+                                <code># Generate cross-team impact analysis
+teams=("frontend" "backend" "mobile" "devops")
+
+for team in "${teams[@]}"; do
+  echo "Analyzing $team team changes..."
+  
+  giv summary HEAD~20..HEAD -- "*/$team/*" \
+    --prompt-file .giv/templates/team-impact.md \
+    --output-file "reports/$team-impact-report.md"
+done
+
+# Combine all team reports
+giv document --prompt-file .giv/templates/cross-team-summary.md \
+  HEAD~20..HEAD --output-file "RELEASE_COORDINATION.md"</code>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+<section id="automation-examples" class="tool-section alt-bg">
+                <div class="section-header">
+                    <h2>Automation and CI/CD Examples</h2>
+                    <p>Integrate giv into automated workflows for consistent documentation</p>
+                </div>
+
+                <div class="automation-examples">
+                    <div class="script-card">
+                        <div class="script-header">
+                            <h3>🔄 GitHub Actions Integration</h3>
+                            <p>Automated documentation generation on every push and release</p>
+                        </div>
+                        
+                        <div class="code-block">
+                            <code># .github/workflows/documentation.yml
+name: AI-Powered Documentation
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  release:
+    types: [created]
+
+jobs:
+  generate-docs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for comprehensive analysis
+
+      - name: Install giv
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/fwdslsh/giv/main/install.sh | bash
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Generate commit documentation
+        if: github.event_name == 'push'
+        run: |
+          # Generate summary of recent changes
+          giv summary HEAD~5..HEAD \
+            --output-file .github/RECENT_CHANGES.md
+          
+          # Update development changelog
+          giv changelog HEAD~10..HEAD \
+            --output-mode prepend \
+            --output-file DEVELOPMENT.md
+        env:
+          GIV_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GIV_API_MODEL: "gpt-4"
+
+      - name: Generate release documentation
+        if: github.event_name == 'release'
+        run: |
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD^)
+          CURRENT_TAG=${GITHUB_REF#refs/tags/}
+          
+          # Generate comprehensive release notes
+          giv release-notes $PREVIOUS_TAG..HEAD \
+            --output-version "$CURRENT_TAG" \
+            --output-file "RELEASE_NOTES_$CURRENT_TAG.md"
+          
+          # Update main changelog
+          giv changelog $PREVIOUS_TAG..HEAD \
+            --output-mode prepend \
+            --output-file CHANGELOG.md
+          
+          # Create marketing announcement
+          giv announcement $PREVIOUS_TAG..HEAD \
+            --output-version "$CURRENT_TAG" \
+            --output-file "ANNOUNCEMENT_$CURRENT_TAG.md"
+        env:
+          GIV_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+      - name: Commit documentation updates
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add .
+          
+          if git diff --staged --quiet; then
+            echo "No documentation changes to commit"
+          else
+            giv message --cached --output-mode none | \
+              git commit -F -
+            git push
+          fi</code>
+                        </div>
+                    </div>
+
+                    <div class="script-card">
+                        <div class="script-header">
+                            <h3>🐳 Docker-Based Documentation Pipeline</h3>
+                            <p>Consistent cross-platform documentation generation</p>
+                        </div>
+                        
+                        <div class="code-block">
+                            <code># docker-compose.docs.yml
+version: '3.8'
+
+services:
+  giv-docs:
+    image: fwdslsh/giv:latest
+    volumes:
+      - .:/workspace
+      - ./docs-output:/output
+    working_dir: /workspace
+    environment:
+      - GIV_API_KEY=${OPENAI_API_KEY}
+      - GIV_API_MODEL=gpt-4
+      - GIV_OUTPUT_MODE=overwrite
+    command: |
+      sh -c "
+        echo 'Generating comprehensive project documentation...'
+        
+        # Release documentation
+        giv release-notes v1.0.0..HEAD \
+          --output-file /output/RELEASE_NOTES.md
+        
+        # Development summary
+        giv summary HEAD~20..HEAD \
+          --output-file /output/DEVELOPMENT_SUMMARY.md
+        
+        # Feature changelogs by directory
+        giv changelog HEAD~30..HEAD -- src/api/ \
+          --output-file /output/API_CHANGES.md
+        
+        giv changelog HEAD~30..HEAD -- src/frontend/ \
+          --output-file /output/FRONTEND_CHANGES.md
+        
+        # Custom security review
+        giv document --prompt-file .giv/templates/security-review.md \
+          HEAD~10..HEAD \
+          --output-file /output/SECURITY_REVIEW.md
+        
+        echo 'Documentation generation complete!'
+        ls -la /output/
+      "
+
+# Usage:
+# docker-compose -f docker-compose.docs.yml up giv-docs</code>
+                        </div>
+                    </div>
+
+                    <div class="script-card">
+                        <div class="script-header">
+                            <h3>🔧 Git Hooks Integration</h3>
+                            <p>Automatic commit enhancement and validation</p>
+                        </div>
+                        
+                        <div class="code-block">
+                            <code>#!/bin/bash
+# .git/hooks/prepare-commit-msg
+# Enhance commit messages with AI assistance
+
+commit_file="$1"
+commit_source="$2"
+commit_sha="$3"
+
+# Only enhance commits without existing messages (interactive commits)
+if [ -z "$commit_source" ] || [ "$commit_source" = "template" ]; then
+    echo "🤖 Enhancing commit message with AI assistance..."
+    
+    # Generate AI-powered commit message
+    ai_message=$(giv message --cached --output-mode none 2>/dev/null)
+    
+    if [ $? -eq 0 ] && [ -n "$ai_message" ]; then
+        # Prepend AI-generated message to commit file
+        {
+            echo "$ai_message"
+            echo ""
+            echo "# AI-generated commit message above."
+            echo "# Edit as needed, then save and close to commit."
+            echo ""
+            cat "$commit_file"
+        } > "$commit_file.tmp"
+        
+        mv "$commit_file.tmp" "$commit_file"
+        echo "✅ AI-enhanced commit message ready for review"
+    else
+        echo "⚠️ Could not generate AI commit message (check giv configuration)"
+    fi
+fi
+
+# Post-commit hook for documentation updates
+# .git/hooks/post-commit
+#!/bin/bash
+
+echo "🔄 Updating project documentation..."
+
+# Update development changelog after every commit
+giv changelog HEAD~5..HEAD \
+  --output-mode prepend \
+  --output-file DEVELOPMENT.md 2>/dev/null
+
+# Generate summary for significant changes (>10 files changed)
+files_changed=$(git diff-tree --no-commit-id --name-only -r HEAD | wc -l)
+
+if [ "$files_changed" -gt 10 ]; then
+    echo "📝 Significant changes detected, generating summary..."
+    giv summary HEAD~1..HEAD \
+      --output-file ".git/LAST_MAJOR_COMMIT.md" 2>/dev/null
+fi
+
+echo "✅ Documentation updated"</code>
+                        </div>
+                    </div>
+
+                    <div class="script-card">
+                        <div class="script-header">
+                            <h3>📊 Analytics and Reporting</h3>
+                            <p>Automated development metrics and team insights</p>
+                        </div>
+                        
+                        <div class="code-block">
+                            <code>#!/bin/bash
+# generate-dev-metrics.sh
+# Comprehensive development analytics using giv
+
+echo "📊 Generating Development Metrics Report..."
+
+# Configuration
+REPORT_DIR="reports/$(date +%Y-%m)"
+WEEKS_BACK=4
+START_DATE=$(date -d "$WEEKS_BACK weeks ago" +%Y-%m-%d)
+
+mkdir -p "$REPORT_DIR"
+
+# Weekly activity summaries
+for i in $(seq 0 $((WEEKS_BACK-1))); do
+    week_start=$(date -d "$START_DATE + $((i*7)) days" +%Y-%m-%d)
+    week_end=$(date -d "$START_DATE + $(((i+1)*7-1)) days" +%Y-%m-%d)
+    week_num=$(date -d "$week_start" +%U)
+    
+    echo "Analyzing week $week_num ($week_start to $week_end)..."
+    
+    giv summary --since="$week_start" --until="$week_end" \
+      --prompt-file .giv/templates/weekly-metrics.md \
+      --output-file "$REPORT_DIR/week-$week_num-summary.md"
+done
+
+# Team productivity analysis
+team_members=($(git log --since="$START_DATE" --pretty=format:"%an" | sort -u))
+
+echo "👥 Analyzing team member contributions..."
+for member in "${team_members[@]}"; do
+    safe_name=$(echo "$member" | tr ' ' '-' | tr '[:upper:]' '[:lower:]')
+    
+    giv summary --since="$START_DATE" --author="$member" \
+      --prompt-file .giv/templates/individual-metrics.md \
+      --output-file "$REPORT_DIR/contributor-$safe_name.md"
+done
+
+# Technology area analysis
+tech_areas=("frontend:src/frontend/" "backend:src/api/" "database:migrations/" "tests:tests/")
+
+echo "🔧 Analyzing technology area changes..."
+for area_spec in "${tech_areas[@]}"; do
+    area_name=$(echo "$area_spec" | cut -d: -f1)
+    area_path=$(echo "$area_spec" | cut -d: -f2)
+    
+    giv changelog --since="$START_DATE" -- "$area_path" \
+      --prompt-file .giv/templates/tech-area-analysis.md \
+      --output-file "$REPORT_DIR/$area_name-changes.md"
+done
+
+# Generate master report
+echo "📋 Compiling master metrics report..."
+giv document --prompt-file .giv/templates/master-metrics.md \
+  --since="$START_DATE" \
+  --output-file "$REPORT_DIR/DEVELOPMENT_METRICS.md"
+
+# Create team dashboard data
+cat > "$REPORT_DIR/metrics-summary.json" << EOF
+{
+  "report_period": {
+    "start": "$START_DATE",
+    "end": "$(date +%Y-%m-%d)",
+    "weeks_analyzed": $WEEKS_BACK
+  },
+  "team_size": ${#team_members[@]},
+  "technology_areas": $(echo "${tech_areas[@]}" | wc -w),
+  "generated_reports": $(find "$REPORT_DIR" -name "*.md" | wc -l),
+  "generation_date": "$(date -Iseconds)"
+}
+EOF
+
+echo "✅ Development metrics report generated in $REPORT_DIR/"
+echo "📈 View DEVELOPMENT_METRICS.md for comprehensive insights"</code>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+<section id="specialized-workflows" class="tool-section">
+                <div class="section-header">
+                    <h2>Specialized Workflow Patterns</h2>
+                    <p>Advanced patterns for specific development scenarios and team structures</p>
+                </div>
+
+                <div class="specialized-examples">
+                    <div class="example-card">
+                        <div class="example-header">
+                            <span class="example-icon">🏢</span>
+                            <h3>Enterprise Multi-Repository Workflow</h3>
+                            <span class="difficulty-badge">Advanced</span>
+                        </div>
+                        
+                        <div class="enterprise-workflow">
+                            <h4>Cross-Repository Documentation Sync</h4>
+                            <div class="code-block">
+                                <code>#!/bin/bash
+# sync-enterprise-docs.sh
+# Synchronize documentation across multiple repositories
+
+repositories=(
+  "frontend-app:/workspace/frontend"
+  "backend-api:/workspace/api"
+  "mobile-app:/workspace/mobile"
+  "shared-components:/workspace/components"
+)
+
+ENTERPRISE_DOCS="/shared/enterprise-docs"
+mkdir -p "$ENTERPRISE_DOCS"
+
+echo "🏢 Synchronizing enterprise documentation..."
+
+for repo_spec in "${repositories[@]}"; do
+    repo_name=$(echo "$repo_spec" | cut -d: -f1)
+    repo_path=$(echo "$repo_spec" | cut -d: -f2)
+    
+    if [ -d "$repo_path" ]; then
+        echo "📁 Processing $repo_name..."
+        cd "$repo_path"
+        
+        # Generate recent changes summary
+        giv summary HEAD~10..HEAD \
+          --prompt-file .giv/templates/enterprise-summary.md \
+          --output-file "$ENTERPRISE_DOCS/$repo_name-recent.md"
+        
+        # Generate API changes if applicable
+        if [ -d "api/" ] || [ -d "src/api/" ]; then
+            giv changelog HEAD~20..HEAD -- "*api*" \
+              --output-file "$ENTERPRISE_DOCS/$repo_name-api-changes.md"
+        fi
+        
+        # Extract breaking changes
+        giv document --prompt-file .giv/templates/breaking-changes.md \
+          HEAD~30..HEAD \
+          --output-file "$ENTERPRISE_DOCS/$repo_name-breaking-changes.md"
+    fi
+done
+
+# Generate enterprise-wide summary
+cd "$ENTERPRISE_DOCS"
+giv document --prompt-file /shared/templates/enterprise-overview.md \
+  --output-file "ENTERPRISE_SUMMARY.md"
+
+echo "✅ Enterprise documentation sync complete"</code>
+                            </div>
+
+                            <h4>Compliance and Audit Trail</h4>
+                            <div class="code-block">
+                                <code># Generate audit-ready documentation
+AUDIT_PERIOD_START="2024-01-01"
+AUDIT_PERIOD_END="2024-12-31"
+
+echo "📋 Generating compliance documentation..."
+
+# Security-related changes
+giv changelog --since="$AUDIT_PERIOD_START" --until="$AUDIT_PERIOD_END" \
+  -- "*security*" "*auth*" "*permission*" \
+  --prompt-file .giv/templates/security-audit.md \
+  --output-file "SECURITY_AUDIT_$AUDIT_PERIOD_START.md"
+
+# Data handling changes
+giv changelog --since="$AUDIT_PERIOD_START" --until="$AUDIT_PERIOD_END" \
+  -- "*data*" "*database*" "*migration*" \
+  --prompt-file .giv/templates/data-audit.md \
+  --output-file "DATA_AUDIT_$AUDIT_PERIOD_START.md"
+
+# Dependency and vulnerability tracking
+giv summary --since="$AUDIT_PERIOD_START" --until="$AUDIT_PERIOD_END" \
+  -- "package*.json" "requirements*.txt" "Cargo.toml" \
+  --prompt-file .giv/templates/dependency-audit.md \
+  --output-file "DEPENDENCY_AUDIT_$AUDIT_PERIOD_START.md"</code>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="example-card">
+                        <div class="example-header">
+                            <span class="example-icon">🌊</span>
+                            <h3>GitOps and Deployment Automation</h3>
+                            <span class="difficulty-badge">Advanced</span>
+                        </div>
+                        
+                        <div class="gitops-workflow">
+                            <h4>Deployment Documentation Pipeline</h4>
+                            <div class="code-block">
+                                <code># deployment-docs.sh
+# Automated deployment documentation for GitOps
+
+ENVIRONMENT="$1"  # staging, production, etc.
+DEPLOY_TAG="$2"   # git tag for deployment
+
+if [ -z "$ENVIRONMENT" ] || [ -z "$DEPLOY_TAG" ]; then
+    echo "Usage: $0 <environment> <deploy-tag>"
+    exit 1
+fi
+
+echo "📦 Generating deployment documentation for $ENVIRONMENT ($DEPLOY_TAG)..."
+
+# Get previous deployment tag
+PREVIOUS_TAG=$(git describe --tags --abbrev=0 $DEPLOY_TAG^)
+
+# Generate deployment notes
+giv release-notes $PREVIOUS_TAG..$DEPLOY_TAG \
+  --output-version "$DEPLOY_TAG" \
+  --prompt-file .giv/templates/deployment-notes.md \
+  --output-file "deployments/$ENVIRONMENT/$DEPLOY_TAG-deployment.md"
+
+# Generate rollback documentation
+giv document --prompt-file .giv/templates/rollback-guide.md \
+  $PREVIOUS_TAG..$DEPLOY_TAG \
+  --output-file "deployments/$ENVIRONMENT/$DEPLOY_TAG-rollback.md"
+
+# Database migration documentation
+if git diff $PREVIOUS_TAG..$DEPLOY_TAG --name-only | grep -q "migrations/"; then
+    giv changelog $PREVIOUS_TAG..$DEPLOY_TAG -- "migrations/" \
+      --prompt-file .giv/templates/migration-notes.md \
+      --output-file "deployments/$ENVIRONMENT/$DEPLOY_TAG-migrations.md"
+fi
+
+# Configuration changes
+if git diff $PREVIOUS_TAG..$DEPLOY_TAG --name-only | grep -qE "\.(env|config|yaml|json)$"; then
+    giv summary $PREVIOUS_TAG..$DEPLOY_TAG -- "*.env*" "*.config*" "*.yaml" "*.json" \
+      --prompt-file .giv/templates/config-changes.md \
+      --output-file "deployments/$ENVIRONMENT/$DEPLOY_TAG-config.md"
+fi
+
+echo "✅ Deployment documentation generated for $ENVIRONMENT"</code>
+                            </div>
+
+                            <h4>Infrastructure as Code Documentation</h4>
+                            <div class="code-block">
+                                <code># infrastructure-docs.sh
+# Document infrastructure changes with giv
+
+echo "🏗️ Generating infrastructure documentation..."
+
+# Terraform changes
+if [ -d "terraform/" ]; then
+    giv changelog HEAD~20..HEAD -- "terraform/" \
+      --prompt-file .giv/templates/terraform-changes.md \
+      --output-file "docs/INFRASTRUCTURE_CHANGES.md"
+fi
+
+# Kubernetes manifests
+if [ -d "k8s/" ] || [ -d "kubernetes/" ]; then
+    giv summary HEAD~10..HEAD -- "*k8s*" "*kubernetes*" \
+      --prompt-file .giv/templates/k8s-changes.md \
+      --output-file "docs/KUBERNETES_CHANGES.md"
+fi
+
+# Docker changes
+if git diff HEAD~10..HEAD --name-only | grep -q "Dockerfile"; then
+    giv changelog HEAD~10..HEAD -- "Dockerfile*" "docker-compose*" \
+      --prompt-file .giv/templates/docker-changes.md \
+      --output-file "docs/CONTAINER_CHANGES.md"
+fi
+
+# CI/CD pipeline changes
+giv summary HEAD~15..HEAD -- ".github/" ".gitlab-ci.yml" "Jenkinsfile" \
+  --prompt-file .giv/templates/cicd-changes.md \
+  --output-file "docs/PIPELINE_CHANGES.md"</code>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="example-card">
+                        <div class="example-header">
+                            <span class="example-icon">🔬</span>
+                            <h3>Research and Academic Collaboration</h3>
+                            <span class="difficulty-badge">Intermediate</span>
+                        </div>
+                        
+                        <div class="academic-workflow">
+                            <h4>Research Paper Version Control</h4>
+                            <div class="code-block">
+                                <code># academic-docs.sh
+# Generate academic collaboration documentation
+
+echo "🔬 Generating research collaboration documentation..."
+
+# Paper revision history
+giv changelog HEAD~50..HEAD -- "paper/" "*.tex" "*.bib" \
+  --prompt-file .giv/templates/paper-revisions.md \
+  --output-file "docs/PAPER_REVISIONS.md"
+
+# Data analysis changes
+giv summary HEAD~20..HEAD -- "analysis/" "data/" "notebooks/" \
+  --prompt-file .giv/templates/analysis-changes.md \
+  --output-file "docs/ANALYSIS_CHANGES.md"
+
+# Methodology updates
+giv document --prompt-file .giv/templates/methodology-summary.md \
+  HEAD~30..HEAD -- "methodology/" "methods/" \
+  --output-file "docs/METHODOLOGY_UPDATES.md"
+
+# Collaboration summary for co-authors
+contributors=$(git log HEAD~20..HEAD --pretty=format:"%an" | sort -u)
+giv summary HEAD~20..HEAD \
+  --prompt-file .giv/templates/collaboration-summary.md \
+  --output-file "docs/COLLABORATION_SUMMARY.md"
+
+# Generate publication-ready changelog
+giv release-notes v1.0..HEAD \
+  --prompt-file .giv/templates/publication-notes.md \
+  --output-file "docs/PUBLICATION_CHANGELOG.md"</code>
+                            </div>
+
+                            <h4>Experiment Tracking</h4>
+                            <div class="code-block">
+                                <code># Track experimental changes and results
+EXPERIMENT_BRANCH="experiment/new-algorithm"
+
+# Document experiment setup
+giv document --prompt-file .giv/templates/experiment-setup.md \
+  main..$EXPERIMENT_BRANCH \
+  --output-file "experiments/$(date +%Y%m%d)-experiment-setup.md"
+
+# Results documentation
+if [ -d "results/" ]; then
+    giv summary main..$EXPERIMENT_BRANCH -- "results/" \
+      --prompt-file .giv/templates/experiment-results.md \
+      --output-file "experiments/$(date +%Y%m%d)-results-summary.md"
+fi
+
+# Peer review preparation
+giv release-notes main..$EXPERIMENT_BRANCH \
+  --prompt-file .giv/templates/peer-review.md \
+  --output-file "experiments/$(date +%Y%m%d)-peer-review.md"</code>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+<section id="custom-templates" class="tool-section alt-bg">
+                <div class="section-header">
+                    <h2>Custom Template Examples</h2>
+                    <p>Specialized prompt templates for different use cases and team requirements</p>
+                </div>
+
+                <div class="template-examples">
+                    <div class="template-card">
+                        <h3>🛡️ Security Review Template</h3>
+                        <div class="code-block">
+                            <code># .giv/templates/security-review.md
+
+You are a senior security engineer reviewing code changes for potential security issues.
+
+## Changes to Review:
+{DIFF}
+
+## Instructions:
+Analyze the provided changes and create a security review that includes:
+
+1. **Security Assessment**
+   - Identify any potential security vulnerabilities
+   - Review authentication and authorization changes
+   - Check for input validation and sanitization
+   - Assess data handling and storage security
+
+2. **Risk Analysis**
+   - Categorize risks as High, Medium, or Low
+   - Explain potential impact of identified issues
+   - Suggest mitigation strategies
+
+3. **Compliance Check**
+   - Verify adherence to security standards (OWASP, etc.)
+   - Check for compliance with data protection regulations
+   - Review logging and monitoring capabilities
+
+4. **Recommendations**
+   - Security improvements to implement
+   - Testing recommendations
+   - Documentation requirements
+
+Format as a professional security review document with clear action items.</code>
+                        </div>
+                    </div>
+
+                    <div class="template-card">
+                        <h3>📊 Performance Impact Template</h3>
+                        <div class="code-block">
+                            <code># .giv/templates/performance-analysis.md
+
+You are a performance engineer analyzing code changes for performance impact.
+
+## Code Changes:
+{DIFF}
+
+## Performance Analysis Required:
+
+1. **Performance Impact Assessment**
+   - Identify changes that may affect performance
+   - Analyze algorithm complexity changes
+   - Review database query modifications
+   - Check for potential memory leaks or inefficiencies
+
+2. **Benchmark Recommendations**
+   - Suggest specific performance tests to run
+   - Identify metrics to monitor
+   - Recommend load testing scenarios
+
+3. **Optimization Opportunities**
+   - Suggest performance improvements
+   - Identify caching opportunities
+   - Recommend architectural optimizations
+
+4. **Monitoring and Alerting**
+   - Suggest metrics to track
+   - Recommend alert thresholds
+   - Identify potential bottlenecks
+
+Provide actionable recommendations with priority levels.</code>
+                        </div>
+                    </div>
+
+                    <div class="template-card">
+                        <h3>📚 API Documentation Template</h3>
+                        <div class="code-block">
+                            <code># .giv/templates/api-documentation.md
+
+You are a technical writer creating API documentation from code changes.
+
+## API Changes:
+{DIFF}
+
+## Documentation Requirements:
+
+1. **Endpoint Changes**
+   - New endpoints added
+   - Modified endpoints
+   - Deprecated or removed endpoints
+   - Changed URL patterns or parameters
+
+2. **Request/Response Format Changes**
+   - New request parameters
+   - Modified response schemas
+   - Changed HTTP methods
+   - Updated content types
+
+3. **Authentication and Authorization**
+   - New authentication requirements
+   - Permission changes
+   - Security considerations
+
+4. **Examples and Usage**
+   - Provide example requests
+   - Show expected responses
+   - Include error scenarios
+   - Add code samples in multiple languages
+
+5. **Migration Guide**
+   - Breaking changes summary
+   - Migration steps for existing clients
+   - Backward compatibility notes
+   - Deprecation timeline
+
+Create comprehensive API documentation suitable for developer consumption.</code>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+<section id="troubleshooting-examples" class="tool-section">
+                <div class="section-header">
+                    <h2>Troubleshooting and Best Practices</h2>
+                    <p>Common issues, solutions, and optimization techniques for giv workflows</p>
+                </div>
+
+                <div class="troubleshooting-examples">
+                    <div class="trouble-example">
+                        <h3>🔧 Configuration Management</h3>
+                        <div class="code-block">
+                            <code># Team configuration setup script
+#!/bin/bash
+# setup-team-giv.sh - Standardize giv configuration across team
+
+echo "🛠️ Setting up team giv configuration..."
+
+# Create team configuration template
+cat > .giv/config << 'EOF'
+# Team Configuration for giv
+api.model=gpt-4
+api.url=https://api.openai.com/v1/chat/completions
+project.title=${PROJECT_NAME}
+project.description=${PROJECT_DESCRIPTION}
+todo.pattern=TODO:|FIXME:|HACK:|NOTE:|REVIEW:
+version.file=package.json|pyproject.toml|Cargo.toml
+output.mode=auto
+EOF
+
+# Create team templates
+mkdir -p .giv/templates
+
+# Team commit message template
+cat > .giv/templates/commit_message_prompt.md << 'EOF'
+Generate a commit message following our team conventions:
+
+{DIFF}
+
+Requirements:
+- Use conventional commit format (type: description)
+- Include ticket number if present in branch name
+- Keep subject line under 72 characters
+- Add detailed body for complex changes
+- Mention breaking changes in footer
+EOF
+
+# Team changelog template
+cat > .giv/templates/changelog_prompt.md << 'EOF'
+Generate a changelog entry for version {VERSION}:
+
+{HISTORY}
+
+Format according to Keep a Changelog standard:
+## [{VERSION}] - {DATE}
+
+### Added
+- New features
+
+### Changed
+- Enhancements to existing features
+
+### Fixed
+- Bug fixes
+
+### Security
+- Security improvements
+EOF
+
+echo "✅ Team giv configuration completed"
+echo "💡 Remind team members to set their API keys:"
+echo "   export GIV_API_KEY='your-api-key'"</code>
+                        </div>
+                    </div>
+
+                    <div class="trouble-example">
+                        <h3>⚡ Performance Optimization</h3>
+                        <div class="code-block">
+                            <code># optimize-giv-performance.sh
+# Optimize giv for large repositories and better performance
+
+echo "⚡ Optimizing giv performance..."
+
+# Configure for large repositories
+giv config set api.model.timeout 60  # Increase timeout for large diffs
+giv config set api.model.max_tokens 4096  # Optimize token usage
+
+# Create performance-optimized templates
+cat > .giv/templates/fast-commit.md << 'EOF'
+Generate a concise commit message (max 50 characters):
+
+{DIFF}
+
+Requirements:
+- Very brief, focused description
+- Use conventional commit type
+- No body or footer needed
+EOF
+
+# Batch processing for multiple commits
+cat > scripts/batch-giv.sh << 'EOF'
+#!/bin/bash
+# Process multiple commits efficiently
+
+COMMITS=$(git rev-list HEAD~10..HEAD)
+BATCH_SIZE=5
+count=0
+
+for commit in $COMMITS; do
+    if [ $((count % BATCH_SIZE)) -eq 0 ]; then
+        echo "Processing batch starting at commit: $commit"
+        sleep 2  # Rate limiting
+    fi
+    
+    # Process commit with optimized template
+    git show $commit --format="" --name-only | \
+      giv document --prompt-file .giv/templates/fast-commit.md \
+      --output-file "logs/commit-$commit.md"
+    
+    ((count++))
+done
+EOF
+
+chmod +x scripts/batch-giv.sh
+
+echo "✅ Performance optimizations applied"</code>
+                        </div>
+                    </div>
+
+                    <div class="trouble-example">
+                        <h3>🔍 Debugging and Validation</h3>
+                        <div class="code-block">
+                            <code># debug-giv-issues.sh
+# Comprehensive debugging and validation script
+
+echo "🔍 Debugging giv configuration and setup..."
+
+# Check giv installation
+echo "📦 Checking giv installation..."
+if command -v giv >/dev/null 2>&1; then
+    echo "✅ giv is installed: $(giv version)"
+else
+    echo "❌ giv not found in PATH"
+    exit 1
+fi
+
+# Validate configuration
+echo "⚙️ Validating configuration..."
+giv config list > /tmp/giv-config.txt
+
+if grep -q "api.key" /tmp/giv-config.txt; then
+    echo "✅ API key configured"
+else
+    echo "⚠️ No API key found. Set with: giv config set api.key 'your-key'"
+fi
+
+if grep -q "api.model" /tmp/giv-config.txt; then
+    echo "✅ Model configured: $(giv config get api.model)"
+else
+    echo "⚠️ No model configured. Set with: giv config set api.model 'gpt-4'"
+fi
+
+# Test Git repository
+echo "📁 Checking Git repository..."
+if git rev-parse --git-dir > /dev/null 2>&1; then
+    echo "✅ Valid Git repository"
+    echo "📋 Recent commits: $(git rev-list --count HEAD~5..HEAD)"
+else
+    echo "❌ Not in a Git repository"
+    exit 1
+fi
+
+# Test API connectivity
+echo "🌐 Testing API connectivity..."
+giv message --dry-run > /dev/null 2>&1
+if [ $? -eq 0 ]; then
+    echo "✅ API connection successful"
+else
+    echo "❌ API connection failed. Check:"
+    echo "   - API key validity"
+    echo "   - Network connectivity"
+    echo "   - API endpoint configuration"
+fi
+
+# Validate templates
+echo "📝 Checking templates..."
+if [ -d ".giv/templates" ]; then
+    template_count=$(find .giv/templates -name "*.md" | wc -l)
+    echo "✅ Found $template_count custom templates"
+else
+    echo "💡 No custom templates found. Create with: giv init"
+fi
+
+# Performance test
+echo "⚡ Running performance test..."
+start_time=$(date +%s)
+giv summary HEAD~2..HEAD --dry-run > /dev/null 2>&1
+end_time=$(date +%s)
+duration=$((end_time - start_time))
+
+if [ $duration -lt 10 ]; then
+    echo "✅ Performance test passed (${duration}s)"
+else
+    echo "⚠️ Performance test slow (${duration}s) - consider optimization"
+fi
+
+echo "🏁 Debugging complete!"</code>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+<section id="next-steps" class="tool-section alt-bg">
+                <div class="section-header">
+                    <h2>Continue Learning</h2>
+                    <p>Explore more giv capabilities and related tools</p>
+                </div>
+
+                <div class="next-steps-grid">
+                    <a href="/giv/docs" class="next-step-card">
+                        <div class="card-icon">📚</div>
+                        <h3>Complete Documentation</h3>
+                        <p>Master all giv features with comprehensive guides, CLI reference, and configuration options</p>
+                        <span class="card-arrow">→</span>
+                    </a>
+
+                    <a href="/ecosystem/" class="next-step-card">
+                        <div class="card-icon">🔄</div>
+                        <h3>Ecosystem Integration</h3>
+                        <p>See how giv works with inform, catalog, and unify for complete development workflows</p>
+                        <span class="card-arrow">→</span>
+                    </a>
+
+                    <a href="https://github.com/fwdslsh/giv" class="next-step-card">
+                        <div class="card-icon">📂</div>
+                        <h3>Source Code & Community</h3>
+                        <p>View source code, contribute improvements, or get help from the community</p>
+                        <span class="card-arrow">→</span>
+                    </a>
+                </div>
+            </section>
+
+</main>
+</body>
+</html>

@@ -1,366 +1,310 @@
 /**
- * Dependency Tracking System for unify
- * Tracks include relationships for selective rebuilds
+ * Dependency Tracker for Unify
+ * Implements US-009: Asset Copying and Management
+ * 
+ * Tracks dependencies between pages, fragments, and assets
+ * to enable efficient incremental builds and change propagation.
  */
 
-import path from 'path';
-import { logger } from '../utils/logger.js';
-import { extractIncludeDependencies } from './include-processor.js';
+import { AssetTracker } from './asset-tracker.js';
 
 /**
- * Dependency tracker for managing include relationships
+ * DependencyTracker class for managing file dependencies
  */
 export class DependencyTracker {
   constructor() {
-    // Maps page file path to array of include file paths it depends on
-    this.includesInPage = new Map();
+    // Maps page path to array of dependency paths
+    this.pageDependencies = new Map();
     
-    // Maps include file path to array of page file paths that depend on it
-    this.pagesByInclude = new Map();
+    // Maps dependency path to array of pages that depend on it
+    this.dependentPages = new Map();
     
-    // Cache of all known files for efficient lookups
-    this.knownFiles = new Set();
+    // Asset tracker for asset-specific dependencies
+    this.assetTracker = new AssetTracker();
   }
-  
+
   /**
-   * Record dependencies for a page
+   * Track dependencies for a page based on its content
    * @param {string} pagePath - Path to the page file
-   * @param {string[]} includePaths - Array of include file paths
-   * @param {string[]} layoutPaths - Array of layout file paths (optional)
+   * @param {string} content - Page content to analyze
+   * @param {string} sourceRoot - Source root directory
    */
-  recordDependencies(pagePath, includePaths, layoutPaths = []) {
-    // Clear existing dependencies for this page
-    this.clearPageDependencies(pagePath);
-    
-    // Combine include and layout dependencies
-    const allDependencies = [...includePaths, ...layoutPaths];
-    
-    // Record new dependencies
-    if (allDependencies.length > 0) {
-      this.includesInPage.set(pagePath, [...allDependencies]);
-      
-      // Update reverse mapping
-      for (const dependencyPath of allDependencies) {
-        if (!this.pagesByInclude.has(dependencyPath)) {
-          this.pagesByInclude.set(dependencyPath, []);
-        }
-        this.pagesByInclude.get(dependencyPath).push(pagePath);
-      }
-      
-      logger.debug(`Recorded ${allDependencies.length} dependencies (${includePaths.length} includes, ${layoutPaths.length} layouts) for ${pagePath}`);
+  async trackPageDependencies(pagePath, content, sourceRoot) {
+    const dependencies = new Set();
+
+    // Extract asset dependencies
+    const assetRefs = this.assetTracker.extractAssetReferences(content, pagePath, sourceRoot);
+    for (const assetRef of assetRefs) {
+      dependencies.add(assetRef);
     }
-    
-    // Track all known files
-    this.knownFiles.add(pagePath);
-    allDependencies.forEach(path => this.knownFiles.add(path));
+
+    // Extract fragment dependencies (data-unify imports)
+    const fragmentRefs = this._extractFragmentReferences(content, pagePath, sourceRoot);
+    for (const fragmentRef of fragmentRefs) {
+      dependencies.add(fragmentRef);
+    }
+
+    // Extract legacy includes (SSI includes)
+    const includeRefs = this._extractIncludeReferences(content, pagePath, sourceRoot);
+    for (const includeRef of includeRefs) {
+      dependencies.add(includeRef);
+    }
+
+    // Update dependency mappings
+    this._updateDependencyMappings(pagePath, Array.from(dependencies));
   }
-  
+
   /**
-   * Clear dependencies for a specific page
+   * Get all dependencies for a specific page
    * @param {string} pagePath - Path to the page file
-   */
-  clearPageDependencies(pagePath) {
-    const existingIncludes = this.includesInPage.get(pagePath);
-    
-    if (existingIncludes) {
-      // Remove from reverse mapping
-      for (const includePath of existingIncludes) {
-        const pages = this.pagesByInclude.get(includePath);
-        if (pages) {
-          const index = pages.indexOf(pagePath);
-          if (index > -1) {
-            pages.splice(index, 1);
-          }
-          
-          // Clean up empty arrays
-          if (pages.length === 0) {
-            this.pagesByInclude.delete(includePath);
-          }
-        }
-      }
-      
-      this.includesInPage.delete(pagePath);
-    }
-  }
-  
-  /**
-   * Get all pages that depend on a specific include file (alias for getAffectedPages)
-   * @param {string} includePath - Path to the include file
-   * @returns {string[]} Array of page paths that depend on the include
-   */
-  getDependentPages(includePath) {
-    return this.getAffectedPages(includePath);
-  }
-
-  /**
-   * Optimized Get all pages that depend on a specific include file
-   * @param {string} includePath - Path to the include file
-   * @returns {string[]} Array of page paths that depend on the include
-   */
-  getAffectedPages(includePath, cache = new Map()) {
-    if (cache.has(includePath)) {
-      return cache.get(includePath);
-    }
-
-    const directlyAffected = this.pagesByInclude.get(includePath) || [];
-    const allAffected = new Set(directlyAffected);
-
-    // Check for nested dependencies - if this include is included by other includes
-    const includesUsingThis = [];
-    for (const [page, includes] of this.includesInPage.entries()) {
-      if (includes.includes(includePath) && this.isIncludeFile(page)) {
-        includesUsingThis.push(page);
-      }
-    }
-
-    // Recursively find pages affected by nested includes
-    for (const nestedInclude of includesUsingThis) {
-      const nestedAffected = this.getAffectedPages(nestedInclude, cache);
-      nestedAffected.forEach(page => allAffected.add(page));
-    }
-
-    const result = Array.from(allAffected);
-    cache.set(includePath, result);
-    logger.debug(`Include ${includePath} affects ${result.length} pages: ${result.join(', ')}`);
-
-    return result;
-  }
-  
-  /**
-   * Get all includes used by a specific page
-   * @param {string} pagePath - Path to the page file
-   * @returns {string[]} Array of include paths used by the page
+   * @returns {string[]} Array of dependency paths
    */
   getPageDependencies(pagePath) {
-    return this.includesInPage.get(pagePath) || [];
-  }
-  
-  /**
-   * Check if a file is an include (used by other files but not a main page)
-   * @param {string} filePath - Path to check
-   * @returns {boolean} True if file is used as an include
-   */
-  isIncludeFile(filePath) {
-    return this.pagesByInclude.has(filePath);
-  }
-  
-  /**
-   * Check if a file is a main page (not used as an include by others)
-   * @param {string} filePath - Path to check
-   * @returns {boolean} True if file is a main page
-   */
-  isMainPage(filePath) {
-    return this.includesInPage.has(filePath) && !this.pagesByInclude.has(filePath);
-  }
-  
-  /**
-   * Get all known files
-   * @returns {string[]} Array of all known file paths
-   */
-  getAllFiles() {
-    return Array.from(this.knownFiles);
-  }
-  
-  /**
-   * Get all main pages (files that are not includes)
-   * @returns {string[]} Array of main page paths
-   */
-  getMainPages() {
-    return this.getAllFiles().filter(file => !this.isIncludeFile(file) || this.includesInPage.has(file));
-  }
-  
-  /**
-   * Get all include files (files used by other files)
-   * @returns {string[]} Array of include file paths
-   */
-  getIncludeFiles() {
-    return Array.from(this.pagesByInclude.keys());
-  }
-  
-  /**
-   * Analyze and record dependencies from HTML content
-   * @param {string} pagePath - Path to the page file
-   * @param {string} htmlContent - HTML content to analyze
-   * @param {string} sourceRoot - Source root directory
-   */
-  async analyzePage(pagePath, htmlContent, sourceRoot) {
-    const includeDependencies = extractIncludeDependencies(htmlContent, pagePath, sourceRoot);
-    const layoutDependencies = await this.extractLayoutDependencies(htmlContent, pagePath, sourceRoot);
-    this.recordDependencies(pagePath, includeDependencies, layoutDependencies);
-    
-    // Also analyze nested dependencies for deeper tracking
-    await this.analyzeNestedDependencies(pagePath, sourceRoot);
+    return this.pageDependencies.get(pagePath) || [];
   }
 
   /**
-   * Extract layout dependencies from HTML content
-   * @param {string} htmlContent - HTML content to analyze
-   * @param {string} pagePath - Path to the current page
-   * @param {string} sourceRoot - Source root directory
-   * @returns {Promise<string[]>} Array of resolved layout file paths
+   * Get all pages that depend on a specific file
+   * @param {string} dependencyPath - Path to the dependency file
+   * @returns {string[]} Array of page paths that depend on this file
    */
-  async extractLayoutDependencies(htmlContent, pagePath, sourceRoot) {
-    const dependencies = [];
-    
-    // Look for explicit data-layout attribute
-    const layoutMatch = htmlContent.match(/data-layout=["']([^"']+)["']/i);
-    
-    if (layoutMatch) {
-      const layoutPath = layoutMatch[1];
-      
-      try {
-        // Resolve layout path (similar to unified-html-processor logic)
-        let resolvedLayoutPath;
-        
-        if (layoutPath.startsWith("/")) {
-          // Absolute path from source root
-          resolvedLayoutPath = path.join(sourceRoot, layoutPath.substring(1));
-        } else if (layoutPath.includes('/')) {
-          // Path with directory structure, relative to source root
-          resolvedLayoutPath = path.join(sourceRoot, layoutPath);
-        } else {
-          // Bare filename, relative to current page directory
-          const pageDir = path.dirname(pagePath);
-          resolvedLayoutPath = path.join(pageDir, layoutPath);
-        }
-        
-        dependencies.push(resolvedLayoutPath);
-        logger.debug(`Extracted explicit layout dependency: ${layoutPath} -> ${resolvedLayoutPath}`);
-      } catch (error) {
-        // Log warning but continue - dependency tracking shouldn't break builds
-        logger.warn(`Could not resolve layout dependency: ${layoutPath} in ${pagePath}`);
-      }
-    }
-    
-    // Also discover auto-discovered layouts (folder-scoped _layout.html, fallback layouts)
-    try {
-      const { LayoutDiscovery } = await import('./layout-discovery.js');
-      const discovery = new LayoutDiscovery();
-      const autoDiscoveredLayouts = await discovery.getLayoutDependencies(pagePath, sourceRoot);
-      
-      // Add auto-discovered layouts that aren't already in dependencies
-      for (const layoutPath of autoDiscoveredLayouts) {
-        if (!dependencies.includes(layoutPath)) {
-          dependencies.push(layoutPath);
-          logger.debug(`Extracted auto-discovered layout dependency: ${layoutPath}`);
-        }
-      }
-    } catch (error) {
-      // Log warning but continue - dependency tracking shouldn't break builds
-      logger.warn(`Could not discover auto-layout dependencies for ${pagePath}: ${error.message}`);
-    }
-    
-    return dependencies;
+  getDependentPages(dependencyPath) {
+    return this.dependentPages.get(dependencyPath) || [];
   }
 
   /**
-   * Analyze nested dependencies by reading include files
-   * @param {string} pagePath - Path to the page file
-   * @param {string} sourceRoot - Source root directory
+   * Get all pages transitively dependent on a specific dependency path
+   * This includes direct dependents and dependents of dependents, recursively
+   * @param {string} dependencyPath - Path to dependency (fragment/layout)
+   * @returns {string[]} List of all transitively dependent page paths
    */
-  async analyzeNestedDependencies(pagePath, sourceRoot) {
-    const directDependencies = this.getPageDependencies(pagePath);
+  getAllTransitiveDependents(dependencyPath) {
+    const visited = new Set();
+    const result = new Set();
     
-    for (const includePath of directDependencies) {
-      try {
-        // Read the include file to find its dependencies
-        const fs = await import('fs/promises');
-        const includeContent = await fs.readFile(includePath, 'utf-8');
-        const nestedDependencies = extractIncludeDependencies(includeContent, includePath, sourceRoot);
-        
-        if (nestedDependencies.length > 0) {
-          this.recordDependencies(includePath, nestedDependencies);
-          logger.debug(`Found ${nestedDependencies.length} nested dependencies in ${includePath}`);
-        }
-      } catch (error) {
-        // Include file might not exist or be readable - log but continue
-        logger.debug(`Could not analyze nested dependencies for ${includePath}: ${error.message}`);
+    const collectDependents = (path) => {
+      if (visited.has(path)) {
+        return; // Avoid infinite loops
       }
-    }
-  }
-  
-  /**
-   * Remove all records of a file (when file is deleted)
-   * @param {string} filePath - Path to the deleted file
-   */
-  removeFile(filePath) {
-    // Clear if it's a page
-    this.clearPageDependencies(filePath);
-    
-    // Clear if it's an include
-    if (this.pagesByInclude.has(filePath)) {
-      const affectedPages = this.pagesByInclude.get(filePath);
-      this.pagesByInclude.delete(filePath);
+      visited.add(path);
       
-      // Update affected pages
-      for (const pagePath of affectedPages) {
-        const includes = this.includesInPage.get(pagePath);
-        if (includes) {
-          const index = includes.indexOf(filePath);
-          if (index > -1) {
-            includes.splice(index, 1);
-          }
-        }
+      const directDependents = this.dependentPages.get(path) || [];
+      for (const dependent of directDependents) {
+        result.add(dependent);
+        // Recursively collect dependents of this dependent
+        collectDependents(dependent);
       }
-    }
-    
-    this.knownFiles.delete(filePath);
-    logger.debug(`Removed file from dependency tracking: ${filePath}`);
-  }
-  
-  /**
-   * Get dependency statistics for debugging
-   * @returns {Object} Statistics about tracked dependencies
-   */
-  getStats() {
-    return {
-      totalFiles: this.knownFiles.size,
-      pagesWithDependencies: this.includesInPage.size,
-      includeFiles: this.pagesByInclude.size,
-      totalDependencyRelationships: Array.from(this.includesInPage.values())
-        .reduce((sum, deps) => sum + deps.length, 0)
     };
+    
+    collectDependents(dependencyPath);
+    return Array.from(result);
   }
-  
+
+  /**
+   * Remove all dependencies for a page (when page is deleted)
+   * @param {string} pagePath - Path to the deleted page
+   */
+  removePage(pagePath) {
+    const dependencies = this.pageDependencies.get(pagePath) || [];
+    
+    // Remove this page from all dependency mappings
+    for (const depPath of dependencies) {
+      const dependentPages = this.dependentPages.get(depPath) || [];
+      const index = dependentPages.indexOf(pagePath);
+      if (index > -1) {
+        dependentPages.splice(index, 1);
+      }
+      
+      // Clean up empty arrays
+      if (dependentPages.length === 0) {
+        this.dependentPages.delete(depPath);
+      } else {
+        this.dependentPages.set(depPath, dependentPages);
+      }
+    }
+    
+    // Remove the page's dependency list
+    this.pageDependencies.delete(pagePath);
+  }
+
   /**
    * Clear all dependency data
    */
   clear() {
-    this.includesInPage.clear();
-    this.pagesByInclude.clear();
-    this.knownFiles.clear();
-    logger.debug('Cleared all dependency data');
+    this.pageDependencies.clear();
+    this.dependentPages.clear();
+    this.assetTracker.clear();
   }
-  
+
   /**
-   * Export dependency data for debugging or persistence
-   * @returns {Object} Serializable dependency data
+   * Get dependency statistics
+   * @returns {Object} Statistics about tracked dependencies
    */
-  export() {
+  getStats() {
     return {
-      includesInPage: Object.fromEntries(this.includesInPage),
-      pagesByInclude: Object.fromEntries(this.pagesByInclude),
-      knownFiles: Array.from(this.knownFiles)
+      totalPages: this.pageDependencies.size,
+      totalDependencies: Array.from(this.pageDependencies.values())
+        .reduce((sum, deps) => sum + deps.length, 0),
+      totalAssets: this.assetTracker.getAllReferencedAssets().length,
+      averageDependenciesPerPage: this.pageDependencies.size > 0 
+        ? Array.from(this.pageDependencies.values())
+            .reduce((sum, deps) => sum + deps.length, 0) / this.pageDependencies.size
+        : 0
     };
   }
-  
+
   /**
-   * Import dependency data
-   * @param {Object} data - Dependency data to import
+   * Extract fragment references from HTML content
+   * @private
+   * @param {string} content - HTML content to analyze
+   * @param {string} pagePath - Path to the page file
+   * @param {string} sourceRoot - Source root directory
+   * @returns {string[]} Array of fragment paths
    */
-  import(data) {
-    this.clear();
+  _extractFragmentReferences(content, pagePath, sourceRoot) {
+    const references = [];
     
-    if (data.includesInPage) {
-      this.includesInPage = new Map(Object.entries(data.includesInPage));
+    // Pattern to match data-unify attributes
+    const dataUnifyPattern = /data-unify=["']([^"']+)["']/gi;
+    let match;
+    
+    while ((match = dataUnifyPattern.exec(content)) !== null) {
+      const fragmentPath = match[1];
+      
+      if (fragmentPath) {
+        // Resolve the path relative to the page
+        const resolvedPath = this._resolveFragmentPath(fragmentPath, pagePath, sourceRoot);
+        if (resolvedPath) {
+          references.push(resolvedPath);
+        }
+      }
     }
     
-    if (data.pagesByInclude) {
-      this.pagesByInclude = new Map(Object.entries(data.pagesByInclude));
+    return references;
+  }
+
+  /**
+   * Extract include references from HTML content (SSI includes)
+   * @private
+   * @param {string} content - HTML content to analyze
+   * @param {string} pagePath - Path to the page file
+   * @param {string} sourceRoot - Source root directory
+   * @returns {string[]} Array of include paths
+   */
+  _extractIncludeReferences(content, pagePath, sourceRoot) {
+    const references = [];
+    
+    // Pattern to match SSI include directives
+    const includePattern = /<!--#include\s+(?:file|virtual)=["']([^"']+)["']\s*-->/gi;
+    let match;
+    
+    while ((match = includePattern.exec(content)) !== null) {
+      const includePath = match[1];
+      
+      if (includePath) {
+        // Resolve the path relative to the page
+        const resolvedPath = this._resolveFragmentPath(includePath, pagePath, sourceRoot);
+        if (resolvedPath) {
+          references.push(resolvedPath);
+        }
+      }
     }
     
-    if (data.knownFiles) {
-      this.knownFiles = new Set(data.knownFiles);
+    return references;
+  }
+
+  /**
+   * Update bidirectional dependency mappings
+   * @private
+   * @param {string} pagePath - Path to the page file
+   * @param {string[]} dependencies - Array of dependency paths
+   */
+  _updateDependencyMappings(pagePath, dependencies) {
+    // Clear old mappings for this page
+    const oldDependencies = this.pageDependencies.get(pagePath) || [];
+    for (const oldDep of oldDependencies) {
+      const dependentPages = this.dependentPages.get(oldDep) || [];
+      const index = dependentPages.indexOf(pagePath);
+      if (index > -1) {
+        dependentPages.splice(index, 1);
+        if (dependentPages.length === 0) {
+          this.dependentPages.delete(oldDep);
+        } else {
+          this.dependentPages.set(oldDep, dependentPages);
+        }
+      }
+    }
+    
+    // Set new dependencies for this page
+    this.pageDependencies.set(pagePath, dependencies);
+    
+    // Update reverse mappings
+    for (const depPath of dependencies) {
+      if (!this.dependentPages.has(depPath)) {
+        this.dependentPages.set(depPath, []);
+      }
+      const dependentPages = this.dependentPages.get(depPath);
+      if (!dependentPages.includes(pagePath)) {
+        dependentPages.push(pagePath);
+      }
+    }
+  }
+
+  /**
+   * Resolve fragment path relative to page and source root
+   * @private
+   * @param {string} fragmentPath - Fragment path from data-unify or include
+   * @param {string} pagePath - Path to the page file
+   * @param {string} sourceRoot - Source root directory
+   * @returns {string|null} Resolved absolute path or null if not found
+   */
+  _resolveFragmentPath(fragmentPath, pagePath, sourceRoot) {
+    const { resolve, dirname, join, isAbsolute } = require('path');
+    const { existsSync } = require('fs');
+    
+    try {
+      let resolvedPath;
+      
+      if (isAbsolute(fragmentPath)) {
+        // Absolute path from source root
+        resolvedPath = join(sourceRoot, fragmentPath.startsWith('/') ? fragmentPath.slice(1) : fragmentPath);
+      } else if (fragmentPath.startsWith('./') || fragmentPath.startsWith('../')) {
+        // Relative path from page directory
+        const pageDir = dirname(pagePath);
+        resolvedPath = resolve(pageDir, fragmentPath);
+      } else {
+        // Simple filename - resolve relative to page directory first
+        const pageDir = dirname(pagePath);
+        resolvedPath = join(pageDir, fragmentPath);
+      }
+      
+      // Check if file exists
+      if (existsSync(resolvedPath)) {
+        return resolvedPath;
+      }
+      
+      // If not found and it's a simple filename, try common directories
+      if (!fragmentPath.includes('/')) {
+        const commonDirs = [
+          join(sourceRoot, '_layouts'),
+          join(sourceRoot, '_components'),
+          join(sourceRoot, '_includes'),
+          sourceRoot
+        ];
+        
+        for (const dir of commonDirs) {
+          const testPath = join(dir, fragmentPath);
+          if (existsSync(testPath)) {
+            return testPath;
+          }
+        }
+      }
+      
+      // For complex paths, don't return null - return the computed path anyway
+      // This allows tracking dependencies even if files don't exist yet
+      return resolvedPath;
+    } catch (error) {
+      return null;
     }
   }
 }

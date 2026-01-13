@@ -1,0 +1,125 @@
+<style data-unify-docs="v1">
+    /* Public areas */
+    .unify-stats-title { /* Stats section title */ }
+    .unify-stats-subtitle { /* Stats section subtitle */ }
+    .unify-stats-grid { /* Stats items container */ }
+</style>
+
+<section class="stats-section">
+    <div class="stats-container">
+        <div class="section-header">
+            <h2><div class="unify-stats-title">Performance That Matters</div></h2>
+            <p><div class="unify-stats-subtitle">Benchmarks from real-world usage</div></p>
+        </div>
+
+        <div class="stats-grid">
+            <div class="unify-stats-grid">
+                <!-- Default stats -->
+                <div class="stat-item">
+                    <div class="stat-number">Fast</div>
+                    <div class="stat-label">Performance</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">0</div>
+                    <div class="stat-label">Dependencies</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<style>
+/* Performance Stats */
+.stats-section {
+    padding: 6rem 2rem;
+    background: var(--bg-darker);
+    text-align: center;
+}
+
+.stats-container {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 2rem;
+    margin-top: 3rem;
+}
+
+.stat-item {
+    padding: 1.5rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    transition: all 0.3s ease;
+}
+
+.stat-item:hover {
+    transform: translateY(-2px);
+    border-color: var(--primary);
+}
+
+.stat-number {
+    font-size: 2.5rem;
+    font-weight: 900;
+    color: var(--primary);
+    font-family: var(--font-mono);
+    margin-bottom: 0.5rem;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+}
+
+/* Animation for stats on scroll */
+.stat-item {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: all 0.6s ease;
+}
+
+.stat-item.animate {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .stat-number {
+        font-size: 2rem;
+    }
+}
+</style>
+
+<script>
+// Animate stats on scroll
+document.addEventListener('DOMContentLoaded', function() {
+    const statsObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const statItems = entry.target.querySelectorAll('.stat-item');
+                statItems.forEach((stat, index) => {
+                    setTimeout(() => {
+                        stat.classList.add('animate');
+                    }, index * 200);
+                });
+            }
+        });
+    }, {
+        threshold: 0.5
+    });
+
+    const statsSection = document.querySelector('.stats-section');
+    if (statsSection) {
+        statsObserver.observe(statsSection);
+    }
+});
+</script>

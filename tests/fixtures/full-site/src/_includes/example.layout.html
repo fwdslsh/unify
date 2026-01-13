@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Example Page</title>
+    <link rel="stylesheet" href="../assets/styles.css" data-remove>
+    <link rel="icon" type="image/x-icon" href="static/favicon.ico">
+</head>
+
+<body>
+    <div class="page-bg"></div>
+
+    <include src="example-nav.html">
+        <!-- Tool-specific navigation replaces main nav-links -->
+        <div class="unify-nav-links">
+            <li><a href="index.html">Overview</a></li>
+            <li><a href="getting-started.html">Getting Started</a></li>
+            <li><a href="docs.html">Documentation</a></li>
+            <li><a href="examples.html">Examples</a></li>
+        </div>
+    </include>
+
+    <main>
+        <!-- Page content goes here -->
+        <div class="unify-content">
+            <h1>Example Page</h1>
+            <p>This is an example page using the example layout.</p>
+        </div>
+    </main>
+
+    <include src="base/footer.html"></include>
+    <include src="base/scripts.html"></include>
+</body>
+
+</html>

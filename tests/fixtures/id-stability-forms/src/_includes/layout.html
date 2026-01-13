@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>ID Stability Demo</title>
+</head>
+<body>
+    <header>
+        <h1>Form Layout</h1>
+    </header>
+    <main>
+        <form class="unify-signup-form" id="layout-signup" action="/signup" method="post">
+            <fieldset id="personal-info" class="form-section">
+                <legend>Personal Information</legend>
+                
+                <div class="form-group">
+                    <label for="user-email">Email Address</label>
+                    <input id="user-email" name="email" type="email" required 
+                           aria-describedby="email-help email-error" />
+                    <div id="email-help" class="help-text">We'll never share your email</div>
+                    <div id="email-error" class="error-text" hidden>Invalid email format</div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="user-name">Full Name</label>
+                    <input id="user-name" name="name" type="text" required />
+                </div>
+            </fieldset>
+            
+            <fieldset id="preferences" class="form-section">
+                <legend>Preferences</legend>
+                <div class="form-group">
+                    <input id="newsletter-opt" type="checkbox" name="newsletter" />
+                    <label for="newsletter-opt">Subscribe to newsletter</label>
+                </div>
+            </fieldset>
+            
+            <button type="submit" id="submit-btn">Sign Up</button>
+        </form>
+        
+        <section class="unify-terms-section" id="terms-container">
+            <h2 id="terms-title">Terms & Conditions</h2>
+            <p id="terms-text">Default terms content</p>
+        </section>
+    </main>
+</body>
+</html>

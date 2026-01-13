@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en" data-unify="_includes/layout.html">
+<head>
+    <title>Scoping Test Page</title>
+</head>
+<body>
+    <!-- This targets the layout's hero area -->
+    <section class="unify-hero">
+        <h1>Page Hero Title</h1>
+        <p>This content replaces the layout's hero section.</p>
+    </section>
+    
+    <!-- This content goes into the card-grid component's scope -->
+    <!-- It targets the grid component's section-title, but cannot directly target individual card areas -->
+    <div class="unify-section-title">
+        <h2>Custom Grid Section Title</h2>
+        <p>This replaces the card-grid's section title.</p>
+    </div>
+    
+    <!-- This targets the card-grid component's footer area -->
+    <div class="unify-grid-footer">
+        <p>Custom grid footer from page</p>
+        <small>Added by the page, not layout</small>
+    </div>
+    
+    <!-- This should NOT affect individual cards - they're in separate component scopes -->
+    <!-- The card components will use their default content because this doesn't cross scopes -->
+    <div class="unify-card-title">This should NOT appear in any cards</div>
+    <div class="unify-card-content">This content should NOT appear in any cards</div>
+    
+    <!-- This targets the layout's footer content -->
+    <section class="unify-footer-content">
+        <p>Custom footer content from page</p>
+        <p>Multiple paragraphs allowed</p>
+    </section>
+</body>
+</html>

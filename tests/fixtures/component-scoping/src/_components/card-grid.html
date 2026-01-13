@@ -1,0 +1,24 @@
+<div class="card-grid">
+    <h2 class="unify-section-title">Default Grid Title</h2>
+    
+    <!-- First card component - creates its own scope -->
+    <article data-unify="_components/card.html" class="card-wrapper">
+        <h3 class="unify-card-title">First Card from Grid</h3>
+        <div class="unify-card-content">
+            <p>First card content from grid component</p>
+        </div>
+    </article>
+    
+    <!-- Second card component - also its own scope -->
+    <article data-unify="_components/card.html" class="card-wrapper">  
+        <h3 class="unify-card-title">Second Card from Grid</h3>
+        <div class="unify-card-content">
+            <p>Second card content from grid component</p>
+        </div>
+    </article>
+    
+    <!-- This area is in the card-grid component scope -->
+    <div class="unify-grid-footer">
+        <p>Default grid footer</p>
+    </div>
+</div>

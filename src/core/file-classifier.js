@@ -1,215 +1,354 @@
-import path from 'path';
+/**
+ * File Classifier for Unify
+ * Implements US-009: Asset Copying and Management and US-016: Glob Pattern Processing
+ * 
+ * Classifies files into different types (pages, assets, fragments)
+ * and determines appropriate processing strategies with optional glob pattern support.
+ */
+
+import { extname } from 'path';
+import { GlobPatternProcessor } from './glob-pattern-processor.js';
 
 /**
- * File classification system for convention-based architecture
- * Determines file types based on naming conventions and location
+ * FileClassifier class for categorizing files in the build process
  */
 export class FileClassifier {
-  /**
-   * Determine if a file is a page (should be emitted to output)
-   * @param {string} filePath - Absolute path to the file
-   * @param {string} sourceRoot - Absolute path to source directory
-   * @returns {boolean} True if file is a page
-   */
-  isPage(filePath, sourceRoot) {
-    const relativePath = path.relative(sourceRoot, filePath);
-    const fileName = path.basename(filePath);
-    const extension = path.extname(filePath).toLowerCase();
-    
-    // Must be HTML or Markdown file
-    if (!['.html', '.htm', '.md'].includes(extension)) {
-      return false;
-    }
-    
-    // Files starting with underscore are partials, not pages
-    if (fileName.startsWith('_')) {
-      return false;
-    }
-    
-    // Files in _includes or other underscore directories are not pages
-    const pathParts = relativePath.split(path.sep);
-    for (const part of pathParts) {
-      if (part.startsWith('_')) {
-        return false;
-      }
-    }
-    
-    // PATCH: Always treat markdown files as pages unless in underscore-prefixed dir
-    if (extension === '.md') {
-      return true;
-    }
-    
-    return true;
-  }
-  
-  /**
-   * Determine if a file is a partial (non-emitting)
-   * @param {string} filePath - Absolute path to the file
-   * @param {string} sourceRoot - Absolute path to source directory
-   * @returns {boolean} True if file is a partial
-   */
-  isPartial(filePath, sourceRoot) {
-    const fileName = path.basename(filePath);
-    const extension = path.extname(filePath).toLowerCase();
-    
-    // Must be HTML file
-    if (!['.html', '.htm'].includes(extension)) {
-      return false;
-    }
-    
-    // Files starting with underscore are partials
-    if (fileName.startsWith('_')) {
-      return true;
-    }
-    
-    // Check if in any directory that should be treated as partials
-    const relativePath = path.relative(sourceRoot, filePath);
-    const pathParts = relativePath.split(path.sep);
-    
-    // Files in underscore-prefixed directories are partials
-    if (pathParts.some(part => part.startsWith('_'))) {
-      return true;
-    }
-    
-    // Also check for common standard directory names that should be treated as partials
-    const commonPartialDirs = [
-      'layouts', '.layouts',
-      'includes', 'partials', 'templates',
-      'site_layouts'  // Support custom naming conventions
+  constructor() {
+    // File type configurations
+    this.pageExtensions = ['.html', '.htm'];
+    this.markdownExtensions = ['.md', '.markdown'];
+    this.assetExtensions = [
+      // Images
+      '.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.ico', '.bmp', '.tiff',
+      // Fonts
+      '.woff', '.woff2', '.ttf', '.otf', '.eot',
+      // Audio/Video
+      '.mp3', '.mp4', '.wav', '.ogg', '.webm', '.avi', '.mov',
+      // Stylesheets and Scripts
+      '.css', '.js', '.ts', '.scss', '.sass', '.less',
+      // Documents
+      '.pdf', '.doc', '.docx', '.txt', '.json', '.xml',
+      // Archives
+      '.zip', '.tar', '.gz', '.rar', '.7z',
+      // Other
+      '.map', '.wasm', '.bin'
     ];
-    
-    for (const dirName of commonPartialDirs) {
-      if (pathParts.includes(dirName)) {
-        return true;
-      }
-    }
-    
-    return false;
-  }
-  
-  /**
-   * Determine if a file is a layout
-   * @param {string} filePath - Absolute path to the file
-   * @param {string} sourceRoot - Absolute path to source directory
-   * @returns {boolean} True if file is a layout
-   */
-  isLayout(filePath, sourceRoot) {
-    const fileName = path.basename(filePath);
-    const extension = path.extname(filePath).toLowerCase();
-    
-    // Must be HTML file
-    if (!['.html', '.htm'].includes(extension)) {
-      return false;
-    }
-    
-    // Check if filename matches layout pattern
-    if (this.isLayoutFileName(fileName)) {
-      return true;
-    }
-    
-    // Check for fallback layout in _includes
-    const relativePath = path.relative(sourceRoot, filePath);
-    if (relativePath === path.join('_includes', '_layout.html') ||
-        relativePath === path.join('_includes', '_layout.htm')) {
-      return true;
-    }
-    
-    return false;
+
+    // Glob pattern processor (optional)
+    this._globProcessor = null;
+    this.onWarning = null;
   }
 
   /**
-   * Check if a filename matches the layout naming convention
-   * @param {string} fileName - Name of the file to check
-   * @returns {boolean} True if matches layout pattern
+   * Classify a file based on its path and content
+   * @param {string} filePath - Full path to the file
+   * @returns {Object} Classification result
    */
-  isLayoutFileName(fileName) {
-    // Must start with underscore
-    if (!fileName.startsWith('_')) {
-      return false;
+  classifyFile(filePath) {
+    // If glob processor is configured, use enhanced classification
+    if (this._globProcessor) {
+      try {
+        return this._enhancedClassifyFile(filePath);
+      } catch (error) {
+        // Fallback to basic classification if glob processing fails
+        this._warn(`Glob processing failed for ${filePath}: ${error.message}`);
+      }
     }
-    
-    // Must end with layout.html or layout.htm
-    if (fileName.endsWith('layout.html') || fileName.endsWith('layout.htm')) {
-      return true;
-    }
-    
-    // Also support the basic _layout.html and _layout.htm patterns
-    if (fileName === '_layout.html' || fileName === '_layout.htm') {
-      return true;
-    }
-    
-    return false;
+
+    // Basic classification (backward compatibility)
+    return this._basicClassifyFile(filePath);
   }
-  
+
   /**
-   * Check if file should be emitted to output directory
-   * @param {string} filePath - Absolute path to the file
-   * @param {string} sourceRoot - Absolute path to source directory
-   * @returns {boolean} True if file should be emitted
+   * Basic file classification (original logic)
+   * @param {string} filePath - Full path to the file
+   * @returns {Object} Basic classification result
+   * @private
    */
-  shouldEmit(filePath, sourceRoot) {
-    const fileName = path.basename(filePath);
-    const extension = path.extname(filePath).toLowerCase();
+  _basicClassifyFile(filePath) {
+    const extension = extname(filePath).toLowerCase();
+    const filename = filePath.split('/').pop() || filePath.split('\\').pop();
     
-    // Pages are always emitted
-    if (this.isPage(filePath, sourceRoot)) {
-      return true;
+    const result = {
+      type: null,
+      shouldEmit: false,
+      shouldCopy: false,
+      isFragment: false,
+      isAsset: false,
+      isPage: false,
+      extension: extension,
+      processingStrategy: null
+    };
+
+    // Check if it's a fragment (starts with underscore or in fragment directory)
+    const pathParts = filePath.split('/');
+    const isInFragmentDirectory = pathParts.some(part => part.startsWith('_'));
+    
+    if (filename.startsWith('_') || isInFragmentDirectory) {
+      result.isFragment = true;
+      result.type = 'fragment';
+      result.shouldEmit = false; // Fragments are not directly emitted
+      result.processingStrategy = 'fragment';
+      return result;
     }
-    
-    // Partials and layouts are never emitted
-    if (this.isPartial(filePath, sourceRoot) || this.isLayout(filePath, sourceRoot)) {
-      return false;
+
+    // Check if it's a page
+    if (this.pageExtensions.includes(extension)) {
+      result.isPage = true;
+      result.type = 'page';
+      result.shouldEmit = true;
+      result.processingStrategy = 'html';
+      return result;
     }
-    
-    // For other files (assets), check underscore convention
-    // Files starting with underscore are non-emitting unless explicitly referenced
-    if (fileName.startsWith('_')) {
-      return false; // Will be copied only if referenced
+
+    // Check if it's a markdown file
+    if (this.markdownExtensions.includes(extension)) {
+      result.isPage = true;
+      result.type = 'page';
+      result.shouldEmit = true;
+      result.processingStrategy = 'markdown';
+      return result;
     }
-    
-    // Files in underscore directories are non-emitting unless explicitly referenced
-    const relativePath = path.relative(sourceRoot, filePath);
-    const pathParts = relativePath.split(path.sep);
-    if (pathParts.some(part => part.startsWith('_'))) {
-      return false; // Will be copied only if referenced
+
+    // Check if it's an asset
+    if (this.assetExtensions.includes(extension)) {
+      result.isAsset = true;
+      result.type = 'asset';
+      result.shouldCopy = true;
+      result.processingStrategy = 'asset';
+      return result;
     }
-    
-    // Regular assets are emitted if they're static files
-    return true;
+
+    // Unknown file type
+    result.type = 'unknown';
+    result.shouldCopy = false; // Don't copy unknown files by default
+    result.processingStrategy = 'skip';
+
+    return result;
   }
-  
+
   /**
-   * Get file type classification
-   * @param {string} filePath - Absolute path to the file
-   * @param {string} sourceRoot - Absolute path to source directory
-   * @returns {string} File type: 'page', 'partial', 'layout', 'asset'
+   * Enhanced file classification with glob pattern processing
+   * @param {string} filePath - Full path to the file
+   * @returns {Object} Enhanced classification result
+   * @private
    */
-  getFileType(filePath, sourceRoot) {
-    if (this.isLayout(filePath, sourceRoot)) {
-      return 'layout';
+  _enhancedClassifyFile(filePath) {
+    // Get basic classification first
+    const basicResult = this._basicClassifyFile(filePath);
+    
+    // For fragments, check if they should be auto-ignored (unless forced to render)
+    if (basicResult.isFragment && this._globProcessor.options.autoIgnore !== false) {
+      this._globProcessor.addAutoIgnoredFile(filePath, 'fragment');
     }
     
-    if (this.isPage(filePath, sourceRoot)) {
-      return 'page';
-    }
+    // Get glob pattern classification
+    const globResult = this._globProcessor.classifyFile(filePath);
     
-    if (this.isPartial(filePath, sourceRoot)) {
-      return 'partial';
-    }
+    // Handle special case: fragments that are forced to render should not be considered fragments
+    const isFragmentOverride = basicResult.isFragment && globResult.action === 'EMIT';
     
-    return 'asset';
+    // Merge results with glob taking precedence
+    const enhancedResult = {
+      // Enhanced properties
+      action: globResult.action,
+      tier: globResult.tier,
+      reason: globResult.reason,
+      matchedPattern: globResult.matchedPattern,
+      
+      // Backward compatibility properties
+      type: this._mapActionToType(globResult.action, basicResult.type),
+      shouldEmit: globResult.action === 'EMIT',
+      shouldCopy: globResult.action === 'COPY',
+      isFragment: basicResult.isFragment && !isFragmentOverride,
+      isAsset: (basicResult.isAsset && globResult.action !== 'IGNORED' && globResult.action !== 'SKIP') || globResult.action === 'COPY',
+      isPage: isFragmentOverride || (basicResult.isPage && globResult.action === 'EMIT'),
+      extension: basicResult.extension,
+      processingStrategy: this._mapActionToProcessingStrategy(globResult.action, basicResult.processingStrategy)
+    };
+
+    return enhancedResult;
   }
-  
+
   /**
-   * Check if a directory is non-emitting (underscore convention)
-   * @param {string} dirPath - Directory path relative to source
-   * @returns {boolean} True if directory should not be emitted
+   * Map glob action to file type
+   * @param {string} action - Glob action (EMIT, COPY, IGNORED, SKIP)
+   * @param {string} basicType - Basic file type
+   * @returns {string} Mapped file type
+   * @private
    */
-  isNonEmittingDirectory(dirPath) {
-    const pathParts = dirPath.split(path.sep);
-    return pathParts.some(part => part.startsWith('_'));
+  _mapActionToType(action, basicType) {
+    switch (action) {
+      case 'EMIT':
+        return 'page';
+      case 'COPY':
+        return 'asset';
+      case 'IGNORED':
+        return 'ignored';
+      case 'SKIP':
+        return 'unknown';
+      default:
+        return basicType;
+    }
+  }
+
+  /**
+   * Map glob action to processing strategy
+   * @param {string} action - Glob action (EMIT, COPY, IGNORED, SKIP)
+   * @param {string} basicStrategy - Basic processing strategy
+   * @returns {string} Processing strategy
+   * @private
+   */
+  _mapActionToProcessingStrategy(action, basicStrategy) {
+    switch (action) {
+      case 'EMIT':
+        return basicStrategy === 'markdown' ? 'markdown' : 'html';
+      case 'COPY':
+        return 'copy';
+      case 'IGNORED':
+        return 'ignore';
+      case 'SKIP':
+        return 'skip';
+      default:
+        return basicStrategy;
+    }
+  }
+
+  /**
+   * Configure glob pattern processing
+   * @param {Object} options - Glob pattern configuration
+   */
+  configureGlobPatterns(options) {
+    // Pass asset extension knowledge to glob processor
+    const globOptions = {
+      ...options,
+      assetExtensions: this.assetExtensions,
+      renderableExtensions: [...this.pageExtensions, ...this.markdownExtensions]
+    };
+    
+    this._globProcessor = new GlobPatternProcessor(globOptions);
+    
+    // Forward warnings from glob processor
+    this._globProcessor.onWarning = (warning) => this._warn(warning);
+    
+    // Add patterns if provided
+    if (options.copy) {
+      options.copy.forEach(pattern => this._globProcessor.addCopyPattern(pattern));
+    }
+    if (options.ignore) {
+      options.ignore.forEach(pattern => this._globProcessor.addIgnorePattern(pattern));
+    }
+    if (options.ignoreRender) {
+      options.ignoreRender.forEach(pattern => this._globProcessor.addIgnoreRenderPattern(pattern));
+    }
+    if (options.ignoreCopy) {
+      options.ignoreCopy.forEach(pattern => this._globProcessor.addIgnoreCopyPattern(pattern));
+    }
+    if (options.render) {
+      options.render.forEach(pattern => this._globProcessor.addRenderPattern(pattern));
+    }
+  }
+
+  /**
+   * Add auto-ignored layout file
+   * @param {string} filePath - Path to layout file
+   */
+  addAutoIgnoredLayout(filePath) {
+    if (this._globProcessor) {
+      this._globProcessor.addAutoIgnoredFile(filePath, 'layout');
+    }
+  }
+
+  /**
+   * Load gitignore patterns
+   * @param {string[]} patterns - Array of gitignore patterns
+   */
+  loadGitignorePatterns(patterns) {
+    if (this._globProcessor) {
+      patterns.forEach(pattern => this._globProcessor.addGitignorePattern(pattern));
+    }
+  }
+
+  /**
+   * Check if a file should be processed as a page
+   * @param {string} filePath - File path to check
+   * @returns {boolean} True if file should be processed as a page
+   */
+  isPageFile(filePath) {
+    const classification = this.classifyFile(filePath);
+    return classification.isPage;
+  }
+
+  /**
+   * Check if a file should be copied as an asset
+   * @param {string} filePath - File path to check
+   * @returns {boolean} True if file should be copied as an asset
+   */
+  isAssetFile(filePath) {
+    const classification = this.classifyFile(filePath);
+    return classification.isAsset;
+  }
+
+  /**
+   * Check if a file is a fragment (layout, component, etc.)
+   * @param {string} filePath - File path to check
+   * @returns {boolean} True if file is a fragment
+   */
+  isFragmentFile(filePath) {
+    const classification = this.classifyFile(filePath);
+    return classification.isFragment;
+  }
+
+  /**
+   * Get the processing strategy for a file
+   * @param {string} filePath - File path to analyze
+   * @returns {string} Processing strategy (html|markdown|asset|fragment|skip)
+   */
+  getProcessingStrategy(filePath) {
+    const classification = this.classifyFile(filePath);
+    return classification.processingStrategy;
+  }
+
+  /**
+   * Get all supported file extensions
+   * @returns {Object} Object with arrays of extensions by type
+   */
+  getSupportedExtensions() {
+    return {
+      pages: [...this.pageExtensions],
+      markdown: [...this.markdownExtensions],
+      assets: [...this.assetExtensions]
+    };
+  }
+
+  /**
+   * Add custom asset extension
+   * @param {string} extension - Extension to add (including dot)
+   */
+  addAssetExtension(extension) {
+    if (!this.assetExtensions.includes(extension.toLowerCase())) {
+      this.assetExtensions.push(extension.toLowerCase());
+    }
+  }
+
+  /**
+   * Add custom page extension
+   * @param {string} extension - Extension to add (including dot)
+   */
+  addPageExtension(extension) {
+    if (!this.pageExtensions.includes(extension.toLowerCase())) {
+      this.pageExtensions.push(extension.toLowerCase());
+    }
+  }
+
+  /**
+   * Emit warning message
+   * @param {string} message - Warning message
+   * @private
+   */
+  _warn(message) {
+    if (this.onWarning) {
+      this.onWarning(message);
+    }
   }
 }
-
-// Export singleton instance
-export const fileClassifier = new FileClassifier();

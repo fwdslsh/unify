@@ -1,0 +1,1035 @@
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>catalog Examples - Real-World Documentation Indexing</title>
+  <meta name="description"
+    content="Real-world examples and patterns for using catalog to generate llms.txt files. AI training workflows, documentation sites, and automation patterns.">
+  <meta name="keywords" content="catalog, llms.txt, documentation indexing, AI training data, RAG workflows, fwdslsh">
+  <meta property="og:title" content="catalog Examples - Real-World Documentation Indexing">
+  <meta property="og:description"
+    content="Real-world examples and patterns for using catalog to generate llms.txt files. AI training workflows, documentation sites, and automation patterns.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="catalog Examples - Real-World Documentation Indexing">
+  <meta name="twitter:description"
+    content="Real-world examples and patterns for using catalog to generate llms.txt files. AI training workflows, documentation sites, and automation patterns.">
+</head>
+
+<body data-unify="/_includes/tool-page.html">
+
+  <include src="/_includes/components/hero-section.html">
+    <div class="unify-hero-content">
+      <h1>catalog Examples</h1>
+      <div class="tagline">Real-world patterns for AI-ready documentation indexing</div>
+      <div class="description">Practical examples, proven workflows, and automation patterns for generating llms.txt
+        files and comprehensive documentation indexes with catalog.</div>
+
+      <div class="cta-buttons">
+        <a href="#ai-workflows" class="btn btn-primary">
+          <span class="btn-icon">🤖</span>
+          AI Workflows
+        </a>
+        <a href="#automation-examples" class="btn btn-secondary">Automation Examples</a>
+      </div>
+    </div>
+  </include>
+
+  <section id="ai-workflows" class="tool-section">
+    <div class="section-header">
+      <h2>AI Training and RAG Workflows</h2>
+      <p>Prepare documentation for AI systems with optimized indexing and content organization</p>
+    </div>
+
+    <div class="ai-examples">
+      <div class="example-card">
+        <div class="example-header">
+          <span class="example-icon">🤖</span>
+          <h3>AI Training Data Pipeline</h3>
+          <span class="difficulty-badge">Intermediate</span>
+        </div>
+
+        <div class="example-description">
+          <p>Prepare comprehensive documentation for AI model training with proper content categorization and quality
+            control.</p>
+        </div>
+
+        <div class="example-workflow">
+          <h4>Step 1: Organize Training Content</h4>
+          <div class="code-block">
+            <code># Organize documentation by importance
+mkdir -p ai-training/{core,supplementary,examples}
+
+# Move essential documentation to core
+cp -r docs/api ai-training/core/
+cp -r docs/guides ai-training/core/
+cp -r docs/tutorials ai-training/core/
+
+# Move supplementary content
+cp -r docs/examples ai-training/supplementary/
+cp -r docs/appendix ai-training/supplementary/
+cp -r docs/archive ai-training/supplementary/</code>
+          </div>
+
+          <h4>Step 2: Generate AI-Optimized Indexes</h4>
+          <div class="code-block">
+            <code># Create comprehensive training dataset
+catalog --input ai-training \
+  --output ai-ready \
+  --optional "supplementary/**/*" \
+  --optional "examples/**/*" \
+  --validate
+
+# Results:
+# - llms.txt: Structured index focusing on core content
+# - llms-full.txt: Complete content for training
+# - llms-ctx.txt: Essential content only for context windows</code>
+          </div>
+
+          <h4>Step 3: Quality Validation and Processing</h4>
+          <div class="code-block">
+            <code># Validate content quality
+catalog --input ai-training --output validated \
+  --validate \
+  --silent
+
+# Check validation results
+if [ $? -eq 0 ]; then
+  echo "✅ All content validated successfully"
+  echo "📊 Ready for AI training pipeline"
+else
+  echo "❌ Validation failed - check content structure"
+  exit 1
+fi
+
+# Generate statistics
+find ai-ready -name "*.txt" -exec wc -w {} \; > content-stats.txt
+echo "📈 Content statistics generated"</code>
+          </div>
+        </div>
+
+        <div class="example-results">
+          <h4>Expected Results</h4>
+          <ul>
+            <li>llms.txt with core documentation prioritized</li>
+            <li>llms-full.txt containing complete training content</li>
+            <li>llms-ctx.txt optimized for context-limited AI systems</li>
+            <li>Validated content structure ensuring training quality</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="example-card">
+        <div class="example-header">
+          <span class="example-icon">🧠</span>
+          <h3>RAG System Content Preparation</h3>
+          <span class="difficulty-badge">Advanced</span>
+        </div>
+
+        <div class="example-description">
+          <p>Optimize documentation for Retrieval-Augmented Generation (RAG) systems with structured indexing and
+            semantic organization.</p>
+        </div>
+
+        <div class="rag-workflow">
+          <h4>Multi-Source Content Aggregation</h4>
+          <div class="code-block">
+            <code># Aggregate documentation from multiple sources
+sources=(
+  "product-docs"
+  "api-documentation" 
+  "user-guides"
+  "troubleshooting"
+  "faqs"
+)
+
+# Create unified structure for RAG
+mkdir -p rag-content/{knowledge-base,context-chunks,embeddings}
+
+# Process each source with appropriate categorization
+for source in "${sources[@]}"; do
+  echo "Processing: $source"
+  
+  catalog --input "$source" \
+    --output "rag-content/knowledge-base/$source" \
+    --index \
+    --validate
+done</code>
+          </div>
+
+          <h4>Context-Optimized Index Generation</h4>
+          <div class="code-block">
+            <code># Generate comprehensive RAG indexes
+catalog --input rag-content/knowledge-base \
+  --output rag-content/context-chunks \
+  --optional "faqs/**/*" \
+  --optional "troubleshooting/legacy/**/*" \
+  --base-url https://docs.company.com \
+  --validate \
+  --index
+
+# Create semantic categorization
+echo "🧠 Generating semantic categories..."
+
+# Core knowledge (highest priority for RAG)
+catalog --input rag-content/knowledge-base \
+  --output rag-content/embeddings/core \
+  --include "*/api/*" \
+  --include "*/guides/*" \
+  --validate
+
+# Contextual knowledge (secondary priority)
+catalog --input rag-content/knowledge-base \
+  --output rag-content/embeddings/context \
+  --include "*/examples/*" \
+  --include "*/tutorials/*" \
+  --validate</code>
+          </div>
+
+          <h4>RAG System Integration</h4>
+          <div class="code-block">
+            <code># Prepare for vector database ingestion
+echo "📋 RAG Content Summary:"
+echo "Core Documents: $(find rag-content/embeddings/core -name "*.md" | wc -l)"
+echo "Context Documents: $(find rag-content/embeddings/context -name "*.md" | wc -l)"
+echo "Total llms.txt files: $(find rag-content -name "llms*.txt" | wc -l)"
+
+# Generate metadata for vector database
+catalog --input rag-content/context-chunks \
+  --output rag-ready \
+  --index \
+  --base-url https://docs.company.com
+
+echo "🚀 RAG content preparation complete!"
+echo "📂 Upload rag-ready/ to your vector database system"</code>
+          </div>
+        </div>
+
+        <div class="rag-benefits">
+          <h4>RAG Optimization Benefits</h4>
+          <ul>
+            <li>Hierarchical content organization for relevance ranking</li>
+            <li>Context-optimized chunks for retrieval efficiency</li>
+            <li>Metadata-rich indexes for semantic search</li>
+            <li>Structured format compatible with vector databases</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="documentation-workflows" class="tool-section alt-bg">
+    <div class="section-header">
+      <h2>Documentation Website Workflows</h2>
+      <p>Generate SEO-optimized documentation sites with comprehensive indexing</p>
+    </div>
+
+    <div class="documentation-examples">
+      <div class="example-card">
+        <div class="example-header">
+          <span class="example-icon">🌐</span>
+          <h3>Static Site Generation</h3>
+          <span class="difficulty-badge">Beginner</span>
+        </div>
+
+        <div class="static-site-workflow">
+          <h4>Documentation Site Pipeline</h4>
+          <div class="code-block">
+            <code># Generate comprehensive documentation site
+catalog --input docs \
+  --output site-build \
+  --base-url https://docs.company.com \
+  --sitemap \
+  --sitemap-no-extensions \
+  --index \
+  --validate
+
+# Results:
+# - llms.txt: Structured documentation index
+# - sitemap.xml: SEO-optimized sitemap
+# - index.json: Navigation metadata
+# - Validated compliance with standards</code>
+          </div>
+
+          <h4>Integration with Static Site Generators</h4>
+          <div class="code-block">
+            <code># Hugo integration
+catalog --input content \
+  --output static/llms \
+  --base-url https://docs.example.com \
+  --sitemap \
+  --index
+
+# Jekyll integration  
+catalog --input _docs \
+  --output _site/generated \
+  --base-url https://docs.example.com \
+  --sitemap-no-extensions
+
+# unify integration (fwdslsh ecosystem)
+catalog --input docs --output indexed \
+  --base-url https://docs.example.com \
+  --sitemap --index
+
+unify build --input indexed --output public</code>
+          </div>
+        </div>
+      </div>
+
+      <div class="example-card">
+        <div class="example-header">
+          <span class="example-icon">🔍</span>
+          <h3>Knowledge Base Creation</h3>
+          <span class="difficulty-badge">Intermediate</span>
+        </div>
+
+        <div class="knowledge-base-workflow">
+          <h4>Enterprise Knowledge Base Setup</h4>
+          <div class="code-block">
+            <code># Organize knowledge base content
+mkdir -p knowledge-base/{public,internal,archived}
+
+# Process public documentation
+catalog --input public-docs \
+  --output knowledge-base/public \
+  --base-url https://kb.company.com \
+  --sitemap \
+  --validate
+
+# Process internal documentation (marked as optional)
+catalog --input internal-docs \
+  --output knowledge-base/internal \
+  --optional "**/*" \
+  --base-url https://internal.company.com \
+  --validate
+
+# Combine all knowledge sources
+catalog --input knowledge-base \
+  --output unified-kb \
+  --optional "internal/**/*" \
+  --optional "archived/**/*" \
+  --index \
+  --sitemap \
+  --base-url https://kb.company.com</code>
+          </div>
+
+          <h4>Search Integration</h4>
+          <div class="code-block">
+            <code># Generate search-optimized content
+catalog --input knowledge-base \
+  --output search-ready \
+  --index \
+  --validate
+
+# Extract metadata for search indexing
+find search-ready -name "index.json" | while read file; do
+  echo "Processing search metadata: $file"
+  # Send to search index (Elasticsearch, Algolia, etc.)
+done
+
+echo "🔍 Knowledge base ready for search integration"</code>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="automation-examples" class="tool-section">
+    <div class="section-header">
+      <h2>Automation and CI/CD Examples</h2>
+      <p>Integrate catalog into automated documentation pipelines and workflows</p>
+    </div>
+
+    <div class="automation-examples">
+      <div class="script-card">
+        <div class="script-header">
+          <h3>🔄 GitHub Actions Workflow</h3>
+          <p>Automated documentation processing on every commit</p>
+        </div>
+
+        <div class="code-block">
+          <code># .github/workflows/docs.yml
+name: Documentation Processing
+
+on:
+  push:
+    paths:
+      - 'docs/**'
+      - '.github/workflows/docs.yml'
+  pull_request:
+    paths:
+      - 'docs/**'
+
+jobs:
+  process-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install catalog
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/fwdslsh/catalog/main/install.sh | bash
+          catalog --version
+
+      - name: Process documentation
+        run: |
+          catalog --input docs \
+            --output dist \
+            --base-url ${{ secrets.DOCS_BASE_URL }} \
+            --sitemap \
+            --validate \
+            --index
+
+      - name: Validate output
+        run: |
+          if [ ! -f "dist/llms.txt" ]; then
+            echo "❌ llms.txt not generated"
+            exit 1
+          fi
+          
+          if [ ! -f "dist/sitemap.xml" ]; then
+            echo "❌ sitemap.xml not generated"
+            exit 1
+          fi
+          
+          echo "✅ All outputs generated successfully"
+
+      - name: Deploy to GitHub Pages
+        if: github.ref == 'refs/heads/main'
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist</code>
+        </div>
+      </div>
+
+      <div class="script-card">
+        <div class="script-header">
+          <h3>📅 Scheduled Documentation Sync</h3>
+          <p>Automatically sync documentation from multiple sources</p>
+        </div>
+
+        <div class="code-block">
+          <code>#!/bin/bash
+# sync-docs.sh - Scheduled documentation synchronization
+
+# Configuration
+DOC_SOURCES=(
+  "https://api-docs.company.com"
+  "https://user-guides.company.com"
+  "https://developer.company.com"
+)
+
+OUTPUT_DIR="/var/www/unified-docs"
+TEMP_DIR="/tmp/doc-sync-$(date +%Y%m%d-%H%M%S)"
+LOG_FILE="/var/log/doc-sync.log"
+
+echo "$(date): Starting documentation sync" >> $LOG_FILE
+
+# Create temporary directory
+mkdir -p $TEMP_DIR
+
+# Extract from each source using inform
+for source in "${DOC_SOURCES[@]}"; do
+  domain=$(echo $source | sed 's/https:\/\///' | sed 's/\/.*$//' | sed 's/\./-/g')
+  echo "$(date): Processing $source" >> $LOG_FILE
+  
+  inform "$source" \
+    --output-dir "$TEMP_DIR/$domain" \
+    --max-pages 200 \
+    --delay 1000
+done
+
+# Generate unified index with catalog
+echo "$(date): Generating unified documentation index" >> $LOG_FILE
+
+catalog --input $TEMP_DIR \
+  --output $OUTPUT_DIR \
+  --base-url https://docs.company.com \
+  --sitemap \
+  --index \
+  --validate
+
+# Check if generation was successful
+if [ $? -eq 0 ]; then
+  echo "$(date): Documentation sync completed successfully" >> $LOG_FILE
+  
+  # Generate notification
+  echo "📚 Documentation updated at $(date)" | \
+    curl -X POST -H 'Content-Type: application/json' \
+    -d '{"text":"'"$(cat)"'"}' \
+    $SLACK_WEBHOOK_URL
+else
+  echo "$(date): Documentation sync failed" >> $LOG_FILE
+  exit 1
+fi
+
+# Cleanup
+rm -rf $TEMP_DIR</code>
+        </div>
+      </div>
+
+      <div class="script-card">
+        <div class="script-header">
+          <h3>🧪 Content Quality Validation</h3>
+          <p>Automated quality checks for documentation</p>
+        </div>
+
+        <div class="code-block">
+          <code>#!/bin/bash
+# validate-docs.sh - Comprehensive documentation validation
+
+DOC_DIR="$1"
+REPORT_FILE="validation-report.json"
+
+if [ -z "$DOC_DIR" ]; then
+  echo "Usage: $0 &lt;documentation-directory&gt;"
+  exit 1
+fi
+
+echo "🔍 Starting documentation validation for: $DOC_DIR"
+
+# Run catalog validation
+echo "📋 Running llms.txt standard validation..."
+catalog --input "$DOC_DIR" \
+  --output validation-output \
+  --validate \
+  --index
+
+VALIDATION_RESULT=$?
+
+# Generate detailed report
+echo "📊 Generating validation report..."
+
+cat > $REPORT_FILE << EOF
+{
+  "validation_date": "$(date -Iseconds)",
+  "directory": "$DOC_DIR",
+  "llms_validation": {
+    "passed": $([ $VALIDATION_RESULT -eq 0 ] && echo "true" || echo "false"),
+    "exit_code": $VALIDATION_RESULT
+  },
+  "content_stats": {
+    "markdown_files": $(find "$DOC_DIR" -name "*.md" | wc -l),
+    "html_files": $(find "$DOC_DIR" -name "*.html" | wc -l),
+    "total_size": "$(du -sh "$DOC_DIR" | cut -f1)"
+  },
+  "generated_files": {
+    "llms_txt": $([ -f "validation-output/llms.txt" ] && echo "true" || echo "false"),
+    "llms_full_txt": $([ -f "validation-output/llms-full.txt" ] && echo "true" || echo "false"),
+    "llms_ctx_txt": $([ -f "validation-output/llms-ctx.txt" ] && echo "true" || echo "false"),
+    "index_json": $([ -f "validation-output/index.json" ] && echo "true" || echo "false")
+  }
+}
+EOF
+
+echo "📋 Validation report generated: $REPORT_FILE"
+
+# Print summary
+if [ $VALIDATION_RESULT -eq 0 ]; then
+  echo "✅ All validations passed!"
+  echo "📚 Documentation is ready for production"
+else
+  echo "❌ Validation failed"
+  echo "📋 Check the validation output for details"
+  exit 1
+fi</code>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="integration-patterns" class="tool-section alt-bg">
+    <div class="section-header">
+      <h2>Integration Patterns</h2>
+      <p>Combine catalog with other tools for powerful documentation workflows</p>
+    </div>
+
+    <div class="integration-examples">
+      <div class="workflow-example">
+        <div class="workflow-header">
+          <h3>🔄 Complete fwdslsh Ecosystem Workflow</h3>
+          <p>End-to-end documentation pipeline using all fwdslsh tools</p>
+        </div>
+
+        <div class="pipeline-steps">
+          <div class="pipeline-step">
+            <div class="step-icon">i</div>
+            <div class="step-content">
+              <h4>Content Extraction</h4>
+              <div class="code-block">
+                <code># Extract from multiple documentation sources
+inform https://legacy-docs.company.com \
+  --output-dir extracted/legacy \
+  --max-pages 200
+
+inform https://api.company.com/docs \
+  --output-dir extracted/api \
+  --max-pages 100</code>
+              </div>
+            </div>
+            <div class="step-arrow">→</div>
+          </div>
+
+          <div class="pipeline-step">
+            <div class="step-icon">c</div>
+            <div class="step-content">
+              <h4>Content Indexing</h4>
+              <div class="code-block">
+                <code># Combine and index all content
+mkdir -p combined-docs
+cp -r extracted/*/* combined-docs/
+
+catalog --input combined-docs \
+  --output indexed-docs \
+  --base-url https://docs.company.com \
+  --sitemap --index --validate</code>
+              </div>
+            </div>
+            <div class="step-arrow">→</div>
+          </div>
+
+          <div class="pipeline-step">
+            <div class="step-icon">u</div>
+            <div class="step-content">
+              <h4>Site Generation</h4>
+              <div class="code-block">
+                <code># Build beautiful documentation site
+unify build \
+  --input indexed-docs \
+  --output production-site</code>
+              </div>
+            </div>
+            <div class="step-arrow">→</div>
+          </div>
+
+          <div class="pipeline-step">
+            <div class="step-icon">g</div>
+            <div class="step-content">
+              <h4>Version Control</h4>
+              <div class="code-block">
+                <code># Professional commit with AI
+git add .
+giv message
+# "docs: integrate legacy and API documentation with comprehensive indexing"
+
+git push origin main</code>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="pipeline-benefits">
+          <h4>Complete Pipeline Benefits</h4>
+          <ul>
+            <li>Automated content migration from multiple sources</li>
+            <li>AI-ready indexing with llms.txt standard compliance</li>
+            <li>SEO-optimized site generation with navigation</li>
+            <li>Professional version control with AI-generated messages</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="workflow-example">
+        <div class="workflow-header">
+          <h3>🤖 AI-Enhanced Documentation Workflow</h3>
+          <p>Leverage AI throughout the documentation lifecycle</p>
+        </div>
+
+        <div class="ai-enhanced-workflow">
+          <h4>Multi-Stage AI Integration</h4>
+          <div class="code-block">
+            <code># Stage 1: Extract content with inform
+inform https://docs.example.com \
+  --output-dir raw-content \
+  --max-pages 300
+
+# Stage 2: Generate AI-optimized indexes
+catalog --input raw-content \
+  --output ai-enhanced \
+  --optional "examples/**/*" \
+  --optional "archived/**/*" \
+  --validate
+
+# Stage 3: Use llms.txt for AI-powered content enhancement
+# (Custom AI processing using generated llms-full.txt)
+python enhance-content.py \
+  --input ai-enhanced/llms-full.txt \
+  --output enhanced-content/
+
+# Stage 4: Re-index enhanced content
+catalog --input enhanced-content \
+  --output final-output \
+  --base-url https://docs.example.com \
+  --sitemap --index --validate
+
+# Stage 5: AI-powered commit message
+giv message
+# Automatically generates: "docs: enhance documentation with AI-powered content optimization"</code>
+          </div>
+
+          <h4>Continuous AI Enhancement</h4>
+          <div class="code-block">
+            <code># Set up automated AI enhancement pipeline
+echo "🤖 Setting up AI-enhanced documentation pipeline..."
+
+# Monitor for content changes
+while inotifywait -e modify,create,delete raw-content/; do
+  echo "📝 Content changed, re-processing..."
+  
+  # Re-generate indexes
+  catalog --input raw-content \
+    --output updated-ai \
+    --validate \
+    --silent
+  
+  # AI enhancement (custom processing)
+  python ai-enhance.py updated-ai/
+  
+  # Update live documentation
+  rsync -av updated-ai/ /var/www/docs/
+  
+  echo "✅ Documentation updated with AI enhancements"
+done</code>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="specialized-use-cases" class="tool-section">
+    <div class="section-header">
+      <h2>Specialized Use Cases</h2>
+      <p>Advanced patterns for specific documentation scenarios</p>
+    </div>
+
+    <div class="specialized-examples">
+      <div class="example-card">
+        <div class="example-header">
+          <span class="example-icon">📚</span>
+          <h3>Multi-Language Documentation</h3>
+          <span class="difficulty-badge">Advanced</span>
+        </div>
+
+        <div class="multilang-workflow">
+          <h4>Language-Specific Processing</h4>
+          <div class="code-block">
+            <code># Process documentation in multiple languages
+languages=("en" "es" "fr" "de" "ja")
+
+for lang in "${languages[@]}"; do
+  echo "Processing documentation for: $lang"
+  
+  catalog --input "docs/$lang" \
+    --output "localized/$lang" \
+    --base-url "https://docs.example.com/$lang" \
+    --sitemap \
+    --validate
+  
+  # Generate language-specific metadata
+  echo "Language: $lang" > "localized/$lang/language.txt"
+  echo "Generated: $(date)" >> "localized/$lang/language.txt"
+done
+
+# Create unified multilingual index
+catalog --input localized \
+  --output unified-multilang \
+  --index \
+  --base-url https://docs.example.com</code>
+          </div>
+        </div>
+      </div>
+
+      <div class="example-card">
+        <div class="example-header">
+          <span class="example-icon">🏢</span>
+          <h3>Enterprise Documentation Hub</h3>
+          <span class="difficulty-badge">Advanced</span>
+        </div>
+
+        <div class="enterprise-workflow">
+          <h4>Department-Specific Organization</h4>
+          <div class="code-block">
+            <code># Organize enterprise documentation by department
+departments=("engineering" "product" "support" "sales" "legal")
+
+mkdir -p enterprise-hub/{public,internal,confidential}
+
+for dept in "${departments[@]}"; do
+  echo "Processing $dept documentation..."
+  
+  # Public documentation
+  catalog --input "departments/$dept/public" \
+    --output "enterprise-hub/public/$dept" \
+    --base-url "https://docs.company.com/$dept" \
+    --sitemap \
+    --validate
+  
+  # Internal documentation (marked as optional)
+  catalog --input "departments/$dept/internal" \
+    --output "enterprise-hub/internal/$dept" \
+    --optional "**/*" \
+    --base-url "https://internal.company.com/$dept" \
+    --validate
+done
+
+# Generate master enterprise index
+catalog --input enterprise-hub \
+  --output master-docs \
+  --optional "internal/**/*" \
+  --optional "confidential/**/*" \
+  --index \
+  --sitemap \
+  --base-url https://docs.company.com</code>
+          </div>
+        </div>
+      </div>
+
+      <div class="example-card">
+        <div class="example-header">
+          <span class="example-icon">🔬</span>
+          <h3>Research and Academic Papers</h3>
+          <span class="difficulty-badge">Intermediate</span>
+        </div>
+
+        <div class="research-workflow">
+          <h4>Academic Content Organization</h4>
+          <div class="code-block">
+            <code># Process research papers and academic content
+mkdir -p research-index/{papers,datasets,methodologies,appendices}
+
+# Organize papers by topic
+topics=("ai-ml" "computer-vision" "nlp" "robotics" "theory")
+
+for topic in "${topics[@]}"; do
+  catalog --input "research/$topic" \
+    --output "research-index/papers/$topic" \
+    --optional "appendices/**/*" \
+    --optional "raw-data/**/*" \
+    --validate
+done
+
+# Create comprehensive research index
+catalog --input research-index \
+  --output academic-kb \
+  --optional "appendices/**/*" \
+  --optional "datasets/**/*" \
+  --index \
+  --base-url https://research.university.edu
+
+# Generate citation metadata
+find academic-kb -name "*.md" | while read file; do
+  echo "Processing citations for: $file"
+  # Extract and process academic citations
+done</code>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="troubleshooting-examples" class="tool-section alt-bg">
+    <div class="section-header">
+      <h2>Troubleshooting Examples</h2>
+      <p>Solutions for common catalog challenges and optimization techniques</p>
+    </div>
+
+    <div class="troubleshooting-examples">
+      <div class="trouble-example">
+        <h3>🔧 Large Document Set Optimization</h3>
+        <div class="code-block">
+          <code># Handle very large documentation sets efficiently
+# Split processing into batches for memory management
+
+BATCH_SIZE=500
+DOC_DIR="large-docs"
+OUTPUT_DIR="processed-docs"
+
+# Count total files
+total_files=$(find "$DOC_DIR" -name "*.md" -o -name "*.html" | wc -l)
+batches=$(( (total_files + BATCH_SIZE - 1) / BATCH_SIZE ))
+
+echo "Processing $total_files files in $batches batches..."
+
+# Process in batches
+for ((i=1; i<=batches; i++)); do
+  echo "Processing batch $i of $batches..."
+  
+  # Create batch directory
+  batch_dir="batch-$i"
+  mkdir -p "$batch_dir"
+  
+  # Copy files for this batch
+  find "$DOC_DIR" -name "*.md" -o -name "*.html" | \
+    head -n $((i * BATCH_SIZE)) | \
+    tail -n +$(((i-1) * BATCH_SIZE + 1)) | \
+    xargs -I {} cp {} "$batch_dir/"
+  
+  # Process batch
+  catalog --input "$batch_dir" \
+    --output "$OUTPUT_DIR/batch-$i" \
+    --validate \
+    --silent
+  
+  # Cleanup batch directory
+  rm -rf "$batch_dir"
+done
+
+# Combine all batches
+echo "Combining all batches..."
+mkdir -p combined-output
+cp -r processed-docs/batch-*/* combined-output/
+
+# Generate final index
+catalog --input combined-output \
+  --output final-large-docs \
+  --index \
+  --validate</code>
+        </div>
+      </div>
+
+      <div class="trouble-example">
+        <h3>📊 Content Quality Assessment</h3>
+        <div class="code-block">
+          <code># Comprehensive content quality assessment
+#!/bin/bash
+
+DOC_DIR="$1"
+QUALITY_REPORT="quality-assessment.md"
+
+echo "# Documentation Quality Assessment" > $QUALITY_REPORT
+echo "Generated: $(date)" >> $QUALITY_REPORT
+echo "" >> $QUALITY_REPORT
+
+# Run catalog with validation
+echo "## Validation Results" >> $QUALITY_REPORT
+catalog --input "$DOC_DIR" --validate --silent
+validation_result=$?
+
+if [ $validation_result -eq 0 ]; then
+  echo "✅ **PASSED**: llms.txt standard compliance" >> $QUALITY_REPORT
+else
+  echo "❌ **FAILED**: llms.txt standard compliance" >> $QUALITY_REPORT
+fi
+
+# Content statistics
+echo "" >> $QUALITY_REPORT
+echo "## Content Statistics" >> $QUALITY_REPORT
+echo "- Markdown files: $(find "$DOC_DIR" -name "*.md" | wc -l)" >> $QUALITY_REPORT
+echo "- HTML files: $(find "$DOC_DIR" -name "*.html" | wc -l)" >> $QUALITY_REPORT
+echo "- Total size: $(du -sh "$DOC_DIR" | cut -f1)" >> $QUALITY_REPORT
+
+# File size analysis
+echo "" >> $QUALITY_REPORT
+echo "## File Size Analysis" >> $QUALITY_REPORT
+echo "Large files (>100KB):" >> $QUALITY_REPORT
+find "$DOC_DIR" -name "*.md" -o -name "*.html" | \
+  xargs ls -la | awk '$5 > 102400 {print $9 ": " $5/1024 "KB"}' >> $QUALITY_REPORT
+
+# Content issues
+echo "" >> $QUALITY_REPORT
+echo "## Potential Issues" >> $QUALITY_REPORT
+
+# Check for empty files
+empty_files=$(find "$DOC_DIR" -name "*.md" -o -name "*.html" -empty | wc -l)
+if [ $empty_files -gt 0 ]; then
+  echo "⚠️ Found $empty_files empty files" >> $QUALITY_REPORT
+fi
+
+# Check for very short files
+short_files=$(find "$DOC_DIR" -name "*.md" -o -name "*.html" -exec wc -w {} \; | awk '$1 < 10 {count++} END {print count+0}')
+if [ $short_files -gt 0 ]; then
+  echo "⚠️ Found $short_files files with fewer than 10 words" >> $QUALITY_REPORT
+fi
+
+echo "📋 Quality assessment complete: $QUALITY_REPORT"</code>
+        </div>
+      </div>
+
+      <div class="trouble-example">
+        <h3>🛠️ Custom Pattern Debugging</h3>
+        <div class="code-block">
+          <code># Debug include/exclude patterns
+#!/bin/bash
+
+DOC_DIR="$1"
+TEST_PATTERNS=(
+  "*.md"
+  "docs/*.md"
+  "**/*.html"
+  "guides/*"
+  "api/**/*"
+)
+
+echo "🔍 Testing glob patterns against: $DOC_DIR"
+echo ""
+
+for pattern in "${TEST_PATTERNS[@]}"; do
+  echo "Testing pattern: $pattern"
+  
+  # Create test output
+  test_output="pattern-test-$(echo $pattern | sed 's/[^a-zA-Z0-9]//g')"
+  
+  catalog --input "$DOC_DIR" \
+    --output "$test_output" \
+    --include "$pattern" \
+    --silent
+  
+  file_count=$(find "$test_output" -name "*.md" -o -name "*.html" | wc -l)
+  echo "  → Matched $file_count files"
+  
+  if [ $file_count -eq 0 ]; then
+    echo "  ⚠️ No files matched - check pattern syntax"
+  elif [ $file_count -gt 100 ]; then
+    echo "  ⚠️ Many files matched - pattern might be too broad"
+  else
+    echo "  ✅ Reasonable match count"
+  fi
+  
+  # Cleanup
+  rm -rf "$test_output"
+  echo ""
+done
+
+echo "🏁 Pattern testing complete"</code>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="next-steps" class="tool-section">
+    <div class="section-header">
+      <h2>Continue Exploring</h2>
+      <p>Dive deeper into catalog capabilities and related tools</p>
+    </div>
+
+    <div class="next-steps-grid">
+      <a href="/catalog/docs" class="next-step-card">
+        <div class="card-icon">📚</div>
+        <h3>Complete Documentation</h3>
+        <p>Master all catalog features with comprehensive guides and CLI reference</p>
+        <span class="card-arrow">→</span>
+      </a>
+
+      <a href="/ecosystem/" class="next-step-card">
+        <div class="card-icon">🔄</div>
+        <h3>Ecosystem Integration</h3>
+        <p>See how catalog combines with inform, unify, and giv for complete workflows</p>
+        <span class="card-arrow">→</span>
+      </a>
+
+      <a href="https://github.com/fwdslsh/catalog" class="next-step-card">
+        <div class="card-icon">📂</div>
+        <h3>Source Code & Issues</h3>
+        <p>View source code, report issues, or contribute to catalog development</p>
+        <span class="card-arrow">→</span>
+      </a>
+    </div>
+  </section>
+
+</main>
+</body>
+
+</html>

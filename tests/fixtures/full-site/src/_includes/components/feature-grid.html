@@ -1,0 +1,113 @@
+<style data-unify-docs="v1">
+    /* Public areas */
+    .unify-feature-title { /* Feature section title */ }
+    .unify-feature-subtitle { /* Feature section subtitle */ }
+    .unify-feature-grid { /* Feature cards container */ }
+</style>
+
+<section class="tool-section">
+    <div class="section-header">
+        <h2 class="unify-feature-title">Features</h2>
+        <p class="unify-feature-subtitle">What makes this tool special</p>
+    </div>
+
+    <div class="unify-feature-grid feature-grid">
+        <!-- Feature cards will be injected here -->
+    </div>
+</section>
+
+<style>
+/* Feature Grid Section */
+.tool-section {
+    padding: 6rem 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.tool-section.alt-bg {
+    background: var(--bg-darker);
+    margin-left: -2rem;
+    margin-right: -2rem;
+    padding-left: 4rem;
+    padding-right: 4rem;
+}
+
+.section-header {
+    text-align: center;
+    margin-bottom: 4rem;
+}
+
+.section-header h2 {
+    font-size: clamp(2rem, 4vw, 3rem);
+    font-weight: 800;
+    margin-bottom: 1rem;
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.section-header p {
+    font-size: 1.2rem;
+    color: var(--text-secondary);
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 2rem;
+}
+
+.feature-card {
+    background: var(--gradient-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 2rem;
+    transition: all 0.3s ease;
+}
+
+.feature-card:hover {
+    transform: translateY(-5px);
+    border-color: var(--primary);
+}
+
+.feature-icon {
+    width: 50px;
+    height: 50px;
+    background: var(--gradient-primary);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1.5rem;
+    font-size: 1.2rem;
+    color: var(--bg-dark);
+}
+
+.feature-card h3 {
+    font-size: 1.3rem;
+    margin-bottom: 1rem;
+    color: var(--text-primary);
+}
+
+.feature-card p {
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .feature-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .tool-section.alt-bg {
+        margin-left: 0;
+        margin-right: 0;
+        padding-left: 2rem;
+        padding-right: 2rem;
+    }
+}
+</style>
