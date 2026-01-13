@@ -89,3 +89,4 @@ coverage/
 .vendor/
 .remove
 tts_output.wav
+.coverage/lcov.info

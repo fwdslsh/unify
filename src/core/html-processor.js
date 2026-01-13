@@ -58,26 +58,26 @@ export class HtmlProcessor {
   /**
    * Main entry point - processes HTML according to DOM Cascade spec
    */
-  async processFile(filePath, htmlContent, fileSystem = {}, sourceRoot = '.', options = {}, processingStack = null) {
-    try {
-      // Initialize SSI processor with source root if not already done
-      if (!this.ssiProcessor) {
-        this.ssiProcessor = new SSIProcessor(sourceRoot);
-      }
+   async processFile(filePath, htmlContent, fileSystem = {}, sourceRoot = '.', options = {}, processingStack = null) {
+     try {
+       // Initialize SSI processor with source root if not already done
+       if (!this.ssiProcessor) {
+         this.ssiProcessor = new SSIProcessor(sourceRoot);
+       }
 
       // Create file resolver function for this context
       const htmlProcessor = this; // Capture 'this' for use in closure
-      const fileResolver = async (path) => {
+      const fileResolver = async function resolveFile(path, includeDepth = 0) {
         // Try exact path first
         if (fileSystem[path]) {
-          return fileSystem[path];
+          return await htmlProcessor.inlineIncludeTags(fileSystem[path], resolveFile, path, includeDepth + 1);
         }
         
         // Handle absolute paths by removing leading slash
         if (path.startsWith('/')) {
           const relativePath = path.substring(1);
           if (fileSystem[relativePath]) {
-            return fileSystem[relativePath];
+            return await htmlProcessor.inlineIncludeTags(fileSystem[relativePath], resolveFile, relativePath, includeDepth + 1);
           }
         }
         
@@ -103,7 +103,7 @@ export class HtmlProcessor {
               
               for (const tryPath of pathsToTry) {
                 if (fileSystem[tryPath]) {
-                  return fileSystem[tryPath];
+                  return await htmlProcessor.inlineIncludeTags(fileSystem[tryPath], resolveFile, tryPath, includeDepth + 1);
                 }
               }
             }
@@ -121,14 +121,14 @@ export class HtmlProcessor {
           
           // Try the path as-is first
           if (fileSystem[includesPath]) {
-            return fileSystem[includesPath];
+            return await htmlProcessor.inlineIncludeTags(fileSystem[includesPath], resolveFile, includesPath, includeDepth + 1);
           }
           
           // If that fails and path doesn't have extension, try adding .html
           if (!path.includes('.')) {
             const includesPathWithHtml = `_includes/${path}.html`;
             if (fileSystem[includesPathWithHtml]) {
-              return fileSystem[includesPathWithHtml];
+              return await htmlProcessor.inlineIncludeTags(fileSystem[includesPathWithHtml], resolveFile, includesPathWithHtml, includeDepth + 1);
             }
           }
         }
@@ -143,6 +143,9 @@ export class HtmlProcessor {
         throw new FileSystemError(`Layout file not found: ${path}`);
       };
 
+      // Preprocess modern include tags (<include src="...">) into inline HTML
+      const preprocessedHtml = await this.inlineIncludeTags(htmlContent, fileResolver, filePath);
+
       // Set up processor with context - share processing stack for circular dependency detection
       const processor = new UnifyProcessor({
         baseDir: sourceRoot,
@@ -152,7 +155,9 @@ export class HtmlProcessor {
       });
 
       // Process the HTML
-      let result = await processor.process(htmlContent, filePath);
+      let result = await processor.process(preprocessedHtml, filePath);
+
+
 
       // Process SSI includes
       let ssiWarnings = [];
@@ -197,7 +202,7 @@ export class HtmlProcessor {
       return {
         success: false,
         error: error.message,
-        html: htmlContent, // Return original on error
+        html: this.cleanupDataUnifyAttributes(htmlContent), // Clean up attributes even on error
         dependencies: [],
         layoutsProcessed: [],
         warnings: [],
@@ -207,12 +212,56 @@ export class HtmlProcessor {
   }
 
 
-  /**
-   * Clean up data-unify attributes from final output
-   */
-  cleanupDataUnifyAttributes(html) {
+   /**
+    * Inline modern <include src="..."> tags before DOM Cascade processing.
+    * This supports Unify's preferred include syntax (non-SSI) by resolving
+    * the referenced file through the same fileResolver used for layouts.
+    * Recurses up to a safe maximum depth to avoid cycles.
+    */
+   async inlineIncludeTags(htmlContent, fileResolver, currentPath, depth = 0) {
+     const MAX_INCLUDE_DEPTH = 10;
+     if (depth > MAX_INCLUDE_DEPTH) {
+       this.logger.error(`Include depth exceeded while processing ${currentPath}`);
+       return htmlContent;
+     }
+
+     // Matches both self-closing and paired include tags
+     const includeRegex = /<include\s+src=["']([^"']+)["']\s*(?:><\/include>|\/>)/gi;
+     let content = htmlContent;
+
+     // Process includes until none remain
+     while (true) {
+       const matches = [];
+       let match;
+       includeRegex.lastIndex = 0;
+       while ((match = includeRegex.exec(content)) !== null) {
+         matches.push({ full: match[0], path: match[1] });
+       }
+
+       if (matches.length === 0) break;
+
+       for (const m of matches) {
+         try {
+           const includeHtml = await fileResolver(m.path);
+           const inlined = await this.inlineIncludeTags(includeHtml, fileResolver, m.path, depth + 1);
+           content = content.replace(m.full, inlined);
+         } catch (err) {
+           this.logger.error(`Failed to resolve include '${m.path}' in ${currentPath}: ${err.message}`);
+         }
+       }
+     }
+
+     return content;
+   }
+
+   /**
+    * Clean up data-unify attributes from final output
+    */
+   cleanupDataUnifyAttributes(html) {
+
     // Remove data-unify attributes with both double and single quotes
-    return html.replace(/\s*data-unify\s*=\s*["'][^"']*["']/g, '');
+    // Improved regex to handle nested quotes correctly
+    return html.replace(/\s*data-unify\s*=\s*("[^"]*"|'[^']*')/g, '');
   }
 
   /**
@@ -222,7 +271,7 @@ export class HtmlProcessor {
     const issues = [];
     
     // Check for remaining data-unify attributes
-    const dataUnifyMatches = html.match(/data-unify\s*=\s*["'][^"']*["']/g);
+    const dataUnifyMatches = html.match(/data-unify\s*=\s*("[^"]*"|'[^']*')/g);
     if (dataUnifyMatches) {
       issues.push({
         type: 'data-unify-cleanup',

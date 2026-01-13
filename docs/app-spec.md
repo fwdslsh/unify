@@ -98,10 +98,16 @@ Unify processes specific data attributes and HTML elements during build to enabl
 ### Special Processing Rules
 
 - **Attribute Removal**: `data-unify` and `data-layer` attributes are stripped from final output
-- **Path Resolution**: All `data-unify` paths support both absolute/relative file paths and short name resolution
+- **Path Resolution**: All `data-unify` paths support both absolute/relative file paths and short name resolution (use leading `/` for shared includes to avoid nested path surprises)
 - **Nested Composition**: Layout and component imports work recursively
 - **Area Matching**: Content replaces areas per DOM Cascade v1 matching precedence
 - **Attribute Merging**: Host element attributes merge with page content per DOM Cascade v1 rules
+
+### Authoring Quick Rules (clarity)
+- Put `data-unify` on `<html>` for layouts (preferred) and on component roots for inline imports. Avoid mixing it on `<body>` and `<html>` simultaneously.
+- Layouts should pull shared head/nav/footer/scripts via `data-unify="/path"`; plain `<include>` without `data-unify` is not composed.
+- Use absolute paths (start with `/`) for shared fragments; relative paths may break from nested pages.
+- Slots: use `<template data-slot="name">` in pages to supply head/meta/styles/CTA blocks, and layout authors expose `<div data-slot="name">` or `<template data-slot="name">` placeholders.
 
 ## Core Functionality
 

@@ -57,6 +57,9 @@ export class ServeCommand {
         ...options
       };
 
+      // Track verbosity for request logging
+      this.verbose = !!serveOptions.verbose;
+
       this.logger.info('Starting development server', {
         source: serveOptions.source,
         output: serveOptions.output,
@@ -327,16 +330,22 @@ export class ServeCommand {
   async _handleRequest(req, options) {
     const url = new URL(req.url);
     const pathname = url.pathname;
+    const start = Date.now();
 
     try {
       // Handle Server-Sent Events endpoint for live reload
       if (pathname === '/__events') {
-        return this._handleSSERequest(req);
+        const res = this._handleSSERequest(req);
+        this._logRequest(pathname, 200, Date.now() - start);
+        return res;
       }
 
       // Serve static files from output directory
-      return await this._serveStaticFile(pathname, options.output);
+      const res = await this._serveStaticFile(pathname, options.output);
+      this._logRequest(pathname, res.status || 0, Date.now() - start);
+      return res;
     } catch (error) {
+      this._logRequest(pathname, 500, Date.now() - start, error.message);
       this.logger.error('Request handling error', { 
         pathname, 
         error: error.message 
@@ -352,6 +361,17 @@ export class ServeCommand {
    * @returns {Response} SSE response
    */
   _handleSSERequest(req) {
+    // Enforce a small cap on concurrent SSE clients to avoid runaway connections
+    // on repeated navigation/reloads in dev. Drop oldest if exceeding cap.
+    const MAX_SSE_CLIENTS = 8;
+    while (this.sseClients.size >= MAX_SSE_CLIENTS) {
+      const oldest = this.sseClients.values().next().value;
+      try { oldest?.close?.(); } catch (_) {}
+      this.sseClients.delete(oldest);
+    }
+
+    this.logger.info('SSE connect', { activeClients: this.sseClients.size + 1 });
+
     // Create SSE response stream
     let controller;
     const self = this; // Capture 'this' context for use in stream callbacks
@@ -371,12 +391,14 @@ export class ServeCommand {
         // Clean up when client disconnects
         if (self.sseClients.has(controller)) {
           self.sseClients.delete(controller);
+          self.logger.info('SSE disconnect', { activeClients: self.sseClients.size });
         }
       }
     });
 
     // Store client for broadcasting updates
     this.sseClients.add(controller);
+    this.logger.info('SSE added', { activeClients: this.sseClients.size });
 
     // Return SSE response
     return new Response(stream, {
@@ -410,7 +432,16 @@ export class ServeCommand {
     }
     
     // Normalize pathname and prevent directory traversal
-    let filePath = decodedPathname === '/' ? '/index.html' : decodedPathname;
+    // Support directory-style URLs by appending index.html when path ends with '/'
+    let filePath;
+    if (decodedPathname === '/') {
+      filePath = '/index.html';
+    } else if (decodedPathname.endsWith('/')) {
+      filePath = `${decodedPathname}index.html`;
+    } else {
+      filePath = decodedPathname;
+    }
+
     if (filePath.startsWith('/')) {
       filePath = filePath.slice(1);
     }
@@ -437,16 +468,24 @@ export class ServeCommand {
       // Check if file exists using file object
       const fileExists = await file.exists();
       if (!fileExists) {
-        // If requesting root and file doesn't exist, it might be a directory
-        if (decodedPathname === '/') {
-          // Try to serve index.html from directory
-          const indexPath = join(outputDir, 'index.html');
-          const indexFile = this.fileFactory(indexPath);
-          const indexExists = await indexFile.exists();
-          if (indexExists) {
-            return await this._createFileResponse(indexFile, 'index.html');
+        // Fallback: if requesting a path without extension, try appending .html first
+        if (!filePath.includes('.')) {
+          const htmlFallbackPath = join(outputDir, `${filePath}.html`);
+          const htmlFallbackFile = this.fileFactory(htmlFallbackPath);
+          if (await htmlFallbackFile.exists()) {
+            this.logger.info('Serve fallback .html', { request: filePath, target: `${filePath}.html` });
+            return await this._createFileResponse(htmlFallbackFile, `${filePath}.html`);
+          }
+
+          // Then try directory-style index.html
+          const indexFallbackPath = join(outputDir, filePath, 'index.html');
+          const indexFallbackFile = this.fileFactory(indexFallbackPath);
+          if (await indexFallbackFile.exists()) {
+            this.logger.info('Serve fallback index', { request: filePath, target: `${filePath}/index.html` });
+            return await this._createFileResponse(indexFallbackFile, `${filePath}/index.html`);
           }
         }
+        this.logger.warn('Serve 404', { request: filePath });
         return new Response('Not Found', { status: 404 });
       }
 
@@ -455,9 +494,11 @@ export class ServeCommand {
     } catch (error) {
       // Handle file read errors
       if (error.code === 'ENOENT') {
+        this.logger.warn('Serve ENOENT', { request: filePath });
         return new Response('Not Found', { status: 404 });
       }
       
+      this.logger.error('Serve fs error', { request: filePath, error: error.message });
       // Return 500 for other file system errors
       return new Response('Internal Server Error', { status: 500 });
     }
@@ -528,28 +569,44 @@ export class ServeCommand {
     const liveReloadScript = `
     <script>
       (function() {
-        console.log('[Unify] Live reload enabled');
         const eventSource = new EventSource('/__events');
+        let lastPing = Date.now();
+        const log = (...args) => console.debug('[Unify]', ...args);
+
+        const heartbeat = setInterval(() => {
+          if (Date.now() - lastPing > 30000) {
+            log('Live reload heartbeat stale, reopening');
+            try { eventSource.close(); } catch (_) {}
+            window.location.reload();
+          }
+        }, 10000);
         
         eventSource.onopen = function() {
-          console.log('[Unify] Connected to live reload server');
+          log('Connected to live reload server');
+          lastPing = Date.now();
         };
         
         eventSource.onmessage = function(event) {
+          lastPing = Date.now();
           try {
             const data = JSON.parse(event.data);
             if (data.type === 'reload') {
-              console.log('[Unify] Reloading page due to file changes:', data.changedFiles);
+              log('Reloading page due to file changes:', data.changedFiles);
               window.location.reload();
             }
           } catch (e) {
-            console.warn('[Unify] Invalid message from live reload server:', event.data);
+            log('Invalid message from live reload server:', event.data);
           }
         };
         
         eventSource.onerror = function() {
-          console.warn('[Unify] Live reload connection error - will retry automatically');
+          log('Live reload connection error - will retry automatically');
         };
+
+        window.addEventListener('beforeunload', () => {
+          clearInterval(heartbeat);
+          try { eventSource.close(); } catch (_) {}
+        });
       })();
     </script>`;
 
@@ -682,5 +739,10 @@ export class ServeCommand {
       connectedClients: this.sseClients.size,
       buildInProgress: this.buildInProgress
     };
+  }
+
+  _logRequest(pathname, status, durationMs, error) {
+    // Always log; dev server hangs are easier to diagnose with per-request visibility
+    this.logger.info('http', { pathname, status, durationMs, error, sseClients: this.sseClients.size });
   }
 }
