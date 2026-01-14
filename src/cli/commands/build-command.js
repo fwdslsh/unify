@@ -256,7 +256,18 @@ export class BuildCommand {
       this._failOnTypes = options.failOn || [];
       this._securityWarnings = [];
       this._recoverableErrors = [];
-      
+
+      // Configure file classifier with glob patterns BEFORE processing files
+      this.fileClassifier.configureGlobPatterns({
+        copy: options.copy || [],
+        ignore: options.ignore || [],
+        ignoreRender: options.ignoreRender || [],
+        ignoreCopy: options.ignoreCopy || [],
+        render: options.render || [],
+        autoIgnore: options.autoIgnore !== false,
+        defaultLayout: options.defaultLayout || []
+      });
+
       // Use PathValidator for proper security validation
       this.validateOptions(options, this.pathValidator);
       
@@ -319,9 +330,12 @@ export class BuildCommand {
       // 5. Copy only referenced assets (per spec: "Asset reference tracking ensures only used assets are copied")
       // TODO: Implement implicit assets/** copying and --copy patterns properly
       const referencedAssetResults = await this.assetCopier.copyAllAssets(options.source, options.output);
+
+      // 6. Copy files matching --copy patterns (these are explicitly requested copies, even if not referenced)
+      const copyPatternResults = await this._copyFilesMatchingPatterns(options.source, options.output);
       
       // Asset counts
-      result.assetsCopied = (referencedAssetResults.successCount || 0);
+      result.assetsCopied = (referencedAssetResults.successCount || 0) + (copyPatternResults.successCount || 0);
 
       // Add warnings for asset issues
       if (referencedAssetResults.results) {
@@ -1140,6 +1154,68 @@ ${markdownResult.headHtml}
             // Copy the file
             copyFileSync(sourcePath, outputPath);
             
+            copiedCount++;
+            results.push({ success: true, assetPath: sourcePath, outputPath });
+          } catch (error) {
+            results.push({ success: false, assetPath: sourcePath, error: error.message });
+          }
+        }
+      }
+
+      return {
+        successCount: copiedCount,
+        results
+      };
+    } catch (error) {
+      return {
+        successCount: 0,
+        results: [{ success: false, error: error.message }]
+      };
+    }
+  }
+
+  /**
+   * Copy files that match configured copy patterns (even if not referenced)
+   * @private
+   * @param {string} sourceRoot - Source root directory
+   * @param {string} outputRoot - Output root directory
+   * @returns {Promise<{successCount: number, results: Array}>} Copy results
+   */
+  async _copyFilesMatchingPatterns(sourceRoot, outputRoot) {
+    try {
+      // Check if fileClassifier has glob processor configured with copy patterns
+      if (!this.fileClassifier._globProcessor) {
+        return { successCount: 0, results: [] };
+      }
+
+      const copyPatterns = this.fileClassifier._globProcessor.patterns.copy;
+      if (!copyPatterns || copyPatterns.length === 0) {
+        return { successCount: 0, results: [] };
+      }
+
+      // Get all files in source directory
+      const files = await this._getFilesInDirectory(sourceRoot);
+      let copiedCount = 0;
+      const results = [];
+
+      for (const sourcePath of files) {
+        // Convert to relative path for pattern matching
+        const relativePath = relative(sourceRoot, sourcePath);
+
+        // Check if this file matches any copy pattern
+        const matchesCopyPattern = this.fileClassifier._globProcessor.matchesPattern(relativePath, 'copy');
+
+        if (matchesCopyPattern) {
+          const outputPath = join(outputRoot, relativePath);
+
+          try {
+            // Ensure output directory exists
+            const outputDir = dirname(outputPath);
+            mkdirSync(outputDir, { recursive: true });
+
+            // Copy the file
+            copyFileSync(sourcePath, outputPath);
+
             copiedCount++;
             results.push({ success: true, assetPath: sourcePath, outputPath });
           } catch (error) {
