@@ -1554,21 +1554,25 @@ export class UnifyProcessor {
 
     // Fix DOCTYPE case - normalize to lowercase as expected by fixtures
     formatted = formatted.replace(/<!DOCTYPE html>/gi, '<!doctype html>');
-
+    
     // First pass: Add strategic newlines only where needed
     formatted = formatted
-      // Add newlines before major block elements
-      .replace(/(<(html|head|body|main|header|footer|nav|aside|section|article|div|form|fieldset)[^>]*>)/gi, '\n$1')
-      // Add newlines after major block elements
-      .replace(/(<\/(html|head|body|main|header|footer|nav|aside|section|article|div|form|fieldset)>)/gi, '$1\n')
+      // Add newlines before major block elements if they don't have one
+      .replace(/(>)\s*(<(html|head|body|main|header|footer|nav|aside|section|article|div|form|fieldset)[^>]*>)/gi, '$1\n$2')
+      // Add newlines after major block closing tags if they don't have one
+      .replace(/(<\/(html|head|body|main|header|footer|nav|aside|section|article|div|form|fieldset)>)\s*(<)/gi, '$1\n$3')
       // Add newlines before head elements but keep them inline
-      .replace(/(<(meta|link)[^>]*>)/gi, '\n$1')
+      .replace(/(>)\s*(<(meta|link)[^>]*>)/gi, '$1\n$2')
       // Handle script and style tags specially - add newlines around them
-      .replace(/(<(script|style)[^>]*>)([\s\S]*?)(<\/\2>)/gi, '\n$1$3$4\n');
+      .replace(/(>)\s*(<(script|style)[^>]*>)/gi, '$1\n$2')
+      .replace(/(<\/(script|style)>)\s*(<)/gi, '$1\n$3');
 
     // Second pass: Process lines for indentation
     const lines = formatted.split('\n');
     const indentedLines = [];
+    
+    // Reset indent for safety
+    indent = 0;
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
@@ -1577,8 +1581,11 @@ export class UnifyProcessor {
         continue; // Skip empty lines
       }
 
-      // Decrease indent for closing tags
-      if (line.startsWith('</')) {
+      // Check if this is a closing tag
+      const isClosingTag = line.startsWith('</');
+      
+      // Decrease indent for closing tags BEFORE adding indentation
+      if (isClosingTag) {
         indent = Math.max(0, indent - indentSize);
       }
 
@@ -1586,9 +1593,32 @@ export class UnifyProcessor {
       const indentedLine = ' '.repeat(indent) + line;
       indentedLines.push(indentedLine);
 
-      // Increase indent for opening tags (but not self-closing or inline content)
-      if (line.startsWith('<') && !line.startsWith('</') && !line.endsWith('/>') && !this.isSelfClosingTag(line) && !this.isInlineElement(line)) {
-        indent += indentSize;
+      // Increase indent for opening tags (but not self-closing, inline content, comments, or doctype)
+      // AND NOT if it's a closing tag (handled above)
+      if (!isClosingTag && line.startsWith('<') && !line.endsWith('/>') && 
+          !this.isSelfClosingTag(line) && 
+          !this.isInlineElement(line) && 
+          !line.startsWith('<!--') && 
+          !line.toLowerCase().startsWith('<!doctype')) {
+        
+        // Look ahead to see if the next line is a closing tag for this element
+        // If so, don't increase indent (it's a one-liner block or empty block)
+        let skipIndent = false;
+        if (i + 1 < lines.length) {
+          const nextLine = lines[i + 1].trim();
+          const tagNameMatch = line.match(/^<([a-zA-Z0-9-]+)/);
+          if (tagNameMatch) {
+            const tagName = tagNameMatch[1];
+            // Check for exact closing tag or closing tag with spaces
+            if (nextLine === `</${tagName}>` || nextLine.startsWith(`</${tagName}>`)) {
+               skipIndent = true;
+            }
+          }
+        }
+        
+        if (!skipIndent) {
+          indent += indentSize;
+        }
       }
     }
 
