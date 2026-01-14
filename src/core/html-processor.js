@@ -1540,7 +1540,15 @@ export class UnifyProcessor {
       return html || '';
     }
 
-    let formatted = html;
+    // PROTECT PRE BLOCKS: Extract them before any formatting occurs
+    // This ensures their internal whitespace is preserved byte-for-byte
+    const preBlocks = [];
+    const protectedHtml = html.replace(/(<pre[^>]*>[\s\S]*?<\/pre>)/gi, (match) => {
+      preBlocks.push(match);
+      return `<!--__UNIFY_PRE_BLOCK_${preBlocks.length - 1}__-->`;
+    });
+
+    let formatted = protectedHtml;
     let indent = 0;
     const indentSize = 4; // 4 spaces per indent level
 
@@ -1584,7 +1592,17 @@ export class UnifyProcessor {
       }
     }
 
-    return indentedLines.join('\n');
+    let result = indentedLines.join('\n');
+
+    // RESTORE PRE BLOCKS: Inject the original content back
+    // The placeholder itself is indented, so the first line of the <pre> block will respect that indentation.
+    // Subsequent lines of the <pre> block will retain their relative formatting from the source.
+    preBlocks.forEach((block, index) => {
+      const placeholder = `<!--__UNIFY_PRE_BLOCK_${index}__-->`;
+      result = result.replace(placeholder, block);
+    });
+
+    return result;
   }
 
   /**
