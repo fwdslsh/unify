@@ -112,6 +112,7 @@ Built result: the layout, with its `<main>` content replaced by the page's body,
 ---
 title: About — My Site
 description: Who we are
+og:image: /assets/team.jpg
 ---
 
 # About
@@ -165,7 +166,7 @@ All replaceable areas use the `unify-` class prefix, and the only attribute is `
 
 ### 3.4 Markdown
 
-Markdown pages are equal citizens: converted to HTML, then processed by the same layout rules as any page. Frontmatter keys for MVP: `title`, `description` (→ `<meta name="description">`), and `layout`. Anything else in frontmatter is ignored with a warning. Markdown output filenames swap `.md` for `.html`.
+Markdown pages are equal citizens: converted to HTML, then processed by the same layout rules as any page. Frontmatter keys: `title` sets the `<title>`, `layout` picks the layout (§3.2), and any other key becomes a `<meta>` tag on the page — `property="…"` if the key contains a colon (`og:image: /photos/cover.jpg`), `name="…"` otherwise (`description`, `author`). Synthesized tags merge with the layout's head by the §3.2 rules — page wins. Markdown output filenames swap `.md` for `.html`.
 
 ---
 
