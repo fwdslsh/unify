@@ -25,7 +25,7 @@ If a capability cannot be expressed with these four, it does not belong in unify
 **Design rules that govern every feature decision:**
 
 1. **Explainable in one sentence** to someone who knows only HTML and CSS. If a rule needs a diagram, it's out.
-2. **Every source file is valid HTML.** Layouts are complete pages (their default content is their preview); pages are complete pages; no template holes, no unbalanced fragments. Authoring preview is a web server at the source root — `unify serve`, or any static server or editor live-server — plus the browser polyfill (§6) for composition. `file://` double-click is not a supported preview.
+2. **Every source file is valid HTML.** Layouts are complete pages (their default content is their preview); pages are complete pages; no template holes, no unbalanced fragments. Authoring preview is any web server at the source root (an editor live-server, `bunx live-server`) plus the browser polyfill (§6) for composition; the built site previews the same way over `dist/`. `file://` double-click is not a supported preview.
 3. **Polyfill-able**: the entire composition model must be implementable by a small (~200-line) browser script that produces the same DOM at design time as the CLI produces at build time. The polyfill is the complexity budget — any rule too intricate to live in it is too intricate to ship.
 4. **Zero configuration.** Conventions, not config files.
 
@@ -37,8 +37,9 @@ This walkthrough is the product. Every release must keep it true, and the end-to
 
 ```bash
 unify init          # scaffold a starter site in the current directory
-unify serve         # build + local server + live reload
-# …edit files, browser refreshes…
+unify watch         # build + rebuild on every save (prints a serve hint)
+# …in another terminal: bunx live-server dist — or your editor's live preview
+# …edit, save, browser reloads…
 unify build         # write the final site to dist/
 # upload dist/ anywhere: GitHub Pages, Netlify, a $3 shared host
 ```
@@ -181,8 +182,7 @@ Write paths that are correct for the file you're editing — relative (`hero.jpg
 
 ```
 unify [build]              build the site (default command)
-unify serve                build + dev server + live reload
-unify watch                build + rebuild on change (no server)
+unify watch                build + rebuild on change; pair with any static file server (see notes)
 unify init [template]      scaffold a starter site (default, basic, blog, docs, portfolio)
 
 Options:
@@ -191,8 +191,6 @@ Options:
       --clean              empty the output directory first
       --pretty-urls        about.html → about/index.html, and rewrite internal links to match
       --base-url <path>    site is served from a subpath (e.g. /repo-name/): prefix root-relative links in the output
-  -p, --port <n>           dev server port (default: 3000)
-      --host <host>        dev server host (default: localhost)
   -v, --version            print version
   -h, --help               print help
 ```
@@ -202,7 +200,9 @@ That is the entire CLI. Behavior notes:
 - **File handling**: `.html`/`.md` files are pages (processed). Pages and directories starting with `_` are never emitted — that is what keeps layouts, fragments, and drafts out of the site. Any other `_`-named file (Netlify's `_redirects`, for example) is an ordinary file. **Everything else is copied through as-is**, mirroring the source tree — what you see in your folder is what ships, bytes untouched — compress images before adding them. The output directory is always excluded from scanning.
 - **Subpath hosting.** GitHub Pages project sites serve from `username.github.io/repo-name/`, where root-relative links would break. `--base-url /repo-name/` prefixes root-relative URLs (`href`, `src`, `srcset`) in the built HTML; source files stay rooted at `/`, so local preview keeps working. `--base-url` also accepts a full URL (`https://example.com/`): the origin absolutizes URL values in `og:`/`twitter:` metas and `rel="canonical"`, which crawlers require to be absolute.
 - **Pretty URLs move pages, never assets.** Every reference in a moved page — `href`, `src`, `srcset` — is rewritten to keep pointing at the same target, so `![diagram](diagram.png)` beside a Markdown page keeps working.
-- **Full rebuilds everywhere.** `serve` and `watch` rebuild the whole site on every change. No cache, no incremental machinery — plain HTML processing is fast enough for this audience, and identical behavior across commands is worth more than milliseconds.
+- **No dev server — the inner loop is `watch` plus any static server.** Serving files with live reload is a solved problem (VS Code Live Preview, `bunx live-server dist`, Vite, caddy); unify's job is to make every such tool work flawlessly by keeping the output directory watcher-friendly. On startup, `watch` prints a copy-paste serve suggestion.
+- **The watch contract.** Saves are coalesced into one rebuild; a save landing mid-rebuild queues exactly one follow-up — no change is ever dropped. Every rebuild is a full rebuild (no cache, no incremental machinery — plain HTML is fast enough, and it guarantees watch output is always identical to a fresh `unify build`). Writes are minimal and atomic: a file whose content didn't change is not rewritten (external watchers see exactly what changed — no reload storms), outputs land via temp-then-rename (a server never reads a half-written file), deletions are precise, and `--clean` applies only at startup.
+- **Broken builds show in the browser.** In watch mode, a page that fails to build is emitted as a default error page carrying the located error and details — the serving tool's reload puts the diagnosis in front of you, and the next successful rebuild replaces it. `unify build` never emits error pages: errors warn and fail the exit code (below).
 - **Errors are loud and located.** A missing include or layout produces a warning naming the file and the reference; the page still builds (dev-friendly); the process exits non-zero if any errors occurred (CI-friendly). Silent failure is a bug by definition. After every build, internal references are checked against the emitted files: a link, image, or asset that resolves to nothing — a renamed page, an image left inside an underscore folder, a path whose case doesn't match — produces a warning naming the page and the reference, and counts as an error for the exit code.
 - **Install story leads with the binary.** The headline install is the standalone single-file executable (Linux/macOS/Windows) — the audience has never heard of Bun and shouldn't need to. Bun/npm installs are the secondary, developer path. Bun is the only supported runtime; no Node/Deno claims.
 
@@ -215,6 +215,7 @@ Things unify deliberately does not do, even if asked:
 - **No JavaScript in the output, ever.** The built site is HTML and CSS.
 - **No templating language.** No variables, loops, conditionals, or expressions in HTML. The moment unify grows a DSL it has become the thing it exists to escape. The visible costs, accepted with eyes open: the footer year is edited once a year, in one include; list pages are maintained by hand (the blog template models it — publishing a post is adding one line to `index.html`); and every HTML page carries the standard document skeleton, while Markdown pages don't. If one of these costs becomes unbearable at real scale, that is the demonstrated demand the collections bullet below waits for.
 - **No configuration files.** If a behavior needs a config file to explain itself, the behavior is wrong.
+- **No dev server.** Serving static files with live reload is a solved problem; unify refuses to re-solve it. `unify watch` plus the author's server of choice is the inner loop (§4).
 - **No component framework.** No props, no attribute-merge semantics, no scoped component imports with override contracts. Fragments (includes) plus layout areas cover the audience's need.
 - **No governance machinery.** No linter rule codes, no contract/documentation blocks, no semver-guarded selector APIs.
 - **No security theater.** Path traversal safety in include resolution is internal engineering, always on, invisible. unify does not scan the author's own HTML for "vulnerabilities" or gate builds on it.
@@ -231,6 +232,7 @@ Things unify deliberately does not do, even if asked:
 4. **HTML minification** (`--minify`).
 5. More and better `init` templates.
 6. **Markdown include shorthand** — a Markdown-native spelling of `<include>`, considered if real authoring demand appears.
+7. **A built-in dev server** — only if real users find pairing `watch` with an external server to be genuine friction; the watch contract (§4) is designed to make this unnecessary.
 
 ---
 
@@ -243,7 +245,7 @@ How the current repository maps to this spec. This is the work plan's table of c
 - The cascade engine core (`UnifyProcessor`): area matching, head merge, layout chaining — reduced to the four rules in §3.2.
 - `<include>` inlining and the SSI processor (legacy alias).
 - Markdown pipeline (`markdown-it`, `gray-matter`) trimmed to §3.4 frontmatter.
-- Dev server with SSE live reload; file watcher.
+- The file watcher, rebuilt around the §4 watch contract.
 - `init` command (repaired: positional template argument, genuinely distinct templates).
 - Path-traversal validation as invisible internal safety.
 - Standalone binary builds — promoted to the headline install.
@@ -252,6 +254,7 @@ How the current repository maps to this spec. This is the work plan's table of c
 ### Cut
 
 - All slot/`<template>`/`data-slot` documentation and claims (the feature does not exist).
+- The `serve` command, dev server, and SSE live-reload layer — serving is delegated to external tooling (§4/§5).
 - Component mode, the attribute-merge matrix, ID-stability/ARIA rewriting.
 - DOM Cascade linter, rules U001–U008, `--fail-on`, `--fail-level`.
 - Security scanner and `[SECURITY]` build gates.
@@ -271,6 +274,7 @@ How the current repository maps to this spec. This is the work plan's table of c
 5. Default-slot behavior exactly per §3.2 rule 2.
 6. Honest packaging: version string, working `package.json` scripts, Bun floor stated once, README rewritten to teach only this spec.
 7. An end-to-end test suite that builds the §2 quickstart site (plus a small fixture site per §3 rule) and asserts the output — the suite that makes the golden path unbreakable.
+8. The `watch` contract (§4): coalesced full rebuilds, skip-unchanged atomic writes, precise deletions, watch-mode error pages, and the startup serve hint. Verified by an equivalence test (watch output after any edit sequence ≡ fresh build) and a byte-stability test (a no-op rebuild writes nothing).
 
 ---
 
