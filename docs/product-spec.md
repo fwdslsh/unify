@@ -191,8 +191,7 @@ Options:
   -s, --source <dir>       source directory (default: src/ if it exists, else .)
   -o, --output <dir>       output directory (default: dist)
       --clean              empty the output directory first
-      --exclude <glob>     add to the exclude set: never emitted, still usable by the build (repeatable)
-      --no-default-excludes  drop the built-in underscore exclusion; your exclude patterns are the whole set
+      --exclude <glob>     globs never emitted, still usable by the build (repeatable; default: _*)
       --pretty-urls        about.html → about/index.html, and rewrite internal links to match
       --base-url <path>    site is served from a subpath (e.g. /repo-name/): prefix root-relative links in the output
       --dry-run            run the full build and every check, print the report, write nothing
@@ -203,7 +202,7 @@ Options:
 
 That is the entire CLI. Behavior notes:
 
-- **File handling**: `.html`/`.md` files are pages (processed). **Everything else is copied through as-is**, mirroring the source tree — what you see in your folder is what ships, bytes untouched — compress images before adding them. One mechanism holds files back: the **exclude set**. Excluded files are never emitted but remain build material — includable, usable as layouts. Its default members: pages and directories starting with `_` — the underscore convention — which is what keeps layouts, fragments, and drafts out of the site (any other `_`-named file — Netlify's `_redirects`, say — is ordinary and ships). `--exclude <glob>` extends the set, for names you can't underscore (`--exclude "*.psd"`, a synced `design/` folder); `--no-default-excludes` drops the underscore default for sites that want a different scheme entirely. Links to anything not emitted are caught by the reference check like any other broken reference. The output directory is always excluded, regardless.
+- **File handling**: `.html`/`.md` files are pages (processed). **Everything else is copied through as-is**, mirroring the source tree — what you see in your folder is what ships, bytes untouched — compress images before adding them. One option holds files back: `--exclude`, a set of globs whose matches are never emitted but remain build material — includable, usable as layouts. Its default is `_*`, which is what keeps layouts, fragments, and drafts out of the site; set your own globs and they replace the default, like any option (keep `_*` in your list if you still want it). Links to anything not emitted are caught by the reference check like any other broken reference. The output directory is always excluded.
 - **`unify.yaml` is saved flags, nothing more.** Every option above may live in an optional `unify.yaml` at the source root — same names, same meanings, CLI wins on conflict — so local runs and CI share one committed invocation instead of retyping flags. No behavior exists that only the file can express; delete it and pass flags instead, and nothing changes. `init` does not create one, and the file itself never ships to output.
 - **Subpath hosting.** GitHub Pages project sites serve from `username.github.io/repo-name/`, where root-relative links would break. `--base-url /repo-name/` prefixes root-relative URLs (`href`, `src`, `srcset`) in the built HTML; source files stay rooted at `/`, so local preview keeps working. `--base-url` also accepts a full URL (`https://example.com/`): the origin absolutizes URL values in `og:`/`twitter:` metas and `rel="canonical"`, which crawlers require to be absolute.
 - **Pretty URLs move pages, never assets.** Every reference in a moved page — `href`, `src`, `srcset` — is rewritten to keep pointing at the same target, so `![diagram](diagram.png)` beside a Markdown page keeps working.
