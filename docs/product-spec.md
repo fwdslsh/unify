@@ -156,7 +156,7 @@ A layout may itself declare `data-unify` to chain into a parent layout (section 
 1. **Areas.** A layout element with a `unify-*` class is a *public area*. A page element carrying the same class replaces that area's **children** (the layout element itself, its tag and attributes, stays). If a page supplies the same area class more than once, their contents are concatenated in page order. An area class should appear once per layout; duplicates produce a warning and the first is used.
 2. **Default slot.** Page body content not addressed to any area replaces the children of the layout's `<main>`. A layout that defines no `<main>` and no areas passes pages through unchanged (with a warning).
 3. **Head merge.** Start with the layout's `<head>`. The page's `<title>` is prepended to the layout's, joined with a space — layout `<title>My Site</title>` plus page `<title>Home —</title>` emits `<title>Home — My Site</title>` — so the site name lives in one file; a page with no title keeps the layout's alone. A page `<meta>` replaces a layout `<meta>` with the same `name`/`property`; other page head elements are appended after the layout's, so page CSS loads last and wins the cascade. Exact-duplicate stylesheet/script URLs are deduplicated. A page `<meta charset>` is dropped in favor of the layout's (which stays first in the head), with a located warning.
-4. **Body classes.** Classes on the page's `<body>` are added to the layout's `<body>` (so pages can hook per-page CSS like `class="home"`). No other attribute merging exists.
+4. **Root attributes.** On `<html>` and `<body>`, the page's classes are added to the layout's, and any other attribute the page explicitly sets wins over the layout's — so a page can carry `class="home"` styling hooks or set its own `lang`, `dir`, or `data-theme`. Attribute merging exists nowhere else: an area element keeps the layout's tag and attributes.
 
 Edge rules, for determinism: layout chains compose pairwise — the page merges into its layout by these four rules, and that result merges into the parent layout the same way, so heads and body classes accumulate up the chain. A page area class that matches no layout area is a located warning, and its content flows to the default slot instead — content is never silently dropped. If the layout has areas but no `<main>`, unaddressed page content is omitted with a located warning naming the fix (add `<main>` or an area). Duplicate `<main>` elements in a layout: the first wins, with a warning.
 
@@ -172,7 +172,7 @@ All replaceable areas use the `unify-` class prefix, and the only attribute is `
 
 ### 3.4 Markdown
 
-Markdown pages are equal citizens: converted to HTML, then processed by the same layout rules as any page. Frontmatter keys: `title` sets the page's `<title>` (prepended to the layout's, §3.2), `layout` picks the layout (§3.2), `class` adds classes to the page's `<body>` (§3.2 rule 4 — so Markdown pages can use the body-class styling recipe), and any other key becomes a `<meta name="…" content="…">` tag (`description`, `author`, `robots`). Namespaced metadata is a nested block, plain YAML: keys under `og:` become `<meta property="og:image" …>` tags (`property=` is what Facebook's crawler reads); keys under any other block — `twitter:`, say — become `name=` tags (`twitter:card`). Synthesized tags merge with the layout's head by the §3.2 rules — page wins. Markdown output filenames swap `.md` for `.html`.
+Markdown pages are equal citizens: converted to HTML, then processed by the same layout rules as any page. Frontmatter keys: `title` sets the page's `<title>` (prepended to the layout's, §3.2), `layout` picks the layout (§3.2), `class` adds classes to the page's `<body>`, `lang` and `dir` set those attributes on `<html>` (all via §3.2 rule 4), and any other key becomes a `<meta name="…" content="…">` tag (`description`, `author`, `robots`). Namespaced metadata is a nested block, plain YAML: keys under `og:` become `<meta property="og:image" …>` tags (`property=` is what Facebook's crawler reads); keys under any other block — `twitter:`, say — become `name=` tags (`twitter:card`). Synthesized tags merge with the layout's head by the §3.2 rules — page wins. Markdown output filenames swap `.md` for `.html`.
 
 ### 3.5 URLs
 
@@ -191,6 +191,7 @@ Options:
   -s, --source <dir>       source directory (default: src/ if it exists, else .)
   -o, --output <dir>       output directory (default: dist)
       --clean              empty the output directory first
+      --exclude <glob>     leave matching source files out of the build entirely (repeatable)
       --pretty-urls        about.html → about/index.html, and rewrite internal links to match
       --base-url <path>    site is served from a subpath (e.g. /repo-name/): prefix root-relative links in the output
       --dry-run            run the full build and every check, print the report, write nothing
@@ -201,7 +202,8 @@ Options:
 
 That is the entire CLI. Behavior notes:
 
-- **File handling**: `.html`/`.md` files are pages (processed). Pages and directories starting with `_` are never emitted — that is what keeps layouts, fragments, and drafts out of the site. Any other `_`-named file (Netlify's `_redirects`, for example) is an ordinary file. **Everything else is copied through as-is**, mirroring the source tree — what you see in your folder is what ships, bytes untouched — compress images before adding them. The output directory is always excluded from scanning.
+- **File handling**: `.html`/`.md` files are pages (processed). Pages and directories starting with `_` are never emitted — that is what keeps layouts, fragments, and drafts out of the site. Any other `_`-named file (Netlify's `_redirects`, for example) is an ordinary file. **Everything else is copied through as-is**, mirroring the source tree — what you see in your folder is what ships, bytes untouched — compress images before adding them. `--exclude` handles what the underscore can't: working files you can't rename (`--exclude "*.psd"`, a synced `design/` folder). The output directory is always excluded from scanning.
+- **`unify.yaml` is saved flags, nothing more.** Every option above may live in an optional `unify.yaml` at the source root — same names, same meanings, CLI wins on conflict — so local runs and CI share one committed invocation instead of retyping flags. No behavior exists that only the file can express; delete it and pass flags instead, and nothing changes. `init` does not create one, and the file itself never ships to output.
 - **Subpath hosting.** GitHub Pages project sites serve from `username.github.io/repo-name/`, where root-relative links would break. `--base-url /repo-name/` prefixes root-relative URLs (`href`, `src`, `srcset`) in the built HTML; source files stay rooted at `/`, so local preview keeps working. `--base-url` also accepts a full URL (`https://example.com/`): the origin absolutizes URL values in `og:`/`twitter:` metas and `rel="canonical"`, which crawlers require to be absolute.
 - **Pretty URLs move pages, never assets.** Every reference in a moved page — `href`, `src`, `srcset` — is rewritten to keep pointing at the same target, so `![diagram](diagram.png)` beside a Markdown page keeps working.
 - **No dev server — the inner loop is `watch` plus any static server.** Serving files with live reload is a solved problem (VS Code Live Preview, `bunx live-server dist`, Vite, caddy); unify's job is to make every such tool work flawlessly by keeping the output directory watcher-friendly. On startup, `watch` prints a copy-paste serve suggestion.
@@ -220,7 +222,7 @@ Things unify deliberately does not do, even if asked:
 
 - **unify adds no JavaScript, ever.** Authors may write and ship whatever scripts they like — script files copy through byte-for-byte and `<script>` tags survive composition untouched (§3.2 head merge dedupes only exact-duplicate tags). What never happens: unify injecting, generating, or rewriting JS. No runtime, no hydration, no helper snippets — the output contains exactly the JavaScript the author wrote and not one byte more.
 - **No templating language.** No variables, loops, conditionals, or expressions in HTML. The moment unify grows a DSL it has become the thing it exists to escape. The visible costs, accepted with eyes open: the footer year is edited once a year, in one include; list pages are maintained by hand (the blog template models it — publishing a post is adding one line to `index.html`); and every HTML page carries the standard document skeleton, while Markdown pages don't. If one of these costs becomes unbearable at real scale, that is the demonstrated demand the collections bullet below waits for.
-- **No configuration files.** If a behavior needs a config file to explain itself, the behavior is wrong.
+- **No configuration language.** `unify.yaml` is optional and is nothing but saved CLI flags (§4). No behavior may exist that only a config file can express — if a feature needs real configuration to explain itself, the feature is wrong.
 - **No dev server.** Serving static files with live reload is a solved problem; unify refuses to re-solve it. `unify watch` plus the author's server of choice is the inner loop (§4).
 - **No component framework.** No props, no attribute-merge semantics, no scoped component imports with override contracts. Fragments (includes) plus layout areas cover the audience's need.
 - **No governance machinery.** Checks speak plain language — no rule codes to memorize, no contract/documentation blocks, no semver-guarded selector APIs.
@@ -253,6 +255,7 @@ How the current repository maps to this spec. This is the work plan's table of c
 - Markdown pipeline (`markdown-it`, `gray-matter`) trimmed to §3.4 frontmatter.
 - The file watcher, rebuilt around the §4 watch contract.
 - The dry-run reporter, rewired to the single pipeline (§4 `--dry-run`).
+- Config-file loading, reduced to the §4 flags mirror (`unify.yaml`).
 - `init` command (repaired: positional template argument, genuinely distinct templates).
 - Path-traversal validation as invisible internal safety.
 - Standalone binary builds — promoted to the headline install.
@@ -282,7 +285,7 @@ How the current repository maps to this spec. This is the work plan's table of c
 6. Honest packaging: version string, working `package.json` scripts, Bun floor stated once, README rewritten to teach only this spec.
 7. An end-to-end test suite that builds the §2 quickstart site (plus a small fixture site per §3 rule) and asserts the output — the suite that makes the golden path unbreakable.
 8. The `watch` contract (§4): coalesced full rebuilds, skip-unchanged atomic writes, precise deletions, watch-mode error pages, and the startup serve hint. Verified by an equivalence test (watch output after any edit sequence ≡ fresh build) and a byte-stability test (a no-op rebuild writes nothing).
-9. The checks surface (§4): advisories, `--strict`, and `--dry-run` on the single pipeline.
+9. The checks surface (§4): advisories, `--strict`, and `--dry-run` on the single pipeline; `--exclude` and the `unify.yaml` flags mirror.
 
 ---
 
