@@ -165,7 +165,7 @@ All replaceable areas use the `unify-` class prefix, and the only attribute is `
 
 ### 3.4 Markdown
 
-Markdown pages are equal citizens: converted to HTML, then processed by the same layout rules as any page. Frontmatter keys for MVP: `title`, `description` (→ `<meta name="description">`), and `layout`. Anything else in frontmatter is ignored with a warning. Markdown output filenames swap `.md` for `.html`.
+Markdown pages are equal citizens: converted to HTML, then processed by the same layout rules as any page. Frontmatter is the page's head. Two keys are special: `title` sets `<title>`, and `layout` picks the layout (§3.2). **Every other key becomes one `<meta>` tag** — `property="…"` when the key contains a colon (`og:image: /photos/cover.jpg`), `name="…"` otherwise (`description`, `author`, `robots`) — except `twitter:*` keys, which use `name=` because Twitter's spec requires it, and `canonical`, which becomes `<link rel="canonical">`. Synthesized tags join the §3.2 head merge, so a page's `og:image` beats the layout's the same way any page meta does. Values are plain strings that appear only in the head, never in the body — head data, not template variables. Nested or non-string values are ignored with a located warning. Markdown output filenames swap `.md` for `.html`.
 
 ---
 
