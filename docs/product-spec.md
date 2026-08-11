@@ -18,7 +18,7 @@ The entire authoring surface is four things:
 | Reuse a fragment (nav, footer, badge) | `<include src="/_includes/nav.html">` |
 | Wrap pages in a layout | nothing (automatic `_layout.html`) — or `data-unify="/path.html"` to pick one |
 | Mark a region of a layout as replaceable, or replace it from a page | `class="unify-hero"` |
-| Keep a file out of the built site | name it with a leading underscore: `_draft.html` |
+| Keep a page or folder out of the built site | name it with a leading underscore: `_draft.html`, `_includes/` |
 
 If a capability cannot be expressed with these four, it does not belong in unify.
 
@@ -112,7 +112,8 @@ Built result: the layout, with its `<main>` content replaced by the page's body,
 ---
 title: About — My Site
 description: Who we are
-og:image: /assets/team.jpg
+og:
+  image: /assets/team.jpg
 ---
 
 # About
@@ -166,7 +167,7 @@ All replaceable areas use the `unify-` class prefix, and the only attribute is `
 
 ### 3.4 Markdown
 
-Markdown pages are equal citizens: converted to HTML, then processed by the same layout rules as any page. Frontmatter keys: `title` sets the `<title>`, `layout` picks the layout (§3.2), and any other key becomes a `<meta>` tag on the page — `property="…"` if the key contains a colon (`og:image: /photos/cover.jpg`), `name="…"` otherwise (`description`, `author`). Synthesized tags merge with the layout's head by the §3.2 rules — page wins. Markdown output filenames swap `.md` for `.html`.
+Markdown pages are equal citizens: converted to HTML, then processed by the same layout rules as any page. Frontmatter keys: `title` sets the `<title>`, `layout` picks the layout (§3.2), and any other key becomes a `<meta name="…" content="…">` tag (`description`, `author`, `robots`). Namespaced metadata is a nested block, plain YAML: keys under `og:` become `<meta property="og:image" …>` tags (`property=` is what Facebook's crawler reads); keys under any other block — `twitter:`, say — become `name=` tags (`twitter:card`). Synthesized tags merge with the layout's head by the §3.2 rules — page wins. Markdown output filenames swap `.md` for `.html`.
 
 ---
 
@@ -183,6 +184,7 @@ Options:
   -o, --output <dir>       output directory (default: dist)
       --clean              empty the output directory first
       --pretty-urls        about.html → about/index.html, and rewrite internal links to match
+      --base-url <path>    site is served from a subpath (e.g. /repo-name/): prefix root-relative links in the output
   -p, --port <n>           dev server port (default: 3000)
       --host <host>        dev server host (default: localhost)
   -v, --version            print version
@@ -191,7 +193,8 @@ Options:
 
 That is the entire CLI. Behavior notes:
 
-- **File handling**: `.html`/`.md` files are pages (processed). Files and directories starting with `_` are never emitted. **Everything else is copied through as-is**, mirroring the source tree — what you see in your folder is what ships. The output directory is always excluded from scanning.
+- **File handling**: `.html`/`.md` files are pages (processed). Pages and directories starting with `_` are never emitted — that is what keeps layouts, fragments, and drafts out of the site. Any other `_`-named file (Netlify's `_redirects`, for example) is an ordinary file. **Everything else is copied through as-is**, mirroring the source tree — what you see in your folder is what ships. The output directory is always excluded from scanning.
+- **Subpath hosting.** GitHub Pages project sites serve from `username.github.io/repo-name/`, where root-relative links would break. `--base-url /repo-name/` prefixes root-relative URLs (`href`, `src`, `srcset`) in the built HTML; source files stay rooted at `/`, so local preview keeps working.
 - **Full rebuilds everywhere.** `serve` and `watch` rebuild the whole site on every change. No cache, no incremental machinery — plain HTML processing is fast enough for this audience, and identical behavior across commands is worth more than milliseconds.
 - **Errors are loud and located.** A missing include or layout produces a warning naming the file and the reference; the page still builds (dev-friendly); the process exits non-zero if any errors occurred (CI-friendly). Silent failure is a bug by definition.
 - **Install story leads with the binary.** The headline install is the standalone single-file executable (Linux/macOS/Windows) — the audience has never heard of Bun and shouldn't need to. Bun/npm installs are the secondary, developer path. Bun is the only supported runtime; no Node/Deno claims.
@@ -217,7 +220,7 @@ Things unify deliberately does not do, even if asked:
 
 1. **GitHub Pages / Netlify recipes and an Actions workflow** in the starter templates — directly serves the adoption ambition (OSS projects using unify for their sites).
 2. **Browser preview polyfill**: the ~200-line script implementing §3 at runtime, so a source tree is viewable without building. Also serves as the spec's conformance check — build and polyfill must agree.
-3. **Sitemap generation** (`--base-url`) — cheap, expected for SEO.
+3. **Sitemap generation** — builds on `--base-url` (§4) gaining a full-origin form; cheap, expected for SEO.
 4. **HTML minification** (`--minify`).
 5. More and better `init` templates.
 
