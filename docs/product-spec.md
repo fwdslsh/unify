@@ -1,7 +1,7 @@
 # unify — Product Specification (MVP)
 
 **Status**: Draft v1, for review
-**Role**: This document defines what unify is, who it serves, and the complete feature surface of the MVP. Where it conflicts with `app-spec.md` or `dom-spec.md`, this document wins; those documents will be rewritten or retired to match it during realignment.
+**Role**: This document defines what unify is, who it serves, and the complete feature surface of the MVP. Where it conflicts with `app-spec.md` or `dom-spec.md`, this document wins; those documents will be rewritten or retired to match it during realignment. Until realignment lands, the released tool and this document intentionally differ — §7 maps the distance; treat mismatches as planned work, not documentation bugs.
 
 ---
 
@@ -9,7 +9,7 @@
 
 Web pages have needed shared headers, footers, and navigation since the beginning — and HTML still has no way to express that. Every existing answer forces a trade the author didn't ask for: a JavaScript framework, a templating language, a config-heavy build system, or copy-paste.
 
-unify is a static site generator for **front-end designers and hobbyists** — people fluent in HTML and CSS who have no interest in JavaScript frameworks, templating languages, or build tooling. It lets them define a header, footer, nav, or page layout once, in plain HTML files, and have those rendered into every page of the site. The output is plain HTML and CSS. There is nothing to configure and nothing to learn beyond HTML itself.
+unify is a static site generator for **front-end designers and hobbyists** — people fluent in HTML and CSS who have no interest in JavaScript frameworks, templating languages, or build tooling. It lets them define a header, footer, nav, or page layout once, in plain HTML files, and have those rendered into every page of the site. The output is the HTML and CSS the author wrote — unify adds no JavaScript and no runtime of its own. There is nothing to configure and nothing to learn beyond HTML itself.
 
 The entire authoring surface is four things:
 
@@ -25,7 +25,7 @@ If a capability cannot be expressed with these four, it does not belong in unify
 **Design rules that govern every feature decision:**
 
 1. **Explainable in one sentence** to someone who knows only HTML and CSS. If a rule needs a diagram, it's out.
-2. **Every source file is valid HTML.** Layouts are complete pages (their default content is their preview); pages are complete pages; no template holes, no unbalanced fragments. Authoring preview is any web server at the source root (an editor live-server, `bunx live-server`) plus the browser polyfill (§6) for composition; the built site previews the same way over `dist/`. `file://` double-click is not a supported preview.
+2. **Every source file is real HTML a browser can parse as written.** Layouts and pages are complete documents (a layout's default content is its preview); fragments are well-formed snippets; no template holes, no unbalanced markup. Authoring preview is any web server at the source root (an editor live-server, `bunx live-server`) plus the browser polyfill (§6) for composition; the built site previews the same way over `dist/`. `file://` double-click is not a supported preview.
 3. **Polyfill-able**: the entire composition model must be implementable by a small (~200-line) browser script that produces the same DOM at design time as the CLI produces at build time. The polyfill is the complexity budget — any rule too intricate to live in it is too intricate to ship.
 4. **Zero configuration.** Conventions, not config files.
 
@@ -131,12 +131,12 @@ That is the whole product. There is nothing else to learn.
 
 ### 3.1 Fragments: includes
 
-- `<include src="/path/file.html">` is replaced by the file's contents. Self-closing or paired forms both work.
+- `<include src="/path/file.html">` is replaced by the file's contents. Void-style (as shown) or paired (`<include src="…"></include>`) both build identically — the build inlines includes textually before any parsing. (Browsers parse an unclosed `<include>` as an element that absorbs the siblings after it, so at design time the paired form is the faithful one; the polyfill compensates for the void form by unwrapping.)
 - Paths starting with `/` resolve from the source root; all other paths resolve relative to the including file.
 - Fragments may include other fragments (cycle-safe, depth-capped, warning on violation).
 - A fragment may be Markdown; it is converted before inlining (frontmatter ignored).
 - Includes work in Markdown pages too: the tags pass through conversion as raw HTML, then resolve normally.
-- Both forms work anywhere in a document, `<head>` included: the build inlines includes before parsing, so placement never matters. (One browser-preview nuance: inside `<head>`, browsers hoist an `<include>` element into the body before any script can run, so the comment form is the faithful form there at design time; build output is identical either way.)
+- Both the tag and the comment form work anywhere in a document, `<head>` included — placement never matters to the build. (In browser preview, `<head>` hoists unknown elements into the body, so the comment form is the faithful one there.)
 - **Legacy alias**: Apache SSI syntax — `<!--#include virtual="/path" -->` and `<!--#include file="rel.html" -->` — is supported indefinitely for compatibility and migration from real SSI sites, but documentation teaches `<include>`.
 
 ### 3.2 Layouts: the cascade
@@ -158,6 +158,8 @@ A layout may itself declare `data-unify` to chain into a parent layout (section 
 3. **Head merge.** Start with the layout's `<head>`. The page's `<title>` is prepended to the layout's, joined with a space — layout `<title>My Site</title>` plus page `<title>Home —</title>` emits `<title>Home — My Site</title>` — so the site name lives in one file; a page with no title keeps the layout's alone. A page `<meta>` replaces a layout `<meta>` with the same `name`/`property`; other page head elements are appended after the layout's, so page CSS loads last and wins the cascade. Exact-duplicate stylesheet/script URLs are deduplicated. A page `<meta charset>` is dropped in favor of the layout's (which stays first in the head), with a located warning.
 4. **Body classes.** Classes on the page's `<body>` are added to the layout's `<body>` (so pages can hook per-page CSS like `class="home"`). No other attribute merging exists.
 
+Edge rules, for determinism: layout chains compose pairwise — the page merges into its layout by these four rules, and that result merges into the parent layout the same way, so heads and body classes accumulate up the chain. A page area class that matches no layout area is a located warning, and its content flows to the default slot instead — content is never silently dropped. If the layout has areas but no `<main>`, unaddressed page content is omitted with a located warning naming the fix (add `<main>` or an area). Duplicate `<main>` elements in a layout: the first wins, with a warning.
+
 `data-unify` attributes are removed from output. `unify-*` classes are **kept** in output — they are real CSS classes and legitimate style hooks.
 
 ### 3.3 The `unify-` namespace
@@ -174,7 +176,7 @@ Markdown pages are equal citizens: converted to HTML, then processed by the same
 
 ### 3.5 URLs
 
-Write paths that are correct for the file you're editing — relative (`hero.jpg`) or root-relative (`/assets/style.css`); both work anywhere. URLs inside layouts and fragments are resolved against the file that wrote them and emitted root-relative, so composed markup is correct at every page depth: authors never compensate for where an include will land, and editor click-through keeps working.
+Write paths that are correct for the file you're editing — relative (`hero.jpg`) or root-relative (`/assets/style.css`); both work anywhere. URLs inside layouts and fragments are resolved against the file that wrote them and emitted root-relative, so composed markup is correct at every page depth: authors never compensate for where an include will land, and editor click-through keeps working. Rewriting applies to `href`, `src`, and `srcset`, on the final composed page — after includes and layouts, before `--pretty-urls` and `--base-url`. Stylesheets never need rewriting: mirror-copy ships every CSS file at its source-relative location, so `url()` references inside them keep working untouched.
 
 ---
 
@@ -203,7 +205,7 @@ That is the entire CLI. Behavior notes:
 - **No dev server — the inner loop is `watch` plus any static server.** Serving files with live reload is a solved problem (VS Code Live Preview, `bunx live-server dist`, Vite, caddy); unify's job is to make every such tool work flawlessly by keeping the output directory watcher-friendly. On startup, `watch` prints a copy-paste serve suggestion.
 - **The watch contract.** Saves are coalesced into one rebuild; a save landing mid-rebuild queues exactly one follow-up — no change is ever dropped. Every rebuild is a full rebuild (no cache, no incremental machinery — plain HTML is fast enough, and it guarantees watch output is always identical to a fresh `unify build`). Writes are minimal and atomic: a file whose content didn't change is not rewritten (external watchers see exactly what changed — no reload storms), outputs land via temp-then-rename (a server never reads a half-written file), deletions are precise, and `--clean` applies only at startup.
 - **Broken builds show in the browser.** In watch mode, a page that fails to build is emitted as a default error page carrying the located error and details — the serving tool's reload puts the diagnosis in front of you, and the next successful rebuild replaces it. `unify build` never emits error pages: errors warn and fail the exit code (below).
-- **Errors are loud and located.** A missing include or layout produces a warning naming the file and the reference; the page still builds (dev-friendly); the process exits non-zero if any errors occurred (CI-friendly). Silent failure is a bug by definition. After every build, internal references are checked against the emitted files: a link, image, or asset that resolves to nothing — a renamed page, an image left inside an underscore folder, a path whose case doesn't match — produces a warning naming the page and the reference, and counts as an error for the exit code.
+- **One error contract, loud and located.** Every problem — a missing include or layout, a page that fails to compose, a broken internal reference — is reported once, naming the file, the reference, and the line where known. `build` always completes best-effort (a missing include leaves a gap rather than killing the page) and exits non-zero if any problem occurred — authors see everything in one pass, CI still gates. `watch` reports the same problems in the terminal and, for a page that fails outright, emits the error page described above. After every build, internal references are checked against the emitted files: a link, image, or asset that resolves to nothing — a renamed page, an image stranded in an underscore folder, a path whose case doesn't match — is a problem like any other. Silent failure is a bug by definition.
 - **Install story leads with the binary.** The headline install is the standalone single-file executable (Linux/macOS/Windows) — the audience has never heard of Bun and shouldn't need to. Bun/npm installs are the secondary, developer path. Bun is the only supported runtime; no Node/Deno claims.
 
 ---
@@ -212,7 +214,7 @@ That is the entire CLI. Behavior notes:
 
 Things unify deliberately does not do, even if asked:
 
-- **No JavaScript in the output, ever.** The built site is HTML and CSS.
+- **unify adds no JavaScript, ever.** Authors may write and ship whatever scripts they like — script files copy through byte-for-byte and `<script>` tags survive composition untouched (§3.2 head merge dedupes only exact-duplicate tags). What never happens: unify injecting, generating, or rewriting JS. No runtime, no hydration, no helper snippets — the output contains exactly the JavaScript the author wrote and not one byte more.
 - **No templating language.** No variables, loops, conditionals, or expressions in HTML. The moment unify grows a DSL it has become the thing it exists to escape. The visible costs, accepted with eyes open: the footer year is edited once a year, in one include; list pages are maintained by hand (the blog template models it — publishing a post is adding one line to `index.html`); and every HTML page carries the standard document skeleton, while Markdown pages don't. If one of these costs becomes unbearable at real scale, that is the demonstrated demand the collections bullet below waits for.
 - **No configuration files.** If a behavior needs a config file to explain itself, the behavior is wrong.
 - **No dev server.** Serving static files with live reload is a solved problem; unify refuses to re-solve it. `unify watch` plus the author's server of choice is the inner loop (§4).
@@ -238,7 +240,7 @@ Things unify deliberately does not do, even if asked:
 
 ## 7. Realignment yardstick: keep / cut / fix
 
-How the current repository maps to this spec. This is the work plan's table of contents, not the work plan itself.
+How the current repository maps to this spec. This is the work plan's table of contents, not the work plan itself — a snapshot of the repository at the time of writing, deleted from this document once realignment lands.
 
 ### Keep (trimmed to §3/§4)
 
