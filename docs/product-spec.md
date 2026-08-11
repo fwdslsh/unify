@@ -83,7 +83,7 @@ my-site/
 <!doctype html>
 <html>
   <head>
-    <title>Home — My Site</title>
+    <title>Home —</title>
   </head>
   <body>
     <h1>Welcome!</h1>
@@ -92,7 +92,7 @@ my-site/
 </html>
 ```
 
-Built result: the layout, with its `<main>` content replaced by the page's body, and the page's `<title>` winning.
+Built result: the layout, with its `<main>` content replaced by the page's body, and the page's title prepended to the layout's: `<title>Home — My Site</title>`.
 
 **Overriding a marked region** — the layout marked its footer with `class="unify-footer"`, so any page may replace it by using the same class:
 
@@ -110,7 +110,7 @@ Built result: the layout, with its `<main>` content replaced by the page's body,
 
 ```markdown
 ---
-title: About — My Site
+title: About —
 description: Who we are
 og:
   image: /assets/team.jpg
@@ -154,7 +154,7 @@ A layout may itself declare `data-unify` to chain into a parent layout (section 
 
 1. **Areas.** A layout element with a `unify-*` class is a *public area*. A page element carrying the same class replaces that area's **children** (the layout element itself, its tag and attributes, stays). If a page supplies the same area class more than once, their contents are concatenated in page order. An area class should appear once per layout; duplicates produce a warning and the first is used.
 2. **Default slot.** Page body content not addressed to any area replaces the children of the layout's `<main>`. A layout that defines no `<main>` and no areas passes pages through unchanged (with a warning).
-3. **Head merge.** Start with the layout's `<head>`. The page's `<title>` replaces the layout's. A page `<meta>` replaces a layout `<meta>` with the same `name`/`property`; other page head elements are appended after the layout's, so page CSS loads last and wins the cascade. Exact-duplicate stylesheet/script URLs are deduplicated. A page `<meta charset>` is dropped in favor of the layout's, which stays first in the head.
+3. **Head merge.** Start with the layout's `<head>`. The page's `<title>` is prepended to the layout's, joined with a space — layout `<title>My Site</title>` plus page `<title>Home —</title>` emits `<title>Home — My Site</title>` — so the site name lives in one file; a page with no title keeps the layout's alone. A page `<meta>` replaces a layout `<meta>` with the same `name`/`property`; other page head elements are appended after the layout's, so page CSS loads last and wins the cascade. Exact-duplicate stylesheet/script URLs are deduplicated. A page `<meta charset>` is dropped in favor of the layout's (which stays first in the head), with a located warning.
 4. **Body classes.** Classes on the page's `<body>` are added to the layout's `<body>` (so pages can hook per-page CSS like `class="home"`). No other attribute merging exists.
 
 `data-unify` attributes are removed from output. `unify-*` classes are **kept** in output — they are real CSS classes and legitimate style hooks.
@@ -169,7 +169,7 @@ All replaceable areas use the `unify-` class prefix, and the only attribute is `
 
 ### 3.4 Markdown
 
-Markdown pages are equal citizens: converted to HTML, then processed by the same layout rules as any page. Frontmatter keys: `title` sets the `<title>`, `layout` picks the layout (§3.2), `class` adds classes to the page's `<body>` (§3.2 rule 4 — so Markdown pages can use the body-class styling recipe), and any other key becomes a `<meta name="…" content="…">` tag (`description`, `author`, `robots`). Namespaced metadata is a nested block, plain YAML: keys under `og:` become `<meta property="og:image" …>` tags (`property=` is what Facebook's crawler reads); keys under any other block — `twitter:`, say — become `name=` tags (`twitter:card`). Synthesized tags merge with the layout's head by the §3.2 rules — page wins. Markdown output filenames swap `.md` for `.html`.
+Markdown pages are equal citizens: converted to HTML, then processed by the same layout rules as any page. Frontmatter keys: `title` sets the page's `<title>` (prepended to the layout's, §3.2), `layout` picks the layout (§3.2), `class` adds classes to the page's `<body>` (§3.2 rule 4 — so Markdown pages can use the body-class styling recipe), and any other key becomes a `<meta name="…" content="…">` tag (`description`, `author`, `robots`). Namespaced metadata is a nested block, plain YAML: keys under `og:` become `<meta property="og:image" …>` tags (`property=` is what Facebook's crawler reads); keys under any other block — `twitter:`, say — become `name=` tags (`twitter:card`). Synthesized tags merge with the layout's head by the §3.2 rules — page wins. Markdown output filenames swap `.md` for `.html`.
 
 ### 3.5 URLs
 
@@ -213,7 +213,7 @@ That is the entire CLI. Behavior notes:
 Things unify deliberately does not do, even if asked:
 
 - **No JavaScript in the output, ever.** The built site is HTML and CSS.
-- **No templating language.** No variables, loops, conditionals, or expressions in HTML. The moment unify grows a DSL it has become the thing it exists to escape. The visible costs, accepted with eyes open: the site name is retyped in each page's `<title>`; the footer year is edited once a year, in one include; list pages are maintained by hand (the blog template models it — publishing a post is adding one line to `index.html`); and every HTML page carries the standard document skeleton, while Markdown pages don't. If one of these costs becomes unbearable at real scale, that is the demonstrated demand the collections bullet below waits for.
+- **No templating language.** No variables, loops, conditionals, or expressions in HTML. The moment unify grows a DSL it has become the thing it exists to escape. The visible costs, accepted with eyes open: the footer year is edited once a year, in one include; list pages are maintained by hand (the blog template models it — publishing a post is adding one line to `index.html`); and every HTML page carries the standard document skeleton, while Markdown pages don't. If one of these costs becomes unbearable at real scale, that is the demonstrated demand the collections bullet below waits for.
 - **No configuration files.** If a behavior needs a config file to explain itself, the behavior is wrong.
 - **No component framework.** No props, no attribute-merge semantics, no scoped component imports with override contracts. Fragments (includes) plus layout areas cover the audience's need.
 - **No governance machinery.** No linter rule codes, no contract/documentation blocks, no semver-guarded selector APIs.
@@ -230,8 +230,7 @@ Things unify deliberately does not do, even if asked:
 3. **Sitemap generation** — uses `--base-url`'s origin (§4); cheap, expected for SEO.
 4. **HTML minification** (`--minify`).
 5. More and better `init` templates.
-6. **Editor extension** — clickable `<include>` and `data-unify` paths, `unify-*` area autocomplete; the payoff of the machine-readable namespace (§3.3).
-7. **Markdown include shorthand** — a Markdown-native spelling of `<include>`, considered if real authoring demand appears.
+6. **Markdown include shorthand** — a Markdown-native spelling of `<include>`, considered if real authoring demand appears.
 
 ---
 
