@@ -193,6 +193,8 @@ Options:
       --clean              empty the output directory first
       --pretty-urls        about.html → about/index.html, and rewrite internal links to match
       --base-url <path>    site is served from a subpath (e.g. /repo-name/): prefix root-relative links in the output
+      --dry-run            run the full build and every check, print the report, write nothing
+      --strict             advisories count as problems for the exit code
   -v, --version            print version
   -h, --help               print help
 ```
@@ -205,7 +207,9 @@ That is the entire CLI. Behavior notes:
 - **No dev server — the inner loop is `watch` plus any static server.** Serving files with live reload is a solved problem (VS Code Live Preview, `bunx live-server dist`, Vite, caddy); unify's job is to make every such tool work flawlessly by keeping the output directory watcher-friendly. On startup, `watch` prints a copy-paste serve suggestion.
 - **The watch contract.** Saves are coalesced into one rebuild; a save landing mid-rebuild queues exactly one follow-up — no change is ever dropped. Every rebuild is a full rebuild (no cache, no incremental machinery — plain HTML is fast enough, and it guarantees watch output is always identical to a fresh `unify build`). Writes are minimal and atomic: a file whose content didn't change is not rewritten (external watchers see exactly what changed — no reload storms), outputs land via temp-then-rename (a server never reads a half-written file), deletions are precise, and `--clean` applies only at startup.
 - **Broken builds show in the browser.** In watch mode, a page that fails to build is emitted as a default error page carrying the located error and details — the serving tool's reload puts the diagnosis in front of you, and the next successful rebuild replaces it. `unify build` never emits error pages: errors warn and fail the exit code (below).
-- **One error contract, loud and located.** Every problem — a missing include or layout, a page that fails to compose, a broken internal reference — is reported once, naming the file, the reference, and the line where known. `build` always completes best-effort (a missing include leaves a gap rather than killing the page) and exits non-zero if any problem occurred — authors see everything in one pass, CI still gates. `watch` reports the same problems in the terminal and, for a page that fails outright, emits the error page described above. After every build, internal references are checked against the emitted files: a link, image, or asset that resolves to nothing — a renamed page, an image stranded in an underscore folder, a path whose case doesn't match — is a problem like any other. Silent failure is a bug by definition.
+- **One error contract, loud and located.** Every problem — a missing include or layout, a page that fails to compose, a broken internal reference — is reported once, naming the file, the reference, and the line where known. `build` always completes best-effort (a missing include leaves a gap rather than killing the page) and exits non-zero if any problem occurred — authors see everything in one pass, CI still gates. `watch` reports the same problems in the terminal and, for a page that fails outright, emits the error page described above. After every build, internal references are checked against the emitted files: a link, image, or asset that resolves to nothing — a renamed page, an image stranded in an underscore folder, a path whose case doesn't match — is a problem like any other. Silent failure is a bug by definition. Set `DEBUG=1` for stack traces.
+- **Advisories (the lint layer).** Beside problems sit *advisories* — hygiene findings that break nothing: a `unify-*` area no page ever overrides, a page `<header>`/`<footer>` outside any area (probably meant to override one), an unclosed `<include>` (builds fine, previews wrong — §3.1), a working-format file headed for the output (`.psd`, `.fig`, a multi-megabyte original). Advisories print but never affect the exit code; `--strict` promotes them to problems for CI. Plain language, no rule codes.
+- **`--dry-run` is the whole build minus the writes.** Composition, URL rewriting, the reference check, every problem and advisory — reported exactly as a real build would report them, plus a list of what would be written, copied, and deleted. `unify build --dry-run --strict` is the one-line CI lint.
 - **Install story leads with the binary.** The headline install is the standalone single-file executable (Linux/macOS/Windows) — the audience has never heard of Bun and shouldn't need to. Bun/npm installs are the secondary, developer path. Bun is the only supported runtime; no Node/Deno claims.
 
 ---
@@ -219,7 +223,7 @@ Things unify deliberately does not do, even if asked:
 - **No configuration files.** If a behavior needs a config file to explain itself, the behavior is wrong.
 - **No dev server.** Serving static files with live reload is a solved problem; unify refuses to re-solve it. `unify watch` plus the author's server of choice is the inner loop (§4).
 - **No component framework.** No props, no attribute-merge semantics, no scoped component imports with override contracts. Fragments (includes) plus layout areas cover the audience's need.
-- **No governance machinery.** No linter rule codes, no contract/documentation blocks, no semver-guarded selector APIs.
+- **No governance machinery.** Checks speak plain language — no rule codes to memorize, no contract/documentation blocks, no semver-guarded selector APIs.
 - **No security theater.** Path traversal safety in include resolution is internal engineering, always on, invisible. unify does not scan the author's own HTML for "vulnerabilities" or gate builds on it.
 - **No build-cache/incremental system** until real users have real sites that are actually slow.
 - **No collections, pagination, RSS, or taxonomies** for now. This is the "every blog eventually wants it" trap; it gets revisited only on demonstrated demand, and only if it survives the one-sentence and polyfill rules.
@@ -248,6 +252,7 @@ How the current repository maps to this spec. This is the work plan's table of c
 - `<include>` inlining and the SSI processor (legacy alias).
 - Markdown pipeline (`markdown-it`, `gray-matter`) trimmed to §3.4 frontmatter.
 - The file watcher, rebuilt around the §4 watch contract.
+- The dry-run reporter, rewired to the single pipeline (§4 `--dry-run`).
 - `init` command (repaired: positional template argument, genuinely distinct templates).
 - Path-traversal validation as invisible internal safety.
 - Standalone binary builds — promoted to the headline install.
@@ -258,9 +263,9 @@ How the current repository maps to this spec. This is the work plan's table of c
 - All slot/`<template>`/`data-slot` documentation and claims (the feature does not exist).
 - The `serve` command, dev server, and SSE live-reload layer — serving is delegated to external tooling (§4/§5).
 - Component mode, the attribute-merge matrix, ID-stability/ARIA rewriting.
-- DOM Cascade linter, rules U001–U008, `--fail-on`, `--fail-level`.
+- The linter's rule-code machinery (U001–U008, `--fail-on`, `--fail-level`) — the useful checks survive as §4's plain-language advisories; implementations may be harvested.
 - Security scanner and `[SECURITY]` build gates.
-- The glob pipeline: `--copy`, `--ignore`, `--ignore-render`, `--ignore-copy`, `--render`, `--auto-ignore`, `--default-layout`, `--dry-run`, and the classification-tier system behind them.
+- The glob pipeline: `--copy`, `--ignore`, `--ignore-render`, `--ignore-copy`, `--render`, `--auto-ignore`, `--default-layout`, and the classification-tier system behind them.
 - Asset *reference tracking* (copy-only-what's-referenced) — replaced by mirror-copy (§4), which is simpler and matches user expectation.
 - Incremental builder, build cache, duplicate dependency graphs; one build pipeline remains.
 - Short-name layout resolution (`blog` → `_blog.layout.html`) and every path-guessing heuristic beyond §3.1/§3.2's two path forms.
@@ -277,6 +282,7 @@ How the current repository maps to this spec. This is the work plan's table of c
 6. Honest packaging: version string, working `package.json` scripts, Bun floor stated once, README rewritten to teach only this spec.
 7. An end-to-end test suite that builds the §2 quickstart site (plus a small fixture site per §3 rule) and asserts the output — the suite that makes the golden path unbreakable.
 8. The `watch` contract (§4): coalesced full rebuilds, skip-unchanged atomic writes, precise deletions, watch-mode error pages, and the startup serve hint. Verified by an equivalence test (watch output after any edit sequence ≡ fresh build) and a byte-stability test (a no-op rebuild writes nothing).
+9. The checks surface (§4): advisories, `--strict`, and `--dry-run` on the single pipeline.
 
 ---
 
