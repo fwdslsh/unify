@@ -132,14 +132,14 @@ That is the whole product. There is nothing else to learn.
 - Paths starting with `/` resolve from the source root; all other paths resolve relative to the including file.
 - Fragments may include other fragments (cycle-safe, depth-capped, warning on violation).
 - A fragment may be Markdown; it is converted before inlining (frontmatter ignored).
-- **Legacy alias**: Apache SSI syntax — `<!--#include virtual="/path" -->` and `<!--#include file="rel.html" -->` — is supported indefinitely for compatibility and migration from real SSI sites. Documentation teaches `<include>` everywhere except inside `<head>`, where HTML parsing hoists unknown tags into the body: there the comment form is the head-safe include, and an `<include>` found in head position produces a located warning saying so.
+- **Legacy alias**: Apache SSI syntax — `<!--#include virtual="/path" -->` and `<!--#include file="rel.html" -->` — is supported indefinitely for compatibility and migration from real SSI sites, but documentation teaches `<include>`.
 
 ### 3.2 Layouts: the cascade
 
 **Layout selection** (first match wins):
 
-1. `data-unify="/path.html"` on the page's `<html>` or `<body>` — explicit choice. `data-unify="none"` opts out of layouts entirely and the page is emitted as-is; `none` is the only keyword the attribute will ever have.
-2. Markdown frontmatter `layout: /path.html` — the Markdown equivalent (`layout: none` likewise).
+1. `data-unify="/path.html"` on the page's `<html>` or `<body>` — explicit choice.
+2. Markdown frontmatter `layout: /path.html` — the Markdown equivalent.
 3. The nearest `_layout.html`, looking in the page's directory, then each parent up to the source root.
 4. `_includes/layout.html` as the site-wide fallback.
 5. No layout: the page is emitted as-is.
@@ -165,7 +165,7 @@ All replaceable areas use the `unify-` class prefix, and the only attribute is `
 
 ### 3.4 Markdown
 
-Markdown pages are equal citizens: converted to HTML, then processed by the same layout rules as any page. Frontmatter keys for MVP: `title`, `description` (→ `<meta name="description">`), and `layout`. Anything else in frontmatter is ignored with a warning. For any other head data — social cards, `rel="canonical"`, robots — write the real tags: `<meta>` and `<link>` elements at the top of a Markdown page (before any content) are moved into its head and merged by the §3.2 head rules, exactly as if the page were HTML. (If frontmatter `description` and a moved `<meta name="description">` both exist, the tag wins.) Markdown output filenames swap `.md` for `.html`.
+Markdown pages are equal citizens: converted to HTML, then processed by the same layout rules as any page. Frontmatter keys for MVP: `title`, `description` (→ `<meta name="description">`), and `layout`. Anything else in frontmatter is ignored with a warning. Markdown output filenames swap `.md` for `.html`.
 
 ---
 
@@ -182,7 +182,6 @@ Options:
   -o, --output <dir>       output directory (default: dist)
       --clean              empty the output directory first
       --pretty-urls        about.html → about/index.html, and rewrite internal links to match
-      --base-url <path>    site is served from a subpath (e.g. /repo-name/): prefix root-relative URLs in the output
   -p, --port <n>           dev server port (default: 3000)
       --host <host>        dev server host (default: localhost)
   -v, --version            print version
@@ -192,9 +191,8 @@ Options:
 That is the entire CLI. Behavior notes:
 
 - **File handling**: `.html`/`.md` files are pages (processed). Files and directories starting with `_` are never emitted. **Everything else is copied through as-is**, mirroring the source tree — what you see in your folder is what ships. The output directory is always excluded from scanning.
-- **Subpath deploys.** `--base-url /repo/` prefixes root-relative `href`/`src`/`srcset` URLs in emitted HTML, applied after `--pretty-urls` rewriting. Sources never carry the prefix. `serve` and `watch` preview at `/` and warn that the flag is ignored. A full URL is rejected with an error — the origin form arrives with sitemap generation (§6). (CSS needs no rewriting: `url()` in a stylesheet resolves relative to the stylesheet, which is already subpath-proof.)
 - **Full rebuilds everywhere.** `serve` and `watch` rebuild the whole site on every change. No cache, no incremental machinery — plain HTML processing is fast enough for this audience, and identical behavior across commands is worth more than milliseconds.
-- **Errors are loud and located.** A missing include or layout produces a warning naming the file and the reference; the page still builds (dev-friendly); the process exits non-zero if any errors occurred (CI-friendly). Silent failure is a bug by definition. In particular: a root-level underscore file that a static host reads for deploy control (`_redirects`, `_headers`) is excluded like any other underscore file, but the exclusion produces a warning naming the file and the copy-it-yourself workaround.
+- **Errors are loud and located.** A missing include or layout produces a warning naming the file and the reference; the page still builds (dev-friendly); the process exits non-zero if any errors occurred (CI-friendly). Silent failure is a bug by definition.
 - **Install story leads with the binary.** The headline install is the standalone single-file executable (Linux/macOS/Windows) — the audience has never heard of Bun and shouldn't need to. Bun/npm installs are the secondary, developer path. Bun is the only supported runtime; no Node/Deno claims.
 
 ---
@@ -216,14 +214,11 @@ Things unify deliberately does not do, even if asked:
 
 ## 6. Post-MVP candidates (rough priority order)
 
-1. **GitHub Pages / Netlify recipes and an Actions workflow** in the starter templates — directly serves the adoption ambition (OSS projects using unify for their sites). The workflow passes `--base-url "/$REPO_NAME/"` automatically.
+1. **GitHub Pages / Netlify recipes and an Actions workflow** in the starter templates — directly serves the adoption ambition (OSS projects using unify for their sites).
 2. **Browser preview polyfill**: the ~200-line script implementing §3 at runtime, so a source tree is viewable without building. Also serves as the spec's conformance check — build and polyfill must agree.
-3. **Sitemap generation and absolute URLs** — `--base-url` grows an origin component that feeds the sitemap and absolutizes `rel="canonical"` and social-card URLs.
+3. **Sitemap generation** (`--base-url`) — cheap, expected for SEO.
 4. **HTML minification** (`--minify`).
 5. More and better `init` templates.
-6. **Deploy-control underscore files** — emitting root-level `_redirects`/`_headers` byte-for-byte, revisited with the deploy recipes (item 1) under a closed principle: code-free static-delivery metadata in; hosts' JS-runtime files (`_worker.js`, `_routes.json`) out.
-7. **Current-page link marking** — `aria-current="page"` on links that point at their own page. Gated on build/polyfill DOM parity (the polyfill cannot know `--pretty-urls` today), an exact-match-forever commitment, and one canonicalization rule; until then the body-class recipe (§3.2 rule 4) is the documented answer.
-8. **Docs-site pack**, designed once, together with the docs template: build-time syntax highlighting (frozen language list, emitted class names declared as API) and automatic Markdown heading ids (algorithm specified in this spec — never by reference to GitHub's — with a located duplicate-id warning on the composed page).
 
 ---
 
@@ -259,7 +254,7 @@ How the current repository maps to this spec. This is the work plan's table of c
 
 1. Automatic `_layout.html` discovery (§3.2 items 3–4): currently non-functional; it is the single most important convention in the product.
 2. `--pretty-urls` link rewriting (files currently move but links break).
-3. Head merge correctness (duplicate `<title>` from Markdown; unrequested synthesized tags — including the existing auto-heading-id helper, cut until §6 item 8 specs it).
+3. Head merge correctness (duplicate `<title>` from Markdown; unrequested synthesized tags).
 4. `unify init blog` positional argument; per-template scaffolds.
 5. Default-slot behavior exactly per §3.2 rule 2.
 6. Honest packaging: version string, working `package.json` scripts, Bun floor stated once, README rewritten to teach only this spec.
