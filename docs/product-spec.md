@@ -25,7 +25,7 @@ If a capability cannot be expressed with these four, it does not belong in unify
 **Design rules that govern every feature decision:**
 
 1. **Explainable in one sentence** to someone who knows only HTML and CSS. If a rule needs a diagram, it's out.
-2. **Every source file is valid HTML** that opens in a browser as-is. Layouts are complete pages (their default content is their preview). Pages are complete pages. No template holes, no unbalanced fragments.
+2. **Every source file is valid HTML.** Layouts are complete pages (their default content is their preview); pages are complete pages; no template holes, no unbalanced fragments. Authoring preview is a web server at the source root — `unify serve`, or any static server or editor live-server — plus the browser polyfill (§6) for composition. `file://` double-click is not a supported preview.
 3. **Polyfill-able**: the entire composition model must be implementable by a small (~200-line) browser script that produces the same DOM at design time as the CLI produces at build time. The polyfill is the complexity budget — any rule too intricate to live in it is too intricate to ship.
 4. **Zero configuration.** Conventions, not config files.
 
@@ -134,6 +134,8 @@ That is the whole product. There is nothing else to learn.
 - Paths starting with `/` resolve from the source root; all other paths resolve relative to the including file.
 - Fragments may include other fragments (cycle-safe, depth-capped, warning on violation).
 - A fragment may be Markdown; it is converted before inlining (frontmatter ignored).
+- Includes work in Markdown pages too: the tags pass through conversion as raw HTML, then resolve normally.
+- Both forms work anywhere in a document, `<head>` included: the build inlines includes before parsing, so placement never matters. (One browser-preview nuance: inside `<head>`, browsers hoist an `<include>` element into the body before any script can run, so the comment form is the faithful form there at design time; build output is identical either way.)
 - **Legacy alias**: Apache SSI syntax — `<!--#include virtual="/path" -->` and `<!--#include file="rel.html" -->` — is supported indefinitely for compatibility and migration from real SSI sites, but documentation teaches `<include>`.
 
 ### 3.2 Layouts: the cascade
@@ -152,7 +154,7 @@ A layout may itself declare `data-unify` to chain into a parent layout (section 
 
 1. **Areas.** A layout element with a `unify-*` class is a *public area*. A page element carrying the same class replaces that area's **children** (the layout element itself, its tag and attributes, stays). If a page supplies the same area class more than once, their contents are concatenated in page order. An area class should appear once per layout; duplicates produce a warning and the first is used.
 2. **Default slot.** Page body content not addressed to any area replaces the children of the layout's `<main>`. A layout that defines no `<main>` and no areas passes pages through unchanged (with a warning).
-3. **Head merge.** Start with the layout's `<head>`. The page's `<title>` replaces the layout's. A page `<meta>` replaces a layout `<meta>` with the same `name`/`property`; other page head elements are appended after the layout's, so page CSS loads last and wins the cascade. Exact-duplicate stylesheet/script URLs are deduplicated.
+3. **Head merge.** Start with the layout's `<head>`. The page's `<title>` replaces the layout's. A page `<meta>` replaces a layout `<meta>` with the same `name`/`property`; other page head elements are appended after the layout's, so page CSS loads last and wins the cascade. Exact-duplicate stylesheet/script URLs are deduplicated. A page `<meta charset>` is dropped in favor of the layout's, which stays first in the head.
 4. **Body classes.** Classes on the page's `<body>` are added to the layout's `<body>` (so pages can hook per-page CSS like `class="home"`). No other attribute merging exists.
 
 `data-unify` attributes are removed from output. `unify-*` classes are **kept** in output — they are real CSS classes and legitimate style hooks.
@@ -167,7 +169,11 @@ All replaceable areas use the `unify-` class prefix, and the only attribute is `
 
 ### 3.4 Markdown
 
-Markdown pages are equal citizens: converted to HTML, then processed by the same layout rules as any page. Frontmatter keys: `title` sets the `<title>`, `layout` picks the layout (§3.2), and any other key becomes a `<meta name="…" content="…">` tag (`description`, `author`, `robots`). Namespaced metadata is a nested block, plain YAML: keys under `og:` become `<meta property="og:image" …>` tags (`property=` is what Facebook's crawler reads); keys under any other block — `twitter:`, say — become `name=` tags (`twitter:card`). Synthesized tags merge with the layout's head by the §3.2 rules — page wins. Markdown output filenames swap `.md` for `.html`.
+Markdown pages are equal citizens: converted to HTML, then processed by the same layout rules as any page. Frontmatter keys: `title` sets the `<title>`, `layout` picks the layout (§3.2), `class` adds classes to the page's `<body>` (§3.2 rule 4 — so Markdown pages can use the body-class styling recipe), and any other key becomes a `<meta name="…" content="…">` tag (`description`, `author`, `robots`). Namespaced metadata is a nested block, plain YAML: keys under `og:` become `<meta property="og:image" …>` tags (`property=` is what Facebook's crawler reads); keys under any other block — `twitter:`, say — become `name=` tags (`twitter:card`). Synthesized tags merge with the layout's head by the §3.2 rules — page wins. Markdown output filenames swap `.md` for `.html`.
+
+### 3.5 URLs
+
+Write paths that are correct for the file you're editing — relative (`hero.jpg`) or root-relative (`/assets/style.css`); both work anywhere. URLs inside layouts and fragments are resolved against the file that wrote them and emitted root-relative, so composed markup is correct at every page depth: authors never compensate for where an include will land, and editor click-through keeps working.
 
 ---
 
@@ -193,10 +199,11 @@ Options:
 
 That is the entire CLI. Behavior notes:
 
-- **File handling**: `.html`/`.md` files are pages (processed). Pages and directories starting with `_` are never emitted — that is what keeps layouts, fragments, and drafts out of the site. Any other `_`-named file (Netlify's `_redirects`, for example) is an ordinary file. **Everything else is copied through as-is**, mirroring the source tree — what you see in your folder is what ships. The output directory is always excluded from scanning.
-- **Subpath hosting.** GitHub Pages project sites serve from `username.github.io/repo-name/`, where root-relative links would break. `--base-url /repo-name/` prefixes root-relative URLs (`href`, `src`, `srcset`) in the built HTML; source files stay rooted at `/`, so local preview keeps working.
+- **File handling**: `.html`/`.md` files are pages (processed). Pages and directories starting with `_` are never emitted — that is what keeps layouts, fragments, and drafts out of the site. Any other `_`-named file (Netlify's `_redirects`, for example) is an ordinary file. **Everything else is copied through as-is**, mirroring the source tree — what you see in your folder is what ships, bytes untouched — compress images before adding them. The output directory is always excluded from scanning.
+- **Subpath hosting.** GitHub Pages project sites serve from `username.github.io/repo-name/`, where root-relative links would break. `--base-url /repo-name/` prefixes root-relative URLs (`href`, `src`, `srcset`) in the built HTML; source files stay rooted at `/`, so local preview keeps working. `--base-url` also accepts a full URL (`https://example.com/`): the origin absolutizes URL values in `og:`/`twitter:` metas and `rel="canonical"`, which crawlers require to be absolute.
+- **Pretty URLs move pages, never assets.** Every reference in a moved page — `href`, `src`, `srcset` — is rewritten to keep pointing at the same target, so `![diagram](diagram.png)` beside a Markdown page keeps working.
 - **Full rebuilds everywhere.** `serve` and `watch` rebuild the whole site on every change. No cache, no incremental machinery — plain HTML processing is fast enough for this audience, and identical behavior across commands is worth more than milliseconds.
-- **Errors are loud and located.** A missing include or layout produces a warning naming the file and the reference; the page still builds (dev-friendly); the process exits non-zero if any errors occurred (CI-friendly). Silent failure is a bug by definition.
+- **Errors are loud and located.** A missing include or layout produces a warning naming the file and the reference; the page still builds (dev-friendly); the process exits non-zero if any errors occurred (CI-friendly). Silent failure is a bug by definition. After every build, internal references are checked against the emitted files: a link, image, or asset that resolves to nothing — a renamed page, an image left inside an underscore folder, a path whose case doesn't match — produces a warning naming the page and the reference, and counts as an error for the exit code.
 - **Install story leads with the binary.** The headline install is the standalone single-file executable (Linux/macOS/Windows) — the audience has never heard of Bun and shouldn't need to. Bun/npm installs are the secondary, developer path. Bun is the only supported runtime; no Node/Deno claims.
 
 ---
@@ -206,7 +213,7 @@ That is the entire CLI. Behavior notes:
 Things unify deliberately does not do, even if asked:
 
 - **No JavaScript in the output, ever.** The built site is HTML and CSS.
-- **No templating language.** No variables, loops, conditionals, or expressions in HTML. The moment unify grows a DSL it has become the thing it exists to escape.
+- **No templating language.** No variables, loops, conditionals, or expressions in HTML. The moment unify grows a DSL it has become the thing it exists to escape. The visible costs, accepted with eyes open: the site name is retyped in each page's `<title>`; the footer year is edited once a year, in one include; list pages are maintained by hand (the blog template models it — publishing a post is adding one line to `index.html`); and every HTML page carries the standard document skeleton, while Markdown pages don't. If one of these costs becomes unbearable at real scale, that is the demonstrated demand the collections bullet below waits for.
 - **No configuration files.** If a behavior needs a config file to explain itself, the behavior is wrong.
 - **No component framework.** No props, no attribute-merge semantics, no scoped component imports with override contracts. Fragments (includes) plus layout areas cover the audience's need.
 - **No governance machinery.** No linter rule codes, no contract/documentation blocks, no semver-guarded selector APIs.
@@ -220,9 +227,11 @@ Things unify deliberately does not do, even if asked:
 
 1. **GitHub Pages / Netlify recipes and an Actions workflow** in the starter templates — directly serves the adoption ambition (OSS projects using unify for their sites).
 2. **Browser preview polyfill**: the ~200-line script implementing §3 at runtime, so a source tree is viewable without building. Also serves as the spec's conformance check — build and polyfill must agree.
-3. **Sitemap generation** — builds on `--base-url` (§4) gaining a full-origin form; cheap, expected for SEO.
+3. **Sitemap generation** — uses `--base-url`'s origin (§4); cheap, expected for SEO.
 4. **HTML minification** (`--minify`).
 5. More and better `init` templates.
+6. **Editor extension** — clickable `<include>` and `data-unify` paths, `unify-*` area autocomplete; the payoff of the machine-readable namespace (§3.3).
+7. **Markdown include shorthand** — a Markdown-native spelling of `<include>`, considered if real authoring demand appears.
 
 ---
 
