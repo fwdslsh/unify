@@ -50,6 +50,16 @@ Two traps worth keeping written down. `--allowedTools` is variadic and will swal
 | 3 | 5 Haiku, 1 Sonnet | **6/6, both layouts** | **zero** |
 | 4a | 5 Haiku, 1 Sonnet — rounds 1–2 brief, re-run isolated | **6/6** | **zero** |
 | 4b | 5 Haiku, 1 Sonnet — round 3 brief, repeated | **6/6** | one broken section link |
+| 5a | 5 Haiku, 1 Sonnet — round 3 brief again | **6/6** | **zero** — directory-link fix held |
+| 5b | 5 Haiku, 1 Sonnet — new content brief | **6/6** | **4/6 wrote flat `og:image:`** |
+
+Round 5b introduced a brief built to reach the parts of the rules nothing had touched in 28 samples: three Markdown interviews each needing a search summary, a social image and a date; one of them forced onto a layout that is *not* the nearest; a second directory level; and a logo image referenced from shared chrome.
+
+Two mechanisms passed outright. **The explicit layout override was 6/6** — every sample pointed the flagship interview at `/_layout.html` to escape the section's narrow layout, the first test of `layout:` overriding proximity rather than merely confirming it. Deeper nesting, assets and the directory-link rule all held.
+
+**The `og:` block did not.** Four of six wrote flat `og:image:` / `og:description:` keys rather than a nested block. Under §10.2 a flat key is "every other key" and emits `<meta name="og:image">` — the tag is present, the build is clean, and the social preview the brief explicitly asked for silently does not work, because scrapers read `property=`. The doc had said "an `og:` block becomes `property=` metas" and never showed the shape; "block" is a term of art, and flat `og:*` keys are the dominant convention in Jekyll/Hugo/Astro frontmatter, so the model prior won. The rule now shows the two-line shape and names the flat form as the trap.
+
+That amendment needed two lines and the doc was full, so the Markdown include-placement clause was displaced to pay for it — block-vs-inline-vs-code-fence placement, which no sample in 40 has ever exercised, against a silent-wrong-output failure on a feature a brief actually requested. The full rule survives in `conformance-spec.md` §5.
 
 Round 4 ran both briefs under identical subprocess isolation. **4a re-ran the rounds 1–2 brief and came back clean at 6/6**, which retires the asterisk on those rounds: the fixes hold, and the `CLAUDE.md` exposure was immaterial to the outcome as well as to the output.
 
