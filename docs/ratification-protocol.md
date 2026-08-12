@@ -242,6 +242,7 @@ Stated plainly, because a method with no known limitations has not been examined
 | 9 | 5 Haiku, 1 Sonnet | round 7's brief, amended doc (fitted) | **5/5 correct `slot=` fills** (was 1/5); every colon-bearing title quoted. 3/5 clean overall — both misses were referenced image files the sandbox could not produce. |
 | 10 | 3 + 4 Haiku/Sonnet, two arms | round 8's fixture, amended messages (fitted) | Arm B **3/3 clean with zero content lost** (was 1 of 3 losing a page); every sample merged rather than deleted. |
 | 11 | 5 Haiku, 1 Sonnet | `--base-url`, `--pretty-urls`, `_headers`/A14, `_scripts/` — never before tested | **5/6.** The seams work: every sample shipped `_headers` from the A14 recipe and wrote a working generator. One sample omitted `--base-url` — a flag the doc did not name — and published a site whose every link 404s, with exit 0. |
+| 12 | 5 Haiku, 1 Sonnet | round 11's brief, amended doc (fitted) | **5/5.** Every root-relative link prefixed (39, 39, 47, 39, 37 of them, none missed); every sample wrote and ran a `gen.mjs`; nobody asked whether unify runs the script for them. |
 
 Round 6 is the clearest single result: with the rule keyed off the key's name, **six of six** wrote the flat spelling — including the control. The nested-only rule would have failed every sample on that brief.
 

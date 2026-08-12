@@ -1,4 +1,4 @@
-# Ratification rounds 7–11 — the build becomes the judge, and the diagnostics get tested
+# Ratification rounds 7–12 — the build becomes the judge, and the diagnostics get tested
 
 **Date:** 2026-08-12. Continues `_notes/ratification-round-1.md` and the results table in
 `docs/ratification-protocol.md`.
@@ -285,6 +285,33 @@ one.
 
 ---
 
+## Round 12 — measuring round 11's two amendments
+
+Round 11's brief and prompt, byte-identical, against the amended doc. Fitted, and stated as
+such. (The brief was deliberately *not* changed to seed an image file, even though that
+would have closed the URL-provenance gap: the two amendments under test are the measurement,
+and changing the environment and the doc together makes a result unattributable. Provenance
+stays open for a deliberately new brief.)
+
+**5 of 5 Haiku.** Every sample:
+
+- published with `--base-url /handbook/` — **39, 39, 47, 39 and 37 root-relative links, all
+  prefixed, none missed.** Round 11's failure mode did not recur, and no sample reported
+  going to `--help` to find the flag.
+- wrote its generator as `gen.mjs`, the literal name the amended line now shows, and ran it
+  before the build. haiku-1 wrote out the exact composition the doc demonstrates:
+  `node src/_scripts/gen.mjs && ./unify build --base-url /handbook/ …`
+- shipped `_headers` at the output root by way of the A14 recipe, at pretty URLs.
+
+**Zero samples reported the "does unify run my script?" ambiguity** that three of six raised
+in round 11. That was the amendment made on self-report evidence alone, and the self-reports
+are where it shows up as fixed.
+
+One valid variation: haiku-3 put `_scripts/` beside the source root rather than inside it.
+The script is not part of the site, so that is arguably tidier; not a finding.
+
+---
+
 ## Status of every fix in this document
 
 | Fix | Evidence it was made on | Tested by a round it was not written for? |
@@ -296,12 +323,12 @@ one.
 | P12 "rename or merge", not "remove" | one real content loss | No — fitted (round 10, 7/7 preserved) |
 | P04 spelling per page kind, plus the drop-it repair | 2/5 misdirected | No — fitted, and **one round-10 sample still reported inferring it** |
 | A04 names the fill spelling | round 7's 3/5, round 8's reproduction | No — fitted |
-| `--base-url` named beside `--pretty-urls` | 1/6 published a wholly broken site; 2 more went to `--help` | **No — not yet measured at all** |
-| `_scripts/`: show the command | 3/6 self-reported the ambiguity | **No — not yet measured at all** |
+| `--base-url` named beside `--pretty-urls` | 1/6 published a wholly broken site; 2 more went to `--help` | No — fitted (round 12, 5/5, every link prefixed) |
+| `_scripts/`: show the command | 3/6 self-reported the ambiguity | No — fitted (round 12, 5/5 ran a `gen.mjs`, nobody asked who runs it) |
 
-The last two are the ones a successor should measure first: re-run round 11's brief
-unchanged against the amended doc. Nothing else in this table needs a new experiment before
-that one.
+Nothing in this table is now *tested* except the two oldest fixes. Every round-7-onward
+amendment has been measured exactly once, by the round it was written for. The next
+unfitted measurement of any of them is worth more than a new experiment.
 
 ## Open, in priority order
 
