@@ -114,10 +114,9 @@ The core composition system implementing the DOM Cascade specification:
   3. Directory-based layouts (`_includes/`, `_layouts/`)
 
 ### Area Matching Rules
-- **Public areas**: Classes prefixed with `unify-` (e.g., `.unify-hero`, `.unify-content`)
-- **Scope isolation**: Matching never crosses component boundaries
-- **Precedence**: Area class match → landmark fallback → ordered fill
-- **Documentation**: `<style data-unify-docs="v1">` blocks document public areas
+- **Public areas**: Classes prefixed with `unify-` (e.g., `.unify-hero`). No area name is special — `unify-content` is an ordinary area, not a reserved one; the default slot is `<main>`.
+- **Precedence**: area class match → the layout's `<main>` (default slot). Landmark fallback and ordered fill are cut — see product-spec §3.2.
+- **Discovery**: the `unify-` class prefix is the only mechanism. `<style data-unify-docs>` contract blocks are cut (product-spec §7).
 
 ### Head Merging
 - **Title**: Page wins over layout
@@ -191,15 +190,16 @@ All config file options can be overridden via CLI arguments.
 
 ## Knowledge Base
 
-- **Application specification**: `./docs/app-spec.md`
-- **DOM Cascade specification**: `./docs/dom-spec.md` (normative reference)
-- **Example implementations**: `./tests/fixtures/` (DOM Cascade compliant)
-- **Working documents**: `./_notes/` (temporary files, drafts)
+- **Product specification**: `./docs/product-spec.md` — **the normative reference.** What unify is, the composition model, the complete CLI, and the non-goals. Where any other document conflicts with it, it wins.
+- **Authoring rules**: `./docs/authoring-rules.md` — the complete authoring surface in 60 lines. Read this before writing any site content.
+- **Superseded**: `./docs/dom-spec.md` and `./docs/app-spec.md` predate the product spec and describe cut or never-implemented features (component mode, `data-unify-docs` contract blocks, U001–U008 rule codes, slots). Retained for reference only; do not author or implement against them.
+- **Example implementations**: `./tests/fixtures/`
+- **Working documents**: `./_notes/` (analyses, drafts)
 
 ## Important Implementation Notes
 
-- **Test Validation**: When tests fail, check `docs/app-spec.md` and `docs/dom-spec.md` for expected behavior
-- **Specification Conformance**: DOM composition behavior MUST conform to DOM Cascade v1
+- **Test Validation**: When tests fail, check `docs/product-spec.md` for expected behavior. A test asserting cut behavior (component mode, slots, rule codes, the `serve` command) is a test to delete, not a bug to fix — see product-spec §7.
+- **Specification Conformance**: composition behavior MUST conform to `docs/product-spec.md` §3
 - **Fragment Detection**: Uses `_` prefix convention and `data-unify` attributes
 - **Asset Handling**: Automatic discovery and copying of referenced assets
 - **Incremental Builds**: Dependency tracking enables fast rebuilds

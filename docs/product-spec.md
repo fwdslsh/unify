@@ -66,7 +66,7 @@ Scaffolding into `src/` is what makes zero-config safe: the source root holds on
 <html>
   <head>
     <meta charset="utf-8">
-    <title>My Site</title>
+    <title>— My Site</title>
     <link rel="stylesheet" href="/assets/style.css">
   </head>
   <body>
@@ -87,7 +87,7 @@ Scaffolding into `src/` is what makes zero-config safe: the source root holds on
 <!doctype html>
 <html>
   <head>
-    <title>Home —</title>
+    <title>Home</title>
   </head>
   <body>
     <h1>Welcome!</h1>
@@ -96,7 +96,7 @@ Scaffolding into `src/` is what makes zero-config safe: the source root holds on
 </html>
 ```
 
-Built result: the layout, with its `<main>` content replaced by the page's body, and the page's title prepended to the layout's: `<title>Home — My Site</title>`.
+Built result: the layout, with its `<main>` content replaced by the page's body, and the page's title prepended to the layout's: `<title>Home — My Site</title>`. The separator lives in the layout, so pages write only their own name.
 
 **Overriding a marked region** — the layout marked its footer with `class="unify-footer"`, so any page may replace it by using the same class:
 
@@ -114,7 +114,7 @@ Built result: the layout, with its `<main>` content replaced by the page's body,
 
 ```markdown
 ---
-title: About —
+title: About
 description: Who we are
 og:
   image: /assets/team.jpg
@@ -170,7 +170,9 @@ A layout may itself declare `data-unify` to chain into a parent layout (section 
    ```
 
    A page supplying both a `unify-hero` element and ordinary content gets its hero in the section and its content in place of the `<article>`; a page supplying only content keeps the layout's default hero; a page supplying only a hero keeps the layout's default content.
-3. **Head merge.** Start with the layout's `<head>`. The page's `<title>` is prepended to the layout's, joined with a space — layout `<title>My Site</title>` plus page `<title>Home —</title>` emits `<title>Home — My Site</title>` — so the site name lives in one file; a page with no title keeps the layout's alone. A page `<meta>` replaces a layout `<meta>` with the same `name`/`property`; other page head elements are appended after the layout's, so page CSS loads last and wins the cascade. Exact-duplicate stylesheet/script URLs are deduplicated, compared after §3.5 resolution — so a page's `assets/style.css` and a layout's `/assets/style.css` are one reference, not two downloads. A page `<meta charset>` is dropped in favor of the layout's, which stays first in the head; if the layout declares none, the page's is kept and moved first. Identical charsets are silent (every complete document has one); a page declaring a *different* charset from the layout's is an advisory.
+
+   **Incoming body content is unwrapped once**: if it contains a `<main>`, that element is replaced by its children before the merge — so a page written as a complete semantic document (which §1 rule 2 asks for), and a chained layout carrying its own `<main>`, both compose without nesting `<main>` inside `<main>`. No other element is unwrapped.
+3. **Head merge.** Start with the layout's `<head>`. The page's `<title>` is prepended to the layout's, joined with a space, so the separator is written once, in the layout: layout `<title>— My Site</title>` plus page `<title>Home</title>` emits `<title>Home — My Site</title>`. The site name and the separator both live in one file, pages write only their own name, and a page with no title keeps the layout's alone. The separator stays the author's choice — an em dash, a pipe, a middot, or nothing at all. A page `<meta>` replaces a layout `<meta>` with the same `name`/`property`; other page head elements are appended after the layout's, so page CSS loads last and wins the cascade. Exact-duplicate stylesheet/script URLs are deduplicated, compared after §3.5 resolution — so a page's `assets/style.css` and a layout's `/assets/style.css` are one reference, not two downloads. A page `<meta charset>` is dropped in favor of the layout's, which stays first in the head; if the layout declares none, the page's is kept and moved first. Identical charsets are silent (every complete document has one); a page declaring a *different* charset from the layout's is an advisory.
 4. **Root attributes.** On `<html>` and `<body>`, the page's classes are added to the layout's, and any other attribute the page explicitly sets wins over the layout's — so a page can carry `class="home"` styling hooks or set its own `lang`, `dir`, or `data-theme`. Attribute merging exists nowhere else: an area element keeps the layout's tag and attributes.
 
 Every rule above has worked input→output examples in the conformance spec (split out of this document — §7 item 16), which is where implementers settle edges and where the test fixtures live.
@@ -227,7 +229,7 @@ Options:
 
 That is the entire CLI. Behavior notes:
 
-- **File handling**: `.html`/`.md` files are pages (processed). **Everything else is copied through as-is**, mirroring the source tree — what you see in your folder is what ships, bytes untouched — compress images before adding them. One option holds files back: `--exclude`, a set of globs whose matches are never emitted but remain build material — includable, usable as layouts. Its default is `_*` — the same naming convention layout discovery uses (§3.2), so the files the build consumes are the files the output omits, and `init && build` is correct with zero configuration (an empty default would ship `dist/_layout.html` as a junk page). Set your own globs and they replace the default, like any option; keep `_*` in your list if you still want it (an advisory catches the usual mistake — a layout or include shipping as its own page). Links to anything not emitted are caught by the reference check like any other broken reference.
+- **File handling**: `.html`/`.md` files are pages (processed). **Everything else is copied through as-is**, mirroring the source tree — what you see in your folder is what ships, bytes untouched — compress images before adding them. One option holds files back: `--exclude`, a set of globs whose matches are never emitted but remain build material — includable, usable as layouts. Its default is `_*` — the same naming convention layout discovery uses (§3.2), so the files the build consumes are the files the output omits, and `init && build` is correct with zero configuration (an empty default would ship `dist/_layout.html` as a junk page). Set your own globs and they replace the default, like any option; keep `_*` in your list if you still want it. Replacing it cannot silently publish the build's own working files: an emitted file that is a `_`-prefixed page, or whose path contains a `_`-prefixed directory segment, is a problem naming the file and the `--exclude` line that fixes it (`--exclude '_*' --exclude 'drafts/**'`). That covers `_layout.html`, `_includes/`, `_scripts/`, `_notes/`, and `blog/_draft.md`, while root-level non-page files like `_headers` and `_redirects` still ship — Netlify sites need them, for the same reason dotfiles ship. Everything in the source root ships unless a glob holds it back, so anything that is not part of the site — notes, drafts, scratch files, scripts — belongs under a leading underscore. Links to anything not emitted are caught by the reference check like any other broken reference.
 - **Never-shipped files (safe by default).** Independent of `--exclude`, and never replaceable by it: the output directory, VCS metadata (`.git/`, `.hg/`, `.svn/`), `node_modules/`, `.env` and `.env.*`, and `unify.yaml`. `--exclude` is an authoring option; this is a footgun guard, in the same family as writing output atomically. It stays deliberately short and literal — no scanning, no heuristics, no "looks secret" guessing (§5's no-security-theater rule). Note what is *not* on it: dotfiles ship. `.htaccess` and `.nojekyll` are exactly the files this audience needs to deploy. Building from a directory you didn't scaffold (`-s .` in an existing project) prints the file count copied and points at `--dry-run` — an honest report, not a guess about your intent.
 - **Output safety.** `--clean` refuses to run when the output directory is, contains, or is contained by the source root or the working directory — `-o . --clean` is an error, not a deleted project. Two sources that would write the same output file (`about.md` and `about.html`; a `--pretty-urls` move landing on an existing `about/index.html`) are a problem naming both sources — never a silent last-write-wins. Outputs differing only by letter case are an advisory (they collide on case-insensitive filesystems and hosts). Symlinks are followed only while they resolve inside the source root; one pointing outside is treated as absent, with an advisory.
 - **`unify.yaml` is saved flags, nothing more.** Every option above may live in an optional `unify.yaml` at the source root — same names, same meanings, CLI wins on conflict — so local runs and CI share one committed invocation instead of retyping flags. No behavior exists that only the file can express; delete it and pass flags instead, and nothing changes. `init` does not create one, and the file itself never ships to output.
@@ -296,6 +298,7 @@ How the current repository maps to this spec. This is the work plan's table of c
 ### Cut
 
 - All slot/`<template>`/`data-slot` documentation and claims (the feature does not exist).
+- `<style data-unify-docs>` contract blocks and their build-removal behavior — currently taught in `dom-spec.md`, `app-spec.md`, `getting-started.md`, `include-syntax.md`, and `CLAUDE.md`. §3.3's class prefix is the only area-discovery mechanism the product ships, and §5 already refuses contract/documentation blocks.
 - The `serve` command's surface area — but **not** the serving code itself: the static-file server and live-reload transport are harvested into `unify dev` (§4), stripped to static files plus reload. What is cut is everything around them (proxying, options, configurability) and the pretense that `serve` is a separate product concept.
 - Component mode, the attribute-merge matrix, ID-stability/ARIA rewriting.
 - The linter's rule-code machinery (U001–U008, `--fail-on`, `--fail-level`) — the useful checks survive as §4's plain-language advisories; implementations may be harvested.
@@ -311,10 +314,14 @@ How the current repository maps to this spec. This is the work plan's table of c
 
 Not small. The authoring *model* is small — four primitives, and the concept count did not grow in this revision — but the engine underneath is a real build tool: URL provenance and rewriting, pretty-URL link fixup, output collision detection, the reference check, cross-platform atomic watching, transactional publishing, and (post-MVP) polyfill parity. Sequenced roughly by dependency:
 
+**Do first — the repository is teaching the wrong product**
+
+0. Retire `dom-spec.md` and rewrite `CLAUDE.md`. `dom-spec.md` still teaches component mode, `<style data-unify-docs>` contract blocks, and the U001–U008 rule codes, and `CLAUDE.md` names it the normative reference — so the repository is currently the largest source of wrong unify priors in existence, for human readers and for every coding agent that reads it. Until the conformance spec (item 16) replaces it, mark it superseded in-document. Costs nothing, blocks nothing, and every day it waits it teaches someone a feature that does not exist.
+
 **Composition spine**
 
 1. Automatic `_layout.html` discovery (§3.2 items 4–5): currently non-functional; it is the single most important convention in the product.
-2. Default-slot behavior exactly per §3.2 rule 2, **including pinned areas inside `<main>`** — the case that made the original four rules ambiguous.
+2. Default-slot behavior exactly per §3.2 rule 2: the `<main>` unwrap, and **pinned areas inside `<main>`** — the case that made the original four rules ambiguous. Pinning *depth* (whether a wrapper containing an area is itself pinned) is deliberately unsettled here and is decided in the conformance spec (item 16) with worked examples; until it lands, layouts should carry areas as direct children of `<main>`.
 3. Layout opt-out: `data-unify="none"` / `layout: none` (§3.2 item 1).
 4. Head merge correctness (duplicate `<title>` from Markdown; unrequested synthesized tags).
 5. Markdown heading `id`s (§3.4).
@@ -347,6 +354,7 @@ Not small. The authoring *model* is small — four primitives, and the concept c
 ## 8. Success criteria
 
 - A newcomer goes from nothing to a built, deployed-ready site in **under five minutes** using only the README, with two commands (`unify init`, `unify dev`) and one terminal.
+- **The rules an author needs fit on one screen.** `docs/authoring-rules.md` states every authoring rule and nothing else, in under sixty lines, and the end-to-end suite (§7 item 15) builds the §2 site driven only by it. That file is the whole product surface in a form anyone — a newcomer, a reviewer, or a coding agent — can hold at once; if a rule cannot survive the trip into it, the rule is too complicated.
 - The README teaches **100% of the product** and is read in one sitting; the HTML composition model stays small enough that the browser polyfill remains feasible. The measure of smallness is the **authoring surface** — the four primitives of §1, unchanged since v1 — not this document's length. This spec is the product contract and grows when honesty requires it; implementation minutiae belong in the conformance spec (§7 item 16), and §7 itself is deleted when realignment lands.
 - **Nothing you didn't mean to publish ever reaches `dist/`, and a build that reports errors never publishes at all.** Deploy safety is a success criterion, not an implementation detail.
 - A site built today builds identically in five years. No toolchain churn, no framework migrations, no config updates.

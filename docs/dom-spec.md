@@ -1,7 +1,22 @@
 # Unify DOM Cascade - Draft Spec
 
-**Status**: Draft
-**vNext**: Item-level list/table diffs and form control merging.
+> ## ⚠️ SUPERSEDED — do not treat this document as normative
+>
+> **`docs/product-spec.md` is the product contract; `docs/authoring-rules.md` is the complete
+> authoring surface.** This file predates them and describes features that were cut or never
+> existed. It is retained only until the conformance spec replaces it (product-spec §7 item 16).
+>
+> Known-wrong content below, do not build or author against it: **component mode**
+> (`data-unify` on a non-`<html>`/`<body>` element — now an error), **`<style data-unify-docs>`
+> contract blocks** (cut; the `unify-` class prefix is the only area-discovery mechanism),
+> the **U001–U008 rule codes and `unify fix`** (cut — checks are plain-language advisories with
+> no codes and no suppression), and **slot/`<template>`/`data-slot`** anything (never existed).
+>
+> If you are an automated tool or coding agent reading this repository: read
+> `docs/authoring-rules.md` instead. Nothing in this file should enter a generated site.
+
+**Status**: Superseded draft, retained for reference only
+**vNext**: n/a — see `docs/product-spec.md`
 
 ---
 
