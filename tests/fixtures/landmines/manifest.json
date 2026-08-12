@@ -300,6 +300,29 @@
       ],
       "diagnosticsExhaustive": true
     },
+    "layout-declares-layout": {
+      "rules": [
+        "LAY-14",
+        "P15",
+        "FIX-14"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/_layout.html",
+          "line": 4,
+          "severity": "problem",
+          "containsAll": [
+            "data-layout",
+            "not supported"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "C7 / FIX-14: a layout that declares data-layout is P15 — layout chaining is not supported in v0.7.0 and is never a silent no-op. The declared target (_base.html) exists, so the only diagnostic is P15 itself."
+    },
     "layout-missing": {
       "rules": [
         "LAY-05",
@@ -337,69 +360,6 @@
           "severity": "problem",
           "containsAll": [
             "../outside.html"
-          ]
-        }
-      ],
-      "diagnosticsExhaustive": true
-    },
-    "layout-cycle": {
-      "rules": [
-        "LAY-08",
-        "P06",
-        "DIA-08"
-      ],
-      "flags": [],
-      "exit": 1,
-      "published": false,
-      "diagnostics": [
-        {
-          "file": "src/index.html",
-          "line": 4,
-          "severity": "problem",
-          "containsAll": [
-            "→",
-            "_a.html",
-            "_b.html"
-          ]
-        }
-      ],
-      "diagnosticsExhaustive": true
-    },
-    "layout-chain-10": {
-      "rules": [
-        "LAY-06",
-        "LAY-07",
-        "LAY-08"
-      ],
-      "flags": [],
-      "exit": 0,
-      "published": true,
-      "diagnostics": [],
-      "diagnosticsExhaustive": true,
-      "expectContains": {
-        "index.html": [
-          "data-chain=\"l10\"",
-          "<h1>Hi</h1>"
-        ]
-      },
-      "note": "Ten layouts in a chain is at the cap and builds; eleven fails (next case). The outermost shell is l10's, so its marker attribute must survive."
-    },
-    "layout-chain-11": {
-      "rules": [
-        "LAY-08",
-        "P06",
-        "DIA-08"
-      ],
-      "flags": [],
-      "exit": 1,
-      "published": false,
-      "diagnostics": [
-        {
-          "file": "src/index.html",
-          "line": 4,
-          "severity": "problem",
-          "containsAll": [
-            "→"
           ]
         }
       ],
@@ -476,7 +436,7 @@
     "duplicate-slot-name": {
       "rules": [
         "MRG-03",
-        "A06",
+        "A13",
         "S03",
         "S04"
       ],
@@ -499,7 +459,7 @@
     "second-bare-slot": {
       "rules": [
         "MRG-02",
-        "A05",
+        "A13",
         "S03",
         "S04"
       ],
@@ -522,7 +482,7 @@
     "dup-main": {
       "rules": [
         "MRG-05",
-        "A07",
+        "A13",
         "S05"
       ],
       "flags": [],
@@ -1240,27 +1200,25 @@
     },
     "slot-in-filled-fallback": {
       "rules": [
-        "MRG-11",
-        "A02",
-        "MRG-18",
-        "S12"
+        "MRG-19",
+        "P16"
       ],
       "flags": [],
-      "exit": 0,
-      "published": true,
+      "exit": 1,
+      "published": false,
       "diagnostics": [
         {
-          "file": "src/index.html",
-          "line": 7,
-          "severity": "advisory",
+          "file": "src/_layout.html",
+          "line": 8,
+          "severity": "problem",
           "containsAll": [
-            "inner"
+            "slot",
+            "nest"
           ]
         }
       ],
       "diagnosticsExhaustive": true,
-      "expectedTree": "expected",
-      "specBug": "B1: §7.1 makes a slot nested in another slot's fallback a sink, but §7.3's outermost-first processing destroys it when the outer slot is filled — the natural reading silently drops the inner fill, violating the content-loss law. This fixture pins the law-preserving behavior (inner fill stays in the default flow with advisory 2) until the spec is amended. See docs/testing-strategy.md §7."
+      "note": "B1 resolved by spec amendment (2026-08-12): slots do not nest. A <slot> inside another slot's fallback is P16, located at the layout, so the fill-stranding case the old outermost-first rule created can no longer arise. The page is plain default content; the single problem is exhaustive."
     },
     "two-problems-one-pass": {
       "rules": [

@@ -1,7 +1,7 @@
 # unify — Conformance Specification
 
 **Status**: v0.7.0, normative
-**Role**: The implementer-grade reference. `docs/product-spec.md` defines the product; this document defines the exact behavior, precisely enough that two independent implementations produce byte-identical output. Every worked example in this document is a test fixture: an implementation conforms when it reproduces each example's output byte-for-byte and each diagnostic at the stated severity. Where this document and the product spec appear to differ, that is a defect in the document set to be fixed — neither may be silently reinterpreted.
+**Role**: The implementer-grade reference. `docs/product-spec.md` defines the product; this document defines the exact behavior, rule by rule. Every worked example in this document is a test fixture: an implementation conforms when it reproduces each example's output exactly — exact in element structure, tag names, attributes and their order, and text content — with only whitespace between block-level elements waived (§3; the comparator contract is `docs/testing-strategy.md` §2), and each diagnostic at the stated severity. Where this document and the product spec appear to differ, that is a defect in the document set to be fixed — neither may be silently reinterpreted.
 
 Conventions: "problem" and "advisory" are the only two severities (§14). MUST-level language is implied throughout; nothing here is optional. All paths in examples are relative to the source root unless prefixed `src/` or `dist/` for clarity. All files are UTF-8.
 
@@ -27,7 +27,7 @@ For `build`, `--dry-run`, and every watch rebuild, in this order:
 1. **Scan** the source tree; apply the never-shipped list (§4.3), then classify every remaining file: page or asset; excluded or emitted.
 2. **Load and inline includes** (§5) for every page and every layout as it is loaded — textual, recursive, before any parsing.
 3. **Parse** each page; detect frontmatter/`<head>` misuse (§10.5); convert Markdown (§10).
-4. **Resolve layouts** (§6) and compose each page pairwise up its chain (§7–§9).
+4. **Resolve layouts** (§6) and compose each page with its layout (§7–§9).
 5. **Rewrite URLs** by provenance (§11.1), then apply `--pretty-urls` (§11.2), then `--base-url` (§11.3).
 6. **Compute output paths**; detect collisions (§13).
 7. **Write** pages and copy assets into a temporary tree.
@@ -41,20 +41,20 @@ Composition is best-effort: a problem in one page never stops the analysis of th
 
 ## 3. Output text rules (the splice model)
 
-unify composes by editing spans of source text. It never reformats, re-indents, or re-serializes markup. These rules make output bytes deterministic:
+unify composes by editing spans of source text — it never reformats, re-indents, or re-serializes markup, so the author's own formatting survives composition. The rules below say **which span is replaced by what**; they are behavioral, not byte-level. **Whitespace between block-level elements is not normative**: no rule in this specification depends on the indentation or inter-element whitespace a splice happens to produce, and conformance comparison normalizes exactly that class of whitespace and nothing else — element structure, tag names, attributes and their order, and text content are compared exactly (the comparator contract is `docs/testing-strategy.md` §2).
 
-- **S1 — Preservation.** All bytes outside an edited span are preserved exactly. The layout file's text is the base document for a composed page; the page contributes the spans the rules below insert.
-- **S2 — Include splice.** The include element's span (start tag through matching end tag, or the void tag, or the SSI comment) is replaced by the included file's processed contents, minus one trailing newline if the file ends with one.
-- **S3 — Slot fill.** The slot element's span (start tag through end tag) is replaced by the fill elements' source texts. Fills contiguous in page source (separated only by whitespace) keep their interior bytes; non-contiguous fills are joined with a single `\n`. The consumed `slot` attribute — the attribute text plus the single whitespace run before it — is removed from each fill.
-- **S4 — Slot fallback.** The slot's start and end tags are removed; its inner bytes are kept as written.
-- **S5 — Children replacement** (a `<main>` receiving default content, or a sink-less layout `<body>`, §7.4–7.5). The span from the first non-whitespace byte after the start tag to the last non-whitespace byte before the end tag is replaced by the default-content text. If the element's content is empty or whitespace-only, the entire inner span is replaced by `\n` + text + `\n` + the indentation (leading whitespace) of the start tag's line.
-- **S6 — Unwrap.** The page's first `<main>` start tag and its matching end tag are deleted; inner bytes stay in place.
-- **S7 — Removal.** When an element is removed (head dedup, replaced layout elements), its span plus the whitespace run immediately before it are removed. Removing an attribute (`data-layout`, consumed `slot`) removes the attribute text plus the single whitespace run before it.
-- **S8 — Head replacement in place.** A layout head element replaced by page elements (§8) has its span replaced by the page elements' source texts, joined with `\n` when there are several; the layout's other same-key elements are removed per S7.
-- **S9 — Head append.** After the last non-whitespace byte of the layout head's content, insert `\n` + IND + element text for each appended element, in page-source order, where IND is the indentation (leading whitespace) of the line containing that last non-whitespace byte. The head's original trailing whitespace and `</head>` follow unchanged. If the head has no non-whitespace content, elements insert immediately after the `<head>` start tag, each preceded by `\n`.
-- **S10 — Title join.** The layout `<title>`'s inner text is replaced by `pageText + " " + layoutText`, both trimmed of leading/trailing whitespace. The layout's title element (tag and attributes) is kept.
-- **S11 — Root attributes.** The layout's `<html>`/`<body>` tags are edited in place: the `class` value becomes the layout's tokens in order followed by page tokens not already present, space-separated; an overridden attribute's value is edited in place; a new attribute is inserted before the tag's closing `>`, preceded by one space, in page-source order.
-- **S12 — Default-content text.** The default-content node sequence (§7.2) drops leading and trailing whitespace-only text nodes; interior nodes (including whitespace and comments) keep their source bytes. Nodes made non-contiguous by fill extraction are joined with a single `\n`.
+- **S1 — Preservation.** Outside the composed regions the rules below name, source text ships as written. The layout file is the base document for a composed page; the page contributes what the rules below place into it.
+- **S2 — Include splice.** The include element (start tag through matching end tag, or the void tag, or the SSI comment) is replaced by the included file's processed contents.
+- **S3 — Slot fill.** The slot element is replaced by the fill elements, in page order. The consumed `slot` attribute is removed from each fill; nothing else about a fill's markup changes.
+- **S4 — Slot fallback.** An unfilled slot's start and end tags are removed; its children remain, as written.
+- **S5 — Children replacement** (a `<main>` receiving default content, or a sink-less layout `<body>`, §7.4–7.5). The element's children are replaced by the default content; the element itself — tag and attributes — stays.
+- **S6 — Unwrap.** The page's first `<main>`'s start and end tags are removed; its children stay in place.
+- **S7 — Removal.** A removed element (head dedup, replaced layout elements) is removed entirely; a removed attribute (`data-layout`, a consumed `slot`) is removed cleanly from its tag. Removal changes nothing else.
+- **S8 — Head replacement in place.** A layout head element replaced under §8 has the page's element(s) take its position, in page order; the layout's other same-key elements are removed per S7.
+- **S9 — Head append.** Appended head elements land at the end of the layout's head content, in page-source order.
+- **S10 — Title join.** The layout `<title>`'s text becomes `pageText + " " + layoutText`, both trimmed of leading/trailing whitespace. The layout's title element (tag and attributes) is kept. Title text is text content and is compared exactly.
+- **S11 — Root attributes.** The layout's `<html>`/`<body>` tags are edited in place: the `class` value becomes the layout's tokens in order followed by page tokens not already present, space-separated; an overridden attribute keeps its position with the page's value; a new attribute is appended to the tag, in page-source order.
+- **S12 — Default content.** Default content (§7.2) keeps its nodes — elements, text, comments — in source order, interior text preserved as written; whitespace-only text nodes at its boundaries are not significant.
 
 The output document's shell — doctype, `<html>`, `<head>`, `<body>` tags — is the layout's. The page's doctype and shell tags are not emitted (their attributes participate via S11). A page with no layout is emitted from its own text.
 
@@ -108,7 +108,7 @@ Independent of `--exclude` and not replaceable by it, these never appear in outp
 
 ### 4.4 Mirror copy and symlinks
 
-Every emitted asset is copied byte-for-byte to the same source-root-relative path. Symlinks are followed only while the resolved target stays inside the source root; a symlink resolving outside is treated as absent, with an advisory (§14.3 #12). Building with `-s .` in a directory `init` did not scaffold prints the count of files that would be copied and points at `--dry-run`.
+Every emitted asset is copied byte-for-byte to the same source-root-relative path. Symlinks are followed only while the resolved target stays inside the source root; a symlink resolving outside is treated as absent, with advisory A12 (§14.3). Building with `-s .` in a directory `init` did not scaffold prints the count of files that would be copied and points at `--dry-run`.
 
 ---
 
@@ -144,7 +144,7 @@ src/index.html:9: problem: <include> takes no content — the file's contents re
   fix: includes are not components; put page content in the page, or generate variants with a script (_scripts/)
 ```
 
-7. The void form (no closing tag) builds identically and carries advisory #1 (§14.3).
+7. The void form (no closing tag) builds identically and carries advisory A01 (§14.3).
 
 Inlining is textual and happens before parsing, so an include may appear anywhere — `<head>` included — and a fragment's top-level elements become the host's (a fragment included at body top level may therefore carry `slot=` fills, and a fragment included in a layout body may contribute `<slot>` elements; both are consequences of this ordering, not extra rules).
 
@@ -209,9 +209,16 @@ src/about.md:2: problem: layout is not a path: "default"
 
 A path that resolves to no file, or escapes the source root, is a problem with the include-not-found shape (§5.1 step 3), including the casing line.
 
-### 6.2 Chaining
+### 6.2 No chaining
 
-A layout may itself carry `data-layout` on its `<html>` or `<body>` to chain into a parent. Layouts never auto-discover parents — no `data-layout` (or `data-layout="none"`) ends the chain. Chains compose pairwise, innermost first: page → L1, result → L2, …. Cycle detection by resolved path; **cap: 10 layouts in a chain**. Violations are problems printing the full chain.
+Layout chaining is not part of v0.7.0. **A layout that itself declares `data-layout` — any value, including `"none"` — is a problem (P15)**, located, naming the layout file and stating plainly that chaining is not supported; it is never a silent no-op:
+
+```
+src/blog/_layout.html:6: problem: this layout declares data-layout — layout chaining is not supported in v0.7.0
+  fix: make blog/_layout.html a complete standalone layout, or delete it so pages use /_layout.html
+```
+
+A section that wants its own chrome writes a complete `_layout.html` in its directory — the discovery walk (§6.1 step 4) already scopes it to that section. Chaining is a recorded future candidate (product spec §6) and returns only on demonstrated demand.
 
 ### 6.3 Misplacement and migration (problems)
 
@@ -227,22 +234,28 @@ src/_layout.html:14: problem: class "unify-footer" is the v0.6 area vocabulary
 
 ### 6.4 Consumed attributes
 
-`data-layout` never appears in output (removed per S7, on pages and on layouts, including the `"none"` form). The `slot` attribute consumed by a fill is removed per S3. A `<script>` tag carrying `data-polyfill` is removed entirely from built output (the author-signed design-time aid; product spec §6.3).
+`data-layout` never appears in output (removed per S7, including the `"none"` form). The `slot` attribute consumed by a fill is removed per S3. A `<script>` tag carrying `data-polyfill` is removed entirely from built output (the author-signed design-time aid; product spec §6.3).
 
 ---
 
 ## 7. Composition: the merge
 
-Pairwise, for each (content document C, layout L) step of the chain:
+For each page: C is the page document (after includes and Markdown conversion), L its selected layout (§6.1).
 
 ### 7.1 Sink detection
 
 L's **sinks** are the `<slot>` elements in L's `<body>` (skipping any inside `<template>`), plus L's first `<main>`. If L's body has no slot and no `<main>`, L is **sink-less** (§7.5).
 
-- The first bare `<slot>` (no `name`) is **the default slot**. Further bare slots: advisory #5, and they render their fallback.
-- The first `<slot name="X">` for each X receives X's fills. A repeated name: advisory #6; later ones render their fallback.
-- A `<slot>` outside a layout's `<body>` (a slot anywhere in a page, or in a layout's `<head>`): advisory #4, and it is replaced by its own children (S4).
-- Duplicate `<main>` in L: the first wins; advisory #7.
+- The first bare `<slot>` (no `name`) is **the default slot**. Further bare slots: advisory A13 (duplicated construct), and they render their fallback.
+- The first `<slot name="X">` for each X receives X's fills. A repeated name: advisory A13; later ones render their fallback.
+- A `<slot>` outside a layout's `<body>` (a slot anywhere in a page, or in a layout's `<head>`): advisory A04, and it is replaced by its own children (S4).
+- Duplicate `<main>` in L: the first wins; advisory A13.
+- **Slots do not nest.** A `<slot>` anywhere inside another `<slot>` element — that is, inside a slot's fallback content — is a **problem (P16)**, located: fallback content is plain markup, and a nested slot would silently vanish (or strand its fills) the moment the outer slot is filled, which the content-loss law forbids:
+
+```
+src/_layout.html:8: problem: <slot name="inner"> is nested inside the fallback of <slot name="outer"> — slots do not nest
+  fix: move the inner slot out of the outer slot's fallback, or drop one of them
+```
 
 ### 7.2 Preparing C's content
 
@@ -250,17 +263,17 @@ If L has at least one sink: C's body content is **unwrapped once** — the first
 
 **Fills** are then collected: every top-level element of C's body carrying a `slot` attribute with a non-empty value. (`slot=""` counts as absent. `slot` on non-top-level elements is the author's own markup and is never touched or reported.) Fill elements are removed from the default-content sequence.
 
-**Default content** is everything else in C's body — elements, text, comments — in source order (S12 trimming applies).
+**Default content** is everything else in C's body — elements, text, comments — in source order (S12).
 
 ### 7.3 Filling
 
-For each name X with fills: `<slot name="X">` is replaced by the fills in page order (S3). A fill whose name matches no slot in L: advisory #2, its `slot` attribute is consumed, and the element stays in place in the default-content sequence — nothing is lost.
+For each name X with fills: `<slot name="X">` is replaced by the fills in page order (S3). A fill whose name matches no slot in L: advisory A02, its `slot` attribute is consumed, and the element stays in place in the default-content sequence — nothing is lost.
 
-Each unfilled named slot is replaced by its own children (S4). Slots inside a shipped fallback are processed the same way, outermost first. Slots inside `<template>` are never touched and ship as written.
+Each unfilled named slot is replaced by its own children (S4). Fallback content is plain markup — a `<slot>` inside it is P16 (§7.1), so no recursive processing exists. Slots inside `<template>` are never touched and ship as written.
 
 ### 7.4 Routing default content
 
-- L has a default slot → the default content replaces it (S3 span, S12 text). If the default content is empty, the default slot renders its fallback (S4).
+- L has a default slot → the default content replaces it (S3, S12). If the default content is empty, the default slot renders its fallback (S4).
 - No default slot, L has `<main>` → the default content replaces `<main>`'s children (S5). If the default content is empty, `<main>` keeps its children (the layout's default persists).
 - No default slot, no `<main>`, L has named slots, and the default content is non-empty → **problem** (content would vanish):
 
@@ -277,7 +290,7 @@ A layout with no slots and no `<main>` treats its whole `<body>` as the default 
 
 ### 7.6 Advisory on stray chrome
 
-When a page composes with a layout, a top-level `<header>` or `<footer>` element left in the default content is advisory #3 (it probably meant `slot=`). It still ships, in place, per the content-loss law.
+When a page composes with a layout, a top-level `<header>` or `<footer>` element left in the default content is advisory A03 (it probably meant `slot=`). It still ships, in place, per the content-loss law.
 
 **The law**: content the author wrote is never dropped without failing the build. Every rule above either places content or raises a problem; no future rule may do otherwise.
 
@@ -336,7 +349,7 @@ When a page composes with a layout, a top-level `<header>` or `<footer>` element
 </html>
 ```
 
-(The page's `<main>` was unwrapped (S6); its children replaced the layout `<main>`'s children (S5, layout's inner leading/trailing whitespace kept); the title joined (S10).)
+(The page's `<main>` was unwrapped (S6); its children replaced the layout `<main>`'s children (S5); the title joined (S10).)
 
 #### C2 — named slot: replace the element
 
@@ -392,12 +405,12 @@ Same layout as C2; `src/about.html` body is `<h1>About</h1>` only. `dist/about.h
 
 #### C4 — multiple fills, one name, page order
 
-Layout body: `<slot name="aside"><p>Default</p></slot>`. Page body top level, in this order: `<p slot="aside">One</p>`, `<h1>Title</h1>`, `<p slot="aside">Two</p>`. Slot replacement text:
+Layout body: `<slot name="aside"><p>Default</p></slot>`. Page body top level, in this order: `<p slot="aside">One</p>`, `<h1>Title</h1>`, `<p slot="aside">Two</p>`. The slot is replaced by:
 ```html
 <p>One</p>
 <p>Two</p>
 ```
-(non-contiguous fills join with `\n` — S3). `<h1>Title</h1>` is default content.
+(fills land in page order — S3; whitespace between them is not significant, §3). `<h1>Title</h1>` is default content.
 
 #### C5 — fill to a slot that doesn't exist
 
@@ -444,7 +457,7 @@ A page supplying only `<p>Body text.</p>` keeps the layout's default hero:
 
 When a layout has a default slot, `<main>`'s other children are never touched — the bare slot is the sink, so persistent (pinned) content is simply markup the layout wrote outside the slot.
 
-#### C7 — chain: section layout → site layout
+#### C7 — a layout that declares `data-layout` is a problem
 
 `src/blog/_layout.html`:
 ```html
@@ -460,38 +473,14 @@ When a layout has a default slot, `<main>`'s other children are never touched �
 </html>
 ```
 
-with the C1 site `src/_layout.html`, and `src/blog/post.html`:
-```html
-<!doctype html>
-<html>
-  <head><title>My Post</title></head>
-  <body>
-    <main>
-      <p>Post body.</p>
-    </main>
-  </body>
-</html>
+With any page under `blog/` (and the C1 site `src/_layout.html` present), the build reports P15, publishes nothing, and exits 1:
+
+```
+src/blog/_layout.html:4: problem: this layout declares data-layout — layout chaining is not supported in v0.7.0
+  fix: make blog/_layout.html a complete standalone layout, or delete it so pages use /_layout.html
 ```
 
-`dist/blog/post.html`:
-```html
-<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8">
-    <title>My Post — Blog — My Site</title>
-    <link rel="stylesheet" href="/assets/style.css">
-  </head>
-  <body>
-    <main>
-      <aside>Blog sidebar</aside>
-      <p>Post body.</p>
-    </main>
-  </body>
-</html>
-```
-
-Step 1: post → blog layout (unwrap post's `<main>`; content fills the bare slot; title `My Post — Blog`). Step 2: that result → site layout (the blog layout's `<main>` is unwrapped in turn; its children — sidebar plus post content — replace the site `<main>`'s children; title `My Post — Blog — My Site`). Titles, heads, and body classes accumulate up the chain by the same pairwise rules.
+A section gets its own chrome by writing a *complete* layout in its directory — the discovery walk (§6.1 step 4) already scopes it to the section, and the accepted cost is that shared chrome is written out in each layout that wants it. Chaining is a recorded future candidate (product spec §6).
 
 #### C8 — sink-less layout: head-only passthrough
 
@@ -518,7 +507,7 @@ Page C1's `index.html` composes to:
     <title>Home</title>
   </head>
   <body>
-<main>
+    <main>
       <h1>Welcome!</h1>
       <p>Hello.</p>
     </main>
@@ -526,7 +515,7 @@ Page C1's `index.html` composes to:
 </html>
 ```
 
-(No unwrap — the page's `<main>` survives, and the page's own bytes ship exactly as written, so its indentation is its own (§7.5, S5 whitespace-only case: `<main>` starts at column 0 because the replacement inserts `\n` + text; unify never re-indents). The layout had no `<title>`, so the page's title appended with S9's indentation.)
+(No unwrap — the page's `<main>` survives (§7.5) and ships as written. The layout had no `<title>`, so the page's title appended at the end of the head (S9).)
 
 #### C9 — slots inside `<template>` are never unify's
 
@@ -534,7 +523,7 @@ A layout containing
 ```html
     <template shadowrootmode="open"><slot name="x"><p>shadow default</p></slot></template>
 ```
-ships those bytes unchanged, and a page fill `slot="x"` matching only that slot gets advisory #2 (no slot named "x" *of the layout's*).
+ships those bytes unchanged, and a page fill `slot="x"` matching only that slot gets advisory A02 (no slot named "x" *of the layout's*).
 
 ---
 
@@ -544,15 +533,13 @@ Start from the layout's `<head>`; apply, in this order:
 
 | # | Page head element | Key | Behavior |
 |---|---|---|---|
-| 1 | `<meta charset>` | — | Dropped in favor of the layout's, which stays first. If the layout declares none, the page's is kept and moved to the head's first position (inserted on its own line immediately after the `<head>` start tag, with the indentation of the head's first content line). Identical values: silent. Different values: advisory #8. |
+| 1 | `<meta charset>` | — | Dropped in favor of the layout's, which stays first. If the layout declares none, the page's is kept and moved to the head's first position. Identical values: silent. Different values: advisory A08. |
 | 2 | `<title>` | — | Joined per S10: page text + `" "` + layout text, in the layout title's position. Page title with empty/whitespace-only text = absent. Layout with no `<title>`: the page's title appends (row 7) with its own text. |
 | 3 | `<meta name="…">`, `<meta property="…">` | the `name`/`property` value, ASCII case-insensitive | Replaces in place (S8): all layout elements with the key are removed, the page's take the first one's position in page order. Multiple page elements with one key are all kept (`og:image` is legitimately plural) — dedup only crosses the layout/page boundary, never within one source. `http-equiv` metas are not keyed; they append (row 7). |
 | 4 | `<link rel="canonical">` | `canonical` ∈ rel tokens | Replaces in place (S8). **One canonical, never two** — this closes the doubled-canonical defect. |
 | 5 | `<link rel="icon">` (rel token list contains `icon`, ASCII case-insensitive — covers `shortcut icon`) | `icon` | Replaces in place (S8): all the layout's icon links are removed; the page's icon set takes the first one's position. `apple-touch-icon` is a different token and is not keyed. |
 | 6 | `<link rel="stylesheet">`, `<script src>` | the URL, **compared after §11.1 resolution** | If the resolved URL equals a layout head reference's resolved URL, the page copy is dropped (S7) — the layout's position stands. A page `assets/style.css` and layout `/assets/style.css` are one reference. Inline `<script>`/`<style>` with byte-identical content: the page copy is dropped. |
 | 7 | Everything else | — | Appended after the layout's head content, in page-source order (S9) — page CSS loads last and wins the cascade. |
-
-Chained layouts merge heads pairwise with the same table.
 
 ### 8.1 Fixture — the whole table at once
 
@@ -682,7 +669,7 @@ More.
 </html>
 ```
 
-(Title from the first `<h1>` (§10.3); synthesized metas appended (§8 row 7, S9); converted body is the default content — its own line breaks are the converter's, and S5 preserves the layout `<main>`'s inner leading/trailing whitespace around it.)
+(Title from the first `<h1>` (§10.3); synthesized metas appended (§8 row 7, S9); the converted body is the default content — its line breaks are the converter's, shipped as written, and not significant between blocks (§3).)
 
 ---
 
@@ -744,7 +731,7 @@ A URL is internal when, after stripping the `--base-url` path prefix, it is root
 |---|---|---|
 | Two sources, one output path | `about.html` + `about.md` → `about.html` | **problem**, naming both sources |
 | `--pretty-urls` move lands on another source's output | `about.html` → `about/index.html` while `about/index.md` exists | **problem**, naming both sources |
-| Two outputs differing only by letter case | `About.html` + `about.html` | advisory #11 (they collide on case-insensitive hosts) |
+| Two outputs differing only by letter case | `About.html` + `about.html` | advisory A11 (they collide on case-insensitive hosts) |
 
 Pages and assets cannot collide with each other by construction: `.html`/`.md` are always pages, everything else is always an asset, and mirror copy is path-preserving. Collisions are detected before any write; there is no last-write-wins anywhere in unify.
 
@@ -760,35 +747,38 @@ Diagnostics go to stderr; the build summary and `--dry-run` list go to stdout; b
 
 ### 14.2 Problems (closed list for v0.7.0)
 
-1. Include target missing, not `.html`/`.md`, or escaping the source root (§5.1)
-2. Include cycle / depth over 10 — chain printed (§5.1)
-3. `<include>` without `src`; `<include>` with non-whitespace content (§5.1)
-4. Layout reference not a `.html` path (bare name) (§6.1)
-5. Layout target missing or escaping the source root (§6.1)
-6. Layout cycle / chain over 10 — chain printed (§6.2)
-7. `data-layout` on a non-root element (§6.3)
-8. `data-unify` attribute; `unify-` class token (§6.3)
-9. Unaddressed page content with no sink in a slotted layout (§7.4)
-10. Frontmatter in an `.html` page (§10.5)
-11. Literal `<head>` in a Markdown body (§10.5)
-12. Output collision (§13)
-13. Broken internal reference (§12)
-14. Emitted `_`-prefixed page or `_`-directory path (§4.2)
+The bold IDs are the stable identifiers used by `tests/conformance/rules.tsv` and by tests; list position is not meaningful.
+
+1. **P01** — Include target missing, not `.html`/`.md`, or escaping the source root (§5.1)
+2. **P02** — Include cycle / depth over 10 — chain printed (§5.1)
+3. **P03** — `<include>` without `src`; `<include>` with non-whitespace content (§5.1)
+4. **P04** — Layout reference not a `.html` path (bare name) (§6.1)
+5. **P05** — Layout target missing or escaping the source root (§6.1)
+6. **P15** — A layout declares `data-layout` — layout chaining is not supported in v0.7.0 (§6.2)
+7. **P07** — `data-layout` on a non-root element (§6.3)
+8. **P08** — `data-unify` attribute; `unify-` class token (§6.3)
+9. **P09** — Unaddressed page content with no sink in a slotted layout (§7.4)
+10. **P16** — A `<slot>` nested inside another slot's fallback content — slots do not nest (§7.1)
+11. **P10** — Frontmatter in an `.html` page (§10.5)
+12. **P11** — Literal `<head>` in a Markdown body (§10.5)
+13. **P12** — Output collision (§13)
+14. **P13** — Broken internal reference (§12)
+15. **P14** — Emitted `_`-prefixed page or `_`-directory path (§4.2)
 
 ### 14.3 Advisories (the closed catalogue — adding one means removing one)
 
-1. Void `<include>` used (builds identically; previews wrong in a browser)
-2. Fill names a slot the layout doesn't have (content stayed in the page flow) (§7.3)
-3. Top-level `<header>`/`<footer>` outside any slot in a composed page (§7.6)
-4. `<slot>` outside a layout's `<body>` (replaced by its children) (§7.1)
-5. Second bare `<slot>` in a layout (first won) (§7.1)
-6. Repeated slot name in a layout (first won) (§7.1)
-7. Duplicate `<main>` in a layout (first won) (§7.1)
-8. Page charset differs from the layout's (layout's kept) (§8 row 1)
-9. Working-format file emitted — extension list, closed: `.psd`, `.ai`, `.sketch`, `.fig`, `.xcf`
-10. A file used as a layout or include also ships as its own page (the non-underscored case)
-11. Output paths differing only by case (§13)
-12. Symlink resolving outside the source root (treated as absent) (§4.4)
+Same ID convention as §14.2.
+
+1. **A01** — Void `<include>` used (builds identically; previews wrong in a browser)
+2. **A02** — Fill names a slot the layout doesn't have (content stayed in the page flow) (§7.3)
+3. **A03** — Top-level `<header>`/`<footer>` outside any slot in a composed page (§7.6)
+4. **A04** — `<slot>` outside a layout's `<body>` (replaced by its children) (§7.1)
+5. **A13** — A duplicated construct of which only the first counts — a second bare `<slot>`, a repeated slot name, or a second `<main>` in a layout: the first won, and the message names the duplicated construct (§7.1)
+6. **A08** — Page charset differs from the layout's (layout's kept) (§8 row 1)
+7. **A09** — Working-format file emitted — extension list, closed: `.psd`, `.ai`, `.sketch`, `.fig`, `.xcf`
+8. **A10** — A file used as a layout or include also ships as its own page (the non-underscored case)
+9. **A11** — Output paths differing only by case (§13)
+10. **A12** — Symlink resolving outside the source root (treated as absent) (§4.4)
 
 Discipline (asserted by the E2E suite): an advisory that fires on a correct site is a bug in the advisory — `unify init && unify build --dry-run --strict` exits `0`. Advisories report what the build observed and what it did; they never instruct the author to restructure markup that composed correctly.
 
@@ -816,11 +806,11 @@ Stdout, one list ordered by output path regardless of verb, one line per action,
 write dist/404.html ← 404.html (no layout)
 write dist/about/index.html ← about.md + _layout.html
 copy dist/assets/style.css ← assets/style.css
-write dist/blog/post/index.html ← blog/post.html + blog/_layout.html + _layout.html
+write dist/blog/post/index.html ← blog/post.html + blog/_layout.html
 delete dist/stale.html
 ```
 
-Every `write` names the full composition chain (the one fact not readable from any single file). Diagnostics print to stderr exactly as a real build would. `unify build --dry-run --strict` is the one-line CI lint.
+Every `write` names its inputs — the source page and the layout it resolved to (the one fact not readable from any single file). Diagnostics print to stderr exactly as a real build would. `unify build --dry-run --strict` is the one-line CI lint.
 
 ---
 

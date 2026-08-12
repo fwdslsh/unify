@@ -41,17 +41,19 @@ The precedence rule in one sentence: **named fills go to named slots, everything
 ```
 source tree → inline <include> (textual, before parsing)
             → resolve layout (data-layout / frontmatter / nearest _layout.html walk)
-            → merge pairwise up the chain: slots → main → head → root attributes
+            → merge with the layout: slots → main → head → root attributes
             → URL provenance rewriting → --pretty-urls → --base-url
             → collision detection → temp tree → reference check → transactional publish
 ```
 
 Merge rules (normative detail in `docs/conformance-spec.md`):
 
-1. **Slots** — a layout `<body>` may contain `<slot>` elements. A page top-level element with `slot="name"` **replaces** `<slot name="name">`, tag and all; the consumed `slot` attribute is removed; an unfilled slot is replaced by its own children (fallback). Slots inside `<template>` are never touched. Fills count only on direct children of `<body>`.
+1. **Slots** — a layout `<body>` may contain `<slot>` elements. A page top-level element with `slot="name"` **replaces** `<slot name="name">`, tag and all; the consumed `slot` attribute is removed; an unfilled slot is replaced by its own children (fallback). Slots do not nest — a `<slot>` inside another slot's fallback is a problem (P16). Slots inside `<template>` are never touched. Fills count only on direct children of `<body>`.
 2. **Main** — content not addressed to a named slot goes to the bare `<slot>`, else replaces the children of the layout's `<main>`. Incoming content is unwrapped once (a page's own `<main>` is replaced by its children). A layout with no slots and no `<main>` passes the page body through (head-only layout).
 3. **Head** — layout's head is the base; page `<title>` is *prepended* to the layout's (separator lives in the layout); page `<meta>` replaces same-`name`/`property`; page `canonical`/`icon` links replace the layout's same-`rel` (never two canonicals); everything else appends (page CSS wins); stylesheet/script dedup compares URLs *after* resolution; layout's charset wins and stays first.
 4. **Root attributes** — on `<html>`/`<body>` only: class union, page wins elsewhere. No attribute merging anywhere else.
+
+Layouts do not chain in v0.7.0: a layout that itself declares `data-layout` is a located problem (P15), never a silent no-op. A section gets its own chrome from a complete standalone `_layout.html` in its directory.
 
 **The content-loss law**: content the author wrote is never dropped without failing the build. Two severities only — `problem` (blocks publish, exit 1) and `advisory` (never blocks; exits 1 only under `--strict`). Exit codes 0/1/2. Build is transactional: any problem leaves the previous `dist/` untouched.
 
@@ -63,7 +65,7 @@ Deleted with v0.6: `html-processor.js`, all of `src/core/cascade/` (area/landmar
 
 ## Testing Strategy
 
-- **Conformance fixtures are the suite's core**: every worked example in `docs/conformance-spec.md` is an input→output fixture; an implementation conforms when it reproduces them byte-for-byte.
+- **Conformance fixtures are the suite's core**: every worked example in `docs/conformance-spec.md` is an input→output fixture; an implementation conforms when it reproduces them exactly in structure, attributes, and text content (whitespace between block-level elements is not normative; the comparator contract is `docs/testing-strategy.md` §2).
 - **The golden-path E2E**: builds the product-spec §2 site and asserts the output; `unify init && unify build --dry-run --strict` exits 0 (an advisory that fires on a correct site is a bug in the advisory).
 - **Watch equivalence**: watch output after any edit sequence ≡ a fresh `unify build`; a no-op rebuild writes nothing.
 - Tests asserting cut behavior (component mode, area classes, linter codes, glob tiers, cache, scanner, short names, `serve`) are deleted with their modules — they are not bugs to fix.
@@ -93,7 +95,7 @@ Path traversal safety in include/layout resolution is internal engineering — a
 ## Knowledge Base
 
 - **`docs/product-spec.md`** — the product contract (v0.7.0): what unify is, the composition model, the complete CLI, the non-goals. Start here.
-- **`docs/conformance-spec.md`** — the normative implementer reference: exact algorithms, byte-level splice rules, the head-merge table, the collision matrix, the complete problem/advisory catalogue, and fixture-grade worked examples.
+- **`docs/conformance-spec.md`** — the normative implementer reference: exact algorithms, the splice model (S1–S12), the head-merge table, the collision matrix, the complete problem/advisory catalogue, and fixture-grade worked examples.
 - **`docs/authoring-rules.md`** — the complete authoring surface in under 60 lines; hand this to any agent writing site content.
 - **`docs/getting-started.md`** — the human tutorial. **`docs/cli-reference.md`** — every command and flag.
 - **Working documents**: `_notes/` (analyses and drafts; `_notes/unbiased-design-synthesis.md` records the v0.7.0 design rationale).

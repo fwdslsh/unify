@@ -19,11 +19,16 @@
  *      `test.todo` in a file that declares `covers(`/`@covers` fails — skipped
  *      coverage is the runtime ledger's job to expose, and a skip that keeps a
  *      declaration is a lie waiting to be believed.
- *  H5  No normalization in tree comparison. `normalizeHtml`, `replace(/\s+/g`
- *      and friends are banned in behavior tests: v0.6 compared whitespace-
- *      normalized HTML, which is how byte-level splice bugs shipped. The
- *      harness compares bytes; anything needing normalization is a spec or
- *      implementation bug, not a comparison problem.
+ *  H5  No ad-hoc normalization in tree comparison. All tree comparison goes
+ *      through the single harness comparator (tests/conformance/compare.mjs),
+ *      whose only normalization is the documented contract (testing-strategy
+ *      §2): whitespace-only text nodes outside pre/textarea/script/style are
+ *      dropped; everything else — structure, attributes and their order,
+ *      comments, and text content — is compared exactly, and non-HTML files
+ *      byte-for-byte. `normalizeHtml`, `replace(/\s+/g` and friends anywhere
+ *      else in a behavior test are banned: v0.6 collapsed ALL whitespace,
+ *      which blinded the one real comparison to text- and attribute-level
+ *      bugs. Narrow and stated, or nothing.
  *
  * Exit 0 clean; 1 violations.
  */
@@ -33,7 +38,9 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const BEHAVIOR_DIRS = ["tests/conformance", "tests/e2e"].map((d) => join(ROOT, d));
-const SELF = ["check-suite-hygiene.mjs", "check-traceability.mjs"];
+// compare.mjs is the ONE sanctioned comparator (H5): its normalization is the
+// documented testing-strategy §2 contract, so the H5 grep exempts it.
+const SELF = ["check-suite-hygiene.mjs", "check-traceability.mjs", "compare.mjs"];
 
 const RULES = [
   { id: "H1", re: /\b(?:mock|spyOn)\s*\(|jest\.fn/, why: "mock/spy in a behavior test" },

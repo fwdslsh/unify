@@ -1,15 +1,20 @@
 {
   "fixture": "spec-fixtures",
-  "description": "Mechanical transcriptions of the conformance spec's worked examples. The spec's own sentence is the assertion: 'an implementation conforms when it reproduces each example's output byte-for-byte.' Only the examples the spec gives as COMPLETE documents are transcribed here (FIX-01, FIX-02/C1, FIX-08/C7, FIX-09/C8, FIX-13/M1). The snippet-form examples (C2-C6, C9, the 8.1 head, the 9 one-liner) need invented document wrappers and are transcribed during Phase 2 of docs/migration-plan.md, next to the merge engine they test — inventing their wrappers before an implementer can run them risks silently diverging from spec intent. FIX-06 and FIX-10 are already realized as landmines misaddressed-fill and slot-in-template.",
+  "description": "Mechanical transcriptions of the conformance spec's worked examples. The spec's own sentence is the assertion: an implementation conforms when it reproduces each example's output exactly in element structure, attributes and their order, and text content, with only whitespace between block-level elements waived (conformance spec preamble + section 3; comparator contract in docs/testing-strategy.md section 2). Ten of the thirteen FIX rows live here as checked-in trees; FIX-06, FIX-10, and FIX-14 are realized as the landmines misaddressed-fill, slot-in-template, and layout-declares-layout. Snippet-form spec examples are wrapped in minimal complete documents; the wrapped regions are transcribed verbatim from the spec.",
   "harnessContract": {
-    "run": "per case: unify build -s <case>/src -o <tmp>/dist; exit 0; zero diagnostics; byte-exact bidirectional tree compare against expected/",
-    "assetStubs": "cases whose spec example references /assets/style.css or /assets/team.jpg include stub files so the post-build reference check passes. The stubs are NOT part of the spec's byte-exact claim; the composed pages are, byte for byte."
+    "run": "per case: unify build -s <case>/src -o <tmp>/dist; asserted: exit code, publish state, declared diagnostics (exhaustive), and a bidirectional tree compare against expected/ using the single harness comparator (tests/conformance/compare.mjs)",
+    "assetStubs": "cases whose spec example references an asset (/assets/style.css, /favicon.ico, deep/page.css) include stub files so the post-build reference check passes. The stubs are not part of the spec's claim; the composed pages are."
   },
   "cases": {
     "FIX-01": { "rules": ["FIX-01", "INC-03", "INC-07", "S02", "LAY-01", "LAY-12"], "flags": [], "exit": 0, "published": true, "diagnostics": [], "diagnosticsExhaustive": true, "expectedTree": "expected" },
     "FIX-02": { "rules": ["FIX-02", "S05", "S06", "S10", "MRG-06", "MRG-13"], "flags": [], "exit": 0, "published": true, "diagnostics": [], "diagnosticsExhaustive": true, "expectedTree": "expected" },
-    "FIX-08": { "rules": ["FIX-08", "LAY-06", "LAY-07", "HED-08", "S10"], "flags": [], "exit": 0, "published": true, "diagnostics": [], "diagnosticsExhaustive": true, "expectedTree": "expected" },
+    "FIX-03": { "rules": ["FIX-03", "MRG-07", "MRG-09", "MRG-13", "S03"], "flags": [], "exit": 0, "published": true, "diagnostics": [], "diagnosticsExhaustive": true, "expectedTree": "expected" },
+    "FIX-04": { "rules": ["FIX-04", "MRG-11", "MRG-13", "S04"], "flags": [], "exit": 0, "published": true, "diagnostics": [], "diagnosticsExhaustive": true, "expectedTree": "expected" },
+    "FIX-05": { "rules": ["FIX-05", "MRG-09", "S03"], "flags": [], "exit": 0, "published": true, "diagnostics": [], "diagnosticsExhaustive": true, "expectedTree": "expected" },
+    "FIX-07": { "rules": ["FIX-07", "MRG-02", "MRG-12", "S03", "S04"], "flags": [], "exit": 0, "published": true, "diagnostics": [], "diagnosticsExhaustive": true, "expectedTree": "expected" },
     "FIX-09": { "rules": ["FIX-09", "MRG-16", "S05", "S09", "HED-02"], "flags": [], "exit": 0, "published": true, "diagnostics": [], "diagnosticsExhaustive": true, "expectedTree": "expected" },
+    "FIX-11": { "rules": ["FIX-11", "HED-01", "HED-02", "HED-03", "HED-04", "HED-05", "HED-06", "HED-07"], "flags": [], "exit": 0, "published": true, "diagnostics": [], "diagnosticsExhaustive": true, "expectedTree": "expected", "ruleNotes": { "HED-05": "kept-when-page-declares-none branch; the page-icon-replaces-layout branch is kitchen-sink contact.html" } },
+    "FIX-12": { "rules": ["FIX-12", "ATT-01", "ATT-02", "S11"], "flags": [], "exit": 0, "published": true, "diagnostics": [], "diagnosticsExhaustive": true, "expectedTree": "expected" },
     "FIX-13": { "rules": ["FIX-13", "MD-03", "MD-09", "MD-10", "MD-15", "MD-16", "S05", "S09"], "flags": [], "exit": 0, "published": true, "diagnostics": [], "diagnosticsExhaustive": true, "expectedTree": "expected" }
   }
 }

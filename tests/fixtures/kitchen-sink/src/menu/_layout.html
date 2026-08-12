@@ -1,15 +1,26 @@
 <!doctype html>
-<html>
+<html lang="en">
   <head>
-    <title>— Menu</title>
+    <meta charset="utf-8">
+    <title>— Menu — Meridian Coffee</title>
+    <meta name="description" content="Small-batch coffee, roasted in Duluth.">
+    <link rel="canonical" href="https://meridian.coffee/">
     <link rel="icon" href="/assets/menu-icon.svg">
+    <link rel="stylesheet" href="/assets/style.css">
+    <include src="/_includes/head-meta.html"></include>
+    <script src="/assets/unify-polyfill.js" data-polyfill></script>
   </head>
-  <body class="menu" data-layout="/_layout.html">
+  <body class="site menu">
+    <include src="/_includes/nav.html"></include>
     <main>
       <img src="hero-menu.jpg" alt="This week's menu board">
       <aside class="menu-aside">Hours: 7–3 daily, <a href="/contact.html">visit us</a></aside>
       <slot name="specials"><p>No specials this week.</p></slot>
       <slot></slot>
     </main>
+    <footer class="site-footer">
+      <slot name="footer"><p>© Meridian Coffee Roasters</p></slot>
+    </footer>
+    <include src="/_includes/colophon.html"></include>
   </body>
 </html>

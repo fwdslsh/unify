@@ -18,15 +18,15 @@ Derived files (a post index, a feed) come from a script in `_scripts/`, run firs
 
 ## Include — reuse a fragment
 `<include src="/_includes/nav.html"></include>`, always with the closing tag; `/…` resolves from the
-source root, anything else relative to the including file. Works anywhere: `.md` pages, `<head>`,
-inside other fragments. **Never put content between the tags** — includes are verbatim, not
-components; parameterized variants come from a `_scripts/` generator.
+source root, anything else relative to the including file. Works anywhere: `.md` pages, `<head>`, other
+fragments. **Never put content between the tags** — includes are verbatim, not components; parameterized variants come from a `_scripts/` generator.
 
 ## Layout — chrome around a page
 Every page is wrapped by the nearest `_layout.html` — its own folder, then each parent; the page says
 nothing. Pick one with `data-layout="/path.html"` on the page's `<html>` or `<body>` (Markdown:
 `layout: /path.html`); opt out with `data-layout="none"` / `layout: none`. Layouts are paths ending in
-`.html` — a bare name like `default` is an error; `data-layout` anywhere else is an error, never a component import.
+`.html` — a bare name like `default` is an error. `data-layout` belongs on pages only: anywhere else it is
+an error — on a layout too, because layouts don't chain (a section layout is a complete standalone page).
 
 ## Merging a page into its layout
 - **Named slots.** Where the layout wrote `<slot name="footer">fallback…</slot>`, a page element with

@@ -74,7 +74,7 @@ The entire build — composition, URL rewriting, collision detection, the refere
 
 ```
 write dist/about/index.html ← about.md + _layout.html
-write dist/blog/post/index.html ← blog/post.html + blog/_layout.html + _layout.html
+write dist/blog/post/index.html ← blog/post.html + blog/_layout.html
 write dist/404.html ← 404.html (no layout)
 copy dist/assets/style.css ← assets/style.css
 delete dist/stale.html

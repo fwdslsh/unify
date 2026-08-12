@@ -143,7 +143,7 @@ Two rules that save you from silent mistakes (unify makes both hard errors): HTM
 
 `src/404.html` carries `data-layout="none"` on its `<body>` — it ships as-is, with includes and URL rules still applied. Use the same attribute with a path to pick a different layout: `data-layout="/other.html"` (in Markdown: `layout: /other.html`). Layouts are always paths ending in `.html`, never bare names.
 
-Section layouts work by nesting: put a `_layout.html` in `blog/` and every page under `blog/` uses it; give *that* layout `data-layout="/_layout.html"` on its `<body>` and it chains into the site layout — sidebar from the section, chrome from the site, titles accumulating (`My Post — Blog — My Site`).
+Section layouts work by placement: put a `_layout.html` in `blog/` and every page under `blog/` uses it instead of the site layout. A section layout is a complete standalone page like any other layout — write the shared chrome into it too. Layouts do not chain: a layout that itself carries `data-layout` is a build error (unify tells you rather than silently ignoring it).
 
 ## Links and assets
 
