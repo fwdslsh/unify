@@ -293,7 +293,16 @@ Each unfilled named slot is replaced by its own children (S4). Fallback content 
 ### 7.4 Routing default content
 
 - L has a default slot → the default content replaces it (S3, S12). If the default content is empty, the default slot renders its fallback (S4).
-- No default slot, L has `<main>` → the default content replaces `<main>`'s children (S5). If the default content is empty, `<main>` keeps its children (the layout's default persists).
+- No default slot, L has `<main>` → the default content replaces `<main>`'s children (S5). If the default content is empty, `<main>` keeps its children (the layout's default persists). The sink `<main>` is L's first in document order, at any depth — the same search §7.2 uses for the page's own `<main>`.
+- No default slot, and a named `<slot>` sits inside that `<main>` → **problem** (**P19**). The two rules would target overlapping spans: this bullet replaces `<main>`'s children wholesale, while §7.3 fills or falls back that slot. Resolving it either way loses something silently — swallow the slot and a page's fill vanishes against the content-loss law; honor it and the sink is no longer wholesale — so the layout is ambiguous and says so:
+
+```
+src/_layout.html:6: problem: named slot "hero" is inside <main>, which is also the default-content sink
+  fix: add <slot></slot> inside <main> — then main's other children are left alone (§7.7 C6)
+  fix: or move <slot name="hero"> outside <main>
+```
+
+  A bare `<slot>` inside `<main>` is the supported way to have both, and carries no such ambiguity: it marks exactly where default content lands, and everything else in `<main>` — named slots included — is untouched.
 - No default slot, no `<main>`, L has named slots, and the default content is non-empty → **problem** (content would vanish):
 
 ```
@@ -836,7 +845,7 @@ The bold IDs are the stable identifiers used by `tests/conformance/rules.tsv` an
 7. **P07** — `data-layout` on a non-root element (§6.3)
 8. **P08** — `data-unify` attribute; `unify-` class token (§6.3)
 9. **P09** — Unaddressed page content with no sink in a slotted layout (§7.4)
-10. **P16** — A `<slot>` nested inside another slot's fallback content — slots do not nest (§7.1)
+10. **P16** — A `<slot>` nested inside another slot's fallback content — slots do not nest (§7.1). Located at the **inner** slot, which is the one that cannot exist
 11. **P10** — Frontmatter in an `.html` page (§10.5)
 12. **P11** — Literal `<head>` in a Markdown body (§10.5)
 13. **P12** — Output collision (§13)
@@ -844,6 +853,7 @@ The bold IDs are the stable identifiers used by `tests/conformance/rules.tsv` an
 15. **P14** — Emitted `_`-prefixed page or `_`-directory path (§4.2)
 16. **P17** — A frontmatter value with no text form: a mapping nested below a key that already names one, or a list item that is itself a mapping or list (§10.2)
 17. **P18** — Frontmatter is not valid YAML (§10.2). Distinct from P17, which is about a value's *shape*: P18 is a parse failure, and its fix is different — repair the syntax, rather than flatten a structure
+18. **P19** — A named `<slot>` inside the layout's default-content sink `<main>`, with no bare `<slot>` (§7.4). Located at the named slot
 
 ### 14.3 Advisories (the closed catalogue — capped at twelve; at the cap, adding one means removing one)
 

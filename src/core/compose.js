@@ -189,8 +189,8 @@ function composeWithLayout({ pageText, pageFile, layoutText, layoutFile, reporte
   }));
 
   // §9/S11 root attributes, and defensive data-layout/slot stripping on the layout's own tags.
-  edits.push(...mergeRootAttrs(lHtml, cHtml, preparedCText));
-  edits.push(...mergeRootAttrs(lBody, cBody, preparedCText));
+  edits.push(...mergeRootAttrs(lHtml, cHtml));
+  edits.push(...mergeRootAttrs(lBody, cBody));
 
   return stripPolyfillScripts(applyEdits(preparedLText, edits));
 }
@@ -425,7 +425,7 @@ function collectStraySlotEdits(scopeRoot, text, file, reporter, excluded) {
  * its existing position, or is appended (page-source order) when the layout
  * doesn't have it; `data-layout`/consumed `slot` never participate.
  */
-function mergeRootAttrs(layoutEl, pageEl, pageText) {
+function mergeRootAttrs(layoutEl, pageEl) {
   const edits = [];
   if (!layoutEl) return edits;
   // Defensive: a layout should never itself carry these (a layout declaring

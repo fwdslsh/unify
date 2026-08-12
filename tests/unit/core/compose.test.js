@@ -23,6 +23,7 @@ import { inlineIncludes } from "../../../src/core/includes.js";
 import { convert } from "../../../src/core/markdown.js";
 import { Reporter } from "../../../src/core/diagnostics.js";
 import { compareHtml } from "../../../tests/conformance/compare.mjs";
+import { findFirst, isElement, parse } from "../../../src/core/html.js";
 
 /** Chains the real includes.js (§5) ahead of compose() — stronger fidelity than hand-splicing. */
 async function withIncludesInlined(caseDir, pageRel, reporter) {
@@ -338,5 +339,101 @@ describe("landmines: composition family", () => {
     expect(reporter.diagnostics).toEqual([]);
     const diffs = compareHtml(readFileSync(join(dir, "expected", "index.html"), "utf8"), composed, "index.html");
     expect(diffs).toEqual([]);
+  });
+
+  test("no-layout-anywhere: an HTML page with no data-layout and nothing to neutralize ships byte-identical", () => {
+    const dir = join(LANDMINES, "no-layout-anywhere");
+    const pageText = readFileSync(join(dir, "src", "index.html"), "utf8");
+    const reporter = silentReporter();
+    const composed = compose({ pageText, pageFile: "index.html", layoutText: null, reporter });
+    expect(reporter.diagnostics).toEqual([]);
+    expect(composed).toBe(pageText); // byte-identical, not just structurally equal
+  });
+
+  test("empty-md: real markdown.js on a zero-byte file, assembled and composed — layout's default persists", () => {
+    const dir = join(LANDMINES, "empty-md");
+    const source = readFileSync(join(dir, "src", "about.md"), "utf8");
+    expect(source).toBe("");
+    const reporter = silentReporter();
+    const md = convert(source, { path: join(dir, "src", "about.md"), sourceRoot: join(dir, "src"), reporter });
+    expect(reporter.diagnostics).toEqual([]);
+    const pageText = assembleMarkdownDocument(md, { standalone: false });
+    const layoutText = readFileSync(join(dir, "src", "_layout.html"), "utf8");
+    const composed = compose({ pageText, pageFile: "about.md", layoutText, layoutFile: "_layout.html", reporter });
+    expect(reporter.diagnostics).toEqual([]); // no title to join, no A02/A03/P09 — nothing to report
+    const diffs = compareHtml(readFileSync(join(dir, "expected", "about.html"), "utf8"), composed, "about.html");
+    expect(diffs).toEqual([]);
+  });
+
+  test("regression: a named slot nested inside <main> (no default slot) must not crash — spec gap, see report", () => {
+    // No fixture pins this: C6/§7.4 states "main's other children are never
+    // touched" only for the default-slot branch; the no-default-slot branch
+    // (default content replaces main's children wholesale, S05) has no
+    // equivalent carve-out when a named slot happens to live inside that
+    // same main. This must degrade gracefully (main's wholesale content
+    // wins) rather than throw on overlapping edits.
+    const layoutText = `<!doctype html>
+<html>
+  <head><title>— S</title></head>
+  <body>
+    <main><h2>Static</h2><slot name="x"><em>fallback</em></slot></main>
+  </body>
+</html>
+`;
+    const pageText = `<!doctype html>
+<html>
+  <head><title>P</title></head>
+  <body>
+    <p>Default text</p>
+  </body>
+</html>
+`;
+    const reporter = silentReporter();
+    let composed;
+    expect(() => {
+      composed = compose({ pageText, pageFile: "index.html", layoutText, layoutFile: "_layout.html", reporter });
+    }).not.toThrow();
+    // Main's wholesale replacement wins; the nested named slot's own markup does not survive twice.
+    expect(composed).toContain("<p>Default text</p>");
+    const { root } = parse(composed);
+    const main = findFirst(root, (n) => isElement(n, "main"));
+    expect(main).not.toBeNull();
+  });
+
+  test("§6.4/LAY-13: a <script data-polyfill> is stripped from built output, with or without a layout", () => {
+    const layoutText = `<!doctype html>
+<html>
+  <head>
+    <title>— S</title>
+    <script src="/assets/unify-polyfill.js" data-polyfill></script>
+  </head>
+  <body>
+    <main><p>here</p></main>
+  </body>
+</html>
+`;
+    const pageText = `<!doctype html>
+<html>
+  <head><title>P</title></head>
+  <body><main><h1>Hi</h1></main></body>
+</html>
+`;
+    const reporter = silentReporter();
+    const withLayout = compose({ pageText, pageFile: "index.html", layoutText, layoutFile: "_layout.html", reporter });
+    expect(withLayout).not.toContain("data-polyfill");
+    expect(withLayout).not.toContain("unify-polyfill.js");
+
+    const standaloneText = `<!doctype html>
+<html>
+  <head>
+    <title>P</title>
+    <script src="/assets/unify-polyfill.js" data-polyfill></script>
+  </head>
+  <body><h1>Hi</h1></body>
+</html>
+`;
+    const noLayout = compose({ pageText: standaloneText, pageFile: "index.html", layoutText: null, reporter });
+    expect(noLayout).not.toContain("data-polyfill");
+    expect(noLayout).not.toContain("unify-polyfill.js");
   });
 });

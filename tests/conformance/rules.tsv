@@ -148,6 +148,7 @@ P15	§14.2	diag	fixture	Problem: a layout declares data-layout - layout chaining
 P16	§14.2	diag	fixture	Problem: a <slot> nested inside another slot's fallback content - slots do not nest
 P17	§14.2	diag	fixture	Problem: a frontmatter value with no text form - a mapping nested below a key that already names one, or a list item that is itself a mapping or list
 P18	§14.2	diag	fixture	Problem: frontmatter is not valid YAML - a parse failure, distinct from P17's shape rule
+P19	§14.2	diag	fixture	Problem: a named slot inside the layout's default-content sink main, with no bare slot - the two rules target overlapping spans
 A01	§14.3	diag	fixture	Advisory: void <include> used
 A02	§14.3	diag	fixture	Advisory: fill names a slot the layout doesn't have; content stayed in the page flow
 A03	§14.3	diag	fixture	Advisory: top-level <header>/<footer> outside any slot in a composed page

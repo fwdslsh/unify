@@ -1394,6 +1394,27 @@
    ],
    "diagnosticsExhaustive": true,
    "note": "P17 via the flat spelling: og:image: with a block under it is the same defect as og: -> image: -> url:, because both name the key og:image and it already carries its prefix. Pins that P17 eligibility is decided by the key's NAME, not by counting recursion levels \u2014 a depth-counting implementation would accept this one and reject its block-spelled twin, breaking the spelling equivalence \u00a710.2 guarantees."
+  },
+  "named-slot-in-sink-main": {
+   "rules": [
+    "P19"
+   ],
+   "flags": [],
+   "exit": 1,
+   "published": false,
+   "diagnostics": [
+    {
+     "file": "src/_layout.html",
+     "line": 9,
+     "severity": "problem",
+     "containsAll": [
+      "hero",
+      "main"
+     ]
+    }
+   ],
+   "diagnosticsExhaustive": true,
+   "note": "P19: with no bare <slot>, <main> is the default-content sink AND contains a named slot, so \u00a77.4's wholesale child replacement and \u00a77.3's fill target overlapping spans. Found by implementing \u00a77 \u2014 a literal implementation crashes here, and the obvious repair (let main win) silently discards the page's slot=\"hero\" fill, which is exactly the content loss \u00a714 forbids. Ruled a problem so the layout says it is ambiguous instead of picking a loser."
   }
  }
 }
