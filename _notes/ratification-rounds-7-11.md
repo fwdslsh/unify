@@ -323,6 +323,14 @@ that one.
    people, and a person who knows HTML but not this tool would fail differently — they stop
    and re-read where a model guesses and moves on.
 
+**One tension to watch, not yet a finding.** The rules doc closes with *"`--exclude`
+**replaces** the `_*` default; keep `_*` in your list"*, while the supported way to ship
+`_headers` is to replace `_*` with narrower globs — exactly what A14's `fix:` line prints.
+Six of six samples quoted the doc line and then followed the advisory instead, correctly, so
+nothing failed and nothing is amended. But the doc's general advice and the deployment recipe
+do point in opposite directions, and one of them is a build message rather than a rule. If a
+later round produces a sample that keeps `_*` and ships no headers, that is the finding.
+
 ## The `<include>` question, closed
 
 The handoff asked whether the ~quarter of samples that duplicate chrome across two layouts
