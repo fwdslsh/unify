@@ -20,15 +20,31 @@ jobs:
     name: Initialize
     runs-on: ubuntu-latest
     steps:
-     
+
       - name: Env Check
         run: |
           echo "Release: ${{ github.event.inputs.tag || github.ref_name }}"
         shell: bash
 
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # The binary build stamps its version from this tag (APP_VERSION, see
+      # bun-build-binaries.yml) while `unify --version` reports package.json
+      # (src/cli.js). If they disagree, npm publish also fails outright — but
+      # only after every binary has already been built and uploaded. Catch it
+      # here instead, before anything is built or published.
+      - name: Tag must match package.json version
+        shell: bash
+        run: |
+          tag="${{ github.event.inputs.tag || github.ref_name }}"
+          pkg="v$(jq -r .version package.json)"
+          [ "$tag" = "$pkg" ] || { echo "::error::tag $tag does not match package.json version $pkg — bump package.json or retag"; exit 1; }
+
   # First, build all binaries
   build:
     name: Build Binaries
+    needs: init
     uses: fwdslsh/toolkit/.github/workflows/bun-build-binaries.yml@main
     with:
       upload-artifacts: true
