@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **unify** (`@fwdslsh/unify`) — a static site generator for front-end designers and hobbyists: HTML-native composition with no expression language and no client runtime. The authoring surface is four primitives — `<include>`, layouts (`_layout.html` / `data-layout`), slots (`<slot name>` in layouts, `slot=` on page elements, `<main>` as the default), and the underscore exclusion.
 
-**The v0.7.0 specification set in `docs/` is authoritative. The implementation in `src/` and the suite in `tests/` predate it and are being rewritten against it — do not learn the product from the code.** In particular, the code still contains the retired v0.6 vocabulary (`data-unify`, `unify-*` area classes, DOM Cascade machinery); under v0.7.0 those are build *errors* that name their replacement, never working features.
+**The v0.7.0 specification set in `docs/` is authoritative, and `src/` now implements it.** The rewrite is complete: every normative rule in `docs/conformance-spec.md` is covered by a test that ran against the real CLI (`tests/conformance/check-traceability.mjs --runtime`), and `tests/legacy-v0.6/` is quarantined out of CI and slated for deletion. The retired v0.6 vocabulary — `data-unify`, `unify-*` area classes, DOM Cascade machinery — exists only as *diagnostics*: encountering it is a build error naming the v0.7.0 replacement, never a working feature.
 
 ## Development Commands
 

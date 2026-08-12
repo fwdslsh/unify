@@ -15,7 +15,7 @@ The entire authoring surface is four things, learnable in five minutes:
 
 If a capability cannot be expressed with these four, it does not belong in unify.
 
-> **Status.** The v0.7.0 specification set in [`docs/`](docs/) is authoritative, and the composition core is being rewritten against it ([`docs/product-spec.md`](docs/product-spec.md) §7). Learn the product from these documents, not from `src/`.
+> **Status.** v0.7.0 is a clean break from 0.6.x: `data-unify`, `unify-*` area classes, `serve`, `--minify`, and `--fail-on` are gone, and a 0.6 site will not build. The composition model is standard HTML — `<main>`, `<slot>`, `slot=` — plus `<include src>` and `data-layout`. The specification set in [`docs/`](docs/) is authoritative; every normative rule in it is covered by a test that runs against the real CLI.
 
 ## Install
 
