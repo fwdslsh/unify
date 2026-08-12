@@ -25,8 +25,8 @@ Conventions: "problem" and "advisory" are the only two severities (§14). MUST-l
 For `build`, `--dry-run`, and every watch rebuild, in this order:
 
 1. **Scan** the source tree; apply the never-shipped list (§4.3), then classify every remaining file: page or asset; excluded or emitted.
-2. **Load and inline includes** (§5) for every page and every layout as it is loaded — textual, recursive, before any parsing.
-3. **Parse** each page; detect frontmatter/`<head>` misuse (§10.5); convert Markdown (§10).
+2. **Load and inline includes** (§5) for every layout and every `.html` page as it is loaded — textual, recursive, before any parsing. A `.md` page converts first, then inlines: frontmatter is read, the body is converted (§10), and its includes resolve on the converted HTML (§10.1). Same machinery, one difference (the moment), one reason: a fragment's contents are spliced verbatim in every host and never pass through the Markdown converter.
+3. **Parse** each page; detect frontmatter/`<head>` misuse (§10.5).
 4. **Resolve layouts** (§6) and compose each page with its layout (§7–§9).
 5. **Rewrite URLs** by provenance (§11.1), then apply `--pretty-urls` (§11.2), then `--base-url` (§11.3).
 6. **Compute output paths**; detect collisions (§13).
@@ -56,7 +56,7 @@ unify composes by editing spans of source text — it never reformats, re-indent
 - **S11 — Root attributes.** The layout's `<html>`/`<body>` tags are edited in place: the `class` value becomes the layout's tokens in order followed by page tokens not already present, space-separated; an overridden attribute keeps its position with the page's value; a new attribute is appended to the tag, in page-source order.
 - **S12 — Default content.** Default content (§7.2) keeps its nodes — elements, text, comments — in source order, interior text preserved as written; whitespace-only text nodes at its boundaries are not significant.
 
-The output document's shell — doctype, `<html>`, `<head>`, `<body>` tags — is the layout's. The page's doctype and shell tags are not emitted (their attributes participate via S11). A page with no layout is emitted from its own text.
+The output document's shell — doctype, `<html>`, `<head>`, `<body>` tags — is the layout's. The page's doctype and shell tags are not emitted (their attributes participate via S11). A page with no layout is emitted from its own text; for a layout-less Markdown page that text is its converted body inside the synthesized shell of §10.7.
 
 ---
 
@@ -108,7 +108,15 @@ Independent of `--exclude` and not replaceable by it, these never appear in outp
 
 ### 4.4 Mirror copy and symlinks
 
-Every emitted asset is copied byte-for-byte to the same source-root-relative path. Symlinks are followed only while the resolved target stays inside the source root; a symlink resolving outside is treated as absent, with advisory A12 (§14.3). Building with `-s .` in a directory `init` did not scaffold prints the count of files that would be copied and points at `--dry-run`.
+Every emitted asset is copied byte-for-byte to the same source-root-relative path. Symlinks are followed only while the resolved target stays inside the source root; a symlink resolving outside is treated as absent, with advisory A12 (§14.3).
+
+**The defaulted-source notice.** When the source root **defaulted to the working directory** — no `--source` flag, no `source` key in `unify.yaml`, and no `src/` directory exists, i.e. the §1 default fell all the way through (the state of a directory `init` did not scaffold) — the build summary on stdout additionally reports how many files mirror copy is about to ship, and points at `--dry-run`:
+
+```
+building from the working directory (no src/ here): 3 files will be copied as-is — run unify build --dry-run to list them
+```
+
+The predicate is the CLI's own argument resolution and nothing else — no marker files, no scaffold detection (§4.3 forbids heuristics). An explicit `--source` — including `--source .` — or an existing `src/` suppresses the notice: naming a directory is declaring intent. The notice is summary text on stdout, never a diagnostic: it names no problem, does not touch the exit code, and prints for `build` and `--dry-run` alike. Its two facts — the copied-file count and the `--dry-run` pointer — are contract; the wording around them is prose (§14.1).
 
 ---
 
@@ -130,7 +138,7 @@ src/index.html:8: problem: include not found: /_includes/navv.html
 ```
 
 4. A `.md` target is converted to HTML first (frontmatter stripped and ignored, heading ids applied per §10.4); an `.html` target is used verbatim.
-5. The target's own includes are processed recursively before splicing (S2). Cycle detection uses the resolved-path stack; **depth cap 10**. Both violations are problems that print the full chain:
+5. The target's own includes are processed recursively before splicing (S2). Cycle detection uses the resolved-path stack; **depth cap 10, inclusive**: the stack may hold ten include files at once — a chain ten deep builds, and the include that would push an eleventh is the problem. Both violations are problems that print the full chain:
 
 ```
 src/_layout.html:7: problem: include cycle: _layout.html → _includes/nav.html → _layout.html
@@ -146,7 +154,7 @@ src/index.html:9: problem: <include> takes no content — the file's contents re
 
 7. The void form (no closing tag) builds identically and carries advisory A01 (§14.3).
 
-Inlining is textual and happens before parsing, so an include may appear anywhere — `<head>` included — and a fragment's top-level elements become the host's (a fragment included at body top level may therefore carry `slot=` fills, and a fragment included in a layout body may contribute `<slot>` elements; both are consequences of this ordering, not extra rules).
+Inlining is textual and happens before parsing, so an include may appear anywhere — `<head>` included — and a fragment's top-level elements become the host's (a fragment included at body top level may therefore carry `slot=` fills, and a fragment included in a layout body may contribute `<slot>` elements; both are consequences of this ordering, not extra rules). In a Markdown page the same textual inlining runs on the converted HTML (§10.1); the timing is the only difference.
 
 ### 5.2 Fixture — nested include with relative resolution
 
@@ -209,6 +217,8 @@ src/about.md:2: problem: layout is not a path: "default"
 
 A path that resolves to no file, or escapes the source root, is a problem with the include-not-found shape (§5.1 step 3), including the casing line.
 
+Layout-less emission, both routes (step 1's opt-out and step 5's nothing-found): an `.html` page is emitted from its own text (§3); a `.md` page is emitted inside the minimal synthesized shell of §10.7.
+
 ### 6.2 No chaining
 
 Layout chaining is not part of v0.7.0. **A layout that itself declares `data-layout` — any value, including `"none"` — is a problem (P15)**, located, naming the layout file and stating plainly that chaining is not supported; it is never a silent no-op:
@@ -223,7 +233,7 @@ A section that wants its own chrome writes a complete `_layout.html` in its dire
 ### 6.3 Misplacement and migration (problems)
 
 - `data-layout` on any element other than `<html>`/`<body>`: problem naming `<include src="…">` as the replacement — `data-layout` is never a component import.
-- Any `data-unify` attribute, and any class token beginning `unify-`, anywhere in any source file: problem naming the v0.7.0 spelling —
+- Any `data-unify` attribute, and any class token beginning `unify-`, anywhere in any source file — **excluded files included**: excluded files are build material (§1) and are scanned like everything else; only the never-shipped list (§4.3) escapes scanning. A retired spelling in an excluded fragment or draft would otherwise sit silently meaning something else until the day the file is included or published. Problem naming the v0.7.0 spelling —
 
 ```
 src/index.html:2: problem: data-unify is the v0.6 spelling
@@ -259,7 +269,7 @@ src/_layout.html:8: problem: <slot name="inner"> is nested inside the fallback o
 
 ### 7.2 Preparing C's content
 
-If L has at least one sink: C's body content is **unwrapped once** — the first `<main>` in C's body, if any, is replaced by its children (S6). No other element is unwrapped.
+If L has at least one sink: C's body content is **unwrapped once** — the first `<main>` in C's body in document order, **at any depth, not only top level**, is replaced by its children (S6): a `<main>` inside a wrapper `<div>` unwraps and the wrapper stays. Exactly once — a `<main>` inside the first one is the author's own markup and survives. No other element is unwrapped. (Top-level-only unwrap would ship `<main>`-inside-`<main>` for the common wrapper pattern; unwrapping the first one anywhere is what keeps composed output valid.)
 
 **Fills** are then collected: every top-level element of C's body carrying a `slot` attribute with a non-empty value. (`slot=""` counts as absent. `slot` on non-top-level elements is the author's own markup and is never touched or reported.) Fill elements are removed from the default-content sequence.
 
@@ -596,7 +606,11 @@ Fixture: layout `<body class="site">` + page `<body class="home" data-theme="dar
 
 ### 10.1 Conversion
 
-CommonMark, no extensions in v0.7.0 beyond §10.4 heading ids. Output filename swaps `.md` for `.html`. Includes pass through conversion as raw HTML and resolve normally (§5). Layout rules then apply exactly as for an HTML page whose body is the converted output and whose head is synthesized from frontmatter.
+CommonMark, no extensions in v0.7.0 beyond §10.4 heading ids and the include-block rule below. Output filename swaps `.md` for `.html`. Layout rules then apply exactly as for an HTML page whose body is the converted output and whose head is synthesized from frontmatter.
+
+**Include timing — conversion first.** In a `.md` page, includes resolve **after** conversion: include tags and SSI comments pass through the converter as raw HTML, then resolve normally (§5) on the converted output. The order is the point, twice over. First, the fragment's contents are spliced verbatim in every host — never run through the Markdown converter — so an HTML fragment is never mangled by blank-line or indentation rules, and a `.md` include target converts exactly once, on its own (§5.1 step 4). Second, include syntax inside a code fence or code span is escaped to text by conversion, so it is content, never a directive — a Markdown page can document `<include>` itself. Pre-conversion textual inlining (§2's order for HTML) would break both.
+
+What survives conversion where is decided by CommonMark's raw-HTML rules, plus one converter extension so the taught form works: **a line beginning with `<include` starts an HTML block, exactly as if `include` were on CommonMark's block-tag (type 6) list**, ending at the next blank line. Consequences, normative: an `<include>` element or `<!--#include -->` comment starting a line is a block — it passes through outside any paragraph, so block-level fragment content splices clean, never `<p>`-wrapped; an include written inside a paragraph's text is inline raw HTML, and its contents splice inside that paragraph, where inline fragments belong.
 
 ### 10.2 Frontmatter
 
@@ -614,6 +628,13 @@ YAML between `---` fences at the very start of the file.
 | a list value | one `<meta>` per item, in order |
 
 Synthesized elements merge by §8 exactly as if the page had written them; their serialization is fixed: double-quoted attributes, `name`/`property` first, then `content` (`<meta name="description" content="…">`), and `<title>TEXT</title>`. There are no other reserved keys: `date`, `tags`, `categories`, `draft`, `permalink`, `slug` have no behavior and become plain metas — `draft: true` publishes the page; a leading underscore is how a page is held back. The honest gap, stated: frontmatter cannot express `rel="canonical"`, `rel="preload"`, or JSON-LD — put those in the layout, or write the page in HTML.
+
+**Value serialization.** VALUE is the value's text, by YAML form. A **plain scalar** serializes as its source text, exactly as written — `draft: true` → `content="true"`, `date: 2026-01-01` → `content="2026-01-01"`, `weight: 0.50` → `content="0.50"`: no type coercion ever rewrites a value (booleans don't normalize, dates don't reformat, numbers keep their zeros — the author's bytes, not YAML's data model). A **quoted scalar** serializes as its content with the quotes gone (`note: "Colons: fine"` → `content="Colons: fine"`); a **block scalar** (`|`, `>`) as the string YAML defines; an **empty value** as the empty string. The list rule composes with blocks: a list under `og:image` emits one `property="og:image"` meta per item, in order. What has no text form is a problem, located at the key (**P17**): a mapping nested below a block (`og:` → `image:` → `url:`) or a list item that is itself a mapping or list. Frontmatter flattens exactly one level of blocks; inventing a serialization or dropping the value would each be a silent lie:
+
+```
+src/post.md:4: problem: frontmatter og:image is a nested block — frontmatter flattens one level
+  fix: give og:image a single value (og:image: /assets/a.jpg) or a list of values
+```
 
 ### 10.3 Title fallback
 
@@ -671,6 +692,51 @@ More.
 
 (Title from the first `<h1>` (§10.3); synthesized metas appended (§8 row 7, S9); the converted body is the default content — its line breaks are the converter's, shipped as written, and not significant between blocks (§3).)
 
+### 10.7 The layout-less shell
+
+A `.md` page that resolves to no layout (§6.1 steps 1 and 5) is emitted inside a **minimal synthesized shell**. The reason is stated because the alternative was considered: conversion output is a body fragment, and a fragment shipped as a page is not an HTML document — no doctype means quirks mode, and the synthesized head elements would have nowhere to land. The shell is exactly:
+
+- the `<!doctype html>` doctype;
+- `<html>`, carrying frontmatter `lang`/`dir` when present;
+- `<head>`, containing `<meta charset="utf-8">` first (all source files are UTF-8 — the conventions above — so declaring it is fact, not invention), then the page's `<title>` when one exists (§10.2/§10.3; no `title` key and no `<h1>` means no title element), then the synthesized metas in frontmatter source order;
+- `<body>`, carrying frontmatter `class` when present, whose content is the converted body.
+
+Nothing else is synthesized — no viewport meta, no stylesheet: opting out of the layout is opting out of shared chrome, and unify does not invent content. Whitespace between the shell's elements is not normative (§3).
+
+Fixture — `standalone.md`, with a site `_layout.html` present that the page opts out of:
+
+```markdown
+---
+layout: none
+lang: en
+class: solo
+description: Standalone page
+---
+
+# Standalone
+
+No layout wanted.
+```
+
+`dist/standalone.html`:
+
+```html
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Standalone</title>
+    <meta name="description" content="Standalone page">
+  </head>
+  <body class="solo">
+    <h1 id="standalone">Standalone</h1>
+<p>No layout wanted.</p>
+  </body>
+</html>
+```
+
+(Title from the first `<h1>`; `layout: none` is consumed, never a meta; the reserved keys landed on the shell's own root elements exactly where §10.2 sends them.)
+
 ---
 
 ## 11. URLs
@@ -708,7 +774,7 @@ Preserved untouched: external URLs, `mailto:`/`tel:`/`data:`, fragment-only link
 
 ### 11.3 `--base-url`
 
-Two forms. A path (`/repo-name/`): every root-relative URL in `href`/`src`/`srcset`/`poster` of emitted HTML is prefixed with it. A full URL (`https://example.com/repo/`): the path part behaves as above, and additionally the origin is prepended to root-relative values in `<meta property="og:*">`/`<meta name="twitter:*">` `content` and in `<link rel="canonical">` `href` — the elements crawlers require to be absolute. Values that are not root-relative are untouched. Source files stay rooted at `/`; only output changes.
+Two forms, one scope. The scope, identical for both forms: every root-relative URL in `href`/`src`/`srcset`/`poster` of emitted HTML, plus root-relative values in `<meta property="og:*">`/`<meta name="twitter:*">` `content` — one list, so no root-relative URL the output declares can dodge the prefix. A **path** (`/repo-name/`) prefixes everything in scope with it. A **full URL** (`https://example.com/repo/`) applies its path part exactly as the path form, and additionally prepends its origin to the og:/twitter: `content` values and the `<link rel="canonical">` `href` — the elements crawlers require to be absolute. Absolutization is therefore always **origin + path prefix**: with `--base-url https://host/repo/`, an og:image of `/assets/x.jpg` emits `https://host/repo/assets/x.jpg`, never `https://host/assets/x.jpg` — origin-only absolutization would 404 for exactly the crawlers the rule exists for. Values that are not root-relative are untouched. Source files stay rooted at `/`; only output changes.
 
 Order within the pipeline: §11.1 → §11.2 → §11.3.
 
@@ -719,9 +785,9 @@ Order within the pipeline: §11.1 → §11.2 → §11.3.
 After the temporary tree is complete, every internal URL the output contains is checked against the emitted files — not only the ones rewriting touched:
 
 - In every emitted HTML file: all `href`, `src`, `srcset`, `poster` values; `<link>` `href` for every rel; root-relative `content` values of `og:*`/`twitter:*` metas.
-- In every emitted CSS file and every `<style>` block of emitted HTML: `url(…)` tokens.
+- In every emitted CSS file, every `<style>` block, and every `style` attribute of emitted HTML: `url(…)` tokens. (Rewriting deliberately never reaches these — §11.1 — but checking is not rewriting: the exemption is about not editing the author's CSS, not about not reading it, and a `url()` the author got wrong must fail here, not 404 quietly.)
 
-A URL is internal when, after stripping the `--base-url` path prefix, it is root-relative or relative (resolved against the containing output file's URL). Query and fragment are stripped; external/`mailto:`/`tel:`/`data:`/fragment-only URLs are skipped. A directory URL (trailing `/` or empty path) checks for `index.html` within it. A URL that resolves to no emitted file is a **problem** naming the source file, the reference, and the line where known — a renamed page, an asset stranded in an underscore folder, a hand-written pretty URL in a non-pretty build, and a path whose case doesn't match the file all fail here, loudly. (Case is compared exactly, byte for byte: a reference that only matches case-insensitively still fails — it would 404 on the Linux host.) `#fragment` targets are not validated against ids — that is a reader's judgment, not a build gate.
+A URL is internal when, after stripping the `--base-url` prefix — the path prefix, or the full base (origin + path) when a full URL was given, so values §11.3 absolutized stay checkable instead of masquerading as external — it is root-relative or relative (resolved against the containing output file's URL). Query and fragment are stripped; external/`mailto:`/`tel:`/`data:`/fragment-only URLs are skipped. A directory URL (trailing `/` or empty path) checks for `index.html` within it. A URL that resolves to no emitted file is a **problem** naming the source file, the reference, and the line where known — a renamed page, an asset stranded in an underscore folder, a hand-written pretty URL in a non-pretty build, and a path whose case doesn't match the file all fail here, loudly. (Case is compared exactly, byte for byte: a reference that only matches case-insensitively still fails — it would 404 on the Linux host.) `#fragment` targets are not validated against ids — that is a reader's judgment, not a build gate.
 
 ---
 
@@ -745,6 +811,8 @@ Two severities exist: **problem** (blocks publish; exit 1) and **advisory** (nev
 
 Diagnostics go to stderr; the build summary and `--dry-run` list go to stdout; both ordered by path, then line — two runs over the same tree print the same bytes. Every diagnostic line begins `FILE:LINE: SEVERITY: ` (line omitted when unknown: `FILE: SEVERITY: `). That prefix and the severity token are stable contract; the message after them is prose and is not — the diagnostic examples throughout this document fix the prefix and the shape, and their message wording is illustrative. Continuation lines are indented two spaces: `in:` (the offending source text) and `fix:` (one edit per line; path-shaped messages always include `fix: check the path spelling and casing`). Cycle and depth messages print the full chain with ` → `. `DEBUG=1` adds stack traces.
 
+Location attribution is fixed, not stylistic: a cycle or depth problem locates at the **outermost include site** — the file and line of the include element where expansion entered the chain; a collision problem at the **path-ordered first** of the colliding sources; a reference problem (§12) at the reference's **provenance file** (§1; for a `url()` in a CSS file, that file), at its line there when known. The examples throughout this document already follow these conventions; they are contract, so two implementations point the author at the same place.
+
 ### 14.2 Problems (closed list for v0.7.0)
 
 The bold IDs are the stable identifiers used by `tests/conformance/rules.tsv` and by tests; list position is not meaningful.
@@ -764,6 +832,7 @@ The bold IDs are the stable identifiers used by `tests/conformance/rules.tsv` an
 13. **P12** — Output collision (§13)
 14. **P13** — Broken internal reference (§12)
 15. **P14** — Emitted `_`-prefixed page or `_`-directory path (§4.2)
+16. **P17** — A frontmatter value with no text form: a mapping nested below a block, or a list item that is itself a mapping or list (§10.2)
 
 ### 14.3 Advisories (the closed catalogue — adding one means removing one)
 

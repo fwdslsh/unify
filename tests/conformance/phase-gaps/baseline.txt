@@ -1,4 +1,3 @@
-EXC-11
 DIA-09
 DIA-10
 PUB-02

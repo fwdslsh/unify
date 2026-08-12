@@ -139,7 +139,7 @@
         "URL-07": "moves about/contact/beans/privacy; index.html files and root 404.html stay",
         "URL-09": "mailto (contact), absolute canonical (layout), relative asset in unmoved page (index beans.jpg) all preserved",
         "REF-02": "the reference check must strip the /coffee/ prefix before resolving, or this green build turns red",
-        "og-note": "og:image content stays /assets/beans.jpg under the path-form base-url because URL-10's scope is href/src/srcset/poster. That is conformant to the spec as written and wrong for real crawlers - reported as spec bug B3 in docs/testing-strategy.md 7."
+        "og-note": "B3 fixed (2026-08-12): section 11.3 now has one scope for both forms, so beans' og:image takes the path prefix like every other root-relative URL and emits /coffee/assets/beans.jpg; twitter:card 'summary' is not root-relative and stays untouched. Absolutization still requires the full-URL form; the non-root-path absolutization trap itself is pinned by landmine base-url-subpath."
       }
     },
     "origin": {
@@ -164,7 +164,7 @@
         "URL-12"
       ],
       "ruleNotes": {
-        "URL-11": "index canonical /index.html and beans og:image /assets/beans.jpg gain the origin; the layout's absolute canonical and non-URL meta content are untouched"
+        "URL-11": "index canonical /index.html and beans og:image /assets/beans.jpg gain the full base (origin + path prefix, here the root path /); the layout's absolute canonical and non-URL meta content are untouched. The non-root-path branch of URL-11 is landmine base-url-subpath"
       }
     },
     "strict": {

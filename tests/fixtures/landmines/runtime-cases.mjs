@@ -10,6 +10,21 @@
  *    `node_modules/` is globally ignored; both are generated.
  *  - clean-containment: needs control of the working directory and a doomed
  *    output path; generated so no repo path is ever at risk.
+ *  - defaulted-source-notice / explicit-source-suppresses-notice: the §4.4
+ *    notice fires only when the source root DEFAULTED to the working
+ *    directory (no -s flag, no src/), which the checked-in harness contract
+ *    (always `-s <case>/src`) cannot express; needs cwd control.
+ *
+ * Schema keys beyond the manifest case schema, used by the two notice cases:
+ *  - omitSourceFlag: true — the harness must inject NO implicit `-s`; the
+ *    case's `flags` are the complete option list after `build`. EXC-11's
+ *    predicate is precisely the absence of --source, so a forced -s would
+ *    test nothing.
+ *  - outputDir: "<rel>" — where, relative to the temp root, the harness
+ *    asserts expectFiles/expectAbsent (these cases pass `-o dist` in flags
+ *    while running with cwd at the temp root).
+ *  - expect.stdoutContains / expect.stdoutNotContains — substrings of stdout
+ *    (the build summary; see the manifest harnessContract "stdout" entry).
  *
  * Each entry has the same expectation schema as manifest.json cases. The
  * conformance harness imports BUILD_CASES, calls build(dir) with a fresh temp
@@ -112,6 +127,54 @@ export const BUILD_CASES = {
       diagnostics: [],
       diagnosticsExhaustive: false,
       note: "Exit 2 (usage/environment), not 1: the refusal must be distinguishable from a site error, and nothing may be deleted. The harness asserts the source tree is byte-untouched afterwards."
+    }
+  },
+
+  "defaulted-source-notice": {
+    rules: ["EXC-11"],
+    build(dir) {
+      // a flat directory init did not scaffold: no src/, files at the root
+      writeFileSync(join(dir, "index.html"), page("Flat", "<p>hi</p>"));
+      writeFileSync(join(dir, "style.css"), "body { margin: 0 }\n");
+      writeFileSync(join(dir, "photo.jpg"), "not-a-real-jpg\n");
+      writeFileSync(join(dir, "notes.txt"), "plain text ships too\n");
+    },
+    // no -s: the source root falls through to the working directory (§1),
+    // which is EXC-11's entire predicate — the CLI's own argument resolution.
+    flags: ["-o", "dist"],
+    cwd: ".",
+    omitSourceFlag: true,
+    outputDir: "dist",
+    expect: {
+      exit: 0,
+      published: true,
+      diagnostics: [],
+      diagnosticsExhaustive: true,
+      stdoutContains: ["3 files", "--dry-run"],
+      expectFiles: ["index.html", "style.css", "photo.jpg", "notes.txt"],
+      note: "B7 resolved (2026-08-12): the §4.4 notice fires exactly when the source root defaulted to the working directory. Its two contract facts are asserted: the copied-file count (3 assets; the page is written, not copied) and the --dry-run pointer. Summary text on stdout, never a diagnostic — zero stderr diagnostics is part of the assertion, and the notice must not move the exit code."
+    }
+  },
+
+  "explicit-source-suppresses-notice": {
+    rules: ["EXC-11"],
+    build(dir) {
+      writeFileSync(join(dir, "index.html"), page("Flat", "<p>hi</p>"));
+      writeFileSync(join(dir, "style.css"), "body { margin: 0 }\n");
+    },
+    // same flat tree, but the author NAMED the directory: -s . declares intent
+    flags: ["-s", ".", "-o", "dist"],
+    cwd: ".",
+    omitSourceFlag: true,
+    outputDir: "dist",
+    expect: {
+      exit: 0,
+      published: true,
+      diagnostics: [],
+      diagnosticsExhaustive: true,
+      stdoutNotContains: ["--dry-run"],
+      expectFiles: ["index.html", "style.css"],
+      note: "The suppressed twin: an explicit --source — even '.' — turns the notice off (§4.4). Identical output either way; only the summary differs."
     }
   }
 };

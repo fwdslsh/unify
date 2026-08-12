@@ -7,6 +7,9 @@ slug: junky
 tags:
   - a
   - b
+note: "Colons: kept, quotes dropped"
+weight: 0.50
+empty:
 ---
 
 # Junk drawer

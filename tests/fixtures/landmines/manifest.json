@@ -6,6 +6,7 @@
     "diagnostics": "stderr parsed via the stable `FILE:LINE: SEVERITY: ` prefix (line optional). Declared lists are exhaustive when diagnosticsExhaustive=true: one undeclared diagnostic of either severity fails the case. This is the mechanical enforcement of the closed problem/advisory catalogue (conformance spec §14.2/§14.3) and of the content-loss law's flip side — nothing may fire that the spec does not name.",
     "trees": "when expectedTree is set, comparison is byte-exact and bidirectional. expectFiles/expectAbsent assert presence/absence relative to the output dir. expectContains maps output files to required substrings; expectNotContains to forbidden ones.",
     "publish": "published=false cases pre-seed the output dir with a sentinel tree and assert it byte-untouched after the run (PUB-01), and assert exit matches.",
+    "stdout": "stdoutContains/stdoutNotContains assert substrings of stdout (the build summary). Used by the runtime-built §4.4 defaulted-source-notice cases, whose entries also carry omitSourceFlag (the harness injects no implicit -s — EXC-11's predicate is the absence of --source) and outputDir (where expectFiles are asserted); diagnostics stay a stderr-only claim.",
     "severityTokens": "the parser accepts only 'problem' and 'advisory' as severity tokens; any 'warning'/'error:' line fails the case (DIA-01)."
   },
   "harnessRules": [
@@ -76,7 +77,7 @@
         }
       ],
       "diagnosticsExhaustive": true,
-      "note": "Pins the literal reading of conformance §6.3: 'anywhere in any source file' includes excluded files (they are build material and get scanned; only the never-shipped list is never scanned). If the spec owners intend excluded files to be exempt, amend the spec and this fixture together — reported as reading R1 in docs/testing-strategy.md §7."
+      "note": "R1 promoted to spec text (2026-08-12): conformance §6.3 now says outright that 'anywhere in any source file' includes excluded files — build material is scanned; only the never-shipped list escapes."
     },
     "missing-include": {
       "rules": [
@@ -107,7 +108,8 @@
       "rules": [
         "INC-08",
         "P02",
-        "DIA-08"
+        "DIA-08",
+        "DIA-11"
       ],
       "flags": [],
       "exit": 1,
@@ -125,7 +127,7 @@
         }
       ],
       "diagnosticsExhaustive": true,
-      "note": "Attribution pinned to the outermost include site, matching the conformance §5.1 example's shape."
+      "note": "Attribution at the outermost include site — R3, promoted to contract in conformance §14.1 (2026-08-12)."
     },
     "include-depth-10": {
       "rules": [
@@ -141,7 +143,7 @@
           "<p>deep</p>"
         ]
       },
-      "note": "Fencepost pinned: a chain of exactly 10 nested expansions builds clean; 11 fails (next case). 'Depth cap 10' is read as max include-stack depth 10."
+      "note": "Fencepost: a chain of exactly 10 nested expansions builds clean; 11 fails (next case). R2 promoted to spec text (2026-08-12): conformance §5.1 now states the cap is inclusive — the stack holds ten files, the include pushing an eleventh is the problem."
     },
     "include-depth-11": {
       "rules": [
@@ -594,7 +596,7 @@
       "diagnostics": [],
       "diagnosticsExhaustive": true,
       "expectedTree": "expected",
-      "note": "Pins the reading that §7.2's 'first <main> in C's body' is not restricted to top level: the main inside the div unwraps; the div survives."
+      "note": "R4 promoted to spec text (2026-08-12): conformance §7.2 now says the first <main> unwraps at any depth — the main inside the div unwraps; the div survives."
     },
     "main-in-main": {
       "rules": [
@@ -607,7 +609,7 @@
       "diagnostics": [],
       "diagnosticsExhaustive": true,
       "expectedTree": "expected",
-      "note": "Unwrap happens exactly once: the outer main's tags are deleted, the inner main survives into the output (the author's own nesting, preserved)."
+      "note": "Unwrap happens exactly once — now explicit in conformance §7.2 (R4): the outer main's tags are deleted, the inner main survives into the output (the author's own nesting, preserved)."
     },
     "empty-default-main": {
       "rules": [
@@ -691,7 +693,8 @@
       "rules": [
         "COL-01",
         "P12",
-        "PUB-01"
+        "PUB-01",
+        "DIA-11"
       ],
       "flags": [],
       "exit": 1,
@@ -708,7 +711,7 @@
         }
       ],
       "diagnosticsExhaustive": true,
-      "note": "One problem naming both sources; attribution pinned to the path-ordered first source. No last-write-wins: nothing publishes."
+      "note": "One problem naming both sources; attribution at the path-ordered first source — R3, promoted to contract in conformance §14.1. No last-write-wins: nothing publishes."
     },
     "collision-pretty-landing": {
       "rules": [
@@ -809,7 +812,8 @@
         "URL-05",
         "REF-04",
         "P13",
-        "REF-01"
+        "REF-01",
+        "DIA-11"
       ],
       "flags": [],
       "exit": 1,
@@ -825,7 +829,7 @@
         }
       ],
       "diagnosticsExhaustive": true,
-      "note": "The spec's own §11.1 trap: the include's relative logo resolves to /_includes/logo.png, which the default exclude keeps out of the output — the reference check must fail loudly. Attribution pinned to the provenance file."
+      "note": "The spec's own §11.1 trap: the include's relative logo resolves to /_includes/logo.png, which the default exclude keeps out of the output — the reference check must fail loudly. Attribution at the provenance file — R3, promoted to contract in conformance §14.1."
     },
     "broken-link": {
       "rules": [
@@ -922,7 +926,28 @@
       "diagnostics": [],
       "diagnosticsExhaustive": true,
       "expectedTree": "expected",
-      "note": "url() inside <style> and style= is never rewritten (byte-equality proves it) and the <style>-block url() IS reference-checked (dot.png exists, so the build is clean). NB: url() in style ATTRIBUTES is outside §12's stated check scope — recorded as spec gap B5."
+      "note": "url() inside <style> and style= is never rewritten (byte-equality proves it) while BOTH are reference-checked — B5 closed (2026-08-12): §12 now covers style-attribute url() too; dot.png exists, so this side builds clean. The firing twin is style-attr-url-broken."
+    },
+    "style-attr-url-broken": {
+      "rules": [
+        "REF-01",
+        "P13"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 5,
+          "severity": "problem",
+          "containsAll": [
+            "gone.png"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "B5's firing side: a url() in a style ATTRIBUTE pointing at nothing is a broken reference like any other — rewriting stays exempt (§11.1), checking does not (§12). The v0.6-shaped alternative was shipping the 404 silently."
     },
     "dollar-patterns": {
       "rules": [
@@ -1032,7 +1057,8 @@
         "MD-14",
         "MD-09",
         "MD-12",
-        "MD-13"
+        "MD-13",
+        "MD-21"
       ],
       "flags": [],
       "exit": 0,
@@ -1040,7 +1066,28 @@
       "diagnostics": [],
       "diagnosticsExhaustive": true,
       "expectedTree": "expected",
-      "note": "draft:true publishes; date/permalink/slug/tags are inert plain metas; permalink does NOT move the output (dist/post.html). Pins YAML plain scalars serializing as their source text ('true', '2026-01-01') — recorded as spec gap B6 (scalar serialization unstated)."
+      "note": "draft:true publishes; date/permalink/slug/tags are inert plain metas; permalink does NOT move the output (dist/post.html). B6 closed (2026-08-12): §10.2 value serialization pinned exact — plain scalars as source text ('true', '2026-01-01', '0.50' keeps its zero), quoted scalars unquoted ('Colons: kept…'), empty value → content=\"\". The no-text-form firing twin is frontmatter-deep-nest (P17)."
+    },
+    "frontmatter-deep-nest": {
+      "rules": [
+        "P17",
+        "MD-21"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/post.md",
+          "line": 4,
+          "severity": "problem",
+          "containsAll": [
+            "og:image"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "P17: a mapping nested below a block (og: → image: → url:) has no text form — frontmatter flattens exactly one level, and both inventing a serialization and dropping the value would be silent lies. Located at the key whose value nests (line 4). The list-item-that-is-a-mapping branch is the same problem."
     },
     "charset-differs": {
       "rules": [
@@ -1087,25 +1134,19 @@
     "md-include-element": {
       "rules": [
         "MD-02",
-        "INC-12"
+        "MD-19",
+        "MD-20",
+        "MD-15",
+        "INC-12",
+        "S02"
       ],
       "flags": [],
       "exit": 0,
       "published": true,
       "diagnostics": [],
       "diagnosticsExhaustive": true,
-      "expectContains": {
-        "page.html": [
-          "boxed content",
-          "After."
-        ]
-      },
-      "expectNotContains": {
-        "page.html": [
-          "<include"
-        ]
-      },
-      "note": "Deliberately contains-level, not byte-exact: CommonMark block rules make an element-form <include> line either an HTML block or paragraph-wrapped inline HTML depending on §2-step-2 vs §10.1 ordering — spec ambiguity B2. The invariant asserted is the law: the content appears, the tag does not."
+      "expectedTree": "expected",
+      "note": "B2 resolved (2026-08-12): conversion first, includes resolve on the converted HTML, and a line-initial <include> is a block (the §10.1 type-6 extension). Exact tree pins all three placements: line-initial paired form splices as a clean block (never <p>-wrapped), an include inside a sentence splices inline within the paragraph, and a code-fenced include is escaped text that resolution never touches. The page is layout-less, so the §10.7 shell wraps it (MD-20)."
     },
     "srcset-poster-rewrite": {
       "rules": [
@@ -1119,6 +1160,24 @@
       "diagnosticsExhaustive": true,
       "expectedTree": "expected",
       "note": "srcset URLs rewritten per candidate with descriptors untouched; poster rewritten; both from layout provenance."
+    },
+    "base-url-subpath": {
+      "rules": [
+        "URL-10",
+        "URL-11",
+        "URL-12",
+        "REF-02"
+      ],
+      "flags": [
+        "--base-url",
+        "https://example.com/repo/"
+      ],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected",
+      "note": "B3's exact trap, pinned fixed (2026-08-12): a full base URL whose path is not / must absolutize og:/twitter:/canonical as origin + path prefix — og:image /assets/hero.jpg emits https://example.com/repo/assets/hero.jpg, never https://example.com/assets/hero.jpg. href/src get the path part only; the absolute og:url is untouched (URL-12); the reference check must strip the full base to keep the absolutized values checkable (REF-02)."
     },
     "no-layout-anywhere": {
       "rules": [
@@ -1136,25 +1195,19 @@
     "layout-none-md": {
       "rules": [
         "LAY-01",
-        "MD-06"
+        "MD-06",
+        "MD-20",
+        "MD-15",
+        "MD-07",
+        "MD-08"
       ],
       "flags": [],
       "exit": 0,
       "published": true,
       "diagnostics": [],
       "diagnosticsExhaustive": true,
-      "expectContains": {
-        "standalone.html": [
-          "No layout wanted.",
-          "<h1 id=\"standalone\">Standalone</h1>"
-        ]
-      },
-      "expectNotContains": {
-        "standalone.html": [
-          "— S"
-        ]
-      },
-      "note": "Deliberately contains-level: what document shell (if any) wraps a layout-less Markdown page is unspecified — spec gap B4. Asserted: conversion happened, the layout did not apply, nothing was lost."
+      "expectedTree": "expected",
+      "note": "B4 resolved (2026-08-12): a layout-less .md page emits inside the §10.7 minimal shell — this tree is the spec's own §10.7 fixture verbatim. Exact assertions: charset first, title from the first h1, metas in source order, lang on <html>, class on <body>, converted body in <body>; the present _layout.html did not apply (bidirectional exactness proves its title never leaked in) and is not emitted."
     },
     "stray-header-footer": {
       "rules": [

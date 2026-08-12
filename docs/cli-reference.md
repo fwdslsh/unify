@@ -44,7 +44,7 @@ Scaffolds a starter site into `src/`. Templates: `default`, `basic`, `blog`, `do
 
 ### `-s, --source <dir>` / `-o, --output <dir>`
 
-Source root and output directory. Pages (`.html`, `.md`) are processed; **every other file mirror-copies byte-for-byte** to the same relative path. Independent of everything else, these never ship: the output directory, `.git/`/`.hg/`/`.svn/`, `node_modules/`, `.env` and `.env.*`, and `unify.yaml`. Dotfiles ship (`.htaccess`, `.nojekyll` are deploy files).
+Source root and output directory. Pages (`.html`, `.md`) are processed; **every other file mirror-copies byte-for-byte** to the same relative path. Independent of everything else, these never ship: the output directory, `.git/`/`.hg/`/`.svn/`, `node_modules/`, `.env` and `.env.*`, and `unify.yaml`. Dotfiles ship (`.htaccess`, `.nojekyll` are deploy files). When no `--source` is given and no `src/` exists — a directory `init` did not scaffold — the build summary reports how many files it is copying and points at `--dry-run`; passing `--source` yourself (even `.`) turns that notice off.
 
 ### `--clean`
 
@@ -66,7 +66,7 @@ Moves every page `X.html` to `X/index.html` — except `index.html` files (alrea
 
 ### `--base-url <path | url>`
 
-For sites served from a subpath. `--base-url /repo-name/` prefixes root-relative URLs (`href`, `src`, `srcset`, `poster`) in the built HTML; source files stay rooted at `/` so local preview keeps working. With a full URL (`--base-url https://example.com/`), the origin also absolutizes root-relative URL values in `og:`/`twitter:` metas and `rel="canonical"`, which crawlers require to be absolute.
+For sites served from a subpath. `--base-url /repo-name/` prefixes every root-relative URL in the built HTML — `href`, `src`, `srcset`, `poster`, and `og:`/`twitter:` meta values; source files stay rooted at `/` so local preview keeps working. With a full URL (`--base-url https://example.com/repo/`), root-relative `og:`/`twitter:`/`rel="canonical"` values — which crawlers require to be absolute — are absolutized against the whole base, origin **and** subpath: `/assets/x.jpg` becomes `https://example.com/repo/assets/x.jpg`.
 
 ### `--dry-run`
 

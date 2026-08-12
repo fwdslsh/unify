@@ -18,8 +18,8 @@ Derived files (a post index, a feed) come from a script in `_scripts/`, run firs
 
 ## Include — reuse a fragment
 `<include src="/_includes/nav.html"></include>`, always with the closing tag; `/…` resolves from the
-source root, anything else relative to the including file. Works anywhere: `.md` pages, `<head>`, other
-fragments. **Never put content between the tags** — includes are verbatim, not components; parameterized variants come from a `_scripts/` generator.
+source root, anything else relative to the including file. Works anywhere: `<head>`, other fragments,
+`.md` pages (own line → block, mid-sentence → inline, in a code fence it stays text). **Never put content between the tags** — includes are verbatim, not components; parameterized variants come from a `_scripts/` generator.
 
 ## Layout — chrome around a page
 Every page is wrapped by the nearest `_layout.html` — its own folder, then each parent; the page says
@@ -48,7 +48,8 @@ an error — on a layout too, because layouts don't chain (a section layout is a
 `title`, `layout`, `class`, `lang`, `dir` are the only keys with meaning. `date`, `tags`, `draft`,
 `permalink`, `slug` do nothing and ship as `<meta>` tags — `draft: true` publishes the page; hold
 pages back with a leading underscore. Any other key becomes `<meta name=…>`; an `og:` block becomes
-`property=` metas. No `title:` → the first `# Heading` is the title. Headings get slug `id`s.
+`property=` metas; values ship as written (`draft: true` → `"true"`), and blocks flatten one level —
+nesting deeper is an error. No `title:` → the first `# Heading` is the title. Headings get slug `id`s.
 Frontmatter cannot express canonical or JSON-LD: put those in the layout, or write the page in HTML.
 
 ## Styles, scripts, finishing

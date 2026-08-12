@@ -31,6 +31,14 @@
  *                records nothing, so its rules go uncovered and the gate
  *                fails. CI runs `bun test && bun check-traceability.mjs
  *                --runtime .conformance-ledger.jsonl`.
+ *    --baseline <file>
+ *              : migration-phase gate (Gate P0..P3). The file lists the gap
+ *                IDs a phase is allowed to have (tests/conformance/phase-gaps/
+ *                *.txt, one ID per line). The check exits 0 iff the computed
+ *                gap set equals the baseline exactly — a new gap fails, and a
+ *                gap that closed fails too until the baseline shrinks in the
+ *                same commit. Without --baseline, any gap fails (the release
+ *                semantics).
  *
  * Exit codes: 0 all green; 1 gap/unknown-id/sync failure; 2 usage error.
  */
@@ -147,6 +155,14 @@ if (mode === "static") {
 }
 
 // ---------- the gate ----------
+const bIdx = process.argv.indexOf("--baseline");
+let baseline = null;
+if (bIdx !== -1) {
+  const f = process.argv[bIdx + 1];
+  if (!f || !existsSync(f)) die("--baseline requires a file of expected gap IDs (one per line)");
+  baseline = readFileSync(f, "utf8").split("\n").map((s) => s.trim()).filter(Boolean);
+}
+
 const gaps = [];
 for (const [id, meta] of inventory) {
   if (meta.testkind === "structural") continue; // asserted by construction; documented in rules.tsv
@@ -156,7 +172,18 @@ const covered = [...inventory.keys()].filter((k) => declared.has(k)).length;
 const gatable = [...inventory.values()].filter((r) => r.testkind !== "structural").length;
 console.log(`inventory: ${inventory.size} rules (${gatable} gated, ${inventory.size - gatable} structural)`);
 console.log(`covered (${mode}): ${covered}`);
-if (gaps.length) {
+if (baseline) {
+  const gapSet = new Set(gaps);
+  const baseSet = new Set(baseline);
+  const unexpected = gaps.filter((g) => !baseSet.has(g));
+  const closed = baseline.filter((b) => !gapSet.has(b));
+  if (unexpected.length) {
+    fail(`${unexpected.length} gap(s) not in the committed baseline:`);
+    for (const id of unexpected) console.error(`  ${id}\t${inventory.get(id).spec}\t${inventory.get(id).summary.slice(0, 80)}`);
+  }
+  if (closed.length) fail(`baseline gap(s) now covered — shrink the baseline file in the same commit: ${closed.join(", ")}`);
+  if (!unexpected.length && !closed.length) console.log(`gaps match the committed baseline (${gaps.length}) — migration phase gate green`);
+} else if (gaps.length) {
   fail(`${gaps.length} rule(s) with no covering test:`);
   for (const id of gaps) console.error(`  ${id}\t${inventory.get(id).spec}\t${inventory.get(id).summary.slice(0, 80)}`);
 }
