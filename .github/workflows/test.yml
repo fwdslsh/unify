@@ -1,4 +1,4 @@
-name: Run Tests
+name: CI
 
 on:
   push:
@@ -8,6 +8,46 @@ on:
   workflow_dispatch:
 
 jobs:
-  run-tests:
-    name: Run Tests
-    uses: fwdslsh/toolkit/.github/workflows/bun-test.yml@main             
+  # The release signal (docs/migration-plan.md §1). RED BY DESIGN until every
+  # gated rule in tests/conformance/rules.tsv is recorded by a passing test
+  # against the real CLI in this run — green here IS the v0.7.0 release
+  # condition. Do not "fix" this job by weakening the harness or the checker;
+  # progress is the covered count it prints (see also
+  # tests/conformance/phase-gaps/p0-expected-fail.txt for why red is correct).
+  release-signal:
+    name: Release signal (red until the ledger is full)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Conformance suite + runtime traceability
+        # The path filters quarantine tests/legacy-v0.6 (migration-plan
+        # Phase 0 step 2: the old suite stops voting). Phase 1 deletes the
+        # legacy tree; this step then returns to a bare `bun test`.
+        run: |
+          rm -f .conformance-ledger.jsonl
+          bun test tests/conformance tests/e2e
+          bun tests/conformance/check-traceability.mjs --runtime .conformance-ledger.jsonl
+
+  # Always-on gate G9: the anti-rot rules for the suite itself (H1-H5).
+  suite-hygiene:
+    name: Suite hygiene (G9)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun tests/conformance/check-suite-hygiene.mjs
+
+  # Always-on: spec-to-inventory sync plus static rule coverage. Green during
+  # the migration iff the gap list equals the committed phase baseline: a new
+  # uncovered rule fails, and a closed gap fails until the baseline shrinks
+  # in the same commit.
+  traceability-static:
+    name: Traceability (static vs phase-gaps baseline)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun tests/conformance/check-traceability.mjs --static --baseline tests/conformance/phase-gaps/baseline.txt

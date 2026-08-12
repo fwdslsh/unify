@@ -1,0 +1,60 @@
+# Authoring a unify site — the complete rules
+
+unify composes plain HTML at build time. No template language, no variables, no loops, no config, no
+JavaScript: if you reach for `{{ }}`, `{% %}`, props, or a config key, you are solving it wrong. The
+vocabulary is standard HTML — `<main>`, `<slot>`, `slot=` — plus two tokens: `<include>` and `data-layout`.
+Derived files (a post index, a feed) come from a script in `_scripts/`, run first: `node _scripts/gen.mjs && unify build`.
+
+## Files
+- Source root is `src/` if it exists, else the current directory. `.html`/`.md` are pages; every other
+  file copies byte-for-byte to the same path. Write `href`/`src` correct for the file you are editing,
+  and link the real file (`about.html`), never a hand-written `/about/` — `--pretty-urls` rewrites links.
+- **Everything in the source root ships.** Anything that is not part of the site — notes, drafts,
+  scratch, scripts — goes under a leading underscore (`_draft.html`, `_notes/`, `_scripts/`): the
+  build still reads it, the output never contains it. Files inside a `_` directory need no prefix.
+- Every file is valid standalone HTML: pages and layouts are complete `<!doctype html>` documents,
+  fragments are balanced snippets. HTML pages never have frontmatter (use `<head>`); Markdown pages
+  never contain `<head>` (use frontmatter). Both are build errors.
+
+## Include — reuse a fragment
+`<include src="/_includes/nav.html"></include>`, always with the closing tag; `/…` resolves from the
+source root, anything else relative to the including file. Works anywhere: `<head>`, other fragments,
+`.md` pages (own line → block, mid-sentence → inline, in a code fence it stays text). **Never put content between the tags** — includes are verbatim, not components; parameterized variants come from a `_scripts/` generator.
+
+## Layout — chrome around a page
+Every page is wrapped by the nearest `_layout.html` — its own folder, then each parent; the page says
+nothing. Pick one with `data-layout="/path.html"` on the page's `<html>` or `<body>` (Markdown:
+`layout: /path.html`); opt out with `data-layout="none"` / `layout: none`. Layouts are paths ending in
+`.html` — a bare name like `default` is an error. `data-layout` belongs on pages only: anywhere else it is
+an error — on a layout too, because layouts don't chain (a section layout is a complete standalone page).
+
+## Merging a page into its layout
+- **Named slots.** Where the layout wrote `<slot name="footer">fallback…</slot>`, a page element with
+  `slot="footer"` replaces the slot, tag and all — your markup ships exactly as written. Omit the
+  fill and the fallback ships. `slot=` counts only on top-level elements (direct children of
+  `<body>`); list a layout's slots with `grep -o '<slot[^>]*>' src/_layout.html`.
+- **Everything else** replaces the layout's bare `<slot></slot>`, or the children of its `<main>` if
+  there is no bare slot. Your own `<main>` wrapper is unwrapped, so write complete semantic
+  documents. A bare `<header>`/`<footer>` does **not** replace the layout's — only `slot=` fills.
+- **Head.** The layout owns `<head>` and declares `<meta charset>` — never write one in a page. Your
+  `<title>` joins the layout's, which carries the separator (`About` + `— My Site` → `About — My Site`);
+  write only the page's name. Your `<meta>` replaces the layout's same-`name`/`property`, your
+  `canonical`/`icon` links replace the layout's, everything else appends after — page CSS wins.
+- **Root attributes.** On `<html>`/`<body>` only, your classes are added and any other attribute you
+  set wins; attributes merge nowhere else. Active nav is `<body class="home">` plus CSS
+  (`body.home .nav-home {…}`), not a feature.
+
+## Markdown
+`title`, `layout`, `class`, `lang`, `dir` are the only keys with meaning. `date`, `tags`, `draft`,
+`permalink`, `slug` do nothing and ship as `<meta>` tags — `draft: true` publishes the page; hold
+pages back with a leading underscore. Any other key becomes `<meta name=…>`; an `og:` block becomes
+`property=` metas; values ship as written (`draft: true` → `"true"`), and blocks flatten one level —
+nesting deeper is an error. No `title:` → the first `# Heading` is the title. Headings get slug `id`s.
+Frontmatter cannot express canonical or JSON-LD: put those in the layout, or write the page in HTML.
+
+## Styles, scripts, finishing
+unify never scopes, rewrites, or injects CSS/JS — scope fragment styles yourself (`@scope`, `@layer`, a
+class prefix); a `url()` inside `<style>`/`style=` is never rewritten, so make it root-relative.
+`unify build --dry-run --strict` is the whole build and every check, writing nothing: every problem in one
+pass, each page naming its layout. Then `unify build` — exit 0 means `dist/` is the complete site; non-zero
+means nothing was published, `dist/` untouched; never report success on non-zero. `--exclude` **replaces** the `_*` default; keep `_*` in your list.

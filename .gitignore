@@ -90,3 +90,6 @@ coverage/
 .remove
 tts_output.wav
 .coverage/lcov.info
+
+# Conformance runtime ledger (rebuilt per test run; CI removes it before bun test)
+.conformance-ledger.jsonl

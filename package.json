@@ -1,7 +1,7 @@
 {
   "name": "@fwdslsh/unify",
   "version": "0.6.6",
-  "description": "A lightweight, framework-free static site generator with Bun native APIs",
+  "description": "A static site generator for HTML-native composition: includes, layouts, and slots in plain HTML — no expression language, no client runtime",
   "type": "module",
   "main": "src/cli.js",
   "bin": {
@@ -16,11 +16,6 @@
   },
   "scripts": {
     "test": "CLAUDECODE=1 bun test --coverage --coverage-dir=.coverage --coverage-reporter=lcov",
-    "watch": "bun run src/cli.js watch --source example/src --output example/dist",
-    "serve": "bun run src/cli.js serve --source example/src --port 3000",
-    "example": "bun run build && bun run serve --pretty-urls",
-    "build": "bun run src/cli.js build --source example/src --output example/dist",
-    "build:advanced": "rm -rf example/advanced/dist && bun run ./src/cli.js build -s example/advanced/src/ -o example/advanced/dist/ -l example/advanced/src/site_layouts/",
     "build:linux": "bun build --compile --target=bun-linux-x64 ./src/cli.js --outfile unify-linux",
     "build:macos": "bun build --compile --target=bun-darwin-arm64 ./src/cli.js --outfile unify-macos",
     "build:windows": "bun build --compile --target=bun-windows-x64 ./src/cli.js --outfile unify-windows.exe"
@@ -44,7 +39,7 @@
   "bugs": {
     "url": "https://github.com/fwdslsh/unify/issues"
   },
-  "homepage": "https://unify.github.io/website",
+  "homepage": "https://github.com/fwdslsh/unify#readme",
   "dependencies": {
     "gray-matter": "^4.0.3",
     "linkedom": "^0.18.12",
@@ -59,7 +54,6 @@
     "bun": ">=1.2.0"
   },
   "files": [
-    "bin/",
     "src/",
     "README.md"
   ]

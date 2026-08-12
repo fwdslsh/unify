@@ -1,4 +1,4 @@
-# Multi-stage Dockerfile for Inform CLI
+# Multi-stage Dockerfile for the unify CLI
 # Uses Ubuntu for glibc compatibility with Bun executables
 
 # Build stage
@@ -63,7 +63,7 @@ USER appuser
 
 # Add metadata labels
 LABEL org.opencontainers.image.title="Unify CLI" \
-    org.opencontainers.image.description="Modern static site generator with server-side includes, DOM templating, and live development features." \
+    org.opencontainers.image.description="Static site generator for HTML-native composition: includes, layouts, and slots in plain HTML — no expression language, no client runtime." \
     org.opencontainers.image.url="https://github.com/fwdslsh/unify" \
     org.opencontainers.image.source="https://github.com/fwdslsh/unify" \
     org.opencontainers.image.vendor="fwdslsh" \

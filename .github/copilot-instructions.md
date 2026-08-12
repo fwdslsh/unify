@@ -1,407 +1,91 @@
-# GitHub Copilot Instructions for Unify CLI
+# GitHub Copilot Instructions for unify
 
-## Project Overview
-Unify CLI is a **Bun-native static site generator** that emphasizes Apache SSI-style includes and high-performance HTML processing. This project is built exclusively for the Bun runtime and leverages Bun's native APIs for optimal performance.
+unify is a Bun-native static site generator for **HTML-native composition**: includes, layouts, and slots written in plain HTML, with no expression language and no client runtime. The output is the HTML and CSS the author wrote; unify adds no JavaScript of its own.
 
-**ALWAYS reference these instructions first and fallback to search or bash commands only when you encounter unexpected information that does not match the info here.**
+**The v0.7.0 specification set in `docs/` is authoritative. Learn the product from those documents, not from `src/`** — the composition core is being rewritten against them, so code you find in the tree may implement the retired v0.6 product.
 
-## Vendor Documentation
+## Read before suggesting anything
 
-Ensure that all code adheres to the vendor documentation provided in the `.vendor/` directory. This includes following best practices and utilizing Bun's built-in features effectively.
+| Document | What it decides |
+|---|---|
+| `docs/product-spec.md` | The product contract: what unify is, the composition model, the complete CLI, the non-goals. |
+| `docs/conformance-spec.md` | The normative implementer reference: exact algorithms, the head-merge table, the closed problem and advisory catalogues, and the worked examples that are the fixtures. |
+| `docs/cli-reference.md` | Every command, option, and exit code. **There are no others.** |
+| `docs/authoring-rules.md` | The complete authoring surface in under sixty lines. |
+| `docs/testing-strategy.md` | What "implemented" means as a machine-checkable claim, and the release gates. |
+| `docs/migration-plan.md` | The phased path from the v0.6 codebase and suite to v0.7.0. |
+| `CONTRIBUTING.md` | The contribution workflow and the gates. |
 
-## Core Architecture
+If two documents disagree, that is a defect to report — never a license to reinterpret either one.
 
-### Central Processing Pipeline
-The build system follows a unified processing pipeline:
-1. **Unified HTML Processor** (`src/core/unified-html-processor.js`) - Central entry point for all HTML processing
-2. **Include Processor** (`src/core/include-processor.js`) - Handles Apache SSI-style includes with recursive processing
-3. **Dependency Tracker** (`src/core/dependency-tracker.js`) - Bidirectional mapping for incremental builds
-4. **Asset Tracker** (`src/core/asset-tracker.js`) - Tracks asset references across HTML and CSS files
-5. **File Processor** (`src/core/file-processor.js`) - Orchestrates the complete build workflow
+## The authoring surface — all of it
 
-### Key Concepts
+| You want to… | You write… |
+|---|---|
+| Reuse a fragment | `<include src="/_includes/nav.html"></include>` (Apache SSI comment form also supported) |
+| Wrap pages in a layout | nothing — the nearest `_layout.html` applies; `data-layout="/path.html"` to pick one, `data-layout="none"` to opt out |
+| Mark where content lands | `<main>` for the default; `<slot name="footer">` in the layout, `slot="footer"` on a page element |
+| Keep a file out of the built site | a leading underscore: `_draft.html`, `_includes/` |
 
-#### SSI Include System
-- **Apache SSI Syntax**: `<!--#include file="header.html" -->` (relative to current file)
-- **Virtual Includes**: `<!--#include virtual="/includes/nav.html" -->` (relative to source root)
-- **Modern DOM Syntax**: `<include src="/.components/button.html" />` (alternative syntax)
-- **Circular Dependency Detection**: Uses Set-based tracking with helpful error messages
-- **Max Depth**: 10-level limit prevents runaway recursion
+**If a capability cannot be expressed with these four, it does not belong in unify.** Layouts do not chain. Includes are verbatim and never take fills.
 
-#### Layout & Templating System
-- **Layout Attribute**: `<div data-layout="base.html">` specifies layout files
-- **Slot System**: `<slot name="content">` for content injection
-- **Template Targets**: `<template target="title">Page Title</template>` for metadata
-- **Layout Resolution**: Supports both absolute paths and relative to `.layouts` directory
+## The CLI — a closed set
 
-#### Asset Processing
-- **Asset Reference Tracking**: Scans HTML/CSS for all asset references (images, styles, scripts, fonts)
-- **Smart Copying**: Only copies assets that are actually referenced
-- **CSS Deep Scanning**: Extracts asset references from CSS files (`url()`, `@font-face`, `@import`)
-- **Component Asset Inlining**: Styles and scripts from components are inlined appropriately
-
-#### Build Cache System
-- **File Hashing**: Uses Bun's native crypto for fast file hashing
-- **Dependency Caching**: Tracks dependencies for incremental rebuilds
-- **Change Detection**: Compares file modification times and content hashes
-
-### Bun-Specific Optimizations
-
-#### Runtime Features
-Always assume these Bun features are available:
-- **HTMLRewriter**: Used for high-performance DOM processing
-- **Bun.serve**: Native HTTP server for dev mode
-- **fs.watch**: Native file watching for live reload
-- **Crypto**: Native hashing for build cache
-
-#### Performance Patterns
-- **Async/Await Everywhere**: All file operations use async patterns
-- **Concurrent Processing**: Asset copying and HTML processing run concurrently
-- **Minimal Dependencies**: Leverages Bun's built-in APIs over external packages
-
-## File Organization Patterns
-
-### Source Structure Conventions
 ```
-src/
-├── index.html              # Main content pages
-├── about.html
-├── .components/            # Reusable components (NOT copied to output)
-│   ├── header.html
-│   └── button.html
-├── .layouts/               # Layout templates (NOT copied to output)
-│   ├── base.html
-│   └── article.html
-├── css/                    # Static assets (copied to output)
-├── images/
-└── js/
+unify [build]              build the site (default command)
+unify dev                  build, watch, serve, and reload — the inner loop
+unify watch                build + rebuild on change, no server
+unify init [template]      scaffold a starter site
+
+Options: -s/--source, -o/--output, --clean, --exclude <glob>, --pretty-urls,
+         --base-url <path>, --dry-run, --strict, -p/--port, -v/--version, -h/--help
 ```
 
-### Test Organization
-- **Unit Tests**: `test/unit/` - Test individual components and utilities
-- **Integration Tests**: `test/integration/` - Test complete workflows and interactions
-- **Fixtures**: `test/fixtures/` - Reusable test data and helper functions
-- **Temp Helpers**: All tests use `createTempDirectory()` and `cleanupTempDirectory()` patterns
+Exit codes: `0` published, `1` problems found and nothing published, `2` invalid usage or fatal environment error. Diagnostics use exactly two severities — `problem` and `advisory` — in plain language with **no rule codes**. `DEBUG=1` is the only environment variable unify reads.
 
-## Development Patterns
+## Retired — never suggest, never reintroduce
 
-### Error Handling
-```javascript
-// Use custom error types with helpful suggestions
-import { IncludeNotFoundError, CircularDependencyError } from '../utils/errors.js';
+`data-unify`, `unify-*` area classes, component mode, `<template data-slot>`, landmark and ordered-fill matching, `<style data-unify-docs>` blocks, U001–U008 rule codes, `--fail-on`/`--fail-level`, the security scanner, the glob pipeline, incremental builds and the build cache, `--minify`, `--host`, `--log-level`, short-name layout resolution, layout chaining, and the `serve` command.
 
-throw new IncludeNotFoundError(includePath, filePath, [resolvedPath]);
-```
+Also gone as concepts: `.components/` and `.layouts/` directories, dependency and asset trackers (every non-page file mirror-copies byte-for-byte), automatic sitemap generation, and Apache/Nginx container images (the repo ships exactly one Dockerfile, a CLI image).
 
-### File Processing
-```javascript
-// Always use absolute paths for file operations
-const resolvedPath = path.resolve(sourceRoot, relativePath);
-await fs.readFile(resolvedPath, 'utf-8');
-```
+Suggesting any of these is a regression, not a feature. `data-unify` and `unify-*` appearing in a source file are diagnosed as located build problems naming the v0.7.0 spelling.
 
-### Logging
-```javascript
-import { logger } from '../utils/logger.js';
-logger.debug(`Processing HTML: ${path.relative(sourceRoot, filePath)}`);
-```
+## Non-goals — do not "helpfully" add these
 
-### Testing Patterns
-```javascript
-// Standard test setup pattern
-beforeEach(async () => {
-  tempDir = await createTempDirectory();
-  sourceDir = path.join(tempDir, 'src');
-  outputDir = path.join(tempDir, 'dist');
-});
+No templating language (no `{{ }}`, `{% %}`, variables, loops, conditionals, or props). No component framework. No configuration language — `unify.yaml` is saved CLI flags and nothing more. No style scoping. No general-purpose web server. No plugin API: the extension interface is the filesystem, and generators run before the build. No collections, pagination, RSS, or taxonomies. No build cache. No security theater.
 
-afterEach(async () => {
-  await cleanupTempDirectory(tempDir);
-});
-```
+`docs/product-spec.md` §5 carries the reasoning and the accepted costs; §6 is the post-MVP candidate list and is the roadmap.
 
-## Security Considerations
+## Commands that actually exist
 
-### Path Traversal Prevention
-```javascript
-// Always validate paths are within source root
-const relativePath = path.relative(sourceRoot, resolvedPath);
-if (relativePath.startsWith('../')) {
-  throw new PathTraversalError(assetPath);
-}
-```
-
-### Request Validation (Dev Server)
-- Check for null bytes, excessive URL length
-- Validate MIME types for security headers
-- Implement early security checks before processing
-
-## CLI Architecture
-
-### Command Structure
-- **Build Command**: `unify build --source src --output dist`
-- **Serve Command**: `unify serve --port 3000 --live-reload`
-- **Flag Patterns**: Support both long (`--source`) and short (`-s`) flags
-
-### Exit Code Conventions
-- `0`: Success
-- `1`: Build errors (file not found, circular dependencies)
-- `2`: CLI argument errors (unknown commands, invalid flags)
-
-## Testing Guidelines
-
-### Test Naming
-- Integration tests: `component-assets.test.js`, `live-reload.test.js`
-- Unit tests: `include-processor.test.js`, `asset-tracker.test.js`
-- Feature tests: `bun-features.test.js`
-
-### Fixture Patterns
-```javascript
-// Use createTestStructure for complex test setups
-await createTestStructure(sourceDir, {
-  'index.html': '<h1>Test</h1>',
-  '.components/header.html': '<header>Site Header</header>',
-  'css/main.css': 'body { margin: 0; }'
-});
-```
-
-### Assertion Patterns
-```javascript
-// Check for content presence and structure
-expect(result.includes('Site Header')).toBeTruthy();
-expect(result.processed).toBe(2); // Number of files processed
-expect(result.errors.length).toBe(0); // No build errors
-```
-
-## Performance Expectations
-
-### Build Performance
-- Large sites (1000+ pages): Should complete in < 30 seconds
-- Include processing: < 10ms per include on average
-- Asset copying: Only copy referenced assets
-- Memory usage: Minimal through streaming and efficient data structures
-
-### Dev Server Performance
-- Live reload: < 100ms response time for file changes
-- Security validation: Early request filtering
-- Static file serving: Leverage Bun.serve for optimal performance
-
-## Working Effectively
-
-### Bootstrap, Build, and Test the Repository
-
-**CRITICAL - Install Bun Runtime First:**
 ```bash
-# Install Bun (required - DO NOT use npm/node)
-curl -fsSL https://bun.sh/install | bash
-source ~/.bashrc  # REQUIRED: Must source to update PATH
-bun --version     # Verify installation (should show 1.2.0+)
-```
-
-**Dependencies and Setup:**
-```bash
-cd /path/to/unify
-bun install      # Install dependencies (~6 seconds)
-```
-
-**Run Tests - NEVER CANCEL:**
-```bash
-# Run complete test suite - NEVER CANCEL, takes ~2 minutes
-# Use timeout 180+ seconds minimum
+bun install
 bun test
+bun src/cli.js build --source src --output dist   # run the CLI from source
 
-# Expected: ~349 pass, 4 fail (CSS asset tracking - known issue)
-# Time: ~2 minutes - NEVER CANCEL THIS COMMAND
+bun tests/conformance/check-traceability.mjs --static   # rule-coverage gap list
+bun tests/conformance/check-suite-hygiene.mjs           # suite hygiene gate
+
+bun run build:linux    # also build:macos, build:windows — compile the standalone binary
 ```
 
-**Build Commands:**
-```bash
-# Basic build (example project) - very fast (~18ms)
-bun run build
+There is no `bun run build`, `serve`, `build:advanced`, `lint`, `format`, `docs:*`, `benchmark`, or `check:coverage` script, and no `example/` directory. Bun >= 1.2.0 is the only supported runtime.
 
-# Advanced build scenario - also fast (~22ms)  
-bun run build:advanced
+## Testing rules that constrain suggestions
 
-# Build executable - fast (~65ms)
-bun build --compile --outfile unify-test src/cli.js
+Read `docs/testing-strategy.md` §1 for why these exist: v0.6 shipped 93% coverage on a product whose `init` command exited 1 and whose builds silently deleted page content.
 
-# Docker build CLI image - NEVER CANCEL, takes ~10 minutes
-# Use timeout 600+ seconds minimum
-docker build -f docker/Dockerfile.cli -t unify-cli-test .
-```
+- **Behavior tests spawn the real CLI** on a real filesystem in a temp directory. No mocks, no `src/**` imports, no `console.warn`-instead-of-fail, no commented-out expectations, no ad-hoc HTML normalization. These are mechanically enforced.
+- **Unit tests carry zero conformance authority.** When a unit test disagrees with a conformance fixture, the unit test is wrong by definition.
+- **A bug fix arrives with its fixture** — one that fails before the fix and passes after.
+- **Never edit a test to match observed output.** If the implementation and a fixture disagree, consult the spec; if the spec agrees with the fixture, the implementation changes.
+- **Never generate an expected output tree by capturing a build run.** Expected trees are written from the spec.
 
-**Development Server:**
-```bash
-# Start dev server with live reload (port 3000)
-bun run serve
+**Coverage gates nothing and no threshold exists in this project on purpose.** Do not suggest a coverage target, a coverage-named test file, or a coverage percentage as evidence of quality. The release metric is the conformance ledger: every gated rule in `tests/conformance/rules.tsv` recorded green by a test that ran against the real CLI.
 
-# Or directly with CLI
-bun run src/cli.js serve --port 3000
-```
+## Code style
 
-### CLI Usage Validation
-```bash
-# Test CLI commands
-bun run src/cli.js --version    # Should show: unify v0.4.3
-bun run src/cli.js --help       # Show all commands and options
-bun run src/cli.js build --source example/src --output /tmp/test-output
-```
+Plain JavaScript with JSDoc — no TypeScript. ES modules with `.js` extensions in imports. Async/await. Prefer Bun-native APIs (`Bun.file`, `Bun.write`, `Bun.spawn`, `Bun.serve`, `fs.watch`) over dependencies; a new dependency needs justification against a Bun-native alternative.
 
-## Validation Requirements
-
-**ALWAYS manually validate any changes by running through complete scenarios:**
-
-### Basic Build Validation
-```bash
-# 1. Clean build from example
-bun run src/cli.js build --source example/src --output /tmp/validate-output
-
-# 2. Check output structure
-ls -la /tmp/validate-output/  # Should show: *.html, css/, sitemap.xml
-
-# 3. Verify HTML content includes processing
-head -20 /tmp/validate-output/index.html  # Should contain navbar, layout applied
-
-# 4. Verify assets copied correctly
-ls -la /tmp/validate-output/css/  # Should contain main.css if referenced
-```
-
-### Dev Server Live Reload Validation
-```bash
-# 1. Start server in background
-bun run serve &
-
-# 2. Verify server responds
-curl http://localhost:3000/  # Should return HTML content
-
-# 3. Test live reload by changing a file in example/src/ 
-# and verify browser receives reload event
-
-# 4. Stop server
-pkill -f "bun run serve"
-```
-
-### Component and Include Processing Validation
-```bash
-# 1. Build advanced example with custom components
-bun run build:advanced
-
-# 2. Verify components processed and content includes applied
-grep "navigation" example/advanced/dist/index.html  # Should contain navigation references
-
-# 3. Verify build completed without errors
-# Advanced example uses custom component directories, components may be copied
-ls -la example/advanced/dist/  # Should show built pages and assets
-```
-
-## Critical Timing and Timeout Values
-
-**NEVER CANCEL these commands - use these timeout values:**
-
-- **bun test**: 180 seconds minimum (typically ~2 minutes)
-- **Docker builds**: 600 seconds minimum (typically ~10 minutes) 
-- **bun install**: 60 seconds (typically ~6 seconds)
-- **Basic builds**: 30 seconds (typically <100ms)
-- **Executable builds**: 60 seconds (typically ~65ms)
-
-## Common Tasks and Outputs
-
-### Repository Structure
-```bash
-# Key directories you'll work with frequently:
-ls /home/runner/work/unify/unify/
-# Output: bin/ src/ test/ example/ docs/ docker/ package.json README.md
-
-# Main entry point
-ls bin/
-# Output: cli.js
-
-# Source code organization  
-ls src/
-# Output: cli/ core/ server/ utils/
-
-# Test structure
-ls test/
-# Output: unit/ integration/ security/ performance/ fixtures/
-```
-
-### Package.json Scripts
-```json
-{
-  "scripts": {
-    "test": "bun test",
-    "build": "bun run src/cli.js build --source example/src --output example/dist",
-    "serve": "bun run src/cli.js serve --source example/src --port 3000",
-    "build:executable": "bun run scripts/build-executables.js"
-  }
-}
-```
-
-## Common Patterns
-
-### Incremental Builds
-```javascript
-// Use dependency tracking for efficient rebuilds
-const affectedPages = dependencyTracker.getAffectedPages(changedFile);
-for (const page of affectedPages) {
-  await processHtmlFile(page, sourceRoot, outputRoot, dependencyTracker, assetTracker);
-}
-```
-
-### Component Processing
-```javascript
-// Components with assets are inlined appropriately
-// Styles -> <head>, Scripts -> end of <body>
-// For SSI includes: inline where included (Apache SSI behavior)
-// For DOM includes: move to appropriate locations
-```
-
-### Build Configuration
-```javascript
-const DEFAULT_OPTIONS = {
-  source: 'src',
-  output: 'dist',
-  components: '.components',
-  layouts: '.layouts',
-  clean: true,
-  prettyUrls: false,
-  baseUrl: 'https://example.com'
-};
-```
-
-## Debugging Tips
-
-### Common Issues
-- **Build Cache Problems**: Clear cache when file dependencies aren't detected properly
-- **Path Resolution**: Always use absolute paths, be careful with Windows path separators
-- **Circular Dependencies**: The system detects these automatically with helpful error messages
-- **Asset References**: Check both HTML and CSS files for asset references
-
-### Logging Levels
-- Use `logger.debug()` for detailed processing information
-- Use `logger.warn()` for recoverable issues (missing optional includes)
-- Use `logger.error()` for build-breaking problems
-
-## Code Style
-
-### Import Patterns
-```javascript
-// Use ES modules exclusively
-import fs from 'fs/promises';
-import { logger } from '../utils/logger.js';
-import { processIncludes } from './include-processor.js';
-```
-
-### Async Patterns
-```javascript
-// Prefer async/await over promises
-const content = await fs.readFile(filePath, 'utf-8');
-const processed = await processIncludes(content, filePath, sourceRoot);
-```
-
-### Error Messages
-- Include file paths in error messages
-- Provide actionable suggestions when possible
-- Use relative paths in user-facing messages for clarity
-
-This project prioritizes **performance**, **security**, and **developer experience**. When contributing, focus on maintaining these principles while leveraging Bun's native capabilities for optimal performance.
+Errors name the file, the reference, and the line where known, with a short fix list. **Silent failure is a bug by definition** — this is the failure class that defined v0.6, and it outranks every other concern.

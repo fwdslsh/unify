@@ -1,0 +1,194 @@
+{
+  "fixture": "kitchen-sink",
+  "description": "A realistic small-business site (Meridian Coffee Roasters) that exercises every composition, head-merge, URL, exclusion, and Markdown rule at least once. One deliberate advisory (the void <include> in legal/privacy.html) is declared below; everything else builds clean. The site is coherent on purpose: integration failures that rule-by-rule micro-fixtures miss (include-into-layout head merging, include-authored URL provenance inside a section layout, Markdown under a section layout) all occur here naturally. The menu section uses a complete standalone _layout.html — layout chaining is not part of v0.7.0 (P15).",
+  "harnessContract": {
+    "run": "for each profile: unify build -s tests/fixtures/kitchen-sink/src -o <tmp>/dist <flags>",
+    "treeComparison": "bidirectional against expectedTree using the single harness comparator (tests/conformance/compare.mjs): a file missing from dist or extra in dist fails; HTML files are compared exactly on structure, attributes and their order, comments, and text content, with only whitespace-only text nodes outside pre/textarea/script/style normalized (testing-strategy section 2); non-HTML files byte-exact. This is what makes the never-shipped list (.env), the underscore exclusions, and LAY-12/LAY-13 (no data-layout, no data-polyfill script tag in output) assertions rather than intentions.",
+    "diagnostics": "stderr is parsed into (file, line?, severity, message) records using the stable prefix contract (conformance spec 14.1). The declared list below is exhaustive per profile: any undeclared diagnostic of either severity fails the run. This enforces the closed problem/advisory catalogue and the advisory discipline on a correct site.",
+    "determinism": "every profile runs twice; the second run must produce a byte-identical tree and byte-identical stdout/stderr (DIA-05).",
+    "publishGate": "profiles with published=false pre-seed <tmp>/dist with a sentinel tree and assert it is byte-untouched afterwards (PUB-01)."
+  },
+  "profiles": {
+    "default": {
+      "flags": [],
+      "expectedTree": "expected",
+      "exit": 0,
+      "published": true,
+      "diagnostics": [
+        {
+          "file": "src/legal/privacy.html",
+          "line": 9,
+          "severity": "advisory",
+          "contains": "include"
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "rules": [
+        "PIP-01",
+        "S01",
+        "S02",
+        "S03",
+        "S04",
+        "S05",
+        "S06",
+        "S07",
+        "S08",
+        "S09",
+        "S10",
+        "S11",
+        "S12",
+        "SHL-01",
+        "EXC-01",
+        "EXC-02",
+        "EXC-04",
+        "EXC-05",
+        "EXC-08",
+        "EXC-09",
+        "INC-01",
+        "INC-02",
+        "INC-03",
+        "INC-07",
+        "INC-11",
+        "INC-12",
+        "LAY-01",
+        "LAY-02",
+        "LAY-04",
+        "LAY-12",
+        "LAY-13",
+        "MRG-01",
+        "MRG-06",
+        "MRG-07",
+        "MRG-08",
+        "MRG-09",
+        "MRG-11",
+        "MRG-12",
+        "MRG-13",
+        "MRG-16",
+        "HED-01",
+        "HED-02",
+        "HED-03",
+        "HED-04",
+        "HED-05",
+        "HED-06",
+        "HED-07",
+        "ATT-01",
+        "ATT-02",
+        "ATT-03",
+        "MD-01",
+        "MD-02",
+        "MD-03",
+        "MD-04",
+        "MD-05",
+        "MD-06",
+        "MD-07",
+        "MD-08",
+        "MD-09",
+        "MD-10",
+        "MD-11",
+        "MD-12",
+        "MD-13",
+        "MD-15",
+        "MD-16",
+        "URL-01",
+        "URL-02",
+        "URL-04",
+        "URL-05",
+        "URL-06",
+        "DIA-02",
+        "DIA-05",
+        "DIA-06",
+        "PUB-01",
+        "A01"
+      ],
+      "ruleNotes": {
+        "INC-03": "leading-/ branch only here; the relative branch is FIX-01 (spec 5.2) and landmine include-relative",
+        "URL-01": "href/src branches; srcset/poster branches live in landmine srcset-poster-rewrite",
+        "HED-01": "branches: page-without-charset (index, about, beans) and identical-charset-silent (contact); the moved-first and differing branches are landmines charset-page-only / charset-differs",
+        "MRG-13": "non-empty default branch; the empty-default-keeps-layout-children branch is landmine empty-page",
+        "HED-05": "replace branch: contact.html declares its own icon, replacing the layout's favicon; the kept-when-page-declares-none branch is FIX-11"
+      }
+    },
+    "pretty-base": {
+      "flags": [
+        "--pretty-urls",
+        "--base-url",
+        "/coffee/"
+      ],
+      "expectedTree": "expected-pretty-base",
+      "exit": 0,
+      "published": true,
+      "diagnostics": [
+        {
+          "file": "src/legal/privacy.html",
+          "line": 9,
+          "severity": "advisory",
+          "contains": "include"
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "rules": [
+        "URL-07",
+        "URL-08",
+        "URL-09",
+        "URL-10",
+        "URL-12",
+        "REF-02",
+        "REF-03"
+      ],
+      "ruleNotes": {
+        "URL-07": "moves about/contact/beans/privacy; index.html files and root 404.html stay",
+        "URL-09": "mailto (contact), absolute canonical (layout), relative asset in unmoved page (index beans.jpg) all preserved",
+        "REF-02": "the reference check must strip the /coffee/ prefix before resolving, or this green build turns red",
+        "og-note": "B3 fixed (2026-08-12): section 11.3 now has one scope for both forms, so beans' og:image takes the path prefix like every other root-relative URL and emits /coffee/assets/beans.jpg; twitter:card 'summary' is not root-relative and stays untouched. Absolutization still requires the full-URL form; the non-root-path absolutization trap itself is pinned by landmine base-url-subpath."
+      }
+    },
+    "origin": {
+      "flags": [
+        "--base-url",
+        "https://meridian.coffee/"
+      ],
+      "expectedTree": "expected-origin",
+      "exit": 0,
+      "published": true,
+      "diagnostics": [
+        {
+          "file": "src/legal/privacy.html",
+          "line": 9,
+          "severity": "advisory",
+          "contains": "include"
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "rules": [
+        "URL-11",
+        "URL-12"
+      ],
+      "ruleNotes": {
+        "URL-11": "index canonical /index.html and beans og:image /assets/beans.jpg gain the full base (origin + path prefix, here the root path /); the layout's absolute canonical and non-URL meta content are untouched. The non-root-path branch of URL-11 is landmine base-url-subpath"
+      }
+    },
+    "strict": {
+      "flags": [
+        "--strict"
+      ],
+      "expectedTree": null,
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/legal/privacy.html",
+          "line": 9,
+          "severity": "advisory",
+          "contains": "include"
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "rules": [
+        "DIA-03"
+      ],
+      "ruleNotes": {
+        "DIA-03": "the single advisory flips the exit code under --strict and blocks publish; the pre-seeded dist sentinel must be byte-untouched"
+      }
+    }
+  }
+}

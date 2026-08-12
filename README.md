@@ -1,226 +1,283 @@
-# unify - an SSG for a more peaceful future
+# unify
 
+**HTML-native composition — no expression language, no client runtime.**
 
-<img src="example/src/imgs/green-icon-64.png" alt="unify banner" style="float: left; margin-right: 16px;" />
+unify is a static site generator for front-end designers and hobbyists: people fluent in HTML and CSS who have no interest in JavaScript frameworks, templating languages, or build tooling. Define a header, footer, nav, or page layout once, in plain HTML files, and have it rendered into every page of the site. The output is the HTML and CSS you wrote — unify adds no JavaScript of its own. It replaces copy-paste chrome, hand-edited HTML, and Apache SSI; it does not compete with Hugo, Eleventy, or Astro.
 
-A modern, lightweight static site generator that brings the power of server-side includes, markdown processing, and live development to your workflow. Build maintainable static sites with component-based architecture—no more copying and pasting headers, footers, and navigation across multiple pages!
+The entire authoring surface is four things, learnable in five minutes:
 
-> So simple, it shouldn't be this powerful!
+| You want to… | You write… |
+|---|---|
+| Reuse a fragment (nav, footer, badge) | `<include src="/_includes/nav.html"></include>` |
+| Wrap pages in a layout | nothing (the nearest `_layout.html` applies) — `data-layout="/path.html"` to pick one, `data-layout="none"` to opt out |
+| Mark where page content lands, or let pages replace a named region | `<main>` for the default; `<slot name="footer">…</slot>` in the layout, `slot="footer"` on a page element |
+| Keep a page or folder out of the built site | name it with a leading underscore: `_draft.html`, `_includes/` |
 
-## ✨ Perfect for Frontend Developers
+If a capability cannot be expressed with these four, it does not belong in unify.
 
-- **Zero Learning Curve**: Uses familiar Apache SSI syntax (`<!--#include file="header.html" -->`) and modern DOM templating (`<include>`, `data-slot`, `<template>`)
-- **Modern Tooling**: Built with ESM modules, powered by **Bun** for maximum performance
-- **Live Development**: Built-in dev server with live reload via Server-Sent Events
-- **Multi-Format Support**: HTML, Markdown with YAML frontmatter, and static assets
-- **Convention-Based**: Files starting with `_` are non-emitting partials/layouts by convention
-- **SEO Optimized**: Automatic sitemap.xml generation
-- **Framework-Free**: Pure HTML and CSS output—no build complexity or JavaScript frameworks required
-- **High Performance**: Native Bun APIs with HTMLRewriter, fs.watch, and Bun.serve
-- **Cross-Platform**: Standalone executables for Linux, macOS, and Windows
+> **Status.** The v0.7.0 specification set in [`docs/`](docs/) is authoritative, and the composition core is being rewritten against it ([`docs/product-spec.md`](docs/product-spec.md) §7). Learn the product from these documents, not from `src/`.
 
-## 🚀 Quick Start
+## Install
 
-### Installation
+### Standalone binary — the headline install
 
 ```bash
-# Install Bun (required runtime)
-curl -fsSL https://bun.sh/install | bash
-
-# Option 1: Install globally via Bun
-bun add -g @fwdslsh/unify
-
-# Option 2: Install cross-platform binary (Linux, macOS, Windows)
 curl -fsSL https://raw.githubusercontent.com/fwdslsh/unify/main/install.sh | bash
-
-# Option 3: User installation (to ~/.local/bin)
-curl -fsSL https://raw.githubusercontent.com/fwdslsh/unify/main/install.sh | bash -s -- --user
-
-# Basic usage with defaults (src => dist)
-unify build                    # Build from src/ to dist/
-unify serve                    # Serve with live reload on port 3000
-unify watch                    # Watch for changes and rebuild
-unify init                     # Initialize new project
-
-# Advanced usage with custom options
-unify build --pretty-urls --base-url https://mysite.com
-unify build --copy "./assets/**/*.*" --clean
-unify serve --port 8080 --host 0.0.0.0
 ```
 
-## 🏎️ Bun-Native Performance
+Installs to `~/.local/bin` by default. The script accepts `--global` (system-wide, needs write access to `/usr/local/bin`), `--dir PATH`, `--version vX.Y.Z`, `--force`, and `--dry-run`. Prebuilt binaries for Linux, macOS, and Windows are attached to each [GitHub release](https://github.com/fwdslsh/unify/releases) — nothing else to install.
 
-unify is built exclusively for Bun and uses native APIs for maximum performance:
-
-| Feature | Implementation | Performance |
-|---------|----------------|-------------|
-| HTML Processing | HTMLRewriter | **Ultra-fast DOM processing** |
-| File Watching | fs.watch | **Native file system events** |
-| Dev Server | Bun.serve | **High-performance HTTP server** |
-| Build Caching | Bun.hash | **Native cryptographic hashing** |
-| Cold Start | Bun native | **~800ms startup time** |
-
-## 📁 Quick Example
-
-```html
-<!-- src/index.html -->
-<!--#include virtual="/_includes/header.html" -->
-<main>
-  <h1>Welcome!</h1>
-  <p>Build maintainable sites with includes and layouts.</p>
-</main>
-<!--#include virtual="/_includes/footer.html" -->
-```
-
-```html
-<!-- Alternative modern DOM syntax -->
-<include src="/_includes/header.html"></include>
-<main>
-  <template data-slot="title">My Page Title</template>
-  <h1>Welcome!</h1>
-  <p>Use data-slot attributes and templates for advanced layouts.</p>
-</main>
-<include src="/_includes/footer.html"></include>
-```
-
-See the [Getting Started Guide](docs/getting-started.md) for a complete tutorial.
-
-## 📚 Documentation
-
-- **[Getting Started](docs/getting-started.md)** - Your first unify site
-- **[CLI Reference](docs/cli-reference.md)** - Complete command documentation  
-- **[Include Syntax](docs/include-syntax.md)** - Apache SSI and DOM templating
-- **[Layouts & Templates](docs/layouts-slots-templates.md)** - Advanced templating features
-- **[Docker Usage](docs/docker-usage.md)** - Container deployment guide
-- **[Architecture](docs/unify-architecture.md)** - Technical deep dive
-
-## ⚡ Core Commands
+### Bun or npm — the developer path
 
 ```bash
-# Build your site (default command)
-unify
-unify build
-
-# Development server with live reload
-unify serve
-
-# Watch for changes without serving
-unify watch
-
-# Initialize new project
-unify init
-
-# Get help
-unify --help
-```
-
-See [CLI Reference](docs/cli-reference.md) for all options.
-
-## 🎯 Why unify?
-
-- **Simple**: Familiar HTML and Apache SSI syntax with modern templating
-- **Fast**: Incremental builds and smart dependency tracking  
-- **Modern**: ESM modules, live reload, cross-platform binaries
-- **Flexible**: Works with HTML, Markdown, and convention-based architecture
-- **Portable**: Runs on Bun (optimal), Node.js, and Deno
-- **Secure**: Path traversal prevention and input validation
-- **Developer-Friendly**: Built-in development server with comprehensive error handling
-
-## 🔒 Security
-
-- **Path traversal prevention**: All file operations validated against source boundaries
-- **Input validation**: CLI arguments and file paths sanitized
-- **Static output**: No client-side template execution vulnerabilities
-- **Secure serving**: Development server restricted to output directory
-
-## 🧪 Testing
-
-unify has comprehensive test coverage:
-
-- **Security tests**: Path traversal and validation
-- **CLI tests**: All commands and options
-- **Build process tests**: Complete workflows
-- **Error handling tests**: Graceful degradation
-
-## 🔗 Cross-Platform Support
-
-### Runtime Requirements
-
-- **Bun**: Minimum version 1.2.19 (recommended for best performance)
-- **Node.js**: 14+ with native ESM support
-- **Deno**: Latest stable version
-
-### Installation Options
-
-#### 1. Cross-Platform Binary (Recommended)
-
-Download and install standalone executables for Linux, macOS, and Windows:
-
-```bash
-# System-wide installation
-curl -fsSL https://raw.githubusercontent.com/fwdslsh/unify/main/install.sh | bash
-
-# User installation (to ~/.local/bin)
-curl -fsSL https://raw.githubusercontent.com/fwdslsh/unify/main/install.sh | bash -s -- --user
-
-# Specific version
-curl -fsSL https://raw.githubusercontent.com/fwdslsh/unify/main/install.sh | bash -s -- --version v0.4.3
-
-# Manual download from GitHub Releases
-# https://github.com/fwdslsh/unify/releases
-```
-
-#### 2. Via Package Manager
-
-```bash
-# Bun (fastest execution)
 bun add -g @fwdslsh/unify
-bun unify serve
-
-# npm/Node.js
+# or
 npm install -g @fwdslsh/unify
-unify serve
-
-# Deno
-deno run --allow-read --allow-write --allow-net npm:@fwdslsh/unify serve
 ```
 
-### Supported Platforms
+Bun (>= 1.2.0) is the only supported runtime: the installed `unify` script runs under `bun`, and there are no Node or Deno builds. If you have never heard of Bun, use the binary above.
 
-| Platform | Architecture | Binary | Package Manager |
-|----------|-------------|--------|-----------------|
-| Linux | x86_64, ARM64 | ✅ | ✅ |
-| macOS | x86_64, ARM64 (Apple Silicon) | ✅ | ✅ |
-| Windows | x86_64, ARM64 | ✅ | ✅ |
+## The five-minute site
 
-The cross-platform binaries are compiled from Bun and include all dependencies, requiring no additional runtime installation.
+```bash
+unify init          # scaffold a starter site into src/
+unify dev           # build, watch, serve, reload — one command, one terminal
+# …edit, save, browser reloads…
+unify build         # write the final site to dist/
+# upload dist/ anywhere: GitHub Pages, Netlify, a $3 shared host
+```
 
-## 🗺️ Roadmap
+`unify init` produces:
 
-See our [detailed roadmap](ROADMAP.md) for completed features, current development, and future plans.
+```
+my-site/
+└── src/                  # the source root — everything here ships
+    ├── _layout.html      # the site chrome — one complete HTML page
+    ├── _includes/
+    │   └── nav.html      # a fragment
+    ├── index.html        # a page
+    ├── about.md          # a Markdown page — equal citizen
+    ├── contact.html      # a page that overrides a named region
+    ├── 404.html          # a page that opts out of the layout
+    └── assets/
+        └── style.css
+```
 
-## 🤝 Contributing
+Templates: `default`, `basic`, `blog`, `docs`, `portfolio`. Each exercises every primitive exactly once, and `unify init && unify build --dry-run --strict` exits `0`.
 
-We welcome contributions! See our [Contributing Guide](CONTRIBUTING.md) for details.
+## How composition works
 
-### Development Setup
+**`_layout.html`** — a complete page you can open in a browser right now. Its slot fallbacks are its own preview:
+
+```html
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>— My Site</title>
+    <link rel="stylesheet" href="/assets/style.css">
+  </head>
+  <body>
+    <include src="/_includes/nav.html"></include>
+    <main>
+      <p>Page content appears here.</p>
+    </main>
+    <footer class="site-footer">
+      <slot name="footer"><p>© My Site</p></slot>
+    </footer>
+  </body>
+</html>
+```
+
+**`index.html`** — also a complete page, an ordinary semantic document. It doesn't mention the layout; the nearest `_layout.html` applies automatically:
+
+```html
+<!doctype html>
+<html>
+  <head>
+    <title>Home</title>
+  </head>
+  <body>
+    <main>
+      <h1>Welcome!</h1>
+      <p>This content lands in the layout's &lt;main&gt;.</p>
+    </main>
+  </body>
+</html>
+```
+
+The built page is the layout with its `<main>` content replaced by the page's, and the page's title prepended to the layout's: `<title>Home — My Site</title>`. The separator lives in the layout, so pages write only their own name.
+
+**`contact.html`** — overriding a named region. The layout marked its footer contents with `<slot name="footer">`, so any page may replace them with one standard attribute:
+
+```html
+<body>
+  <h1>Contact</h1>
+  <p>Ordinary content as usual.</p>
+  <p slot="footer">© My Site — <a href="mailto:hi@example.com">email us</a></p>
+</body>
+```
+
+The footer then contains exactly the element you wrote. No tool vocabulary of any kind survives into the output: built pages contain no `<slot>` elements, no `data-layout` attributes, and no injected script.
+
+The precedence rule, in one sentence: **named fills go to named slots, everything else to the bare slot, else into `<main>`.**
+
+**`about.md`** — Markdown pages work identically; frontmatter supplies the head:
+
+```markdown
+---
+title: About
+description: Who we are
+og:
+  image: /assets/team.jpg
+---
+
+# About
+
+Everything here is converted to HTML and dropped into the layout
+exactly like an HTML page's content.
+```
+
+`title`, `layout`, `class`, `lang`, and `dir` are the frontmatter keys with behavior; every other key becomes a `<meta>` tag. Headings get slug `id`s so every heading is a deep link.
+
+That is the whole product. There is nothing else to learn.
+
+## CLI
+
+```
+unify [build]              build the site (default command)
+unify dev                  build, watch, serve, and reload — the inner loop
+unify watch                build + rebuild on change, no server (pair with your own)
+unify init [template]      scaffold a starter site
+
+Options:
+  -s, --source <dir>       source directory (default: src/ if it exists, else .)
+  -o, --output <dir>       output directory (default: dist)
+      --clean              empty the output directory first
+      --exclude <glob>     globs never emitted, still usable by the build (repeatable; default: _*)
+      --pretty-urls        about.html → about/index.html, and rewrite internal links to match
+      --base-url <path>    site served from a subpath: prefix root-relative links in the output
+      --dry-run            run the full build and every check, print the report, write nothing
+      --strict             advisories count as problems for the exit code
+  -p, --port <n>           port for `unify dev` (default: 3000)
+  -v, --version            print version
+  -h, --help               print help
+```
+
+That is the entire CLI — there are no other commands or flags. See [`docs/cli-reference.md`](docs/cli-reference.md) for what each one does.
+
+`unify build` publishes all-or-nothing: composition and every check — including a reference check of every internal URL in the output — run into a temporary tree, and `dist/` is updated only if there were **zero problems**. Exit `0` means `dist/` is the complete site; `1` means problems were found and the previous output is byte-for-byte untouched; `2` means invalid usage or a fatal environment error. Diagnostics come in two severities, `problem` and `advisory`, in plain language with no rule codes:
+
+```
+src/index.html:8: problem: include not found: /_includes/navv.html
+  in: <include src="/_includes/navv.html">
+  fix: create src/_includes/navv.html, or point src at an existing file
+  fix: check the path spelling and casing
+```
+
+`unify build --dry-run --strict` is the whole build and every check, writing nothing — the one-line CI lint.
+
+An optional `unify.yaml` at the source root holds saved flags and nothing more (keys are the long option names; CLI flags win; the file never ships). No behavior exists that only the config file can express.
+
+## What unify will never do
+
+- **Ship JavaScript.** Your scripts pass through untouched; unify injects, generates, and rewrites none of its own. `unify dev` injects live reload only into the pages it serves, never into `dist/`.
+- **Grow a templating language.** No variables, loops, conditionals, or expressions — no `{{ }}`, no `{% %}`, no props. Anything derived from a set of files (a post index, a feed) comes from a script you own, run before the build: `node _scripts/gen.mjs && unify build`.
+- **Become a component framework.** Slots fill layouts; `<include>` is verbatim and never takes fills.
+- **Need configuration.** Conventions, not config files.
+- **Scope your CSS.** Use `@scope`, `@layer`, nesting, or a class prefix — the platform already answers this.
+- **Be a real web server.** `unify dev` serves static files and reloads. No proxying, HTTPS, middleware, or plugins; pair `unify watch` with a real server instead.
+
+The full list, with the reasoning and the accepted costs, is [`docs/product-spec.md`](docs/product-spec.md) §5. Sitemaps, minification, layout chaining, and a browser preview polyfill are post-MVP candidates (§6), not current features.
+
+## The complete authoring rules
+
+Every rule an author needs, in under sixty lines. This section is [`docs/authoring-rules.md`](docs/authoring-rules.md) embedded verbatim: the bytes between the two markers below are byte-identical to that file, which release gate G10 asserts ([`docs/testing-strategy.md`](docs/testing-strategy.md) §6). Edit the file, never this copy.
+
+<!-- BEGIN docs/authoring-rules.md -->
+# Authoring a unify site — the complete rules
+
+unify composes plain HTML at build time. No template language, no variables, no loops, no config, no
+JavaScript: if you reach for `{{ }}`, `{% %}`, props, or a config key, you are solving it wrong. The
+vocabulary is standard HTML — `<main>`, `<slot>`, `slot=` — plus two tokens: `<include>` and `data-layout`.
+Derived files (a post index, a feed) come from a script in `_scripts/`, run first: `node _scripts/gen.mjs && unify build`.
+
+## Files
+- Source root is `src/` if it exists, else the current directory. `.html`/`.md` are pages; every other
+  file copies byte-for-byte to the same path. Write `href`/`src` correct for the file you are editing,
+  and link the real file (`about.html`), never a hand-written `/about/` — `--pretty-urls` rewrites links.
+- **Everything in the source root ships.** Anything that is not part of the site — notes, drafts,
+  scratch, scripts — goes under a leading underscore (`_draft.html`, `_notes/`, `_scripts/`): the
+  build still reads it, the output never contains it. Files inside a `_` directory need no prefix.
+- Every file is valid standalone HTML: pages and layouts are complete `<!doctype html>` documents,
+  fragments are balanced snippets. HTML pages never have frontmatter (use `<head>`); Markdown pages
+  never contain `<head>` (use frontmatter). Both are build errors.
+
+## Include — reuse a fragment
+`<include src="/_includes/nav.html"></include>`, always with the closing tag; `/…` resolves from the
+source root, anything else relative to the including file. Works anywhere: `<head>`, other fragments,
+`.md` pages (own line → block, mid-sentence → inline, in a code fence it stays text). **Never put content between the tags** — includes are verbatim, not components; parameterized variants come from a `_scripts/` generator.
+
+## Layout — chrome around a page
+Every page is wrapped by the nearest `_layout.html` — its own folder, then each parent; the page says
+nothing. Pick one with `data-layout="/path.html"` on the page's `<html>` or `<body>` (Markdown:
+`layout: /path.html`); opt out with `data-layout="none"` / `layout: none`. Layouts are paths ending in
+`.html` — a bare name like `default` is an error. `data-layout` belongs on pages only: anywhere else it is
+an error — on a layout too, because layouts don't chain (a section layout is a complete standalone page).
+
+## Merging a page into its layout
+- **Named slots.** Where the layout wrote `<slot name="footer">fallback…</slot>`, a page element with
+  `slot="footer"` replaces the slot, tag and all — your markup ships exactly as written. Omit the
+  fill and the fallback ships. `slot=` counts only on top-level elements (direct children of
+  `<body>`); list a layout's slots with `grep -o '<slot[^>]*>' src/_layout.html`.
+- **Everything else** replaces the layout's bare `<slot></slot>`, or the children of its `<main>` if
+  there is no bare slot. Your own `<main>` wrapper is unwrapped, so write complete semantic
+  documents. A bare `<header>`/`<footer>` does **not** replace the layout's — only `slot=` fills.
+- **Head.** The layout owns `<head>` and declares `<meta charset>` — never write one in a page. Your
+  `<title>` joins the layout's, which carries the separator (`About` + `— My Site` → `About — My Site`);
+  write only the page's name. Your `<meta>` replaces the layout's same-`name`/`property`, your
+  `canonical`/`icon` links replace the layout's, everything else appends after — page CSS wins.
+- **Root attributes.** On `<html>`/`<body>` only, your classes are added and any other attribute you
+  set wins; attributes merge nowhere else. Active nav is `<body class="home">` plus CSS
+  (`body.home .nav-home {…}`), not a feature.
+
+## Markdown
+`title`, `layout`, `class`, `lang`, `dir` are the only keys with meaning. `date`, `tags`, `draft`,
+`permalink`, `slug` do nothing and ship as `<meta>` tags — `draft: true` publishes the page; hold
+pages back with a leading underscore. Any other key becomes `<meta name=…>`; an `og:` block becomes
+`property=` metas; values ship as written (`draft: true` → `"true"`), and blocks flatten one level —
+nesting deeper is an error. No `title:` → the first `# Heading` is the title. Headings get slug `id`s.
+Frontmatter cannot express canonical or JSON-LD: put those in the layout, or write the page in HTML.
+
+## Styles, scripts, finishing
+unify never scopes, rewrites, or injects CSS/JS — scope fragment styles yourself (`@scope`, `@layer`, a
+class prefix); a `url()` inside `<style>`/`style=` is never rewritten, so make it root-relative.
+`unify build --dry-run --strict` is the whole build and every check, writing nothing: every problem in one
+pass, each page naming its layout. Then `unify build` — exit 0 means `dist/` is the complete site; non-zero
+means nothing was published, `dist/` untouched; never report success on non-zero. `--exclude` **replaces** the `_*` default; keep `_*` in your list.
+<!-- END docs/authoring-rules.md -->
+
+## Documentation
+
+- **[Getting Started](docs/getting-started.md)** — the tutorial.
+- **[CLI Reference](docs/cli-reference.md)** — every command, option, and exit code.
+- **[Authoring Rules](docs/authoring-rules.md)** — the complete authoring surface (embedded above).
+- **[Product Specification](docs/product-spec.md)** — what unify is, the composition model, the non-goals.
+- **[Conformance Specification](docs/conformance-spec.md)** — the normative implementer reference: exact algorithms, the head-merge table, the closed problem and advisory catalogues.
+- **[Testing Strategy](docs/testing-strategy.md)** — the testing contract and the release gates.
+- **[Docker Usage](docs/docker-usage.md)** — running the CLI in a container.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Development setup:
 
 ```bash
 git clone https://github.com/fwdslsh/unify
 cd unify
 bun install
 bun test
-bun run build
 ```
 
-### CI/CD Workflows
+## License
 
-Our GitHub Actions workflows are optimized for performance and cost efficiency. See [CI/CD Workflows Documentation](docs/cicd-workflows.md) for details on:
-
-- Fast test feedback loops
-- Docker build validation on PRs
-- Automated publishing on releases
-
----
-
-_Built with ❤️ for frontend developers who love simple, powerful tools._
+CC-BY-4.0. See [LICENSE](LICENSE).
