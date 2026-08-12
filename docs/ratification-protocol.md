@@ -48,6 +48,12 @@ Two traps worth keeping written down. `--allowedTools` is variadic and will swal
 | 1 | 4 Haiku, 2 Sonnet | 3/6 — **1/4 Haiku** | none mechanical; four doc ambiguities reported |
 | 2 | 5 Haiku, 1 Sonnet | **5/5 Haiku** | one hand-written `/about/`; four `charset` "violations" that were the doc's error |
 | 3 | 5 Haiku, 1 Sonnet | **6/6, both layouts** | **zero** |
+| 4a | 5 Haiku, 1 Sonnet — rounds 1–2 brief, re-run isolated | **6/6** | **zero** |
+| 4b | 5 Haiku, 1 Sonnet — round 3 brief, repeated | **6/6** | one broken section link |
+
+Round 4 ran both briefs under identical subprocess isolation. **4a re-ran the rounds 1–2 brief and came back clean at 6/6**, which retires the asterisk on those rounds: the fixes hold, and the `CLAUDE.md` exposure was immaterial to the outcome as well as to the output.
+
+**4b produced the first defect found against unpatched text** — every earlier amendment was written in response to the round that found it, so this is the first time the current wording was tested rather than fitted. One sample linked `/guides/` from the nav with no `guides/index.html` in the tree: a broken reference, and precisely the pattern the link rule forbids. The rule's example is about a *page* (`/about.html` versus `/about/`) and said nothing about linking a *section*, so the universal web convention won. A round-3 sample had reached for the same construct and made it work by writing the index; §12 of the conformance spec resolves directory URLs to `index.html`, so both instincts are legitimate and only one of them was complete. The rule now states the condition.
 
 Round 3 used the harder brief — two layouts sharing chrome, a nested section, an embedded page with no chrome, and a footer overridden on one page — under full subprocess isolation. Every sample was clean, and the four primitives that eleven earlier samples never touched were all exercised: `guides/_layout.html` discovered by proximity (6/6), `data-layout="none"` on the embed page (6/6), a named slot with fallback overridden on contact (6/6), and `<include>` for shared chrome (5/6).
 

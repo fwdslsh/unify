@@ -1,14 +1,14 @@
 # Authoring a unify site — the complete rules
 
-unify composes plain HTML at build time. No template language, no variables, no loops, no config, no
-JavaScript: if you reach for `{{ }}`, `{% %}`, props, or a config key, you are solving it wrong. The
-vocabulary is standard HTML — `<main>`, `<slot>`, `slot=` — plus two tokens: `<include>` and `data-layout`.
-Derived files (a post index, a feed) come from a script in `_scripts/`, run first: `node _scripts/gen.mjs && unify build`.
+unify composes plain HTML at build time. No template language, variables, loops, or config: if you reach
+for `{{ }}`, `{% %}`, props, or a config key, you are solving it wrong. The vocabulary is standard HTML —
+`<main>`, `<slot>`, `slot=` — plus `<include>` and `data-layout`. Derived files (a post index, a feed) come from a script in `_scripts/`, run first.
 
 ## Files
 - Source root is `src/` if it exists, else the current directory. `.html`/`.md` are pages; every other
   file copies byte-for-byte to the same path. A leading `/` means the source root, in any path you
-  write. Always link the real filename — `/about.html`, never `/about/`; `--pretty-urls` rewrites links.
+  write. Always link the real filename — `/about.html`, never `/about/`; a directory link (`/guides/`)
+  resolves only if you wrote a `guides/index.html`. `--pretty-urls` rewrites links.
 - **Everything in the source root ships.** Anything that is not part of the site — notes, drafts,
   scratch, scripts — goes under a leading underscore (`_draft.html`, `_notes/`, `_scripts/`): the
   build still reads it, the output never contains it. Files inside a `_` directory need no prefix.
