@@ -1,173 +1,51 @@
-# CI/CD Workflows
+# CI/CD workflows
 
-This document describes the GitHub Actions workflows used for continuous integration and deployment of the Unify project.
+What actually runs, and what each job is allowed to mean. Two workflow files exist: `.github/workflows/test.yml` (every push and PR) and `.github/workflows/release.yml` (tagged releases).
 
-## Workflow Overview
+## `test.yml` — three jobs, one of them red on purpose
 
-The project uses three main workflows optimized for performance and cost efficiency:
+### `release-signal` — the release condition itself
 
-| Workflow | Trigger | Purpose | Duration |
-|----------|---------|---------|----------|
-| **Test** | Push to main/test | Run tests and build verification | ~2-3 minutes |
-| **Docker Build** | PRs to main, Releases | Build and optionally publish Docker images | ~8-12 minutes |
-| **NPM Publish** | GitHub Releases | Publish package to NPM registry | ~3-5 minutes |
-
-## Test Workflow (`test.yml`)
-
-**Triggers:** Push to `main` or `test` branches
-
-**Purpose:** Fast feedback loop for code changes
-- Installs dependencies with Bun
-- Runs complete test suite
-- Builds and tests executable
-- Verifies package structure
-
-**Key Features:**
-- Focused on testing only (no Docker builds for speed)
-- Creates test executable for validation
-- Runs in ~2-3 minutes for fast feedback
-
-**Artifacts:**
-- Test executable (`unify-linux-x64`) for verification
-
-## Docker Build Workflow (`publish-docker.yml`)
-
-**Triggers:** 
-- Pull requests to `main` (builds only, doesn't publish)
-- GitHub releases (builds and publishes)
-- Manual dispatch (`workflow_dispatch`)
-
-**Purpose:** Docker image validation and publishing
-
-### On Pull Requests
-- Builds all Docker images (CLI, Nginx, Apache) 
-- Tests that images can be built successfully
-- **Does NOT publish** to registries (validation only)
-- Uses GitHub Actions cache to speed up builds
-
-### On Releases
-- Builds Docker images for multiple platforms (linux/amd64, linux/arm64)
-- **Publishes** to Docker Hub registry
-- Runs security scans with Trivy
-- Tests published images for functionality
-
-**Key Features:**
-- Multi-platform builds (AMD64 and ARM64)
-- Automated security scanning
-- Smart caching for faster builds
-- Only publishes on releases to avoid registry bloat
-
-**Published Images:**
-- `fwdslsh/unify` - CLI container
-- `fwdslsh/unify-nginx` - Nginx + Unify container  
-- `fwdslsh/unify-apache` - Apache + Unify container
-
-## NPM Publish Workflow (`publish.yml`)
-
-**Triggers:** GitHub releases only
-
-**Purpose:** Publish package to NPM registry
-- Runs full test suite before publishing
-- Builds optimized executable
-- Publishes to NPM with public access
-- Uploads executable as release artifact
-
-**Key Features:**
-- Only publishes on official releases
-- Includes comprehensive testing before publish
-- Creates release artifacts
-- Uses NPM token for secure publishing
-
-## Performance Optimizations
-
-### Before (Inefficient)
-- Docker builds ran on every main commit (~10 minutes each)
-- Test workflow included Docker builds (slow feedback)
-- Redundant builds on both test.yml and publish-docker.yml
-
-### After (Optimized)
-- Tests run fast on main commits (~2-3 minutes)
-- Docker builds only on PRs (validation) and releases (publishing)
-- No redundant Docker builds
-- Clear separation of concerns
-
-### Cost Savings
-- **~70% reduction** in GitHub Actions minutes usage
-- **Faster feedback** for developers (tests complete in 2-3 minutes vs 10+ minutes)
-- **Reduced registry storage** (only publish on releases)
-
-## Workflow Dependencies
-
-```mermaid
-graph TD
-    A[Code Push to Main] --> B[Test Workflow]
-    C[Pull Request] --> D[Docker Build Workflow - Build Only]
-    E[GitHub Release] --> F[Docker Build Workflow - Build & Publish]
-    E --> G[NPM Publish Workflow]
-    
-    B --> H[Fast Test Feedback]
-    D --> I[Docker Validation]
-    F --> J[Docker Images Published]
-    G --> K[NPM Package Published]
-```
-
-## Best Practices
-
-### For Contributors
-1. **Push to main**: Tests run automatically and provide fast feedback
-2. **Open PRs**: Docker builds validate your changes work in containers
-3. **Create releases**: Triggers publication to both Docker Hub and NPM
-
-### For Maintainers
-1. **Monitor test failures** on main branch pushes
-2. **Review Docker build results** on PRs before merging
-3. **Create GitHub releases** to trigger publishing workflows
-4. **Use semantic versioning** for consistent releases
-
-## Troubleshooting
-
-### Common Issues
-
-**Test failures on main:**
-- Check test output in GitHub Actions
-- Ensure local tests pass before pushing
-- Verify Bun version compatibility
-
-**Docker build failures on PRs:**
-- Check Docker build logs
-- Verify Dockerfile syntax
-- Ensure all dependencies are available
-
-**Publishing failures on releases:**
-- Verify GitHub secrets are configured
-- Check NPM token validity
-- Ensure version number is updated
-
-### Debug Commands
+Runs the conformance suite against the real CLI, then checks the runtime traceability ledger:
 
 ```bash
-# Run tests locally
-bun test
-
-# Build Docker images locally
-docker build -f docker/Dockerfile.cli -t unify:cli .
-docker build -f docker/Dockerfile.nginx -t unify:nginx .
-
-# Test executable build
-bun build --compile --outfile unify-test src/cli.js
-./unify-test --version
+rm -f .conformance-ledger.jsonl
+bun test tests/conformance tests/e2e
+bun tests/conformance/check-traceability.mjs --runtime .conformance-ledger.jsonl
 ```
 
-## Security Considerations
+**This job going green *is* the v0.7.0 release condition** — every gated rule in `tests/conformance/rules.tsv` recorded by a test that actually ran and passed in this run. It was red by design for the whole rewrite, and `tests/conformance/phase-gaps/p0-expected-fail.txt` records why a red harness was the correct Phase 0 *pass* condition.
 
-- **NPM Token**: Stored as GitHub secret `NPM_TOKEN`
-- **Docker Hub**: Uses `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` secrets
-- **Vulnerability Scanning**: Trivy scans run on all published images
-- **Minimal Permissions**: Workflows use least-privilege access patterns
+The failure mode to guard against is not this job failing; it is someone making it pass. Do not weaken the harness, the comparator, or the checker to turn it green. Progress is the covered count it prints.
 
-## Future Improvements
+### `suite-hygiene` — gate G9
 
-- **Multi-registry publishing**: Consider publishing to both Docker Hub and GHCR
-- **Release automation**: Automated release creation from version tags
-- **Performance monitoring**: Track workflow execution times
-- **Advanced caching**: Implement more sophisticated build caching strategies
+```bash
+bun tests/conformance/check-suite-hygiene.mjs
+```
+
+Enforces the anti-rot rules H1–H5 from `docs/testing-strategy.md` §5 — no filesystem mocking in behavior tests, no `src/**` imports in the conformance harness, and the rest of what keeps this suite from decaying into the one it replaced.
+
+### `traceability-static` — the phase gate
+
+```bash
+bun tests/conformance/check-traceability.mjs --static --baseline tests/conformance/phase-gaps/baseline.txt
+```
+
+Compares the computed gap set against the committed baseline and fails on **any** difference. A new gap fails; so does a gap that closed, until the baseline shrinks in the same commit. `baseline.txt` is now empty — every gated rule is covered — so any regression surfaces immediately.
+
+The static check also enforces spec↔inventory sync: if `docs/conformance-spec.md` gains or loses an enumerable rule (a splice rule, a problem, an advisory, a head-merge row) without `rules.tsv` being updated in the same commit, it exits 1.
+
+## Coverage is reported, and gates nothing
+
+There is no coverage threshold anywhere in CI, deliberately. This project shipped 240 test files at 93% coverage over a CLI that could not scaffold or build a site; `docs/testing-strategy.md` §1 documents the five mechanisms that made that possible. Coverage counts lines executed, not behavior verified, so it is a diagnostic here and never a gate. **No PR should cite a coverage number as evidence.**
+
+## The legacy suite does not vote
+
+`tests/legacy-v0.6/` is excluded from CI by path filter. It tests a product that no longer exists — component mode, area classes, rule codes — and its green was load-bearing for nothing. Tests asserting cut behavior are deleted with their modules rather than fixed; `docs/migration-plan.md` §2 has the rule for telling those apart from tests worth porting.
+
+## `release.yml`
+
+Triggered by GitHub releases: publishes to npm and builds the Docker image (delegating to a shared workflow in `fwdslsh/toolkit`). The release body comes from `.github/workflows/release_notes.md` — that file ships to users on every release, so it is worth reading before tagging.
+
+Before tagging, the eleven release gates in `docs/testing-strategy.md` §6 should be green. `release-signal` covers G1 and G2; the rest — determinism, watch-equivalence, module reachability, the README embed, and the compiled binary walking the golden path — are checkable locally and documented there.

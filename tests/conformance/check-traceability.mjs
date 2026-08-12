@@ -104,6 +104,51 @@ for (const s of sections) {
 
 // ---------- collect declared/recorded IDs ----------
 const declared = new Map(); // id -> [sources]
+/**
+ * Blank out comments before scanning for `covers(...)` calls, preserving
+ * offsets so nothing else shifts.
+ *
+ * The scanner used to match the literal text anywhere in a file, so a comment
+ * *explaining* covers() read as a call to it — a contributor documenting the
+ * helper had a stray backtick parsed as a rule ID.
+ *
+ * Two earlier attempts at this were wrong, which is why it tracks string state
+ * rather than pattern-matching. Blanking string CONTENTS as well got clever
+ * about telling an argument from an example and silently stopped seeing a real
+ * covers("SCF-03"). Stripping `//` without string awareness ate every URL —
+ * `http://localhost` starts a "comment" that swallows the rest of the line,
+ * including real calls. So: track quotes, treat `//` and comments as comments
+ * only outside a string, and copy everything else through untouched. A stray
+ * ID inside a string still trips the unknown-ID check, loudly, which is enough.
+ */
+function stripComments(src) {
+  let out = "";
+  let i = 0;
+  let quote = null; // the delimiter of the string we are inside, or null
+  while (i < src.length) {
+    const c = src[i];
+    if (quote) {
+      if (c === "\\") { out += src.slice(i, i + 2); i += 2; continue; }
+      if (c === quote) quote = null;
+      out += c; i++;
+      continue;
+    }
+    if (c === '"' || c === "'" || c === "`") { quote = c; out += c; i++; continue; }
+    const two = src.slice(i, i + 2);
+    if (two === "//") {
+      while (i < src.length && src[i] !== "\n") { out += " "; i++; }
+      continue;
+    }
+    if (two === "/*") {
+      while (i < src.length && src.slice(i, i + 2) !== "*/") { out += src[i] === "\n" ? "\n" : " "; i++; }
+      out += "  "; i += 2;
+      continue;
+    }
+    out += c; i++;
+  }
+  return out;
+}
+
 function declare(id, source) {
   if (!inventory.has(id)) { fail(`unknown rule id "${id}" declared by ${source} (typo, or rule retired from rules.tsv)`); return; }
   if (!declared.has(id)) declared.set(id, []);
@@ -135,7 +180,7 @@ if (mode === "static") {
       const p = join(dir, String(f));
       if (/check-[a-z-]+\.mjs$/.test(p)) continue; // the gate scripts are not tests; their docs contain ID examples
       if (!/\.(test\.)?(js|mjs|ts)$/.test(p) || !statSync(p).isFile()) continue;
-      const src = readFileSync(p, "utf8");
+      const src = stripComments(readFileSync(p, "utf8"));
       for (const m of src.matchAll(/covers\(([^)]*)\)/g))
         for (const id of m[1].split(",").map((s) => s.trim().replace(/^["']|["']$/g, "")).filter(Boolean))
           declare(id, String(f));
