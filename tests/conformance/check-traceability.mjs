@@ -1,0 +1,164 @@
+#!/usr/bin/env bun
+/**
+ * check-traceability.mjs — the spec-rule traceability gate.
+ *
+ * The claim it enforces: every normative rule in docs/conformance-spec.md has
+ * at least one test that actually ran and passed. It has two halves:
+ *
+ *  SPEC → INVENTORY (sync check, always on)
+ *    The countable structures of the conformance spec — the S1..S12 splice
+ *    rules, the closed problem list (14), the closed advisory catalogue (12),
+ *    and the head-merge table rows (7) — are parsed out of the spec text and
+ *    compared against tests/conformance/rules.tsv. If the spec grows or loses
+ *    an enumerable rule and the inventory was not updated in the same commit,
+ *    this exits 1. Prose rules cannot be machine-extracted; for those the
+ *    check enforces a weaker invariant: every top-level spec section that
+ *    contains normative prose must have at least one inventory row.
+ *
+ *  INVENTORY → TESTS (coverage check)
+ *    --static  : collects rule IDs declared by the fixture manifests
+ *                (tests/fixtures/kitchen-sink/manifest.json,
+ *                tests/fixtures/landmines/manifest.json + runtime-cases.mjs)
+ *                and by `covers("ID", …)` / `@covers ID …` markers under
+ *                tests/conformance and tests/e2e. Any inventory rule with
+ *                testkind != structural that no test declares → exit 1.
+ *                Any declared ID that is not in the inventory → exit 1
+ *                (catches typos and rules retired from the spec).
+ *    --runtime <ledger.jsonl>
+ *              : same diff, but against IDs recorded at *test runtime* by the
+ *                harness (each passing fixture case / covers() call appends a
+ *                line). This closes the skipped-test hole: a test.skip'd case
+ *                records nothing, so its rules go uncovered and the gate
+ *                fails. CI runs `bun test && bun check-traceability.mjs
+ *                --runtime .conformance-ledger.jsonl`.
+ *
+ * Exit codes: 0 all green; 1 gap/unknown-id/sync failure; 2 usage error.
+ */
+import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const ROOT = join(HERE, "..", "..");
+const SPEC = join(ROOT, "docs", "conformance-spec.md");
+const RULES = join(HERE, "rules.tsv");
+const MANIFESTS = [
+  join(ROOT, "tests", "fixtures", "kitchen-sink", "manifest.json"),
+  join(ROOT, "tests", "fixtures", "landmines", "manifest.json"),
+  join(ROOT, "tests", "conformance", "spec-fixtures", "manifest.json"),
+];
+const RUNTIME_CASES = join(ROOT, "tests", "fixtures", "landmines", "runtime-cases.mjs");
+const TEST_DIRS = [join(ROOT, "tests", "conformance"), join(ROOT, "tests", "e2e")];
+
+const ID_RE = /^(?:S\d{2}|SHL-\d{2}|PIP-\d{2}|EXC-\d{2}|INC-\d{2}|LAY-\d{2}|MRG-\d{2}|HED-\d{2}|ATT-\d{2}|MD-\d{2}|URL-\d{2}|REF-\d{2}|COL-\d{2}|DIA-\d{2}|P\d{2}|A\d{2}|PUB-\d{2}|WCH-\d{2}|DRY-\d{2}|CFG-\d{2}|SCF-\d{2}|FIX-\d{2})$/;
+
+function die(msg) { console.error(`traceability: ${msg}`); process.exit(2); }
+let failed = false;
+function fail(msg) { console.error(`FAIL ${msg}`); failed = true; }
+
+// ---------- load inventory ----------
+const inventory = new Map(); // id -> {spec, kind, testkind, summary}
+for (const [i, line] of readFileSync(RULES, "utf8").trimEnd().split("\n").entries()) {
+  if (i === 0) continue; // header
+  const [id, spec, kind, testkind, summary] = line.split("\t");
+  if (!ID_RE.test(id)) die(`rules.tsv line ${i + 1}: malformed id "${id}"`);
+  if (inventory.has(id)) die(`rules.tsv: duplicate id ${id}`);
+  inventory.set(id, { spec, kind, testkind, summary });
+}
+
+// ---------- SPEC → INVENTORY sync ----------
+const specText = readFileSync(SPEC, "utf8");
+const count = (re) => [...specText.matchAll(re)].length;
+const syncChecks = [
+  // splice rules: "- **S1 — ..." bullets in §3
+  ["splice rules (S01..)", count(/^- \*\*S(\d+) — /gm),
+    [...inventory.keys()].filter((k) => /^S\d{2}$/.test(k)).length],
+  // closed problem list: numbered items in §14.2
+  ["problems (P01..)", (specText.split("### 14.2")[1] ?? "").split("### 14.3")[0].split("\n").filter((l) => /^\d+\. /.test(l)).length,
+    [...inventory.keys()].filter((k) => /^P\d{2}$/.test(k)).length],
+  // closed advisory catalogue: numbered items in §14.3
+  ["advisories (A01..)", (specText.split("### 14.3")[1] ?? "").split("---")[0].split("\n").filter((l) => /^\d+\. /.test(l)).length,
+    [...inventory.keys()].filter((k) => /^A\d{2}$/.test(k)).length],
+  // head-merge table body rows in §8 (lines starting "| n |")
+  ["head-merge rows (HED-01..07)", count(/^\| [1-7] \| /gm),
+    [...inventory.keys()].filter((k) => /^HED-0[1-7]$/.test(k)).length],
+];
+for (const [name, inSpec, inInv] of syncChecks) {
+  if (inSpec !== inInv) fail(`spec↔inventory drift: ${name}: spec has ${inSpec}, rules.tsv has ${inInv}`);
+}
+// every top-level spec section must have at least one inventory row
+const sections = [...specText.matchAll(/^## (\d+)\./gm)].map((m) => m[1]);
+for (const s of sections) {
+  if (s === "1") continue; // §1 Definitions carries no testable rules of its own
+  const hit = [...inventory.values()].some((r) => r.spec.includes(`§${s}`) || r.spec.includes(`§${s}.`));
+  if (!hit) fail(`spec section §${s} has no rule in rules.tsv — enumerate it or mark why not`);
+}
+
+// ---------- collect declared/recorded IDs ----------
+const declared = new Map(); // id -> [sources]
+function declare(id, source) {
+  if (!inventory.has(id)) { fail(`unknown rule id "${id}" declared by ${source} (typo, or rule retired from rules.tsv)`); return; }
+  if (!declared.has(id)) declared.set(id, []);
+  declared.get(id).push(source);
+}
+
+const mode = process.argv.includes("--runtime") ? "runtime" : "static";
+
+if (mode === "static") {
+  for (const mf of MANIFESTS) {
+    const m = JSON.parse(readFileSync(mf, "utf8"));
+    const label = mf.split("/").slice(-2).join("/");
+    for (const id of m.harnessRules ?? []) declare(id, `${label}#harness`);
+    for (const [name, entry] of Object.entries(m.profiles ?? {}))
+      for (const id of entry.rules ?? []) declare(id, `${label}#${name}`);
+    for (const [name, entry] of Object.entries(m.cases ?? {}))
+      for (const id of entry.rules ?? []) declare(id, `${label}#${name}`);
+  }
+  if (existsSync(RUNTIME_CASES)) {
+    const src = readFileSync(RUNTIME_CASES, "utf8");
+    for (const m of src.matchAll(/rules:\s*\[([^\]]*)\]/g))
+      for (const id of m[1].split(",").map((s) => s.trim().replace(/^["']|["']$/g, "")).filter(Boolean))
+        declare(id, "runtime-cases.mjs");
+  }
+  // covers("ID", ...) calls and @covers markers in behavior-test sources
+  for (const dir of TEST_DIRS) {
+    if (!existsSync(dir)) continue;
+    for (const f of readdirSync(dir, { recursive: true })) {
+      const p = join(dir, String(f));
+      if (/check-[a-z-]+\.mjs$/.test(p)) continue; // the gate scripts are not tests; their docs contain ID examples
+      if (!/\.(test\.)?(js|mjs|ts)$/.test(p) || !statSync(p).isFile()) continue;
+      const src = readFileSync(p, "utf8");
+      for (const m of src.matchAll(/covers\(([^)]*)\)/g))
+        for (const id of m[1].split(",").map((s) => s.trim().replace(/^["']|["']$/g, "")).filter(Boolean))
+          declare(id, String(f));
+      for (const m of src.matchAll(/@covers\s+([A-Z0-9, -]+)/g))
+        for (const id of m[1].split(/[,\s]+/).filter(Boolean))
+          declare(id, String(f));
+    }
+  }
+} else {
+  const idx = process.argv.indexOf("--runtime");
+  const ledger = process.argv[idx + 1];
+  if (!ledger || !existsSync(ledger)) die(`--runtime requires a ledger file (produced by the harness during bun test)`);
+  for (const line of readFileSync(ledger, "utf8").trim().split("\n").filter(Boolean)) {
+    const rec = JSON.parse(line); // {rule, test, status}
+    if (rec.status === "pass") declare(rec.rule, rec.test);
+  }
+}
+
+// ---------- the gate ----------
+const gaps = [];
+for (const [id, meta] of inventory) {
+  if (meta.testkind === "structural") continue; // asserted by construction; documented in rules.tsv
+  if (!declared.has(id)) gaps.push(id);
+}
+const covered = [...inventory.keys()].filter((k) => declared.has(k)).length;
+const gatable = [...inventory.values()].filter((r) => r.testkind !== "structural").length;
+console.log(`inventory: ${inventory.size} rules (${gatable} gated, ${inventory.size - gatable} structural)`);
+console.log(`covered (${mode}): ${covered}`);
+if (gaps.length) {
+  fail(`${gaps.length} rule(s) with no covering test:`);
+  for (const id of gaps) console.error(`  ${id}\t${inventory.get(id).spec}\t${inventory.get(id).summary.slice(0, 80)}`);
+}
+if (failed) process.exit(1);
+console.log("traceability: OK");

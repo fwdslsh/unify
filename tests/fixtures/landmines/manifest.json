@@ -1,0 +1,1307 @@
+{
+  "fixture": "landmines",
+  "description": "The adversarial set: every edge case, ambiguity, and interaction the v0.7.0 spec had to settle, each with its EXACT declared outcome — which problem/advisory fires at what severity and location, or that the case builds clean. Cases that cannot live in git (case-only twins, symlinks, nested .git, --clean containment) are generated at runtime by runtime-cases.mjs and share this expectation schema.",
+  "harnessContract": {
+    "run": "per case: unify build -s <case>/src -o <tmp>/dist <flags>, wrapped in a hard 30s timeout — the v0.6 engine hung forever on a missing <include>; a hang is a failure, never a wait.",
+    "diagnostics": "stderr parsed via the stable `FILE:LINE: SEVERITY: ` prefix (line optional). Declared lists are exhaustive when diagnosticsExhaustive=true: one undeclared diagnostic of either severity fails the case. This is the mechanical enforcement of the closed problem/advisory catalogue (conformance spec §14.2/§14.3) and of the content-loss law's flip side — nothing may fire that the spec does not name.",
+    "trees": "when expectedTree is set, comparison is byte-exact and bidirectional. expectFiles/expectAbsent assert presence/absence relative to the output dir. expectContains maps output files to required substrings; expectNotContains to forbidden ones.",
+    "publish": "published=false cases pre-seed the output dir with a sentinel tree and assert it byte-untouched after the run (PUB-01), and assert exit matches.",
+    "severityTokens": "the parser accepts only 'problem' and 'advisory' as severity tokens; any 'warning'/'error:' line fails the case (DIA-01)."
+  },
+  "harnessRules": [
+    "DIA-01",
+    "DIA-05",
+    "DIA-06",
+    "MRG-18"
+  ],
+  "cases": {
+    "retired-data-unify": {
+      "rules": [
+        "LAY-10",
+        "P08",
+        "DIA-03",
+        "PUB-01"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 2,
+          "severity": "problem",
+          "containsAll": [
+            "data-unify"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true
+    },
+    "retired-unify-class": {
+      "rules": [
+        "LAY-11",
+        "P08"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/_layout.html",
+          "line": 6,
+          "severity": "problem",
+          "containsAll": [
+            "unify-footer"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true
+    },
+    "retired-vocab-in-excluded": {
+      "rules": [
+        "LAY-10",
+        "P08"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/_drafts/old.html",
+          "line": 2,
+          "severity": "problem",
+          "containsAll": [
+            "data-unify"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "Pins the literal reading of conformance §6.3: 'anywhere in any source file' includes excluded files (they are build material and get scanned; only the never-shipped list is never scanned). If the spec owners intend excluded files to be exempt, amend the spec and this fixture together — reported as reading R1 in docs/testing-strategy.md §7."
+    },
+    "missing-include": {
+      "rules": [
+        "INC-05",
+        "P01",
+        "DIA-06",
+        "DIA-07",
+        "PUB-01"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 5,
+          "severity": "problem",
+          "containsAll": [
+            "/_includes/nope.html",
+            "casing"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "The v0.6 engine looped forever on this input. The 30s harness timeout makes a hang a hard failure. The 'casing' assertion pins the mandatory fix line for path-shaped problems (DIA-07)."
+    },
+    "include-cycle": {
+      "rules": [
+        "INC-08",
+        "P02",
+        "DIA-08"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 5,
+          "severity": "problem",
+          "containsAll": [
+            "→",
+            "a.html",
+            "b.html"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "Attribution pinned to the outermost include site, matching the conformance §5.1 example's shape."
+    },
+    "include-depth-10": {
+      "rules": [
+        "INC-08"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectContains": {
+        "index.html": [
+          "<p>deep</p>"
+        ]
+      },
+      "note": "Fencepost pinned: a chain of exactly 10 nested expansions builds clean; 11 fails (next case). 'Depth cap 10' is read as max include-stack depth 10."
+    },
+    "include-depth-11": {
+      "rules": [
+        "INC-08",
+        "P02",
+        "DIA-08"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 5,
+          "severity": "problem",
+          "containsAll": [
+            "→"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true
+    },
+    "include-no-src": {
+      "rules": [
+        "INC-09",
+        "P03"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 5,
+          "severity": "problem",
+          "containsAll": [
+            "src"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true
+    },
+    "include-with-content": {
+      "rules": [
+        "INC-10",
+        "P03"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 5,
+          "severity": "problem",
+          "containsAll": [
+            "content"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "The include target exists; exactly one problem fires — the content one. Includes are verbatim, never components."
+    },
+    "include-escape": {
+      "rules": [
+        "INC-04",
+        "P01",
+        "DIA-07"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 5,
+          "severity": "problem",
+          "containsAll": [
+            "../../etc/passwd.html"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true
+    },
+    "include-bad-ext": {
+      "rules": [
+        "INC-05",
+        "P01"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 5,
+          "severity": "problem",
+          "containsAll": [
+            "notes.txt"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true
+    },
+    "include-relative": {
+      "rules": [
+        "INC-03",
+        "S02"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected"
+    },
+    "include-md-fragment": {
+      "rules": [
+        "INC-06"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectContains": {
+        "index.html": [
+          "<h2 id=\"from-markdown\">From markdown</h2>",
+          "A converted fragment."
+        ]
+      },
+      "expectNotContains": {
+        "index.html": [
+          "This frontmatter is ignored",
+          "<include"
+        ]
+      }
+    },
+    "layout-bare-name": {
+      "rules": [
+        "LAY-03",
+        "P04"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/about.md",
+          "line": 2,
+          "severity": "problem",
+          "containsAll": [
+            "default"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true
+    },
+    "layout-missing": {
+      "rules": [
+        "LAY-05",
+        "P05",
+        "DIA-07"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 4,
+          "severity": "problem",
+          "containsAll": [
+            "/nope.html",
+            "casing"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true
+    },
+    "layout-escape": {
+      "rules": [
+        "LAY-05",
+        "P05"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 4,
+          "severity": "problem",
+          "containsAll": [
+            "../outside.html"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true
+    },
+    "layout-cycle": {
+      "rules": [
+        "LAY-08",
+        "P06",
+        "DIA-08"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 4,
+          "severity": "problem",
+          "containsAll": [
+            "→",
+            "_a.html",
+            "_b.html"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true
+    },
+    "layout-chain-10": {
+      "rules": [
+        "LAY-06",
+        "LAY-07",
+        "LAY-08"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectContains": {
+        "index.html": [
+          "data-chain=\"l10\"",
+          "<h1>Hi</h1>"
+        ]
+      },
+      "note": "Ten layouts in a chain is at the cap and builds; eleven fails (next case). The outermost shell is l10's, so its marker attribute must survive."
+    },
+    "layout-chain-11": {
+      "rules": [
+        "LAY-08",
+        "P06",
+        "DIA-08"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 4,
+          "severity": "problem",
+          "containsAll": [
+            "→"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true
+    },
+    "data-layout-on-div": {
+      "rules": [
+        "LAY-09",
+        "P07"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 5,
+          "severity": "problem",
+          "containsAll": [
+            "include"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true
+    },
+    "content-nowhere": {
+      "rules": [
+        "MRG-14",
+        "P09",
+        "MRG-15",
+        "PUB-01",
+        "DIA-03"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/about.html",
+          "line": 1,
+          "severity": "problem",
+          "containsAll": [
+            "_layout.html"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "The exact failure v0.6 shipped silently (content deleted, exit 0, success banner). Here it must block publish, name the layout, and leave the sentinel output untouched."
+    },
+    "misaddressed-fill": {
+      "rules": [
+        "MRG-10",
+        "A02",
+        "FIX-06",
+        "S03",
+        "S07"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 6,
+          "severity": "advisory",
+          "containsAll": [
+            "footer"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected"
+    },
+    "duplicate-slot-name": {
+      "rules": [
+        "MRG-03",
+        "A06",
+        "S03",
+        "S04"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [
+        {
+          "file": "src/_layout.html",
+          "line": 9,
+          "severity": "advisory",
+          "containsAll": [
+            "x"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected"
+    },
+    "second-bare-slot": {
+      "rules": [
+        "MRG-02",
+        "A05",
+        "S03",
+        "S04"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [
+        {
+          "file": "src/_layout.html",
+          "line": 6,
+          "severity": "advisory",
+          "containsAll": [
+            "slot"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected"
+    },
+    "dup-main": {
+      "rules": [
+        "MRG-05",
+        "A07",
+        "S05"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [
+        {
+          "file": "src/_layout.html",
+          "line": 8,
+          "severity": "advisory",
+          "containsAll": [
+            "main"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected"
+    },
+    "slot-in-page": {
+      "rules": [
+        "MRG-04",
+        "A04",
+        "S04"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 5,
+          "severity": "advisory",
+          "containsAll": [
+            "slot"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected"
+    },
+    "slot-in-layout-head": {
+      "rules": [
+        "MRG-04",
+        "A04",
+        "S04"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [
+        {
+          "file": "src/_layout.html",
+          "line": 5,
+          "severity": "advisory",
+          "containsAll": [
+            "slot"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected"
+    },
+    "slot-in-template": {
+      "rules": [
+        "MRG-01",
+        "MRG-11",
+        "A02",
+        "FIX-10",
+        "S01"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 6,
+          "severity": "advisory",
+          "containsAll": [
+            "x"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected",
+      "note": "C9: the template's slot is not unify's — the fill gets advisory 2, the template ships byte-identical, the fill's content stays in the page flow."
+    },
+    "slot-attr-edge": {
+      "rules": [
+        "MRG-07",
+        "MRG-11"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected",
+      "note": "slot= on a nested element is the author's web-component markup: never touched, never reported, ships with the attribute intact. slot=\"\" is not a fill. Zero diagnostics is the assertion."
+    },
+    "nested-main-in-div": {
+      "rules": [
+        "MRG-06",
+        "S06"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected",
+      "note": "Pins the reading that §7.2's 'first <main> in C's body' is not restricted to top level: the main inside the div unwraps; the div survives."
+    },
+    "main-in-main": {
+      "rules": [
+        "MRG-06",
+        "S06"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected",
+      "note": "Unwrap happens exactly once: the outer main's tags are deleted, the inner main survives into the output (the author's own nesting, preserved)."
+    },
+    "empty-default-main": {
+      "rules": [
+        "MRG-13",
+        "S05"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected"
+    },
+    "empty-default-slot": {
+      "rules": [
+        "MRG-12",
+        "S04"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected"
+    },
+    "empty-md": {
+      "rules": [
+        "MD-01",
+        "HED-02",
+        "MRG-13"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected",
+      "note": "A zero-byte .md page builds: .html swap happens, no h1 means no page title, the layout's title stands alone (separator included — that is the specified behavior), the layout main keeps its children."
+    },
+    "head-in-markdown": {
+      "rules": [
+        "MD-18",
+        "P11"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/page.md",
+          "line": 3,
+          "severity": "problem",
+          "containsAll": [
+            "head"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true
+    },
+    "frontmatter-in-html": {
+      "rules": [
+        "MD-17",
+        "P10"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 1,
+          "severity": "problem",
+          "containsAll": [
+            "frontmatter"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true
+    },
+    "collision-md-html": {
+      "rules": [
+        "COL-01",
+        "P12",
+        "PUB-01"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/about.html",
+          "line": null,
+          "severity": "problem",
+          "containsAll": [
+            "about.md",
+            "about.html"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "One problem naming both sources; attribution pinned to the path-ordered first source. No last-write-wins: nothing publishes."
+    },
+    "collision-pretty-landing": {
+      "rules": [
+        "COL-02",
+        "P12"
+      ],
+      "flags": [
+        "--pretty-urls"
+      ],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/about.html",
+          "line": null,
+          "severity": "problem",
+          "containsAll": [
+            "about/index"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true
+    },
+    "collision-pretty-landing-noflag": {
+      "caseDir": "collision-pretty-landing",
+      "rules": [
+        "COL-02"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectFiles": [
+        "about.html",
+        "about/index.html"
+      ],
+      "note": "The same tree is legal without --pretty-urls: the collision exists only under the move."
+    },
+    "underscore-guard": {
+      "rules": [
+        "EXC-06",
+        "P14",
+        "EXC-01",
+        "EXC-03"
+      ],
+      "flags": [
+        "--exclude",
+        "drafts/**"
+      ],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/_layout.html",
+          "line": 1,
+          "severity": "problem",
+          "containsAll": [
+            "--exclude"
+          ]
+        },
+        {
+          "file": "src/_notes/todo.html",
+          "line": 1,
+          "severity": "problem",
+          "containsAll": [
+            "--exclude"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "Replacing the default exclude set cannot silently publish working files: the guard names each _-page/_-dir path and the fixing --exclude line."
+    },
+    "netlify-headers": {
+      "rules": [
+        "EXC-07",
+        "EXC-01"
+      ],
+      "flags": [
+        "--exclude",
+        "_*.html",
+        "--exclude",
+        "_*.md",
+        "--exclude",
+        "_includes",
+        "--exclude",
+        "_scripts"
+      ],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected",
+      "note": "The conformance §4.2 recipe verbatim: _headers/_redirects ship (non-page files, guard passes them), _layout.html/_includes stay excluded and still drive composition."
+    },
+    "stranded-underscore-asset": {
+      "rules": [
+        "URL-05",
+        "REF-04",
+        "P13",
+        "REF-01"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/_includes/nav.html",
+          "line": 2,
+          "severity": "problem",
+          "containsAll": [
+            "logo.png"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "The spec's own §11.1 trap: the include's relative logo resolves to /_includes/logo.png, which the default exclude keeps out of the output — the reference check must fail loudly. Attribution pinned to the provenance file."
+    },
+    "broken-link": {
+      "rules": [
+        "REF-04",
+        "P13",
+        "PUB-01",
+        "DIA-03"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 5,
+          "severity": "problem",
+          "containsAll": [
+            "old-name.html"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true
+    },
+    "case-mismatch-link": {
+      "rules": [
+        "REF-05",
+        "P13"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 5,
+          "severity": "problem",
+          "containsAll": [
+            "About.html"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true
+    },
+    "handwritten-pretty-url": {
+      "rules": [
+        "REF-03",
+        "P13"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 5,
+          "severity": "problem",
+          "containsAll": [
+            "/about/"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "Write href to the real file, never a hand-written pretty URL: /about/ resolves to /about/index.html, which no build without --pretty-urls emits."
+    },
+    "css-url-broken": {
+      "rules": [
+        "REF-01",
+        "P13"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/assets/style.css",
+          "line": 1,
+          "severity": "problem",
+          "containsAll": [
+            "missing.png"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true
+    },
+    "style-url-not-rewritten": {
+      "rules": [
+        "URL-03",
+        "REF-01",
+        "S01"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected",
+      "note": "url() inside <style> and style= is never rewritten (byte-equality proves it) and the <style>-block url() IS reference-checked (dot.png exists, so the build is clean). NB: url() in style ATTRIBUTES is outside §12's stated check scope — recorded as spec gap B5."
+    },
+    "dollar-patterns": {
+      "rules": [
+        "S01",
+        "S02",
+        "S03"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected",
+      "note": "$&, $1, $', $`, $$ inside fragments and fills must survive byte-for-byte. This is a direct regression trap for String.prototype.replace-based splicing."
+    },
+    "working-format": {
+      "rules": [
+        "A09",
+        "EXC-09"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [
+        {
+          "file": "src/logo.fig",
+          "line": null,
+          "severity": "advisory",
+          "containsAll": [
+            "logo.fig"
+          ]
+        },
+        {
+          "file": "src/logo.psd",
+          "line": null,
+          "severity": "advisory",
+          "containsAll": [
+            "logo.psd"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "expectFiles": [
+        "index.html",
+        "logo.psd",
+        "logo.fig"
+      ],
+      "note": "Advisories never change what is published: the files still ship."
+    },
+    "working-format-strict": {
+      "caseDir": "working-format",
+      "rules": [
+        "DIA-03",
+        "A09"
+      ],
+      "flags": [
+        "--strict"
+      ],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/logo.fig",
+          "line": null,
+          "severity": "advisory",
+          "containsAll": [
+            "logo.fig"
+          ]
+        },
+        {
+          "file": "src/logo.psd",
+          "line": null,
+          "severity": "advisory",
+          "containsAll": [
+            "logo.psd"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "Under --strict the same advisories flip the exit code and block publish — a stray .psd can never cost a publish silently."
+    },
+    "include-also-page": {
+      "rules": [
+        "A10"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [
+        {
+          "file": "src/partials/nav.html",
+          "line": null,
+          "severity": "advisory",
+          "containsAll": [
+            "nav.html"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "expectFiles": [
+        "index.html",
+        "partials/nav.html"
+      ]
+    },
+    "frontmatter-junk-keys": {
+      "rules": [
+        "MD-14",
+        "MD-09",
+        "MD-12",
+        "MD-13"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected",
+      "note": "draft:true publishes; date/permalink/slug/tags are inert plain metas; permalink does NOT move the output (dist/post.html). Pins YAML plain scalars serializing as their source text ('true', '2026-01-01') — recorded as spec gap B6 (scalar serialization unstated)."
+    },
+    "charset-differs": {
+      "rules": [
+        "HED-01",
+        "A08"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 4,
+          "severity": "advisory",
+          "containsAll": [
+            "charset"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "expectContains": {
+        "index.html": [
+          "<meta charset=\"utf-8\">"
+        ]
+      },
+      "expectNotContains": {
+        "index.html": [
+          "utf-16"
+        ]
+      }
+    },
+    "charset-page-only": {
+      "rules": [
+        "HED-01"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected",
+      "note": "Layout declares no charset: the page's is kept and moved to the head's first position on its own line with the first-content-line indentation — byte-exact."
+    },
+    "md-include-element": {
+      "rules": [
+        "MD-02",
+        "INC-12"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectContains": {
+        "page.html": [
+          "boxed content",
+          "After."
+        ]
+      },
+      "expectNotContains": {
+        "page.html": [
+          "<include"
+        ]
+      },
+      "note": "Deliberately contains-level, not byte-exact: CommonMark block rules make an element-form <include> line either an HTML block or paragraph-wrapped inline HTML depending on §2-step-2 vs §10.1 ordering — spec ambiguity B2. The invariant asserted is the law: the content appears, the tag does not."
+    },
+    "srcset-poster-rewrite": {
+      "rules": [
+        "URL-01",
+        "URL-05"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected",
+      "note": "srcset URLs rewritten per candidate with descriptors untouched; poster rewritten; both from layout provenance."
+    },
+    "no-layout-anywhere": {
+      "rules": [
+        "LAY-01",
+        "SHL-01"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected",
+      "note": "Selection step 5: no layout found anywhere — the page is emitted from its own text, byte-identical."
+    },
+    "layout-none-md": {
+      "rules": [
+        "LAY-01",
+        "MD-06"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectContains": {
+        "standalone.html": [
+          "No layout wanted.",
+          "<h1 id=\"standalone\">Standalone</h1>"
+        ]
+      },
+      "expectNotContains": {
+        "standalone.html": [
+          "— S"
+        ]
+      },
+      "note": "Deliberately contains-level: what document shell (if any) wraps a layout-less Markdown page is unspecified — spec gap B4. Asserted: conversion happened, the layout did not apply, nothing was lost."
+    },
+    "stray-header-footer": {
+      "rules": [
+        "MRG-17",
+        "A03"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 5,
+          "severity": "advisory",
+          "containsAll": [
+            "header"
+          ]
+        },
+        {
+          "file": "src/index.html",
+          "line": 7,
+          "severity": "advisory",
+          "containsAll": [
+            "footer"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected",
+      "note": "Advisory, not silent replacement (the v0.6 landmark matcher would have swallowed these): both ship in place per the content-loss law."
+    },
+    "empty-include": {
+      "rules": [
+        "S02",
+        "INC-03"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected"
+    },
+    "slot-in-filled-fallback": {
+      "rules": [
+        "MRG-11",
+        "A02",
+        "MRG-18",
+        "S12"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 7,
+          "severity": "advisory",
+          "containsAll": [
+            "inner"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected",
+      "specBug": "B1: §7.1 makes a slot nested in another slot's fallback a sink, but §7.3's outermost-first processing destroys it when the outer slot is filled — the natural reading silently drops the inner fill, violating the content-loss law. This fixture pins the law-preserving behavior (inner fill stays in the default flow with advisory 2) until the spec is amended. See docs/testing-strategy.md §7."
+    },
+    "two-problems-one-pass": {
+      "rules": [
+        "PIP-02"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/pageA.html",
+          "line": 5,
+          "severity": "problem",
+          "containsAll": [
+            "gone.html"
+          ]
+        },
+        {
+          "file": "src/pageB.md",
+          "line": 2,
+          "severity": "problem",
+          "containsAll": [
+            "default"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "Best-effort composition: both problems in one run, ordered by path — authors never fix errors one build at a time."
+    },
+    "fragment-links-ok": {
+      "rules": [
+        "REF-06",
+        "URL-02"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected",
+      "note": "#fragment targets are never validated against ids; fragment-only links are skipped by rewriting entirely."
+    }
+  }
+}
