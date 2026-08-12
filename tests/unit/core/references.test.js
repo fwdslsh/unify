@@ -134,6 +134,25 @@ describe("checkReferences — hand-built", () => {
     expect(p.file).toBe("index.html");
   });
 
+  test("under --base-url, the diagnostic quotes the source spelling, not the prefixed output form", () => {
+    const reporter = silentReporter();
+    checkReferences({
+      // The output tree the author never wrote: §11.3 already prefixed the link.
+      htmlFiles: new Map([["index.html", '<a href="/handbook/missing.html">x</a>']]),
+      cssFiles: new Map(),
+      emittedPaths: new Set(["index.html"]),
+      base: parseBaseUrl("/handbook/"),
+      reporter,
+    });
+    const p = firstProblem(reporter);
+    expect(p).toBeDefined();
+    // The author's file says /missing.html; "check the spelling" of
+    // /handbook/missing.html points at a string their source doesn't contain.
+    expect(p.message).toContain("/missing.html");
+    expect(p.message).not.toContain("/handbook/");
+    expect(p.context).toBe("/missing.html");
+  });
+
   test("a resolvable href is silent", () => {
     const reporter = silentReporter();
     checkReferences({

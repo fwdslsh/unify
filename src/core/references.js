@@ -224,11 +224,18 @@ function checkOne({ raw, offset }, containingOutputPath, { base, emittedPaths, r
   if (emittedPaths.has(resolved)) return; // REF-05: exact, case-sensitive membership
 
   const { file, line } = locate(containingOutputPath, offset);
+  // §14.1: the `in:` continuation is the offending SOURCE text. `raw` is the
+  // output form — under --base-url, §11.3 has already prefixed it, and the
+  // author's file contains no such string (a round-8-style repair agent was
+  // told to "check the spelling" of a path it could not find anywhere).
+  // `stripped` is the pre-§11.3 value: byte-identical to the source for the
+  // root-relative URLs §11.3 touches, and identical to `raw` for everything
+  // else.
   reporter.problem({
     file,
     line,
-    message: `${raw} does not resolve to any emitted file`,
-    context: raw,
+    message: `${stripped} does not resolve to any emitted file`,
+    context: stripped,
     fixes: [CHECK_SPELLING],
   });
 }
