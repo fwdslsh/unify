@@ -1,4 +1,4 @@
-# Ratification rounds 7–10 — the build becomes the judge, and the diagnostics get tested
+# Ratification rounds 7–11 — the build becomes the judge, and the diagnostics get tested
 
 **Date:** 2026-08-12. Continues `_notes/ratification-round-1.md` and the results table in
 `docs/ratification-protocol.md`.
@@ -179,4 +179,158 @@ why the wrong-spelling bug survived to be found by an agent instead of by the su
 Both re-run the earlier round's **unchanged** brief and fixture against the amended doc and
 the amended messages. Both are therefore *fitted* rounds: they can show a fix failed, but a
 clean sweep here is weaker evidence than the same brief coming back clean two rounds later.
-Results in `docs/ratification-protocol.md`'s table.
+
+**Round 9** (round 7's brief, amended doc): **5 of 5 Haiku wrote a correct `slot=` fill on a
+real element** — `<footer slot="footer">` four times, `<div slot="footer-text">` once — where
+round 7 managed one. Zero stray `<slot>` tags in any page. Every Markdown title containing
+a colon was quoted; zero P18. Overall 4 of 6 built clean, and *both* misses were the same
+non-doc artifact as round 7: an `og:image` naming a file the sandbox could not produce.
+
+**Round 10** (round 8's fixture, amended messages): arm B **3 of 3 clean with nothing lost**,
+where round 8 lost a page's address. All three merged instead of deleting, and one quoted
+the new wording back — "with fix instruction to rename or merge". Arm A 3 of 3 clean, no
+loss, one sample renaming rather than deleting.
+
+One amendment did **not** fully land: an arm-A sample still reported having to "infer that
+it needed to be deleted rather than fixed to a path" for P04 — even though the message now
+carries `fix: or drop the layout selection to use the nearest _layout.html`. It made the
+right repair. Recorded as unresolved; if a later round repeats it, the phrasing should name
+the literal thing to delete (`remove the data-layout attribute`) rather than describe it.
+
+---
+
+## Round 11 — the three surfaces no brief had reached
+
+**Samples:** 5 Haiku + 1 Sonnet, each with the CLI in its sandbox (this brief is about
+publishing, so the tool's own output is legitimately part of the loop).
+
+**Brief:** a field station handbook published to `https://ellwood.github.io/handbook/` —
+a subpath — with `.html`-free addresses, a `_headers` deployment file that must arrive at
+the top of the published output, an index that lists every entry without anyone editing it,
+and a logo in shared chrome used one folder down.
+
+That compels, in one job: `--base-url`, `--pretty-urls`, the `_headers`/A14 seam, the
+`_scripts/` generator seam, and URL provenance. **Nothing in eleven rounds had touched any
+of them.**
+
+**Result: 5 of 6.** Five samples published correctly — `_headers` at the output root with its
+exact contents, every root-relative link carrying the `/handbook/` prefix (39, 39, 39, 47 and
+83 of them), every page at a pretty URL, and a working generator in `_scripts/`. The A14
+advisory did its whole job: samples hit it, read the `--exclude` recipe it prints, and used
+it verbatim. The `_headers` seam and the `_scripts` seam both work as designed.
+
+### Finding — `--base-url` is missing from the doc, and one sample invented a fact instead
+
+haiku-4 published with `--pretty-urls` and no `--base-url`: **0 of 47 links carry the base
+path**, so every link on the deployed site 404s. The build exits 0 and says nothing, because
+the reference check runs against the output tree, where every one of those links resolves —
+the prefix only matters at the host.
+
+What makes this a documentation defect rather than a slip is its report. It diagnosed the
+problem exactly right:
+
+> "when the site is deployed to a subdirectory, root-relative links like `/safety/` would
+> incorrectly point to `https://ellwood.github.io/safety/` instead of
+> `https://ellwood.github.io/handbook/safety/`"
+
+…quoted the rules sentence that names **`--pretty-urls`** while omitting its sibling, concluded
+no such mechanism existed, and invented one: *"rely on GitHub Pages to handle the subdirectory
+routing… the site works correctly because GitHub Pages serves the site from the correct
+subdirectory context."* It then built a second layout to work around the limitation it had
+imagined — the same cascade as round 1's haiku-3, where a missing sentence became an
+architectural decision.
+
+Two other samples reached the flag only by going outside the doc: *"the rules… do not
+explicitly document `--pretty-urls` or `--base-url`, though the help output does. I used the
+tool's own help documentation."* So three of six were affected by the omission, one fatally.
+
+**Amendment:** the flag is now named where its sibling already was —
+`--base-url /handbook/` prefixes every root-relative link for a subpath host.
+
+I had written this up as *not* a defect after the first three samples, on the grounds that
+the rules doc is the authoring surface and `docs/cli-reference.md` documents the flags. The
+fourth sample settled it: the doc had already decided that `--pretty-urls` and `--exclude`
+belong in those 60 lines, and naming one of a pair is worse than naming neither.
+
+### Finding — "run first" does not say who runs it (documentation)
+
+The intro's five words about derived files —
+
+> Derived files (a post index, a feed) come from a script in `_scripts/`, run first.
+
+— left three independent samples uncertain about the one thing they needed to know:
+
+- haiku-2: *"The rules do not specify whether scripts are automatically executed by the
+  build tool or run manually beforehand. I tested by attempting a build and confirmed unify
+  does not auto-run scripts."*
+- haiku-3: *"**Uncertainty:** whether the field notes index should be generated before the
+  build, or if unify would handle calling the script automatically."*
+- haiku-5 filed it as an open "Issue" and resolved it by trial.
+
+Every one of them resolved it correctly, so **no output failed** — this is an amendment made
+on self-report evidence alone, which is a weaker basis than the others in this document and
+is recorded as such. It earns its place because the repair is the protocol's standard one
+and costs nothing: replace the description with the literal command, which the getting
+-started guide has carried all along (`node _scripts/gen.mjs && unify build`). A clause that
+makes three of six readers stop and run an experiment is not carrying its line.
+
+### A brief-design lesson worth keeping
+
+To stop round 7's missing-image artifact recurring, this brief said "you have no image
+files: write a small placeholder SVG". Four of six then inlined the SVG directly into the
+markup — which is valid, and which **dodged the URL-provenance probe entirely**, since an
+inline `<svg>` has no URL to rewrite. The hygiene fix quietly deleted one of the five
+things the brief was built to test. Seed a real asset file next time instead of asking for
+one.
+
+---
+
+## Status of every fix in this document
+
+| Fix | Evidence it was made on | Tested by a round it was not written for? |
+|---|---|---|
+| `og:` keyed off the key name (round 5) | 4/6 wrote the rejected spelling | **Yes** — round 7, 6/6 flat, and again in round 9 |
+| Layout title separator (rounds 1–2) | 3/4 Haiku wrong | **Yes** — 6/6 in round 7, 6/6 in round 9 |
+| Named-slot fill shows the page-side literal | 4/5 Haiku wrong | No — fitted; round 9 is the round it was written for |
+| Frontmatter is YAML, quote colons | 2/5 broke the build | No — fitted |
+| P12 "rename or merge", not "remove" | one real content loss | No — fitted (round 10, 7/7 preserved) |
+| P04 spelling per page kind, plus the drop-it repair | 2/5 misdirected | No — fitted, and **one round-10 sample still reported inferring it** |
+| A04 names the fill spelling | round 7's 3/5, round 8's reproduction | No — fitted |
+| `--base-url` named beside `--pretty-urls` | 1/6 published a wholly broken site; 2 more went to `--help` | **No — not yet measured at all** |
+| `_scripts/`: show the command | 3/6 self-reported the ambiguity | **No — not yet measured at all** |
+
+The last two are the ones a successor should measure first: re-run round 11's brief
+unchanged against the amended doc. Nothing else in this table needs a new experiment before
+that one.
+
+## Open, in priority order
+
+1. **Re-run round 11's brief unchanged.** Two amendments are sitting on zero measurements.
+   Seed a real image file in the sandbox this time (see the brief-design lesson above) so
+   URL provenance is actually exercised rather than inlined away.
+2. **Re-run round 7's brief with images seeded.** It is the only way to settle whether the
+   `og:image`-to-a-nonexistent-file failure (2/5 in round 7, 2/5 in round 9, same shape both
+   times) is a harness artifact or a missing rule about the reference check. Do not amend
+   the doc for it until that discriminator has run — it is the one recurring failure in
+   this document with no confident triage.
+3. **Cascade noise, on a bigger site.** Round 8's fixture prints 17 problems for 8 faults,
+   and the same diagnostic once per composed page containing the offending fragment. It
+   misled nobody at seven pages. Twenty pages with one bad nav link would print twenty
+   identical lines; that is where to test it, and only then decide whether the reference
+   check should dedupe by (file, line, message) and skip targets whose source page exists
+   but failed to compose.
+4. **The human half is still untested.** Eleven rounds, all models. The stated goal covers
+   people, and a person who knows HTML but not this tool would fail differently — they stop
+   and re-read where a model guesses and moves on.
+
+## The `<include>` question, closed
+
+The handoff asked whether the ~quarter of samples that duplicate chrome across two layouts
+instead of sharing a fragment is a documentation problem. On a brief that states the
+maintenance requirement in content terms — *"there must be exactly one place to edit if the
+navigation changes"* — **10 of 11 samples across rounds 7 and 9 used `<include>`**. The one
+that did not wrote its two layouts with duplicate headers and never mentioned includes as a
+difficulty in its report; nothing in it suggests confusion about the text.
+
+That is a preference, not a defect, and the fix would have to be an exhortation. Not
+amended. Recorded as closed unless a brief that states the requirement produces a cluster.

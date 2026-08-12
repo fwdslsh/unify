@@ -1,14 +1,14 @@
 # Authoring a unify site — the complete rules
 
-unify composes plain HTML at build time. No template language, variables, loops, or config: if you reach
-for `{{ }}`, `{% %}`, props, or a config key, you are solving it wrong. The vocabulary is standard HTML —
-`<main>`, `<slot>`, `slot=` — plus `<include>` and `data-layout`. Derived files (a post index, a feed) come from a script in `_scripts/`, run first.
+unify composes plain HTML at build time. No template language, variables, loops, or config: if you reach for
+`{{ }}`, `{% %}`, props, or a config key, you are solving it wrong. The vocabulary is standard HTML — `<main>`,
+`<slot>`, `slot=` — plus `<include>` and `data-layout`. Derived files (a post index, a feed) come from a script you write and run yourself: `node _scripts/gen.mjs && unify build`.
 
 ## Files
-- Source root is `src/` if it exists, else the current directory. `.html`/`.md` are pages; every other
-  file copies byte-for-byte to the same path. A leading `/` means the source root, in any path you
-  write. Always link the real filename — `/about.html`, never `/about/`; a directory link (`/guides/`)
-  resolves only if you wrote a `guides/index.html`. `--pretty-urls` rewrites links.
+- Source root is `src/` if it exists, else the current directory. `.html`/`.md` are pages; every other file
+  copies byte-for-byte to the same path. A leading `/` means the source root, in any path you write. Always
+  link the real filename — `/about.html`, never `/about/`; a directory link (`/guides/`) resolves only if you
+  wrote a `guides/index.html`. `--pretty-urls` rewrites links; `--base-url /handbook/` prefixes every root-relative link for a subpath host.
 - **Everything in the source root ships.** Anything that is not part of the site — notes, drafts,
   scratch, scripts — goes under a leading underscore (`_draft.html`, `_notes/`, `_scripts/`): the
   build still reads it, the output never contains it. Files inside a `_` directory need no prefix.
@@ -30,9 +30,9 @@ an error — on a layout too, because layouts don't chain (a section layout is a
 
 ## Merging a page into its layout
 - **Named slots.** The layout writes `<slot name="footer">fallback…</slot>`; the page fills it with `slot=`
-  on a real element — `<footer slot="footer">…</footer>`, never a `<slot>` tag, which in a page fills
-  nothing — and that element replaces the slot, tag and all, shipping exactly as written. Omit the fill and
-  the fallback ships; `slot=` counts only on direct children of `<body>`. List a layout's slots with `grep -o '<slot[^>]*>' src/_layout.html`.
+  on a real element — `<footer slot="footer">…</footer>`, never a `<slot>` tag, which in a page fills nothing
+  — and that element replaces the slot, tag and all, shipping exactly as written. Omit the fill and the
+  fallback ships; `slot=` counts only on direct children of `<body>`. `grep -o '<slot[^>]*>' src/_layout.html` lists a layout's slots.
 - **Everything else** replaces the layout's bare `<slot></slot>` if it has one — `<main><slot></slot></main>`
   is the usual shape — otherwise the children of its `<main>`. A `<main>` you wrote is dropped and its children used, so write complete semantic
   documents. A bare `<header>`/`<footer>` does **not** replace the layout's — only `slot=` fills.

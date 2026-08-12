@@ -236,13 +236,18 @@ Stated plainly, because a method with no known limitations has not been examined
 | 8 | 4 + 3 Haiku/Sonnet, two arms | the diagnostics as documentation — repair a broken site | **7/7 reached a clean build**, four of them with no docs at all. One sample deleted a page's content following a `fix:` line. Three messages amended. |
 | 9 | 5 Haiku, 1 Sonnet | round 7's brief, amended doc (fitted) | **5/5 correct `slot=` fills** (was 1/5); every colon-bearing title quoted. 3/5 clean overall — both misses were referenced image files the sandbox could not produce. |
 | 10 | 3 + 4 Haiku/Sonnet, two arms | round 8's fixture, amended messages (fitted) | Arm B **3/3 clean with zero content lost** (was 1 of 3 losing a page); every sample merged rather than deleted. |
+| 11 | 5 Haiku, 1 Sonnet | `--base-url`, `--pretty-urls`, `_headers`/A14, `_scripts/` — never before tested | **5/6.** The seams work: every sample shipped `_headers` from the A14 recipe and wrote a working generator. One sample omitted `--base-url` — a flag the doc did not name — and published a site whose every link 404s, with exit 0. |
 
 Round 6 is the clearest single result: with the rule keyed off the key's name, **six of six** wrote the flat spelling — including the control. The nested-only rule would have failed every sample on that brief.
 
 Round 7 is the most uncomfortable one: the same document that had passed four consecutive rounds failed four of five samples the moment the build did the judging. Two of those failures were real doc defects, and the fixes took the same brief to 5/5 in round 9. The other lesson is about the method rather than the doc — **a clean sweep is only as good as the instrument that declared it clean.**
 
-### The pattern across all six rounds
+### The pattern across eleven rounds
 
-Every genuine failure had the same shape: **a mechanism described from the wrong vantage point, or named without being shown, where a strong ecosystem convention was waiting to fill the gap.** Titles, `charset`, section links, `og:` keys — four instances, all repaired by making the doc imperative and concrete rather than by adding rules.
+Every genuine failure has had the same shape: **a mechanism described from the wrong vantage point, named without being shown, or not named at all, where a strong ecosystem convention was waiting to fill the gap.** Titles, `charset`, section links, `og:` keys, the named-slot fill, a colon in a YAML title, `--base-url` — seven instances, every one repaired by making the doc imperative and concrete rather than by adding rules.
+
+The sharpest version of it: a rule that shows exactly one literal will have that literal copied, whether or not it belongs in the file the reader is editing. The named-slot rule showed `<slot name="footer">` and got it pasted into pages by three of five samples; the P04 diagnostic showed `layout:` and sent two repair samples hunting for that key in an HTML file. **Show the string that belongs in the file you are talking to.**
+
+The corollary, from round 11: naming one of a pair is worse than naming neither. The doc named `--pretty-urls` and not `--base-url`, so a sample that had correctly diagnosed the subpath problem read the omission as proof no such flag existed and invented a hosting behaviour to cover it.
 
 The doc did not get longer. It got more specific.
