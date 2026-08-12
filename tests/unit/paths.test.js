@@ -62,6 +62,7 @@ describe("isNeverShipped", () => {
 });
 
 describe("cleanRefusalReason", () => {
+  // The dangerous cases: emptying the output would destroy something authored.
   test("refuses when output is the working directory", () => {
     expect(cleanRefusalReason("/proj", "/proj/src", "/proj")).not.toBeNull();
   });
@@ -70,8 +71,25 @@ describe("cleanRefusalReason", () => {
     expect(cleanRefusalReason("/proj", "/proj/src", "/elsewhere")).not.toBeNull();
   });
 
-  test("refuses when output is inside the source root", () => {
-    expect(cleanRefusalReason("/proj/src/dist", "/proj/src", "/elsewhere")).not.toBeNull();
+  test("refuses when output contains the working directory", () => {
+    expect(cleanRefusalReason("/proj", "/proj/src", "/proj/deep/cwd")).not.toBeNull();
+  });
+
+  // The ordinary cases. The first of these is what `init` scaffolds and what
+  // nearly every site uses, and the original rule refused it: every earlier
+  // test here put cwd somewhere other than the project root, so none of them
+  // exercised the one invocation that actually matters. That is how the bug
+  // shipped — the tests agreed with the code by never asking the real question.
+  test("allows dist/ beside src/ with cwd at the project root — the golden path", () => {
+    expect(cleanRefusalReason("/proj/dist", "/proj/src", "/proj")).toBeNull();
+  });
+
+  test("allows output nested under the working directory", () => {
+    expect(cleanRefusalReason("/proj/build/site", "/proj/src", "/proj")).toBeNull();
+  });
+
+  test("allows output inside the source root (`-s . -o dist`)", () => {
+    expect(cleanRefusalReason("/proj/dist", "/proj", "/proj")).toBeNull();
   });
 
   test("allows a sibling output directory", () => {

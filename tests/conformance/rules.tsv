@@ -162,7 +162,7 @@ A13	§14.3	diag	fixture	Advisory: duplicated construct of which only the first c
 A14	§14.3	diag	fixture	Advisory: known deployment file at the source root held back by the exclude set (maintained list, non-normative; today _headers, _redirects, _routes.json, _worker.js); names the file and the --exclude line that ships it; source-root names only
 PUB-01	§15	rule	fixture	Transactional publish: zero problems → publish; any problem → previous output byte-for-byte untouched and exit 1
 PUB-02	§15	rule	targeted	Publish sync: unchanged files not rewritten; files no longer produced deleted; new/changed land via temp-then-rename
-PUB-03	§15	rule	targeted	--clean empties the output directory first; refuses with exit 2 when the output directory is, contains, or is contained by the source root or the working directory
+PUB-03	§15	rule	targeted	--clean empties the output directory first; refuses with exit 2 when the output directory is, or contains, the source root or the working directory - not when it merely sits inside them
 PUB-04	§15	rule	targeted	--dry-run runs the entire pipeline through the report with no writes at all
 WCH-01	§16	rule	targeted	Saves coalesce into one rebuild; a save landing mid-rebuild queues exactly one follow-up; no change dropped
 WCH-02	§16	rule	targeted	Every rebuild is full; watch output after any edit sequence is identical to a fresh unify build

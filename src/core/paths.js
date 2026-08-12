@@ -56,9 +56,17 @@ export function resolveSource(flag, cwd = process.cwd()) {
 }
 
 /**
- * `--clean` refuses when the output directory is, contains, or is contained by
- * the source root or the working directory. `-o . --clean` is an error, not a
- * deleted project.
+ * `--clean` refuses when the output directory **is, or contains,** the source
+ * root or the working directory — `-o . --clean` is an error, not a deleted
+ * project, and `-o ..` must not empty the source.
+ *
+ * It deliberately does NOT refuse when the output merely sits inside them.
+ * That was the original rule and it was wrong: `src/` beside `dist/` under a
+ * project root is what `init` scaffolds and what nearly every site uses, and
+ * `-s . -o dist` puts the output inside the source root by construction. The
+ * guard exists to stop `--clean` destroying something the author wrote, not to
+ * police directory nesting.
+ *
  * @param {string} output
  * @param {string} source
  * @param {string} [cwd]
@@ -69,7 +77,6 @@ export function cleanRefusalReason(output, source, cwd = process.cwd()) {
   for (const [name, dir] of [["the source root", resolve(source)], ["the working directory", resolve(cwd)]]) {
     if (out === dir) return `the output directory is ${name}`;
     if (contains(out, dir)) return `the output directory contains ${name}`;
-    if (contains(dir, out)) return `the output directory is inside ${name}`;
   }
   return null;
 }

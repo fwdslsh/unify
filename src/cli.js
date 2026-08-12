@@ -93,7 +93,10 @@ export async function run(argv) {
 
   const { settings, sourceRoot, sourceDefaulted } = resolveSettings({ ...options, command });
 
-  if (!existsSync(sourceRoot) || !statSync(sourceRoot).isDirectory()) {
+  // `init` is exempt: its whole job is to create the source root, so requiring
+  // one to already exist made `unify init --source new-site` exit 2 before the
+  // command ever ran.
+  if (command !== "init" && (!existsSync(sourceRoot) || !statSync(sourceRoot).isDirectory())) {
     throw new UsageError(`source directory not found: ${sourceRoot}`, [
       "pass --source <dir>, or run from a directory containing src/",
     ]);
