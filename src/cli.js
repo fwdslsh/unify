@@ -7,9 +7,9 @@
  * 2 invalid usage or fatal environment fault.
  */
 
-import { existsSync, readFileSync, statSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { existsSync, statSync } from "node:fs";
+import { resolve } from "node:path";
+import pkg from "../package.json" with { type: "json" };
 import { Reporter, UsageError } from "./core/diagnostics.js";
 import { cleanRefusalReason, resolveSource } from "./core/paths.js";
 import { loadConfig, mergeConfig, parseArgs } from "./cli/options.js";
@@ -36,11 +36,19 @@ Options:
 `;
 
 /**
+ * The version is *imported*, not read from disk.
+ *
+ * Reading `package.json` relative to `import.meta.url` works in development
+ * and fails in the shipped artifact: `bun build --compile` bundles by tracing
+ * imports, so there is no `package.json` beside the script inside the binary
+ * and `unify --version` died with `ENOENT: /$bunfs/package.json` — on the
+ * install path the product leads with. An import is traced and inlined like
+ * any other module, so it works in both.
+ *
  * @returns {string}
  */
 function version() {
-  const here = dirname(fileURLToPath(import.meta.url));
-  return JSON.parse(readFileSync(join(here, "..", "package.json"), "utf8")).version;
+  return pkg.version;
 }
 
 /**
