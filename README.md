@@ -215,7 +215,8 @@ for `{{ }}`, `{% %}`, props, or a config key, you are solving it wrong. The voca
 
 ## Include — reuse a fragment
 `<include src="/_includes/nav.html"></include>`, always with the closing tag; `/…` resolves from the source root,
-anything else relative to the including file. Works in any file — layouts, pages, `<head>`, fragments, `.md`. **Never put content between the tags** — includes are verbatim, not components.
+anything else relative to the including file. Works in any file — layouts, pages, `<head>`, fragments, and
+`.md` (own line → block, mid-sentence → inline, in a code fence it stays text). **Never put content between the tags** — includes are verbatim, not components.
 
 ## Layout — chrome around a page
 Every page is wrapped by the nearest `_layout.html` — its own folder, then each parent; the page says
@@ -243,11 +244,10 @@ an error — on a layout too, because layouts don't chain (a section layout is a
 
 ## Markdown
 `title`, `layout`, `class` (on `<body>`), `lang`, `dir` are the only keys with meaning; every other becomes
-`<meta name=…>` with the value as written, so `date`/`tags`/`permalink`/`slug` do nothing and
-`draft: true` publishes (hold pages back with a leading underscore instead). Social tags need a **nested**
-block — `og:` alone on its line, `  image: /card.png` indented under it — to emit `property=`; a flat
-`og:image:` key is only another `name=` meta, which scrapers ignore. Deeper nesting is an error. No `title:`
-→ first `# Heading`; headings get slug `id`s. Canonical and JSON-LD have no frontmatter key: put them in the layout, or write the page in HTML.
+`<meta name=…>` with the value as written, so `date`/`tags`/`permalink`/`slug` do nothing and `draft: true`
+publishes (hold pages back with a leading underscore instead). A key named `og:…` emits `property=` instead —
+flat (`og:image: /card.png`) or a nested `og:` block, they name the same key; two levels deep is an error.
+No `title:` → first `# Heading`; headings get slug `id`s. Canonical and JSON-LD have no frontmatter key: put them in the layout, or write the page in HTML.
 
 ## Styles, scripts, finishing
 unify never scopes, rewrites, or injects CSS/JS — scope fragment styles yourself (`@scope`, `@layer`, a
