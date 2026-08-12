@@ -158,6 +158,18 @@ describe("publish() — the transactional gate (PUB-01)", () => {
 // ============================================================ --clean gate
 
 describe("assertCleanIsSafe / performClean (§15 --clean containment)", () => {
+  // paths.js's cleanRefusalReason (imported, not owned by this module — see
+  // the report) refuses exactly two shapes per anchor (source root, working
+  // directory): output IS the anchor, or output CONTAINS the anchor. It
+  // deliberately does NOT refuse merely-nested output ("src/ beside dist/"
+  // is what `init` scaffolds and what nearly every site uses — see that
+  // function's own docstring) — an earlier revision of this test suite
+  // pinned a broader reading (nested-output also refuses) against an
+  // earlier revision of cleanRefusalReason that this task found and flagged
+  // as very likely an unintended over-refusal; paths.js has since been
+  // corrected independently, and these tests were updated to match — see
+  // the report's note on this.
+
   test("refuses when output IS the source root", () => {
     const src = join(tmp, "src");
     mkdirSync(src, { recursive: true });
@@ -170,16 +182,17 @@ describe("assertCleanIsSafe / performClean (§15 --clean containment)", () => {
     expect(() => assertCleanIsSafe({ output: tmp, source: src, cwd: tmp })).toThrow(UsageError);
   });
 
-  test("refuses when output IS CONTAINED BY the source root", () => {
-    const src = join(tmp, "src");
-    mkdirSync(join(src, "dist"), { recursive: true });
-    expect(() => assertCleanIsSafe({ output: join(src, "dist"), source: src, cwd: tmp })).toThrow(UsageError);
-  });
-
   test("refuses when output IS the working directory (-o . --clean)", () => {
     const src = join(tmp, "src");
     mkdirSync(src, { recursive: true });
     expect(() => assertCleanIsSafe({ output: tmp, source: src, cwd: tmp })).toThrow(UsageError);
+  });
+
+  test("refuses when output CONTAINS the working directory (-o .. --clean)", () => {
+    const src = join(tmp, "src");
+    mkdirSync(src, { recursive: true });
+    const parent = join(tmp, "..");
+    expect(() => assertCleanIsSafe({ output: parent, source: src, cwd: tmp })).toThrow(UsageError);
   });
 
   test("the thrown error carries exit code 2 (usage/environment, §14.1), not 1", () => {
@@ -194,22 +207,27 @@ describe("assertCleanIsSafe / performClean (§15 --clean containment)", () => {
     }
   });
 
-  test("an output directory outside both source root and cwd does not refuse, and performClean empties only that directory", async () => {
+  test("the ordinary case — output nested inside the working directory, beside the source root — does NOT refuse", async () => {
     const src = join(tmp, "src");
-    const out = mkdtempSync(join(tmpdir(), "unify-publish-test-out-")); // NOT nested under tmp/cwd at all
+    const out = join(tmp, "dist"); // exactly what `init` scaffolds: src/ beside dist/
     mkdirSync(src, { recursive: true });
+    mkdirSync(out, { recursive: true });
     writeFileSync(join(src, "index.html"), "keep me");
     writeFileSync(join(out, "stale.html"), "delete me");
-    try {
-      expect(() => assertCleanIsSafe({ output: out, source: src, cwd: tmp })).not.toThrow();
-      await performClean({ output: out, source: src, cwd: tmp });
 
-      expect(existsSync(join(out, "stale.html"))).toBe(false);
-      expect(existsSync(out)).toBe(true); // the directory itself survives, only its contents are removed
-      expect(readFileSync(join(src, "index.html"), "utf8")).toBe("keep me"); // source untouched
-    } finally {
-      rmSync(out, { recursive: true, force: true });
-    }
+    expect(() => assertCleanIsSafe({ output: out, source: src, cwd: tmp })).not.toThrow();
+    await performClean({ output: out, source: src, cwd: tmp });
+
+    expect(existsSync(join(out, "stale.html"))).toBe(false);
+    expect(existsSync(out)).toBe(true); // the directory itself survives, only its contents are removed
+    expect(readFileSync(join(src, "index.html"), "utf8")).toBe("keep me"); // source untouched
+  });
+
+  test("output nested inside the source root (-s . -o dist) also does not refuse — the guard is about not destroying authored content outright, not about policing nesting", async () => {
+    const out = join(tmp, "dist");
+    mkdirSync(out, { recursive: true });
+    writeFileSync(join(out, "stale.html"), "delete me");
+    expect(() => assertCleanIsSafe({ output: out, source: tmp, cwd: tmp })).not.toThrow();
   });
 
   test("performClean refuses (and deletes nothing) for an unsafe pair", async () => {
@@ -218,35 +236,6 @@ describe("assertCleanIsSafe / performClean (§15 --clean containment)", () => {
     writeFileSync(join(src, "index.html"), "keep me");
     await expect(performClean({ output: src, source: src, cwd: tmp })).rejects.toBeInstanceOf(UsageError);
     expect(readFileSync(join(src, "index.html"), "utf8")).toBe("keep me");
-  });
-
-  // --- SPEC DEFECT (found while testing, reported in full in this task's
-  // report): §15's containment rule reads "[output] is, contains, or is
-  // contained by the source root OR THE WORKING DIRECTORY" — applying ALL
-  // THREE relations symmetrically to both anchors. Applied literally, "is
-  // contained by ... the working directory" refuses the single most common
-  // real invocation: `unify build -s src -o dist --clean` run from a
-  // project root, because "dist" is trivially contained by cwd. This test
-  // pins the CURRENT (spec-faithful, almost certainly unintended) behavior
-  // rather than hiding it — paths.js's cleanRefusalReason is off limits to
-  // this task and is a correct implementation of what §15 currently says;
-  // the fix belongs in the spec text (narrowing the working-directory leg
-  // to "is" only, matching the `-o .` case the one checked-in test for this
-  // rule — runtime-cases.mjs's clean-containment — actually exercises) and
-  // is out of this module's authority to make.
-  test("SPEC DEFECT: an ordinary nested -o dist --clean from a project root currently refuses, because output is 'contained by' cwd", () => {
-    const src = join(tmp, "src");
-    const out = join(tmp, "dist"); // the completely ordinary, everyday case
-    mkdirSync(src, { recursive: true });
-    mkdirSync(out, { recursive: true });
-    expect(() => assertCleanIsSafe({ output: out, source: src, cwd: tmp })).toThrow(UsageError);
-    let reason = "";
-    try {
-      assertCleanIsSafe({ output: out, source: src, cwd: tmp });
-    } catch (e) {
-      reason = e.message;
-    }
-    expect(reason).toContain("the working directory");
   });
 });
 

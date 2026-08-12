@@ -136,10 +136,22 @@ export function stripBaseUrl(url, base) {
  * provenance): root-relative URLs resolve from the tree root; relative ones
  * resolve against `dirname(containingOutputPath)`; a directory URL (empty
  * path or trailing `/`) resolves to `index.html` within it (REF-03).
+ *
+ * A relative reference that climbs ABOVE the tree root (`../../etc/passwd`
+ * from a root-level file) is deliberately NOT special-cased to `null` here:
+ * §12 exempts exactly one closed list from checking (external/mailto/tel/
+ * data/fragment-only — `isSkippedUrl`), and an escaping relative path is
+ * none of those — it is a malformed INTERNAL reference, exactly the kind
+ * "fails here, loudly" exists for. Leaving the `..`-prefixed string intact
+ * and letting the caller's `emittedPaths.has(...)` check fail naturally
+ * (no real output path ever starts with `..`) is both simpler and correct;
+ * a `null` return here is reserved for "not internal at all", never for
+ * "internal but broken".
  * @param {string} url - already base-url-stripped
  * @param {string} containingOutputPath
- * @returns {string|null} an output path with no leading "/", or null when
- *   the URL is out of scope (skipped) or escapes the tree entirely
+ * @returns {string|null} an output path with no leading "/" (never found in
+ *   `emittedPaths` when it escapes the tree, which is exactly the point —
+ *   see above), or null only when the URL is out of scope entirely
  */
 export function resolveReference(url, containingOutputPath) {
   if (isSkippedUrl(url)) return null;
@@ -148,8 +160,7 @@ export function resolveReference(url, containingOutputPath) {
   let resolved = path.startsWith("/")
     ? posix.normalize(path).replace(/^\/+/, "")
     : posix.normalize(posix.join(posix.dirname(containingOutputPath), path));
-  if (resolved === "." ) resolved = "";
-  if (resolved.startsWith("..")) return null; // escapes the tree — never resolvable, never emitted
+  if (resolved === ".") resolved = "";
   if (resolved === "" || resolved.endsWith("/")) resolved = posix.join(resolved, "index.html");
   return resolved;
 }

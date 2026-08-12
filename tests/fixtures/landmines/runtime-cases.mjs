@@ -55,8 +55,8 @@ export const BUILD_CASES = {
       ],
       diagnosticsExhaustive: true,
       expectFiles: ["About.html", "about.html"],
-      note: "Advisory only: both ship; they collide on case-insensitive hosts. Under --strict this exits 1 (second run below).",
-      strictVariant: { flags: ["--strict"], exit: 1, published: false }
+      note: "Advisory only: both ship; they collide on case-insensitive hosts. Under --strict this exits 1 but STILL PUBLISHES — --strict moves the exit code, never what ships (product-spec §4).",
+      strictVariant: { flags: ["--strict"], exit: 1, published: true }
     }
   },
 

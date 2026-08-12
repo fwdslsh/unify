@@ -71,7 +71,13 @@ export function resolveTarget({ spec, form, fromFile, sourceRoot }) {
  * @param {string} args.sourceRoot
  * @param {import('./diagnostics.js').Reporter} args.reporter
  * @param {(path: string) => Promise<string>} args.convertMarkdown - §5.1 step 4
- * @param {string[]} [args.stack] - resolved paths currently being expanded
+ * @param {string[]} [args.stack] - resolved paths currently being expanded;
+ *   element 0 is the originating page, so the include count is `length - 1`
+ * @param {{file: string, line: number}} [args.origin] - the outermost include
+ *   site: where expansion entered this chain. §14.1 fixes cycle and depth
+ *   diagnostics to that site, not the innermost frame, so the author is
+ *   pointed at the include they wrote rather than at a file they may never
+ *   have opened.
  * @returns {Promise<string>}
  */
 export async function inlineIncludes({
@@ -81,11 +87,17 @@ export async function inlineIncludes({
   reporter,
   convertMarkdown,
   stack = [file],
+  origin = null,
 }) {
   const edits = [];
 
   for (const { match, spec, form, index, content } of findIncludes(text)) {
     const at = { file: toRelative(sourceRoot, file), line: lineOf(text, index) };
+    // §14.1/DIA-11: cycle and depth problems locate at the OUTERMOST include
+    // site — the one the author wrote — not at the recursion frame that
+    // happened to notice. `origin` is null at the top level, where `at` is
+    // already that site.
+    const chainAt = origin ?? at;
 
     if (spec === null) {
       reporter.problem({ ...at, message: "<include> without src", context: match.trim() });
@@ -123,11 +135,14 @@ export async function inlineIncludes({
 
     const chain = [...stack, target.path].map((p) => toRelative(sourceRoot, p));
     if (stack.includes(target.path)) {
-      reporter.problem({ ...at, message: `include cycle: ${formatChain(chain)}` });
+      reporter.problem({ ...chainAt, message: `include cycle: ${formatChain(chain)}` });
       continue;
     }
-    if (stack.length >= MAX_DEPTH) {
-      reporter.problem({ ...at, message: `include depth over ${MAX_DEPTH}: ${formatChain(chain)}` });
+    // Inclusive cap (R2): ten include files may be on the stack at once, so a
+    // chain ten deep builds and the eleventh is the problem. stack[0] is the
+    // originating page, hence the -1 — without it the cap fired at nine.
+    if (stack.length - 1 >= MAX_DEPTH) {
+      reporter.problem({ ...chainAt, message: `include depth over ${MAX_DEPTH}: ${formatChain(chain)}` });
       continue;
     }
 
@@ -157,6 +172,7 @@ export async function inlineIncludes({
         reporter,
         convertMarkdown,
         stack: [...stack, target.path],
+        origin: chainAt,
       }),
     });
   }

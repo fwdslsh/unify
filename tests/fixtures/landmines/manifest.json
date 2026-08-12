@@ -1048,7 +1048,7 @@
     "--strict"
    ],
    "exit": 1,
-   "published": false,
+   "published": true,
    "diagnostics": [
     {
      "file": "src/logo.fig",
@@ -1068,7 +1068,7 @@
     }
    ],
    "diagnosticsExhaustive": true,
-   "note": "Under --strict the same advisories flip the exit code and block publish \u2014 a stray .psd can never cost a publish silently."
+   "note": "Under --strict the same advisories flip the exit code and block publish \u2014 a stray .psd can never cost a publish silently. | CORRECTED: --strict changes the exit code, never what is published (product-spec \u00a74, conformance \u00a714.1) \u2014 a stray .psd must not cost you a publish. This asserted published:false, the same defect as the kitchen-sink strict profile; both were written from one wrong reading of the rule."
   },
   "include-also-page": {
    "rules": [

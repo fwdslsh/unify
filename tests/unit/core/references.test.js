@@ -153,8 +153,10 @@ describe("resolveReference (§12 resolution — against the CONTAINING OUTPUT FI
     expect(resolveReference("mailto:x@y.com", "index.html")).toBeNull();
     expect(resolveReference("https://x.com/y", "index.html")).toBeNull();
   });
-  test("escaping above the tree root resolves to null", () => {
-    expect(resolveReference("../../../etc/passwd", "index.html")).toBeNull();
+  test("escaping above the tree root is NOT out-of-scope — it resolves (to a path no real output ever has), so the caller's emittedPaths check reports it as broken, loudly, rather than silently skipping it", () => {
+    const resolved = resolveReference("../../../etc/passwd", "index.html");
+    expect(resolved).not.toBeNull();
+    expect(resolved.startsWith("..")).toBe(true);
   });
 });
 
@@ -182,6 +184,19 @@ describe("checkReferences — hand-built", () => {
       reporter,
     });
     expect(reporter.diagnostics).toEqual([]);
+  });
+
+  test("a relative href climbing above the tree root fires a problem, not a silent skip", () => {
+    const reporter = silentReporter();
+    checkReferences({
+      htmlFiles: new Map([["index.html", '<a href="../../../etc/passwd">x</a>']]),
+      cssFiles: new Map(),
+      emittedPaths: new Set(["index.html"]),
+      reporter,
+    });
+    const p = firstProblem(reporter);
+    expect(p).toBeDefined();
+    expect(p.message).toContain("etc/passwd");
   });
 
   test("case-sensitive: an otherwise-matching path in the wrong case still fails (REF-05)", () => {

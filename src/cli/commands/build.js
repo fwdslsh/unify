@@ -12,14 +12,17 @@
  * transactional publish (publish.js). This file wires those four together;
  * it does not implement any of their rules itself.
  *
- * One correction applied here rather than in diagnostics.js (out of scope
- * — see `shouldPublish` below): the publish gate uses `reporter.exitCode`,
- * not `reporter.canPublish`, because `canPublish` does not account for
- * `--strict` turning an advisory into a publish-blocking condition (§14.1:
- * "1 problems found (or advisories under `--strict`) ... nothing
- * published"), which the kitchen-sink `strict` profile fixture pins
- * (`published: false` with zero problems, one advisory, `--strict`) — see
- * the implementation report.
+ * The publish gate is `reporter.canPublish` (problems only), NOT
+ * `reporter.exitCode === 0`. `--strict` changes the exit code without
+ * changing what is published — product-spec §4 states it twice, with the
+ * reason: "a stray `.psd` can never cost you a publish", so --strict gates
+ * CI without withholding the site. An earlier version of this file gated on
+ * exitCode because the kitchen-sink `strict` fixture asserted
+ * `published: false`; that fixture was wrong, and it is the first fixture
+ * defect found in this rewrite. It is corrected now. Recorded here because
+ * the mistake is instructive: the fixture read as authority, the engine was
+ * changed to satisfy it, and testing-strategy §5's resolution order — spec
+ * beats fixture beats engine — exists precisely to stop that.
  *
  * Known, documented limitation inherited from urls.js/references.js: true
  * per-byte provenance (which file — page, layout, or include — authored a
@@ -204,7 +207,7 @@ export async function build({ sourceRoot, output, settings, reporter }) {
  * `publish()`'s own internal `canPublish` gate never disagrees.
  */
 function shouldPublish(reporter) {
-  return reporter.exitCode === 0;
+  return reporter.canPublish;
 }
 
 // ------------------------------------------------------------- per-page build
