@@ -293,10 +293,10 @@ would have closed the URL-provenance gap: the two amendments under test are the 
 and changing the environment and the doc together makes a result unattributable. Provenance
 stays open for a deliberately new brief.)
 
-**5 of 5 Haiku.** Every sample:
+**5 of 5 Haiku, and the Sonnet control.** Every sample:
 
-- published with `--base-url /handbook/` — **39, 39, 47, 39 and 37 root-relative links, all
-  prefixed, none missed.** Round 11's failure mode did not recur, and no sample reported
+- published with `--base-url /handbook/` — **39, 39, 47, 39, 37 and 71 root-relative links,
+  all prefixed, none missed.** Round 11's failure mode did not recur, and no sample reported
   going to `--help` to find the flag.
 - wrote its generator as `gen.mjs`, the literal name the amended line now shows, and ran it
   before the build. haiku-1 wrote out the exact composition the doc demonstrates:
