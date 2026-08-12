@@ -294,6 +294,15 @@ export function checkHtmlFrontmatter(source, { path, sourceRoot, reporter }) {
  * flat-spelled compound key would be invisible to this index even though
  * §10.2 makes it byte-identical in meaning to the block-nested spelling.
  */
+/**
+ * Joins nested frontmatter key paths into a single map key. A NUL can never
+ * appear in a YAML key, so it cannot collide with real content. Written as an
+ * escape rather than a literal: two literal NUL bytes here previously made
+ * this file register as binary, so grep, diff and review tooling silently
+ * skipped it.
+ */
+const KEY_SEP = "\u0000";
+
 function indexFrontmatterLines(yamlText, startLine) {
   const KEY_LINE_RE = /^(\s*)((?:[^\s:]|:(?!\s|$))+):(?:\s|$)/;
   const index = new Map();
@@ -307,7 +316,7 @@ function indexFrontmatterLines(yamlText, startLine) {
     while (stack.length && stack[stack.length - 1].indent >= indent) stack.pop();
     const parentPath = stack.length ? stack[stack.length - 1].path : [];
     const path = [...parentPath, key];
-    index.set(path.join(" "), startLine + i);
+    index.set(path.join(KEY_SEP), startLine + i);
     stack.push({ indent, path });
   }
   return index;
@@ -316,7 +325,7 @@ function indexFrontmatterLines(yamlText, startLine) {
 /** Full path first, then progressively shorter prefixes — a location for any path, even one this index never saw directly (e.g. a list item). */
 function lineForPath(path, index) {
   for (let n = path.length; n > 0; n--) {
-    const hit = index.get(path.slice(0, n).join(" "));
+    const hit = index.get(path.slice(0, n).join(KEY_SEP));
     if (hit !== undefined) return hit;
   }
   return undefined;
@@ -341,11 +350,24 @@ function parseFrontmatterYaml(yamlText, { file, reporter }) {
   let parsed;
   try {
     parsed = yaml.load(yamlText, { schema: yaml.FAILSAFE_SCHEMA });
-  } catch {
+  } catch (err) {
+    // js-yaml carries the real position on the thrown error. `mark.line` is
+    // 0-based and relative to the frontmatter body, which starts on the line
+    // after the opening `---` — so the file line is mark.line + 2. Reporting a
+    // fixed line 2 pointed every parse failure at the first key regardless of
+    // where the syntax actually broke.
+    const markLine = err?.mark?.line;
+    const reason = String(err?.reason ?? "").trim();
     reporter.problem({
       file,
-      line: 2,
-      message: "frontmatter is not valid YAML",
+      // The parser's position is where it *discovered* the fault, which for an
+      // unterminated construct is the line after the one that opened it. That
+      // is standard compiler behaviour and the only position actually known —
+      // recovering the opening line would require parsing YAML ourselves — so
+      // the parser's own reason is carried along to name the construct.
+      line: Number.isInteger(markLine) ? markLine + 2 : 2,
+      message: reason ? `frontmatter is not valid YAML: ${reason}` : "frontmatter is not valid YAML",
+      fixes: ["check quoting, indentation, and that every [ and { is closed"],
     });
     return {};
   }

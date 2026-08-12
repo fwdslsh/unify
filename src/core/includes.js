@@ -9,6 +9,23 @@
  * Path resolution is harvested from the v0.6 SSI processor, which the audit found
  * was the only correct implementation of §5.1 in the old codebase: `file=` against
  * the including file's directory, `virtual=` against the source root.
+ *
+ * PROVENANCE (§1, §11.1, §14.1 R3): `inlineIncludes` returns `{text, spans}`,
+ * not a bare string. `spans` is a sorted, contiguous, non-overlapping
+ * `{start, end, file, fileOffset}[]` covering the whole of `text`: for any
+ * output offset `o` with `start <= o < end`, the byte at `o` was authored by
+ * `file` (source-root-relative), and it sat at offset `fileOffset + (o -
+ * start)` in `file`'s OWN raw source text — that second fact is what lets a
+ * caller recover a real line number (`lineOf(rawTextOfFile, fileOffset)`),
+ * not just a filename, which §14.1 R3's exact `:2` line attribution needs.
+ * Every byte of `text` is covered by exactly one span, including a spliced
+ * include's own contents (recursively, so a page -> layout -> include chain
+ * attributes correctly at every level) and — as a zero-length span, so the
+ * file's identity is still recorded even though nothing can ever "be inside"
+ * it — a completely empty include target. This is the fix threaded through
+ * `compose.js` and `src/cli/commands/build.js` to close the provenance gap
+ * `urls.js`/`references.js` were built to consume (their own doc comments;
+ * see this task's report for the full chain).
  */
 
 import { readFile } from "node:fs/promises";
@@ -78,7 +95,7 @@ export function resolveTarget({ spec, form, fromFile, sourceRoot }) {
  *   diagnostics to that site, not the innermost frame, so the author is
  *   pointed at the include they wrote rather than at a file they may never
  *   have opened.
- * @returns {Promise<string>}
+ * @returns {Promise<{text: string, spans: {start:number,end:number,file:string,fileOffset:number}[]}>}
  */
 export async function inlineIncludes({
   text,
@@ -89,6 +106,8 @@ export async function inlineIncludes({
   stack = [file],
   origin = null,
 }) {
+  const relFile = toRelative(sourceRoot, file);
+  /** @type {{index:number,length:number,text:string,spans:{start:number,end:number,file:string,fileOffset:number}[]}[]} */
   const edits = [];
 
   for (const { match, spec, form, index, content } of findIncludes(text)) {
@@ -161,23 +180,20 @@ export async function inlineIncludes({
       continue;
     }
 
-    edits.push({
-      index,
-      length: match.length,
-      // Step 5: the target's own includes resolve before this one is spliced.
-      text: await inlineIncludes({
-        text: body,
-        file: target.path,
-        sourceRoot,
-        reporter,
-        convertMarkdown,
-        stack: [...stack, target.path],
-        origin: chainAt,
-      }),
+    // Step 5: the target's own includes resolve before this one is spliced.
+    const child = await inlineIncludes({
+      text: body,
+      file: target.path,
+      sourceRoot,
+      reporter,
+      convertMarkdown,
+      stack: [...stack, target.path],
+      origin: chainAt,
     });
+    edits.push({ index, length: match.length, text: child.text, spans: child.spans });
   }
 
-  return applyEdits(text, edits);
+  return spliceWithProvenance(text, edits, relFile);
 }
 
 /**
@@ -217,17 +233,42 @@ function lineOf(text, index) {
  * Splice by index so replacement text is never rescanned — a fragment
  * containing `$&` or `$'` would otherwise be mangled by String.replace's
  * substitution patterns, which is a real v0.6 defect the landmines pin.
+ *
+ * Also builds the provenance spans array (module doc comment): every byte of
+ * `text` not covered by an edit is a verbatim gap authored by `relFile` at
+ * its own offset (`fileOffset`); every edit's replacement is a spliced
+ * child's own text, so its spans are lifted from `edit.spans` verbatim
+ * (only the OUTPUT position shifts — `fileOffset` stays relative to
+ * whichever file the child attributed it to, since that fact never changes
+ * just because the text moved to a new position in the parent's output).
  * @param {string} text
- * @param {{index: number, length: number, text: string}[]} edits
+ * @param {{index: number, length: number, text: string, spans: {start:number,end:number,file:string,fileOffset:number}[]}[]} edits
+ * @param {string} relFile
+ * @returns {{text: string, spans: {start:number,end:number,file:string,fileOffset:number}[]}}
  */
-function applyEdits(text, edits) {
-  if (edits.length === 0) return text;
+function spliceWithProvenance(text, edits, relFile) {
+  if (edits.length === 0) {
+    return { text, spans: text.length > 0 ? [{ start: 0, end: text.length, file: relFile, fileOffset: 0 }] : [] };
+  }
   edits.sort((a, b) => a.index - b.index);
   let out = "";
   let cursor = 0;
+  const spans = [];
   for (const edit of edits) {
-    out += text.slice(cursor, edit.index) + edit.text;
+    const gapLen = edit.index - cursor;
+    if (gapLen > 0) {
+      spans.push({ start: out.length, end: out.length + gapLen, file: relFile, fileOffset: cursor });
+      out += text.slice(cursor, edit.index);
+    }
+    const base = out.length;
+    for (const s of edit.spans) spans.push({ ...s, start: base + s.start, end: base + s.end });
+    out += edit.text;
     cursor = edit.index + edit.length;
   }
-  return out + text.slice(cursor);
+  const tailLen = text.length - cursor;
+  if (tailLen > 0) {
+    spans.push({ start: out.length, end: out.length + tailLen, file: relFile, fileOffset: cursor });
+    out += text.slice(cursor);
+  }
+  return { text: out, spans };
 }

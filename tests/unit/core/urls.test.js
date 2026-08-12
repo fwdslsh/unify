@@ -5,27 +5,31 @@
  *  - Hand-built cases pin every branch of each exported function precisely
  *    (the §11.2 table's eight rows, the §11.1 provenance branches, base-url's
  *    two forms) against known, small inputs.
- *  - Fixture-driven cases drive the REAL pipeline — includes.js's exported
- *    `resolveTarget` plus a small test-only span-tracking inliner (see
- *    `inlineWithProvenance` below and urls.js's own "PROVENANCE GAP" note:
- *    includes.js/compose.js do not yet return per-span provenance, so this
- *    is the closest a test can get to the real thing without editing either
- *    file) and the real `compose()` — then apply urls.js on top and diff the
- *    result against the checked-in kitchen-sink / landmine expected trees
- *    using compare.mjs's `compareHtml` (H5 discipline: one comparator, never
+ *  - Fixture-driven cases drive the REAL pipeline — `includes.js`'s
+ *    `inlineIncludes` and `compose.js`'s `compose`, both of which now return
+ *    real `{text, spans}` provenance (see either module's own doc comment) —
+ *    then apply urls.js on top, using `spansToLocator` to build
+ *    `provenanceOf` straight from the real spans, and diff the result
+ *    against the checked-in kitchen-sink / landmine expected trees using
+ *    compare.mjs's `compareHtml` (H5 discipline: one comparator, never
  *    hand-rolled), exactly as compose.test.js already does for compose.js.
+ *    (An earlier version of this file hand-rolled its own span-tracking
+ *    inliner and a text-anchor-search `provenanceOf`, back when
+ *    includes.js/compose.js only returned bare strings; both are gone now
+ *    that the real mechanism exists — testing it directly is both simpler
+ *    and stronger than a parallel reimplementation that could itself drift.)
  */
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { dirname, join, relative, sep } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   applyBaseUrl, applyPrettyLinks, isSkippedUrl, pageWillMove, parseBaseUrl,
   prettyLinkTarget, prettyOutputPath, resolveProvenanceUrl, rewriteProvenanceUrls,
   rewriteSrcsetValue, rewriteUrls, spansToLocator, splitUrl,
 } from "../../../src/core/urls.js";
-import { resolveTarget } from "../../../src/core/includes.js";
-import { compose } from "../../../src/core/compose.js";
+import { inlineIncludes } from "../../../src/core/includes.js";
+import { assembleMarkdownDocument, compose } from "../../../src/core/compose.js";
 import { convert } from "../../../src/core/markdown.js";
 import { Reporter } from "../../../src/core/diagnostics.js";
 import { compareHtml } from "../../../tests/conformance/compare.mjs";
@@ -39,131 +43,54 @@ function silentReporter() {
   return new Reporter({ stderr: { write() {} }, stdout: { write() {} } });
 }
 
-// ---------------------------------------------------- test-only provenance
+// ---------------------------------------------------------- real provenance
 
-const INCLUDE_TAG = /<include\b([^>]*)>(?:([\s\S]*?)<\/include\s*>)?/gi;
-const SSI_TAG = /<!--#include\s+(virtual|file)\s*=\s*"([^"]*)"\s*-->/gi;
-
-function findIncludeTags(text) {
-  const found = [];
-  for (const m of text.matchAll(INCLUDE_TAG)) {
-    const srcMatch = /\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)')/i.exec(m[1] ?? "");
-    if (srcMatch) found.push({ match: m[0], spec: srcMatch[1] ?? srcMatch[2], form: "src", index: m.index });
-  }
-  for (const m of text.matchAll(SSI_TAG)) {
-    found.push({ match: m[0], spec: m[2], form: m[1].toLowerCase(), index: m.index });
-  }
-  return found.sort((a, b) => a.index - b.index);
-}
+const noMarkdownIncludes = async () => { throw new Error("no .md include targets expected in these fixtures"); };
 
 /**
- * Test-only recursive inliner that ALSO returns a `{start,end,file}` span
- * list — see this file's header doc and urls.js's PROVENANCE GAP note. Reuses
- * includes.js's own exported `resolveTarget` for path resolution so that
- * part is the real implementation, not a reimplementation.
- * @returns {{text: string, spans: {start:number,end:number,file:string}[]}}
+ * Compose a real kitchen-sink-shaped page end to end through the REAL
+ * pipeline (includes.js -> [markdown.js ->] compose.js), and build a
+ * `provenanceOf` straight from the real spans compose() returns via urls.js's
+ * own `spansToLocator` — no test-only reimplementation of either module.
  */
-function inlineWithProvenance(text, absFile, sourceRoot) {
-  const fileRel = relative(sourceRoot, absFile).split(sep).join("/");
-  let out = "";
-  const spans = [];
-  let cursor = 0;
-  for (const inc of findIncludeTags(text)) {
-    const before = text.slice(cursor, inc.index);
-    if (before) {
-      spans.push({ start: out.length, end: out.length + before.length, file: fileRel });
-      out += before;
-    }
-    const target = resolveTarget({ spec: inc.spec, form: inc.form, fromFile: absFile, sourceRoot });
-    if ("escapes" in target) throw new Error(`test inliner: include escapes source root: ${inc.spec}`);
-    const childText = readFileSync(target.path, "utf8");
-    const child = inlineWithProvenance(childText, target.path, sourceRoot);
-    const childBase = out.length;
-    out += child.text;
-    for (const s of child.spans) spans.push({ start: childBase + s.start, end: childBase + s.end, file: s.file });
-    cursor = inc.index + inc.match.length;
-  }
-  const tail = text.slice(cursor);
-  if (tail) {
-    spans.push({ start: out.length, end: out.length + tail.length, file: fileRel });
-    out += tail;
-  }
-  return { text: out, spans };
-}
-
-/**
- * Compose a real kitchen-sink-shaped page end to end: includes inlined (with
- * provenance tracked), then real compose(). Returns the composed text plus a
- * `provenanceOf` callback ready for `rewriteProvenanceUrls`.
- */
-function composeWithProvenance({ caseDir, pageRel, layoutRel, isMarkdown = false }) {
+async function composeWithProvenance({ caseDir, pageRel, layoutRel, isMarkdown = false }) {
   const sourceRoot = join(caseDir, "src");
   const reporter = silentReporter();
   const pageAbs = join(sourceRoot, pageRel);
 
   let pageText;
+  let pageSpans;
   if (isMarkdown) {
     const md = convert(readFileSync(pageAbs, "utf8"), { path: pageAbs, sourceRoot, reporter });
-    // §10.7/SHL-01 pseudo-document — the same shape compose.js documents its
-    // pageText contract as (assembleMarkdownDocument), reproduced minimally
-    // here since standalone:false composition is compose()'s own concern.
-    pageText = `<!doctype html>\n<html>\n<head>\n${md.headHtml ?? ""}\n</head>\n<body>\n${md.html}\n</body>\n</html>\n`;
+    const inlinedBody = await inlineIncludes({ text: md.html, file: pageAbs, sourceRoot, reporter, convertMarkdown: noMarkdownIncludes });
+    ({ text: pageText, spans: pageSpans } = assembleMarkdownDocument(
+      { ...md, html: inlinedBody.text, htmlSpans: inlinedBody.spans },
+      { standalone: !layoutRel, pageFile: pageRel },
+    ));
   } else {
-    pageText = readFileSync(pageAbs, "utf8");
+    const pageInlined = await inlineIncludes({
+      text: readFileSync(pageAbs, "utf8"), file: pageAbs, sourceRoot, reporter, convertMarkdown: noMarkdownIncludes,
+    });
+    pageText = pageInlined.text;
+    pageSpans = pageInlined.spans;
   }
-  const pageInlined = inlineWithProvenance(pageText, pageAbs, sourceRoot);
-  // Markdown's OWN synthesized wrapper text (doctype/html/head/body scaffolding
-  // this helper just added above) is attributed to the page file too — only
-  // content that came from a REAL include should carry a different file.
-  const pageSpans = isMarkdown ? [{ start: 0, end: pageInlined.text.length, file: pageRel }, ...pageInlined.spans.map((s) => ({ ...s }))] : pageInlined.spans;
 
   let layoutText = null;
-  let layoutSpans = [];
+  let layoutSpans;
   if (layoutRel) {
     const layoutAbs = join(sourceRoot, layoutRel);
-    const layoutInlined = inlineWithProvenance(readFileSync(layoutAbs, "utf8"), layoutAbs, sourceRoot);
+    const layoutInlined = await inlineIncludes({
+      text: readFileSync(layoutAbs, "utf8"), file: layoutAbs, sourceRoot, reporter, convertMarkdown: noMarkdownIncludes,
+    });
     layoutText = layoutInlined.text;
     layoutSpans = layoutInlined.spans;
   }
 
-  const composed = compose({ pageText: pageInlined.text, pageFile: pageRel, layoutText, layoutFile: layoutRel, reporter });
+  const { text: composed, spans } = compose({
+    pageText, pageFile: pageRel, pageSpans, layoutText, layoutFile: layoutRel, layoutSpans, reporter,
+  });
 
-  // compose() always uses the LAYOUT's text as the base document (SHL-01),
-  // splicing verbatim spans lifted from the page text in at known points.
-  // For these tests we only need `provenanceOf` to answer correctly at the
-  // offsets urls.js actually queries (every URL-bearing element's start);
-  // a byte-for-byte remap of compose()'s edits is unnecessary — searching
-  // for the ORIGINAL raw markup of the element containing each query offset
-  // in both source texts is sufficient and avoids re-deriving compose.js's
-  // own splice logic a second time.
-  const provenanceOf = (offset) => {
-    // Reverse-engineer provenance by locating which prepared text the byte
-    // AT this offset in the COMPOSED text came from: an anchor that STARTS
-    // exactly at `offset` (the element's own start tag) and runs forward is
-    // a reliable, near-always-unique key, since compose() never edits
-    // element start tags themselves outside the specific rows §8/§9 name
-    // (S1 preservation) — search shorter anchors first so we still resolve
-    // very short tags (e.g. a bare `<img>` near EOF) without over-matching.
-    const tryLengths = [40, 20, 10];
-    for (const len of tryLengths) {
-      const anchor = composed.slice(offset, offset + len);
-      if (!anchor) continue;
-      if (layoutText) {
-        const idx = layoutText.indexOf(anchor);
-        if (idx !== -1) return locateInSpans(layoutSpans, idx) ?? layoutRel;
-      }
-      const idx2 = pageInlined.text.indexOf(anchor);
-      if (idx2 !== -1) return locateInSpans(pageSpans, idx2) ?? pageRel;
-    }
-    return pageRel;
-  };
-
-  return { composed, provenanceOf, reporter };
-}
-
-function locateInSpans(spans, offset) {
-  for (const s of spans) if (offset >= s.start && offset < s.end) return s.file;
-  return null;
+  return { composed, provenanceOf: spansToLocator(spans, pageRel), reporter };
 }
 
 // ============================================================ isSkippedUrl
@@ -318,9 +245,9 @@ describe("rewriteSrcsetValue", () => {
 // -------------------------------------------------- fixture: stranded-underscore-asset
 
 describe("rewriteProvenanceUrls — fixture: stranded-underscore-asset (the spec's own §11.1 worked example)", () => {
-  test("nav.html's relative logo resolves against ITS OWN directory, not the layout's or page's", () => {
+  test("nav.html's relative logo resolves against ITS OWN directory, not the layout's or page's", async () => {
     const dir = join(LANDMINES, "stranded-underscore-asset");
-    const { composed, provenanceOf } = composeWithProvenance({
+    const { composed, provenanceOf } = await composeWithProvenance({
       caseDir: dir, pageRel: "index.html", layoutRel: "_layout.html",
     });
     expect(composed).toContain('<img src="logo.png" alt="logo">'); // pre-rewrite sanity: still relative in composed text
@@ -332,9 +259,9 @@ describe("rewriteProvenanceUrls — fixture: stranded-underscore-asset (the spec
 // -------------------------------------------------- fixture: srcset-poster-rewrite
 
 describe("rewriteProvenanceUrls — fixture: srcset-poster-rewrite", () => {
-  test("byte-exact against the checked-in expected tree", () => {
+  test("byte-exact against the checked-in expected tree", async () => {
     const dir = join(LANDMINES, "srcset-poster-rewrite");
-    const { composed, provenanceOf } = composeWithProvenance({
+    const { composed, provenanceOf } = await composeWithProvenance({
       caseDir: dir, pageRel: "gallery/index.html", layoutRel: "gallery/_layout.html",
     });
     const out = rewriteProvenanceUrls(composed, { provenanceOf, pageFile: "gallery/index.html", pageMoved: false });
@@ -429,8 +356,8 @@ describe("full §11.1+§11.2+§11.3 chain — fixture: kitchen-sink (pretty-base
   ]);
   const base = parseBaseUrl("/coffee/");
 
-  test("index.html", () => {
-    const { composed, provenanceOf } = composeWithProvenance({ caseDir: KITCHEN_SINK, pageRel: "index.html", layoutRel: "_layout.html" });
+  test("index.html", async () => {
+    const { composed, provenanceOf } = await composeWithProvenance({ caseDir: KITCHEN_SINK, pageRel: "index.html", layoutRel: "_layout.html" });
     const out = rewriteUrls(composed, {
       provenanceOf, pageFile: "index.html", pageOutputPath: "index.html",
       prettyUrls: true, emittedHtmlPaths, base,
@@ -439,8 +366,8 @@ describe("full §11.1+§11.2+§11.3 chain — fixture: kitchen-sink (pretty-base
     expect(compareHtml(expected, out, "index.html")).toEqual([]);
   });
 
-  test("menu/index.html (layout-provenance relative img; page-self relative link to a moved page)", () => {
-    const { composed, provenanceOf } = composeWithProvenance({ caseDir: KITCHEN_SINK, pageRel: "menu/index.html", layoutRel: "menu/_layout.html" });
+  test("menu/index.html (layout-provenance relative img; page-self relative link to a moved page)", async () => {
+    const { composed, provenanceOf } = await composeWithProvenance({ caseDir: KITCHEN_SINK, pageRel: "menu/index.html", layoutRel: "menu/_layout.html" });
     const out = rewriteUrls(composed, {
       provenanceOf, pageFile: "menu/index.html", pageOutputPath: "menu/index.html",
       prettyUrls: true, emittedHtmlPaths, base,
@@ -508,9 +435,9 @@ describe("applyBaseUrl (§11.3)", () => {
 // -------------------------------------------------- fixture: base-url-subpath landmine
 
 describe("applyBaseUrl — fixture: base-url-subpath (B3's pinned trap)", () => {
-  test("full base with a non-root path: og/twitter/canonical get origin+path, everything else gets path only", () => {
+  test("full base with a non-root path: og/twitter/canonical get origin+path, everything else gets path only", async () => {
     const dir = join(LANDMINES, "base-url-subpath");
-    const { composed, provenanceOf } = composeWithProvenance({ caseDir: dir, pageRel: "index.html", layoutRel: "_layout.html" });
+    const { composed, provenanceOf } = await composeWithProvenance({ caseDir: dir, pageRel: "index.html", layoutRel: "_layout.html" });
     const base = parseBaseUrl("https://example.com/repo/");
     const rewritten = rewriteProvenanceUrls(composed, { provenanceOf, pageFile: "index.html", pageMoved: false });
     const out = applyBaseUrl(rewritten, base);
@@ -522,8 +449,8 @@ describe("applyBaseUrl — fixture: base-url-subpath (B3's pinned trap)", () => 
 // -------------------------------------------------- fixture: kitchen-sink origin profile
 
 describe("full chain — fixture: kitchen-sink (origin profile, no pretty-urls)", () => {
-  test("index.html: root-relative canonical gains the full origin, regular hrefs do not", () => {
-    const { composed, provenanceOf } = composeWithProvenance({ caseDir: KITCHEN_SINK, pageRel: "index.html", layoutRel: "_layout.html" });
+  test("index.html: root-relative canonical gains the full origin, regular hrefs do not", async () => {
+    const { composed, provenanceOf } = await composeWithProvenance({ caseDir: KITCHEN_SINK, pageRel: "index.html", layoutRel: "_layout.html" });
     const base = parseBaseUrl("https://meridian.coffee/");
     const out = rewriteUrls(composed, {
       provenanceOf, pageFile: "index.html", pageOutputPath: "index.html",
@@ -541,15 +468,15 @@ describe("full chain — fixture: kitchen-sink (default profile: §11.1 only, no
     ["index.html", "_layout.html", "index.html"],
     ["contact.html", "_layout.html", "contact.html"],
     ["menu/index.html", "menu/_layout.html", "menu/index.html"],
-  ])("%s", (pageRel, layoutRel, expectedRel) => {
-    const { composed, provenanceOf } = composeWithProvenance({ caseDir: KITCHEN_SINK, pageRel, layoutRel });
+  ])("%s", async (pageRel, layoutRel, expectedRel) => {
+    const { composed, provenanceOf } = await composeWithProvenance({ caseDir: KITCHEN_SINK, pageRel, layoutRel });
     const out = rewriteProvenanceUrls(composed, { provenanceOf, pageFile: pageRel, pageMoved: false });
     const expected = readFileSync(join(KITCHEN_SINK, "expected", expectedRel), "utf8");
     expect(compareHtml(expected, out, expectedRel)).toEqual([]);
   });
 
-  test("about.md (Markdown page): page-self relative links/images stay exactly as written, unmoved", () => {
-    const { composed, provenanceOf } = composeWithProvenance({
+  test("about.md (Markdown page): page-self relative links/images stay exactly as written, unmoved", async () => {
+    const { composed, provenanceOf } = await composeWithProvenance({
       caseDir: KITCHEN_SINK, pageRel: "about.md", layoutRel: "_layout.html", isMarkdown: true,
     });
     const out = rewriteProvenanceUrls(composed, { provenanceOf, pageFile: "about.md", pageMoved: false });

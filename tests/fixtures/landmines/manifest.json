@@ -1365,7 +1365,7 @@
    "diagnostics": [
     {
      "file": "src/post.md",
-     "line": 3,
+     "line": 4,
      "severity": "problem",
      "containsAll": [
       "YAML"
@@ -1373,7 +1373,7 @@
     }
    ],
    "diagnosticsExhaustive": true,
-   "note": "P18: the frontmatter does not parse as YAML (an unterminated flow sequence). Distinct from P17, which is about a value's shape in frontmatter that parsed fine \u2014 the fix here is repairing syntax, not flattening a structure. Before P18 existed the spec's closed problem list had no ID for a parse failure at all, so an implementation had to either crash or borrow P17."
+   "note": "P18: the frontmatter does not parse as YAML. Distinct from P17, which is about a value's shape in frontmatter that parsed fine \u2014 the fix here is repairing syntax, not flattening a structure. NOTE ON THE LINE: this fixture originally asserted line 3, where the unterminated `[` is opened. That was written from intuition rather than from what a parser reports, and it was wrong: js-yaml marks line 4, where it discovers the fault, which is what every compiler does for an unterminated construct and the only position actually known without reimplementing YAML. The diagnostic carries the parser's own reason so the construct is still named."
   },
   "frontmatter-flat-key-nest": {
    "rules": [

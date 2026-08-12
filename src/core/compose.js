@@ -12,6 +12,44 @@
  * source. That is how the author's own formatting survives composition
  * untouched outside the spans a rule actually names (S1).
  *
+ * PROVENANCE (§1, §11.1, §14.1 R3): `compose()` and `assembleMarkdownDocument()`
+ * return `{text, spans}`, not a bare string — `spans` is the same
+ * `{start,end,file,fileOffset}[]` contract `includes.js` documents (this
+ * module's own doc comment there is the canonical description), extended
+ * end-to-end through composition: `compose()` accepts the PAGE's and
+ * LAYOUT's own already-computed spans (`pageSpans`/`layoutSpans`, from
+ * `inlineIncludes` — a plain whole-text span when the caller omits them, so
+ * every existing simple caller keeps working) and produces a spans array
+ * covering the composed output, so that a byte the layout's own `<main>`
+ * wrote is attributed to the layout, a byte an include contributed (however
+ * many layers deep, however it got positioned by composition) is attributed
+ * to that include, and a byte the page contributed is attributed to the
+ * page — or, once more precisely, to whichever file's text that byte was
+ * ultimately lifted from, since a page's own head can itself contain an
+ * include. Two internal techniques make this tractable without touching
+ * head-merge.js (out of this task's scope):
+ *
+ *   - Every edit THIS module constructs (Pass A's stray-slot removal, the
+ *     `<main>` unwrap, fill/default-content classification, sink routing,
+ *     duplicates) is a self-referential slice of a text this module already
+ *     has spans for, so its `replacementSpans` are computed in parallel with
+ *     the replacement text itself, by the same helpers (`sliceSpans`,
+ *     `shiftSpans`, `joinWithGlue`) — never re-derived after the fact.
+ *   - head-merge.js's edits are opaque `{start,end,replacement}` triples
+ *     with no span information, and this module does not reimplement its
+ *     row-by-row dedup logic to get any. But every one of its replacements
+ *     is either empty or a `"\n    "`-joined concatenation of one or more
+ *     PAGE HEAD ELEMENTS' own raw spans (verified against head-merge.js's
+ *     source — rows 1/3-7; row 2's title join mixes page+layout TEXT rather
+ *     than copying an element, which this reconciliation cannot place
+ *     precisely, but a `<title>`'s text can never carry a checkable
+ *     href/src/srcset/poster/og:/twitter: value, so attributing it to the
+ *     page as a harmless default is exact-enough by construction, not a
+ *     shortcut). `mergeHeadWithProvenance` below matches each
+ *     `"\n    "`-delimited piece of a returned replacement against the
+ *     page head's own children by EXACT text equality — not substring
+ *     search — since a piece is always one child's whole raw span.
+ *
  * Processing happens in two text-edit passes rather than one, purely for
  * implementation robustness, not because the spec calls for two passes:
  *
@@ -30,7 +68,7 @@
  *   attribute merge (§9/S11).
  */
 import {
-  applyEdits, attrValueOrEmpty, contentSpan, elementChildren, findAll,
+  attrValueOrEmpty, contentSpan, elementChildren, findAll,
   findFirst, getAttrNode, hasAttr, isBlank, isElement, lineOf, parse,
   rawSpan, removeAttrEdit, spanWithAttrRemoved, tokens,
 } from "./html.js";
@@ -40,6 +78,150 @@ const DATA_LAYOUT = "data-layout";
 const SLOT_ATTR = "slot";
 /** Never merged onto the composed <html>/<body> tag — consumed before §9's merge (ATT-03). */
 const ROOT_ATTR_SKIP = new Set([DATA_LAYOUT, SLOT_ATTR]);
+/** head-merge.js's own, sole join/insert separator for every multi-piece row (verified against its source). */
+const HEAD_JOIN = "\n    ";
+
+// ------------------------------------------------------- span-tracking utils
+//
+// A `Span` is `{start, end, file, fileOffset}`: `[start,end)` is a range in
+// SOME text this module is currently building; `file` is who authored it
+// (source-root-relative); `fileOffset` is where `start` sits in `file`'s OWN
+// raw text (so a caller can compute a real line number there, not just a
+// filename). These four functions are this module's one splice-with-spans
+// primitive, used everywhere an edit list becomes new text: they mirror
+// html.js's plain `applyEdits` ordering/overlap contract exactly (in fact
+// delegate text assembly to conceptually the same algorithm) while also
+// producing the matching spans array.
+
+/**
+ * Clip `spans` to `[from, to)` and rebase to be 0-based at `from`.
+ * @param {{start:number,end:number,file:string,fileOffset:number}[]} spans
+ * @param {number} from
+ * @param {number} to
+ * @returns {{start:number,end:number,file:string,fileOffset:number}[]}
+ */
+function sliceSpans(spans, from, to) {
+  const out = [];
+  for (const sp of spans) {
+    const s = Math.max(sp.start, from);
+    const e = Math.min(sp.end, to);
+    if (s < e) out.push({ start: s - from, end: e - from, file: sp.file, fileOffset: sp.fileOffset + (s - sp.start) });
+  }
+  return out;
+}
+
+/**
+ * Move `spans`' output positions by `delta` (their `file`/`fileOffset` — what
+ * they mean — never changes just because they landed somewhere else).
+ * @param {{start:number,end:number,file:string,fileOffset:number}[]} spans
+ * @param {number} delta
+ */
+function shiftSpans(spans, delta) {
+  if (!delta) return spans;
+  return spans.map((s) => ({ ...s, start: s.start + delta, end: s.end + delta }));
+}
+
+/**
+ * Ensure `spans` (0-based, local to a string of length `len`) cover `[0,len)`
+ * entirely, filling any hole with a synthetic `fallbackFile` span (structural
+ * glue this module writes itself — a `"\n    "` joiner, an unmatched
+ * head-merge title join — never carries a checkable URL, so an
+ * unattributable/approximate `fileOffset` of 0 is harmless).
+ */
+function fillGaps(spans, len, fallbackFile) {
+  if (len === 0) return [];
+  const sorted = [...spans].sort((a, b) => a.start - b.start);
+  const out = [];
+  let cursor = 0;
+  for (const s of sorted) {
+    if (s.start > cursor) out.push({ start: cursor, end: s.start, file: fallbackFile, fileOffset: 0 });
+    out.push(s);
+    cursor = Math.max(cursor, s.end);
+  }
+  if (cursor < len) out.push({ start: cursor, end: len, file: fallbackFile, fileOffset: 0 });
+  return out;
+}
+
+/**
+ * The splice-with-spans primitive: apply non-overlapping
+ * `{start, end, replacement, replacementSpans?}` edits to `text` (covered
+ * end-to-end by `spans`), returning new text and its matching spans.
+ * `replacementSpans` (0-based within `edit.replacement`) needs only cover
+ * the parts of the replacement whose provenance is known; `fillGaps` covers
+ * the rest with `fallbackFile`. Throws on overlap, exactly like html.js's
+ * `applyEdits` (same contract, extended).
+ * @param {string} text
+ * @param {{start:number,end:number,file:string,fileOffset:number}[]} spans
+ * @param {{start:number,end:number,replacement:string,replacementSpans?:{start:number,end:number,file:string,fileOffset:number}[]}[]} edits
+ * @param {string} fallbackFile
+ * @returns {{text:string, spans:{start:number,end:number,file:string,fileOffset:number}[]}}
+ */
+function spliceTrackingSpans(text, spans, edits, fallbackFile) {
+  if (edits.length === 0) return { text, spans };
+  const sorted = [...edits].sort((a, b) => a.start - b.start);
+  let out = "";
+  let cursor = 0;
+  const result = [];
+  for (const edit of sorted) {
+    if (edit.start < cursor) {
+      throw new Error(`compose.js spliceTrackingSpans: overlapping edit at ${edit.start} (cursor at ${cursor})`);
+    }
+    if (edit.start > cursor) {
+      result.push(...shiftSpans(sliceSpans(spans, cursor, edit.start), out.length));
+      out += text.slice(cursor, edit.start);
+    }
+    if (edit.replacement.length > 0) {
+      const filled = fillGaps(edit.replacementSpans ?? [], edit.replacement.length, fallbackFile);
+      result.push(...shiftSpans(filled, out.length));
+      out += edit.replacement;
+    }
+    cursor = edit.end;
+  }
+  if (cursor < text.length) {
+    result.push(...shiftSpans(sliceSpans(spans, cursor, text.length), out.length));
+    out += text.slice(cursor);
+  }
+  return { text: out, spans: result };
+}
+
+/** A single whole-text span attributing every byte of `text` to `file`, for a caller with no finer-grained provenance. */
+function wholeTextSpan(text, file) {
+  return text.length > 0 ? [{ start: 0, end: text.length, file, fileOffset: 0 }] : [];
+}
+
+/**
+ * `html.js`'s `spanWithAttrRemoved` (an element's raw span with one
+ * attribute cleanly excised), mirrored for spans: the same two-piece
+ * before/after excision, so a fill's `replacementSpans` line up byte for
+ * byte with `spanWithAttrRemoved`'s text.
+ */
+function spansWithAttrRemoved(spans, el, name) {
+  const a = getAttrNode(el, name);
+  if (!a) return sliceSpans(spans, el.start, el.end);
+  const before = sliceSpans(spans, el.start, a.start);
+  const after = shiftSpans(sliceSpans(spans, a.end, el.end), a.start - el.start);
+  return [...before, ...after];
+}
+
+/**
+ * Concatenate `{text, spans}` pieces with a glue string between them (§7.3's
+ * multi-fill join, S3: "in page order"). The glue itself is left
+ * unattributed on purpose — it is this module's own punctuation, not
+ * anyone's authored byte — and picked up by `fillGaps` in the enclosing
+ * `spliceTrackingSpans` call.
+ * @param {{text:string, spans:{start:number,end:number,file:string,fileOffset:number}[]}[]} pieces
+ * @param {string} glue
+ */
+function joinWithGlue(pieces, glue) {
+  let text = "";
+  const spans = [];
+  for (let i = 0; i < pieces.length; i++) {
+    if (i > 0) text += glue;
+    spans.push(...shiftSpans(pieces[i].spans, text.length));
+    text += pieces[i].text;
+  }
+  return { replacement: text, replacementSpans: spans };
+}
 
 // ------------------------------------------------------------- public API
 
@@ -64,16 +246,25 @@ const ROOT_ATTR_SKIP = new Set([DATA_LAYOUT, SLOT_ATTR]);
  *     layout. §10.1: "layout rules apply exactly as for an HTML page whose
  *     body is the converted output and whose head is synthesized from
  *     frontmatter." The returned pseudo-document is meant to be `compose()`'s
- *     `pageText` — un-charset'd, so §8 row 1 (head-merge.js) decides the
- *     charset outcome instead of this function inventing one ahead of it.
+ *     `pageText`/`pageSpans`, un-charset'd, so §8 row 1 (head-merge.js)
+ *     decides the charset outcome instead of this function inventing one
+ *     ahead of it.
  *
- * @param {{html:string, headHtml:string, bodyClass?:string, htmlAttrs?:{lang?:string,dir?:string}}} md
- *   — exactly `markdown.js`'s `convert()` return shape (this module never
- *   imports markdown.js; the caller passes its result through).
- * @param {{standalone?: boolean}} [opts]
- * @returns {string}
+ * Provenance: `md.html` may carry its own `md.htmlSpans` (from
+ * `inlineIncludes`, when the converted body had includes of its own —
+ * §10.1's post-conversion resolution); everything else this function
+ * synthesizes (the doctype/html/head/body scaffolding, `md.headHtml`'s
+ * frontmatter-derived metas) is trivially page-authored — there is nowhere
+ * else it could have come from — so it is attributed to `pageFile`.
+ *
+ * @param {{html:string, headHtml:string, bodyClass?:string, htmlAttrs?:{lang?:string,dir?:string}, htmlSpans?:{start:number,end:number,file:string,fileOffset:number}[]}} md
+ *   — `markdown.js`'s `convert()` return shape plus the optional `htmlSpans`
+ *   this module's own caller (`src/cli/commands/build.js`) attaches after
+ *   running `md.html` through `includes.inlineIncludes`.
+ * @param {{standalone?: boolean, pageFile: string}} opts
+ * @returns {{text: string, spans: {start:number,end:number,file:string,fileOffset:number}[]}}
  */
-export function assembleMarkdownDocument(md, { standalone = false } = {}) {
+export function assembleMarkdownDocument(md, { standalone = false, pageFile }) {
   const htmlAttrs = md.htmlAttrs ?? {};
   const attrParts = [];
   if (htmlAttrs.lang !== undefined) attrParts.push(`lang="${escapeAttr(htmlAttrs.lang)}"`);
@@ -86,7 +277,17 @@ export function assembleMarkdownDocument(md, { standalone = false } = {}) {
 
   const bodyTag = md.bodyClass !== undefined ? `<body class="${escapeAttr(md.bodyClass)}">` : "<body>";
 
-  return `<!doctype html>\n${htmlTag}\n  <head>\n    ${headParts.join("\n    ")}\n  </head>\n  ${bodyTag}\n    ${md.html}\n  </body>\n</html>\n`;
+  const before = `<!doctype html>\n${htmlTag}\n  <head>\n    ${headParts.join("\n    ")}\n  </head>\n  ${bodyTag}\n    `;
+  const after = `\n  </body>\n</html>\n`;
+  const text = before + md.html + after;
+
+  const htmlSpans = md.htmlSpans ?? wholeTextSpan(md.html, pageFile);
+  const spans = [
+    ...wholeTextSpan(before, pageFile),
+    ...shiftSpans(htmlSpans, before.length),
+    ...shiftSpans(wholeTextSpan(after, pageFile), before.length + md.html.length),
+  ];
+  return { text, spans };
 }
 
 /** Minimal attribute-value escaping for text synthesized here (never applied to parsed source — parsing never decodes). */
@@ -103,23 +304,31 @@ function escapeAttr(s) {
  *   include-inlined (§5); for a Markdown page, the document markdown.js
  *   synthesized (§10.1/§10.7) — this module does not know or care which.
  * @param {string} args.pageFile - source-root-relative path, for diagnostics
+ * @param {{start:number,end:number,file:string,fileOffset:number}[]} [args.pageSpans] -
+ *   `pageText`'s own provenance (from `inlineIncludes`/`assembleMarkdownDocument`);
+ *   defaults to attributing all of `pageText` to `pageFile`, which is exact
+ *   for a caller with no includes of its own to track.
  * @param {string|null|undefined} args.layoutText - L's full HTML document
  *   text (also already include-inlined), or absent for no layout
  * @param {string} [args.layoutFile] - required whenever `layoutText` is given
+ * @param {{start:number,end:number,file:string,fileOffset:number}[]} [args.layoutSpans] -
+ *   `layoutText`'s own provenance; same default as `pageSpans`.
  * @param {import('./diagnostics.js').Reporter} args.reporter
- * @returns {string} the composed HTML document text
+ * @returns {{text: string, spans: {start:number,end:number,file:string,fileOffset:number}[]}}
  */
-export function compose({ pageText, pageFile, layoutText, layoutFile, reporter }) {
-  if (!layoutText) return composeNoLayout({ pageText, pageFile, reporter });
-  return composeWithLayout({ pageText, pageFile, layoutText, layoutFile, reporter });
+export function compose({ pageText, pageFile, pageSpans, layoutText, layoutFile, layoutSpans, reporter }) {
+  const pSpans = pageSpans ?? wholeTextSpan(pageText, pageFile);
+  if (!layoutText) return composeNoLayout({ pageText, pageFile, pageSpans: pSpans, reporter });
+  const lSpans = layoutSpans ?? wholeTextSpan(layoutText, layoutFile);
+  return composeWithLayout({ pageText, pageFile, pageSpans: pSpans, layoutText, layoutFile, layoutSpans: lSpans, reporter });
 }
 
 // --------------------------------------------------------------- no layout
 
-function composeNoLayout({ pageText, pageFile, reporter }) {
+function composeNoLayout({ pageText, pageFile, pageSpans, reporter }) {
   const { root } = parse(pageText);
   const excluded = checkNestedSlots(root, pageText, pageFile, reporter);
-  const edits = collectStraySlotEdits(root, pageText, pageFile, reporter, excluded);
+  const edits = collectStraySlotEdits(root, pageText, pageSpans, pageFile, reporter, excluded);
 
   const html = findFirst(root, (n) => isElement(n, "html"));
   const body = findFirst(root, (n) => isElement(n, "body"));
@@ -130,27 +339,28 @@ function composeNoLayout({ pageText, pageFile, reporter }) {
     if (e) edits.push(e);
   }
 
-  return stripPolyfillScripts(applyEdits(pageText, edits));
+  const spliced = spliceTrackingSpans(pageText, pageSpans, edits, pageFile);
+  return stripPolyfillScripts(spliced.text, spliced.spans, pageFile);
 }
 
 // ------------------------------------------------------------- with layout
 
-function composeWithLayout({ pageText, pageFile, layoutText, layoutFile, reporter }) {
+function composeWithLayout({ pageText, pageFile, pageSpans, layoutText, layoutFile, layoutSpans, reporter }) {
   // ---- Pass A: neutralize stray slots (§7.1 MRG-04/A04), both documents.
   const c0 = parse(pageText);
   const cExcluded = checkNestedSlots(c0.root, pageText, pageFile, reporter);
-  const cEdits0 = collectStraySlotEdits(c0.root, pageText, pageFile, reporter, cExcluded);
-  const preparedCText = applyEdits(pageText, cEdits0);
+  const cEdits0 = collectStraySlotEdits(c0.root, pageText, pageSpans, pageFile, reporter, cExcluded);
+  const preparedC = spliceTrackingSpans(pageText, pageSpans, cEdits0, pageFile);
 
   const l0 = parse(layoutText);
   const lHead0 = findFirst(l0.root, (n) => isElement(n, "head"));
   const lHeadExcluded = lHead0 ? checkNestedSlots(lHead0, layoutText, layoutFile, reporter) : new Set();
-  const lEdits0 = lHead0 ? collectStraySlotEdits(lHead0, layoutText, layoutFile, reporter, lHeadExcluded) : [];
-  const preparedLText = applyEdits(layoutText, lEdits0);
+  const lEdits0 = lHead0 ? collectStraySlotEdits(lHead0, layoutText, layoutSpans, layoutFile, reporter, lHeadExcluded) : [];
+  const preparedL = spliceTrackingSpans(layoutText, layoutSpans, lEdits0, layoutFile);
 
   // ---- Pass B: reparse once, do everything else against stable offsets.
-  const C = parse(preparedCText);
-  const L = parse(preparedLText);
+  const C = parse(preparedC.text);
+  const L = parse(preparedL.text);
   const lHtml = findFirst(L.root, (n) => isElement(n, "html"));
   const lBody = findFirst(L.root, (n) => isElement(n, "body"));
   const lHead = findFirst(L.root, (n) => isElement(n, "head"));
@@ -162,37 +372,42 @@ function composeWithLayout({ pageText, pageFile, layoutText, layoutFile, reporte
     // A layout with no <body> at all is outside anything the spec describes
     // (layouts are complete documents). Fail soft — one malformed layout
     // must not crash best-effort analysis of the rest of the site.
-    return preparedLText;
+    return preparedL;
   }
 
   const edits = [];
 
   // §7.1 sink detection, including P16 (checked once, fresh, on the stable body).
-  const lBodyExcluded = checkNestedSlots(lBody, preparedLText, layoutFile, reporter);
-  const sinks = detectSinks(lBody, lBodyExcluded, preparedLText, layoutFile, reporter);
+  const lBodyExcluded = checkNestedSlots(lBody, preparedL.text, layoutFile, reporter);
+  const sinks = detectSinks(lBody, lBodyExcluded, preparedL.text, layoutFile, reporter);
 
   if (sinks.none) {
     // §7.5 — sink-less: the whole body is the default slot, verbatim, no unwrap.
     const [cs, ce] = contentSpan(cBody);
     const [ls, le] = contentSpan(lBody);
-    edits.push({ start: ls, end: le, replacement: preparedCText.slice(cs, ce) });
+    edits.push({
+      start: ls, end: le,
+      replacement: preparedC.text.slice(cs, ce),
+      replacementSpans: sliceSpans(preparedC.spans, cs, ce),
+    });
   } else {
     edits.push(...composeSinkedBody({
-      preparedCText, cBody, preparedLText, sinks, pageFile, layoutFile, reporter,
+      preparedC, cBody, preparedL, sinks, pageFile, layoutFile, reporter,
     }));
   }
 
   // §8 head merge.
-  edits.push(...mergeHead({
-    layoutHead: lHead, layoutText: preparedLText, layoutFile,
-    pageHead: cHead, pageText: preparedCText, pageFile, reporter,
+  edits.push(...mergeHeadWithProvenance({
+    layoutHead: lHead, layoutText: preparedL.text, layoutFile,
+    pageHead: cHead, pageText: preparedC.text, pageSpans: preparedC.spans, pageFile, reporter,
   }));
 
   // §9/S11 root attributes, and defensive data-layout/slot stripping on the layout's own tags.
   edits.push(...mergeRootAttrs(lHtml, cHtml));
   edits.push(...mergeRootAttrs(lBody, cBody));
 
-  return stripPolyfillScripts(applyEdits(preparedLText, edits));
+  const composed = spliceTrackingSpans(preparedL.text, preparedL.spans, edits, pageFile);
+  return stripPolyfillScripts(composed.text, composed.spans, pageFile);
 }
 
 /**
@@ -200,23 +415,28 @@ function composeWithLayout({ pageText, pageFile, layoutText, layoutFile, reporte
  * content into fills and default content, route default content to its
  * sink, and fill (or fall back) every named slot.
  */
-function composeSinkedBody({ preparedCText, cBody, preparedLText, sinks, pageFile, layoutFile, reporter }) {
+function composeSinkedBody({ preparedC, cBody, preparedL, sinks, pageFile, layoutFile, reporter }) {
   const edits = [];
+  const preparedCText = preparedC.text;
+  const preparedLText = preparedL.text;
 
   // §7.2 — unwrap C's first <main>, at any depth, exactly once (R4).
   let bodyText = preparedCText;
+  let bodySpans = preparedC.spans;
   let body = cBody;
   const main = findFirst(cBody, (n) => isElement(n, "main"));
   if (main) {
     const unwrapEdits = [{ start: main.start, end: main.openTagEnd, replacement: "" }];
     if (main.endTagStart != null) unwrapEdits.push({ start: main.endTagStart, end: main.endTagEnd, replacement: "" });
-    bodyText = applyEdits(preparedCText, unwrapEdits);
+    const unwrapped = spliceTrackingSpans(preparedCText, preparedC.spans, unwrapEdits, pageFile);
+    bodyText = unwrapped.text;
+    bodySpans = unwrapped.spans;
     body = findFirst(parse(bodyText).root, (n) => isElement(n, "body"));
   }
 
   // §7.2 — classify top-level children into fills (by slot name) and default content.
   const topKids = elementChildren(body);
-  const fillsByName = new Map(); // name -> string[] (already slot-attr-stripped, in page order)
+  const fillsByName = new Map(); // name -> {text,spans}[] (already slot-attr-stripped, in page order)
   const localEdits = []; // within body's own content span
   for (const el of topKids) {
     const slotVal = attrValueOrEmpty(el, SLOT_ATTR);
@@ -225,7 +445,10 @@ function composeSinkedBody({ preparedCText, cBody, preparedLText, sinks, pageFil
 
     if (matchesRealSlot) {
       if (!fillsByName.has(slotVal)) fillsByName.set(slotVal, []);
-      fillsByName.get(slotVal).push(spanWithAttrRemoved(bodyText, el, SLOT_ATTR));
+      fillsByName.get(slotVal).push({
+        text: spanWithAttrRemoved(bodyText, el, SLOT_ATTR),
+        spans: spansWithAttrRemoved(bodySpans, el, SLOT_ATTR),
+      });
       localEdits.push({ start: el.start, end: el.end, replacement: "" }); // excised from default content
     } else if (isFillCandidate) {
       // MRG-10/A02: names a slot the layout doesn't have — stays in default content, attr consumed.
@@ -250,32 +473,53 @@ function composeSinkedBody({ preparedCText, cBody, preparedLText, sinks, pageFil
 
   const [bs, be] = contentSpan(body);
   const local = localEdits.map((e) => ({ start: e.start - bs, end: e.end - bs, replacement: e.replacement }));
-  const defaultContentText = applyEdits(bodyText.slice(bs, be), local);
+  const defaultSlice = spliceTrackingSpans(bodyText.slice(bs, be), sliceSpans(bodySpans, bs, be), local, pageFile);
+  const defaultContentText = defaultSlice.text;
+  const defaultContentSpans = defaultSlice.spans;
   const defaultEmpty = isBlank(defaultContentText);
 
   // §7.4 — route default content.
-  // Spec gap (see implementation report): C6/§7.4 states explicitly that
-  // "when a layout has a default slot, main's other children are never
-  // touched" — but gives no equivalent carve-out for the no-default-slot
-  // branch, where default content replaces main's children wholesale (S05).
-  // A named slot the layout author nested *inside* that main would then have
-  // its own span wholly contained in the very span being replaced. Rather
-  // than let that produce an overlapping edit (a crash — worse than any
-  // single-page best-effort outcome), this resolves it the same direction
-  // the wholesale-replacement wording points: main's replacement wins, and a
-  // named slot swallowed inside it is skipped below instead of double-edited.
   let swallowedByMain = null;
+  const namedSlotsInMain = new Set(sinks.namedSlotsInMain);
   if (sinks.defaultSlot) {
     if (defaultEmpty) {
       const [s, e] = contentSpan(sinks.defaultSlot);
-      edits.push({ start: sinks.defaultSlot.start, end: sinks.defaultSlot.end, replacement: preparedLText.slice(s, e) });
+      edits.push({
+        start: sinks.defaultSlot.start, end: sinks.defaultSlot.end,
+        replacement: preparedLText.slice(s, e), replacementSpans: sliceSpans(preparedL.spans, s, e),
+      });
     } else {
-      edits.push({ start: sinks.defaultSlot.start, end: sinks.defaultSlot.end, replacement: defaultContentText });
+      edits.push({
+        start: sinks.defaultSlot.start, end: sinks.defaultSlot.end,
+        replacement: defaultContentText, replacementSpans: defaultContentSpans,
+      });
     }
   } else if (sinks.firstMain) {
-    if (!defaultEmpty) {
+    if (namedSlotsInMain.size > 0) {
+      // P19 (§7.4): no default slot, main is the wholesale-replacement sink,
+      // AND a named slot sits inside it — the two rules target overlapping
+      // spans (this bullet would replace main's children wholesale; §7.3
+      // would separately fill or fall back the nested slot). Resolving it
+      // either way loses something silently, so: report, and touch neither
+      // main's children nor the nested slot(s) — left exactly as written,
+      // matching how P16-flagged slots are left untouched below. The page
+      // will not publish (a problem was just raised), so this is a
+      // best-effort remnant, not a resolution.
+      for (const node of namedSlotsInMain) {
+        const name = attrValueOrEmpty(node, "name");
+        reporter.problem({
+          file: layoutFile,
+          line: lineOf(preparedLText, node.start),
+          message: `named slot "${name}" is inside <main>, which is also the default-content sink`,
+          fixes: [
+            "add <slot></slot> inside <main> — then main's other children are left alone (§7.7 C6)",
+            `or move <slot name="${name}"> outside <main>`,
+          ],
+        });
+      }
+    } else if (!defaultEmpty) {
       const [s, e] = contentSpan(sinks.firstMain);
-      edits.push({ start: s, end: e, replacement: defaultContentText });
+      edits.push({ start: s, end: e, replacement: defaultContentText, replacementSpans: defaultContentSpans });
       swallowedByMain = [s, e];
     } // else: main keeps its own children untouched (S1) — the layout's default persists.
   } else if (sinks.namedSlots.size > 0 && !defaultEmpty) {
@@ -289,15 +533,16 @@ function composeSinkedBody({ preparedCText, cBody, preparedLText, sinks, pageFil
   }
   const isSwallowed = (node) => swallowedByMain !== null && node.start >= swallowedByMain[0] && node.end <= swallowedByMain[1];
 
-  // §7.3 — fill or fall back every named slot.
+  // §7.3 — fill or fall back every named slot (P19-flagged ones are left untouched, like P16's).
   for (const [name, node] of sinks.namedSlots) {
-    if (isSwallowed(node)) continue;
+    if (isSwallowed(node) || namedSlotsInMain.has(node)) continue;
     const fills = fillsByName.get(name);
     if (fills && fills.length > 0) {
-      edits.push({ start: node.start, end: node.end, replacement: fills.join("\n    ") });
+      const { replacement, replacementSpans } = joinWithGlue(fills, "\n    ");
+      edits.push({ start: node.start, end: node.end, replacement, replacementSpans });
     } else {
       const [s, e] = contentSpan(node);
-      edits.push({ start: node.start, end: node.end, replacement: preparedLText.slice(s, e) });
+      edits.push({ start: node.start, end: node.end, replacement: preparedLText.slice(s, e), replacementSpans: sliceSpans(preparedL.spans, s, e) });
     }
   }
 
@@ -305,7 +550,7 @@ function composeSinkedBody({ preparedCText, cBody, preparedLText, sinks, pageFil
   for (const dup of sinks.duplicates) {
     if (dup.kind === "main" || isSwallowed(dup.node)) continue;
     const [s, e] = contentSpan(dup.node);
-    edits.push({ start: dup.node.start, end: dup.node.end, replacement: preparedLText.slice(s, e) });
+    edits.push({ start: dup.node.start, end: dup.node.end, replacement: preparedLText.slice(s, e), replacementSpans: sliceSpans(preparedL.spans, s, e) });
   }
 
   return edits;
@@ -315,9 +560,11 @@ function composeSinkedBody({ preparedCText, cBody, preparedLText, sinks, pageFil
 
 /**
  * §7.1: the layout's sinks — the default slot, each first named slot, the
- * first `<main>` — plus every duplicate (advisory A13, first occurrence wins).
+ * first `<main>` — plus every duplicate (advisory A13, first occurrence wins)
+ * and, when there is no default slot, every named slot nested inside
+ * `firstMain` (§7.4 P19 — see `composeSinkedBody`).
  * @returns {{defaultSlot: object|null, namedSlots: Map<string,object>, firstMain: object|null,
- *   duplicates: {node:object, kind:'slot'|'main'}[], none: boolean}}
+ *   duplicates: {node:object, kind:'slot'|'main'}[], namedSlotsInMain: object[], none: boolean}}
  */
 function detectSinks(lBody, excluded, layoutText, layoutFile, reporter) {
   const allSlots = findAll(lBody, (n) => isElement(n, "slot")).filter((n) => !excluded.has(n));
@@ -357,8 +604,20 @@ function detectSinks(lBody, excluded, layoutText, layoutFile, reporter) {
     duplicates.push({ node: allMains[i], kind: "main" });
   }
 
+  // §7.4 P19: named slots physically inside firstMain's CONTENT, only
+  // meaningful (and only checked) when there is no default slot — a bare
+  // slot anywhere would already have become `defaultSlot` above, so
+  // `!defaultSlot` here means the layout truly has none.
+  const namedSlotsInMain = [];
+  if (!defaultSlot && firstMain) {
+    const [ms, me] = contentSpan(firstMain);
+    for (const node of namedSlots.values()) {
+      if (node.start >= ms && node.end <= me) namedSlotsInMain.push(node);
+    }
+  }
+
   return {
-    defaultSlot, namedSlots, firstMain, duplicates,
+    defaultSlot, namedSlots, firstMain, duplicates, namedSlotsInMain,
     none: !defaultSlot && namedSlots.size === 0 && !firstMain,
   };
 }
@@ -401,7 +660,7 @@ function checkNestedSlots(scopeRoot, text, file, reporter) {
  * advisory A04. Used for an entire page document (all of a page's slots are
  * "outside a layout's body") and for a layout's `<head>` alone.
  */
-function collectStraySlotEdits(scopeRoot, text, file, reporter, excluded) {
+function collectStraySlotEdits(scopeRoot, text, spans, file, reporter, excluded) {
   const edits = [];
   for (const slot of findAll(scopeRoot, (n) => isElement(n, "slot"))) {
     if (excluded.has(slot)) continue;
@@ -411,9 +670,61 @@ function collectStraySlotEdits(scopeRoot, text, file, reporter, excluded) {
       message: "<slot> is outside a layout's <body> — replaced by its own children",
     });
     const [s, e] = contentSpan(slot);
-    edits.push({ start: slot.start, end: slot.end, replacement: text.slice(s, e) });
+    edits.push({ start: slot.start, end: slot.end, replacement: text.slice(s, e), replacementSpans: sliceSpans(spans, s, e) });
   }
   return edits;
+}
+
+// ------------------------------------------------------------ §8 provenance
+
+/**
+ * Calls the real `mergeHead` (head-merge.js, untouched) and reconciles
+ * provenance onto its returned edits — see this file's header doc for why
+ * this is possible without re-deriving head-merge.js's own dedup logic.
+ * `pageSpans` must already be valid against `pageText` (i.e. `preparedC`,
+ * post-Pass-A) — same text head-merge.js itself is called with.
+ */
+function mergeHeadWithProvenance({ layoutHead, layoutText, layoutFile, pageHead, pageText, pageSpans, pageFile, reporter }) {
+  const rawEdits = mergeHead({ layoutHead, layoutText, layoutFile, pageHead, pageText, pageFile, reporter });
+  if (!pageHead || rawEdits.length === 0) return rawEdits;
+  const candidates = elementChildren(pageHead).map((el) => ({
+    rawText: rawSpan(pageText, el),
+    spans: sliceSpans(pageSpans, el.start, el.end),
+  }));
+  return rawEdits.map((e) => ({ ...e, replacementSpans: headEditReplacementSpans(e.replacement, candidates) }));
+}
+
+/**
+ * Split `replacement` on head-merge.js's own `"\n    "` join separator and
+ * match each non-empty piece against a page-head child by EXACT text
+ * equality (a piece is always one child's whole raw span — rows 1/3-7).
+ * Each candidate is consumed at most once (in piece order) so that two
+ * byte-identical elements (e.g. a repeated `og:image`, legitimately plural
+ * per §8 row 3) still resolve to their own, positionally-correct span rather
+ * than both collapsing onto the first match. Unmatched pieces (only ever row
+ * 2's title join, which mixes page+layout TEXT rather than copying a child)
+ * are left uncovered, so the enclosing `spliceTrackingSpans` call attributes
+ * them to `pageFile` via `fillGaps` — harmless, since title text never
+ * carries a checkable URL.
+ */
+function headEditReplacementSpans(replacement, candidates) {
+  if (replacement === "") return [];
+  const spans = [];
+  let cursor = 0;
+  const used = new Array(candidates.length).fill(false);
+  const pieces = replacement.split(HEAD_JOIN);
+  for (let i = 0; i < pieces.length; i++) {
+    const piece = pieces[i];
+    if (piece !== "") {
+      const idx = candidates.findIndex((c, ci) => !used[ci] && c.rawText === piece);
+      if (idx !== -1) {
+        used[idx] = true;
+        spans.push(...shiftSpans(candidates[idx].spans, cursor));
+      }
+    }
+    cursor += piece.length + (i < pieces.length - 1 ? HEAD_JOIN.length : 0);
+  }
+  return spans;
 }
 
 // ------------------------------------------------------- §9/S11 root attrs
@@ -423,7 +734,11 @@ function collectStraySlotEdits(scopeRoot, text, file, reporter, excluded) {
  * in place, per §9/S11: `class` is layout tokens then new page tokens
  * (deduplicated); any other page attribute overrides the layout's value at
  * its existing position, or is appended (page-source order) when the layout
- * doesn't have it; `data-layout`/consumed `slot` never participate.
+ * doesn't have it; `data-layout`/consumed `slot` never participate. Never
+ * URL-bearing (§11 has no rule for `<html>`/`<body>` attributes), so these
+ * edits carry no `replacementSpans` — the enclosing splice attributes them
+ * to `pageFile` by fallback, which is harmless and, for `class`/page-set
+ * attributes, also simply correct.
  */
 function mergeRootAttrs(layoutEl, pageEl) {
   const edits = [];
@@ -471,9 +786,10 @@ function mergeRootAttrs(layoutEl, pageEl) {
 // -------------------------------------------------------------- §6.4 LAY-13
 
 /** A `<script>` carrying `data-polyfill` is removed entirely from built output. */
-function stripPolyfillScripts(text) {
+function stripPolyfillScripts(text, spans, fallbackFile) {
   const { root } = parse(text);
   const scripts = findAll(root, (n) => isElement(n, "script") && hasAttr(n, "data-polyfill"));
-  if (scripts.length === 0) return text;
-  return applyEdits(text, scripts.map((s) => ({ start: s.start, end: s.end, replacement: "" })));
+  if (scripts.length === 0) return { text, spans };
+  const edits = scripts.map((s) => ({ start: s.start, end: s.end, replacement: "" }));
+  return spliceTrackingSpans(text, spans, edits, fallbackFile);
 }

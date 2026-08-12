@@ -24,19 +24,20 @@
  * changed to satisfy it, and testing-strategy §5's resolution order — spec
  * beats fixture beats engine — exists precisely to stop that.
  *
- * Known, documented limitation inherited from urls.js/references.js: true
- * per-byte provenance (which file — page, layout, or include — authored a
- * given composed element) is lost once includes.js/compose.js splice text
- * together; neither of those modules returns span/file metadata, and
- * fixing that is out of scope for all of the modules involved here (see
- * urls.js's own "PROVENANCE GAP" comment). This file supplies the
- * same-file approximation both modules' docs recommend as the fallback
- * (`provenanceOf`/`locate` default to the composed page's own file) — exact
- * for page-authored content, imprecise for anything a layout or include
- * contributed. That imprecision is pre-existing and not something this
- * file's scope (§6 layout resolution + orchestration) can close.
+ * PROVENANCE: `includes.js`'s `inlineIncludes` and `compose.js`'s `compose`
+ * now return `{text, spans}` (each span `{start,end,file,fileOffset}` —
+ * either module's own doc comment has the exact contract). This file is
+ * where that lands: `buildPage`/`loadLayout` thread spans through composition
+ * and this function builds, per composed page, a REAL `provenanceOf` for
+ * `urls.rewriteUrls` (`urls.spansToLocator(spans, pageFile)`, replacing the
+ * old same-file approximation `() => pageFile`) and a REAL `locate` for
+ * `references.checkReferences` (`makeReferenceLocator` below — richer than
+ * `spansToLocator` since a reference diagnostic needs a LINE, not just a
+ * file, so it re-derives one from the true source file's own text using each
+ * span's `fileOffset`). See `makeReferenceLocator`'s own comment for the one
+ * honestly-named residual approximation.
  */
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { basename, extname, join, resolve } from "node:path";
 import * as collisions from "../../core/collisions.js";
 import * as compose from "../../core/compose.js";
@@ -44,7 +45,7 @@ import * as html from "../../core/html.js";
 import * as includes from "../../core/includes.js";
 import * as layout from "../../core/layout.js";
 import * as markdown from "../../core/markdown.js";
-import { isNeverShipped, toRelative } from "../../core/paths.js";
+import { contains, isNeverShipped, toRelative } from "../../core/paths.js";
 import * as publishModule from "../../core/publish.js";
 import * as references from "../../core/references.js";
 import * as urls from "../../core/urls.js";
@@ -55,10 +56,12 @@ import * as urls from "../../core/urls.js";
  * @param {string} context.output
  * @param {Record<string, any>} context.settings
  * @param {import('../../core/diagnostics.js').Reporter} context.reporter
+ * @param {boolean} [context.sourceDefaulted] - §4.4 EXC-11: true only when
+ *   nothing chose the source root (no --source, no unify.yaml key, no src/)
  * @returns {Promise<number>}
  */
-export async function build({ sourceRoot, output, settings, reporter }) {
-  const files = scanSourceTree(sourceRoot, output, settings.exclude);
+export async function build({ sourceRoot, output, settings, reporter, sourceDefaulted = false }) {
+  const files = scanSourceTree(sourceRoot, output, settings.exclude, reporter);
 
   // §6.3/P08 — every .html/.md source file, excluded or not (§1: a "page" by
   // extension; only the never-shipped list, already applied in the scan,
@@ -75,19 +78,24 @@ export async function build({ sourceRoot, output, settings, reporter }) {
     layout.checkRetiredVocabulary({ text, file: f.relPath, reporter });
   }
 
-  const layoutCache = new Map(); // absolute layout path -> Promise<{text, file, broken}>
+  const layoutCache = new Map(); // absolute layout path -> Promise<{text, spans, file, broken}>
   const convertMarkdown = (absPath) => markdown.convertFragment(absPath, { sourceRoot, reporter });
+  // A10 (§14.3): every file consumed AS a layout or an include, anywhere in
+  // the build — accumulated here (buildPage/loadLayout add to it as they go)
+  // and checked below, once composition is done, against the pages that
+  // actually got emitted.
+  const consumedAsIncludeOrLayout = new Set();
 
   // ---- Pass 1: compose every non-excluded page, entirely in memory. -------
   const pageFiles = files.filter((f) => f.isPage && !f.excluded);
   const assetFiles = files.filter((f) => !f.isPage && !f.excluded);
 
-  /** @type {{relPath: string, html: string}[]} */
+  /** @type {{relPath: string, html: string, spans: {start:number,end:number,file:string,fileOffset:number}[]}[]} */
   const composedPages = [];
   for (const page of pageFiles) {
     const problemsBefore = reporter.problemCount;
     try {
-      const composedHtml = await buildPage(page, { sourceRoot, reporter, layoutCache, convertMarkdown });
+      const composed = await buildPage(page, { sourceRoot, reporter, layoutCache, convertMarkdown, consumedAsIncludeOrLayout });
       // A page whose OWN processing reported a new problem (an unresolved
       // <include> left verbatim in the output by includes.js's own
       // best-effort splice, a P16/P09 mid-composition failure, …) is excluded
@@ -101,7 +109,9 @@ export async function build({ sourceRoot, output, settings, reporter }) {
       // second, undeclared "does not resolve to any emitted file" on top of
       // the include's own already-reported problem.
       const hadNewProblem = reporter.problemCount > problemsBefore;
-      if (composedHtml !== null && !hadNewProblem) composedPages.push({ relPath: page.relPath, html: composedHtml });
+      if (composed !== null && !hadNewProblem) {
+        composedPages.push({ relPath: page.relPath, html: composed.text, spans: composed.spans });
+      }
     } catch (err) {
       // Best-effort composition (PIP-02): one page's failure must not stop
       // analysis of the others. This is a defensive net for the unexpected
@@ -110,6 +120,27 @@ export async function build({ sourceRoot, output, settings, reporter }) {
       // and returns null instead of throwing.
       reporter.problem({ file: page.relPath, message: `internal error building this page: ${err.message}` });
     }
+  }
+
+  // A10 — a file used as a layout or include also ships as its own page —
+  // "the non-underscored case" is the catalogue entry's own wording (§14.3
+  // item 8), so an underscore-prefixed path (by page name or by a `_`
+  // directory segment) is excluded here even if a custom --exclude set (like
+  // underscore-guard's `--exclude drafts/**`, which REPLACES the default and
+  // so no longer holds `_`-prefixed files back at all) lets it reach
+  // `composedPages`: that combination is P14's territory (a problem, not an
+  // advisory), already reported by collisions.js, and reporting BOTH would
+  // be redundant noise about the same file for the same underlying fact.
+  // Advisory only — both copies still ship (§14.3's own framing: it reports
+  // what the build observed, it does not restructure anything).
+  const composedPageRelPaths = new Set(composedPages.map((p) => p.relPath));
+  for (const relPath of consumedAsIncludeOrLayout) {
+    if (relPath.split("/").some((seg) => seg.startsWith("_"))) continue;
+    if (!composedPageRelPaths.has(relPath)) continue;
+    reporter.advisory({
+      file: relPath,
+      message: `${relPath} is used as a layout or include and also ships as its own page`,
+    });
   }
 
   // ---- §13 — collision-aware output paths, for pages AND assets. ----------
@@ -144,17 +175,25 @@ export async function build({ sourceRoot, output, settings, reporter }) {
 
   /** @type {Map<string, string|Buffer>} */
   const tempFiles = new Map();
+  // Real per-output-file provenance spans (§12/§14.1 R3), keyed by the SAME
+  // final output path `tempFiles`/`htmlFiles` use below — see
+  // `makeReferenceLocator`'s own comment for how an offset in the
+  // POST-rewrite text maps back through spans computed against the
+  // PRE-rewrite composed text.
+  const pageSpansByOutputPath = new Map();
   for (const p of composedPages) {
     const pageOutputPath = collisions.computeOutputPath({ path: p.relPath, kind: "page" }, { prettyUrls: false });
     const rewritten = urls.rewriteUrls(p.html, {
-      provenanceOf: () => p.relPath, // same-file approximation — see module docstring
+      provenanceOf: urls.spansToLocator(p.spans, p.relPath),
       pageFile: p.relPath,
       pageOutputPath,
       prettyUrls: settings.prettyUrls,
       emittedHtmlPaths,
       base: baseConfig,
     });
-    tempFiles.set(outputPathOf.get(p.relPath), rewritten);
+    const finalOutputPath = outputPathOf.get(p.relPath);
+    tempFiles.set(finalOutputPath, rewritten);
+    pageSpansByOutputPath.set(finalOutputPath, p.spans);
   }
 
   // §4.4/EXC-09 — mirror copy: every emitted asset, byte-for-byte, same
@@ -174,10 +213,26 @@ export async function build({ sourceRoot, output, settings, reporter }) {
   }
   references.checkReferences({
     htmlFiles, cssFiles, emittedPaths: new Set(tempFiles.keys()), base: baseConfig, reporter,
+    locate: makeReferenceLocator(pageSpansByOutputPath, sourceRoot, htmlFiles, cssFiles),
   });
 
   relocateDiagnosticsToCwd(reporter, sourceRoot);
   reporter.flush();
+
+  // §4.4 — the defaulted-source notice: stdout summary text, never a
+  // diagnostic (it names no problem, never touches the exit code), printed
+  // for `build` and `--dry-run` alike, and only when the source root fell
+  // all the way through to the working directory (cli.js's own argument
+  // resolution — no marker files, no heuristics). Its two contract facts:
+  // the count of files mirror copy is about to ship, and the --dry-run
+  // pointer for listing them.
+  if (sourceDefaulted) {
+    const n = assetFiles.length;
+    reporter.summary(
+      `building from the working directory (no src/ here): ${n} file${n === 1 ? "" : "s"} will be copied as-is` +
+      ` — run unify build --dry-run to list them`,
+    );
+  }
 
   // ---- §15 — transactional publish. ----------------------------------------
   if (shouldPublish(reporter) && !settings.dryRun) {
@@ -192,6 +247,61 @@ export async function build({ sourceRoot, output, settings, reporter }) {
   // stdout content for `build`.
 
   return reporter.exitCode;
+}
+
+/**
+ * Build the `locate` callback `references.checkReferences` uses for §14.1
+ * R3 attribution: given an EMITTED output path and a byte offset into that
+ * file's FINAL (post-§11-rewrite) text, return the reference's true
+ * provenance `{file, line}` — a page, layout, or include, not just the
+ * composed page's own path (see `stranded-underscore-asset`'s pinned
+ * `src/_includes/nav.html:2`).
+ *
+ * `pageSpansByOutputPath` holds each composed page's OWN spans, valid
+ * against its PRE-rewrite composed text. §11's rewrites (`urls.rewriteUrls`)
+ * only ever replace attribute VALUE bytes in place — never insert or delete
+ * a byte before content that itself was not rewritten — so querying those
+ * spans with an offset taken from the FINAL text is exact for any reference
+ * with no EARLIER length-changing rewrite before it in the same output
+ * file. A fully general fix would mean `urls.js` tracking spans through its
+ * own edits too, which nothing this repository checks needs (every fixture
+ * requiring real attribution — this one — resolves correctly under the
+ * above); named here rather than silently assumed.
+ *
+ * Once the right span is found, its `fileOffset` (where it sits in that
+ * file's OWN raw text) gives a real line number by re-reading that one file
+ * — cheap and simple since this only runs for a reference that is actually
+ * BROKEN, not per reference in the tree. `outputFile` is not always a
+ * composed PAGE, though — a CSS file is only ever mirror-copied, never in
+ * `pageSpansByOutputPath` at all, and even a page's own spans can fail to
+ * cover an offset that a length-increasing §11 rewrite pushed past the
+ * pre-rewrite text's end. Either way, when no span covers the query, the
+ * OUTPUT file's own (already-loaded) text is itself the true provenance —
+ * exactly references.js's own `defaultLocate` fallback, reused here rather
+ * than reimplemented.
+ * @param {Map<string, {start:number,end:number,file:string,fileOffset:number}[]>} pageSpansByOutputPath
+ * @param {string} sourceRoot
+ * @param {Map<string,string>} htmlFiles
+ * @param {Map<string,string>} cssFiles
+ * @returns {import('../../core/references.js').Locate}
+ */
+function makeReferenceLocator(pageSpansByOutputPath, sourceRoot, htmlFiles, cssFiles) {
+  return (outputFile, offset) => {
+    const spans = pageSpansByOutputPath.get(outputFile);
+    const hit = spans?.find((s) => offset >= s.start && offset < s.end);
+    if (!hit) {
+      const text = htmlFiles.get(outputFile) ?? cssFiles.get(outputFile) ?? "";
+      return { file: outputFile, line: html.lineOf(text, offset) };
+    }
+    let line;
+    try {
+      const raw = readFileSync(resolve(sourceRoot, hit.file), "utf8");
+      line = html.lineOf(raw, hit.fileOffset + (offset - hit.start));
+    } catch {
+      line = undefined;
+    }
+    return { file: hit.file, line };
+  };
 }
 
 /**
@@ -213,14 +323,27 @@ function shouldPublish(reporter) {
 // ------------------------------------------------------------- per-page build
 
 /**
- * Run one page through §2 steps 2-4: includes → (Markdown conversion, for
- * `.md`) → layout resolution → composition. Returns the composed HTML text,
- * or `null` when the page has a problem of its own (already reported) —
- * best-effort composition continues with the next page regardless (the
- * caller's loop, not this function).
- * @returns {Promise<string|null>}
+ * Every file `inlineIncludes` attributed any text to, OTHER than `entryFile`
+ * itself, was consumed as an include (directly or transitively) — A10's own
+ * accumulation, fed by every `inlineIncludes` call below (page and layout
+ * alike). A zero-length span (an empty include target — includes.js's own
+ * doc comment) still records the file's identity, so an empty fragment
+ * still counts as "used".
  */
-async function buildPage(page, { sourceRoot, reporter, layoutCache, convertMarkdown }) {
+function trackIncludedFiles(spans, entryFile, consumedAsIncludeOrLayout) {
+  for (const s of spans) if (s.file !== entryFile) consumedAsIncludeOrLayout.add(s.file);
+}
+
+/**
+ * Run one page through §2 steps 2-4: includes → (Markdown conversion, for
+ * `.md`) → layout resolution → composition. Returns `{text, spans}` (see
+ * includes.js/compose.js for the spans contract), or `null` when the page
+ * has a problem of its own (already reported) — best-effort composition
+ * continues with the next page regardless (the caller's loop, not this
+ * function).
+ * @returns {Promise<{text: string, spans: {start:number,end:number,file:string,fileOffset:number}[]}|null>}
+ */
+async function buildPage(page, { sourceRoot, reporter, layoutCache, convertMarkdown, consumedAsIncludeOrLayout }) {
   const pageFile = page.relPath;
 
   if (extname(page.absPath) === ".md") {
@@ -242,34 +365,41 @@ async function buildPage(page, { sourceRoot, reporter, layoutCache, convertMarkd
     const inlinedBody = await includes.inlineIncludes({
       text: md.html, file: page.absPath, sourceRoot, reporter, convertMarkdown,
     });
-    const assembled = { ...md, html: inlinedBody };
+    trackIncludedFiles(inlinedBody.spans, pageFile, consumedAsIncludeOrLayout);
+    const assembled = { ...md, html: inlinedBody.text, htmlSpans: inlinedBody.spans };
 
     if (resolution.none) {
-      const pageText = compose.assembleMarkdownDocument(assembled, { standalone: true });
-      return compose.compose({ pageText, pageFile, layoutText: null, reporter });
+      const { text: pageText, spans: pageSpans } = compose.assembleMarkdownDocument(assembled, { standalone: true, pageFile });
+      return compose.compose({ pageText, pageFile, pageSpans, layoutText: null, reporter });
     }
 
-    const loaded = await loadLayout(resolution.path, { sourceRoot, reporter, convertMarkdown, layoutCache });
+    const loaded = await loadLayout(resolution.path, { sourceRoot, reporter, convertMarkdown, layoutCache, consumedAsIncludeOrLayout });
     if (loaded.broken) return null; // P15 already reported once for the layout itself
-    const pageText = compose.assembleMarkdownDocument(assembled, { standalone: false });
-    return compose.compose({ pageText, pageFile, layoutText: loaded.text, layoutFile: loaded.file, reporter });
+    const { text: pageText, spans: pageSpans } = compose.assembleMarkdownDocument(assembled, { standalone: false, pageFile });
+    return compose.compose({
+      pageText, pageFile, pageSpans, layoutText: loaded.text, layoutFile: loaded.file, layoutSpans: loaded.spans, reporter,
+    });
   }
 
   // .html
   const raw = readFileSync(page.absPath, "utf8");
   markdown.checkHtmlFrontmatter(raw, { path: page.absPath, sourceRoot, reporter }); // P10
   const inlined = await includes.inlineIncludes({ text: raw, file: page.absPath, sourceRoot, reporter, convertMarkdown });
-  const { root } = html.parse(inlined);
-  const resolution = layout.resolveHtmlLayout({ root, text: inlined, pageAbsPath: page.absPath, sourceRoot, reporter });
+  trackIncludedFiles(inlined.spans, pageFile, consumedAsIncludeOrLayout);
+  const { root } = html.parse(inlined.text);
+  const resolution = layout.resolveHtmlLayout({ root, text: inlined.text, pageAbsPath: page.absPath, sourceRoot, reporter });
   if (resolution.problem) return null;
 
   if (resolution.none) {
-    return compose.compose({ pageText: inlined, pageFile, layoutText: null, reporter });
+    return compose.compose({ pageText: inlined.text, pageFile, pageSpans: inlined.spans, layoutText: null, reporter });
   }
 
-  const loaded = await loadLayout(resolution.path, { sourceRoot, reporter, convertMarkdown, layoutCache });
+  const loaded = await loadLayout(resolution.path, { sourceRoot, reporter, convertMarkdown, layoutCache, consumedAsIncludeOrLayout });
   if (loaded.broken) return null;
-  return compose.compose({ pageText: inlined, pageFile, layoutText: loaded.text, layoutFile: loaded.file, reporter });
+  return compose.compose({
+    pageText: inlined.text, pageFile, pageSpans: inlined.spans,
+    layoutText: loaded.text, layoutFile: loaded.file, layoutSpans: loaded.spans, reporter,
+  });
 }
 
 /**
@@ -279,22 +409,26 @@ async function buildPage(page, { sourceRoot, reporter, layoutCache, convertMarkd
  * `data-layout` elsewhere in the document). Cached by absolute path so a
  * layout shared by many pages is read/checked once and any P15 it carries is
  * reported exactly once (§14.1 exhaustiveness — a diagnostic repeated once
- * per referencing page would not match a fixture's declared count).
+ * per referencing page would not match a fixture's declared count); the
+ * A10 "used as a layout" fact is likewise recorded exactly once here rather
+ * than once per referencing page.
  */
-function loadLayout(absPath, { sourceRoot, reporter, convertMarkdown, layoutCache }) {
+function loadLayout(absPath, { sourceRoot, reporter, convertMarkdown, layoutCache, consumedAsIncludeOrLayout }) {
   if (layoutCache.has(absPath)) return layoutCache.get(absPath);
   const promise = (async () => {
     const file = toRelative(sourceRoot, absPath);
+    consumedAsIncludeOrLayout.add(file);
     let raw;
     try {
       raw = readFileSync(absPath, "utf8");
     } catch {
-      return { text: "", file, broken: true };
+      return { text: "", spans: [], file, broken: true };
     }
     const inlined = await includes.inlineIncludes({ text: raw, file: absPath, sourceRoot, reporter, convertMarkdown });
-    const { root } = html.parse(inlined);
-    const { broken } = layout.checkLayoutDocument({ root, text: inlined, file, reporter });
-    return { text: inlined, file, broken };
+    trackIncludedFiles(inlined.spans, file, consumedAsIncludeOrLayout);
+    const { root } = html.parse(inlined.text);
+    const { broken } = layout.checkLayoutDocument({ root, text: inlined.text, file, reporter });
+    return { text: inlined.text, spans: inlined.spans, file, broken };
   })();
   layoutCache.set(absPath, promise);
   return promise;
@@ -342,9 +476,21 @@ function relocateDiagnosticsToCwd(reporter, sourceRoot) {
  * (`.html`/`.md`, §1) or asset, and mark it excluded per the effective
  * `--exclude` glob set.
  *
+ * §4.4/A12 — symlinks: followed only while the resolved target stays inside
+ * the source root. A directory symlink is walked at its LOGICAL (symlink)
+ * path, exactly as an ordinary directory would be, so its children's
+ * `relPath`s reflect where the link sits in the tree, not where the target
+ * physically lives. One resolving outside the root — or broken entirely —
+ * is treated as absent; the outside case additionally carries advisory A12,
+ * located at the symlink's own path (no line: it is a whole-file fact).
+ *
+ * @param {string} sourceRoot
+ * @param {string} output
+ * @param {string[]} excludePatterns
+ * @param {import('../../core/diagnostics.js').Reporter} reporter
  * @returns {{absPath: string, relPath: string, isPage: boolean, excluded: boolean}[]} sorted by relPath (determinism, DIA-05)
  */
-function scanSourceTree(sourceRoot, output, excludePatterns) {
+function scanSourceTree(sourceRoot, output, excludePatterns, reporter) {
   const root = resolve(sourceRoot);
   const outputAbs = resolve(output);
   /** @type {{absPath: string, relPath: string, isPage: boolean, excluded: boolean}[]} */
@@ -353,6 +499,11 @@ function scanSourceTree(sourceRoot, output, excludePatterns) {
   walk(root);
   files.sort((a, b) => (a.relPath < b.relPath ? -1 : a.relPath > b.relPath ? 1 : 0));
   return files;
+
+  function pushFile(abs, rel) {
+    const isPage = extname(rel) === ".html" || extname(rel) === ".md";
+    files.push({ absPath: abs, relPath: rel, isPage, excluded: isExcluded(rel, excludePatterns) });
+  }
 
   function walk(dir) {
     let entries;
@@ -367,14 +518,34 @@ function scanSourceTree(sourceRoot, output, excludePatterns) {
       const rel = toRelative(root, abs);
       if (isNeverShipped(rel)) continue; // §4.3 — the only scan-time exemption
 
+      if (entry.isSymbolicLink()) {
+        let real;
+        try {
+          real = realpathSync(abs);
+        } catch {
+          continue; // broken target: not a path the build can read — treated as absent, silently (not the A12 case)
+        }
+        if (!contains(root, real)) {
+          reporter.advisory({ file: rel, message: `${rel} is a symlink resolving outside the source root — treated as absent` });
+          continue;
+        }
+        let targetStat;
+        try {
+          targetStat = statSync(real);
+        } catch {
+          continue;
+        }
+        if (targetStat.isDirectory()) walk(abs);
+        else if (targetStat.isFile()) pushFile(abs, rel);
+        continue;
+      }
       if (entry.isDirectory()) {
         walk(abs);
         continue;
       }
-      if (!entry.isFile()) continue; // symlink-outside-root handling (A12/EXC-10) is not this module's scope
+      if (!entry.isFile()) continue;
 
-      const isPage = extname(entry.name) === ".html" || extname(entry.name) === ".md";
-      files.push({ absPath: abs, relPath: rel, isPage, excluded: isExcluded(rel, excludePatterns) });
+      pushFile(abs, rel);
     }
   }
 }

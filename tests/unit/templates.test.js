@@ -198,24 +198,30 @@ describe.each(TEMPLATE_NAMES)('template "%s" — full composition (SCF-04: zero 
     if (extname(pageRel).toLowerCase() === ".md") {
       const source = readFileSync(pageAbs, "utf8");
       const md = convert(source, { path: pageAbs, sourceRoot: dir, reporter });
-      pageText = assembleMarkdownDocument(md, { standalone: !layoutRelPath });
+      ({ text: pageText } = assembleMarkdownDocument(md, { standalone: !layoutRelPath, pageFile: pageRel }));
     } else {
       pageText = readFileSync(pageAbs, "utf8");
     }
-    pageText = await inlineIncludes({ text: pageText, file: pageAbs, sourceRoot: dir, reporter, convertMarkdown });
+    const inlinedPage = await inlineIncludes({ text: pageText, file: pageAbs, sourceRoot: dir, reporter, convertMarkdown });
 
     let layoutText = null;
+    let layoutSpans;
     if (layoutRelPath) {
       const layoutAbs = join(dir, layoutRelPath);
-      layoutText = await inlineIncludes({
+      const inlinedLayout = await inlineIncludes({
         text: readFileSync(layoutAbs, "utf8"), file: layoutAbs, sourceRoot: dir, reporter, convertMarkdown,
       });
+      layoutText = inlinedLayout.text;
+      layoutSpans = inlinedLayout.spans;
     }
 
-    const composed = compose({ pageText, pageFile: pageRel, layoutText, layoutFile: layoutRelPath, reporter });
+    const composed = compose({
+      pageText: inlinedPage.text, pageFile: pageRel, pageSpans: inlinedPage.spans,
+      layoutText, layoutFile: layoutRelPath, layoutSpans, reporter,
+    });
 
     expect(reporter.diagnostics).toEqual([]);
-    expect(composed).toContain("<!doctype html>");
+    expect(composed.text).toContain("<!doctype html>");
   });
 
   test("every root-relative href/src in every composed page resolves to a file the scaffold will emit", async () => {
@@ -235,20 +241,26 @@ describe.each(TEMPLATE_NAMES)('template "%s" — full composition (SCF-04: zero 
       let pageText;
       if (extname(pageRel).toLowerCase() === ".md") {
         const md = convert(readFileSync(pageAbs, "utf8"), { path: pageAbs, sourceRoot: dir, reporter });
-        pageText = assembleMarkdownDocument(md, { standalone: !layoutRelPath });
+        ({ text: pageText } = assembleMarkdownDocument(md, { standalone: !layoutRelPath, pageFile: pageRel }));
       } else {
         pageText = readFileSync(pageAbs, "utf8");
       }
-      pageText = await inlineIncludes({ text: pageText, file: pageAbs, sourceRoot: dir, reporter, convertMarkdown });
+      const inlinedPage = await inlineIncludes({ text: pageText, file: pageAbs, sourceRoot: dir, reporter, convertMarkdown });
 
       let layoutText = null;
+      let layoutSpans;
       if (layoutRelPath) {
         const layoutAbs = join(dir, layoutRelPath);
-        layoutText = await inlineIncludes({
+        const inlinedLayout = await inlineIncludes({
           text: readFileSync(layoutAbs, "utf8"), file: layoutAbs, sourceRoot: dir, reporter, convertMarkdown,
         });
+        layoutText = inlinedLayout.text;
+        layoutSpans = inlinedLayout.spans;
       }
-      const html = compose({ pageText, pageFile: pageRel, layoutText, layoutFile: layoutRelPath, reporter });
+      const { text: html } = compose({
+        pageText: inlinedPage.text, pageFile: pageRel, pageSpans: inlinedPage.spans,
+        layoutText, layoutFile: layoutRelPath, layoutSpans, reporter,
+      });
 
       const { root } = parse(html);
       for (const el of findAll(root, (n) => n.type === "element")) {

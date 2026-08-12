@@ -4,15 +4,19 @@
  * branch precisely, and fixture-driven cases build REAL emitted-tree content
  * (real includes.js + compose.js + urls.js chained together, matching what
  * a wired build would produce) and diff the resulting diagnostics against
- * the landmines manifest's declared expectations.
+ * the landmines manifest's declared expectations. Provenance (`provenanceOf`
+ * below) comes straight from `includes.js`/`compose.js`'s own real
+ * `{text, spans}` return via `urls.js`'s `spansToLocator` — no hand-rolled
+ * reimplementation (an earlier version of this file had one, back when
+ * neither module returned real spans).
  */
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { dirname, join, relative, sep } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { checkReferences, resolveReference, stripBaseUrl } from "../../../src/core/references.js";
-import { applyBaseUrl, parseBaseUrl, rewriteProvenanceUrls } from "../../../src/core/urls.js";
-import { resolveTarget } from "../../../src/core/includes.js";
+import { applyBaseUrl, parseBaseUrl, rewriteProvenanceUrls, spansToLocator } from "../../../src/core/urls.js";
+import { inlineIncludes } from "../../../src/core/includes.js";
 import { compose } from "../../../src/core/compose.js";
 import { Reporter } from "../../../src/core/diagnostics.js";
 
@@ -30,84 +34,39 @@ function silentReporter() {
 // import — this codebase's existing unit tests, e.g. compose.test.js, keep
 // their fixture helpers local rather than sharing a test-support module.)
 
-const INCLUDE_TAG = /<include\b([^>]*)>(?:([\s\S]*?)<\/include\s*>)?/gi;
-const SSI_TAG = /<!--#include\s+(virtual|file)\s*=\s*"([^"]*)"\s*-->/gi;
-
-function findIncludeTags(text) {
-  const found = [];
-  for (const m of text.matchAll(INCLUDE_TAG)) {
-    const srcMatch = /\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)')/i.exec(m[1] ?? "");
-    if (srcMatch) found.push({ match: m[0], spec: srcMatch[1] ?? srcMatch[2], form: "src", index: m.index });
-  }
-  for (const m of text.matchAll(SSI_TAG)) found.push({ match: m[0], spec: m[2], form: m[1].toLowerCase(), index: m.index });
-  return found.sort((a, b) => a.index - b.index);
-}
-
-function inlineWithProvenance(text, absFile, sourceRoot) {
-  const fileRel = relative(sourceRoot, absFile).split(sep).join("/");
-  let out = "";
-  const spans = [];
-  let cursor = 0;
-  for (const inc of findIncludeTags(text)) {
-    const before = text.slice(cursor, inc.index);
-    if (before) { spans.push({ start: out.length, end: out.length + before.length, file: fileRel }); out += before; }
-    const target = resolveTarget({ spec: inc.spec, form: inc.form, fromFile: absFile, sourceRoot });
-    if ("escapes" in target) throw new Error(`test inliner: include escapes source root: ${inc.spec}`);
-    const childText = readFileSync(target.path, "utf8");
-    const child = inlineWithProvenance(childText, target.path, sourceRoot);
-    const childBase = out.length;
-    out += child.text;
-    for (const s of child.spans) spans.push({ start: childBase + s.start, end: childBase + s.end, file: s.file });
-    cursor = inc.index + inc.match.length;
-  }
-  const tail = text.slice(cursor);
-  if (tail) { spans.push({ start: out.length, end: out.length + tail.length, file: fileRel }); out += tail; }
-  return { text: out, spans };
-}
-
-function locateInSpans(spans, offset) {
-  for (const s of spans) if (offset >= s.start && offset < s.end) return s.file;
-  return null;
-}
+const noMarkdownIncludes = async () => { throw new Error("no .md include targets expected in these fixtures"); };
 
 /** Compose+rewrite one page for these tests. Returns final HTML text and a real provenanceOf/locate pair. */
-function buildPage({ caseDir, pageRel, layoutRel }) {
+async function buildPage({ caseDir, pageRel, layoutRel }) {
   const sourceRoot = join(caseDir, "src");
   const reporter = silentReporter();
   const pageAbs = join(sourceRoot, pageRel);
-  const pageInlined = inlineWithProvenance(readFileSync(pageAbs, "utf8"), pageAbs, sourceRoot);
+  const pageInlined = await inlineIncludes({
+    text: readFileSync(pageAbs, "utf8"), file: pageAbs, sourceRoot, reporter, convertMarkdown: noMarkdownIncludes,
+  });
 
   let layoutText = null;
-  let layoutSpans = [];
+  let layoutSpans;
   if (layoutRel) {
     const layoutAbs = join(sourceRoot, layoutRel);
-    const layoutInlined = inlineWithProvenance(readFileSync(layoutAbs, "utf8"), layoutAbs, sourceRoot);
+    const layoutInlined = await inlineIncludes({
+      text: readFileSync(layoutAbs, "utf8"), file: layoutAbs, sourceRoot, reporter, convertMarkdown: noMarkdownIncludes,
+    });
     layoutText = layoutInlined.text;
     layoutSpans = layoutInlined.spans;
   }
 
-  const composed = compose({ pageText: pageInlined.text, pageFile: pageRel, layoutText, layoutFile: layoutRel, reporter });
+  const { text: composed, spans } = compose({
+    pageText: pageInlined.text, pageFile: pageRel, pageSpans: pageInlined.spans,
+    layoutText, layoutFile: layoutRel, layoutSpans, reporter,
+  });
 
-  const provenanceOf = (offset) => {
-    for (const len of [40, 20, 10]) {
-      const anchor = composed.slice(offset, offset + len);
-      if (!anchor) continue;
-      if (layoutText) {
-        const idx = layoutText.indexOf(anchor);
-        if (idx !== -1) return locateInSpans(layoutSpans, idx) ?? layoutRel;
-      }
-      const idx2 = pageInlined.text.indexOf(anchor);
-      if (idx2 !== -1) return locateInSpans(pageSpansOf(pageInlined), idx2) ?? pageRel;
-    }
-    return pageRel;
-  };
-  return { composed, provenanceOf, reporter };
+  return { composed, provenanceOf: spansToLocator(spans, pageRel), reporter };
 }
-function pageSpansOf(pageInlined) { return pageInlined.spans; }
 
 /** §11.1-only final text (these landmines don't use --pretty-urls/--base-url unless noted). */
-function finalHtmlFor(caseDir, pageRel, layoutRel) {
-  const { composed, provenanceOf } = buildPage({ caseDir, pageRel, layoutRel });
+async function finalHtmlFor(caseDir, pageRel, layoutRel) {
+  const { composed, provenanceOf } = await buildPage({ caseDir, pageRel, layoutRel });
   return rewriteProvenanceUrls(composed, { provenanceOf, pageFile: pageRel, pageMoved: false });
 }
 
@@ -307,8 +266,8 @@ describe("checkReferences — hand-built", () => {
 // ==================================================== fixture-driven cases
 
 describe("checkReferences — landmine fixtures", () => {
-  test("broken-link: relative href to a renamed page fires P13", () => {
-    const html = finalHtmlFor(join(LANDMINES, "broken-link"), "index.html");
+  test("broken-link: relative href to a renamed page fires P13", async () => {
+    const html = await finalHtmlFor(join(LANDMINES, "broken-link"), "index.html");
     const reporter = silentReporter();
     checkReferences({
       htmlFiles: new Map([["index.html", html]]),
@@ -321,11 +280,12 @@ describe("checkReferences — landmine fixtures", () => {
     expect(p.message).toContain("old-name.html");
   });
 
-  test("case-mismatch-link: right file, wrong case fires P13 (REF-05)", () => {
-    const html = finalHtmlFor(join(LANDMINES, "case-mismatch-link"), "index.html");
+  test("case-mismatch-link: right file, wrong case fires P13 (REF-05)", async () => {
+    const html = await finalHtmlFor(join(LANDMINES, "case-mismatch-link"), "index.html");
+    const aboutHtml = await finalHtmlFor(join(LANDMINES, "case-mismatch-link"), "about.html");
     const reporter = silentReporter();
     checkReferences({
-      htmlFiles: new Map([["index.html", html], ["about.html", finalHtmlFor(join(LANDMINES, "case-mismatch-link"), "about.html")]]),
+      htmlFiles: new Map([["index.html", html], ["about.html", aboutHtml]]),
       cssFiles: new Map(),
       emittedPaths: new Set(["index.html", "about.html"]),
       reporter,
@@ -334,10 +294,10 @@ describe("checkReferences — landmine fixtures", () => {
     expect(p.message).toContain("About.html");
   });
 
-  test("css-url-broken: url() in a mirror-copied CSS file fires P13", () => {
+  test("css-url-broken: url() in a mirror-copied CSS file fires P13", async () => {
     const dir = join(LANDMINES, "css-url-broken");
     const css = readFileSync(join(dir, "src", "assets", "style.css"), "utf8");
-    const html = finalHtmlFor(dir, "index.html");
+    const html = await finalHtmlFor(dir, "index.html");
     const reporter = silentReporter();
     checkReferences({
       htmlFiles: new Map([["index.html", html]]),
@@ -350,8 +310,8 @@ describe("checkReferences — landmine fixtures", () => {
     expect(p.message).toContain("missing.png");
   });
 
-  test("style-attr-url-broken: url() in a style= attribute fires P13 (B5)", () => {
-    const html = finalHtmlFor(join(LANDMINES, "style-attr-url-broken"), "index.html");
+  test("style-attr-url-broken: url() in a style= attribute fires P13 (B5)", async () => {
+    const html = await finalHtmlFor(join(LANDMINES, "style-attr-url-broken"), "index.html");
     const reporter = silentReporter();
     checkReferences({
       htmlFiles: new Map([["index.html", html]]),
@@ -362,9 +322,9 @@ describe("checkReferences — landmine fixtures", () => {
     expect(firstProblem(reporter).message).toContain("gone.png");
   });
 
-  test("style-url-not-rewritten: both <style> and style= url()s resolve cleanly (dot.png exists)", () => {
+  test("style-url-not-rewritten: both <style> and style= url()s resolve cleanly (dot.png exists)", async () => {
     const dir = join(LANDMINES, "style-url-not-rewritten");
-    const html = finalHtmlFor(dir, "index.html", "_layout.html");
+    const html = await finalHtmlFor(dir, "index.html", "_layout.html");
     const dot = readFileSync(join(dir, "src", "assets", "dot.png"));
     const reporter = silentReporter();
     checkReferences({
@@ -378,10 +338,10 @@ describe("checkReferences — landmine fixtures", () => {
     expect(html).toContain("url(/assets/dot.png)");
   });
 
-  test("fragment-links-ok: fragment-only and page+fragment links build clean (REF-06)", () => {
+  test("fragment-links-ok: fragment-only and page+fragment links build clean (REF-06)", async () => {
     const dir = join(LANDMINES, "fragment-links-ok");
-    const indexHtml = finalHtmlFor(dir, "index.html");
-    const aboutHtml = finalHtmlFor(dir, "about.html");
+    const indexHtml = await finalHtmlFor(dir, "index.html");
+    const aboutHtml = await finalHtmlFor(dir, "about.html");
     const reporter = silentReporter();
     checkReferences({
       htmlFiles: new Map([["index.html", indexHtml], ["about.html", aboutHtml]]),
@@ -392,10 +352,10 @@ describe("checkReferences — landmine fixtures", () => {
     expect(reporter.diagnostics).toEqual([]);
   });
 
-  test("handwritten-pretty-url: a hand-authored pretty href fires P13 in a NON-pretty build", () => {
+  test("handwritten-pretty-url: a hand-authored pretty href fires P13 in a NON-pretty build", async () => {
     const dir = join(LANDMINES, "handwritten-pretty-url");
-    const indexHtml = finalHtmlFor(dir, "index.html");
-    const aboutHtml = finalHtmlFor(dir, "about.html");
+    const indexHtml = await finalHtmlFor(dir, "index.html");
+    const aboutHtml = await finalHtmlFor(dir, "about.html");
     const reporter = silentReporter();
     checkReferences({
       // note: about/index.html is NOT emitted in a non-pretty build -- only about.html is
@@ -409,9 +369,9 @@ describe("checkReferences — landmine fixtures", () => {
     expect(p.message).toContain("/about/");
   });
 
-  test("stranded-underscore-asset: broken reference attributes to the TRUE provenance file when locate is supplied", () => {
+  test("stranded-underscore-asset: broken reference attributes to the TRUE provenance file when locate is supplied", async () => {
     const dir = join(LANDMINES, "stranded-underscore-asset");
-    const { composed, provenanceOf } = buildPage({ caseDir: dir, pageRel: "index.html", layoutRel: "_layout.html" });
+    const { composed, provenanceOf } = await buildPage({ caseDir: dir, pageRel: "index.html", layoutRel: "_layout.html" });
     const html = rewriteProvenanceUrls(composed, { provenanceOf, pageFile: "index.html", pageMoved: false });
     // logo.png resolves (§11.1) to /_includes/logo.png, which the default
     // exclude (_*) keeps out of the emitted tree -- broken, by design (this
@@ -431,9 +391,9 @@ describe("checkReferences — landmine fixtures", () => {
     expect(p.message).toContain("logo.png");
   });
 
-  test("base-url-subpath: the reference check strips the full base and stays clean (REF-02)", () => {
+  test("base-url-subpath: the reference check strips the full base and stays clean (REF-02)", async () => {
     const dir = join(LANDMINES, "base-url-subpath");
-    const { composed, provenanceOf } = buildPage({ caseDir: dir, pageRel: "index.html", layoutRel: "_layout.html" });
+    const { composed, provenanceOf } = await buildPage({ caseDir: dir, pageRel: "index.html", layoutRel: "_layout.html" });
     const base = parseBaseUrl("https://example.com/repo/");
     const rewritten = rewriteProvenanceUrls(composed, { provenanceOf, pageFile: "index.html", pageMoved: false });
     // Apply §11.3 too, matching what the real pipeline would emit, so the

@@ -9,7 +9,7 @@
  * Nothing here touches the filesystem.
  *
  * ---------------------------------------------------------------------------
- * PROVENANCE GAP (read before wiring this module in)
+ * PROVENANCE (read before wiring this module in)
  * ---------------------------------------------------------------------------
  * §11.1 is defined per §1's "provenance": *the source file whose text
  * contained an element's start tag*. `resolveProvenanceUrls` therefore needs,
@@ -17,37 +17,28 @@
  * file (page, layout, or include) wrote this element" — NOT just the page's
  * and layout's own filenames.
  *
- * As of this writing, nothing in the pipeline preserves that fact past
- * `includes.js`'s `inlineIncludes` (text -> Promise<string>, no span/file
- * metadata returned) or `compose.js`'s `compose` (same shape). Both splice
- * fragment/page/layout text together and hand back one flat string; a byte
- * that started life in `_includes/nav.html`, once inlined into a layout that
- * is then composed with a page, is indistinguishable — by the time it
- * reaches this module — from a byte the layout author typed directly. The
- * conformance spec's own worked example (§11.1: `_includes/nav.html`'s
- * `logo.png` must resolve to `/_includes/logo.png`, not the layout's or the
- * page's directory) is *unrepresentable* without that mapping.
- *
- * This module therefore does not attempt to reconstruct provenance itself
- * (that would mean re-deriving includes.js/compose.js's own splice decisions
- * a second time, in a different file, with every attendant drift risk) and
+ * This module does not attempt to compute that mapping itself (that would
+ * mean re-deriving `includes.js`/`compose.js`'s own splice decisions a
+ * second time, in a different file, with every attendant drift risk) and
  * does not read the filesystem. Instead `rewriteProvenanceUrls` takes a
  * `provenanceOf(offset) => sourceFile` callback as an explicit, required
  * parameter — the caller supplies the mapping however it can. `spansToLocator`
- * below builds one cheaply from a sorted span list, for a caller that has
- * one. Until `includes.js`/`compose.js` are extended to return
- * `{text, spans}` instead of bare strings (this module's owner does not have
- * write access to either file — see the accompanying report), the only
- * available `provenanceOf` a wiring layer can supply is the same-file
- * approximation `() => pageFile`, which is correct for every element the
- * PAGE itself authored and silently wrong for anything inherited from a
- * layout or an include. That approximation is enough to keep a build
- * running; it is not conformant, and this comment is the paper trail.
+ * below builds one cheaply from a sorted span list.
+ *
+ * `includes.js`'s `inlineIncludes` and `compose.js`'s `compose` now return
+ * `{text, spans}` (spans: a sorted, contiguous `{start,end,file,fileOffset}[]`
+ * covering the whole text — see either module's own doc comment for the
+ * exact contract), so the caller (`src/cli/commands/build.js`) has a REAL
+ * mapping to hand in via `spansToLocator(spans, pageFile)` — not the
+ * same-file approximation `() => pageFile` an earlier version of this
+ * comment described as the only thing available. That approximation is
+ * gone; every element inherited from a layout or an include is now
+ * attributed correctly, not just page-authored ones.
  *
  * `applyPrettyLinks` and `applyBaseUrl` (§11.2/§11.3) do NOT need provenance
  * — they operate on already-§11.1-rewritten (mostly root-relative) URLs and
- * the site's own output-path manifest, so they are unaffected by the gap
- * above and fully conformant as written.
+ * the site's own output-path manifest, so they are unaffected by any of the
+ * above.
  */
 import { posix } from "node:path";
 import { applyEdits, findAll, getAttr, getAttrNode, parse, tokens } from "./html.js";
@@ -116,11 +107,12 @@ export function resolveProvenanceUrl(url, provenanceFile) {
 }
 
 /**
- * Build a `provenanceOf` lookup (see the module-level PROVENANCE GAP note)
- * from a sorted, non-overlapping list of `{start, end, file}` spans that
- * together cover every offset of interest in a composed document. Spans do
- * not need to cover the *whole* document — only offsets a caller actually
- * queries — but any gap queried falls back to `fallbackFile`.
+ * Build a `provenanceOf` lookup (see the module-level PROVENANCE note) from
+ * a sorted, non-overlapping list of spans (`includes.js`/`compose.js`'s
+ * `{start, end, file, fileOffset}` shape — only `start`/`end`/`file` matter
+ * here) that together cover every offset of interest in a composed
+ * document. Spans do not need to cover the *whole* document — only offsets a
+ * caller actually queries — but any gap queried falls back to `fallbackFile`.
  * @param {{start:number, end:number, file:string}[]} spans
  * @param {string} fallbackFile
  * @returns {(offset:number) => string}

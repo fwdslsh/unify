@@ -279,11 +279,17 @@ describe("P17 — a frontmatter value with no text form (§10.2)", () => {
     expect(r.diags).toHaveLength(0);
   });
 
-  test("spec gap: YAML that fails to parse at all has no dedicated problem ID in the closed catalogue — this reports it as a P17-shaped problem rather than crashing", () => {
+  test("P18 — YAML that fails to parse, located at the parser's own position and naming the construct", () => {
     const r = reporter();
     const out = convert('---\ntitle: "unterminated\n---\n\n# Body\n', { path: "/s/post.md", sourceRoot: "/s", reporter: r });
     expect(r.diags).toHaveLength(1);
-    expect(r.diags[0]).toMatchObject({ file: "post.md", line: 2, severity: "problem" });
+    // The quote opens on line 2; the parser reports line 3, where it reaches
+    // end-of-stream. For an unterminated construct that is one line past the
+    // cause — standard compiler behaviour, and the only position known without
+    // reimplementing YAML, which is why the message carries the parser's own
+    // reason so the construct is still named.
+    expect(r.diags[0]).toMatchObject({ file: "post.md", line: 3, severity: "problem" });
+    expect(r.diags[0].message).toContain("double quoted scalar");
     // Frontmatter that fails to parse contributes no keys at all — same as if it
     // were absent, so the title fallback (§10.3) still reaches the body's h1.
     expect(out.headHtml).toBe("<title>Body</title>");

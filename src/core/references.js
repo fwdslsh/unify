@@ -19,12 +19,24 @@
  * rule locates a reference problem at the reference's true PROVENANCE file
  * (a page, layout, or include — see `stranded-underscore-asset`'s pinned
  * location `src/_includes/nav.html:2`, not the composed page's own path).
- * That is the identical gap urls.js documents at length (its "PROVENANCE
- * GAP" note) applied to attribution instead of rewriting. `checkReferences`
+ * That is the identical need urls.js documents at length (its "PROVENANCE"
+ * note) applied to attribution instead of rewriting. `checkReferences`
  * takes an optional `locate` callback for this reason; its default
  * attributes every diagnostic to the OUTPUT file itself, which is correct
  * for page-authored content and imprecise for anything inherited from a
- * layout or include.
+ * layout or include — `src/cli/commands/build.js` supplies a real one, built
+ * from `includes.js`/`compose.js`'s own spans, whenever it has one.
+ *
+ * One nuance the real `locate` in build.js has to account for that this
+ * module intentionally stays ignorant of: `collectHtmlReferences` below
+ * reads offsets from the FINAL, already-§11-rewritten output text, while a
+ * page's provenance spans are computed against the PRE-rewrite composed
+ * text — §11's rewrites only ever change attribute VALUE bytes, never
+ * insert or remove a byte before an unrewritten attribute, so this is exact
+ * whenever no EARLIER same-file URL rewrite in the same attribute changed
+ * length; see build.js's own comment on its `locate` for the honest
+ * accounting of where that stops being exact and why every fixture this
+ * module is checked against still resolves correctly.
  */
 import { posix } from "node:path";
 import { findAll, getAttr, getAttrNode, isElement, lineOf, parse } from "./html.js";
