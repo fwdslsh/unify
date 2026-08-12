@@ -25,7 +25,7 @@ If a capability cannot be expressed with these four, it does not belong in unify
 curl -fsSL https://raw.githubusercontent.com/fwdslsh/unify/main/install.sh | bash
 ```
 
-Installs to `~/.local/bin` by default. The script accepts `--global` (system-wide, needs write access to `/usr/local/bin`), `--dir PATH`, `--version vX.Y.Z`, `--force`, and `--dry-run`. Prebuilt binaries for Linux, macOS, and Windows are attached to each [GitHub release](https://github.com/fwdslsh/unify/releases) — nothing else to install.
+Installs to `~/.local/bin` by default. The script accepts `--global` (system-wide, needs write access to `/usr/local/bin`), `--dir PATH`, `--version vX.Y.Z`, `--force`, and `--dry-run`. Prebuilt binaries for Linux and macOS (x86_64 and arm64) are attached to each [GitHub release](https://github.com/fwdslsh/unify/releases) — nothing else to install. No Windows binary yet — use the Bun or npm install below.
 
 ### Bun or npm — the developer path
 

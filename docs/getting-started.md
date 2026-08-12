@@ -6,7 +6,7 @@ This guide takes you from nothing to a deployed-ready site. It matches unify v0.
 
 ## Install
 
-Download the standalone binary for Linux, macOS, or Windows from the releases page and put it on your `PATH` — no runtime, no package manager. (Developers who already use Bun can `bun add -g @fwdslsh/unify` instead.)
+Download the standalone binary for Linux or macOS from the releases page and put it on your `PATH` — no runtime, no package manager. (No Windows binary yet — Windows users, or developers who already use Bun, can `bun add -g @fwdslsh/unify` instead.)
 
 ## Two commands
 

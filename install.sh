@@ -2,7 +2,7 @@
 
 # Unify Installation Script
 # This script downloads and installs the latest unify binary from GitHub releases
-# Supports Linux, macOS, and Windows across x86_64 and arm64 architectures
+# Supports Linux and macOS across x86_64 and arm64 architectures
 
 set -e
 
@@ -107,8 +107,13 @@ detect_platform() {
     case "$(uname -s)" in
         Linux*)   os="linux" ;;
         Darwin*)  os="darwin" ;;
-        CYGWIN*|MINGW*|MSYS*) os="windows" ;;
-        *)        
+        CYGWIN*|MINGW*|MSYS*)
+            log_error "No Windows binary is published yet — only linux-x86_64, linux-arm64, darwin-x86_64, and darwin-arm64 are built."
+            log_error "Install via npm instead:  npm install -g @fwdslsh/unify"
+            log_error "Or via Bun:                bun add -g @fwdslsh/unify"
+            exit 1
+            ;;
+        *)
             log_error "Unsupported operating system: $(uname -s)"
             exit 1
             ;;
@@ -285,14 +290,7 @@ install_unify() {
     log_info "Detected platform: $platform"
     
     # Construct binary name based on platform
-    case "$platform" in
-        windows-*)
-            binary_name="${PROJECT_NAME}-${platform}.exe"
-            ;;
-        *)
-            binary_name="${PROJECT_NAME}-${platform}"
-            ;;
-    esac
+    binary_name="${PROJECT_NAME}-${platform}"
     
     # Get version to install
     if [[ -z "$VERSION" ]]; then
@@ -336,11 +334,7 @@ install_unify() {
         # Make executable and move to final location
         chmod +x "$temp_file"
         final_path="$INSTALL_DIR/$PROJECT_NAME"
-        
-        if [[ "$platform" == windows-* ]]; then
-            final_path="${final_path}.exe"
-        fi
-        
+
         log_info "Installing to: $final_path"
         mv "$temp_file" "$final_path"
         
