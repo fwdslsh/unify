@@ -98,6 +98,7 @@ Path traversal safety in include/layout resolution is internal engineering — a
 - **`docs/conformance-spec.md`** — the normative implementer reference: exact algorithms, the splice model (S1–S12), the head-merge table, the collision matrix, the complete problem/advisory catalogue, and fixture-grade worked examples.
 - **`docs/authoring-rules.md`** — the complete authoring surface in under 60 lines; hand this to any agent writing site content.
 - **`docs/getting-started.md`** — the human tutorial. **`docs/cli-reference.md`** — every command and flag.
+- **`docs/testing-strategy.md`** — the tier model and the traceability gate. **`docs/ratification-protocol.md`** — how to validate `authoring-rules.md` empirically by having agents author from it in isolation, and how to triage a failure into doc / spec / implementation / outlier. **Read the protocol before editing the authoring rules**: it is the procedure that decides whether an edit is warranted.
 - **Working documents**: `_notes/` (analyses and drafts; `_notes/unbiased-design-synthesis.md` records the v0.7.0 design rationale).
 
 ## Important Implementation Notes
