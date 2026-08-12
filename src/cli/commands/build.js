@@ -90,7 +90,7 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
   const pageFiles = files.filter((f) => f.isPage && !f.excluded);
   const assetFiles = files.filter((f) => !f.isPage && !f.excluded);
 
-  /** @type {{relPath: string, html: string, spans: {start:number,end:number,file:string,fileOffset:number}[]}[]} */
+  /** @type {{relPath: string, html: string, spans: {start:number,end:number,file:string,fileOffset:number}[], layoutFile: string|null}[]} */
   const composedPages = [];
   for (const page of pageFiles) {
     const problemsBefore = reporter.problemCount;
@@ -110,7 +110,7 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
       // the include's own already-reported problem.
       const hadNewProblem = reporter.problemCount > problemsBefore;
       if (composed !== null && !hadNewProblem) {
-        composedPages.push({ relPath: page.relPath, html: composed.text, spans: composed.spans });
+        composedPages.push({ relPath: page.relPath, html: composed.text, spans: composed.spans, layoutFile: composed.layoutFile });
       }
     } catch (err) {
       // Best-effort composition (PIP-02): one page's failure must not stop
@@ -239,12 +239,59 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
     if (settings.clean) await publishModule.performClean({ output, source: sourceRoot });
     await publishModule.publish({ tempFiles, outputDir: output, reporter });
   }
-  // SEAM (§17, the --dry-run report / build summary): publish.js's own
-  // `formatDryRunReport` is ready to use; not wired in here because doing so
-  // needs per-page "inputs" tracking (DRY-02: "the source page and the
-  // layout it resolved to") this function does not currently retain past
-  // `buildPage`'s return, and no fixture in this module's scope asserts
-  // stdout content for `build`.
+
+  // ---- §17 — the --dry-run report. ------------------------------------------
+  // PUB-04/DRY-01..03: `--dry-run` is the branch above simply not running (no
+  // clean, no publish — no writes at all, anywhere), plus this report on
+  // stdout: one write row per composed page (naming, per DRY-02, the source
+  // page and the layout it resolved to — `layoutFile`, threaded through
+  // `buildPage`'s return above for exactly this), one copy row per mirrored
+  // asset, and one delete row per file `planPublish` — a pure, read-only diff
+  // (`snapshotDirectory` only reads `output`; it is never created or written
+  // here) — finds stranded in the CURRENT output directory. Best-effort
+  // (PIP-02): this runs even when the site has problems elsewhere, so a
+  // partially-broken tree still reports what WOULD happen for its good pages
+  // alongside the stderr diagnostics for its bad ones, which already print
+  // unconditionally above regardless of --dry-run (DRY-03). Display paths use
+  // `settings.output` (the CONFIGURED name, e.g. "dist") rather than `output`
+  // (resolved to an absolute path for the filesystem calls above) — the
+  // report's own contract (publish.js's DryRunRow doc comment) is to show
+  // "whatever the configured --output directory name is", not an absolute path.
+  if (settings.dryRun) {
+    const outputFiles = await publishModule.snapshotDirectory(output);
+    const plan = publishModule.planPublish({ tempFiles, outputFiles });
+    const displayOutput = String(settings.output).replace(/\/+$/, "");
+    const rows = [
+      ...composedPages.map((p) => ({
+        action: "write",
+        outputPath: `${displayOutput}/${outputPathOf.get(p.relPath)}`,
+        from: p.layoutFile ? `${p.relPath} + ${p.layoutFile}` : `${p.relPath} (no layout)`,
+      })),
+      ...assetFiles.map((a) => ({
+        action: "copy",
+        outputPath: `${displayOutput}/${outputPathOf.get(a.relPath)}`,
+        from: a.relPath,
+      })),
+      ...plan.delete.map((rel) => ({ action: "delete", outputPath: `${displayOutput}/${rel}` })),
+    ];
+    const report = publishModule.formatDryRunReport(rows);
+    if (report) reporter.summary(report);
+
+    // §17: the list above is what the pipeline PRODUCED. Publishing is step 10
+    // and dry-run never reaches it, so without this line a page listed as
+    // `write` could be one a real build would refuse to publish — a single
+    // problem anywhere blocks the whole site (§15). State the outcome instead
+    // of letting the verb imply it.
+    if (shouldPublish(reporter)) {
+      const count = rows.filter((r) => r.action !== "delete").length;
+      reporter.summary(`would publish ${count} file${count === 1 ? "" : "s"} to ${displayOutput}/`);
+    } else {
+      const n = reporter.problemCount;
+      reporter.summary(
+        `would publish nothing — ${n} problem${n === 1 ? "" : "s"}; ${displayOutput}/ would be left untouched`,
+      );
+    }
+  }
 
   return reporter.exitCode;
 }
@@ -337,11 +384,14 @@ function trackIncludedFiles(spans, entryFile, consumedAsIncludeOrLayout) {
 /**
  * Run one page through §2 steps 2-4: includes → (Markdown conversion, for
  * `.md`) → layout resolution → composition. Returns `{text, spans}` (see
- * includes.js/compose.js for the spans contract), or `null` when the page
- * has a problem of its own (already reported) — best-effort composition
- * continues with the next page regardless (the caller's loop, not this
- * function).
- * @returns {Promise<{text: string, spans: {start:number,end:number,file:string,fileOffset:number}[]}|null>}
+ * includes.js/compose.js for the spans contract) plus `layoutFile` — the
+ * resolved layout's source-root-relative path, or `null` when the page has
+ * no layout (§17/DRY-02's "the layout it resolved to"; nothing upstream of
+ * this function retained that fact past the resolution step) — or `null`
+ * when the page has a problem of its own (already reported) — best-effort
+ * composition continues with the next page regardless (the caller's loop,
+ * not this function).
+ * @returns {Promise<{text: string, spans: {start:number,end:number,file:string,fileOffset:number}[], layoutFile: string|null}|null>}
  */
 async function buildPage(page, { sourceRoot, reporter, layoutCache, convertMarkdown, consumedAsIncludeOrLayout }) {
   const pageFile = page.relPath;
@@ -370,15 +420,18 @@ async function buildPage(page, { sourceRoot, reporter, layoutCache, convertMarkd
 
     if (resolution.none) {
       const { text: pageText, spans: pageSpans } = compose.assembleMarkdownDocument(assembled, { standalone: true, pageFile });
-      return compose.compose({ pageText, pageFile, pageSpans, layoutText: null, reporter });
+      return { ...compose.compose({ pageText, pageFile, pageSpans, layoutText: null, reporter }), layoutFile: null };
     }
 
     const loaded = await loadLayout(resolution.path, { sourceRoot, reporter, convertMarkdown, layoutCache, consumedAsIncludeOrLayout });
     if (loaded.broken) return null; // P15 already reported once for the layout itself
     const { text: pageText, spans: pageSpans } = compose.assembleMarkdownDocument(assembled, { standalone: false, pageFile });
-    return compose.compose({
-      pageText, pageFile, pageSpans, layoutText: loaded.text, layoutFile: loaded.file, layoutSpans: loaded.spans, reporter,
-    });
+    return {
+      ...compose.compose({
+        pageText, pageFile, pageSpans, layoutText: loaded.text, layoutFile: loaded.file, layoutSpans: loaded.spans, reporter,
+      }),
+      layoutFile: loaded.file,
+    };
   }
 
   // .html
@@ -391,15 +444,18 @@ async function buildPage(page, { sourceRoot, reporter, layoutCache, convertMarkd
   if (resolution.problem) return null;
 
   if (resolution.none) {
-    return compose.compose({ pageText: inlined.text, pageFile, pageSpans: inlined.spans, layoutText: null, reporter });
+    return { ...compose.compose({ pageText: inlined.text, pageFile, pageSpans: inlined.spans, layoutText: null, reporter }), layoutFile: null };
   }
 
   const loaded = await loadLayout(resolution.path, { sourceRoot, reporter, convertMarkdown, layoutCache, consumedAsIncludeOrLayout });
   if (loaded.broken) return null;
-  return compose.compose({
-    pageText: inlined.text, pageFile, pageSpans: inlined.spans,
-    layoutText: loaded.text, layoutFile: loaded.file, layoutSpans: loaded.spans, reporter,
-  });
+  return {
+    ...compose.compose({
+      pageText: inlined.text, pageFile, pageSpans: inlined.spans,
+      layoutText: loaded.text, layoutFile: loaded.file, layoutSpans: loaded.spans, reporter,
+    }),
+    layoutFile: loaded.file,
+  };
 }
 
 /**

@@ -903,6 +903,17 @@ delete dist/stale.html
 
 Every `write` names its inputs — the source page and the layout it resolved to (the one fact not readable from any single file). Diagnostics print to stderr exactly as a real build would. `unify build --dry-run --strict` is the one-line CI lint.
 
+The list is what the **pipeline produced** — every page that composed, whether or not the build would go on to publish it. `--dry-run` is the pipeline through step 9; publishing is step 10 and it never runs. Because a single problem anywhere blocks the whole site (§15), a list of `write` lines could otherwise imply writes that a real build would refuse, so the report **ends with one line stating the outcome**:
+
+```
+would publish 5 files to dist/
+```
+```
+would publish nothing — 2 problems; dist/ would be left untouched
+```
+
+Keeping the list and naming the outcome are both required: suppressing the list on failure would make `--dry-run` useless for the case it is most needed in, and printing it without the outcome would misdescribe what a real build does.
+
 ---
 
 ## 18. `unify.yaml`

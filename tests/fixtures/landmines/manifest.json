@@ -1415,6 +1415,55 @@
    ],
    "diagnosticsExhaustive": true,
    "note": "P19: with no bare <slot>, <main> is the default-content sink AND contains a named slot, so \u00a77.4's wholesale child replacement and \u00a77.3's fill target overlapping spans. Found by implementing \u00a77 \u2014 a literal implementation crashes here, and the obvious repair (let main win) silently discards the page's slot=\"hero\" fill, which is exactly the content loss \u00a714 forbids. Ruled a problem so the layout says it is ambiguous instead of picking a loser."
+  },
+  "dry-run-diagnostics": {
+   "caseDir": "broken-link",
+   "rules": [
+    "DRY-03"
+   ],
+   "flags": [
+    "--dry-run"
+   ],
+   "exit": 1,
+   "published": false,
+   "diagnostics": [
+    {
+     "file": "src/index.html",
+     "line": 5,
+     "severity": "problem",
+     "containsAll": [
+      "old-name.html"
+     ]
+    }
+   ],
+   "diagnosticsExhaustive": true,
+   "note": "DRY-03: the twin of broken-link with --dry-run added \u2014 the identical problem prints to stderr, byte-for-byte the same diagnostic a real build would produce, and (like any blocked publish) nothing is written; the sentinel output stays untouched."
+  },
+  "dry-run-mixed-outcome": {
+   "rules": [
+    "DRY-01",
+    "DRY-03"
+   ],
+   "flags": [
+    "--dry-run"
+   ],
+   "exit": 1,
+   "published": false,
+   "diagnostics": [
+    {
+     "file": "src/bad.html",
+     "line": 5,
+     "severity": "problem",
+     "containsAll": [
+      "nope.html"
+     ]
+    }
+   ],
+   "diagnosticsExhaustive": true,
+   "stdoutContains": [
+    "write dist/bad.html \u2190 bad.html (no layout)\nwrite dist/good.html \u2190 good.html (no layout)"
+   ],
+   "note": "Pins a reading the spec leaves implicit: \u00a717's report is scoped to steps 1-9 (\u00a715 \u2014 'the entire pipeline through step 9 ... plus the report'), one step short of the transactional gate (step 10), which --dry-run never reaches at all. So the report lists every page the pipeline actually composed (best-effort, PIP-02 \u2014 the same principle that puts both good.html's and bad.html's own diagnostics in one pass) even though a REAL build of this exact tree would publish NEITHER file (\u00a715: any problem anywhere blocks the whole site). The alternative reading \u2014 suppress or annotate write/copy/delete rows when reporter.canPublish is false \u2014 is defensible too and not textually excluded; flagged in the implementation report as an ambiguity worth an explicit spec sentence, not silently picked."
   }
  }
 }

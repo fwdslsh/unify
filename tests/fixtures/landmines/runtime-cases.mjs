@@ -14,6 +14,11 @@
  *    notice fires only when the source root DEFAULTED to the working
  *    directory (no -s flag, no src/), which the checked-in harness contract
  *    (always `-s <case>/src`) cannot express; needs cwd control.
+ *  - dry-run-report: §17's "delete" verb requires a file ALREADY present in
+ *    the output directory before the CLI runs; checked-in cases only ever
+ *    get their `src/` copied in (harness.test.js's `normalizeCase`), with no
+ *    way to seed `dist/` ahead of time, so this needs build()'s access to the
+ *    whole temp root.
  *
  * Schema keys beyond the manifest case schema, used by the two notice cases:
  *  - omitSourceFlag: true — the harness must inject NO implicit `-s`; the
@@ -175,6 +180,71 @@ export const BUILD_CASES = {
       stdoutNotContains: ["--dry-run"],
       expectFiles: ["index.html", "style.css"],
       note: "The suppressed twin: an explicit --source — even '.' — turns the notice off (§4.4). Identical output either way; only the summary differs."
+    }
+  },
+
+  "dry-run-report": {
+    rules: ["DRY-01", "DRY-02"],
+    build(dir) {
+      mkdirSync(join(dir, "src", "blog"), { recursive: true });
+      mkdirSync(join(dir, "src", "assets"), { recursive: true });
+      mkdirSync(join(dir, "dist"), { recursive: true });
+      writeFileSync(
+        join(dir, "src", "_layout.html"),
+        "<!doctype html>\n<html>\n  <head>\n    <meta charset=\"utf-8\">\n    <title>— Site</title>\n  </head>\n" +
+        "  <body>\n    <main>\n      <p>Page content appears here.</p>\n    </main>\n  </body>\n</html>\n",
+      );
+      writeFileSync(
+        join(dir, "src", "404.html"),
+        "<!doctype html>\n<html>\n  <head>\n    <meta charset=\"utf-8\">\n    <title>Not Found</title>\n  </head>\n" +
+        "  <body data-layout=\"none\">\n    <h1>404</h1>\n  </body>\n</html>\n",
+      );
+      writeFileSync(join(dir, "src", "about.md"), "---\ntitle: About\n---\n\n# About\n\nText here.\n");
+      writeFileSync(
+        join(dir, "src", "blog", "_layout.html"),
+        "<!doctype html>\n<html>\n  <head>\n    <meta charset=\"utf-8\">\n    <title>— Blog</title>\n  </head>\n" +
+        "  <body>\n    <main>\n      <p>Page content appears here.</p>\n    </main>\n  </body>\n</html>\n",
+      );
+      writeFileSync(
+        join(dir, "src", "blog", "post.html"),
+        "<!doctype html>\n<html>\n  <head>\n    <title>Post</title>\n  </head>\n" +
+        "  <body>\n    <main>\n      <h1>Post</h1>\n      <p>Hi.</p>\n    </main>\n  </body>\n</html>\n",
+      );
+      writeFileSync(join(dir, "src", "assets", "style.css"), "body { margin: 0; }\n");
+      // A file already in the output that this source no longer produces —
+      // the one thing a checked-in case cannot express (see the module doc
+      // comment) and the only way to exercise the "delete" verb.
+      writeFileSync(
+        join(dir, "dist", "stale.html"),
+        "<!doctype html>\n<html>\n  <head><title>Stale</title></head>\n  <body>gone</body>\n</html>\n",
+      );
+    },
+    flags: ["--dry-run", "--pretty-urls"],
+    expect: {
+      exit: 0,
+      published: true,
+      diagnostics: [],
+      diagnosticsExhaustive: true,
+      // published:true + expectAbsent (rather than the generic PUB-01
+      // sentinel, which would seed its own extra index.html/sentinel-keep/
+      // files into dist/ and blur an otherwise-exact report) proves nothing
+      // was actually written: every path the report calls "write"/"copy"
+      // stays absent, and the pre-seeded stale.html survives untouched.
+      expectFiles: ["stale.html"],
+      expectAbsent: ["404.html", "about.html", "about/index.html", "index.html", "assets/style.css", "blog/post.html", "blog/post/index.html"],
+      // DRY-01/02, transcribed verbatim from the conformance spec's own §17
+      // worked example: ordered by output path regardless of verb (404 <
+      // about/ < assets/ < blog/ < stale.html, byte for byte), each write
+      // line naming its source page and the layout it resolved to, or "(no
+      // layout)" when it resolved to none.
+      stdoutContains: [
+        "write dist/404.html ← 404.html (no layout)\n" +
+        "write dist/about/index.html ← about.md + _layout.html\n" +
+        "copy dist/assets/style.css ← assets/style.css\n" +
+        "write dist/blog/post/index.html ← blog/post.html + blog/_layout.html\n" +
+        "delete dist/stale.html",
+      ],
+      note: "DRY-01/DRY-02: reproduces conformance-spec.md §17's own worked example exactly (same paths, same arrow, same order), under --pretty-urls so both the '+layout' and '(no layout)' write-line shapes and the delete verb all appear in one pass. published:true here (not the generic PUB-01 sentinel) so the exact stdout block matches the spec's example without extra seeded files; PUB-04's stronger byte-for-byte 'nothing written anywhere' proof lives in tests/conformance/publish-sync.test.js."
     }
   }
 };
