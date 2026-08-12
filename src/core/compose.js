@@ -69,7 +69,7 @@
  */
 import {
   attrValueOrEmpty, contentSpan, elementChildren, findAll,
-  findFirst, getAttrNode, hasAttr, isBlank, isElement, lineOf, parse,
+  findFirst, getAttr, getAttrNode, hasAttr, isBlank, isElement, lineOf, parse,
   rawSpan, removeAttrEdit, spanWithAttrRemoved, tokens,
 } from "./html.js";
 import { mergeHead } from "./head-merge.js";
@@ -328,7 +328,7 @@ export function compose({ pageText, pageFile, pageSpans, layoutText, layoutFile,
 function composeNoLayout({ pageText, pageFile, pageSpans, reporter }) {
   const { root } = parse(pageText);
   const excluded = checkNestedSlots(root, pageText, pageFile, reporter);
-  const edits = collectStraySlotEdits(root, pageText, pageSpans, pageFile, reporter, excluded);
+  const edits = collectStraySlotEdits(root, pageText, pageSpans, pageFile, reporter, excluded, true);
 
   const html = findFirst(root, (n) => isElement(n, "html"));
   const body = findFirst(root, (n) => isElement(n, "body"));
@@ -349,7 +349,7 @@ function composeWithLayout({ pageText, pageFile, pageSpans, layoutText, layoutFi
   // ---- Pass A: neutralize stray slots (§7.1 MRG-04/A04), both documents.
   const c0 = parse(pageText);
   const cExcluded = checkNestedSlots(c0.root, pageText, pageFile, reporter);
-  const cEdits0 = collectStraySlotEdits(c0.root, pageText, pageSpans, pageFile, reporter, cExcluded);
+  const cEdits0 = collectStraySlotEdits(c0.root, pageText, pageSpans, pageFile, reporter, cExcluded, true);
   const preparedC = spliceTrackingSpans(pageText, pageSpans, cEdits0, pageFile);
 
   const l0 = parse(layoutText);
@@ -660,14 +660,22 @@ function checkNestedSlots(scopeRoot, text, file, reporter) {
  * advisory A04. Used for an entire page document (all of a page's slots are
  * "outside a layout's body") and for a layout's `<head>` alone.
  */
-function collectStraySlotEdits(scopeRoot, text, spans, file, reporter, excluded) {
+function collectStraySlotEdits(scopeRoot, text, spans, file, reporter, excluded, inPage = false) {
   const edits = [];
   for (const slot of findAll(scopeRoot, (n) => isElement(n, "slot"))) {
     if (excluded.has(slot)) continue;
+    // A page's own <slot> is nearly always a fill written with the layout's
+    // spelling (round 7: three of five authoring samples), so name the fill
+    // spelling here — the advisory alone publishes a page whose slot never
+    // filled anything.
+    const name = getAttr(slot, "name");
     reporter.advisory({
       file,
       line: lineOf(text, slot.start),
       message: "<slot> is outside a layout's <body> — replaced by its own children",
+      fixes: inPage
+        ? [`to fill a layout slot, put slot= on a real element: <footer slot="${name || "footer"}">…</footer>`]
+        : [],
     });
     const [s, e] = contentSpan(slot);
     edits.push({ start: slot.start, end: slot.end, replacement: text.slice(s, e), replacementSpans: sliceSpans(spans, s, e) });

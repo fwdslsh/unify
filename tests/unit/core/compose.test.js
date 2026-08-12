@@ -249,6 +249,11 @@ describe("landmines: composition family", () => {
     expect(reporter.diagnostics[0].file).toBe("index.html");
     expect(reporter.diagnostics[0].line).toBe(5);
     expect(reporter.diagnostics[0].message).toContain("slot");
+    // A page's <slot> is nearly always a fill written with the layout's
+    // spelling (ratification round 7: three of five samples), so the page
+    // case names the fill spelling — otherwise the advisory says what was
+    // dropped without saying what to write instead.
+    expect((reporter.diagnostics[0].fixes ?? []).join(" ")).toContain('slot="');
     expectTreeMatch(dir, "index.html", composed);
   });
 
@@ -258,6 +263,9 @@ describe("landmines: composition family", () => {
     expect(reporter.diagnostics.length).toBe(1);
     expect(reporter.diagnostics[0].file).toBe("_layout.html");
     expect(reporter.diagnostics[0].line).toBe(5);
+    // The fill spelling is page-side advice; a layout's own head slot is a
+    // different mistake and must not carry it.
+    expect(reporter.diagnostics[0].fixes ?? []).toEqual([]);
     expectTreeMatch(dir, "index.html", composed);
   });
 

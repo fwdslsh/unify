@@ -71,6 +71,7 @@ export function resolveHtmlLayout({ root, text, pageAbsPath, sourceRoot, reporte
     if (value === "none") return { none: true };
     return resolveExplicitPath(value, {
       declaringDir: dirname(pageAbsPath), sourceRoot, file, line: lineOf(text, attr.start), reporter,
+      spelling: 'data-layout="/_layout.html"',
     });
   }
 
@@ -212,13 +213,20 @@ function reportMisplaced(misplaced, { text, file, reporter }) {
  * path, checked before any existence check) then P05 (missing or escaping
  * the source root, same shape as include-not-found).
  */
-function resolveExplicitPath(value, { declaringDir, sourceRoot, file, line, reporter }) {
+function resolveExplicitPath(value, { declaringDir, sourceRoot, file, line, reporter, spelling = "layout: /_layout.html" }) {
   if (!value.endsWith(".html")) {
     reporter.problem({
       file,
       line,
+      // The fix names the spelling of *this* file's kind: round 8 sent two
+      // repair samples looking for a `layout:` key in an HTML page because
+      // this line always printed the Markdown form. The second line is the
+      // other real repair — dropping the selection restores discovery.
       message: `layout is not a path: "${value}"`,
-      fixes: ["layouts are paths — write layout: /_layout.html (or a relative path ending in .html)"],
+      fixes: [
+        `layouts are paths — write ${spelling} (or a relative path ending in .html)`,
+        "or drop the layout selection to use the nearest _layout.html",
+      ],
     });
     return { problem: true };
   }

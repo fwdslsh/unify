@@ -214,9 +214,9 @@ for `{{ }}`, `{% %}`, props, or a config key, you are solving it wrong. The voca
   never contain `<head>` (use frontmatter). Both are build errors.
 
 ## Include — reuse a fragment
-`<include src="/_includes/nav.html"></include>`, always with the closing tag; `/…` resolves from the source root,
-anything else relative to the including file. Works in any file — layouts, pages, `<head>`, fragments, and
-`.md` (own line → block, mid-sentence → inline, in a code fence it stays text). **Never put content between the tags** — includes are verbatim, not components.
+`<include src="/_includes/nav.html"></include>`, always with the closing tag; `/…` resolves from the source
+root, anything else relative to the including file. Works in any file — layouts, pages, `<head>`, fragments,
+and `.md`. **Never put content between the tags** — includes are verbatim, not components.
 
 ## Layout — chrome around a page
 Every page is wrapped by the nearest `_layout.html` — its own folder, then each parent; the page says
@@ -226,10 +226,10 @@ nothing. Pick one with `data-layout="/path.html"` on the page's `<html>` or `<bo
 an error — on a layout too, because layouts don't chain (a section layout is a complete standalone page).
 
 ## Merging a page into its layout
-- **Named slots.** Where the layout wrote `<slot name="footer">fallback…</slot>`, a page element with
-  `slot="footer"` replaces the slot, tag and all — your markup ships exactly as written. Omit the
-  fill and the fallback ships. `slot=` counts only on top-level elements (direct children of
-  `<body>`); list a layout's slots with `grep -o '<slot[^>]*>' src/_layout.html`.
+- **Named slots.** The layout writes `<slot name="footer">fallback…</slot>`; the page fills it with `slot=`
+  on a real element — `<footer slot="footer">…</footer>`, never a `<slot>` tag, which in a page fills
+  nothing — and that element replaces the slot, tag and all, shipping exactly as written. Omit the fill and
+  the fallback ships; `slot=` counts only on direct children of `<body>`. List a layout's slots with `grep -o '<slot[^>]*>' src/_layout.html`.
 - **Everything else** replaces the layout's bare `<slot></slot>` if it has one — `<main><slot></slot></main>`
   is the usual shape — otherwise the children of its `<main>`. A `<main>` you wrote is dropped and its children used, so write complete semantic
   documents. A bare `<header>`/`<footer>` does **not** replace the layout's — only `slot=` fills.
@@ -243,11 +243,11 @@ an error — on a layout too, because layouts don't chain (a section layout is a
   (`body.home .nav-home {…}`), not a feature.
 
 ## Markdown
-`title`, `layout`, `class` (on `<body>`), `lang`, `dir` are the only keys with meaning; every other becomes
+Frontmatter is YAML: quote any value containing a colon — `title: "Finish: the last quarter"`. `title`,
+`layout`, `class` (on `<body>`), `lang`, `dir` are the only keys with meaning; every other becomes
 `<meta name=…>` with the value as written, so `date`/`tags`/`permalink`/`slug` do nothing and `draft: true`
-publishes (hold pages back with a leading underscore instead). A key named `og:…` emits `property=` instead —
-flat (`og:image: /card.png`) or a nested `og:` block, they name the same key; two levels deep is an error.
-No `title:` → first `# Heading`; headings get slug `id`s. Canonical and JSON-LD have no frontmatter key: put them in the layout, or write the page in HTML.
+publishes (hold pages back with a leading underscore instead). A key named `og:…` emits `property=` instead
+(`og:image: /card.png`; two levels deep is an error). No `title:` → first `# Heading`; headings get slug `id`s. Canonical and JSON-LD have no frontmatter key: put them in the layout, or write the page in HTML.
 
 ## Styles, scripts, finishing
 unify never scopes, rewrites, or injects CSS/JS — scope fragment styles yourself (`@scope`, `@layer`, a

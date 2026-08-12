@@ -296,11 +296,34 @@
      "line": 2,
      "severity": "problem",
      "containsAll": [
-      "default"
+      "default",
+      "layout: /_layout.html"
      ]
     }
    ],
    "diagnosticsExhaustive": true
+  },
+  "layout-bare-name-html": {
+   "rules": [
+    "LAY-03",
+    "P04"
+   ],
+   "flags": [],
+   "exit": 1,
+   "published": false,
+   "diagnostics": [
+    {
+     "file": "src/about.html",
+     "line": 2,
+     "severity": "problem",
+     "containsAll": [
+      "default",
+      "data-layout=\"/_layout.html\""
+     ]
+    }
+   ],
+   "diagnosticsExhaustive": true,
+   "note": "Ratification round 8: the fix line used to print the Markdown spelling (`layout:`) for every page, and two repair samples went looking for a `layout:` key in an HTML page. Each kind of page is now shown its own spelling."
   },
   "layout-declares-layout": {
    "rules": [

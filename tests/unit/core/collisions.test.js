@@ -50,6 +50,13 @@ describe("resolveOutputPaths — P12 exact collisions", () => {
     expect(p.file).toBe("about.html"); // "about.html" < "about.md" lexicographically
     expect(p.message).toContain("about.md");
     expect(p.message).toContain("about.html");
+    // The fix must not read as "delete one of these": a ratification round-8
+    // repair sample took that literally and lost the page's only copy of the
+    // shop's address. Both named edits keep every source's text.
+    const fix = (p.fixes ?? []).join(" ");
+    expect(fix).toContain("rename");
+    expect(fix).toContain("merge");
+    expect(fix).not.toContain("remove");
   });
 
   test("a --pretty-urls move landing on another source's output is also a problem (COL-02)", () => {
