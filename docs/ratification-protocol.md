@@ -23,11 +23,23 @@
 
 A corollary earned in round 2: when several independent samples make the same "mistake," check the spec before fixing the agents. Four of five wrote `<meta charset>` into pages against a rule forbidding it — and the rule was wrong, contradicting both the conformance spec and the sentence above it.
 
-## Known limitation: isolation is not total
+## Isolation: run each agent as a subprocess under /tmp
 
-Subagents inherit the session's project context, so `CLAUDE.md` is auto-loaded regardless of the instruction to read only the three files. It names `data-unify` and `unify-*` in order to say they are retired, and one Sonnet run misread that as a description of the live product before correctly deferring to the supplied rules.
+Rounds 1–2 used in-session subagents, which inherit the session's project context — `CLAUDE.md` loads regardless of any instruction to read only the supplied files. It names `data-unify` and `unify-*` in order to say they are retired, and one Sonnet run misread that as a description of the live product before correctly deferring to the rules it was given. Zero of those eleven samples emitted retired vocabulary, so nothing was corrupted, but the exposure was real and could not be closed by instruction.
 
-Contamination has been measured, not assumed: **zero of eleven samples across rounds 1–2 emitted any retired vocabulary, templating syntax, or `data-slot`.** The exposure points at constructs whose appearance would be immediately visible, so the check is meaningful. Treat any future sample using v0.6 vocabulary as a contaminated run rather than a documentation failure, and re-run it.
+From round 3 the loop runs each agent as its own process with cwd inside its sandbox, which puts the repo out of reach entirely:
+
+```bash
+cd /tmp/unify-ratify/<round>/<agent>
+printf '%s' "$PROMPT" | claude -p --model haiku \
+  --permission-mode acceptEdits --allowedTools Read Write Edit Glob Grep
+```
+
+Verified rather than assumed: a run so configured answers "NO" when asked whether it has any project context describing a static site generator called unify. Copy the task, the rules, and the report format *into* each sandbox so no path outside cwd is ever referenced.
+
+Two traps worth keeping written down. `--allowedTools` is variadic and will swallow a positional prompt as another tool name — pass the prompt on stdin. And restrict tools to file access: in print mode a permission prompt has nobody to answer it and the run hangs to its timeout.
+
+**Grep the site output, not the sandbox.** The sandbox contains `rules.md`, which quotes `{{ }}` as an example of what not to write, so a naive violation sweep reports templating syntax in every clean sample. Exclude the harness files.
 
 ## Results so far
 
@@ -35,6 +47,11 @@ Contamination has been measured, not assumed: **zero of eleven samples across ro
 |---|---|---|---|
 | 1 | 4 Haiku, 2 Sonnet | 3/6 — **1/4 Haiku** | none mechanical; four doc ambiguities reported |
 | 2 | 5 Haiku, 1 Sonnet | **5/5 Haiku** | one hand-written `/about/`; four `charset` "violations" that were the doc's error |
+| 3 | 5 Haiku, 1 Sonnet | **6/6, both layouts** | **zero** |
+
+Round 3 used the harder brief — two layouts sharing chrome, a nested section, an embedded page with no chrome, and a footer overridden on one page — under full subprocess isolation. Every sample was clean, and the four primitives that eleven earlier samples never touched were all exercised: `guides/_layout.html` discovered by proximity (6/6), `data-layout="none"` on the embed page (6/6), a named slot with fallback overridden on contact (6/6), and `<include>` for shared chrome (5/6).
+
+The sixth is the interesting one. h1 wrote two layouts and no fragment, duplicating the header verbatim in both files — output-correct, and a maintenance hazard the include primitive exists to prevent. It is not a spec violation and not counted as one; but it is the only remaining case where the doc describes a tool the author does not reach for, and it is worth watching in later rounds rather than fixing by exhortation.
 
 Round 1 fixed: the title instruction (written from the page's perspective, so the layout author was never told what to do), a `<head>`/charset pronoun with the wrong antecedent, the `<main>` unwrap stated as a state rather than an operation, an include-placement list that omitted layouts, and four gaps only Sonnet articulated.
 
