@@ -7,8 +7,8 @@ Derived files (a post index, a feed) come from a script in `_scripts/`, run firs
 
 ## Files
 - Source root is `src/` if it exists, else the current directory. `.html`/`.md` are pages; every other
-  file copies byte-for-byte to the same path. In any path you write, a leading `/` means the source
-  root; link the real file (`about.html`), never a hand-written `/about/` — `--pretty-urls` rewrites links.
+  file copies byte-for-byte to the same path. A leading `/` means the source root, in any path you
+  write. Always link the real filename — `/about.html`, never `/about/`; `--pretty-urls` rewrites links.
 - **Everything in the source root ships.** Anything that is not part of the site — notes, drafts,
   scratch, scripts — goes under a leading underscore (`_draft.html`, `_notes/`, `_scripts/`): the
   build still reads it, the output never contains it. Files inside a `_` directory need no prefix.
@@ -36,10 +36,10 @@ an error — on a layout too, because layouts don't chain (a section layout is a
 - **Everything else** replaces the layout's bare `<slot></slot>` if it has one — `<main><slot></slot></main>`
   is the usual shape — otherwise the children of its `<main>`. A `<main>` you wrote is dropped and its children used, so write complete semantic
   documents. A bare `<header>`/`<footer>` does **not** replace the layout's — only `slot=` fills.
-- **Head.** A page has its own `<head>`; the layout's is the base, and only the layout declares
-  `<meta charset>`. **Write the separator into the layout's title** — `<title>— My Site</title>` — and
-  a page writes only its own name (`<title>About</title>`); joined with a space that gives
-  `About — My Site`. Your `<meta>` replaces the layout's same-`name`/`property`, your `canonical`/`icon`
+- **Head.** A page has its own complete `<head>`; the layout's is the base, and where both declare
+  `<meta charset>` the layout's wins. **Write the separator into the layout's title** —
+  `<title>— My Site</title>`, no leading space — and a page writes only its own name
+  (`<title>About</title>`); the join adds the space, giving `About — My Site`. Your `<meta>` replaces the layout's same-`name`/`property`, your `canonical`/`icon`
   links replace the layout's, everything else appends after — page CSS wins.
 - **Root attributes.** On `<html>`/`<body>` only, your classes are added and any other attribute you
   set wins; attributes merge nowhere else. Active nav is `<body class="home">` plus CSS
