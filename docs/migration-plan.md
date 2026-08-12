@@ -13,9 +13,9 @@
 bun test && bun tests/conformance/check-traceability.mjs --runtime .conformance-ledger.jsonl
 ```
 
-That job is red until every one of the 189 gated rules in `tests/conformance/rules.tsv` is recorded by a passing test — and the golden-path rules (SCF-01..04, DIA-10) are gated rules like any other. Therefore *the suite cannot be green while `unify init && unify dev` is broken*, structurally: green is defined as a superset of the golden path working. The v0.6 inversion (green badge, broken product) becomes unrepresentable rather than merely discouraged.
+That job is red until every one of the 190 gated rules in `tests/conformance/rules.tsv` is recorded by a passing test — and the golden-path rules (SCF-01..04, DIA-10) are gated rules like any other. Therefore *the suite cannot be green while `unify init && unify dev` is broken*, structurally: green is defined as a superset of the golden path working. The v0.6 inversion (green badge, broken product) becomes unrepresentable rather than merely discouraged.
 
-The corollary is that the badge stays **red for the whole migration**. That is the honest state of a product being rewritten, and this plan reports progress as the ledger count (`covered/189`) instead of pretending with a partial-green pipeline. Intermediate phase gates below are separate CI jobs that measure progress; none of them is the release signal.
+The corollary is that the badge stays **red for the whole migration**. That is the honest state of a product being rewritten, and this plan reports progress as the ledger count (`covered/190`) instead of pretending with a partial-green pipeline. Intermediate phase gates below are separate CI jobs that measure progress; none of them is the release signal.
 
 ---
 
@@ -46,7 +46,7 @@ A test is a **candidate to port** only when its subject module is on the CLAUDE.
 
 **Legacy fixture directories — all 9 deleted** (`alpine`, `area-merging-complex`, `component-scoping`, `contract-documentation`, `default-layout-site`, `full-site`, `head-merging-advanced`, `id-stability-forms`, `landmark-fallback`): every one encodes retired vocabulary, which under v0.7.0 is a **build error by design** (P08) — they are not merely stale, they are anti-fixtures. Their legitimate concerns are already re-expressed in the new sets (third-party attribute survival → kitchen-sink `data-theme` + the `slot-in-template` landmine; head merging → kitchen-sink + FIX-11; layout discovery → kitchen-sink + the layout landmines). The one salvageable *idea* with no v0.7 counterpart yet — an Alpine-flavored "framework attributes survive composition untouched" case — becomes a new landmine during Phase 2, written fresh.
 
-Replacement suite already in place (this branch): `tests/conformance/` (rules.tsv, 2 gate scripts, 10 spec-fixtures — all thirteen FIX rows realized, three of them as landmines), `tests/fixtures/kitchen-sink/` (3 expected trees, 4 profiles), `tests/fixtures/landmines/` (64 checked-in cases + 6 runtime-generated). Still to write: the harness itself and its comparator (`compare.mjs`, Phase 0), Tier-2 targeted tests (Phase 3), Tier-0 E2E (Phase 4).
+Replacement suite already in place (this branch): `tests/conformance/` (rules.tsv, the harness `harness.test.js` + its comparator `compare.mjs`, 2 gate scripts, 10 spec-fixtures — all thirteen FIX rows realized, three of them as landmines), `tests/fixtures/kitchen-sink/` (3 expected trees, 4 profiles), `tests/fixtures/landmines/` (65 checked-in cases + 6 runtime-generated). Still to write: Tier-2 targeted tests (Phase 3), Tier-0 E2E (Phase 4).
 
 ---
 
@@ -61,7 +61,7 @@ Each phase ends at a **gate**: commands with exit codes, run in CI. A phase is n
 3. Write the conformance harness (`tests/conformance/harness.test.js`): reads the three manifests, spawns the CLI per case/profile with a hard 30s timeout, byte-compares trees bidirectionally, parses diagnostics on the stable prefix, enforces `diagnosticsExhaustive`, seeds/asserts publish sentinels, appends to the runtime ledger, exports `covers()`. Every case will FAIL against the v0.6 engine — correct and desired: the harness lands proving it can detect the broken product the old suite blessed.
 4. Retire the coverage badge and the "93%" claims from README/CLAUDE.md (that number measured execution of code that is about to be deleted).
 
-**Gate P0**: hygiene green; `--static` traceability reports 192 rules / 170 declared / 20 named gaps (the committed baseline `tests/conformance/phase-gaps/baseline.txt` — the checker output must `diff` clean against it); harness runs and fails against the v0.6 engine (expected-fail recorded, proving detection); old suite out of CI.
+**Gate P0**: hygiene green; `--static` traceability reports 193 rules / 171 declared / 20 named gaps (the committed baseline `tests/conformance/phase-gaps/baseline.txt` — the checker output must `diff` clean against it); harness runs and fails against the v0.6 engine (expected-fail recorded, proving detection); old suite out of CI.
 
 ### Phase 1 — Deletion and the CLI skeleton (~2–3 days)
 
@@ -87,7 +87,7 @@ URL provenance rewriting, `--pretty-urls`, `--base-url`, the reference check, co
 
 `file-watcher.js` harvested under the new contract; `unify dev` (static server + SSE reload, injection scoping); `unify init` rewritten as **offline scaffolding** (the v0.6 init died on a network fetch of a nonexistent repo — templates compile into the binary; the golden path must work on a plane); binaries.
 
-**Gate P4 = the release gates G1–G11** of `docs/testing-strategy.md` §6, verbatim. The ledger reads 189/189; the final CI job goes green for the first time since Phase 0; that green *is* the release condition.
+**Gate P4 = the release gates G1–G11** of `docs/testing-strategy.md` §6, verbatim. The ledger reads 190/190; the final CI job goes green for the first time since Phase 0; that green *is* the release condition.
 
 ---
 
@@ -95,7 +95,7 @@ URL provenance rewriting, `--pretty-urls`, `--base-url`, the reference check, co
 
 It will crater, in two steps: Phase 1 deletes ~8k lines whose execution the 93% described, and Phases 2–3 add new core code faster than unit tests appear (correctly — the verification lives in fixtures, which bun's per-file coverage does not attribute to `src/**` the way unit tests do).
 
-What that means and what we say: **the number was never evidence and is not evidence now.** The honest progress metric during migration is the ledger fraction (`covered/189`, printed by `check-traceability.mjs` in every CI run) plus the phase-gap diff. Coverage continues to be *collected* and published in CI artifacts as a diagnostic (strategy §4) — useful for spotting un-hit branches in the new core, which are answered with new landmine cases — but: no threshold, no badge, no README mention, and no PR may cite it as evidence of quality in either direction. Anyone asking "what happened to 93%?" gets the true answer: 93% measured how much of a broken product the old suite executed; 189/189 measures how much of the specification the new product satisfies. The first number is gone because the thing it measured is gone.
+What that means and what we say: **the number was never evidence and is not evidence now.** The honest progress metric during migration is the ledger fraction (`covered/190`, printed by `check-traceability.mjs` in every CI run) plus the phase-gap diff. Coverage continues to be *collected* and published in CI artifacts as a diagnostic (strategy §4) — useful for spotting un-hit branches in the new core, which are answered with new landmine cases — but: no threshold, no badge, no README mention, and no PR may cite it as evidence of quality in either direction. Anyone asking "what happened to 93%?" gets the true answer: 93% measured how much of a broken product the old suite executed; 190/190 measures how much of the specification the new product satisfies. The first number is gone because the thing it measured is gone.
 
 ---
 

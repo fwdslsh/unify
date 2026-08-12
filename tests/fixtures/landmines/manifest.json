@@ -788,7 +788,8 @@
     "netlify-headers": {
       "rules": [
         "EXC-07",
-        "EXC-01"
+        "EXC-01",
+        "A14"
       ],
       "flags": [
         "--exclude",
@@ -805,7 +806,47 @@
       "diagnostics": [],
       "diagnosticsExhaustive": true,
       "expectedTree": "expected",
-      "note": "The conformance §4.2 recipe verbatim: _headers/_redirects ship (non-page files, guard passes them), _layout.html/_includes stay excluded and still drive composition."
+      "note": "The conformance §4.2 recipe verbatim: _headers/_redirects ship (non-page files, guard passes them), _layout.html/_includes stay excluded and still drive composition. The A14 side of the coin: with the deployment files shipping, the deployment-file advisory must stay silent — an advisory that fires on a correct site is a bug, and diagnosticsExhaustive asserts the silence."
+    },
+    "deploy-file-excluded": {
+      "rules": [
+        "A14"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [
+        {
+          "file": "src/_headers",
+          "line": null,
+          "severity": "advisory",
+          "containsAll": [
+            "_headers",
+            "--exclude"
+          ]
+        },
+        {
+          "file": "src/_redirects",
+          "line": null,
+          "severity": "advisory",
+          "containsAll": [
+            "_redirects",
+            "--exclude"
+          ]
+        },
+        {
+          "file": "src/_routes.json",
+          "line": null,
+          "severity": "advisory",
+          "containsAll": [
+            "_routes.json",
+            "--exclude"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected",
+      "note": "Default excludes hold back root-level _headers/_redirects/_routes.json — known deployment files (conformance §4.2), so each draws advisory A14 naming the file and the --exclude line that ships it. The advisory is the whole mechanism: the files stay excluded (expected tree is index.html alone), the build publishes, exit 0. blog/_headers draws nothing — recognition is by name at the source root only."
     },
     "stranded-underscore-asset": {
       "rules": [

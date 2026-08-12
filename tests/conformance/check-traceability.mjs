@@ -7,7 +7,7 @@
  *
  *  SPEC → INVENTORY (sync check, always on)
  *    The countable structures of the conformance spec — the S1..S12 splice
- *    rules, the closed problem list (15), the closed advisory catalogue (10),
+ *    rules, the closed problem list (16), the closed advisory catalogue (11),
  *    and the head-merge table rows (7) — are parsed out of the spec text and
  *    compared against tests/conformance/rules.tsv. If the spec grows or loses
  *    an enumerable rule and the inventory was not updated in the same commit,

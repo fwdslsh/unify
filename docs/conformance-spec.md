@@ -102,6 +102,15 @@ unify build --exclude '_*.html' --exclude '_*.md' --exclude '_includes' --exclud
 
 — which ships `_headers`/`_redirects` (non-page files, guard passes them) while the guard still stops any `_`-page or `_`-directory the replacement missed.
 
+**The deployment-file advisory.** The seam has a silent side: these files work by *being at the publish root* — nothing links to them, so when the exclude set holds one back the reference check (§12) has no thread to pull, and the deploy simply arrives without its headers. A **known deployment file** at the source root that the effective exclude set keeps out of the output is advisory **A14** (§14.3), naming the file and an `--exclude` replacement that ships it:
+
+```
+src/_headers: advisory: _headers is a deployment file (Netlify, Cloudflare Pages), and the exclude set ('_*') keeps it out of the output
+  fix: replace the default: --exclude '_*.html' --exclude '_*.md' --exclude '_includes' --exclude '_scripts'
+```
+
+The advisory is the entire mechanism: nothing is exempted from the exclude set, the file stays held back, the build publishes, and `--strict` is what makes the miss fatal in CI. Recognition is by exact file name, at the source root only — the one place these files function on any host; a nested `blog/_headers` is ordinary excluded material and draws nothing. The recognized names are a maintained list in the implementation — one exported constant, `KNOWN_DEPLOYMENT_FILES`, one entry per file name, greppable and editable in one place — and the list is deliberately **not** enumerated as normative text: hosting providers add conventions faster than a specification is amended, so recognizing a new provider's file is a one-line code change, not a spec revision, and growth of the list is not a conformance break. Its contents today (informative, non-normative): `_headers` and `_redirects` (Netlify and Cloudflare Pages; GitLab Pages also reads `_redirects`), `_routes.json` and `_worker.js` (Cloudflare Pages). Only names the default `_*` would catch belong on it — `netlify.toml`, `vercel.json`, `CNAME`, and `.nojekyll` carry no underscore and already ship (§4.3: dotfiles ship).
+
 ### 4.3 Never-shipped list
 
 Independent of `--exclude` and not replaceable by it, these never appear in output and are never scanned as source: the output directory (when inside the source root), `.git/`, `.hg/`, `.svn/`, `node_modules/`, `.env` and `.env.*`, and `unify.yaml`. Nothing else — dotfiles ship (`.htaccess`, `.nojekyll`). The list is literal: no scanning, no heuristics.
@@ -834,7 +843,7 @@ The bold IDs are the stable identifiers used by `tests/conformance/rules.tsv` an
 15. **P14** — Emitted `_`-prefixed page or `_`-directory path (§4.2)
 16. **P17** — A frontmatter value with no text form: a mapping nested below a block, or a list item that is itself a mapping or list (§10.2)
 
-### 14.3 Advisories (the closed catalogue — adding one means removing one)
+### 14.3 Advisories (the closed catalogue — capped at twelve; at the cap, adding one means removing one)
 
 Same ID convention as §14.2.
 
@@ -848,6 +857,7 @@ Same ID convention as §14.2.
 8. **A10** — A file used as a layout or include also ships as its own page (the non-underscored case)
 9. **A11** — Output paths differing only by case (§13)
 10. **A12** — Symlink resolving outside the source root (treated as absent) (§4.4)
+11. **A14** — Known deployment file at the source root held back by the exclude set — names the file and the `--exclude` line that ships it; the recognized names are the implementation's maintained list, which may grow without a spec revision (§4.2)
 
 Discipline (asserted by the E2E suite): an advisory that fires on a correct site is a bug in the advisory — `unify init && unify build --dry-run --strict` exits `0`. Advisories report what the build observed and what it did; they never instruct the author to restructure markup that composed correctly.
 
