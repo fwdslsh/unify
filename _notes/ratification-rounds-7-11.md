@@ -123,7 +123,7 @@ re-run; that failure is the harness's, not the agents'.
 including the four samples that had no documentation at all. Repair took 2–4 build runs.
 The error contract, on this fixture, *is* sufficient documentation for repair.
 
-**One sample lost content**: round10b-haiku-2 deleted `contact.html` outright — with the
+**One sample lost content**: arm B's haiku-2 deleted `contact.html` outright — with the
 shop's address and phone number — to resolve the collision. It was following the message:
 `fix: rename or remove one of the sources`. The brief forbade exactly this; the diagnostic
 suggested it anyway.
