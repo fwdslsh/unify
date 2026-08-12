@@ -1,6 +1,6 @@
 {
   "name": "@fwdslsh/unify",
-  "version": "0.6.6",
+  "version": "0.7.0",
   "description": "A static site generator for HTML-native composition: includes, layouts, and slots in plain HTML — no expression language, no client runtime",
   "type": "module",
   "main": "src/cli.js",
