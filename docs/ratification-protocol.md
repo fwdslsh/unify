@@ -48,10 +48,38 @@ Two traps that each cost a full round:
 1. Regenerate the rules file from the current doc.
 2. Seed N sandboxes (5 Haiku + 1 control is a good default).
 3. Launch, wait, collect.
-4. Sweep the output mechanically for violations.
-5. Read every agent's self-report.
-6. Triage each finding (next section).
-7. Amend at most a handful of things. Re-run.
+4. **Run `unify build --dry-run --strict` over every sample yourself.** Exit code plus the
+   diagnostic list is the verdict.
+5. Read the output anyway — a green exit says the site composes, not that the author reached
+   for the mechanism the brief was built to compel.
+6. Read every agent's self-report.
+7. Triage each finding (next section).
+8. Amend at most a handful of things. Re-run.
+
+**The build is the instrument, and it is much sharper than reading.** Rounds 1–6 were judged
+by hand and recorded two 6/6 sweeps. The first brief judged by the real build came back
+**1 of 5**, on a doc those rounds had passed. Nothing regressed; the measurement improved.
+Read every pre-round-7 result as *no violation a human reviewer noticed*, and re-run any
+older brief you intend to rely on.
+
+Two cautions the upgrade brings. Put the CLI **inside** the sandbox (a compiled binary
+carries no docs with it) so isolation still holds — verify with the project-context
+question, as always. And keep briefs honest about what the build will check: a reference to
+an image the agent had no way to create fails the build without telling you anything about
+the doc. Seed those assets, or ask for placeholders in the brief.
+
+### Giving the agent the build, or not
+
+Both are experiments, and they answer different questions.
+
+- **Blind authoring** (the agent cannot run anything) measures *the document*. Use it when
+  you are testing whether a rule teaches.
+- **Authoring with the build** measures *the document plus the error contract*, which is
+  how anyone actually works. Use it for briefs about publishing and deployment, where the
+  tool's own output is part of the loop.
+
+Do not switch a brief from one to the other while you are measuring a fix — that changes
+the environment as well as the doc, and the result stops being attributable.
 
 **Ask every agent what the rules did not answer and what it had to re-read.** That self-report has been more diagnostic than the output in every round: the files show the symptom, the report points at the sentence. haiku-3 in round 1 not only got the title wrong but explained that it had concluded titles were a Markdown-only feature and *restructured the site around the limitation it had imagined*. No amount of staring at its HTML would have revealed that.
 
@@ -116,6 +144,36 @@ One sample in N, no pattern, and the agent's own report shows a reasoning slip r
 
 If you are unsure between "outlier" and "doc defect," run more samples. Samples are cheap; a bad amendment is permanent.
 
+## The other experiment: repair, not authoring
+
+Every round above asks whether the rules teach you to *build* something. None of them tests
+whether the diagnostics teach you to *fix* something — and the error contract is a far
+larger documentation surface than the 60 lines, written by implementers, read only in the
+moment someone is stuck.
+
+The design that works: plant known faults in a working site, hand it over with the CLI, and
+require a clean build **without losing anything the site says**. Give every page a unique
+marker sentence so content loss is mechanically detectable — a repair that deletes a page
+to silence its error is the failure mode you are hunting, and it looks like success from
+the exit code alone. Run it in two arms — the CLI alone, and the CLI plus the rules — and
+the difference tells you which surface is carrying the load.
+
+Round 8's answer was that the messages are sufficient: seven of seven samples reached a
+clean build, four of them with no documentation whatsoever. What it found instead was three
+messages that misdirect, and only one of the three was visible from reading them:
+
+- **A `fix:` line that suggests a destructive repair will get one.** "rename or remove one
+  of the sources" — a sample removed one, and the page's address went with it.
+- **A `fix:` line must be spelled for the file it is pointing at.** P04 printed the
+  Markdown spelling on HTML pages for the whole life of the project; the fixture that
+  covered it used a Markdown page, so the suite could not see it and two agents did.
+- **An advisory that names what it dropped must also name what to write instead**, or the
+  author gets told they have a problem and not how to leave it.
+
+Message prose is explicitly not contract (conformance §14.1), so these are cheap to fix —
+but each one still needs a test, and the P04 case is the argument for fixture *variety*
+over fixture count: one rule, two page kinds, and only the untested kind was broken.
+
 ## The two amendment rules
 
 1. **Only amend for failures the documentation caused.** See triage step 0.
@@ -174,8 +232,14 @@ Stated plainly, because a method with no known limitations has not been examined
 | 5a | 5 Haiku, 1 Sonnet | link fix | **6/6 clean.** |
 | 5b | 5 Haiku, 1 Sonnet | new content brief | 6/6, **4/6 wrote flat `og:image:`** — a spec defect, not an authoring one. |
 | 6 | 5 Haiku, 1 Sonnet | `og:` + link fixes | **6/6 flat spelling, zero broken links.** Every sample used the form the old rule rejected. |
+| 7 | 5 Haiku, 1 Sonnet | first round judged by the build; a brief the round-5/6 fixes were not written for | **1/5 Haiku clean**, Sonnet clean. `og:` flat spelling 6/6 — that fix is now *tested*. Two doc defects: named-slot fill (4/5 wrong), unquoted colon in a YAML title (2/5). |
+| 8 | 4 + 3 Haiku/Sonnet, two arms | the diagnostics as documentation — repair a broken site | **7/7 reached a clean build**, four of them with no docs at all. One sample deleted a page's content following a `fix:` line. Three messages amended. |
+| 9 | 5 Haiku, 1 Sonnet | round 7's brief, amended doc (fitted) | **5/5 correct `slot=` fills** (was 1/5); every colon-bearing title quoted. 3/5 clean overall — both misses were referenced image files the sandbox could not produce. |
+| 10 | 3 + 4 Haiku/Sonnet, two arms | round 8's fixture, amended messages (fitted) | Arm B **3/3 clean with zero content lost** (was 1 of 3 losing a page); every sample merged rather than deleted. |
 
 Round 6 is the clearest single result: with the rule keyed off the key's name, **six of six** wrote the flat spelling — including the control. The nested-only rule would have failed every sample on that brief.
+
+Round 7 is the most uncomfortable one: the same document that had passed four consecutive rounds failed four of five samples the moment the build did the judging. Two of those failures were real doc defects, and the fixes took the same brief to 5/5 in round 9. The other lesson is about the method rather than the doc — **a clean sweep is only as good as the instrument that declared it clean.**
 
 ### The pattern across all six rounds
 
