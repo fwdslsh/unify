@@ -215,8 +215,8 @@ Derived files (a post index, a feed) come from a script in `_scripts/`, run firs
 
 ## Include — reuse a fragment
 `<include src="/_includes/nav.html"></include>`, always with the closing tag; `/…` resolves from the
-source root, anything else relative to the including file. Works anywhere: `<head>`, other fragments,
-`.md` pages (own line → block, mid-sentence → inline, in a code fence it stays text). **Never put content between the tags** — includes are verbatim, not components; parameterized variants come from a `_scripts/` generator.
+source root, anything else relative to the including file. Works in any file — layouts, pages, `<head>`,
+other fragments, `.md` pages (own line → block, mid-sentence → inline, in a code fence it stays text). **Never put content between the tags** — includes are verbatim, not components; parameterized variants come from a `_scripts/` generator.
 
 ## Layout — chrome around a page
 Every page is wrapped by the nearest `_layout.html` — its own folder, then each parent; the page says
@@ -230,23 +230,23 @@ an error — on a layout too, because layouts don't chain (a section layout is a
   `slot="footer"` replaces the slot, tag and all — your markup ships exactly as written. Omit the
   fill and the fallback ships. `slot=` counts only on top-level elements (direct children of
   `<body>`); list a layout's slots with `grep -o '<slot[^>]*>' src/_layout.html`.
-- **Everything else** replaces the layout's bare `<slot></slot>`, or the children of its `<main>` if
-  there is no bare slot. Your own `<main>` wrapper is unwrapped, so write complete semantic
+- **Everything else** replaces the layout's bare `<slot></slot>` if it has one, otherwise the children
+  of its `<main>`. A `<main>` you wrote is dropped and its children used, so write complete semantic
   documents. A bare `<header>`/`<footer>` does **not** replace the layout's — only `slot=` fills.
-- **Head.** The layout owns `<head>` and declares `<meta charset>` — never write one in a page. Your
-  `<title>` joins the layout's, which carries the separator (`About` + `— My Site` → `About — My Site`);
-  write only the page's name. Your `<meta>` replaces the layout's same-`name`/`property`, your
-  `canonical`/`icon` links replace the layout's, everything else appends after — page CSS wins.
+- **Head.** A page has its own `<head>`; the layout's is the base, and only the layout declares
+  `<meta charset>`. **Write the separator into the layout's title** — `<title>— My Site</title>` — and
+  a page writes only its own name (`<title>About</title>`); joined with a space that gives
+  `About — My Site`. Your `<meta>` replaces the layout's same-`name`/`property`, your `canonical`/`icon`
+  links replace the layout's, everything else appends after — page CSS wins.
 - **Root attributes.** On `<html>`/`<body>` only, your classes are added and any other attribute you
   set wins; attributes merge nowhere else. Active nav is `<body class="home">` plus CSS
   (`body.home .nav-home {…}`), not a feature.
 
 ## Markdown
-`title`, `layout`, `class`, `lang`, `dir` are the only keys with meaning. `date`, `tags`, `draft`,
-`permalink`, `slug` do nothing and ship as `<meta>` tags — `draft: true` publishes the page; hold
-pages back with a leading underscore. Any other key becomes `<meta name=…>`; an `og:` block becomes
-`property=` metas; values ship as written (`draft: true` → `"true"`), and blocks flatten one level —
-nesting deeper is an error. No `title:` → the first `# Heading` is the title. Headings get slug `id`s.
+`title`, `layout`, `class`, `lang`, `dir` are the only keys with meaning; every other key becomes
+`<meta name=…>` with the value as written, so `date`/`tags`/`permalink`/`slug` do nothing and
+`draft: true` publishes (hold pages back with a leading underscore instead). An `og:` block becomes
+`property=` metas; nesting deeper is an error. No `title:` → first `# Heading`. Headings get slug `id`s.
 Frontmatter cannot express canonical or JSON-LD: put those in the layout, or write the page in HTML.
 
 ## Styles, scripts, finishing
