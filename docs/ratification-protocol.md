@@ -43,6 +43,11 @@ Two traps that each cost a full round:
 - **`--allowedTools` is variadic** and will swallow a positional prompt as another tool name. Pass the prompt on stdin. (Symptom: every agent exits 1 with "Input must be provided.")
 - **Restrict tools to file access.** In print mode a permission prompt has nobody to answer it, and the run hangs to its timeout.
 
+Two more that cost hours rather than rounds:
+
+- **Empty the sandbox before re-seeding it.** A retried sample that starts on top of the dead run's half-built site is not a sample, and nothing downstream will tell you.
+- **Stagger the launches.** Thirteen simultaneous cold starts produced a burst of transient proxy TLS failures that killed half a round; twenty seconds apart, none. Check every sample's exit code before analysing anything — a sample that never started looks exactly like a sample that did nothing.
+
 ## Running a round
 
 1. Regenerate the rules file from the current doc.
