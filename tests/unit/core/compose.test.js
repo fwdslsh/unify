@@ -242,30 +242,37 @@ describe("landmines: composition family", () => {
     expectTreeMatch(dir, "index.html", composed);
   });
 
-  test("slot-in-page: MRG-04/A04 — page's own stray slot neutralized before composition", () => {
+  test("slot-in-page: MRG-04/P20 — a page's own slot is a problem, and is still neutralized", () => {
     const dir = join(LANDMINES, "slot-in-page");
     const { composed, reporter } = composeFixture(dir, "index.html");
     expect(reporter.diagnostics.length).toBe(1);
+    expect(reporter.diagnostics[0].severity).toBe("problem");
     expect(reporter.diagnostics[0].file).toBe("index.html");
     expect(reporter.diagnostics[0].line).toBe(5);
     expect(reporter.diagnostics[0].message).toContain("slot");
-    // A page's <slot> is nearly always a fill written with the layout's
-    // spelling (ratification round 7: three of five samples), so the page
-    // case names the fill spelling — otherwise the advisory says what was
-    // dropped without saying what to write instead.
+    // Ratification round 7: three of five samples wrote the layout-side
+    // spelling into a page, so the message names the one that belongs in a
+    // page. It became a problem (was advisory A04) because the advisory let
+    // each of those samples publish at exit 0 with the fill never applied.
     expect((reporter.diagnostics[0].fixes ?? []).join(" ")).toContain('slot="');
+    // The S4 children-replacement still runs — best-effort composition (§2)
+    // produces a tree to report on even though it will never be published.
     expectTreeMatch(dir, "index.html", composed);
   });
 
-  test("slot-in-layout-head: MRG-04/A04 — layout head's stray slot becomes ordinary head content", () => {
+  test("slot-in-layout-head: MRG-04/P20 — a head slot is a problem, with head-side advice", () => {
     const dir = join(LANDMINES, "slot-in-layout-head");
     const { composed, reporter } = composeFixture(dir, "index.html");
     expect(reporter.diagnostics.length).toBe(1);
+    expect(reporter.diagnostics[0].severity).toBe("problem");
     expect(reporter.diagnostics[0].file).toBe("_layout.html");
     expect(reporter.diagnostics[0].line).toBe(5);
-    // The fill spelling is page-side advice; a layout's own head slot is a
-    // different mistake and must not carry it.
-    expect(reporter.diagnostics[0].fixes ?? []).toEqual([]);
+    // A head slot is a different mistake from a page-side one, so it must not
+    // carry the fill spelling: nothing can fill it, and a page's own <head>
+    // reaches the output by the §8 merge instead.
+    const fixes = (reporter.diagnostics[0].fixes ?? []).join(" ");
+    expect(fixes).toContain("<body>");
+    expect(fixes).not.toContain('slot="');
     expectTreeMatch(dir, "index.html", composed);
   });
 

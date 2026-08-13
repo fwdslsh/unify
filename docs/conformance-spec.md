@@ -267,7 +267,14 @@ L's **sinks** are the `<slot>` elements in L's `<body>` (skipping any inside `<t
 
 - The first bare `<slot>` (no `name`) is **the default slot**. Further bare slots: advisory A13 (duplicated construct), and they render their fallback.
 - The first `<slot name="X">` for each X receives X's fills. A repeated name: advisory A13; later ones render their fallback.
-- A `<slot>` outside a layout's `<body>` (a slot anywhere in a page, or in a layout's `<head>`): advisory A04, and it is replaced by its own children (S4).
+- A `<slot>` outside a layout's `<body>` (a slot anywhere in a page, or in a layout's `<head>`) is a **problem (P20)**; it is still replaced by its own children (S4), so best-effort composition (§2) produces a tree to report on. Such a slot is inert in every case — a page fills a layout's slot with the `slot=` attribute, and a slot in a head is never a sink — and the message names the spelling that belongs in *that* file:
+
+```
+src/contact.html:4: problem: <slot> in a page fills nothing — only a layout declares slots
+  fix: to fill a layout slot, put slot= on a real element: <footer slot="footer">…</footer>
+```
+
+This was advisory A04 until 2026-08-13. Ratification round 7 had three of five samples write `<slot name="footer">` into a page — the layout-side spelling, in the file that cannot use it — and under the advisory a plain `unify build` published every one of them at exit 0, carrying the layout's fallback footer *and* the intended replacement loose in the body. Nothing was lost, so the content-loss law was satisfied and the author's intent still silently did not happen. Every sibling misplacement of this vocabulary (P07, P15, P16, P19) was already a problem; this one was the outlier, and `A04` is now a retired ID.
 - Duplicate `<main>` in L: the first wins; advisory A13.
 - **Slots do not nest.** A `<slot>` anywhere inside another `<slot>` element — that is, inside a slot's fallback content — is a **problem (P16)**, located: fallback content is plain markup, and a nested slot would silently vanish (or strand its fills) the moment the outer slot is filled, which the content-loss law forbids:
 
@@ -856,17 +863,17 @@ The bold IDs are the stable identifiers used by `tests/conformance/rules.tsv` an
 16. **P17** — A frontmatter value with no text form: a mapping nested below a key that already names one, or a list item that is itself a mapping or list (§10.2)
 17. **P18** — Frontmatter is not valid YAML (§10.2). Distinct from P17, which is about a value's *shape*: P18 is a parse failure, and its fix is different — repair the syntax, rather than flatten a structure
 18. **P19** — A named `<slot>` inside the layout's default-content sink `<main>`, with no bare `<slot>` (§7.4). Located at the named slot
+19. **P20** — A `<slot>` outside a layout's `<body>` — anywhere in a page, or in a layout's `<head>` (§7.1). Inert in both cases; the message names the spelling that belongs in that file (`slot=` on a real element for a page, the layout's `<body>` for a head slot). Was advisory A04 until 2026-08-13
 
 ### 14.3 Advisories (the closed catalogue — capped at twelve; at the cap, adding one means removing one)
 
-Eleven, one slot free. A twelfth (A15, an `og:` value left root-relative by a path-only `--base-url`) was added and retired the same day: the form it warned about stopped existing (§11.3), which is the outcome to prefer whenever a diagnostic is compensating for a choice the tool did not have to offer.
+Ten, two slots free. Two IDs left this catalogue on 2026-08-13 and neither was replaced: **A15** (an `og:` value left root-relative by a path-only `--base-url`) was added and retired the same day, because the form it warned about stopped existing (§11.3); **A04** became problem **P20**, because what it reported was never merely informative — the page it let through was wrong. Both are the outcome to prefer over a warning: delete the choice, or fail the build. A retired ID is never reused.
 
 Same ID convention as §14.2.
 
 1. **A01** — Void `<include>` used (builds identically; previews wrong in a browser)
 2. **A02** — Fill names a slot the layout doesn't have (content stayed in the page flow) (§7.3)
 3. **A03** — Top-level `<header>`/`<footer>` outside any slot in a composed page (§7.6)
-4. **A04** — `<slot>` outside a layout's `<body>` (replaced by its children) (§7.1)
 5. **A13** — A duplicated construct of which only the first counts — a second bare `<slot>`, a repeated slot name, or a second `<main>` in a layout: the first won, and the message names the duplicated construct (§7.1)
 6. **A08** — Page charset differs from the layout's (layout's kept) (§8 row 1)
 7. **A09** — Working-format file emitted — extension list, closed: `.psd`, `.ai`, `.sketch`, `.fig`, `.xcf`

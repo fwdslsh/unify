@@ -51,7 +51,7 @@ LAY-14	§6.2	rule	fixture	A layout that itself declares data-layout (any value, 
 MRG-01	§7.1	rule	fixture	Sinks are the <slot> elements in the layout's <body> (skipping any inside <template>) plus the layout's first <main>; neither → sink-less
 MRG-02	§7.1	rule	fixture	First bare <slot> is the default slot; further bare slots get advisory A13 (duplicated construct) and render their fallback
 MRG-03	§7.1	rule	fixture	First <slot name=X> per X receives X's fills; a repeated name gets advisory A13 and later ones render their fallback
-MRG-04	§7.1	rule	fixture	A <slot> outside a layout's <body> (in any page, or a layout's <head>) gets advisory A04 and is replaced by its own children
+MRG-04	§7.1	rule	fixture	A <slot> outside a layout's <body> (in any page, or a layout's <head>) is problem P20 and is replaced by its own children
 MRG-05	§7.1	rule	fixture	Duplicate <main> in a layout: the first wins, advisory A13
 MRG-06	§7.2	rule	fixture	When the layout has at least one sink, the page's first <main> — in document order, at any depth, not only top level — is unwrapped once (S06); a <main> inside the first survives; no other element is unwrapped
 MRG-07	§7.2	rule	fixture	Fills are top-level elements of the page body carrying a non-empty slot attribute; slot="" counts as absent; slot on non-top-level elements is never touched or reported
@@ -149,10 +149,10 @@ P16	§14.2	diag	fixture	Problem: a <slot> nested inside another slot's fallback 
 P17	§14.2	diag	fixture	Problem: a frontmatter value with no text form - a mapping nested below a key that already names one, or a list item that is itself a mapping or list
 P18	§14.2	diag	fixture	Problem: frontmatter is not valid YAML - a parse failure, distinct from P17's shape rule
 P19	§14.2	diag	fixture	Problem: a named slot inside the layout's default-content sink main, with no bare slot - the two rules target overlapping spans
+P20	§14.2	diag	fixture	Problem: <slot> outside a layout's <body> (anywhere in a page, or in a layout's <head>); the fix names the spelling that belongs in that file. Was advisory A04
 A01	§14.3	diag	fixture	Advisory: void <include> used
 A02	§14.3	diag	fixture	Advisory: fill names a slot the layout doesn't have; content stayed in the page flow
 A03	§14.3	diag	fixture	Advisory: top-level <header>/<footer> outside any slot in a composed page
-A04	§14.3	diag	fixture	Advisory: <slot> outside a layout's <body>, replaced by its children
 A08	§14.3	diag	fixture	Advisory: page charset differs from the layout's, layout's kept
 A09	§14.3	diag	fixture	Advisory: working-format file emitted; closed extension list .psd .ai .sketch .fig .xcf
 A10	§14.3	diag	fixture	Advisory: a file used as a layout or include also ships as its own page

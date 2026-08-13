@@ -655,27 +655,36 @@ function checkNestedSlots(scopeRoot, text, file, reporter) {
 }
 
 /**
- * §7.1 MRG-04/A04: every `<slot>` in `scopeRoot` (excluding P16-flagged ones,
- * which are left completely untouched) is replaced by its own children (S4),
- * advisory A04. Used for an entire page document (all of a page's slots are
+ * §7.1 MRG-04/P20: every `<slot>` in `scopeRoot` (excluding P16-flagged ones,
+ * which are left completely untouched) is a problem, and is replaced by its
+ * own children (S4) so best-effort composition still produces a tree to
+ * report on. Used for an entire page document (all of a page's slots are
  * "outside a layout's body") and for a layout's `<head>` alone.
+ *
+ * This was advisory A04 until 2026-08-13. A `<slot>` outside a layout's body
+ * is inert in every case — pages fill with the `slot=` attribute, and a head
+ * slot is never a sink — so the advisory's only effect was to let a page ship
+ * whose author's intent had silently not happened: ratification round 7 had
+ * three of five samples write `<slot name="footer">` into a page, and a plain
+ * `unify build` published each of them at exit 0 with the layout's fallback
+ * footer AND the intended content loose in the body. Every sibling
+ * misplacement of this vocabulary (P07, P15, P16, P19) was already a problem;
+ * this one was the outlier.
  */
 function collectStraySlotEdits(scopeRoot, text, spans, file, reporter, excluded, inPage = false) {
   const edits = [];
   for (const slot of findAll(scopeRoot, (n) => isElement(n, "slot"))) {
     if (excluded.has(slot)) continue;
-    // A page's own <slot> is nearly always a fill written with the layout's
-    // spelling (round 7: three of five authoring samples), so name the fill
-    // spelling here — the advisory alone publishes a page whose slot never
-    // filled anything.
     const name = getAttr(slot, "name");
-    reporter.advisory({
+    reporter.problem({
       file,
       line: lineOf(text, slot.start),
-      message: "<slot> is outside a layout's <body> — replaced by its own children",
+      message: inPage
+        ? "<slot> in a page fills nothing — only a layout declares slots"
+        : "<slot> in a layout's <head> is never a sink — sinks are the <slot> elements in the layout's <body>",
       fixes: inPage
         ? [`to fill a layout slot, put slot= on a real element: <footer slot="${name || "footer"}">…</footer>`]
-        : [],
+        : ["move it into the layout's <body>, or drop it — a page contributes its own <head> and the two are merged (§8)"],
     });
     const [s, e] = contentSpan(slot);
     edits.push({ start: slot.start, end: slot.end, replacement: text.slice(s, e), replacementSpans: sliceSpans(spans, s, e) });

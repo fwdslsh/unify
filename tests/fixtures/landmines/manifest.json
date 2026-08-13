@@ -529,46 +529,46 @@
   "slot-in-page": {
    "rules": [
     "MRG-04",
-    "A04",
+    "P20",
     "S04"
    ],
    "flags": [],
-   "exit": 0,
-   "published": true,
+   "exit": 1,
+   "published": false,
    "diagnostics": [
     {
      "file": "src/index.html",
      "line": 5,
-     "severity": "advisory",
+     "severity": "problem",
      "containsAll": [
       "slot"
      ]
     }
    ],
    "diagnosticsExhaustive": true,
-   "expectedTree": "expected"
+   "note": "A04 became P20 on 2026-08-13 (ratification round 7): a <slot> outside a layout's <body> is inert, and letting it publish shipped pages whose author's intent had silently not happened. The S4 children-replacement still runs — best-effort composition (§2) — it just never reaches publish."
   },
   "slot-in-layout-head": {
    "rules": [
     "MRG-04",
-    "A04",
+    "P20",
     "S04"
    ],
    "flags": [],
-   "exit": 0,
-   "published": true,
+   "exit": 1,
+   "published": false,
    "diagnostics": [
     {
      "file": "src/_layout.html",
      "line": 5,
-     "severity": "advisory",
+     "severity": "problem",
      "containsAll": [
       "slot"
      ]
     }
    ],
    "diagnosticsExhaustive": true,
-   "expectedTree": "expected"
+   "note": "A04 became P20 on 2026-08-13 (ratification round 7): a <slot> outside a layout's <body> is inert, and letting it publish shipped pages whose author's intent had silently not happened. The S4 children-replacement still runs — best-effort composition (§2) — it just never reaches publish."
   },
   "slot-in-template": {
    "rules": [
