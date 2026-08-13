@@ -1112,3 +1112,66 @@ round: sandboxed samples were all appending transcripts to one shared
 `projects/-sandbox/<orchestrator-id>.jsonl` — readable in principle from inside the
 namespace — so `isolate.sh` now masks it; and rounds now overlap on the machine, so every
 transcript sweep is bounded by the round's own `.exit` times.
+
+
+---
+
+# Round 22 — inline url(): the open question, closed by evidence (pre-registered)
+
+6 samples (5 Haiku, 1 Sonnet control), 45-minute cap, mount-namespace isolation. The
+round-19 post-fixes left one question deliberately open: should §11.1 rewrite `url()` in
+a page's own `<style>`/`style=`, where no correct static spelling exists under
+`--pretty-urls` + `--base-url` together — or does the doc's "keep every url() in a
+stylesheet file" line carry the load? Pre-registered decision rule
+(`_notes/ratification-round-22-preregistration.md`, written before any sample ran):
+≥2 of 5 Haiku shipping an inline `url()` that 404s at the deploy address at exit 0 →
+rewrite; ≤1 → no engine change, record and close. The advisory middle ground was barred
+in advance by §14.3's operational tests. Brief: Alderfen Arboretum
+(`_notes/BRIEF-r22.md`), a full-width photo banner with text over it on the home page
+and a narrower one on each of two section landings — banners-with-text-over being the
+strongest content-side pull toward CSS backgrounds — at a subdirectory deploy with
+`.html`-free addresses, images seeded.
+
+**Result: 0 of 5 — the question closes with no engine change.** 6/6 exit 0 on their own
+publish commands, zero diagnostics anywhere in the round's final state, 36/36 markers,
+6/6 `--pretty-urls` (round 19's omission did not recur), all six isolation answers NO.
+
+**The finding is *which* mechanism authors reach for: 5 of 6 built every banner as
+`<img>` + `object-fit: cover` with an absolutely-positioned overlay — zero `url()`
+tokens in their entire output, stylesheets included.** The modern prior for
+image-with-text-over is no longer the CSS background; it is the pattern that happens to
+sit exactly on unify's rewritten path (`src=` gets §11.1/§11.3, and the reference check
+covers it). H1 — that most samples would follow the clause's remedy into a stylesheet
+file — was falsified in the best direction available: 0/6 wrote a stylesheet `url()` at
+all. The clause carried the round by **deterrence**, and explicitly so: the control's
+report says it treated "the CSS-background route as the one to avoid" because "the rules
+explicitly warn that `url()` inside CSS is never rewritten by `--base-url`".
+
+**The one sample that did write inline `url()` traversed the whole trap and shipped
+correct.** haiku-1 wrote `url(/images/banner-*.png)` into all three banner pages — the
+silent spelling — and had a green build with three dead banners for half a minute.
+Nothing in the tool flags that state; what closed it was the author reading the emitted
+output ("I notice the CSS image URLs need to be fixed - they use root-relative paths
+which won't be rewritten by unify") — and its report quotes the doc's `url()` clause in
+full as the sentence that taught it what to look for. Its first repair (`../images/`
+everywhere) was caught loudly — `src/index.html:5: problem: ../images/banner-home.png
+does not resolve to any emitted file` — confirming the pre-registered geometry: every
+wrong inline spelling except root-relative-with-base fails §12 at exit 1. Its second
+repair shipped three relative inline `url()` values that all fetch at the deploy
+address, legal because every page is authored as `dir/index.html` and never moves.
+
+**Verdict, per the pre-registered rule: ≤1 of 5 — no engine change; the doc line
+carries the load; the catalogue stays at nine of twelve; closed.** The silent window is
+real (one sample stood in it this round), but no sample shipped it, the doc clause is
+what pulled the one visitor out, and both neighbouring escapes — `<img>` and loud §12
+failures — worked every time they were reached. Re-open only if a later round shows a
+shipped inline 404 in the wild.
+
+Recorded, not acted on: what `--pretty-urls` does to the root `index.html` is unstated
+in the 60 lines — the control scratch-built a test site to learn it and haiku-5 "had to
+infer" it; both were right, the spec states it, and the dry-run's per-file report
+answers it, so hesitation-without-failure does not clear the amendment bar. haiku-4
+wanted "a local dev server" from a tool whose `--help` (which it never ran) names
+`unify dev` on line two — authoring miss, not a gap. The `.fragment.html` suffix was
+adopted unprompted by two samples for `_includes/` fragments — harmless where it is not
+needed, and evidence the new vocabulary reads.
