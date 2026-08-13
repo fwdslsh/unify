@@ -1415,33 +1415,15 @@
   },
   "stray-header-footer": {
    "rules": [
-    "MRG-17",
-    "A03"
+    "MRG-17"
    ],
    "flags": [],
    "exit": 0,
    "published": true,
-   "diagnostics": [
-    {
-     "file": "src/index.html",
-     "line": 5,
-     "severity": "advisory",
-     "containsAll": [
-      "header"
-     ]
-    },
-    {
-     "file": "src/index.html",
-     "line": 7,
-     "severity": "advisory",
-     "containsAll": [
-      "footer"
-     ]
-    }
-   ],
+   "diagnostics": [],
    "diagnosticsExhaustive": true,
    "expectedTree": "expected",
-   "note": "Advisory, not silent replacement (the v0.6 landmark matcher would have swallowed these): both ship in place per the content-loss law."
+   "note": "No diagnostic. A page's own <header>/<footer> are default content and ship in place, which is what the author drew; advisory A03 fired here until it was retired, and this expected tree is byte-for-byte what it used to narrate. The advisory was the defect: unify's own §7.2 unwrap hoisted a <header> written inside the page's <main> to top level and then reported it for being there, a meaningless wrapper <div> switched it off, and the repair it implied composed a <footer> inside a <footer> silently at exit 0."
   },
   "empty-include": {
    "rules": [
@@ -1680,6 +1662,19 @@
    ],
    "diagnosticsExhaustive": true,
    "note": "Ratification round 18: the P04 fix line used to print a hardcoded /_layout.html, which in a site with a section layout is a real, resolvable, WRONG answer — a repair sample followed it and both news articles silently lost their section body class and stylesheet at exit 0. The suggestion is now the layout this page would actually discover. layout-bare-name and -html cover the fallback wording when no layout exists at all."
+  },
+  "fill-in-wrapped-main": {
+   "rules": [
+    "MRG-06",
+    "MRG-07"
+   ],
+   "flags": [],
+   "exit": 0,
+   "published": true,
+   "diagnostics": [],
+   "diagnosticsExhaustive": true,
+   "expectedTree": "expected",
+   "note": "slot= is collected from the direct children of <body> and of the page's first <main>, wherever that <main> sits — the wrapper <div> does not break the fill, and the consumed attribute never ships. One wrapper deeper is still the author's own markup: untouched, unreported, attribute intact. Before this, the author watched their <main> tags vanish from the output while the fill silently did nothing and slot= shipped at exit 0."
   }
  }
 }

@@ -482,6 +482,15 @@ function composeSinkedBody({ preparedC, cBody, preparedL, sinks, pageFile, layou
   let bodySpans = preparedC.spans;
   let body = cBody;
   const main = findFirst(cBody, (n) => isElement(n, "main"));
+  // Where this <main>'s own element children will land once its open tag is
+  // gone — every one shifts left by exactly that tag's length. Captured here,
+  // before the splice, because after it the nodes are new objects. See the
+  // fill-scope note below for why they count.
+  const unwrappedKidStarts = new Set();
+  if (main) {
+    const delta = main.openTagEnd - main.start;
+    for (const k of elementChildren(main)) unwrappedKidStarts.add(k.start - delta);
+  }
   if (main) {
     const unwrapEdits = [{ start: main.start, end: main.openTagEnd, replacement: "" }];
     if (main.endTagStart != null) unwrapEdits.push({ start: main.endTagStart, end: main.endTagEnd, replacement: "" });
@@ -490,14 +499,33 @@ function composeSinkedBody({ preparedC, cBody, preparedL, sinks, pageFile, layou
     bodySpans = unwrapped.spans;
     body = findFirst(parse(bodyText).root, (n) => isElement(n, "body"));
   }
-  // Built AFTER the unwrap: A02/A03 below carry offsets into `bodyText`.
+  // Built AFTER the unwrap: A02 below carries offsets into `bodyText`.
   const pageAt = spansToDiagnosticLocator(bodySpans, pageFile, resolveLine);
 
   // §7.2 — classify top-level children into fills (by slot name) and default content.
   const topKids = elementChildren(body);
+
+  // §7.2 — the unwrapped <main>'s own element children are fills too, wherever
+  // that <main> sat. Unwrapping a <main> nested in a wrapper makes its children
+  // the WRAPPER's children, not the body's, so the scan below never saw them:
+  // the author watched their <main> tags vanish from the output — the strongest
+  // possible evidence unify processed exactly that region — while the fill did
+  // nothing and `slot=` shipped, at exit 0. Removing the open tag shifts each
+  // child left by exactly that tag's length, which is how these offsets are
+  // recovered after the splice. The parent of a fill is therefore always <body>
+  // or that <main>, and neither can be a component the author is assigning
+  // light DOM to — which is what keeps `slot=` inside their own web-component
+  // markup untouched.
+  const seenStarts = new Set(topKids.map((n) => n.start));
+  const extraKids = unwrappedKidStarts.size
+    ? findAll(body, (n) => n.type === "element" && unwrappedKidStarts.has(n.start) && !seenStarts.has(n.start))
+    : [];
+  const fillScope = extraKids.length
+    ? [...topKids, ...extraKids].sort((a, b) => a.start - b.start)
+    : topKids;
   const fillsByName = new Map(); // name -> {text,spans}[] (already slot-attr-stripped, in page order)
   const localEdits = []; // within body's own content span
-  for (const el of topKids) {
+  for (const el of fillScope) {
     const slotVal = attrValueOrEmpty(el, SLOT_ATTR);
     const isFillCandidate = slotVal !== "";
     const matchesRealSlot = isFillCandidate && sinks.namedSlots.has(slotVal);
@@ -519,13 +547,6 @@ function composeSinkedBody({ preparedC, cBody, preparedL, sinks, pageFile, layou
       if (attrEdit) localEdits.push(attrEdit);
     }
 
-    // §7.6/A03 — top-level header/footer NOT addressed to a real slot stayed in default content.
-    if ((isElement(el, "header") || isElement(el, "footer")) && !matchesRealSlot) {
-      reporter.advisory({
-        ...pageAt(el.start),
-        message: `top-level <${el.tag}> is not addressed to any slot in ${layoutFile} — it stayed in the page content`,
-      });
-    }
   }
 
   const [bs, be] = contentSpan(body);

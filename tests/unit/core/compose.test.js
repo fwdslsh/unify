@@ -333,14 +333,25 @@ describe("landmines: composition family", () => {
     expectTreeMatch(dir, "index.html", composed);
   });
 
-  test("stray-header-footer: MRG-17/A03 fires for both, content still ships in place", () => {
+  test("stray-header-footer: MRG-17 — both ship in place, nothing is reported", () => {
+    // A03 fired here until it was retired, and this expected tree is
+    // byte-for-byte what it used to narrate: the markup had composed exactly
+    // as its author drew it. See §7.6 for the three reproductions that
+    // condemned the advisory rather than its wording.
     const dir = join(LANDMINES, "stray-header-footer");
     const { composed, reporter } = composeFixture(dir, "index.html");
-    expect(reporter.diagnostics.length).toBe(2);
-    expect(reporter.diagnostics[0].line).toBe(5);
-    expect(reporter.diagnostics[0].message).toContain("header");
-    expect(reporter.diagnostics[1].line).toBe(7);
-    expect(reporter.diagnostics[1].message).toContain("footer");
+    expect(reporter.diagnostics).toEqual([]);
+    expectTreeMatch(dir, "index.html", composed);
+  });
+
+  test("fill-in-wrapped-main: MRG-07 — a fill inside a wrapped <main> counts; one wrapper deeper does not", () => {
+    const dir = join(LANDMINES, "fill-in-wrapped-main");
+    const { composed, reporter } = composeFixture(dir, "index.html");
+    expect(reporter.diagnostics).toEqual([]);
+    // The fill was lifted out of the wrapper and its slot= consumed…
+    expect(composed).toContain("<aside>FILLED FROM INSIDE A WRAPPED MAIN</aside>");
+    // …while the one a wrapper deeper stays the author's own markup, attribute intact.
+    expect(composed).toContain('<aside slot="aside">not a fill — one wrapper deeper</aside>');
     expectTreeMatch(dir, "index.html", composed);
   });
 

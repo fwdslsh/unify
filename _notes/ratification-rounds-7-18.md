@@ -786,3 +786,81 @@ supplement to the 60 lines — for repair, they are the documentation.
 Both 3/3 clean. The doc bought **speed and durability, not success**: 3.7 builds against
 4.7, and it changed the outcome on exactly two faults — P18 (guessed vs read) and P14
 (symptom vs convention).
+
+---
+
+## The two silent-intent failures — decided by a four-phase design study
+
+Rounds 16 and 18 each surfaced a case where an author wrote a fill, the fill did not
+happen, and nothing said so. Rather than deciding by instinct, three independent proposals
+were written from deliberately opposed angles — prose-only, new-diagnostic, and
+delete-the-choice — each attacked by an adversarial judge told to default to rejecting and
+to verify by running the CLI. **The two cases turned out to need opposite treatments, and
+neither needed a new diagnostic.**
+
+### A03 is retired — the advisory was the defect
+
+Four reproductions, all verified independently before acting:
+
+| site | A03 | what shipped |
+|---|---|---|
+| `<header>` written inside the page's own `<main>` — textbook HTML | **fires** | §7.2 unwrapped the `<main>`, hoisting the header to top level, and §7.6 then reported it for being there. Output is the source's structure. |
+| the same header wrapped in a meaningless `<div>` | **silent** | identical body once wrapper tags are stripped |
+| layout whose sink is a bare top-level `<slot>` | **fires** | header lands between the layout's nav and footer — exactly where its author drew it |
+| one typo'd `slot="fotter"` | **two** advisories (A02 + A03) | two `--strict` failures for one authoring act |
+
+And the finding that settled it. Against the idiomatic layout
+`<footer class="site-foot"><slot name="footer">…</slot></footer>`:
+
+- a page writing `<footer>MY FOOTER</footer>` → **A03 fires, `--strict` exit 1**, output has
+  two sibling footers, which is valid.
+- the same page applying A03's own implied repair, `<footer slot="footer">` → **exit 0,
+  nothing reported**, output is `<footer class="site-foot"><footer>MY FOOTER</footer></footer>`.
+
+**A03 condemned the valid document and silently rewarded the nested one.** The scaffold
+fills that slot with `<p slot="footer">` rather than `<footer slot="footer">` precisely to
+sidestep the trap, unexplained until now. SCF-04 never protected it either way: `<header>`
+and `<footer>` appear in the five templates only inside `_layout.html`, never in a page.
+
+Retiring it is purely subtractive — **zero bytes of output change anywhere**, and the
+`stray-header-footer` expected tree is byte-for-byte what the advisory used to narrate. The
+catalogue goes to **nine of twelve**, the third ID to leave and the third not replaced.
+
+The misconception A03 was aimed at — that a page's `<header>` replaces the layout's — moves
+into `authoring-rules.md`, in the file the author is actually editing, along with the trap:
+*if the layout wraps its slot in its own `<footer>`, write `<p slot="footer">`, or you ship
+a footer inside a footer.* One in-place sentence, no line added, cap untouched. (Round 13's
+measured lesson: the changed literal moved 6/6 samples; nobody ever saw the advisory.)
+
+**Two operational tests generalise out of it**, now in §14.3 — they would have caught A03
+before it shipped:
+
+> An advisory that a meaningless wrapper element switches off is reporting tree position,
+> not authorial error. And an advisory whose only available repair edits a file the page
+> does not own — a shared layout, a shared fragment — is instructing a restructure by
+> another name, whatever its wording.
+
+### The mis-nested fill — a sentence I wrote was false, so the engine changed to match it
+
+`authoring-rules.md` said `slot=` counts on direct children of `<body>` "or of your
+`<main>`, unwrapped first". **The second clause was false.** §7.2 unwraps the first `<main>`
+at any depth, but its children become the *wrapper's* children, so the fill scan never saw
+them. The author watched their `<main>` tags vanish from the output — the strongest possible
+evidence unify processed exactly that region — while the fill did nothing, the layout's
+fallback shipped, and `slot="footer"` was published at exit 0 under `--strict`.
+
+Fills are now the direct element children of `<body>` **and of the page's first `<main>`,
+wherever it sat**. The safety property is that the parent of a fill is always `<body>` or
+that `<main>` — neither of which can be a component an author is assigning light DOM to —
+which is what leaves `slot=` inside web-component markup, inside `<template>`, and one
+wrapper deeper untouched. The ratified `slot-attr-edge` fixture is unmoved; no ID added, no
+row added or removed, no doc line displaced.
+
+One disclosed artefact: a wrapper whose only content was the fill now ships empty. It is
+asserted in the fixture's expected tree rather than hidden.
+
+**The residue stays silent, deliberately.** A fill under a plain wrapper `<div>` still does
+nothing and still ships its attribute. No diagnostic was added for it: the catalogue has
+three free slots and this is a case where the evidence does not yet say whether authors
+write that markup at all. The experiment that would settle it is a brief compelling a fill
+from inside a styled wrapper — not a guess.

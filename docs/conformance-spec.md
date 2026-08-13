@@ -287,7 +287,7 @@ src/_layout.html:8: problem: <slot name="inner"> is nested inside the fallback o
 
 If L has at least one sink: C's body content is **unwrapped once** — the first `<main>` in C's body in document order, **at any depth, not only top level**, is replaced by its children (S6): a `<main>` inside a wrapper `<div>` unwraps and the wrapper stays. Exactly once — a `<main>` inside the first one is the author's own markup and survives. No other element is unwrapped. (Top-level-only unwrap would ship `<main>`-inside-`<main>` for the common wrapper pattern; unwrapping the first one anywhere is what keeps composed output valid.)
 
-**Fills** are then collected: every top-level element of C's body carrying a `slot` attribute with a non-empty value. (`slot=""` counts as absent. `slot` on non-top-level elements is the author's own markup and is never touched or reported.) Fill elements are removed from the default-content sequence.
+**Fills** are then collected: every direct element child of C's body, **and every direct element child of the `<main>` that was just unwrapped, wherever it sat**, carrying a `slot` attribute with a non-empty value. (`slot=""` counts as absent.) The unwrap and the collection are one step, not two: a fill inside a `<main>` inside a wrapper `<div>` counts, because the `<main>` is the page's content region and the wrapper is styling. A `slot` attribute anywhere else — deeper than that, or inside a `<template>` — is the author's own markup and is never touched or reported: the parent of a fill is always `<body>` or that `<main>`, and neither can be a component the author is assigning light DOM to. Fill elements are removed from the default-content sequence wherever they sat; a wrapper they leave behind stays, possibly empty.
 
 **Default content** is everything else in C's body — elements, text, comments — in source order (S12).
 
@@ -323,9 +323,11 @@ Every message about a slot or a layout names the layout file it was checked agai
 
 A layout with no slots and no `<main>` treats its whole `<body>` as the default slot: C's body children replace L's body children verbatim (S5, **no unwrap** — C's own `<main>` survives). The head-only layout (shared stylesheet, empty body) is the intended use and is legitimate, not a mistake.
 
-### 7.6 Advisory on stray chrome
+### 7.6 Stray chrome, and the content-loss law
 
-When a page composes with a layout, a top-level `<header>` or `<footer>` element left in the default content is advisory A03 (it probably meant `slot=`). It still ships, in place, per the content-loss law.
+When a page composes with a layout, a `<header>` or `<footer>` element that is not a fill is default content like any other element: it ships, in place, wherever §7.4 routes the default content, and **nothing is reported**.
+
+This was advisory **A03** until it was retired. The advisory was the defect. §7.2 unwraps C's first `<main>` before the top-level scan, so a `<header>` written inside the page's own `<main>` — ordinary, correct HTML — was hoisted to top level by unify and then reported for being there, with composed output identical in structure to the source. Wrapping that same element in a meaningless `<div>` silenced the advisory and changed nothing else in the output, which is the tell: it was reporting tree position, not authorial error. And the repair it gestured at is a trap — against the idiomatic layout that wraps its slot in the matching landmark, `<footer slot="footer">` composes to a `<footer>` inside a `<footer>` at exit 0 with nothing reported, which is why the scaffold fills that slot with `<p slot="footer">`. `A03` is a retired ID. The misconception it was aimed at — that a page's `<header>` replaces the layout's — belongs in `authoring-rules.md`, in the file the author is editing.
 
 **The law**: content the author wrote is never dropped without failing the build. Every rule above either places content or raises a problem; no future rule may do otherwise.
 
@@ -875,13 +877,12 @@ The bold IDs are the stable identifiers used by `tests/conformance/rules.tsv` an
 
 ### 14.3 Advisories (the closed catalogue — capped at twelve; at the cap, adding one means removing one)
 
-Ten, two slots free. Two IDs left this catalogue on 2026-08-13 and neither was replaced: **A15** (an `og:` value left root-relative by a path-only `--base-url`) was added and retired the same day, because the form it warned about stopped existing (§11.3); **A04** became problem **P20**, because what it reported was never merely informative — the page it let through was wrong. Both are the outcome to prefer over a warning: delete the choice, or fail the build. A retired ID is never reused.
+Nine, three slots free. Three IDs have left this catalogue and none was replaced: **A15** (an `og:` value left root-relative by a path-only `--base-url`) was added and retired the same day, because the form it warned about stopped existing (§11.3); **A04** became problem **P20**, because what it reported was never merely informative — the page it let through was wrong; **A03** (a top-level `<header>`/`<footer>` outside any slot) was deleted, because the markup it fired on had composed exactly as its author drew it (§7.6). All three are the outcome to prefer over a warning that stays: delete the choice, fail the build, or delete the warning. A retired ID is never reused.
 
 Same ID convention as §14.2.
 
 1. **A01** — Void `<include>` used (builds identically; previews wrong in a browser)
 2. **A02** — Fill names a slot the layout doesn't have (content stayed in the page flow) (§7.3)
-3. **A03** — Top-level `<header>`/`<footer>` outside any slot in a composed page (§7.6)
 5. **A13** — A duplicated construct of which only the first counts — a second bare `<slot>`, a repeated slot name, or a second `<main>` in a layout: the first won, and the message names the duplicated construct (§7.1)
 6. **A08** — Page charset differs from the layout's (layout's kept) (§8 row 1)
 7. **A09** — Working-format file emitted — extension list, closed: `.psd`, `.ai`, `.sketch`, `.fig`, `.xcf`
@@ -889,6 +890,8 @@ Same ID convention as §14.2.
 9. **A11** — Output paths differing only by case (§13)
 10. **A12** — Symlink resolving outside the source root (treated as absent) (§4.4)
 11. **A14** — Known deployment file at the source root held back by the exclude set — names the file and the `--exclude` line that ships it; the recognized names are the implementation's maintained list, which may grow without a spec revision (§4.2)
+
+Two operational tests fell out of A03's retirement. An advisory that a meaningless wrapper element switches off is reporting tree position, not authorial error. And an advisory whose only available repair edits a file the page does not own — a shared layout, a shared fragment — is instructing a restructure by another name, whatever its wording.
 
 Discipline (asserted by the E2E suite): an advisory that fires on a correct site is a bug in the advisory — `unify init && unify build --dry-run --strict` exits `0`. Advisories report what the build observed and what it did; they never instruct the author to restructure markup that composed correctly.
 

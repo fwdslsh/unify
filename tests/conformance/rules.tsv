@@ -54,7 +54,7 @@ MRG-03	§7.1	rule	fixture	First <slot name=X> per X receives X's fills; a repeat
 MRG-04	§7.1	rule	fixture	A <slot> outside a layout's <body> (in any page, or a layout's <head>) is problem P20 and is replaced by its own children
 MRG-05	§7.1	rule	fixture	Duplicate <main> in a layout: the first wins, advisory A13
 MRG-06	§7.2	rule	fixture	When the layout has at least one sink, the page's first <main> — in document order, at any depth, not only top level — is unwrapped once (S06); a <main> inside the first survives; no other element is unwrapped
-MRG-07	§7.2	rule	fixture	Fills are top-level elements of the page body carrying a non-empty slot attribute; slot="" counts as absent; slot on non-top-level elements is never touched or reported
+MRG-07	§7.2	rule	fixture	Fills are the direct element children of the page body and of the page's first <main> wherever it sat, carrying a non-empty slot attribute; slot="" counts as absent; slot anywhere else is never touched or reported
 MRG-08	§7.2	rule	fixture	Default content is everything else in the page body - elements, text, comments - in source order (S12)
 MRG-09	§7.3	rule	fixture	For each name with fills, <slot name> is replaced by the fills in page order (S03)
 MRG-10	§7.3	rule	fixture	A fill naming a slot the layout lacks: advisory A02, slot attribute consumed, element stays in place in the default-content sequence
@@ -64,7 +64,7 @@ MRG-13	§7.4	rule	fixture	No default slot, layout has <main> → default content
 MRG-14	§7.4	rule	fixture	No default slot, no <main>, named slots exist, default content non-empty → problem (content would vanish)
 MRG-15	§7.4	rule	targeted	Every message about a slot or a layout names the layout file it was checked against
 MRG-16	§7.5	rule	fixture	Sink-less layout: whole <body> is the default slot; page body children replace layout body children verbatim (S05, no unwrap); head-only layout is legitimate
-MRG-17	§7.6	rule	fixture	Top-level <header>/<footer> left in composed default content: advisory A03; still ships in place
+MRG-17	§7.6	rule	fixture	A <header>/<footer> that is not a fill is default content: it ships in place and is not reported (A03 retired)
 MRG-18	§7.6	rule	structural	The content-loss law: authored content is never dropped without failing the build; every rule places content or raises a problem (enforced across all fixtures via diagnosticsExhaustive + tree assertions)
 MRG-19	§7.1	rule	fixture	Slots do not nest: a <slot> inside another slot's fallback content is a problem P16 - fallback content is plain markup
 HED-01	§8 row 1	rule	fixture	Charset: page's dropped in favor of layout's which stays first; layout without one -> page's kept and moved first; identical silent; different -> advisory A08
@@ -155,7 +155,6 @@ P19	§14.2	diag	fixture	Problem: a named slot inside the layout's default-conten
 P20	§14.2	diag	fixture	Problem: <slot> outside a layout's <body> (anywhere in a page, or in a layout's <head>); the fix names the spelling that belongs in that file. Was advisory A04
 A01	§14.3	diag	fixture	Advisory: void <include> used
 A02	§14.3	diag	fixture	Advisory: fill names a slot the layout doesn't have; content stayed in the page flow
-A03	§14.3	diag	fixture	Advisory: top-level <header>/<footer> outside any slot in a composed page
 A08	§14.3	diag	fixture	Advisory: page charset differs from the layout's, layout's kept
 A09	§14.3	diag	fixture	Advisory: working-format file emitted; closed extension list .psd .ai .sketch .fig .xcf
 A10	§14.3	diag	fixture	Advisory: a file used as a layout or include also ships as its own page

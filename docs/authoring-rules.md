@@ -35,7 +35,7 @@ an error — on a layout too, because layouts don't chain (a section layout is a
   fallback ships; `slot=` counts on direct children of `<body>` — or of your `<main>`, unwrapped first — and silently does nothing deeper. `grep -o '<slot[^>]*>' src/_layout.html` lists a layout's slots.
 - **Everything else** replaces the layout's bare `<slot></slot>` if it has one — `<main><slot></slot></main>`
   is the usual shape — otherwise the children of its `<main>`. A `<main>` you wrote is dropped and its children used, so write complete semantic
-  documents. A bare `<header>`/`<footer>` does **not** replace the layout's — only `slot=` fills.
+  documents. A bare `<header>`/`<footer>` does **not** replace the layout's — only `slot=` fills, and it fills the *contents*: where the layout wraps its slot in its own `<footer>`, write `<p slot="footer">`, or you ship a footer inside a footer.
 - **Head.** A page has its own complete `<head>`; the layout's is the base, and where both declare
   `<meta charset>` the layout's wins. **Write the separator into the layout's title** —
   `<title>— My Site</title>`, no leading space — and a page writes only its own name
