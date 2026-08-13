@@ -2,19 +2,19 @@
 
 What actually runs, and what each job is allowed to mean. Two workflow files exist: `.github/workflows/test.yml` (every push and PR) and `.github/workflows/release.yml` (tagged releases).
 
-## `test.yml` — three jobs, one of them red on purpose
+## `test.yml` — three jobs
 
 ### `release-signal` — the release condition itself
 
-Runs the conformance suite against the real CLI, then checks the runtime traceability ledger:
+Runs the whole suite against the real CLI, then checks the runtime traceability ledger:
 
 ```bash
 rm -f .conformance-ledger.jsonl
-bun test tests/conformance tests/e2e
+bun test
 bun tests/conformance/check-traceability.mjs --runtime .conformance-ledger.jsonl
 ```
 
-**This job going green *is* the v0.7.0 release condition** — every gated rule in `tests/conformance/rules.tsv` recorded by a test that actually ran and passed in this run. It was red by design for the whole rewrite, and `tests/conformance/phase-gaps/p0-expected-fail.txt` records why a red harness was the correct Phase 0 *pass* condition.
+**This job going green *is* the v0.7.0 release condition** — every gated rule in `tests/conformance/rules.tsv` recorded by a test that actually ran and passed in this run. It was red by design for the whole rewrite, and `tests/conformance/phase-gaps/p0-expected-fail.txt` records why a red harness was the correct Phase 0 *pass* condition. That phase is over: the ledger is full and the job is green, so a red run is now a regression rather than progress.
 
 The failure mode to guard against is not this job failing; it is someone making it pass. Do not weaken the harness, the comparator, or the checker to turn it green. Progress is the covered count it prints.
 
@@ -40,9 +40,9 @@ The static check also enforces spec↔inventory sync: if `docs/conformance-spec.
 
 There is no coverage threshold anywhere in CI, deliberately. This project shipped 240 test files at 93% coverage over a CLI that could not scaffold or build a site; `docs/testing-strategy.md` §1 documents the five mechanisms that made that possible. Coverage counts lines executed, not behavior verified, so it is a diagnostic here and never a gate. **No PR should cite a coverage number as evidence.**
 
-## The legacy suite does not vote
+## The legacy suite is gone
 
-`tests/legacy-v0.6/` is excluded from CI by path filter. It tests a product that no longer exists — component mode, area classes, rule codes — and its green was load-bearing for nothing. Tests asserting cut behavior are deleted with their modules rather than fixed; `docs/migration-plan.md` §2 has the rule for telling those apart from tests worth porting.
+`tests/legacy-v0.6/` was quarantined out of CI for the whole rewrite and has now been deleted, along with the nine v0.6 fixture trees (`component-scoping`, `area-merging-complex`, `landmark-fallback`, and the rest) that no other test read. It tested a product that no longer exists — component mode, area classes, rule codes — and its green was load-bearing for nothing. Tests asserting cut behavior are deleted with their modules rather than fixed; `docs/migration-plan.md` §2 has the rule for telling those apart from tests worth porting. Nothing in the repo is excluded from `bun test` any more, so a red suite on any branch means something is actually broken.
 
 ## `release.yml`
 

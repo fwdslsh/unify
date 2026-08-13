@@ -24,7 +24,7 @@ Exactly **one** of 62 test files invoked the real CLI: `tests/integration/fixtur
 // expect(comparison.valid).toBe(true);
 ```
 
-The only end-to-end output comparison in the entire suite printed a warning and passed. The same file weakened its content expectations to match the broken implementation, with comments narrating the surrender: `// Note: Third element may not be fully implemented yet`, `// Note: Full ID rewriting not yet implemented`, `// Note: Component scoping may not be fully implemented yet`. When implementation and test disagreed, the **test** was edited. A fixture tree with expected outputs existed (`tests/fixtures/full-site/expected/`) that no test read at all.
+The only end-to-end output comparison in the entire suite printed a warning and passed. The same file weakened its content expectations to match the broken implementation, with comments narrating the surrender: `// Note: Third element may not be fully implemented yet`, `// Note: Full ID rewriting not yet implemented`, `// Note: Component scoping may not be fully implemented yet`. When implementation and test disagreed, the **test** was edited. A fixture tree with expected outputs existed (`tests/fixtures/full-site/expected/`) that no test read at all; it was deleted with the legacy suite.
 
 ### M3 — The suite ratified bugs as contracts
 

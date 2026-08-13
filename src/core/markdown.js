@@ -35,9 +35,8 @@
  *     HTML for entities, the exact class of bug that got linkedom rejected
  *     elsewhere in this codebase.
  *
- * Dependency choice — frontmatter YAML: js-yaml (already present
- * transitively via gray-matter; promoted to a direct dependency here since
- * this module imports it directly), loaded with `FAILSAFE_SCHEMA`.
+ * Dependency choice — frontmatter YAML: js-yaml, a direct dependency since
+ * this module imports it directly, loaded with `FAILSAFE_SCHEMA`.
  * Justification: §10.2's value-serialization rule is source-text fidelity —
  * "no type coercion ever rewrites a value" (`0.50` must stay `"0.50"`,
  * `2026-01-01` must stay a string, never a Date). js-yaml's *default* schema
