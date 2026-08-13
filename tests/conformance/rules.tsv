@@ -51,10 +51,10 @@ LAY-14	§6.2	rule	fixture	A layout that itself declares data-layout (any value, 
 MRG-01	§7.1	rule	fixture	Sinks are the <slot> elements in the layout's <body> (skipping any inside <template>) plus the layout's first <main>; neither → sink-less
 MRG-02	§7.1	rule	fixture	First bare <slot> is the default slot; further bare slots get advisory A13 (duplicated construct) and render their fallback
 MRG-03	§7.1	rule	fixture	First <slot name=X> per X receives X's fills; a repeated name gets advisory A13 and later ones render their fallback
-MRG-04	§7.1	rule	fixture	A <slot> outside a layout's <body> (in any page, or a layout's <head>) gets advisory A04 and is replaced by its own children
+MRG-04	§7.1	rule	fixture	A <slot> outside a layout's <body> (in any page, or a layout's <head>) is problem P20 and is replaced by its own children
 MRG-05	§7.1	rule	fixture	Duplicate <main> in a layout: the first wins, advisory A13
 MRG-06	§7.2	rule	fixture	When the layout has at least one sink, the page's first <main> — in document order, at any depth, not only top level — is unwrapped once (S06); a <main> inside the first survives; no other element is unwrapped
-MRG-07	§7.2	rule	fixture	Fills are top-level elements of the page body carrying a non-empty slot attribute; slot="" counts as absent; slot on non-top-level elements is never touched or reported
+MRG-07	§7.2	rule	fixture	Fills are the direct element children of the page body and of the page's first <main> wherever it sat, carrying a non-empty slot attribute; slot="" counts as absent; slot anywhere else is never touched or reported
 MRG-08	§7.2	rule	fixture	Default content is everything else in the page body - elements, text, comments - in source order (S12)
 MRG-09	§7.3	rule	fixture	For each name with fills, <slot name> is replaced by the fills in page order (S03)
 MRG-10	§7.3	rule	fixture	A fill naming a slot the layout lacks: advisory A02, slot attribute consumed, element stays in place in the default-content sequence
@@ -64,7 +64,7 @@ MRG-13	§7.4	rule	fixture	No default slot, layout has <main> → default content
 MRG-14	§7.4	rule	fixture	No default slot, no <main>, named slots exist, default content non-empty → problem (content would vanish)
 MRG-15	§7.4	rule	targeted	Every message about a slot or a layout names the layout file it was checked against
 MRG-16	§7.5	rule	fixture	Sink-less layout: whole <body> is the default slot; page body children replace layout body children verbatim (S05, no unwrap); head-only layout is legitimate
-MRG-17	§7.6	rule	fixture	Top-level <header>/<footer> left in composed default content: advisory A03; still ships in place
+MRG-17	§7.6	rule	fixture	A <header>/<footer> that is not a fill is default content: it ships in place and is not reported (A03 retired)
 MRG-18	§7.6	rule	structural	The content-loss law: authored content is never dropped without failing the build; every rule places content or raises a problem (enforced across all fixtures via diagnosticsExhaustive + tree assertions)
 MRG-19	§7.1	rule	fixture	Slots do not nest: a <slot> inside another slot's fallback content is a problem P16 - fallback content is plain markup
 HED-01	§8 row 1	rule	fixture	Charset: page's dropped in favor of layout's which stays first; layout without one -> page's kept and moved first; identical silent; different -> advisory A08
@@ -107,8 +107,8 @@ URL-06	§11.1	rule	fixture	A relative URL whose provenance is the page stays exa
 URL-07	§11.2	rule	fixture	Pretty files: every page output X.html moves to X/index.html except any index.html and the root 404.html
 URL-08	§11.2	rule	fixture	Pretty links: after §11.1, every internal URL resolving to an emitted page's .html output is rewritten resolve-first then transformed, emitted root-relative (the eight-row table)
 URL-09	§11.2	rule	fixture	Pretty preserves untouched: external URLs, mailto/tel/data, fragment-only, URLs to non-page files; query and fragment always survive
-URL-10	§11.3	rule	fixture	base-url one scope both forms: every root-relative URL in href/src/srcset/poster plus root-relative og:/twitter: meta content; the path form prefixes everything in scope
-URL-11	§11.3	rule	fixture	base-url full URL: path part applied exactly as URL-10, then origin prepended to og:/twitter: content and canonical href — absolutization is always origin + path prefix (og:image /assets/x.jpg under https://host/repo/ emits https://host/repo/assets/x.jpg)
+URL-10	§11.3	rule	fixture	base-url is the whole address (scheme+domain); a bare path is a usage error, exit 2. Its path part prefixes every root-relative URL in href/src/srcset/poster plus root-relative og:/twitter: meta content
+URL-11	§11.3	rule	fixture	base-url origin is prepended to og:/twitter: content and canonical href — absolutization is always origin + path prefix (og:image /assets/x.jpg under https://host/repo/ emits https://host/repo/assets/x.jpg)
 URL-12	§11.3	rule	fixture	base-url leaves non-root-relative values untouched; source files stay rooted at /; order §11.1→§11.2→§11.3
 REF-01	§12	rule	fixture	Check scope: every emitted HTML file's href/src/srcset/poster, link href for every rel, root-relative og:/twitter: meta content; url() in emitted CSS files, <style> blocks, and style attributes (rewriting-exempt but checked)
 REF-02	§12	rule	fixture	Internal = after stripping the base-url prefix (path prefix, or the full origin+path base when a full URL was given — absolutized values stay checkable), root-relative or relative (resolved against the containing output file's URL); query/fragment stripped; external and mailto/tel/data/fragment-only skipped
@@ -116,6 +116,7 @@ REF-03	§12	rule	fixture	A directory URL (trailing / or empty path) checks for i
 REF-04	§12	rule	fixture	A URL resolving to no emitted file is a problem naming the source file, the reference, and the line where known
 REF-05	§12	rule	fixture	Case is compared byte-for-byte; a reference matching only case-insensitively fails
 REF-06	§12	rule	fixture	#fragment targets are not validated against ids
+REF-07	§12	rule	fixture	A reference resolving to the output path of a source page that exists but failed to compose is NOT reported (its own problem already blocks the publish); a target with no source file, and an excluded-but-existing target, still fail
 COL-01	§13	rule	fixture	Two sources producing one output path is a problem naming both sources
 COL-02	§13	rule	fixture	A --pretty-urls move landing on another source's output is a problem naming both sources
 COL-03	§13	rule	targeted	Two outputs differing only by letter case: advisory A11
@@ -130,7 +131,9 @@ DIA-07	§14.1	rule	fixture	Continuation lines indented two spaces: in: and fix:;
 DIA-08	§14.1	rule	fixture	Cycle and depth messages print the full chain joined with " → "
 DIA-09	§14.1	rule	targeted	DEBUG=1 adds stack traces
 DIA-10	§14.3	rule	e2e	Advisory discipline: unify init && unify build --dry-run --strict exits 0; an advisory firing on a correct site is a bug in the advisory
-DIA-11	§14.1	rule	fixture	Attribution conventions are contract: cycle/depth problems locate at the outermost include site; collision problems at the path-ordered first source; reference problems at the reference's provenance file, at its line there when known
+DIA-11	§14.1	rule	fixture	Attribution conventions are contract: cycle/depth problems locate at the outermost include site; collision problems at the path-ordered first colliding source; every other located diagnostic — §6 layout selection, §7 composition, §8 charset advisory, §12 references — at the provenance file of the offending markup and its line IN that file, never the host post-inlining line
+DIA-13	§14.1	rule	fixture	A line that cannot be mapped to the named file is omitted, not guessed: the FILE: SEVERITY: form is used (a .md page converts before inlining, so an offset attributed to Markdown source indexes converted HTML)
+DIA-12	§14.1	rule	fixture	Diagnostics are deduplicated before counting or printing: same file, line, severity, message, in: and fix: lines = one diagnostic; genuinely distinct faults that print identically (a relative url() in shared chrome resolving per consumer) are distinguished by resolved target and both printed
 P01	§14.2	diag	fixture	Problem: include target missing, wrong extension, or escaping the source root
 P02	§14.2	diag	fixture	Problem: include cycle or depth over 10, chain printed
 P03	§14.2	diag	fixture	Problem: <include> without src; <include> with non-whitespace content
@@ -149,10 +152,9 @@ P16	§14.2	diag	fixture	Problem: a <slot> nested inside another slot's fallback 
 P17	§14.2	diag	fixture	Problem: a frontmatter value with no text form - a mapping nested below a key that already names one, or a list item that is itself a mapping or list
 P18	§14.2	diag	fixture	Problem: frontmatter is not valid YAML - a parse failure, distinct from P17's shape rule
 P19	§14.2	diag	fixture	Problem: a named slot inside the layout's default-content sink main, with no bare slot - the two rules target overlapping spans
+P20	§14.2	diag	fixture	Problem: <slot> outside a layout's <body> (anywhere in a page, or in a layout's <head>); the fix names the spelling that belongs in that file. Was advisory A04
 A01	§14.3	diag	fixture	Advisory: void <include> used
 A02	§14.3	diag	fixture	Advisory: fill names a slot the layout doesn't have; content stayed in the page flow
-A03	§14.3	diag	fixture	Advisory: top-level <header>/<footer> outside any slot in a composed page
-A04	§14.3	diag	fixture	Advisory: <slot> outside a layout's <body>, replaced by its children
 A08	§14.3	diag	fixture	Advisory: page charset differs from the layout's, layout's kept
 A09	§14.3	diag	fixture	Advisory: working-format file emitted; closed extension list .psd .ai .sketch .fig .xcf
 A10	§14.3	diag	fixture	Advisory: a file used as a layout or include also ships as its own page
@@ -174,6 +176,7 @@ WCH-07	§16	rule	structural	No proxying, HTTPS, middleware, or config in dev —
 DRY-01	§17	rule	fixture	--dry-run report: stdout, one list ordered by output path, one line per action, verbs write/copy/delete only
 DRY-02	§17	rule	fixture	Every write line names its inputs: the source page and the layout it resolved to
 DRY-03	§17	rule	fixture	Under --dry-run, diagnostics print to stderr exactly as a real build would
+DRY-04	§17	rule	fixture	--dry-run states the address it is building for (base-url, or the domain root when unset), and each write/copy row carries the URL that file answers to
 CFG-01	§18	rule	targeted	unify.yaml keys are the long option names: source output clean exclude pretty-urls base-url strict port; exclude replaces the default like the flag
 CFG-02	§18	rule	targeted	CLI flags win over unify.yaml on conflict
 CFG-03	§18	rule	targeted	No behavior exists that only the file can express; the file itself is never emitted

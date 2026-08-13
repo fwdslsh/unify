@@ -66,13 +66,28 @@
  *   `<main>` unwrap (§7.2), fill/default-content classification (§7.2-7.3),
  *   sink routing (§7.4-7.5), head merge (head-merge.js, §8), and root
  *   attribute merge (§9/S11).
+ *
+ * DIAGNOSTIC LOCATION (§14.1): every diagnostic below names the file and line
+ * the SPANS say authored the offending byte — never "the page/layout this
+ * offset belongs to, measured in the include-inlined text". Those two answers
+ * differ by every line any fragment inlined above the fault contributed, so
+ * the second one routinely pointed past the end of the file it named — a
+ * duplicate `<slot>` on line 7 of a nine-line layout reported at line 12,
+ * the fragment above it having contributed five lines (ratification round
+ * 18; pinned by tests/fixtures/landmines/line-after-include, and its
+ * counterpart slot-inside-include pins the file half: a `<slot>` a fragment
+ * contributed is reported IN that fragment, at its own line, not at the host
+ * that included it). See `spansToDiagnosticLocator` (urls.js) for the
+ * mechanism and `resolveLine` for why the offset→line half is injected rather
+ * than computed here.
  */
 import {
   attrValueOrEmpty, contentSpan, elementChildren, findAll,
-  findFirst, getAttrNode, hasAttr, isBlank, isElement, lineOf, parse,
+  findFirst, getAttr, getAttrNode, hasAttr, isBlank, isElement, parse,
   rawSpan, removeAttrEdit, spanWithAttrRemoved, tokens,
 } from "./html.js";
 import { mergeHead } from "./head-merge.js";
+import { spansToDiagnosticLocator, verbatimLineResolver, wholeTextSpan } from "./urls.js";
 
 const DATA_LAYOUT = "data-layout";
 const SLOT_ATTR = "slot";
@@ -184,10 +199,29 @@ function spliceTrackingSpans(text, spans, edits, fallbackFile) {
   return { text: out, spans: result };
 }
 
-/** A single whole-text span attributing every byte of `text` to `file`, for a caller with no finer-grained provenance. */
-function wholeTextSpan(text, file) {
-  return text.length > 0 ? [{ start: 0, end: text.length, file, fileOffset: 0 }] : [];
-}
+// -------------------------------------------------- §14.1 diagnostic location
+//
+// WHERE THE OFFSET→LINE CONVERSION BELONGS, and why it is not here.
+//
+// A span answers "which file, and at what offset in THAT file" exactly
+// (`spansToSourceLocator`). Turning that offset into a line needs the source
+// file's own raw text — which this module deliberately never has: it is
+// content-in/diagnostics-out (module header; every input is a string its
+// caller loaded) and reading `_includes/nav.html` off disk to number a line
+// would make composition a filesystem client, breaking every unit test that
+// composes from strings and every future caller that composes from memory
+// (`unify dev`'s in-memory rebuilds).
+//
+// So the conversion is INJECTED: `compose()` takes an optional
+// `resolveLine(file, fileOffset) => number|undefined`, supplied by the one
+// component that already knows how to obtain any source file's text —
+// `src/cli/commands/build.js`, which does the same thing for the §12
+// reference check (`makeReferenceLocator`). This module only ever composes
+// the two halves, via `spansToDiagnosticLocator` (urls.js — shared with
+// layout.js's §6 diagnostics and head-merge.js's §8 advisory, so all three
+// stages locate a fault identically); `verbatimLineResolver` is the
+// no-injection fallback for unit tests, and returns undefined rather than
+// guessing whenever the text in hand is not the named file's raw source.
 
 /**
  * `html.js`'s `spanWithAttrRemoved` (an element's raw span with one
@@ -313,22 +347,34 @@ function escapeAttr(s) {
  * @param {string} [args.layoutFile] - required whenever `layoutText` is given
  * @param {{start:number,end:number,file:string,fileOffset:number}[]} [args.layoutSpans] -
  *   `layoutText`'s own provenance; same default as `pageSpans`.
+ * @param {(file: string, fileOffset: number) => number|undefined} [args.resolveLine] -
+ *   turns a provenance position into a 1-based line in that file, for §14.1
+ *   diagnostic locations (see the DIAGNOSTIC LOCATION note above and
+ *   `verbatimLineResolver` for the omitted case). Injected because this module
+ *   never reads the filesystem.
  * @param {import('./diagnostics.js').Reporter} args.reporter
  * @returns {{text: string, spans: {start:number,end:number,file:string,fileOffset:number}[]}}
  */
-export function compose({ pageText, pageFile, pageSpans, layoutText, layoutFile, layoutSpans, reporter }) {
+export function compose({ pageText, pageFile, pageSpans, layoutText, layoutFile, layoutSpans, resolveLine, reporter }) {
   const pSpans = pageSpans ?? wholeTextSpan(pageText, pageFile);
-  if (!layoutText) return composeNoLayout({ pageText, pageFile, pageSpans: pSpans, reporter });
-  const lSpans = layoutSpans ?? wholeTextSpan(layoutText, layoutFile);
-  return composeWithLayout({ pageText, pageFile, pageSpans: pSpans, layoutText, layoutFile, layoutSpans: lSpans, reporter });
+  const lSpans = layoutText ? (layoutSpans ?? wholeTextSpan(layoutText, layoutFile)) : [];
+  const resolve = resolveLine ?? verbatimLineResolver([
+    { file: pageFile, text: pageText, spans: pSpans },
+    { file: layoutFile, text: layoutText ?? "", spans: lSpans },
+  ]);
+  if (!layoutText) return composeNoLayout({ pageText, pageFile, pageSpans: pSpans, resolveLine: resolve, reporter });
+  return composeWithLayout({
+    pageText, pageFile, pageSpans: pSpans, layoutText, layoutFile, layoutSpans: lSpans, resolveLine: resolve, reporter,
+  });
 }
 
 // --------------------------------------------------------------- no layout
 
-function composeNoLayout({ pageText, pageFile, pageSpans, reporter }) {
+function composeNoLayout({ pageText, pageFile, pageSpans, resolveLine, reporter }) {
   const { root } = parse(pageText);
-  const excluded = checkNestedSlots(root, pageText, pageFile, reporter);
-  const edits = collectStraySlotEdits(root, pageText, pageSpans, pageFile, reporter, excluded);
+  const at = spansToDiagnosticLocator(pageSpans, pageFile, resolveLine);
+  const excluded = checkNestedSlots(root, at, reporter);
+  const edits = collectStraySlotEdits(root, pageText, pageSpans, at, reporter, excluded, true);
 
   const html = findFirst(root, (n) => isElement(n, "html"));
   const body = findFirst(root, (n) => isElement(n, "body"));
@@ -345,17 +391,19 @@ function composeNoLayout({ pageText, pageFile, pageSpans, reporter }) {
 
 // ------------------------------------------------------------- with layout
 
-function composeWithLayout({ pageText, pageFile, pageSpans, layoutText, layoutFile, layoutSpans, reporter }) {
+function composeWithLayout({ pageText, pageFile, pageSpans, layoutText, layoutFile, layoutSpans, resolveLine, reporter }) {
   // ---- Pass A: neutralize stray slots (§7.1 MRG-04/A04), both documents.
   const c0 = parse(pageText);
-  const cExcluded = checkNestedSlots(c0.root, pageText, pageFile, reporter);
-  const cEdits0 = collectStraySlotEdits(c0.root, pageText, pageSpans, pageFile, reporter, cExcluded);
+  const cAt = spansToDiagnosticLocator(pageSpans, pageFile, resolveLine);
+  const cExcluded = checkNestedSlots(c0.root, cAt, reporter);
+  const cEdits0 = collectStraySlotEdits(c0.root, pageText, pageSpans, cAt, reporter, cExcluded, true);
   const preparedC = spliceTrackingSpans(pageText, pageSpans, cEdits0, pageFile);
 
   const l0 = parse(layoutText);
+  const lAt = spansToDiagnosticLocator(layoutSpans, layoutFile, resolveLine);
   const lHead0 = findFirst(l0.root, (n) => isElement(n, "head"));
-  const lHeadExcluded = lHead0 ? checkNestedSlots(lHead0, layoutText, layoutFile, reporter) : new Set();
-  const lEdits0 = lHead0 ? collectStraySlotEdits(lHead0, layoutText, layoutSpans, layoutFile, reporter, lHeadExcluded) : [];
+  const lHeadExcluded = lHead0 ? checkNestedSlots(lHead0, lAt, reporter) : new Set();
+  const lEdits0 = lHead0 ? collectStraySlotEdits(lHead0, layoutText, layoutSpans, lAt, reporter, lHeadExcluded) : [];
   const preparedL = spliceTrackingSpans(layoutText, layoutSpans, lEdits0, layoutFile);
 
   // ---- Pass B: reparse once, do everything else against stable offsets.
@@ -378,8 +426,11 @@ function composeWithLayout({ pageText, pageFile, pageSpans, layoutText, layoutFi
   const edits = [];
 
   // §7.1 sink detection, including P16 (checked once, fresh, on the stable body).
-  const lBodyExcluded = checkNestedSlots(lBody, preparedL.text, layoutFile, reporter);
-  const sinks = detectSinks(lBody, lBodyExcluded, preparedL.text, layoutFile, reporter);
+  // Offsets are now Pass-A text offsets, so the locator is rebuilt over the
+  // PREPARED spans — the same bytes, still carrying their original provenance.
+  const lPreparedAt = spansToDiagnosticLocator(preparedL.spans, layoutFile, resolveLine);
+  const lBodyExcluded = checkNestedSlots(lBody, lPreparedAt, reporter);
+  const sinks = detectSinks(lBody, lBodyExcluded, lPreparedAt, layoutFile, reporter);
 
   if (sinks.none) {
     // §7.5 — sink-less: the whole body is the default slot, verbatim, no unwrap.
@@ -392,14 +443,20 @@ function composeWithLayout({ pageText, pageFile, pageSpans, layoutText, layoutFi
     });
   } else {
     edits.push(...composeSinkedBody({
-      preparedC, cBody, preparedL, sinks, pageFile, layoutFile, reporter,
+      preparedC, cBody, preparedL, sinks, pageFile, layoutFile, layoutAt: lPreparedAt, resolveLine, reporter,
     }));
   }
 
-  // §8 head merge.
+  // §8 head merge. `cPreparedAt` is the page-side counterpart of `lPreparedAt`
+  // — head-merge.js's own A08 advisory locates through it, so a `<meta
+  // charset>` a fragment pushed down the page's head is still reported at its
+  // true line (§14.1). Built over preparedC rather than reusing `cAt`, whose
+  // offsets index the PRE-Pass-A text, and separately from composeSinkedBody's
+  // `pageAt`, whose offsets index the post-`<main>`-unwrap text.
+  const cPreparedAt = spansToDiagnosticLocator(preparedC.spans, pageFile, resolveLine);
   edits.push(...mergeHeadWithProvenance({
     layoutHead: lHead, layoutText: preparedL.text, layoutFile,
-    pageHead: cHead, pageText: preparedC.text, pageSpans: preparedC.spans, pageFile, reporter,
+    pageHead: cHead, pageText: preparedC.text, pageSpans: preparedC.spans, pageFile, pageAt: cPreparedAt, reporter,
   }));
 
   // §9/S11 root attributes, and defensive data-layout/slot stripping on the layout's own tags.
@@ -415,7 +472,7 @@ function composeWithLayout({ pageText, pageFile, pageSpans, layoutText, layoutFi
  * content into fills and default content, route default content to its
  * sink, and fill (or fall back) every named slot.
  */
-function composeSinkedBody({ preparedC, cBody, preparedL, sinks, pageFile, layoutFile, reporter }) {
+function composeSinkedBody({ preparedC, cBody, preparedL, sinks, pageFile, layoutFile, layoutAt, resolveLine, reporter }) {
   const edits = [];
   const preparedCText = preparedC.text;
   const preparedLText = preparedL.text;
@@ -425,6 +482,15 @@ function composeSinkedBody({ preparedC, cBody, preparedL, sinks, pageFile, layou
   let bodySpans = preparedC.spans;
   let body = cBody;
   const main = findFirst(cBody, (n) => isElement(n, "main"));
+  // Where this <main>'s own element children will land once its open tag is
+  // gone — every one shifts left by exactly that tag's length. Captured here,
+  // before the splice, because after it the nodes are new objects. See the
+  // fill-scope note below for why they count.
+  const unwrappedKidStarts = new Set();
+  if (main) {
+    const delta = main.openTagEnd - main.start;
+    for (const k of elementChildren(main)) unwrappedKidStarts.add(k.start - delta);
+  }
   if (main) {
     const unwrapEdits = [{ start: main.start, end: main.openTagEnd, replacement: "" }];
     if (main.endTagStart != null) unwrapEdits.push({ start: main.endTagStart, end: main.endTagEnd, replacement: "" });
@@ -433,12 +499,33 @@ function composeSinkedBody({ preparedC, cBody, preparedL, sinks, pageFile, layou
     bodySpans = unwrapped.spans;
     body = findFirst(parse(bodyText).root, (n) => isElement(n, "body"));
   }
+  // Built AFTER the unwrap: A02 below carries offsets into `bodyText`.
+  const pageAt = spansToDiagnosticLocator(bodySpans, pageFile, resolveLine);
 
   // §7.2 — classify top-level children into fills (by slot name) and default content.
   const topKids = elementChildren(body);
+
+  // §7.2 — the unwrapped <main>'s own element children are fills too, wherever
+  // that <main> sat. Unwrapping a <main> nested in a wrapper makes its children
+  // the WRAPPER's children, not the body's, so the scan below never saw them:
+  // the author watched their <main> tags vanish from the output — the strongest
+  // possible evidence unify processed exactly that region — while the fill did
+  // nothing and `slot=` shipped, at exit 0. Removing the open tag shifts each
+  // child left by exactly that tag's length, which is how these offsets are
+  // recovered after the splice. The parent of a fill is therefore always <body>
+  // or that <main>, and neither can be a component the author is assigning
+  // light DOM to — which is what keeps `slot=` inside their own web-component
+  // markup untouched.
+  const seenStarts = new Set(topKids.map((n) => n.start));
+  const extraKids = unwrappedKidStarts.size
+    ? findAll(body, (n) => n.type === "element" && unwrappedKidStarts.has(n.start) && !seenStarts.has(n.start))
+    : [];
+  const fillScope = extraKids.length
+    ? [...topKids, ...extraKids].sort((a, b) => a.start - b.start)
+    : topKids;
   const fillsByName = new Map(); // name -> {text,spans}[] (already slot-attr-stripped, in page order)
   const localEdits = []; // within body's own content span
-  for (const el of topKids) {
+  for (const el of fillScope) {
     const slotVal = attrValueOrEmpty(el, SLOT_ATTR);
     const isFillCandidate = slotVal !== "";
     const matchesRealSlot = isFillCandidate && sinks.namedSlots.has(slotVal);
@@ -453,22 +540,13 @@ function composeSinkedBody({ preparedC, cBody, preparedL, sinks, pageFile, layou
     } else if (isFillCandidate) {
       // MRG-10/A02: names a slot the layout doesn't have — stays in default content, attr consumed.
       reporter.advisory({
-        file: pageFile,
-        line: lineOf(bodyText, el.start),
+        ...pageAt(el.start),
         message: `no slot named "${slotVal}" in ${layoutFile}; the element stayed in the page content`,
       });
       const attrEdit = removeAttrEdit(el, SLOT_ATTR);
       if (attrEdit) localEdits.push(attrEdit);
     }
 
-    // §7.6/A03 — top-level header/footer NOT addressed to a real slot stayed in default content.
-    if ((isElement(el, "header") || isElement(el, "footer")) && !matchesRealSlot) {
-      reporter.advisory({
-        file: pageFile,
-        line: lineOf(bodyText, el.start),
-        message: `top-level <${el.tag}> is not addressed to any slot in ${layoutFile} — it stayed in the page content`,
-      });
-    }
   }
 
   const [bs, be] = contentSpan(body);
@@ -508,8 +586,7 @@ function composeSinkedBody({ preparedC, cBody, preparedL, sinks, pageFile, layou
       for (const node of namedSlotsInMain) {
         const name = attrValueOrEmpty(node, "name");
         reporter.problem({
-          file: layoutFile,
-          line: lineOf(preparedLText, node.start),
+          ...layoutAt(node.start),
           message: `named slot "${name}" is inside <main>, which is also the default-content sink`,
           fixes: [
             "add <slot></slot> inside <main> — then main's other children are left alone (§7.7 C6)",
@@ -563,10 +640,14 @@ function composeSinkedBody({ preparedC, cBody, preparedL, sinks, pageFile, layou
  * first `<main>` — plus every duplicate (advisory A13, first occurrence wins)
  * and, when there is no default slot, every named slot nested inside
  * `firstMain` (§7.4 P19 — see `composeSinkedBody`).
+ * `at` locates a layout-text offset at its true source (`spansToDiagnosticLocator`);
+ * `layoutFile` is still named in the A13 messages themselves, because "which
+ * layout is this page composing against" is the fact the author needs there
+ * and stays true even when the duplicate arrived from a fragment.
  * @returns {{defaultSlot: object|null, namedSlots: Map<string,object>, firstMain: object|null,
  *   duplicates: {node:object, kind:'slot'|'main'}[], namedSlotsInMain: object[], none: boolean}}
  */
-function detectSinks(lBody, excluded, layoutText, layoutFile, reporter) {
+function detectSinks(lBody, excluded, at, layoutFile, reporter) {
   const allSlots = findAll(lBody, (n) => isElement(n, "slot")).filter((n) => !excluded.has(n));
   let defaultSlot = null;
   const namedSlots = new Map();
@@ -578,7 +659,7 @@ function detectSinks(lBody, excluded, layoutText, layoutFile, reporter) {
         defaultSlot = slot;
       } else {
         reporter.advisory({
-          file: layoutFile, line: lineOf(layoutText, slot.start),
+          ...at(slot.start),
           message: `duplicate bare <slot> in ${layoutFile} — the first one wins and renders its own fallback`,
         });
         duplicates.push({ node: slot, kind: "slot" });
@@ -587,7 +668,7 @@ function detectSinks(lBody, excluded, layoutText, layoutFile, reporter) {
       namedSlots.set(name, slot);
     } else {
       reporter.advisory({
-        file: layoutFile, line: lineOf(layoutText, slot.start),
+        ...at(slot.start),
         message: `duplicate <slot name="${name}"> in ${layoutFile} — the first one wins and this one renders its own fallback`,
       });
       duplicates.push({ node: slot, kind: "slot" });
@@ -598,7 +679,7 @@ function detectSinks(lBody, excluded, layoutText, layoutFile, reporter) {
   const firstMain = allMains[0] ?? null;
   for (let i = 1; i < allMains.length; i++) {
     reporter.advisory({
-      file: layoutFile, line: lineOf(layoutText, allMains[i].start),
+      ...at(allMains[i].start),
       message: `duplicate <main> in ${layoutFile} — the first one wins`,
     });
     duplicates.push({ node: allMains[i], kind: "main" });
@@ -629,10 +710,12 @@ function detectSinks(lBody, excluded, layoutText, layoutFile, reporter) {
  * to whatever root the caller passes (a whole page document — every slot in
  * a page is fair game; a layout's `<head>`; a layout's `<body>`) so it can be
  * checked once per region, at the point that region is stable. Reports each
- * violation once, located at the inner (nested) slot, and returns the set of
- * both slots in the pair so callers can exclude them from further processing.
+ * violation once, located at the inner (nested) slot — in whichever file
+ * actually wrote it, which for a fragment-contributed slot is the fragment
+ * (`at`, from `spansToDiagnosticLocator`) — and returns the set of both slots in the pair
+ * so callers can exclude them from further processing.
  */
-function checkNestedSlots(scopeRoot, text, file, reporter) {
+function checkNestedSlots(scopeRoot, at, reporter) {
   const excluded = new Set();
   const allSlots = findAll(scopeRoot, (n) => isElement(n, "slot"));
   for (const outer of allSlots) {
@@ -642,8 +725,7 @@ function checkNestedSlots(scopeRoot, text, file, reporter) {
     const outerName = attrValueOrEmpty(outer, "name");
     const innerName = attrValueOrEmpty(inner, "name");
     reporter.problem({
-      file,
-      line: lineOf(text, inner.start),
+      ...at(inner.start),
       message: `<slot${innerName ? ` name="${innerName}"` : ""}> is nested inside the fallback of ` +
         `<slot${outerName ? ` name="${outerName}"` : ""}> — slots do not nest`,
       fixes: ["move the inner slot out of the outer slot's fallback, or drop one of them"],
@@ -655,19 +737,35 @@ function checkNestedSlots(scopeRoot, text, file, reporter) {
 }
 
 /**
- * §7.1 MRG-04/A04: every `<slot>` in `scopeRoot` (excluding P16-flagged ones,
- * which are left completely untouched) is replaced by its own children (S4),
- * advisory A04. Used for an entire page document (all of a page's slots are
+ * §7.1 MRG-04/P20: every `<slot>` in `scopeRoot` (excluding P16-flagged ones,
+ * which are left completely untouched) is a problem, and is replaced by its
+ * own children (S4) so best-effort composition still produces a tree to
+ * report on. Used for an entire page document (all of a page's slots are
  * "outside a layout's body") and for a layout's `<head>` alone.
+ *
+ * This was advisory A04 until 2026-08-13. A `<slot>` outside a layout's body
+ * is inert in every case — pages fill with the `slot=` attribute, and a head
+ * slot is never a sink — so the advisory's only effect was to let a page ship
+ * whose author's intent had silently not happened: ratification round 7 had
+ * three of five samples write `<slot name="footer">` into a page, and a plain
+ * `unify build` published each of them at exit 0 with the layout's fallback
+ * footer AND the intended content loose in the body. Every sibling
+ * misplacement of this vocabulary (P07, P15, P16, P19) was already a problem;
+ * this one was the outlier.
  */
-function collectStraySlotEdits(scopeRoot, text, spans, file, reporter, excluded) {
+function collectStraySlotEdits(scopeRoot, text, spans, at, reporter, excluded, inPage = false) {
   const edits = [];
   for (const slot of findAll(scopeRoot, (n) => isElement(n, "slot"))) {
     if (excluded.has(slot)) continue;
-    reporter.advisory({
-      file,
-      line: lineOf(text, slot.start),
-      message: "<slot> is outside a layout's <body> — replaced by its own children",
+    const name = getAttr(slot, "name");
+    reporter.problem({
+      ...at(slot.start),
+      message: inPage
+        ? "<slot> in a page fills nothing — only a layout declares slots"
+        : "<slot> in a layout's <head> is never a sink — sinks are the <slot> elements in the layout's <body>",
+      fixes: inPage
+        ? [`to fill a layout slot, put slot= on a real element: <footer slot="${name || "footer"}">…</footer>`]
+        : ["move it into the layout's <body>, or drop it — a page contributes its own <head> and the two are merged (§8)"],
     });
     const [s, e] = contentSpan(slot);
     edits.push({ start: slot.start, end: slot.end, replacement: text.slice(s, e), replacementSpans: sliceSpans(spans, s, e) });
@@ -678,14 +776,16 @@ function collectStraySlotEdits(scopeRoot, text, spans, file, reporter, excluded)
 // ------------------------------------------------------------ §8 provenance
 
 /**
- * Calls the real `mergeHead` (head-merge.js, untouched) and reconciles
- * provenance onto its returned edits — see this file's header doc for why
- * this is possible without re-deriving head-merge.js's own dedup logic.
- * `pageSpans` must already be valid against `pageText` (i.e. `preparedC`,
- * post-Pass-A) — same text head-merge.js itself is called with.
+ * Calls the real `mergeHead` (head-merge.js) and reconciles provenance onto
+ * its returned edits — see this file's header doc for why this is possible
+ * without re-deriving head-merge.js's own dedup logic. `pageSpans` must
+ * already be valid against `pageText` (i.e. `preparedC`, post-Pass-A) — same
+ * text head-merge.js itself is called with — and `pageAt` must be the locator
+ * built over those same spans, which head-merge.js's one located diagnostic
+ * (A08) reports through.
  */
-function mergeHeadWithProvenance({ layoutHead, layoutText, layoutFile, pageHead, pageText, pageSpans, pageFile, reporter }) {
-  const rawEdits = mergeHead({ layoutHead, layoutText, layoutFile, pageHead, pageText, pageFile, reporter });
+function mergeHeadWithProvenance({ layoutHead, layoutText, layoutFile, pageHead, pageText, pageSpans, pageFile, pageAt, reporter }) {
+  const rawEdits = mergeHead({ layoutHead, layoutText, layoutFile, pageHead, pageText, pageFile, pageAt, reporter });
   if (!pageHead || rawEdits.length === 0) return rawEdits;
   const candidates = elementChildren(pageHead).map((el) => ({
     rawText: rawSpan(pageText, el),

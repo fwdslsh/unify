@@ -14,7 +14,7 @@ Options:
       --clean              empty the output directory first
       --exclude <glob>     globs never emitted, still usable by the build (repeatable; default: _*)
       --pretty-urls        about.html → about/index.html, and rewrite internal links to match
-      --base-url <path>    site served from a subpath: prefix root-relative links in the output
+      --base-url <url>     the site's whole address (https://site.example/repo/): prefix root-relative links, and make og:/canonical absolute for share crawlers
       --dry-run            run the full build and every check, print the report, write nothing
       --strict             advisories count as problems for the exit code
   -p, --port <n>           port for `unify dev` (default: 3000)
@@ -64,21 +64,26 @@ unify build --exclude '_*.html' --exclude '_*.md' --exclude '_includes' --exclud
 
 Moves every page `X.html` to `X/index.html` — except `index.html` files (already pretty) and the root `404.html` (hosts require that exact path) — and rewrites every internal link to match (`/about.html` → `/about/`, queries and fragments preserved; links to assets and external URLs untouched). Relative asset references inside moved pages are re-emitted root-relative so they keep working. Author pages always link the real file (`about.html`); this flag owns the pretty form.
 
-### `--base-url <path | url>`
+### `--base-url <url>`
 
-For sites served from a subpath. `--base-url /repo-name/` prefixes every root-relative URL in the built HTML — `href`, `src`, `srcset`, `poster`, and `og:`/`twitter:` meta values; source files stay rooted at `/` so local preview keeps working. With a full URL (`--base-url https://example.com/repo/`), root-relative `og:`/`twitter:`/`rel="canonical"` values — which crawlers require to be absolute — are absolutized against the whole base, origin **and** subpath: `/assets/x.jpg` becomes `https://example.com/repo/assets/x.jpg`.
+The address the site will be served from, scheme and domain included: `--base-url https://example.com/repo/`. Its path part prefixes every root-relative URL in the built HTML — `href`, `src`, `srcset`, `poster`, and `og:`/`twitter:` meta values; source files stay rooted at `/` so local preview keeps working. Its origin additionally absolutizes root-relative `og:`/`twitter:`/`rel="canonical"` values, which crawlers require to be absolute: `/assets/x.jpg` becomes `https://example.com/repo/assets/x.jpg` — origin **and** subpath, so the URL points where the file is actually served.
+
+A bare path (`--base-url /repo-name/`) is a usage error naming the full form. It used to be accepted, and prefixed links correctly while leaving `og:`/`canonical` root-relative — valid-looking metadata no share crawler can fetch. Give the whole address; for a local preview of a subpath site, `http://localhost:3000/repo-name/` is one.
 
 ### `--dry-run`
 
 The entire build — composition, URL rewriting, collision detection, the reference check, every problem and advisory — with no writes. Stdout lists what would be written, copied, and deleted, each page naming what it composed from:
 
 ```
-write dist/about/index.html ← about.md + _layout.html
-write dist/blog/post/index.html ← blog/post.html + blog/_layout.html
-write dist/404.html ← 404.html (no layout)
-copy dist/assets/style.css ← assets/style.css
+serving from https://example.com/repo/
+write dist/about/index.html (/repo/about/) ← about.md + _layout.html
+write dist/blog/post/index.html (/repo/blog/post/) ← blog/post.html + blog/_layout.html
+write dist/404.html (/repo/404.html) ← 404.html (no layout)
+copy dist/assets/style.css (/repo/assets/style.css) ← assets/style.css
 delete dist/stale.html
 ```
+
+The first line is the address the build assumed — `serving from / — the domain root` when no `--base-url` is set. Each write/copy carries the URL that file answers to, so a site built for the wrong address shows it here rather than after deployment.
 
 ### `--strict`
 

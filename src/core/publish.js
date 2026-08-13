@@ -204,21 +204,43 @@ export async function performClean({ output, source, cwd = process.cwd() }) {
  * @property {string} outputPath - as displayed, e.g. "dist/about/index.html"
  *   (includes whatever the configured --output directory name is — this
  *   module does not know or assume "dist")
+ * @property {string} [url] - the address this file answers to once published
+ *   (DRY-04), e.g. "/about/" — omitted for `delete`, which is a disk
+ *   operation on a file the site no longer has
  * @property {string} [from] - the §17 " ← inputs" text; required for
  *   write/copy, unused for delete (e.g. "about.md + _layout.html" for a
  *   composed page, "assets/style.css" for a copied asset)
  */
 
 /**
+ * The URL path an output file answers to, given the site's path prefix
+ * (`/` unless `--base-url` moved it). `index.html` is the directory itself —
+ * the one inference `--pretty-urls` forces on a reader of output paths, and
+ * the reason DRY-04 prints this rather than leaving it to be derived.
+ * @param {string} outputPath - source-root-relative, no leading "/"
+ * @param {string} pathPrefix - starts and ends with "/"
+ * @returns {string}
+ */
+export function urlForOutputPath(outputPath, pathPrefix = "/") {
+  const rel = outputPath.replace(/(^|\/)index\.html$/, "$1");
+  return pathPrefix + rel;
+}
+
+/**
  * §17 — format the `--dry-run` report: one line per row, ordered by output
- * path regardless of verb (write/copy rows show their inputs after " ← ";
- * delete rows show none). Not newline-terminated.
+ * path regardless of verb. Write/copy rows carry the published address in
+ * parentheses (DRY-04) and their inputs after " ← "; delete rows carry
+ * neither. Not newline-terminated.
  * @param {DryRunRow[]} rows
  * @returns {string}
  */
 export function formatDryRunReport(rows) {
   const sorted = [...rows].sort((a, b) => (a.outputPath < b.outputPath ? -1 : a.outputPath > b.outputPath ? 1 : 0));
   return sorted
-    .map((row) => (row.action === "delete" ? `delete ${row.outputPath}` : `${row.action} ${row.outputPath} ← ${row.from}`))
+    .map((row) =>
+      row.action === "delete"
+        ? `delete ${row.outputPath}`
+        : `${row.action} ${row.outputPath}${row.url ? ` (${row.url})` : ""} ← ${row.from}`,
+    )
     .join("\n");
 }

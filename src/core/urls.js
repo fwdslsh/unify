@@ -39,9 +39,19 @@
  * — they operate on already-§11.1-rewritten (mostly root-relative) URLs and
  * the site's own output-path manifest, so they are unaffected by any of the
  * above.
+ *
+ * That is also why the §14.1 DIAGNOSTIC LOCATION primitives live in this
+ * §11 module rather than in `diagnostics.js`: `spansToSourceLocator` — the
+ * span arithmetic itself — was placed here because §11.1 was its first
+ * consumer, and the one thing this arithmetic must never be is implemented
+ * twice (a second copy is precisely how a diagnostic came to name one file
+ * while measuring its line in another). `spansToDiagnosticLocator` and
+ * `verbatimLineResolver` below are that same mapping composed with an
+ * offset→line step, shared verbatim by compose.js (§7), layout.js (§6) and
+ * head-merge.js (§8) so all three locate a fault the same way.
  */
 import { posix } from "node:path";
-import { applyEdits, findAll, getAttr, getAttrNode, parse, tokens } from "./html.js";
+import { applyEdits, findAll, getAttr, getAttrNode, lineOf, parse, tokens } from "./html.js";
 
 // --------------------------------------------------------------- URL basics
 
@@ -107,26 +117,144 @@ export function resolveProvenanceUrl(url, provenanceFile) {
 }
 
 /**
+ * The whole of what a span list answers: given an offset in a composed
+ * (include-inlined, layout-merged) text, WHICH source file authored that byte
+ * and WHERE it sits in that file's OWN raw text —
+ * `fileOffset + (offset - start)`, exactly as includes.js's span contract
+ * defines it. `fileOffset` is `null` when no span covers the query (spans
+ * need not cover the whole document; only offsets a caller actually queries),
+ * in which case `file` is `fallbackFile` and the caller knows the position is
+ * a guess it must not turn into a line number.
+ *
+ * This is the single implementation of that arithmetic in the codebase: the
+ * §11.1 rewriter's `provenanceOf` (below), compose.js's §14.1 diagnostic
+ * locations, and build.js's reference locator are three consumers of one
+ * mapping, and three hand-rolled span scans were how a diagnostic came to
+ * name one file while measuring its line in another (the round-18 defect:
+ * a nine-line layout reporting a fault at line 13, the fragment above it
+ * having shifted every offset below).
+ * @param {{start:number, end:number, file:string, fileOffset:number}[]} spans
+ * @param {string} fallbackFile
+ * @returns {(offset:number) => {file: string, fileOffset: number|null}}
+ */
+export function spansToSourceLocator(spans, fallbackFile) {
+  const sorted = [...spans].sort((a, b) => a.start - b.start);
+  return (offset) => {
+    // Linear scan is fine here: documents are small (product-spec's own
+    // non-goals rule out perf gates) and this runs once per URL occurrence
+    // and once per diagnostic, never per byte.
+    for (const span of sorted) {
+      if (offset >= span.start && offset < span.end) {
+        return { file: span.file, fileOffset: span.fileOffset + (offset - span.start) };
+      }
+    }
+    return { file: fallbackFile, fileOffset: null };
+  };
+}
+
+/**
  * Build a `provenanceOf` lookup (see the module-level PROVENANCE note) from
  * a sorted, non-overlapping list of spans (`includes.js`/`compose.js`'s
- * `{start, end, file, fileOffset}` shape — only `start`/`end`/`file` matter
- * here) that together cover every offset of interest in a composed
- * document. Spans do not need to cover the *whole* document — only offsets a
- * caller actually queries — but any gap queried falls back to `fallbackFile`.
- * @param {{start:number, end:number, file:string}[]} spans
+ * `{start, end, file, fileOffset}` shape) that together cover every offset of
+ * interest in a composed document. §11.1 needs only the file half of
+ * `spansToSourceLocator`'s answer — a URL is resolved against its provenance
+ * file's directory, and no line number is involved — so this is that function
+ * with the position discarded. Any gap queried falls back to `fallbackFile`.
+ * @param {{start:number, end:number, file:string, fileOffset:number}[]} spans
  * @param {string} fallbackFile
  * @returns {(offset:number) => string}
  */
 export function spansToLocator(spans, fallbackFile) {
-  const sorted = [...spans].sort((a, b) => a.start - b.start);
+  const locate = spansToSourceLocator(spans, fallbackFile);
+  return (offset) => locate(offset).file;
+}
+
+// -------------------------------------------------- §14.1 diagnostic location
+
+/**
+ * A single whole-text span attributing every byte of `text` to `file` — the
+ * spans a caller that did no splicing (no includes to inline, a unit test
+ * composing from strings) honestly has.
+ * @param {string} text
+ * @param {string} file
+ * @returns {{start:number,end:number,file:string,fileOffset:number}[]}
+ */
+export function wholeTextSpan(text, file) {
+  return text.length > 0 ? [{ start: 0, end: text.length, file, fileOffset: 0 }] : [];
+}
+
+/**
+ * `(offset) => {file, line}` for one text whose provenance is `spans`: the
+ * §14.1 `FILE:LINE` pair, both halves answered from the SAME span, so they
+ * can never disagree. `file` is whoever the spans say authored the byte — a
+ * page, a layout, or a fragment several includes deep — and `line` is
+ * measured in THAT file's own raw text, never in the include-inlined text the
+ * offset came from. Those two answers differ by every line any fragment
+ * inlined above the fault contributed, which is how a `data-layout` on line 6
+ * of an 8-line page came to be reported at line 11 (ratification round 18;
+ * pinned by tests/fixtures/landmines/line-after-include and
+ * layout-line-after-include).
+ *
+ * `line` is `undefined` (§14.1: "line omitted when unknown") rather than a
+ * plausible-looking number whenever the pair cannot be produced honestly: no
+ * span covers the offset (only reachable at end-of-text — spans are
+ * contiguous), or `resolveLine` has no raw text for that file. An omitted line
+ * costs the author one file-wide search; a fabricated one sends them to the
+ * wrong place with full confidence, which is the defect this whole mechanism
+ * exists to remove.
+ *
+ * `resolveLine` is INJECTED rather than computed here because turning a
+ * file-relative offset into a line needs that file's own raw text, and none of
+ * the `src/core` modules that raise these diagnostics reads the filesystem —
+ * see compose.js's DIAGNOSTIC LOCATION note and build.js's
+ * `makeSourceLineResolver`, the one real implementation.
+ * @param {{start:number,end:number,file:string,fileOffset:number}[]} spans
+ * @param {string} fallbackFile
+ * @param {(file: string, fileOffset: number) => number|undefined} resolveLine
+ * @returns {(offset: number) => {file: string, line: number|undefined}}
+ */
+export function spansToDiagnosticLocator(spans, fallbackFile, resolveLine) {
+  const locate = spansToSourceLocator(spans, fallbackFile);
   return (offset) => {
-    // Linear scan is fine here: documents are small (product-spec's own
-    // non-goals rule out perf gates) and this runs once per URL occurrence.
-    for (const span of sorted) {
-      if (offset >= span.start && offset < span.end) return span.file;
-    }
-    return fallbackFile;
+    const { file, fileOffset } = locate(offset);
+    return { file, line: fileOffset === null ? undefined : resolveLine(file, fileOffset) };
   };
+}
+
+/**
+ * The `resolveLine` a core module uses when its caller injects none — every
+ * unit test, and any future in-memory caller. It can answer for exactly the
+ * files whose raw text the module was handed, which it recognizes
+ * structurally: a text whose spans are the single whole-text span of its own
+ * file IS that file's raw source (`fileOffset` is then an offset in the text
+ * in hand), so `lineOf` on it is exact. That covers every page and layout with
+ * no includes of its own — precisely the case where a caller has no spans to
+ * pass in the first place.
+ *
+ * For anything else (a fragment's text, which no core module ever sees; a page
+ * or layout that WAS include-inlined, whose offsets no longer index the text in
+ * hand) it returns undefined rather than guessing. The real pipeline always
+ * injects a resolver, so this degradation never reaches a `unify build`.
+ * @param {{file: string|undefined, text: string, spans: {start:number,end:number,file:string,fileOffset:number}[]}[]} candidates
+ * @returns {(file: string, fileOffset: number) => number|undefined}
+ */
+export function verbatimLineResolver(candidates) {
+  const rawSources = new Map();
+  for (const { file, text, spans } of candidates) {
+    if (file !== undefined && isVerbatimSourceText(text, spans, file)) rawSources.set(file, text);
+  }
+  return (file, fileOffset) => {
+    const text = rawSources.get(file);
+    return text === undefined ? undefined : lineOf(text, fileOffset);
+  };
+}
+
+/** True when `spans` say `text` is `file`'s own raw source, byte for byte, unspliced. */
+function isVerbatimSourceText(text, spans, file) {
+  if (text.length === 0) return spans.length === 0;
+  const [only] = spans;
+  return spans.length === 1 && only.file === file
+    && only.start === 0 && only.end === text.length && only.fileOffset === 0;
 }
 
 // ---------------------------------------------------------- §11.1 rewriting
@@ -301,29 +429,28 @@ export function applyPrettyLinks(html, { pageOutputPath, emittedHtmlPaths }) {
 /**
  * @typedef {object} BaseUrlConfig
  * @property {string} pathPrefix - always starts and ends with "/"
- * @property {string|null} origin - scheme+authority (e.g.
- *   "https://example.com"), or null for the bare-path form
+ * @property {string} origin - scheme+authority (e.g. "https://example.com")
  */
 
 /**
- * Parse a `--base-url` value into its path-prefix and (for a full URL) its
- * origin. Both forms share one scope (URL-10); the origin, when present, is
- * additionally prepended to canonical/og/twitter values (URL-11).
- * @param {string} raw
+ * Parse a `--base-url` value — the site's whole address — into its origin and
+ * path prefix. The path prefix goes on every root-relative URL in scope
+ * (URL-10); the origin is additionally prepended to canonical/og/twitter
+ * values (URL-11), which crawlers require to be absolute.
+ *
+ * One form only. A bare path parsed here until 2026-08-13: it prefixed links
+ * correctly and left og:/twitter:/canonical root-relative, silently — see
+ * cli.js's usage error for the ratification evidence that retired it.
+ * `origin` is therefore never null, and callers no longer branch on it.
+ * @param {string} raw - must carry a scheme; cli.js rejects anything else
  * @returns {BaseUrlConfig}
  */
 export function parseBaseUrl(raw) {
-  if (SCHEME_RE.test(raw)) {
-    const u = new URL(raw);
-    let path = u.pathname;
-    if (!path.startsWith("/")) path = `/${path}`;
-    if (!path.endsWith("/")) path += "/";
-    return { origin: u.origin, pathPrefix: path };
-  }
-  let path = raw;
+  const u = new URL(raw);
+  let path = u.pathname;
   if (!path.startsWith("/")) path = `/${path}`;
   if (!path.endsWith("/")) path += "/";
-  return { origin: null, pathPrefix: path };
+  return { origin: u.origin, pathPrefix: path };
 }
 
 function isOgOrTwitterMeta(el) {

@@ -118,7 +118,10 @@ export function resolveOutputPaths({ entries, prettyUrls = false, reporter }) {
     reporter.problem({
       file: sorted[0].source.path,
       message: `${sorted.map((g) => g.source.path).join(" and ")} both produce ${sorted[0].outputPath}`,
-      fixes: ["rename or remove one of the sources so only one produces this output path"],
+      // Not "remove one": a round-8 repair sample deleted the losing source
+      // outright, taking the page's address and phone number with it. Naming
+      // the two non-destructive edits first is the whole fix.
+      fixes: ["rename one of the sources, or merge them into one, so only one produces this output path"],
     });
   }
 

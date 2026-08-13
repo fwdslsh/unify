@@ -267,7 +267,14 @@ L's **sinks** are the `<slot>` elements in L's `<body>` (skipping any inside `<t
 
 - The first bare `<slot>` (no `name`) is **the default slot**. Further bare slots: advisory A13 (duplicated construct), and they render their fallback.
 - The first `<slot name="X">` for each X receives X's fills. A repeated name: advisory A13; later ones render their fallback.
-- A `<slot>` outside a layout's `<body>` (a slot anywhere in a page, or in a layout's `<head>`): advisory A04, and it is replaced by its own children (S4).
+- A `<slot>` outside a layout's `<body>` (a slot anywhere in a page, or in a layout's `<head>`) is a **problem (P20)**; it is still replaced by its own children (S4), so best-effort composition (§2) produces a tree to report on. Such a slot is inert in every case — a page fills a layout's slot with the `slot=` attribute, and a slot in a head is never a sink — and the message names the spelling that belongs in *that* file:
+
+```
+src/contact.html:4: problem: <slot> in a page fills nothing — only a layout declares slots
+  fix: to fill a layout slot, put slot= on a real element: <footer slot="footer">…</footer>
+```
+
+This was advisory A04 until 2026-08-13. Ratification round 7 had three of five samples write `<slot name="footer">` into a page — the layout-side spelling, in the file that cannot use it — and under the advisory a plain `unify build` published every one of them at exit 0, carrying the layout's fallback footer *and* the intended replacement loose in the body. Nothing was lost, so the content-loss law was satisfied and the author's intent still silently did not happen. Every sibling misplacement of this vocabulary (P07, P15, P16, P19) was already a problem; this one was the outlier, and `A04` is now a retired ID.
 - Duplicate `<main>` in L: the first wins; advisory A13.
 - **Slots do not nest.** A `<slot>` anywhere inside another `<slot>` element — that is, inside a slot's fallback content — is a **problem (P16)**, located: fallback content is plain markup, and a nested slot would silently vanish (or strand its fills) the moment the outer slot is filled, which the content-loss law forbids:
 
@@ -280,7 +287,7 @@ src/_layout.html:8: problem: <slot name="inner"> is nested inside the fallback o
 
 If L has at least one sink: C's body content is **unwrapped once** — the first `<main>` in C's body in document order, **at any depth, not only top level**, is replaced by its children (S6): a `<main>` inside a wrapper `<div>` unwraps and the wrapper stays. Exactly once — a `<main>` inside the first one is the author's own markup and survives. No other element is unwrapped. (Top-level-only unwrap would ship `<main>`-inside-`<main>` for the common wrapper pattern; unwrapping the first one anywhere is what keeps composed output valid.)
 
-**Fills** are then collected: every top-level element of C's body carrying a `slot` attribute with a non-empty value. (`slot=""` counts as absent. `slot` on non-top-level elements is the author's own markup and is never touched or reported.) Fill elements are removed from the default-content sequence.
+**Fills** are then collected: every direct element child of C's body, **and every direct element child of the `<main>` that was just unwrapped, wherever it sat**, carrying a `slot` attribute with a non-empty value. (`slot=""` counts as absent.) The unwrap and the collection are one step, not two: a fill inside a `<main>` inside a wrapper `<div>` counts, because the `<main>` is the page's content region and the wrapper is styling. A `slot` attribute anywhere else — deeper than that, or inside a `<template>` — is the author's own markup and is never touched or reported: the parent of a fill is always `<body>` or that `<main>`, and neither can be a component the author is assigning light DOM to. Fill elements are removed from the default-content sequence wherever they sat; a wrapper they leave behind stays, possibly empty.
 
 **Default content** is everything else in C's body — elements, text, comments — in source order (S12).
 
@@ -316,9 +323,11 @@ Every message about a slot or a layout names the layout file it was checked agai
 
 A layout with no slots and no `<main>` treats its whole `<body>` as the default slot: C's body children replace L's body children verbatim (S5, **no unwrap** — C's own `<main>` survives). The head-only layout (shared stylesheet, empty body) is the intended use and is legitimate, not a mistake.
 
-### 7.6 Advisory on stray chrome
+### 7.6 Stray chrome, and the content-loss law
 
-When a page composes with a layout, a top-level `<header>` or `<footer>` element left in the default content is advisory A03 (it probably meant `slot=`). It still ships, in place, per the content-loss law.
+When a page composes with a layout, a `<header>` or `<footer>` element that is not a fill is default content like any other element: it ships, in place, wherever §7.4 routes the default content, and **nothing is reported**.
+
+This was advisory **A03** until it was retired. The advisory was the defect. §7.2 unwraps C's first `<main>` before the top-level scan, so a `<header>` written inside the page's own `<main>` — ordinary, correct HTML — was hoisted to top level by unify and then reported for being there, with composed output identical in structure to the source. Wrapping that same element in a meaningless `<div>` silenced the advisory and changed nothing else in the output, which is the tell: it was reporting tree position, not authorial error. And the repair it gestured at is a trap — against the idiomatic layout that wraps its slot in the matching landmark, `<footer slot="footer">` composes to a `<footer>` inside a `<footer>` at exit 0 with nothing reported, which is why the scaffold fills that slot with `<p slot="footer">`. `A03` is a retired ID. The misconception it was aimed at — that a page's `<header>` replaces the layout's — belongs in `authoring-rules.md`, in the file the author is editing.
 
 **The law**: content the author wrote is never dropped without failing the build. Every rule above either places content or raises a problem; no future rule may do otherwise.
 
@@ -793,7 +802,9 @@ Preserved untouched: external URLs, `mailto:`/`tel:`/`data:`, fragment-only link
 
 ### 11.3 `--base-url`
 
-Two forms, one scope. The scope, identical for both forms: every root-relative URL in `href`/`src`/`srcset`/`poster` of emitted HTML, plus root-relative values in `<meta property="og:*">`/`<meta name="twitter:*">` `content` — one list, so no root-relative URL the output declares can dodge the prefix. A **path** (`/repo-name/`) prefixes everything in scope with it. A **full URL** (`https://example.com/repo/`) applies its path part exactly as the path form, and additionally prepends its origin to the og:/twitter: `content` values and the `<link rel="canonical">` `href` — the elements crawlers require to be absolute. Absolutization is therefore always **origin + path prefix**: with `--base-url https://host/repo/`, an og:image of `/assets/x.jpg` emits `https://host/repo/assets/x.jpg`, never `https://host/assets/x.jpg` — origin-only absolutization would 404 for exactly the crawlers the rule exists for. Values that are not root-relative are untouched. Source files stay rooted at `/`; only output changes.
+**One form: the site's whole address**, scheme and domain included (`https://example.com/repo/`). Its **path part** prefixes every root-relative URL in `href`/`src`/`srcset`/`poster` of emitted HTML, plus root-relative values in `<meta property="og:*">`/`<meta name="twitter:*">` `content` — one list, so no root-relative URL the output declares can dodge the prefix. Its **origin** is additionally prepended to the og:/twitter: `content` values and the `<link rel="canonical">` `href` — the elements crawlers require to be absolute. Absolutization is therefore always **origin + path prefix**: with `--base-url https://host/repo/`, an og:image of `/assets/x.jpg` emits `https://host/repo/assets/x.jpg`, never `https://host/assets/x.jpg` — origin-only absolutization would 404 for exactly the crawlers the rule exists for. Values that are not root-relative are untouched. Source files stay rooted at `/`; only output changes.
+
+A bare path (`--base-url /repo-name/`) is a **usage error** (exit 2) naming the full form. It was accepted until 2026-08-13, prefixing links correctly while leaving og:/twitter:/canonical root-relative — which the rationale above makes unusable, since a crawler fetches those with no page address to resolve them against. Ratification made the cost measurable: seventeen of eighteen samples handed a full deploy address chose the bare path anyway, and five of five then published dead preview images with a green build and a report claiming the sharing requirement verified. A diagnostic was tried first (advisory A15, retired the same day it was added); deleting the weaker form is the repair that leaves nothing to warn about.
 
 Order within the pipeline: §11.1 → §11.2 → §11.3.
 
@@ -807,6 +818,8 @@ After the temporary tree is complete, every internal URL the output contains is 
 - In every emitted CSS file, every `<style>` block, and every `style` attribute of emitted HTML: `url(…)` tokens. (Rewriting deliberately never reaches these — §11.1 — but checking is not rewriting: the exemption is about not editing the author's CSS, not about not reading it, and a `url()` the author got wrong must fail here, not 404 quietly.)
 
 A URL is internal when, after stripping the `--base-url` prefix — the path prefix, or the full base (origin + path) when a full URL was given, so values §11.3 absolutized stay checkable instead of masquerading as external — it is root-relative or relative (resolved against the containing output file's URL). Query and fragment are stripped; external/`mailto:`/`tel:`/`data:`/fragment-only URLs are skipped. A directory URL (trailing `/` or empty path) checks for `index.html` within it. A URL that resolves to no emitted file is a **problem** naming the source file, the reference, and the line where known — a renamed page, an asset stranded in an underscore folder, a hand-written pretty URL in a non-pretty build, and a path whose case doesn't match the file all fail here, loudly. (Case is compared exactly, byte for byte: a reference that only matches case-insensitively still fails — it would 404 on the Linux host.) `#fragment` targets are not validated against ids — that is a reader's judgment, not a build gate.
+
+One absence is **not** reported: a URL that resolves to the output path of a **source page that exists but failed to compose**. That page emitted no file because of a problem of its own — already reported, and already blocking the publish — so a second diagnostic located at the *link* sends the author to a correctly-spelled path in the wrong file, and, diagnostics being path-ordered, usually prints above the one problem that matters. Measured on a twenty-page site with one page failing to compose: twenty-one problems printed, one of them real, the real one last. A reference to a target with no source file at all, and a reference to a source file that exists but is *excluded* (the stranded underscore asset above), are not this case and still fail here, loudly.
 
 ---
 
@@ -830,7 +843,13 @@ Two severities exist: **problem** (blocks publish; exit 1) and **advisory** (nev
 
 Diagnostics go to stderr; the build summary and `--dry-run` list go to stdout; both ordered by path, then line — two runs over the same tree print the same bytes. **Internally a diagnostic's `file` is source-root-relative; it is made relative to the working directory once, immediately before printing.** Every example in this document shows the printed form (`src/about.html:12: …`), which is why the two look different — stated because two independent implementations each had to derive it, and a third should not have to. Modules that never see the working directory therefore emit root-relative paths and are correct to. Every diagnostic line begins `FILE:LINE: SEVERITY: ` (line omitted when unknown: `FILE: SEVERITY: `). That prefix and the severity token are stable contract; the message after them is prose and is not — the diagnostic examples throughout this document fix the prefix and the shape, and their message wording is illustrative. Continuation lines are indented two spaces: `in:` (the offending source text) and `fix:` (one edit per line; path-shaped messages always include `fix: check the path spelling and casing`). Cycle and depth messages print the full chain with ` → `. `DEBUG=1` adds stack traces.
 
-Location attribution is fixed, not stylistic: a cycle or depth problem locates at the **outermost include site** — the file and line of the include element where expansion entered the chain; a collision problem at the **path-ordered first** of the colliding sources; a reference problem (§12) at the reference's **provenance file** (§1; for a `url()` in a CSS file, that file), at its line there when known. The examples throughout this document already follow these conventions; they are contract, so two implementations point the author at the same place.
+Location attribution is fixed, not stylistic: a cycle or depth problem locates at the **outermost include site** — the file and line of the include element where expansion entered the chain; a collision problem at the **path-ordered first** of the colliding sources; a reference problem (§12) at the reference's **provenance file** (§1; for a `url()` in a CSS file, that file), at its line there when known; and every other located diagnostic — §6's layout selection, §7's composition, §8's charset advisory, §12's references — at the **provenance file** of the offending markup, at its line *in that file*. The examples throughout this document already follow these conventions; they are contract, so two implementations point the author at the same place.
+
+That last clause has a consequence worth stating outright, because implementations reach it late: composition runs on include-inlined text (§2 step 2), so an offset in the text a composer holds is **not** a position in the file that text is attributed to — every line a fragment splices in above a fault shifts it, routinely past the end of the file the message names. A `<slot>` or a duplicate sink an include contributed is therefore reported **in the fragment that wrote it**, at its line there, never at the host's post-inlining line, which is a position no source file has and which a differently-implemented composer would number differently. Combined with deduplication below, one such fault in a fragment consumed by twenty pages is one diagnostic naming one line of one file.
+
+**A line is omitted rather than guessed.** Where a position cannot be mapped back to a line of the named file, the `FILE: SEVERITY:` form of DIA-06 is required, not a plausible-looking number: a Markdown page converts before its includes inline (§10.1), so an offset attributed to a `.md` source indexes converted HTML and no line of the author's file corresponds to it. Printing the nearest number would be worse than printing none — it is checkable-looking and wrong.
+
+Diagnostics are **deduplicated** before they are counted or printed: two diagnostics with the same file, line, severity, message, `in:` and `fix:` lines are one diagnostic, however many times the build encountered it. This follows from the attribution rule above rather than adding to it — a problem located at a shared include or layout is one problem at one line of one file, whatever number of pages consume it — and it is what keeps the printed count and the printed lines in agreement. Two faults that would print identically but are genuinely distinct — the same relative `url()` in shared chrome, which §11.1 does not rewrite, resolving against different consuming pages (§12) — are distinguished by their resolved targets and both printed.
 
 ### 14.2 Problems (closed list for v0.7.0)
 
@@ -854,15 +873,16 @@ The bold IDs are the stable identifiers used by `tests/conformance/rules.tsv` an
 16. **P17** — A frontmatter value with no text form: a mapping nested below a key that already names one, or a list item that is itself a mapping or list (§10.2)
 17. **P18** — Frontmatter is not valid YAML (§10.2). Distinct from P17, which is about a value's *shape*: P18 is a parse failure, and its fix is different — repair the syntax, rather than flatten a structure
 18. **P19** — A named `<slot>` inside the layout's default-content sink `<main>`, with no bare `<slot>` (§7.4). Located at the named slot
+19. **P20** — A `<slot>` outside a layout's `<body>` — anywhere in a page, or in a layout's `<head>` (§7.1). Inert in both cases; the message names the spelling that belongs in that file (`slot=` on a real element for a page, the layout's `<body>` for a head slot). Was advisory A04 until 2026-08-13
 
 ### 14.3 Advisories (the closed catalogue — capped at twelve; at the cap, adding one means removing one)
+
+Nine, three slots free. Three IDs have left this catalogue and none was replaced: **A15** (an `og:` value left root-relative by a path-only `--base-url`) was added and retired the same day, because the form it warned about stopped existing (§11.3); **A04** became problem **P20**, because what it reported was never merely informative — the page it let through was wrong; **A03** (a top-level `<header>`/`<footer>` outside any slot) was deleted, because the markup it fired on had composed exactly as its author drew it (§7.6). All three are the outcome to prefer over a warning that stays: delete the choice, fail the build, or delete the warning. A retired ID is never reused.
 
 Same ID convention as §14.2.
 
 1. **A01** — Void `<include>` used (builds identically; previews wrong in a browser)
 2. **A02** — Fill names a slot the layout doesn't have (content stayed in the page flow) (§7.3)
-3. **A03** — Top-level `<header>`/`<footer>` outside any slot in a composed page (§7.6)
-4. **A04** — `<slot>` outside a layout's `<body>` (replaced by its children) (§7.1)
 5. **A13** — A duplicated construct of which only the first counts — a second bare `<slot>`, a repeated slot name, or a second `<main>` in a layout: the first won, and the message names the duplicated construct (§7.1)
 6. **A08** — Page charset differs from the layout's (layout's kept) (§8 row 1)
 7. **A09** — Working-format file emitted — extension list, closed: `.psd`, `.ai`, `.sketch`, `.fig`, `.xcf`
@@ -870,6 +890,8 @@ Same ID convention as §14.2.
 9. **A11** — Output paths differing only by case (§13)
 10. **A12** — Symlink resolving outside the source root (treated as absent) (§4.4)
 11. **A14** — Known deployment file at the source root held back by the exclude set — names the file and the `--exclude` line that ships it; the recognized names are the implementation's maintained list, which may grow without a spec revision (§4.2)
+
+Two operational tests fell out of A03's retirement. An advisory that a meaningless wrapper element switches off is reporting tree position, not authorial error. And an advisory whose only available repair edits a file the page does not own — a shared layout, a shared fragment — is instructing a restructure by another name, whatever its wording.
 
 Discipline (asserted by the E2E suite): an advisory that fires on a correct site is a bug in the advisory — `unify init && unify build --dry-run --strict` exits `0`. Advisories report what the build observed and what it did; they never instruct the author to restructure markup that composed correctly.
 
@@ -891,17 +913,22 @@ Discipline (asserted by the E2E suite): an advisory that fires on a correct site
 
 ## 17. `--dry-run` report
 
-Stdout, one list ordered by output path regardless of verb, one line per action, three verbs:
+Stdout: one line naming the address the site is being built for, then one list ordered by output path regardless of verb, one line per action, three verbs:
 
 ```
-write dist/404.html ← 404.html (no layout)
-write dist/about/index.html ← about.md + _layout.html
-copy dist/assets/style.css ← assets/style.css
-write dist/blog/post/index.html ← blog/post.html + blog/_layout.html
+serving from / — the domain root (no --base-url)
+write dist/404.html (/404.html) ← 404.html (no layout)
+write dist/about/index.html (/about/) ← about.md + _layout.html
+copy dist/assets/style.css (/assets/style.css) ← assets/style.css
+write dist/blog/post/index.html (/blog/post/) ← blog/post.html + blog/_layout.html
 delete dist/stale.html
 ```
 
-Every `write` names its inputs — the source page and the layout it resolved to (the one fact not readable from any single file). Diagnostics print to stderr exactly as a real build would. `unify build --dry-run --strict` is the one-line CI lint.
+With `--base-url https://example.com/repo/` the first line reads `serving from https://example.com/repo/` and every parenthesized URL carries the path prefix (`/repo/about/`).
+
+Every `write` names its inputs — the source page and the layout it resolved to (the one fact not readable from any single file). Every `write` and `copy` also names, in parentheses, **the URL that file answers to** once published; `delete` names neither, being a disk operation on a file the site no longer has. Diagnostics print to stderr exactly as a real build would. `unify build --dry-run --strict` is the one-line CI lint.
+
+The address line and the URLs exist because the reference check (§12) validates against the output *tree*, which is correct and says nothing about where that tree will live: a site built for a subpath with no `--base-url` passes every check and 404s on every link once deployed. Ratification round 11 produced exactly that, with exit 0. The URL is also the one inference `--pretty-urls` forces on a reader of output paths — `dist/about/index.html` is served as `/about/` — so the report states it instead of leaving it to be derived.
 
 The list is what the **pipeline produced** — every page that composed, whether or not the build would go on to publish it. `--dry-run` is the pipeline through step 9; publishing is step 10 and it never runs. Because a single problem anywhere blocks the whole site (§15), a list of `write` lines could otherwise imply writes that a real build would refuse, so the report **ends with one line stating the outcome**:
 

@@ -24,12 +24,31 @@
  * from the source root, otherwise relative to the declaring file — always
  * the page itself, since frontmatter and `data-layout` both live IN the
  * page) are shared by both document shapes.
+ *
+ * DIAGNOSTIC LOCATION (§14.1): `resolveHtmlLayout` and `checkLayoutDocument`
+ * are handed an INCLUDE-INLINED document, so an offset in `text` is not a
+ * position in `file` — every line a fragment spliced in above a fault shifts
+ * it, routinely past the end of the file the message names (a `data-layout`
+ * on line 6 of an 8-line page, under a 5-line nav fragment, printed as line
+ * 11). Both therefore take the `spans` that inlining produced plus an injected
+ * `resolveLine`, and locate through `spansToDiagnosticLocator` — identically
+ * to compose.js's §7 diagnostics and head-merge.js's §8 advisory, through the
+ * same urls.js helper, so the three stages can never drift apart. Both
+ * arguments are optional: with neither, `text` IS `file`'s raw source and
+ * `lineOf` on it is exact, which is what every unit test passes.
+ *
+ * `checkRetiredVocabulary` (§6.3/P08) is the exception that needs none of
+ * this: its caller sweeps every `.html`/`.md` source file in its own right, on
+ * RAW text, so a `unify-` class in a fragment is already found and located in
+ * that fragment — provenance-exact by construction rather than by span
+ * arithmetic.
  */
 import { statSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { CHECK_SPELLING } from "./diagnostics.js";
 import { contains, toRelative } from "./paths.js";
 import { findAll, getAttrNode, hasAttr, isElement, lineOf, parse, tokens } from "./html.js";
+import { spansToDiagnosticLocator, verbatimLineResolver, wholeTextSpan } from "./urls.js";
 
 /** §6.1 step 4 — the automatic layout, discovered by name alone. */
 export const LAYOUT_FILENAME = "_layout.html";
@@ -44,22 +63,38 @@ const UNIFY_CLASS_PREFIX = "unify-";
  * Resolve an HTML page's layout selection (§6.1 steps 1-5) and flag any
  * `data-layout` found on a non-root element (§6.3/P07) anywhere in the
  * document — includes already inlined, so a fragment-contributed
- * `data-layout` is caught too (consequence of §5's textual-splice ordering,
- * same convention compose.js's own A04/P16 checks already use: attributed to
- * the host page's post-inlining line, not the fragment's own file).
+ * `data-layout` is caught too (a consequence of §5's textual-splice ordering,
+ * not a separate rule).
+ *
+ * Such a fault is reported IN THE FRAGMENT, at its own line there, exactly as
+ * compose.js's P16/P20 and §12's reference check already do: the host's
+ * post-inlining line is a position no source file has, and one stray
+ * `data-layout` in a fragment included by three pages is one authored fault
+ * with one place to fix it, not three. (An earlier version of this comment
+ * documented the opposite convention; the engine had never actually been able
+ * to honor it, since the shifted line it printed was not the host's real line
+ * either.) The RESOLUTION base is untouched by any of this — §6.1 resolves a
+ * relative layout path against the declaring page's directory, which stays
+ * `pageAbsPath`'s, because that is where §5 says the declaration textually is.
  *
  * @param {object} args
  * @param {import('./html.js').RootNode} args.root - `html.parse(text).root`
  * @param {string} args.text - the page's own (include-inlined) document text
+ * @param {{start:number,end:number,file:string,fileOffset:number}[]} [args.spans] -
+ *   `text`'s provenance, from `includes.inlineIncludes`; defaults to
+ *   attributing all of `text` to the page, exact when it inlined nothing
+ * @param {(file: string, fileOffset: number) => number|undefined} [args.resolveLine] -
+ *   see this module's DIAGNOSTIC LOCATION note
  * @param {string} args.pageAbsPath
  * @param {string} args.sourceRoot
  * @param {import('./diagnostics.js').Reporter} args.reporter
  * @returns {{none: true} | {path: string} | {problem: true}}
  */
-export function resolveHtmlLayout({ root, text, pageAbsPath, sourceRoot, reporter }) {
+export function resolveHtmlLayout({ root, text, spans, resolveLine, pageAbsPath, sourceRoot, reporter }) {
   const file = toRelative(sourceRoot, pageAbsPath);
+  const at = documentLocator({ file, text, spans, resolveLine });
   const { onHtml, onBody, misplaced } = findDataLayoutAttrs(root);
-  reportMisplaced(misplaced, { text, file, reporter });
+  reportMisplaced(misplaced, { at, reporter });
 
   // "on the page's <html> or <body>" (§6.1): both are legal; the spec does
   // not say which wins when both are set (see the implementation report) —
@@ -70,7 +105,8 @@ export function resolveHtmlLayout({ root, text, pageAbsPath, sourceRoot, reporte
     const value = (attr.value ?? "").trim();
     if (value === "none") return { none: true };
     return resolveExplicitPath(value, {
-      declaringDir: dirname(pageAbsPath), sourceRoot, file, line: lineOf(text, attr.start), reporter,
+      declaringDir: dirname(pageAbsPath), sourceRoot, at: at(attr.start), reporter,
+      spelling: (p) => `data-layout="${p}"`,
     });
   }
 
@@ -96,8 +132,13 @@ export function resolveMarkdownLayout({ layoutValue, mdSource, pageAbsPath, sour
   if (layoutValue !== undefined) {
     const value = String(layoutValue).trim();
     if (value === "none") return { none: true };
+    // No spans/locator here: `mdSource` is the page's RAW source and
+    // frontmatter precedes both conversion and include inlining (§10.1), so
+    // the key's line is already a true line in `file` — the one place in this
+    // module where the naive measurement is the correct one.
     return resolveExplicitPath(value, {
-      declaringDir: dirname(pageAbsPath), sourceRoot, file, line: frontmatterKeyLine(mdSource, "layout"), reporter,
+      declaringDir: dirname(pageAbsPath), sourceRoot, reporter,
+      at: { file, line: frontmatterKeyLine(mdSource, "layout") },
     });
   }
 
@@ -116,19 +157,25 @@ export function resolveMarkdownLayout({ layoutValue, mdSource, pageAbsPath, sour
  * @param {object} args
  * @param {import('./html.js').RootNode} args.root - `html.parse(text).root` of the layout's own (include-inlined) text
  * @param {string} args.text
+ * @param {{start:number,end:number,file:string,fileOffset:number}[]} [args.spans] - `text`'s provenance; see `resolveHtmlLayout`
+ * @param {(file: string, fileOffset: number) => number|undefined} [args.resolveLine] - see this module's DIAGNOSTIC LOCATION note
  * @param {string} args.file - source-root-relative path of the layout
  * @param {import('./diagnostics.js').Reporter} args.reporter
  * @returns {{broken: boolean}}
  */
-export function checkLayoutDocument({ root, text, file, reporter }) {
+export function checkLayoutDocument({ root, text, spans, resolveLine, file, reporter }) {
+  const at = documentLocator({ file, text, spans, resolveLine });
   const { onHtml, onBody, misplaced } = findDataLayoutAttrs(root);
-  reportMisplaced(misplaced, { text, file, reporter });
+  reportMisplaced(misplaced, { at, reporter });
 
   const attr = onBody ?? onHtml;
   if (!attr) return { broken: false };
   reporter.problem({
-    file,
-    line: lineOf(text, attr.start),
+    // Located wherever the declaration was written; the FIX still names the
+    // layout, which is the file whose ROLE is wrong (compose.js's A13
+    // messages keep `layoutFile` for the same reason — "which layout is this"
+    // stays the useful fact even when a fragment contributed the markup).
+    ...at(attr.start),
     message: "this layout declares data-layout — layout chaining is not supported in v0.7.0",
     fixes: [`make ${file} a complete standalone layout, or delete it so pages use a parent ${LAYOUT_FILENAME}`],
   });
@@ -180,6 +227,18 @@ export function checkRetiredVocabulary({ text, file, reporter }) {
 // ------------------------------------------------------------------ helpers
 
 /**
+ * `(offset) => {file, line}` for an offset in the include-inlined `text` —
+ * §14.1's pair, both halves from one span (see the DIAGNOSTIC LOCATION note).
+ * Absent `spans`, `text` is `file`'s own raw source; absent `resolveLine`,
+ * `verbatimLineResolver` answers for exactly that case and declines (line
+ * omitted, never guessed) for anything else.
+ */
+function documentLocator({ file, text, spans, resolveLine }) {
+  const s = spans ?? wholeTextSpan(text, file);
+  return spansToDiagnosticLocator(s, file, resolveLine ?? verbatimLineResolver([{ file, text, spans: s }]));
+}
+
+/**
  * Every `data-layout`-carrying element in a parsed document, split into the
  * root ones §6.1 selection reads (`<html>`, `<body>`) and misplaced ones
  * (§6.3/P07 — any other element).
@@ -196,11 +255,10 @@ function findDataLayoutAttrs(root) {
   };
 }
 
-function reportMisplaced(misplaced, { text, file, reporter }) {
+function reportMisplaced(misplaced, { at, reporter }) {
   for (const { el, attr } of misplaced) {
     reporter.problem({
-      file,
-      line: lineOf(text, attr.start),
+      ...at(attr.start),
       message: `data-layout on <${el.tag}> is never a component import`,
       fixes: [`use <include src="…"> to import a fragment instead of data-layout`],
     });
@@ -210,15 +268,32 @@ function reportMisplaced(misplaced, { text, file, reporter }) {
 /**
  * §6.1: an explicit layout value other than `none` — P04 (not a `.html`
  * path, checked before any existence check) then P05 (missing or escaping
- * the source root, same shape as include-not-found).
+ * the source root, same shape as include-not-found). `at` is the already-
+ * resolved `{file, line}` of the declaration itself (§14.1), not the page's
+ * path: for HTML the two differ whenever a fragment contributed the tag
+ * carrying `data-layout`.
  */
-function resolveExplicitPath(value, { declaringDir, sourceRoot, file, line, reporter }) {
+function resolveExplicitPath(value, { declaringDir, sourceRoot, at, reporter, spelling = (p) => `layout: ${p}` }) {
   if (!value.endsWith(".html")) {
+    // Name the layout this page would actually get, not a fixed literal.
+    // Round 8's repair fixed the *kind* (`layout:` vs `data-layout=`); round
+    // 18 showed the *path* was still one hardcoded `/_layout.html`, which in
+    // any site with a section layout is a real, resolvable, WRONG answer — a
+    // sample followed it, both news articles silently lost their section's
+    // body class and stylesheet, exit 0. "A rule that shows exactly one
+    // literal will have that literal copied" is this project's most repeated
+    // finding; it applies to diagnostics too, so the literal has to be right.
+    const nearest = walkForLayout(declaringDir, sourceRoot);
+    const suggestion = nearest ? `/${toRelative(sourceRoot, nearest)}` : "/_layout.html";
     reporter.problem({
-      file,
-      line,
+      ...at,
       message: `layout is not a path: "${value}"`,
-      fixes: ["layouts are paths — write layout: /_layout.html (or a relative path ending in .html)"],
+      fixes: [
+        `layouts are paths — write ${spelling(suggestion)} (or a relative path ending in .html)`,
+        nearest
+          ? `or drop the layout selection: this page's nearest layout is ${toRelative(sourceRoot, nearest)}`
+          : "or drop the layout selection to use the nearest _layout.html",
+      ],
     });
     return { problem: true };
   }
@@ -234,8 +309,7 @@ function resolveExplicitPath(value, { declaringDir, sourceRoot, file, line, repo
   }
   if (!isFile) {
     reporter.problem({
-      file,
-      line,
+      ...at,
       message: `layout not found: ${value}`,
       fixes: ["create it, or point layout at an existing .html file", CHECK_SPELLING],
     });

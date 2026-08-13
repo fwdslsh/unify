@@ -73,7 +73,7 @@ test("CFG-01: output/clean/pretty-urls/base-url/strict/port are all recognized k
       "exclude:",
       "  - drafts/**",
       "pretty-urls: true",
-      "base-url: /demo/",
+      "base-url: https://demo.example/demo/",
       "strict: true",
       "port: 4321",
       "",
@@ -163,10 +163,10 @@ test("CFG-03: no behavior exists that only the file can express — flags-only a
   };
   writeTree(join(tmp, "flags-site"), site);
   writeTree(join(tmp, "file-site"), site);
-  writeTree(join(tmp, "file-site"), { "unify.yaml": "pretty-urls: true\nbase-url: /demo/\nexclude:\n  - drafts/**\nstrict: true\n" });
+  writeTree(join(tmp, "file-site"), { "unify.yaml": "pretty-urls: true\nbase-url: https://demo.example/demo/\nexclude:\n  - drafts/**\nstrict: true\n" });
 
   const rFlags = await runCli(
-    ["build", "-s", "flags-site", "-o", "dist-flags", "--pretty-urls", "--base-url", "/demo/", "--exclude", "drafts/**", "--strict"],
+    ["build", "-s", "flags-site", "-o", "dist-flags", "--pretty-urls", "--base-url", "https://demo.example/demo/", "--exclude", "drafts/**", "--strict"],
     tmp,
   );
   const rFile = await runCli(["build", "-s", "file-site", "-o", "dist-file"], tmp);

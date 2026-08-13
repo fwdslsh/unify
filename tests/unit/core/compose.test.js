@@ -23,7 +23,7 @@ import { inlineIncludes } from "../../../src/core/includes.js";
 import { convert } from "../../../src/core/markdown.js";
 import { Reporter } from "../../../src/core/diagnostics.js";
 import { compareHtml } from "../../../tests/conformance/compare.mjs";
-import { findFirst, isElement, parse } from "../../../src/core/html.js";
+import { findFirst, isElement, lineOf, parse } from "../../../src/core/html.js";
 
 /**
  * Chains the real includes.js (§5) ahead of compose() — stronger fidelity
@@ -39,6 +39,18 @@ async function withIncludesInlined(caseDir, pageRel, reporter) {
     text, file, sourceRoot, reporter,
     convertMarkdown: async () => { throw new Error("no .md includes expected in these fixtures"); },
   });
+}
+
+/**
+ * compose()'s injected `resolveLine` (§14.1), the same thing
+ * src/cli/commands/build.js builds for a real build: a provenance position
+ * `{file, fileOffset}` turned into a line by reading that file. compose.js
+ * cannot do this itself — it never touches the filesystem — which is exactly
+ * why the parameter exists.
+ */
+function sourceLineResolver(caseDir) {
+  const sourceRoot = join(caseDir, "src");
+  return (file, fileOffset) => lineOf(readFileSync(join(sourceRoot, file), "utf8"), fileOffset);
 }
 
 const ROOT = join(import.meta.dir, "..", "..", "..");
@@ -242,22 +254,37 @@ describe("landmines: composition family", () => {
     expectTreeMatch(dir, "index.html", composed);
   });
 
-  test("slot-in-page: MRG-04/A04 — page's own stray slot neutralized before composition", () => {
+  test("slot-in-page: MRG-04/P20 — a page's own slot is a problem, and is still neutralized", () => {
     const dir = join(LANDMINES, "slot-in-page");
     const { composed, reporter } = composeFixture(dir, "index.html");
     expect(reporter.diagnostics.length).toBe(1);
+    expect(reporter.diagnostics[0].severity).toBe("problem");
     expect(reporter.diagnostics[0].file).toBe("index.html");
     expect(reporter.diagnostics[0].line).toBe(5);
     expect(reporter.diagnostics[0].message).toContain("slot");
+    // Ratification round 7: three of five samples wrote the layout-side
+    // spelling into a page, so the message names the one that belongs in a
+    // page. It became a problem (was advisory A04) because the advisory let
+    // each of those samples publish at exit 0 with the fill never applied.
+    expect((reporter.diagnostics[0].fixes ?? []).join(" ")).toContain('slot="');
+    // The S4 children-replacement still runs — best-effort composition (§2)
+    // produces a tree to report on even though it will never be published.
     expectTreeMatch(dir, "index.html", composed);
   });
 
-  test("slot-in-layout-head: MRG-04/A04 — layout head's stray slot becomes ordinary head content", () => {
+  test("slot-in-layout-head: MRG-04/P20 — a head slot is a problem, with head-side advice", () => {
     const dir = join(LANDMINES, "slot-in-layout-head");
     const { composed, reporter } = composeFixture(dir, "index.html");
     expect(reporter.diagnostics.length).toBe(1);
+    expect(reporter.diagnostics[0].severity).toBe("problem");
     expect(reporter.diagnostics[0].file).toBe("_layout.html");
     expect(reporter.diagnostics[0].line).toBe(5);
+    // A head slot is a different mistake from a page-side one, so it must not
+    // carry the fill spelling: nothing can fill it, and a page's own <head>
+    // reaches the output by the §8 merge instead.
+    const fixes = (reporter.diagnostics[0].fixes ?? []).join(" ");
+    expect(fixes).toContain("<body>");
+    expect(fixes).not.toContain('slot="');
     expectTreeMatch(dir, "index.html", composed);
   });
 
@@ -306,14 +333,25 @@ describe("landmines: composition family", () => {
     expectTreeMatch(dir, "index.html", composed);
   });
 
-  test("stray-header-footer: MRG-17/A03 fires for both, content still ships in place", () => {
+  test("stray-header-footer: MRG-17 — both ship in place, nothing is reported", () => {
+    // A03 fired here until it was retired, and this expected tree is
+    // byte-for-byte what it used to narrate: the markup had composed exactly
+    // as its author drew it. See §7.6 for the three reproductions that
+    // condemned the advisory rather than its wording.
     const dir = join(LANDMINES, "stray-header-footer");
     const { composed, reporter } = composeFixture(dir, "index.html");
-    expect(reporter.diagnostics.length).toBe(2);
-    expect(reporter.diagnostics[0].line).toBe(5);
-    expect(reporter.diagnostics[0].message).toContain("header");
-    expect(reporter.diagnostics[1].line).toBe(7);
-    expect(reporter.diagnostics[1].message).toContain("footer");
+    expect(reporter.diagnostics).toEqual([]);
+    expectTreeMatch(dir, "index.html", composed);
+  });
+
+  test("fill-in-wrapped-main: MRG-07 — a fill inside a wrapped <main> counts; one wrapper deeper does not", () => {
+    const dir = join(LANDMINES, "fill-in-wrapped-main");
+    const { composed, reporter } = composeFixture(dir, "index.html");
+    expect(reporter.diagnostics).toEqual([]);
+    // The fill was lifted out of the wrapper and its slot= consumed…
+    expect(composed).toContain("<aside>FILLED FROM INSIDE A WRAPPED MAIN</aside>");
+    // …while the one a wrapper deeper stays the author's own markup, attribute intact.
+    expect(composed).toContain('<aside slot="aside">not a fill — one wrapper deeper</aside>');
     expectTreeMatch(dir, "index.html", composed);
   });
 
@@ -336,6 +374,65 @@ describe("landmines: composition family", () => {
     expect(reporter.diagnostics[0].line).toBe(8);
     expect(reporter.diagnostics[0].message).toContain("slot");
     expect(reporter.diagnostics[0].message).toContain("nest");
+  });
+
+  test("line-after-include: a diagnostic's line is measured in the file it NAMES, not in the inlined text", async () => {
+    // The round-18 defect, at library level: the layout's duplicate bare
+    // <slot> is on line 7 of a 9-line file, with a five-line fragment inlined
+    // above it on line 5. Measured in the inlined text the same slot sits on
+    // line 12 — a line that file does not have (verified against the engine
+    // before this fix: it printed `src/_layout.html:12`).
+    const dir = join(LANDMINES, "line-after-include");
+    const reporter = silentReporter();
+    const { text: layoutText, spans: layoutSpans } = await withIncludesInlined(dir, "_layout.html", reporter);
+    const pageText = readFileSync(join(dir, "src", "index.html"), "utf8");
+    compose({
+      pageText, pageFile: "index.html",
+      layoutText, layoutFile: "_layout.html", layoutSpans,
+      resolveLine: sourceLineResolver(dir), reporter,
+    });
+    expect(reporter.diagnostics.length).toBe(1);
+    expect(reporter.diagnostics[0].file).toBe("_layout.html");
+    expect(reporter.diagnostics[0].line).toBe(7);
+    const layoutLineCount = readFileSync(join(dir, "src", "_layout.html"), "utf8").trimEnd().split("\n").length;
+    expect(layoutLineCount).toBe(9); // the reported line must be a line the file HAS
+    expect(lineOf(layoutText, layoutText.indexOf("second default"))).toBe(12); // what the bug reported
+  });
+
+  test("line-after-include: with no resolveLine injected, the line is omitted — never guessed", async () => {
+    // §14.1 prints without a line when the line is unknown. A caller that
+    // hands compose() include-inlined text but no way to read source files
+    // gets `undefined`, not the offset counted in whatever text happened to
+    // be in hand — the failure mode that produced line 11 above.
+    const dir = join(LANDMINES, "line-after-include");
+    const reporter = silentReporter();
+    const { text: layoutText, spans: layoutSpans } = await withIncludesInlined(dir, "_layout.html", reporter);
+    const pageText = readFileSync(join(dir, "src", "index.html"), "utf8");
+    compose({ pageText, pageFile: "index.html", layoutText, layoutFile: "_layout.html", layoutSpans, reporter });
+    expect(reporter.diagnostics.length).toBe(1);
+    expect(reporter.diagnostics[0].file).toBe("_layout.html");
+    expect(reporter.diagnostics[0].line).toBeUndefined();
+  });
+
+  test("slot-inside-include: a fragment's own <slot> is P20 IN THE FRAGMENT, at its own line", async () => {
+    // INC-12: a fragment's top-level elements become the host's, including a
+    // <slot> it contributes. The author wrote that slot in aside.html, so
+    // that is where the problem is reported — the same convention §12
+    // already uses for a reference written in a fragment (P13, pinned by
+    // landmines/stranded-underscore-asset).
+    const dir = join(LANDMINES, "slot-inside-include");
+    const reporter = silentReporter();
+    const { text: pageText, spans: pageSpans } = await withIncludesInlined(dir, "index.html", reporter);
+    const layoutText = readFileSync(join(dir, "src", "_layout.html"), "utf8");
+    compose({
+      pageText, pageFile: "index.html", pageSpans,
+      layoutText, layoutFile: "_layout.html",
+      resolveLine: sourceLineResolver(dir), reporter,
+    });
+    expect(reporter.diagnostics.length).toBe(1);
+    expect(reporter.diagnostics[0].severity).toBe("problem");
+    expect(reporter.diagnostics[0].file).toBe("_includes/aside.html");
+    expect(reporter.diagnostics[0].line).toBe(2);
   });
 
   test("dollar-patterns: $&, $1, $', $`, $$ survive byte-for-byte through slot fills", async () => {

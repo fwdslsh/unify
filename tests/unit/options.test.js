@@ -5,8 +5,11 @@
  */
 
 import { describe, expect, test } from "bun:test";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { UsageError } from "../../src/core/diagnostics.js";
-import { mergeConfig, parseArgs } from "../../src/cli/options.js";
+import { loadConfig, mergeConfig, parseArgs } from "../../src/cli/options.js";
 
 describe("parseArgs", () => {
   test("build is the default command", () => {
@@ -59,6 +62,35 @@ describe("parseArgs", () => {
 
   test("a flag given a value is a usage fault", () => {
     expect(() => parseArgs(["--strict=yes"])).toThrow(UsageError);
+  });
+});
+
+describe("loadConfig comments", () => {
+  /** Write a unify.yaml into a fresh temp root and load it. */
+  function load(yaml) {
+    const dir = mkdtempSync(join(tmpdir(), "unify-cfg-"));
+    writeFileSync(join(dir, "unify.yaml"), yaml);
+    return loadConfig(dir);
+  }
+
+  test("a whole-line comment is skipped, not a usage error", () => {
+    // Ratification round 18's fixture carried one and it exited 2: the
+    // trailing-comment strip requires whitespace before the '#', so a comment
+    // at column 0 fell through to the key/value match and failed it.
+    expect(load("# Build settings\noutput: dist\n")).toEqual({ output: "dist" });
+    expect(load("   # indented too\noutput: dist\n")).toEqual({ output: "dist" });
+  });
+
+  test("a trailing comment is still stripped", () => {
+    expect(load("output: dist  # where it goes\n")).toEqual({ output: "dist" });
+  });
+
+  test("a '#' inside a value survives — it needs preceding whitespace to be a comment", () => {
+    expect(load("base-url: https://x.example/#frag\n")).toEqual({ "base-url": "https://x.example/#frag" });
+  });
+
+  test("a line that is neither comment, blank, key nor list item is still a usage error", () => {
+    expect(() => load("just some prose\n")).toThrow(UsageError);
   });
 });
 

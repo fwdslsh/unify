@@ -77,8 +77,8 @@ function firstProblem(reporter) {
 // ============================================================ hand-built
 
 describe("stripBaseUrl (REF-02)", () => {
-  test("path-only base strips the prefix", () => {
-    const base = parseBaseUrl("/coffee/");
+  test("the path prefix is stripped from href/src values, which never carry the origin", () => {
+    const base = parseBaseUrl("https://meridian.coffee/coffee/");
     expect(stripBaseUrl("/coffee/menu/", base)).toBe("/menu/");
     expect(stripBaseUrl("/other/x", base)).toBe("/other/x"); // no match -> unchanged
   });
@@ -132,6 +132,66 @@ describe("checkReferences — hand-built", () => {
     expect(p).toBeDefined();
     expect(p.message).toContain("/missing.html");
     expect(p.file).toBe("index.html");
+  });
+
+  test("under --base-url, the diagnostic quotes the source spelling, not the prefixed output form", () => {
+    const reporter = silentReporter();
+    checkReferences({
+      // The output tree the author never wrote: §11.3 already prefixed the link.
+      htmlFiles: new Map([["index.html", '<a href="/handbook/missing.html">x</a>']]),
+      cssFiles: new Map(),
+      emittedPaths: new Set(["index.html"]),
+      base: parseBaseUrl("https://site.example/handbook/"),
+      reporter,
+    });
+    const p = firstProblem(reporter);
+    expect(p).toBeDefined();
+    // The author's file says /missing.html; "check the spelling" of
+    // /handbook/missing.html points at a string their source doesn't contain.
+    expect(p.message).toContain("/missing.html");
+    expect(p.message).not.toContain("/handbook/");
+    expect(p.context).toBe("/missing.html");
+  });
+
+  test("REF-02: a BROKEN og:image absolutized by a full-URL base still fails the reference check", () => {
+    const reporter = silentReporter();
+    checkReferences({
+      htmlFiles: new Map([["post.html", '<meta property="og:image" content="https://example.com/repo/missing.png">']]),
+      cssFiles: new Map(),
+      emittedPaths: new Set(["post.html"]),
+      base: parseBaseUrl("https://example.com/repo/"),
+      reporter,
+    });
+    // §12: absolutized values "stay checkable instead of masquerading as
+    // external" — collecting only "/"-prefixed og: content made this 404
+    // silently.
+    const p = firstProblem(reporter);
+    expect(p).toBeDefined();
+    expect(p.message).toContain("/missing.png");
+  });
+
+  test("REF-02: og: content on a FOREIGN origin stays external and unchecked", () => {
+    const reporter = silentReporter();
+    checkReferences({
+      htmlFiles: new Map([["post.html", '<meta property="og:url" content="https://elsewhere.example/kept">']]),
+      cssFiles: new Map(),
+      emittedPaths: new Set(["post.html"]),
+      base: parseBaseUrl("https://example.com/repo/"),
+      reporter,
+    });
+    expect(reporter.diagnostics).toEqual([]);
+  });
+
+  test("non-URL og:/twitter: content (site names, card types) is never collected", () => {
+    const reporter = silentReporter();
+    checkReferences({
+      htmlFiles: new Map([["index.html", '<meta property="og:site_name" content="Meridian Coffee"><meta name="twitter:card" content="summary">']]),
+      cssFiles: new Map(),
+      emittedPaths: new Set(["index.html"]),
+      base: parseBaseUrl("https://meridian.coffee/coffee/"),
+      reporter,
+    });
+    expect(reporter.diagnostics).toEqual([]);
   });
 
   test("a resolvable href is silent", () => {
@@ -246,6 +306,45 @@ describe("checkReferences — hand-built", () => {
     expect(reporter.diagnostics).toEqual([]);
   });
 
+  test("one broken href in shared chrome is reported once, not once per consuming page", () => {
+    // The duplication defect, at the shape it was measured in: the check
+    // iterates OUTPUT files, §14.1 R3 attributes to the fragment, so the same
+    // fragment line was printed once per page that includes it.
+    const reporter = silentReporter();
+    const nav = '<nav><a href="/gone.html">gone</a></nav>';
+    const pages = ["index.html", "about.html", "menu.html", "blog/post.html"];
+    checkReferences({
+      htmlFiles: new Map(pages.map((p) => [p, nav])),
+      cssFiles: new Map(),
+      emittedPaths: new Set(pages),
+      // Every page inherited this href from one line of one fragment.
+      locate: () => ({ file: "_includes/nav.html", line: 2 }),
+      reporter,
+    });
+    expect(reporter.problemCount).toBe(1);
+    expect(reporter.diagnostics[0].file).toBe("_includes/nav.html");
+    // The raw tally still records that the check hit it four times.
+    expect(reporter.problemsReported).toBe(4);
+  });
+
+  test("a relative url() in shared chrome resolving differently per page reports BOTH faults", () => {
+    // §11.1 never rewrites url() in <style>/style= (URL-03), so a relative one
+    // in a shared layout genuinely resolves against each containing output
+    // file. Same source spelling, same provenance line — two different
+    // targets, and dedup must not collapse them.
+    const reporter = silentReporter();
+    const layoutStyle = '<html><head><style>.h{background:url(bg.png)}</style></head><body></body></html>';
+    checkReferences({
+      htmlFiles: new Map([["index.html", layoutStyle], ["blog/post.html", layoutStyle]]),
+      cssFiles: new Map(),
+      emittedPaths: new Set(["index.html", "blog/post.html"]),
+      locate: () => ({ file: "_layout.html", line: 5 }),
+      reporter,
+    });
+    expect(reporter.problemCount).toBe(2);
+    expect(reporter.diagnostics.map((d) => d.discriminator).sort()).toEqual(["bg.png", "blog/bg.png"]);
+  });
+
   test("custom `locate` attributes the diagnostic to true provenance, not the output file", () => {
     const reporter = silentReporter();
     const html = '<nav><img src="/missing-logo.png"></nav>';
@@ -260,6 +359,93 @@ describe("checkReferences — hand-built", () => {
     const p = firstProblem(reporter);
     expect(p.file).toBe("_includes/nav.html");
     expect(p.line).toBe(2);
+  });
+});
+
+describe("checkReferences — the cascade exemption (unbuiltPagePaths)", () => {
+  test("a link to a page that exists in source but failed to compose is NOT reported", () => {
+    const reporter = silentReporter();
+    checkReferences({
+      htmlFiles: new Map([["index.html", '<a href="/about.html">about</a>']]),
+      cssFiles: new Map(),
+      emittedPaths: new Set(["index.html"]), // about.html emitted nothing: it failed to compose
+      unbuiltPagePaths: new Set(["about.html"]),
+      locate: () => ({ file: "_includes/nav.html", line: 2 }),
+      reporter,
+    });
+    // about.html already reported its own problem, which already blocks the
+    // publish; "check the path spelling and casing" of a correct path would
+    // send the author to the wrong file with false advice.
+    expect(reporter.diagnostics).toEqual([]);
+  });
+
+  test("a link to a target with no source file at all is still reported (the real broken link)", () => {
+    const reporter = silentReporter();
+    checkReferences({
+      htmlFiles: new Map([["index.html", '<a href="/old-name.html">x</a>']]),
+      cssFiles: new Map(),
+      emittedPaths: new Set(["index.html"]),
+      unbuiltPagePaths: new Set(["about.html"]), // a DIFFERENT page failed; this target never existed
+      reporter,
+    });
+    expect(reporter.problemCount).toBe(1);
+    expect(firstProblem(reporter).message).toContain("/old-name.html");
+  });
+
+  test("a reference to a source file that exists but is EXCLUDED still fails loudly (§12's own example)", () => {
+    // "an asset stranded in an underscore folder" — the file is right there on
+    // disk and the build deliberately did not ship it. Nothing about it is a
+    // cascade: no page failed, and the reference is genuinely dead in the
+    // output. The exemption set is built from composition failures only, so an
+    // excluded target is never in it.
+    const reporter = silentReporter();
+    checkReferences({
+      htmlFiles: new Map([["index.html", '<img src="/_includes/logo.png">']]),
+      cssFiles: new Map(),
+      emittedPaths: new Set(["index.html"]),
+      unbuiltPagePaths: new Set(),
+      locate: () => ({ file: "_includes/nav.html", line: 2 }),
+      reporter,
+    });
+    expect(reporter.problemCount).toBe(1);
+    expect(firstProblem(reporter).message).toContain("/_includes/logo.png");
+  });
+
+  test("an excluded PAGE is not exempted either — exclusion is not a composition failure", () => {
+    const reporter = silentReporter();
+    checkReferences({
+      htmlFiles: new Map([["index.html", '<a href="/_drafts/wip.html">draft</a>']]),
+      cssFiles: new Map(),
+      emittedPaths: new Set(["index.html"]),
+      unbuiltPagePaths: new Set(), // excluded pages are never attempted, so never in here
+      reporter,
+    });
+    expect(reporter.problemCount).toBe(1);
+  });
+
+  test("omitting unbuiltPagePaths keeps the pre-existing behaviour: every absence is reported", () => {
+    const reporter = silentReporter();
+    checkReferences({
+      htmlFiles: new Map([["index.html", '<a href="/about.html">about</a>']]),
+      cssFiles: new Map(),
+      emittedPaths: new Set(["index.html"]),
+      reporter,
+    });
+    expect(reporter.problemCount).toBe(1);
+  });
+
+  test("the exemption is exact-path, like the emitted check: a near-miss spelling still reports", () => {
+    const reporter = silentReporter();
+    checkReferences({
+      htmlFiles: new Map([["index.html", '<a href="/About.html">x</a>']]),
+      cssFiles: new Map(),
+      emittedPaths: new Set(["index.html"]),
+      unbuiltPagePaths: new Set(["about.html"]),
+      reporter,
+    });
+    // The page that failed is about.html; the author ALSO typed the case
+    // wrong. That is a real fault of its own and survives the exemption.
+    expect(reporter.problemCount).toBe(1);
   });
 });
 

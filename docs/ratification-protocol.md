@@ -43,17 +43,52 @@ Two traps that each cost a full round:
 - **`--allowedTools` is variadic** and will swallow a positional prompt as another tool name. Pass the prompt on stdin. (Symptom: every agent exits 1 with "Input must be provided.")
 - **Restrict tools to file access.** In print mode a permission prompt has nobody to answer it, and the run hangs to its timeout.
 
+Two more that cost hours rather than rounds:
+
+- **Empty the sandbox before re-seeding it.** A retried sample that starts on top of the dead run's half-built site is not a sample, and nothing downstream will tell you.
+- **Stagger the launches.** Thirteen simultaneous cold starts produced a burst of transient proxy TLS failures that killed half a round; twenty seconds apart, none. Check every sample's exit code before analysing anything — a sample that never started looks exactly like a sample that did nothing.
+
 ## Running a round
 
 1. Regenerate the rules file from the current doc.
 2. Seed N sandboxes (5 Haiku + 1 control is a good default).
 3. Launch, wait, collect.
-4. Sweep the output mechanically for violations.
-5. Read every agent's self-report.
-6. Triage each finding (next section).
-7. Amend at most a handful of things. Re-run.
+4. **Run `unify build --dry-run --strict` over every sample yourself.** Exit code plus the
+   diagnostic list is the verdict.
+5. Read the output anyway — a green exit says the site composes, not that the author reached
+   for the mechanism the brief was built to compel.
+6. Read every agent's self-report.
+7. Triage each finding (next section).
+8. Amend at most a handful of things. Re-run.
+
+**The build is the instrument, and it is much sharper than reading.** Rounds 1–6 were judged
+by hand and recorded two 6/6 sweeps. The first brief judged by the real build came back
+**1 of 5**, on a doc those rounds had passed. Nothing regressed; the measurement improved.
+Read every pre-round-7 result as *no violation a human reviewer noticed*, and re-run any
+older brief you intend to rely on.
+
+Two cautions the upgrade brings. Put the CLI **inside** the sandbox (a compiled binary
+carries no docs with it) so isolation still holds — verify with the project-context
+question, as always. And keep briefs honest about what the build will check: a reference to
+an image the agent had no way to create fails the build without telling you anything about
+the doc. Seed those assets, or ask for placeholders in the brief.
+
+### Giving the agent the build, or not
+
+Both are experiments, and they answer different questions.
+
+- **Blind authoring** (the agent cannot run anything) measures *the document*. Use it when
+  you are testing whether a rule teaches.
+- **Authoring with the build** measures *the document plus the error contract*, which is
+  how anyone actually works. Use it for briefs about publishing and deployment, where the
+  tool's own output is part of the loop.
+
+Do not switch a brief from one to the other while you are measuring a fix — that changes
+the environment as well as the doc, and the result stops being attributable.
 
 **Ask every agent what the rules did not answer and what it had to re-read.** That self-report has been more diagnostic than the output in every round: the files show the symptom, the report points at the sentence. haiku-3 in round 1 not only got the title wrong but explained that it had concluded titles were a Markdown-only feature and *restructured the site around the limitation it had imagined*. No amount of staring at its HTML would have revealed that.
+
+**Judge what a sample did from its transcript, not from its report.** The self-report is the best evidence available about what a sample found *ambiguous*, and it is not evidence about what the sample ran or wrote. Round 15's write-up claimed five of six samples never ran `--dry-run`; the session transcripts show all six did, and the figure had come from grepping each agent's final report text. Round 16 hit the same thing twice independently — a report naming `data-layout=` on pages that carry the Markdown `layout:` spelling, and another declaring a site clean of a placeholder string its own files still contained. Read the files and the transcript for what happened; read the report for where the reader hesitated.
 
 **Sweep the site output, not the sandbox.** `rules.md` quotes `{{ }}` as an example of what not to write, so a naive violation grep reports templating syntax in every clean sample. Exclude the harness files. (I lost a round's analysis to this and briefly believed four samples had failed.)
 
@@ -116,6 +151,36 @@ One sample in N, no pattern, and the agent's own report shows a reasoning slip r
 
 If you are unsure between "outlier" and "doc defect," run more samples. Samples are cheap; a bad amendment is permanent.
 
+## The other experiment: repair, not authoring
+
+Every round above asks whether the rules teach you to *build* something. None of them tests
+whether the diagnostics teach you to *fix* something — and the error contract is a far
+larger documentation surface than the 60 lines, written by implementers, read only in the
+moment someone is stuck.
+
+The design that works: plant known faults in a working site, hand it over with the CLI, and
+require a clean build **without losing anything the site says**. Give every page a unique
+marker sentence so content loss is mechanically detectable — a repair that deletes a page
+to silence its error is the failure mode you are hunting, and it looks like success from
+the exit code alone. Run it in two arms — the CLI alone, and the CLI plus the rules — and
+the difference tells you which surface is carrying the load.
+
+Round 8's answer was that the messages are sufficient: seven of seven samples reached a
+clean build, four of them with no documentation whatsoever. What it found instead was three
+messages that misdirect, and only one of the three was visible from reading them:
+
+- **A `fix:` line that suggests a destructive repair will get one.** "rename or remove one
+  of the sources" — a sample removed one, and the page's address went with it.
+- **A `fix:` line must be spelled for the file it is pointing at.** P04 printed the
+  Markdown spelling on HTML pages for the whole life of the project; the fixture that
+  covered it used a Markdown page, so the suite could not see it and two agents did.
+- **An advisory that names what it dropped must also name what to write instead**, or the
+  author gets told they have a problem and not how to leave it.
+
+Message prose is explicitly not contract (conformance §14.1), so these are cheap to fix —
+but each one still needs a test, and the P04 case is the argument for fixture *variety*
+over fixture count: one rule, two page kinds, and only the untested kind was broken.
+
 ## The two amendment rules
 
 1. **Only amend for failures the documentation caused.** See triage step 0.
@@ -174,11 +239,29 @@ Stated plainly, because a method with no known limitations has not been examined
 | 5a | 5 Haiku, 1 Sonnet | link fix | **6/6 clean.** |
 | 5b | 5 Haiku, 1 Sonnet | new content brief | 6/6, **4/6 wrote flat `og:image:`** — a spec defect, not an authoring one. |
 | 6 | 5 Haiku, 1 Sonnet | `og:` + link fixes | **6/6 flat spelling, zero broken links.** Every sample used the form the old rule rejected. |
+| 7 | 5 Haiku, 1 Sonnet | first round judged by the build; a brief the round-5/6 fixes were not written for | **1/5 Haiku clean**, Sonnet clean. `og:` flat spelling 6/6 — that fix is now *tested*. Two doc defects: named-slot fill (4/5 wrong), unquoted colon in a YAML title (2/5). |
+| 8 | 4 + 3 Haiku/Sonnet, two arms | the diagnostics as documentation — repair a broken site | **7/7 reached a clean build**, four of them with no docs at all. One sample deleted a page's content following a `fix:` line. Three messages amended. |
+| 9 | 5 Haiku, 1 Sonnet | round 7's brief, amended doc (fitted) | **5/5 correct `slot=` fills** (was 1/5); every colon-bearing title quoted. 3/5 clean overall — both misses were referenced image files the sandbox could not produce. |
+| 10 | 3 + 4 Haiku/Sonnet, two arms | round 8's fixture, amended messages (fitted) | Arm B **3/3 clean with zero content lost** (was 1 of 3 losing a page); every sample merged rather than deleted. |
+| 11 | 5 Haiku, 1 Sonnet | `--base-url`, `--pretty-urls`, `_headers`/A14, `_scripts/` — never before tested | **5/6.** The seams work: every sample shipped `_headers` from the A14 recipe and wrote a working generator. One sample omitted `--base-url` — a flag the doc did not name — and published a site whose every link 404s, with exit 0. |
+| 12 | 5 Haiku, 1 Sonnet | round 11's brief, amended doc (fitted) | **6/6.** Every root-relative link prefixed (39, 39, 47, 39, 37 and 71 of them, none missed); every sample wrote and ran a `gen.mjs`; nobody asked whether unify runs the script for them. |
+| 13 | 5 Haiku, 1 Sonnet | og:image + subpath deploy (pre-registered) | **5/5 Haiku shipped dead social metadata with exit 0 and reports claiming it verified**; Sonnet escaped on prior knowledge alone; 0/6 found the full-URL `--base-url`. Spec-level repair: advisory A15 (the catalogue's last slot), the doc's literal becomes the full form, `--help` names both. A REF-02 implementation gap (absolutized og: never reference-checked) found and fixed alongside. |
+| 14 | 5 Haiku, 1 Sonnet | round 13's brief, amended doc + live A15 (fitted) | **6/6 absolute og: URLs** (was 0/5). No sample ever saw the advisory — the doc's full-URL literal carried all six on the first build. A15 stays as the net under the path form nobody needed this round. |
+| 15 | 5 Haiku, 1 Sonnet | round 13's brief; `--base-url` collapsed to one form, address named in the report (fitted) | **6/6**, and **18/18 frontmatter values root-relative** — no sample hardcoded a domain, none needed the new usage error. The report change went under-exercised: six of six ran `--dry-run`, but five passed `--base-url` to the first one and so never saw the warning form. |
+| 16 | 4 Haiku, 1 Sonnet | the first round to start from `unify init` — do the scaffolded templates teach? | **5/5 clean, the first round with zero diagnostics anywhere.** The scaffold erases the doc's two worst failures without anyone re-reading a rule: 5/5 correct `slot=` fills (was 1/5). It also taught one thing wrong — 4/4 kept a placeholder in the position of structure and 3/4 copied it into new code. Scaffold defect, not a doc defect. |
+| 17 | 16 Haiku, two arms | where `serving from …` belongs: `--dry-run` only, or every build | **Null result — the arms are indistinguishable**, and the one sample that shipped a broken site had already read the line and reasoned correctly from it before running a different command. Line stays put. |
+| 18 | 6 Haiku, two arms (+6 accidental blind) | the diagnostics re-tested on a fault set chosen outside round 8 | **6/6 clean, zero content lost** — round 8's destructive repair is closed. One wrong repair, caused by a `fix:` line shipping a hardcoded path that is a real but wrong answer in any site with a section layout. The accidental control is the finding: **0/6 reached a clean build without the CLI**, and every one reported confidently. |
 
 Round 6 is the clearest single result: with the rule keyed off the key's name, **six of six** wrote the flat spelling — including the control. The nested-only rule would have failed every sample on that brief.
 
-### The pattern across all six rounds
+Round 7 is the most uncomfortable one: the same document that had passed four consecutive rounds failed four of five samples the moment the build did the judging. Two of those failures were real doc defects, and the fixes took the same brief to 5/5 in round 9. The other lesson is about the method rather than the doc — **a clean sweep is only as good as the instrument that declared it clean.**
 
-Every genuine failure had the same shape: **a mechanism described from the wrong vantage point, or named without being shown, where a strong ecosystem convention was waiting to fill the gap.** Titles, `charset`, section links, `og:` keys — four instances, all repaired by making the doc imperative and concrete rather than by adding rules.
+### The pattern across eleven rounds
+
+Every genuine failure has had the same shape: **a mechanism described from the wrong vantage point, named without being shown, or not named at all, where a strong ecosystem convention was waiting to fill the gap.** Titles, `charset`, section links, `og:` keys, the named-slot fill, a colon in a YAML title, `--base-url` — seven instances, every one repaired by making the doc imperative and concrete rather than by adding rules.
+
+The sharpest version of it: a rule that shows exactly one literal will have that literal copied, whether or not it belongs in the file the reader is editing. The named-slot rule showed `<slot name="footer">` and got it pasted into pages by three of five samples; the P04 diagnostic showed `layout:` and sent two repair samples hunting for that key in an HTML file. **Show the string that belongs in the file you are talking to.**
+
+The corollary, from round 11: naming one of a pair is worse than naming neither. The doc named `--pretty-urls` and not `--base-url`, so a sample that had correctly diagnosed the subpath problem read the omission as proof no such flag existed and invented a hosting behaviour to cover it.
 
 The doc did not get longer. It got more specific.
