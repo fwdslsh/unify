@@ -567,6 +567,7 @@ describe("P21: the merge requires a <body> on both sides (§7/MRG-20)", () => {
     expect(p[0].line).toBeUndefined(); // no line to point at — omitted, never guessed (§14.1)
     expect(p[0].message).toContain("no <body>");
     expect(p[0].fixes.join(" ")).toContain("<!doctype html>"); // the complete-document shape, spelled out
+    expect(p[0].fixes.join(" ")).toContain("index.fragment.html"); // and the rename, for the intended-partial case (§4.4)
   });
 
   test("a body-less layout is P21 at the layout — never the layout's own text as the page", () => {

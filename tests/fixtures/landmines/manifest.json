@@ -1690,7 +1690,8 @@
      "severity": "problem",
      "containsAll": [
       "no <body>",
-      "complete HTML document"
+      "complete HTML document",
+      "fragment.html"
      ]
     }
    ],
@@ -1737,6 +1738,20 @@
    ],
    "diagnosticsExhaustive": true,
    "note": "A resolved layout file that is empty. Until 2026-08-13 an accident of truthiness (`if (!layoutText)`) made a zero-byte _layout.html silently identical to having no layout at all; discovery had resolved it, so its missing <body> is P21 like any other, never a silent pass-through."
+  },
+  "fragment-file": {
+   "rules": [
+    "EXC-12"
+   ],
+   "flags": [
+    "--pretty-urls"
+   ],
+   "exit": 0,
+   "published": true,
+   "diagnostics": [],
+   "diagnosticsExhaustive": true,
+   "expectedTree": "expected",
+   "note": "The .fragment.html opt-out (§4.4): hours.fragment.html is BOTH spliced into index.html by <include> and shipped byte-for-byte at its own path; late.fragment.html contains a link to a file that does not exist and the build says nothing, because a fragment's insides resolve at runtime against whichever page consumed them; _wip.fragment.html never ships (underscore beats everything); --pretty-urls moves visit.html to visit/index.html and does not move either fragment. Before 2026-08-13 there was no way to publish a bare HTML snippet at all — every route ended in P21, P07, a synthesized shell, or the wrong content-type."
   }
  }
 }

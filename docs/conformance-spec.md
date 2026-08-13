@@ -10,9 +10,9 @@ Conventions: "problem" and "advisory" are the only two severities (§14). MUST-l
 ## 1. Definitions
 
 - **Source root**: the directory named by `--source` (default `src/` if it exists, else the working directory).
-- **Page**: a file whose extension is exactly `.html` or `.md`. No other extension is a page; `.htm` is not special and copies through like any asset.
+- **Page**: a file whose extension is exactly `.html` or `.md` — except a name ending `.fragment.html`, which is a **fragment**, not a page: it mirror-copies byte-for-byte (§4.4). No other extension is a page; `.htm` is not special and copies through like any asset.
 - **Asset**: any non-page file. Assets are mirror-copied byte-for-byte to the same source-root-relative path.
-- **Fragment**: any file referenced by an include. **Layout**: any `.html` file referenced by layout selection (§6).
+- **Fragment**: any file referenced by an include; a name ending `.fragment.html` declares one in its filename, and additionally ships byte-for-byte at its own path (§4.4) — the two meanings are one: a balanced snippet that is not a document. **Layout**: any `.html` file referenced by layout selection (§6).
 - **Excluded**: matched by the effective `--exclude` set (§4). Excluded files are never emitted but remain build material (includable, usable as layouts).
 - **Top-level element**: an element child of `<body>` (elements only; text and comment nodes cannot carry attributes).
 - **Provenance**: the source file whose text contained an element's start tag. Every composed element has exactly one provenance file (the page, a layout, or an include file).
@@ -118,6 +118,13 @@ Independent of `--exclude` and not replaceable by it, these never appear in outp
 ### 4.4 Mirror copy and symlinks
 
 Every emitted asset is copied byte-for-byte to the same source-root-relative path. Symlinks are followed only while the resolved target stays inside the source root; a symlink resolving outside is treated as absent, with advisory A12 (§14.3).
+
+**Fragments: `*.fragment.html`.** A name ending `.fragment.html` opts an HTML file out of being a page (§1's definition): it mirror-copies like any asset — never composed, never rewritten, never moved by `--pretty-urls` — so a bare HTML snippet can be published at a URL, for `hx-get`/`fetch`, or for another system's embed. It is a *filename* convention because it has to be: a fragment has no `<html>`/`<body>` to carry `data-layout`, and unify's conventions already live in filenames (`_layout.html`, the underscore). Consequences, each deliberate:
+
+- The same file is an ordinary include target (§5.1 — its extension is `.html`): `<include src="/panels/hours.fragment.html">` splices its contents into the consuming page's build, where nested includes resolve normally, while the shipped copy stays raw bytes. One file serves a build-time consumer and a runtime one.
+- Its **insides are not reference-checked**: a URL written inside a fragment resolves at runtime against whichever page consumed it — a base the build cannot know — so checking it against the fragment's own path would be wrong in both directions. (Mirror-copied stylesheets stay checked, §12: CSS defines resolution against the stylesheet's own location, so there the check is sound.) References **to** a fragment from pages are checked like any emitted file, and a page's link to one is rewritten by §11 like any other URL — only the fragment's contents are the author's own.
+- The underscore still wins: `_hours.fragment.html`, or a fragment under a `_` directory, never ships. Never-ship beats ship-verbatim, and the never-shipped list (§4.3) is untouched by this rule.
+- P21's page-side message names this spelling as its second fix line (§7): a body-less `.html` is either an unfinished page or an intended fragment, and the diagnostic is where the author learns they can say which.
 
 **The defaulted-source notice.** When the source root **defaulted to the working directory** — no `--source` flag, no `source` key in `unify.yaml`, and no `src/` directory exists, i.e. the §1 default fell all the way through (the state of a directory `init` did not scaffold) — the build summary on stdout additionally reports how many files mirror copy is about to ship, and points at `--dry-run`:
 
@@ -261,7 +268,7 @@ src/_layout.html:14: problem: class "unify-footer" is the v0.6 area vocabulary
 
 For each page: C is the page document (after includes and Markdown conversion), L its selected layout (§6.1).
 
-**The merge requires a `<body>` element on both sides.** C or L without one — a fragment, a bare `<main>`, a head-only shell with no body tag, an empty file — is a **problem (P21)** attributed to the file that lacks it, and the page is not built: the merge is undefined, and both previous behaviors were worse (a body-less L silently published its own text *as* the page, dropping C entirely at exit 0 — a §7.6 violation; a body-less C crashed with an unlocated internal error). One rule, two vantage-specific messages: C's names the complete-document shape to wrap the content in; L's names the one-keystroke repair, because a layout with an *empty* `<body></body>` is the legitimate head-only pattern (§7.5) — the fault is only the element's absence. A resolved layout file that is empty is this problem, not a silent no-layout: `.md` conversion always synthesizes a body (§10.7), so P21's page side is reachable only from `.html` sources, and a page with no layout does not merge and is outside this rule.
+**The merge requires a `<body>` element on both sides.** C or L without one — a fragment, a bare `<main>`, a head-only shell with no body tag, an empty file — is a **problem (P21)** attributed to the file that lacks it, and the page is not built: the merge is undefined, and both previous behaviors were worse (a body-less L silently published its own text *as* the page, dropping C entirely at exit 0 — a §7.6 violation; a body-less C crashed with an unlocated internal error). One rule, two vantage-specific messages: C's names the complete-document shape to wrap the content in and the `.fragment.html` rename for the intended-partial case (§4.4); L's names the one-keystroke repair, because a layout with an *empty* `<body></body>` is the legitimate head-only pattern (§7.5) — the fault is only the element's absence. A resolved layout file that is empty is this problem, not a silent no-layout: `.md` conversion always synthesizes a body (§10.7), so P21's page side is reachable only from `.html` sources, and a page with no layout does not merge and is outside this rule.
 
 ### 7.1 Sink detection
 
@@ -876,7 +883,7 @@ The bold IDs are the stable identifiers used by `tests/conformance/rules.tsv` an
 17. **P18** — Frontmatter is not valid YAML (§10.2). Distinct from P17, which is about a value's *shape*: P18 is a parse failure, and its fix is different — repair the syntax, rather than flatten a structure
 18. **P19** — A named `<slot>` inside the layout's default-content sink `<main>`, with no bare `<slot>` (§7.4). Located at the named slot
 19. **P20** — A `<slot>` outside a layout's `<body>` — anywhere in a page, or in a layout's `<head>` (§7.1). Inert in both cases; the message names the spelling that belongs in that file (`slot=` on a real element for a page, the layout's `<body>` for a head slot). Was advisory A04 until 2026-08-13
-20. **P21** — A page or layout with no `<body>` element where a merge requires one (§7). Attributed to the file that lacks it, file-level (there is no line to point at); the fix line is spelled for that file's kind — the complete-document shape for a page, `<body></body>` (the §7.5 head-only pattern) for a layout
+20. **P21** — A page or layout with no `<body>` element where a merge requires one (§7). Attributed to the file that lacks it, file-level (there is no line to point at); the fix lines are spelled for that file's kind — for a page, the complete-document shape and the `.fragment.html` rename (§4.4), because a body-less `.html` is either an unfinished page or an intended partial; for a layout, `<body></body>` (the §7.5 head-only pattern)
 
 ### 14.3 Advisories (the closed catalogue — capped at twelve; at the cap, adding one means removing one)
 

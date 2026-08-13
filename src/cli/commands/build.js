@@ -653,7 +653,12 @@ function scanSourceTree(sourceRoot, output, excludePatterns, reporter) {
   return files;
 
   function pushFile(abs, rel) {
-    const isPage = extname(rel) === ".html" || extname(rel) === ".md";
+    // §4.4 — a name ending `.fragment.html` opts out of page-ness: it mirror
+    // copies byte-for-byte (never composed, never rewritten, never moved by
+    // --pretty-urls) so a bare HTML snippet can ship at a URL for <include>,
+    // embed, or fetch. Everything downstream keys off this one classification.
+    const ext = extname(rel);
+    const isPage = (ext === ".html" || ext === ".md") && !rel.endsWith(".fragment.html");
     files.push({ absPath: abs, relPath: rel, isPage, excluded: isExcluded(rel, excludePatterns) });
   }
 

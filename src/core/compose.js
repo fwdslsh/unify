@@ -437,10 +437,16 @@ function composeWithLayout({ pageText, pageFile, pageSpans, layoutText, layoutFi
       });
     }
     if (!cBody) {
+      // Two intents produce this file — an unfinished page, or an intended
+      // partial — and they need opposite repairs, so the message names both
+      // spellings (the P20 pattern) and the author says which they meant.
       reporter.problem({
         file: pageFile,
         message: "this page has no <body> element, so there is nothing to merge into its layout",
-        fixes: ["a page is a complete HTML document — wrap the content: <!doctype html><html><head><title>…</title></head><body>…</body></html>"],
+        fixes: [
+          "a page is a complete HTML document — wrap the content: <!doctype html><html><head><title>…</title></head><body>…</body></html>",
+          `or, to publish it verbatim as a bare fragment — for <include>, embedding, or fetch — rename it ${pageFile.replace(/\.html$/, ".fragment.html")}: fragments ship byte-for-byte and are never composed (§4.4)`,
+        ],
       });
     }
     return null;

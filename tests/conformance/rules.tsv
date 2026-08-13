@@ -25,6 +25,7 @@ EXC-08	§4.3	rule	fixture	Never-shipped list exactly: output dir inside root, .g
 EXC-09	§4.4	rule	fixture	Mirror copy: every emitted asset copied byte-for-byte to the same source-root-relative path
 EXC-10	§4.4	rule	targeted	Symlinks followed only while resolving inside the source root; outside → treated as absent with advisory A12
 EXC-11	§4.4	rule	targeted	Defaulted-source notice: when the source root defaulted to the working directory (no --source flag, no unify.yaml source key, no src/), the stdout summary reports the copied-file count and points at --dry-run; explicit --source (even .) or an existing src/ suppresses it; never a diagnostic, never affects exit
+EXC-12	§4.4	rule	fixture	Fragments: a name ending .fragment.html is not a page - mirror-copied byte-for-byte, never composed or rewritten, never moved by --pretty-urls, insides not reference-checked (runtime resolution base is the consuming page), still an ordinary include target; references to it are checked and rewritten normally; underscore still excludes it
 INC-01	§5.1	rule	fixture	SSI virtual="P" resolves against the source root; leading / permitted and equivalent
 INC-02	§5.1	rule	fixture	SSI file="P" must be relative and resolves against dirname of the including file
 INC-03	§5.1	rule	fixture	<include src="P">: leading / resolves from source root, else relative to the including file

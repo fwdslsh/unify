@@ -200,8 +200,8 @@ unify composes plain HTML at build time. No template language, variables, loops,
 `<slot>`, `slot=` — plus `<include>` and `data-layout`. Derived files (a post index, a feed) come from a script you write and run yourself: `node _scripts/gen.mjs && unify build`.
 
 ## Files
-- Source root is `src/` if it exists, else the current directory. `.html`/`.md` are pages; every other file
-  copies byte-for-byte to the same path. A leading `/` means the source root, in any path you write. Always
+- Source root is `src/` if it exists, else the current directory. `.html`/`.md` are pages — except a name
+  ending `.fragment.html`, a bare snippet shipped as written, for `<include>`, embeds, or `fetch`/`hx-get` — and every other file copies byte-for-byte to the same path. A leading `/` means the source root, in any path you write. Always
   link the real filename — `/about.html`, never `/about/`; a directory link (`/guides/`) resolves only if you
   wrote a `guides/index.html`. `--pretty-urls` rewrites links; `--base-url https://you.example/handbook/` — the site's whole address, never a bare path — prefixes them and makes `og:`/`canonical` absolute for share crawlers.
 - **Everything in the source root ships.** Anything that is not part of the site — notes, drafts,
