@@ -77,6 +77,11 @@ function isOgOrTwitterMeta(el) {
   return Boolean(name && /^twitter:/i.test(name));
 }
 
+/** The og:/twitter: key naming this meta, for diagnostics ("og:image"). */
+function ogMetaName(el) {
+  return getAttr(el, "property") ?? getAttr(el, "name") ?? "og:";
+}
+
 /**
  * Every checkable reference in one emitted HTML file's text: href/src/poster
  * (any element, any `<link>` rel — REF-01), srcset candidates, root-relative
@@ -102,8 +107,17 @@ function collectHtmlReferences(text) {
     }
     if (isElement(el, "meta") && isOgOrTwitterMeta(el)) {
       const content = getAttrNode(el, "content");
-      if (content && content.value && content.value.startsWith("/")) {
-        refs.push({ raw: content.value, offset: content.valueStart });
+      // Root-relative values are §12's stated scope; absolute URLs are
+      // collected too so REF-02's base-stripping can classify them — §11.3
+      // absolutizes og:/twitter: values under a full --base-url, and §12
+      // says those "stay checkable instead of masquerading as external".
+      // (Collecting only "/"-prefixed values made that sentence dead code:
+      // a broken og:image under a full base was never checked at all.)
+      // Non-URL content (og:site_name "Meridian Coffee", twitter:card
+      // "summary") stays out of scope.
+      const v = content?.value ?? "";
+      if (v.startsWith("/") || /^https?:\/\//i.test(v)) {
+        refs.push({ raw: v, offset: content.valueStart, ogMeta: ogMetaName(el) });
       }
     }
     if (isElement(el, "style")) {
@@ -217,7 +231,24 @@ export function checkReferences({ htmlFiles, cssFiles, emittedPaths, base = null
   }
 }
 
-function checkOne({ raw, offset }, containingOutputPath, { base, emittedPaths, reporter, locate }) {
+function checkOne({ raw, offset, ogMeta }, containingOutputPath, { base, emittedPaths, reporter, locate }) {
+  // A15 — a path-only --base-url declares the site lives under a subpath
+  // without saying where, so an og:/twitter: value it leaves root-relative
+  // is one a share crawler has no page address to resolve against. Fires
+  // independently of whether the target resolves (the form is wrong even
+  // when the file exists — the usual case), and never without --base-url:
+  // with no flag unify knows nothing about the deploy address, and the
+  // spec's own worked examples ship root-relative og: values legitimately.
+  if (ogMeta && base && !base.origin && base.pathPrefix !== "/" && raw.startsWith("/")) {
+    const { file, line } = locate(containingOutputPath, offset);
+    reporter.advisory({
+      file,
+      line,
+      message: `${ogMeta} is emitted as ${raw} — root-relative, and share crawlers fetch it with no page address to resolve it against`,
+      fixes: [`give --base-url the site's full address (--base-url https://your-domain${base.pathPrefix}) and og:/twitter:/canonical values become absolute`],
+    });
+  }
+
   const stripped = base ? stripBaseUrl(raw, base) : raw;
   const resolved = resolveReference(stripped, containingOutputPath);
   if (resolved === null) return; // out of scope: external/mailto/tel/data/fragment-only/escaping

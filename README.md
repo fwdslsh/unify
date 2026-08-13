@@ -205,7 +205,7 @@ unify composes plain HTML at build time. No template language, variables, loops,
 - Source root is `src/` if it exists, else the current directory. `.html`/`.md` are pages; every other file
   copies byte-for-byte to the same path. A leading `/` means the source root, in any path you write. Always
   link the real filename — `/about.html`, never `/about/`; a directory link (`/guides/`) resolves only if you
-  wrote a `guides/index.html`. `--pretty-urls` rewrites links; `--base-url /handbook/` prefixes every root-relative link for a subpath host.
+  wrote a `guides/index.html`. `--pretty-urls` rewrites links; publishing anywhere but the domain root, give `--base-url` the full address — `--base-url https://you.example/handbook/` prefixes every root-relative link **and** makes `og:`/`canonical` absolute, which share crawlers require (a bare `/handbook/` prefixes links only).
 - **Everything in the source root ships.** Anything that is not part of the site — notes, drafts,
   scratch, scripts — goes under a leading underscore (`_draft.html`, `_notes/`, `_scripts/`): the
   build still reads it, the output never contains it. Files inside a `_` directory need no prefix.

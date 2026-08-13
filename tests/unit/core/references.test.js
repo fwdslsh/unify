@@ -153,6 +153,85 @@ describe("checkReferences — hand-built", () => {
     expect(p.context).toBe("/missing.html");
   });
 
+  test("A15: path-only --base-url + root-relative og: content fires the advisory, with the full form in the fix", () => {
+    const reporter = silentReporter();
+    checkReferences({
+      // Final output under --base-url /outreach/ — §11.3 prefixed the value, but it is still root-relative.
+      htmlFiles: new Map([["post.html", '<meta property="og:image" content="/outreach/card.png">']]),
+      cssFiles: new Map(),
+      emittedPaths: new Set(["post.html", "card.png"]),
+      base: parseBaseUrl("/outreach/"),
+      reporter,
+    });
+    // The target resolves, so no P13 — the advisory is about the FORM.
+    expect(reporter.problemCount).toBe(0);
+    const a = reporter.diagnostics.find((d) => d.severity === "advisory");
+    expect(a).toBeDefined();
+    expect(a.message).toContain("og:image");
+    expect(a.message).toContain("/outreach/card.png");
+    expect((a.fixes ?? []).join(" ")).toContain("https://your-domain/outreach/");
+  });
+
+  test("A15 never fires under the full-URL form (§11.3 absolutized it) or with no --base-url at all", () => {
+    for (const [html, base] of [
+      // Full-URL base: the value is absolute in output — and still reference-checked via REF-02.
+      ['<meta property="og:image" content="https://example.com/outreach/card.png">', parseBaseUrl("https://example.com/outreach/")],
+      // No base: the spec's own worked examples ship root-relative og: legitimately (§10.6/FIX-13).
+      ['<meta property="og:image" content="/card.png">', null],
+    ]) {
+      const reporter = silentReporter();
+      checkReferences({
+        htmlFiles: new Map([["post.html", html]]),
+        cssFiles: new Map(),
+        emittedPaths: new Set(["post.html", "card.png"]),
+        base,
+        reporter,
+      });
+      expect(reporter.diagnostics).toEqual([]);
+    }
+  });
+
+  test("REF-02: a BROKEN og:image absolutized by a full-URL base still fails the reference check", () => {
+    const reporter = silentReporter();
+    checkReferences({
+      htmlFiles: new Map([["post.html", '<meta property="og:image" content="https://example.com/repo/missing.png">']]),
+      cssFiles: new Map(),
+      emittedPaths: new Set(["post.html"]),
+      base: parseBaseUrl("https://example.com/repo/"),
+      reporter,
+    });
+    // §12: absolutized values "stay checkable instead of masquerading as
+    // external" — collecting only "/"-prefixed og: content made this 404
+    // silently.
+    const p = firstProblem(reporter);
+    expect(p).toBeDefined();
+    expect(p.message).toContain("/missing.png");
+  });
+
+  test("REF-02: og: content on a FOREIGN origin stays external and unchecked", () => {
+    const reporter = silentReporter();
+    checkReferences({
+      htmlFiles: new Map([["post.html", '<meta property="og:url" content="https://elsewhere.example/kept">']]),
+      cssFiles: new Map(),
+      emittedPaths: new Set(["post.html"]),
+      base: parseBaseUrl("https://example.com/repo/"),
+      reporter,
+    });
+    expect(reporter.diagnostics).toEqual([]);
+  });
+
+  test("non-URL og:/twitter: content (site names, card types) is never collected", () => {
+    const reporter = silentReporter();
+    checkReferences({
+      htmlFiles: new Map([["index.html", '<meta property="og:site_name" content="Meridian Coffee"><meta name="twitter:card" content="summary">']]),
+      cssFiles: new Map(),
+      emittedPaths: new Set(["index.html"]),
+      base: parseBaseUrl("/coffee/"),
+      reporter,
+    });
+    expect(reporter.diagnostics).toEqual([]);
+  });
+
   test("a resolvable href is silent", () => {
     const reporter = silentReporter();
     checkReferences({

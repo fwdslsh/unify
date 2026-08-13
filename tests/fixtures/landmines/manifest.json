@@ -303,6 +303,29 @@
    ],
    "diagnosticsExhaustive": true
   },
+  "og-path-base": {
+   "rules": [
+    "A15"
+   ],
+   "flags": [
+    "--base-url",
+    "/repo/"
+   ],
+   "exit": 0,
+   "published": true,
+   "diagnostics": [
+    {
+     "file": "src/post.md",
+     "severity": "advisory",
+     "containsAll": [
+      "og:image",
+      "/repo/card.png"
+     ]
+    }
+   ],
+   "diagnosticsExhaustive": true,
+   "note": "Ratification round 13 (2026-08-13): five of five weakest-model authors published a subpath site whose og:image no crawler could fetch, with exit 0, and reported the sharing requirement verified. The path form of --base-url declares a subpath without an origin, so a root-relative og:/twitter: value is known-unresolvable the moment it is emitted; the fix line names the full form. Line deliberately undeclared: metas emitted from Markdown frontmatter locate at the provenance file with an output-derived line (same approximation P13 has always had there)."
+  },
   "layout-bare-name-html": {
    "rules": [
     "LAY-03",

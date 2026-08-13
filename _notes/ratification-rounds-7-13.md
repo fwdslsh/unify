@@ -1,4 +1,4 @@
-# Ratification rounds 7–12 — the build becomes the judge, and the diagnostics get tested
+# Ratification rounds 7–13 — the build becomes the judge, and the diagnostics get tested
 
 **Date:** 2026-08-12. Continues `_notes/ratification-round-1.md` and the results table in
 `docs/ratification-protocol.md`.
@@ -369,3 +369,88 @@ difficulty in its report; nothing in it suggests confusion about the text.
 
 That is a preference, not a defect, and the fix would have to be an exhortation. Not
 amended. Recorded as closed unless a brief that states the requirement produces a cluster.
+
+---
+
+## Round 13 — og:image under a subpath deploy (pre-registered)
+
+Pre-registration: `_notes/ratification-round-13-preregistration.md`, committed before any
+sample ran. **Samples:** 5 Haiku + 1 Sonnet, CLI in sandbox, a real `images/` directory
+seeded (closing the round-7/9 missing-image artifact). **Brief:** an observatory site whose
+log entries are reached "through links shared on Facebook, LinkedIn and Slack", deployed to
+`https://saltmarsh.github.io/outreach/` at pretty URLs.
+
+**Result — the pre-registered hypotheses held almost exactly:**
+
+| Sample | `--base-url` form | og:image in built output | Verdict |
+|---|---|---|---|
+| haiku-1…5 | `/outreach/` (path) | `/outreach/images/card-*.png` | **DEAD** — no crawler can fetch it; exit 0 |
+| sonnet-1 | `/outreach/` (path) | `https://saltmarsh.github.io/outreach/…` | works — absolute URLs hand-written in frontmatter |
+
+- **H2 confirmed, 5/5** (pre-registered ≥4/6): every Haiku shipped social metadata no
+  crawler can use, with a green build, and **every report claimed the sharing behaviour
+  verified** — haiku-3's quotes the dead root-relative meta as its evidence of correctness.
+- **H3 confirmed, 0/6** discovered the full-URL form. Nothing they could reach names it:
+  the 60 lines showed the path form, and `--help` said `--base-url <path>`.
+- The Sonnet is the protocol's exact doc-defect signature: it succeeded by *prior
+  knowledge* ("that fetch is not relative to the page, so og:image has to be a
+  fully-qualified URL"), not by anything it read.
+
+(haiku-3 was initially judged exit-1; that was the judge re-running its command against a
+sandbox whose stale `dist/` became source material once the output was redirected
+elsewhere. With its own command verbatim it builds exit 0 — the sample is clean and DEAD
+like the rest. Judge artifact, recorded.)
+
+### Triage
+
+Spec §11.3 documents both forms and the crawler rationale correctly — the spec is not
+wrong, it is **missing the diagnostic for a trap its own design creates**, which is the
+A14 precedent exactly (the underscore seam's silent side). Round-5 shape, one layer up:
+valid-looking output, silently ignored by every consumer, on the feature the brief asked
+for. Three surfaces repaired for one finding:
+
+1. **Advisory A15** (spec + rules.tsv + landmine `og-path-base` + unit tests): an
+   `og:`/`twitter:` value left root-relative by a **path-only** `--base-url`. The scope
+   was forced by the discipline check, not chosen by taste: a fire-always rule would flag
+   FIX-13 — the spec's own §10.6 worked example ships `og:image: /assets/team.jpg` with no
+   base-url, legitimately. The path form is the one case where the author has *declared*
+   the site lives under a subpath, making the value known-unresolvable at emit time. The
+   fix line echoes their own prefix: `--base-url https://your-domain/outreach/`. The
+   catalogue is now **at its cap of twelve** — the next advisory costs one of these.
+2. **The 60 lines** now show the full-URL literal as *the* `--base-url` example (the
+   proven repair register: the one literal shown is the one copied — five of five copied
+   the path form when that was the literal).
+3. **`--help`** (and its two doc embeds) now reads `--base-url <url>` and says only the
+   full form absolutizes og:/canonical.
+
+The kitchen-sink `pretty-base` profile turned out to already contain the trap — path-form
+base over `og:image: /assets/beans.jpg`, declared diagnostics-silent. The suite had pinned
+the failure as correct. Its manifest now declares the advisory.
+
+### A second defect found by reading, fixed in the same change (implementation, §12/REF-02)
+
+`collectHtmlReferences` only gathered og:/twitter: content starting with `/` — so under a
+**full-URL** base, the absolutized values were never reference-checked at all, despite
+§12's explicit sentence that stripping exists so they "stay checkable instead of
+masquerading as external". A broken og:image under the full form 404'd silently;
+REF-02's `stripBaseUrl` was dead code for the metas it was written for. The collector now
+also gathers absolute-URL og: values; foreign origins still skip as external
+(`base-url-subpath`'s `og:url https://elsewhere.example/kept` pins that), and non-URL
+content (`og:site_name`, `twitter:card`) is never collected.
+
+### Recorded, not fixed
+
+- Metas emitted from Markdown frontmatter locate at the provenance file with an
+  output-derived line that can point past EOF (`post.md:8` in a 7-line file). Verified
+  pre-existing — P13 on the same meta does the same — so A15 inherits it and the landmine
+  deliberately declares no line. A locate that maps frontmatter-emitted metas to their
+  frontmatter key's line is a real improvement waiting on evidence that it misleads.
+- Relative (not root-relative) og: values are outside §12's scope and every form of
+  `--base-url`; no sample has ever written one. Watch.
+
+### Round 14 (pending)
+
+Same brief, byte-identical, against the amended doc + the live advisory: measures whether
+the doc's full-URL literal or the advisory (via `--dry-run --strict`, which rules.md tells
+every author to run) carries samples to working metadata — and which of the two does the
+carrying.
