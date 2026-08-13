@@ -106,6 +106,8 @@ the environment as well as the doc, and the result stops being attributable.
 
 **Sweep the site output, not the sandbox.** `rules.md` quotes `{{ }}` as an example of what not to write, so a naive violation grep reports templating syntax in every clean sample. Exclude the harness files. (I lost a round's analysis to this and briefly believed four samples had failed.)
 
+**Judge with the standing instrument, not ad-hoc greps: `bun _notes/judge-round.mjs <round-dir>`** extracts each sample's own publish command whole (quoted arguments, backslash continuations), re-runs it in place with `--dry-run --strict`, greps for exact private values only, resolves client-side fetch targets against the deploy address, and records every candidate command so a wrong pick stays visible. Improvised judging is how every false verdict in this record happened — three in rounds 19–20 alone (a regex that truncated a quoted URL, a split line-continuation, a domain-level privacy grep), all from the experimenter and none from the samples.
+
 ## Triage: doc, spec, implementation, or outlier
 
 This is the part that matters. Getting it wrong means overfitting the doc to noise, or worse, "fixing" agents that were right.
