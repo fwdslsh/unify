@@ -1,6 +1,6 @@
 {
  "fixture": "kitchen-sink",
- "description": "A realistic small-business site (Meridian Coffee Roasters) that exercises every composition, head-merge, URL, exclusion, and Markdown rule at least once. Two deliberate advisories are declared below: the void <include> in legal/privacy.html (every profile), and A15 on beans.md's og:image under the pretty-base profile — its path-only --base-url leaves the value root-relative, which is exactly ratification round 13's finding. Everything else builds clean. The site is coherent on purpose: integration failures that rule-by-rule micro-fixtures miss (include-into-layout head merging, include-authored URL provenance inside a section layout, Markdown under a section layout) all occur here naturally. The menu section uses a complete standalone _layout.html — layout chaining is not part of v0.7.0 (P15).",
+ "description": "A realistic small-business site (Meridian Coffee Roasters) that exercises every composition, head-merge, URL, exclusion, and Markdown rule at least once. One deliberate advisory (the void <include> in legal/privacy.html) is declared below; everything else builds clean. The site is coherent on purpose: integration failures that rule-by-rule micro-fixtures miss (include-into-layout head merging, include-authored URL provenance inside a section layout, Markdown under a section layout) all occur here naturally. The menu section uses a complete standalone _layout.html — layout chaining is not part of v0.7.0 (P15).",
  "harnessContract": {
   "run": "for each profile: unify build -s tests/fixtures/kitchen-sink/src -o <tmp>/dist <flags>",
   "treeComparison": "bidirectional against expectedTree using the single harness comparator (tests/conformance/compare.mjs): a file missing from dist or extra in dist fails; HTML files are compared exactly on structure, attributes and their order, comments, and text content, with only whitespace-only text nodes outside pre/textarea/script/style normalized (testing-strategy section 2); non-HTML files byte-exact. This is what makes the never-shipped list (.env), the underscore exclusions, and LAY-12/LAY-13 (no data-layout, no data-polyfill script tag in output) assertions rather than intentions.",
@@ -112,7 +112,7 @@
    "flags": [
     "--pretty-urls",
     "--base-url",
-    "/coffee/"
+    "https://meridian.coffee/coffee/"
    ],
    "expectedTree": "expected-pretty-base",
    "exit": 0,
@@ -123,14 +123,6 @@
      "line": 9,
      "severity": "advisory",
      "contains": "include"
-    },
-    {
-     "file": "src/menu/beans.md",
-     "severity": "advisory",
-     "containsAll": [
-      "og:image",
-      "/coffee/assets/beans.jpg"
-     ]
     }
    ],
    "diagnosticsExhaustive": true,
@@ -141,8 +133,7 @@
     "URL-10",
     "URL-12",
     "REF-02",
-    "REF-03",
-    "A15"
+    "REF-03"
    ],
    "ruleNotes": {
     "URL-07": "moves about/contact/beans/privacy; index.html files and root 404.html stay",

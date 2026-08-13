@@ -77,10 +77,6 @@ function isOgOrTwitterMeta(el) {
   return Boolean(name && /^twitter:/i.test(name));
 }
 
-/** The og:/twitter: key naming this meta, for diagnostics ("og:image"). */
-function ogMetaName(el) {
-  return getAttr(el, "property") ?? getAttr(el, "name") ?? "og:";
-}
 
 /**
  * Every checkable reference in one emitted HTML file's text: href/src/poster
@@ -109,15 +105,15 @@ function collectHtmlReferences(text) {
       const content = getAttrNode(el, "content");
       // Root-relative values are §12's stated scope; absolute URLs are
       // collected too so REF-02's base-stripping can classify them — §11.3
-      // absolutizes og:/twitter: values under a full --base-url, and §12
-      // says those "stay checkable instead of masquerading as external".
-      // (Collecting only "/"-prefixed values made that sentence dead code:
-      // a broken og:image under a full base was never checked at all.)
-      // Non-URL content (og:site_name "Meridian Coffee", twitter:card
-      // "summary") stays out of scope.
+      // absolutizes og:/twitter: values under --base-url, and §12 says those
+      // "stay checkable instead of masquerading as external". (Collecting
+      // only "/"-prefixed values made that sentence dead code: a broken
+      // og:image under a base URL was never checked at all.) Non-URL content
+      // (og:site_name "Meridian Coffee", twitter:card "summary") stays out
+      // of scope.
       const v = content?.value ?? "";
       if (v.startsWith("/") || /^https?:\/\//i.test(v)) {
-        refs.push({ raw: v, offset: content.valueStart, ogMeta: ogMetaName(el) });
+        refs.push({ raw: v, offset: content.valueStart });
       }
     }
     if (isElement(el, "style")) {
@@ -136,16 +132,16 @@ function collectHtmlReferences(text) {
 /**
  * Strip the `--base-url` prefix from a URL so a value §11.3 absolutized
  * stays checkable instead of masquerading as external (REF-02). Tries the
- * full origin+path form first (only meaningful when `base.origin` is set),
- * then the bare path-prefix form. A value matching neither is returned
- * unchanged — it will be classified as root-relative/relative/external
- * normally by the caller.
+ * whole base (origin + path) first, which is what og:/twitter:/canonical
+ * values carry, then the path prefix alone, which is what href/src carry. A
+ * value matching neither is returned unchanged — it will be classified as
+ * root-relative/relative/external normally by the caller.
  * @param {string} url
  * @param {import('./urls.js').BaseUrlConfig} base
  * @returns {string}
  */
 export function stripBaseUrl(url, base) {
-  if (base.origin && url.startsWith(base.origin)) {
+  if (url.startsWith(base.origin)) {
     const rest = url.slice(base.origin.length); // expected to start with "/"
     if (rest.startsWith(base.pathPrefix)) return `/${rest.slice(base.pathPrefix.length)}`;
     return rest || "/";
@@ -231,24 +227,7 @@ export function checkReferences({ htmlFiles, cssFiles, emittedPaths, base = null
   }
 }
 
-function checkOne({ raw, offset, ogMeta }, containingOutputPath, { base, emittedPaths, reporter, locate }) {
-  // A15 — a path-only --base-url declares the site lives under a subpath
-  // without saying where, so an og:/twitter: value it leaves root-relative
-  // is one a share crawler has no page address to resolve against. Fires
-  // independently of whether the target resolves (the form is wrong even
-  // when the file exists — the usual case), and never without --base-url:
-  // with no flag unify knows nothing about the deploy address, and the
-  // spec's own worked examples ship root-relative og: values legitimately.
-  if (ogMeta && base && !base.origin && base.pathPrefix !== "/" && raw.startsWith("/")) {
-    const { file, line } = locate(containingOutputPath, offset);
-    reporter.advisory({
-      file,
-      line,
-      message: `${ogMeta} is emitted as ${raw} — root-relative, and share crawlers fetch it with no page address to resolve it against`,
-      fixes: [`give --base-url the site's full address (--base-url https://your-domain${base.pathPrefix}) and og:/twitter:/canonical values become absolute`],
-    });
-  }
-
+function checkOne({ raw, offset }, containingOutputPath, { base, emittedPaths, reporter, locate }) {
   const stripped = base ? stripBaseUrl(raw, base) : raw;
   const resolved = resolveReference(stripped, containingOutputPath);
   if (resolved === null) return; // out of scope: external/mailto/tel/data/fragment-only/escaping

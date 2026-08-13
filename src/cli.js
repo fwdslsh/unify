@@ -27,7 +27,7 @@ Options:
       --clean              empty the output directory first
       --exclude <glob>     globs never emitted, still usable by the build (repeatable; default: _*)
       --pretty-urls        about.html → about/index.html, and rewrite internal links to match
-      --base-url <url>     the deploy address (https://site.example/repo/, or just /repo/): prefix root-relative links; only the full form makes og:/canonical absolute for crawlers
+      --base-url <url>     the site's whole address (https://site.example/repo/): prefix root-relative links, and make og:/canonical absolute for share crawlers
       --dry-run            run the full build and every check, print the report, write nothing
       --strict             advisories count as problems for the exit code
   -p, --port <n>           port for \`unify dev\` (default: 3000)
@@ -111,6 +111,19 @@ export async function run(argv) {
   }
   if (Number.isNaN(settings.port) || settings.port <= 0) {
     throw new UsageError(`--port must be a positive number, got: ${settings.port}`);
+  }
+  // §11.3 — one form, the whole address. A bare path used to be accepted and
+  // prefixed links correctly while leaving og:/twitter:/canonical
+  // root-relative, which no share crawler can resolve: seventeen of eighteen
+  // ratification samples chose it, and five of five then published dead
+  // preview images with a green build. There is no repair for that inside a
+  // diagnostic — the fix is that the weaker form no longer exists.
+  if (settings.baseUrl !== undefined && !/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(String(settings.baseUrl))) {
+    const path = `/${String(settings.baseUrl).replace(/^\/+/, "")}`;
+    throw new UsageError(`--base-url needs the site's whole address, got: ${settings.baseUrl}`, [
+      `write it with the scheme and domain: --base-url https://your-domain.example${path.endsWith("/") ? path : `${path}/`}`,
+      "only the full address can make og:/twitter:/canonical absolute, which is what share crawlers fetch",
+    ]);
   }
 
   const output = resolve(process.cwd(), settings.output);

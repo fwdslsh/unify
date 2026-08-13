@@ -261,19 +261,36 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
     const outputFiles = await publishModule.snapshotDirectory(output);
     const plan = publishModule.planPublish({ tempFiles, outputFiles });
     const displayOutput = String(settings.output).replace(/\/+$/, "");
+    const prefix = baseConfig ? baseConfig.pathPrefix : "/";
     const rows = [
       ...composedPages.map((p) => ({
         action: "write",
         outputPath: `${displayOutput}/${outputPathOf.get(p.relPath)}`,
+        url: publishModule.urlForOutputPath(outputPathOf.get(p.relPath), prefix),
         from: p.layoutFile ? `${p.relPath} + ${p.layoutFile}` : `${p.relPath} (no layout)`,
       })),
       ...assetFiles.map((a) => ({
         action: "copy",
         outputPath: `${displayOutput}/${outputPathOf.get(a.relPath)}`,
+        url: publishModule.urlForOutputPath(outputPathOf.get(a.relPath), prefix),
         from: a.relPath,
       })),
       ...plan.delete.map((rel) => ({ action: "delete", outputPath: `${displayOutput}/${rel}` })),
     ];
+
+    // DRY-04 — the address the site is being built for, stated once, before
+    // the list whose every row is relative to it. A site published to a
+    // subpath with no --base-url builds clean and 404s on every link at the
+    // deploy address (ratification round 11), because the reference check
+    // validates against the output tree, which is correct and silent about
+    // where that tree will live. This line is the one place the build says
+    // out loud what it assumed.
+    reporter.summary(
+      baseConfig
+        ? `serving from ${baseConfig.origin}${baseConfig.pathPrefix}`
+        : "serving from / — the domain root (no --base-url)",
+    );
+
     const report = publishModule.formatDryRunReport(rows);
     if (report) reporter.summary(report);
 

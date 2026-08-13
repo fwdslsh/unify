@@ -161,7 +161,7 @@ unify build                      # publish to dist/ — all-or-nothing
 
 `--dry-run` prints what would be written and which layout each page composed from. The build checks every internal reference against the emitted files — a renamed page, a typo'd image path, or a case mismatch is a located error, not a quiet 404. If anything is wrong, **nothing is published**: exit 0 means `dist/` is the complete site, non-zero means the previous `dist/` is untouched.
 
-Deploying under a subpath (GitHub Pages project sites)? `unify build --pretty-urls --base-url /repo-name/`. Passing a full URL (`--base-url https://example.com/`) also absolutizes `og:` and canonical URLs for crawlers.
+Deploying under a subpath (GitHub Pages project sites)? Give `--base-url` the site's whole address: `unify build --pretty-urls --base-url https://you.github.io/repo-name/`. The path part prefixes every root-relative link; the domain absolutizes `og:` and canonical URLs, which is what Facebook, LinkedIn and Slack fetch when someone shares a page. A bare `/repo-name/` is rejected — it would prefix the links and leave the share metadata unfetchable.
 
 ## Anything derived from other files
 

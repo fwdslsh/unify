@@ -793,7 +793,9 @@ Preserved untouched: external URLs, `mailto:`/`tel:`/`data:`, fragment-only link
 
 ### 11.3 `--base-url`
 
-Two forms, one scope. The scope, identical for both forms: every root-relative URL in `href`/`src`/`srcset`/`poster` of emitted HTML, plus root-relative values in `<meta property="og:*">`/`<meta name="twitter:*">` `content` — one list, so no root-relative URL the output declares can dodge the prefix. A **path** (`/repo-name/`) prefixes everything in scope with it. A **full URL** (`https://example.com/repo/`) applies its path part exactly as the path form, and additionally prepends its origin to the og:/twitter: `content` values and the `<link rel="canonical">` `href` — the elements crawlers require to be absolute. The path form therefore has a silent side: it leaves those values root-relative, which the previous sentence's own rationale makes unusable — a crawler fetches them with no page address to resolve them against. That combination draws advisory **A15** (§14.3), which names the full form — added after ratification round 13, where every weakest-model author shipped it and reported it verified. Absolutization is therefore always **origin + path prefix**: with `--base-url https://host/repo/`, an og:image of `/assets/x.jpg` emits `https://host/repo/assets/x.jpg`, never `https://host/assets/x.jpg` — origin-only absolutization would 404 for exactly the crawlers the rule exists for. Values that are not root-relative are untouched. Source files stay rooted at `/`; only output changes.
+**One form: the site's whole address**, scheme and domain included (`https://example.com/repo/`). Its **path part** prefixes every root-relative URL in `href`/`src`/`srcset`/`poster` of emitted HTML, plus root-relative values in `<meta property="og:*">`/`<meta name="twitter:*">` `content` — one list, so no root-relative URL the output declares can dodge the prefix. Its **origin** is additionally prepended to the og:/twitter: `content` values and the `<link rel="canonical">` `href` — the elements crawlers require to be absolute. Absolutization is therefore always **origin + path prefix**: with `--base-url https://host/repo/`, an og:image of `/assets/x.jpg` emits `https://host/repo/assets/x.jpg`, never `https://host/assets/x.jpg` — origin-only absolutization would 404 for exactly the crawlers the rule exists for. Values that are not root-relative are untouched. Source files stay rooted at `/`; only output changes.
+
+A bare path (`--base-url /repo-name/`) is a **usage error** (exit 2) naming the full form. It was accepted until 2026-08-13, prefixing links correctly while leaving og:/twitter:/canonical root-relative — which the rationale above makes unusable, since a crawler fetches those with no page address to resolve them against. Ratification made the cost measurable: seventeen of eighteen samples handed a full deploy address chose the bare path anyway, and five of five then published dead preview images with a green build and a report claiming the sharing requirement verified. A diagnostic was tried first (advisory A15, retired the same day it was added); deleting the weaker form is the repair that leaves nothing to warn about.
 
 Order within the pipeline: §11.1 → §11.2 → §11.3.
 
@@ -857,6 +859,8 @@ The bold IDs are the stable identifiers used by `tests/conformance/rules.tsv` an
 
 ### 14.3 Advisories (the closed catalogue — capped at twelve; at the cap, adding one means removing one)
 
+Eleven, one slot free. A twelfth (A15, an `og:` value left root-relative by a path-only `--base-url`) was added and retired the same day: the form it warned about stopped existing (§11.3), which is the outcome to prefer whenever a diagnostic is compensating for a choice the tool did not have to offer.
+
 Same ID convention as §14.2.
 
 1. **A01** — Void `<include>` used (builds identically; previews wrong in a browser)
@@ -870,7 +874,6 @@ Same ID convention as §14.2.
 9. **A11** — Output paths differing only by case (§13)
 10. **A12** — Symlink resolving outside the source root (treated as absent) (§4.4)
 11. **A14** — Known deployment file at the source root held back by the exclude set — names the file and the `--exclude` line that ships it; the recognized names are the implementation's maintained list, which may grow without a spec revision (§4.2)
-12. **A15** — An `og:`/`twitter:` meta value left root-relative by a path-only `--base-url` (§11.3). The path form declares that the site lives under a subpath without saying where, and share crawlers fetch these URLs with no page address to resolve them against — so the value is known-unresolvable at the moment it is emitted. Fires per meta, at its provenance; the fix names the full `--base-url` form, which absolutizes them. Never fires without `--base-url` (unify then knows nothing about the deploy address, and §10.6's own worked example ships a root-relative `og:image` legitimately), and never under the full-URL form (§11.3 already absolutized)
 
 Discipline (asserted by the E2E suite): an advisory that fires on a correct site is a bug in the advisory — `unify init && unify build --dry-run --strict` exits `0`. Advisories report what the build observed and what it did; they never instruct the author to restructure markup that composed correctly.
 
@@ -892,17 +895,22 @@ Discipline (asserted by the E2E suite): an advisory that fires on a correct site
 
 ## 17. `--dry-run` report
 
-Stdout, one list ordered by output path regardless of verb, one line per action, three verbs:
+Stdout: one line naming the address the site is being built for, then one list ordered by output path regardless of verb, one line per action, three verbs:
 
 ```
-write dist/404.html ← 404.html (no layout)
-write dist/about/index.html ← about.md + _layout.html
-copy dist/assets/style.css ← assets/style.css
-write dist/blog/post/index.html ← blog/post.html + blog/_layout.html
+serving from / — the domain root (no --base-url)
+write dist/404.html (/404.html) ← 404.html (no layout)
+write dist/about/index.html (/about/) ← about.md + _layout.html
+copy dist/assets/style.css (/assets/style.css) ← assets/style.css
+write dist/blog/post/index.html (/blog/post/) ← blog/post.html + blog/_layout.html
 delete dist/stale.html
 ```
 
-Every `write` names its inputs — the source page and the layout it resolved to (the one fact not readable from any single file). Diagnostics print to stderr exactly as a real build would. `unify build --dry-run --strict` is the one-line CI lint.
+With `--base-url https://example.com/repo/` the first line reads `serving from https://example.com/repo/` and every parenthesized URL carries the path prefix (`/repo/about/`).
+
+Every `write` names its inputs — the source page and the layout it resolved to (the one fact not readable from any single file). Every `write` and `copy` also names, in parentheses, **the URL that file answers to** once published; `delete` names neither, being a disk operation on a file the site no longer has. Diagnostics print to stderr exactly as a real build would. `unify build --dry-run --strict` is the one-line CI lint.
+
+The address line and the URLs exist because the reference check (§12) validates against the output *tree*, which is correct and says nothing about where that tree will live: a site built for a subpath with no `--base-url` passes every check and 404s on every link once deployed. Ratification round 11 produced exactly that, with exit 0. The URL is also the one inference `--pretty-urls` forces on a reader of output paths — `dist/about/index.html` is served as `/about/` — so the report states it instead of leaving it to be derived.
 
 The list is what the **pipeline produced** — every page that composed, whether or not the build would go on to publish it. `--dry-run` is the pipeline through step 9; publishing is step 10 and it never runs. Because a single problem anywhere blocks the whole site (§15), a list of `write` lines could otherwise imply writes that a real build would refuse, so the report **ends with one line stating the outcome**:
 

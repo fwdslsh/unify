@@ -301,29 +301,28 @@ export function applyPrettyLinks(html, { pageOutputPath, emittedHtmlPaths }) {
 /**
  * @typedef {object} BaseUrlConfig
  * @property {string} pathPrefix - always starts and ends with "/"
- * @property {string|null} origin - scheme+authority (e.g.
- *   "https://example.com"), or null for the bare-path form
+ * @property {string} origin - scheme+authority (e.g. "https://example.com")
  */
 
 /**
- * Parse a `--base-url` value into its path-prefix and (for a full URL) its
- * origin. Both forms share one scope (URL-10); the origin, when present, is
- * additionally prepended to canonical/og/twitter values (URL-11).
- * @param {string} raw
+ * Parse a `--base-url` value — the site's whole address — into its origin and
+ * path prefix. The path prefix goes on every root-relative URL in scope
+ * (URL-10); the origin is additionally prepended to canonical/og/twitter
+ * values (URL-11), which crawlers require to be absolute.
+ *
+ * One form only. A bare path parsed here until 2026-08-13: it prefixed links
+ * correctly and left og:/twitter:/canonical root-relative, silently — see
+ * cli.js's usage error for the ratification evidence that retired it.
+ * `origin` is therefore never null, and callers no longer branch on it.
+ * @param {string} raw - must carry a scheme; cli.js rejects anything else
  * @returns {BaseUrlConfig}
  */
 export function parseBaseUrl(raw) {
-  if (SCHEME_RE.test(raw)) {
-    const u = new URL(raw);
-    let path = u.pathname;
-    if (!path.startsWith("/")) path = `/${path}`;
-    if (!path.endsWith("/")) path += "/";
-    return { origin: u.origin, pathPrefix: path };
-  }
-  let path = raw;
+  const u = new URL(raw);
+  let path = u.pathname;
   if (!path.startsWith("/")) path = `/${path}`;
   if (!path.endsWith("/")) path += "/";
-  return { origin: null, pathPrefix: path };
+  return { origin: u.origin, pathPrefix: path };
 }
 
 function isOgOrTwitterMeta(el) {

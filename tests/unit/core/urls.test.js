@@ -354,7 +354,7 @@ describe("full §11.1+§11.2+§11.3 chain — fixture: kitchen-sink (pretty-base
     "404.html", "about.html", "contact.html", "index.html",
     "legal/privacy.html", "menu/beans.html", "menu/index.html",
   ]);
-  const base = parseBaseUrl("/coffee/");
+  const base = parseBaseUrl("https://meridian.coffee/coffee/");
 
   test("index.html", async () => {
     const { composed, provenanceOf } = await composeWithProvenance({ caseDir: KITCHEN_SINK, pageRel: "index.html", layoutRel: "_layout.html" });
@@ -380,9 +380,12 @@ describe("full §11.1+§11.2+§11.3 chain — fixture: kitchen-sink (pretty-base
 // ============================================================== §11.3 base
 
 describe("parseBaseUrl", () => {
-  test("bare path form, normalized to lead/trail slashes", () => {
-    expect(parseBaseUrl("/coffee/")).toEqual({ origin: null, pathPrefix: "/coffee/" });
-    expect(parseBaseUrl("coffee")).toEqual({ origin: null, pathPrefix: "/coffee/" });
+  test("one form only: a bare path is not a base URL — cli.js rejects it before this is reached (URL-10)", () => {
+    expect(() => parseBaseUrl("/coffee/")).toThrow();
+    expect(() => parseBaseUrl("coffee")).toThrow();
+  });
+  test("path is normalized to lead/trail slashes", () => {
+    expect(parseBaseUrl("https://x.example/coffee")).toEqual({ origin: "https://x.example", pathPrefix: "/coffee/" });
   });
   test("full URL form: origin split from path", () => {
     expect(parseBaseUrl("https://meridian.coffee/")).toEqual({ origin: "https://meridian.coffee", pathPrefix: "/" });
@@ -391,8 +394,8 @@ describe("parseBaseUrl", () => {
 });
 
 describe("applyBaseUrl (§11.3)", () => {
-  test("path form prefixes every root-relative href/src/srcset/poster and og/twitter content; no origin exists to add", () => {
-    const base = parseBaseUrl("/coffee/");
+  test("the path part prefixes every root-relative href/src/srcset/poster and og/twitter content (URL-10)", () => {
+    const base = parseBaseUrl("https://meridian.coffee/coffee/");
     const html =
       `<link rel="stylesheet" href="/assets/style.css">` +
       `<img src="/assets/beans.jpg">` +
@@ -403,9 +406,9 @@ describe("applyBaseUrl (§11.3)", () => {
     expect(out).toBe(
       `<link rel="stylesheet" href="/coffee/assets/style.css">` +
       `<img src="/coffee/assets/beans.jpg">` +
-      `<meta property="og:image" content="/coffee/assets/beans.jpg">` +
+      `<meta property="og:image" content="https://meridian.coffee/coffee/assets/beans.jpg">` +
       `<meta name="twitter:card" content="summary">` +
-      `<link rel="canonical" href="/coffee/index.html">`,
+      `<link rel="canonical" href="https://meridian.coffee/coffee/index.html">`,
     );
   });
 
@@ -426,7 +429,7 @@ describe("applyBaseUrl (§11.3)", () => {
   });
 
   test("non-root-relative values are never touched (URL-12)", () => {
-    const base = parseBaseUrl("/coffee/");
+    const base = parseBaseUrl("https://meridian.coffee/coffee/");
     const html = `<a href="mailto:x@y.com">m</a><a href="relative.html">r</a><a href="https://x.com/y">e</a>`;
     expect(applyBaseUrl(html, base)).toBe(html);
   });

@@ -184,7 +184,7 @@ export const BUILD_CASES = {
   },
 
   "dry-run-report": {
-    rules: ["DRY-01", "DRY-02"],
+    rules: ["DRY-01", "DRY-02", "DRY-04"],
     build(dir) {
       mkdirSync(join(dir, "src", "blog"), { recursive: true });
       mkdirSync(join(dir, "src", "assets"), { recursive: true });
@@ -238,10 +238,11 @@ export const BUILD_CASES = {
       // line naming its source page and the layout it resolved to, or "(no
       // layout)" when it resolved to none.
       stdoutContains: [
-        "write dist/404.html ← 404.html (no layout)\n" +
-        "write dist/about/index.html ← about.md + _layout.html\n" +
-        "copy dist/assets/style.css ← assets/style.css\n" +
-        "write dist/blog/post/index.html ← blog/post.html + blog/_layout.html\n" +
+        "serving from / — the domain root (no --base-url)",
+        "write dist/404.html (/404.html) ← 404.html (no layout)\n" +
+        "write dist/about/index.html (/about/) ← about.md + _layout.html\n" +
+        "copy dist/assets/style.css (/assets/style.css) ← assets/style.css\n" +
+        "write dist/blog/post/index.html (/blog/post/) ← blog/post.html + blog/_layout.html\n" +
         "delete dist/stale.html",
       ],
       note: "DRY-01/DRY-02: reproduces conformance-spec.md §17's own worked example exactly (same paths, same arrow, same order), under --pretty-urls so both the '+layout' and '(no layout)' write-line shapes and the delete verb all appear in one pass. published:true here (not the generic PUB-01 sentinel) so the exact stdout block matches the spec's example without extra seeded files; PUB-04's stronger byte-for-byte 'nothing written anywhere' proof lives in tests/conformance/publish-sync.test.js."

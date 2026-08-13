@@ -107,8 +107,8 @@ URL-06	§11.1	rule	fixture	A relative URL whose provenance is the page stays exa
 URL-07	§11.2	rule	fixture	Pretty files: every page output X.html moves to X/index.html except any index.html and the root 404.html
 URL-08	§11.2	rule	fixture	Pretty links: after §11.1, every internal URL resolving to an emitted page's .html output is rewritten resolve-first then transformed, emitted root-relative (the eight-row table)
 URL-09	§11.2	rule	fixture	Pretty preserves untouched: external URLs, mailto/tel/data, fragment-only, URLs to non-page files; query and fragment always survive
-URL-10	§11.3	rule	fixture	base-url one scope both forms: every root-relative URL in href/src/srcset/poster plus root-relative og:/twitter: meta content; the path form prefixes everything in scope
-URL-11	§11.3	rule	fixture	base-url full URL: path part applied exactly as URL-10, then origin prepended to og:/twitter: content and canonical href — absolutization is always origin + path prefix (og:image /assets/x.jpg under https://host/repo/ emits https://host/repo/assets/x.jpg)
+URL-10	§11.3	rule	fixture	base-url is the whole address (scheme+domain); a bare path is a usage error, exit 2. Its path part prefixes every root-relative URL in href/src/srcset/poster plus root-relative og:/twitter: meta content
+URL-11	§11.3	rule	fixture	base-url origin is prepended to og:/twitter: content and canonical href — absolutization is always origin + path prefix (og:image /assets/x.jpg under https://host/repo/ emits https://host/repo/assets/x.jpg)
 URL-12	§11.3	rule	fixture	base-url leaves non-root-relative values untouched; source files stay rooted at /; order §11.1→§11.2→§11.3
 REF-01	§12	rule	fixture	Check scope: every emitted HTML file's href/src/srcset/poster, link href for every rel, root-relative og:/twitter: meta content; url() in emitted CSS files, <style> blocks, and style attributes (rewriting-exempt but checked)
 REF-02	§12	rule	fixture	Internal = after stripping the base-url prefix (path prefix, or the full origin+path base when a full URL was given — absolutized values stay checkable), root-relative or relative (resolved against the containing output file's URL); query/fragment stripped; external and mailto/tel/data/fragment-only skipped
@@ -160,7 +160,6 @@ A11	§14.3	diag	targeted	Advisory: output paths differing only by case
 A12	§14.3	diag	targeted	Advisory: symlink resolving outside the source root, treated as absent
 A13	§14.3	diag	fixture	Advisory: duplicated construct of which only the first counts - second bare <slot>, repeated slot name, or second <main>; message names the construct
 A14	§14.3	diag	fixture	Advisory: known deployment file at the source root held back by the exclude set (maintained list, non-normative; today _headers, _redirects, _routes.json, _worker.js); names the file and the --exclude line that ships it; source-root names only
-A15	§14.3	diag	fixture	Advisory: og:/twitter: meta value left root-relative by a path-only --base-url; per meta, at its provenance; fix names the full --base-url form; never fires without --base-url or under the full-URL form
 PUB-01	§15	rule	fixture	Transactional publish: zero problems → publish; any problem → previous output byte-for-byte untouched and exit 1
 PUB-02	§15	rule	targeted	Publish sync: unchanged files not rewritten; files no longer produced deleted; new/changed land via temp-then-rename
 PUB-03	§15	rule	targeted	--clean empties the output directory first; refuses with exit 2 when the output directory is, or contains, the source root or the working directory - not when it merely sits inside them
@@ -175,6 +174,7 @@ WCH-07	§16	rule	structural	No proxying, HTTPS, middleware, or config in dev —
 DRY-01	§17	rule	fixture	--dry-run report: stdout, one list ordered by output path, one line per action, verbs write/copy/delete only
 DRY-02	§17	rule	fixture	Every write line names its inputs: the source page and the layout it resolved to
 DRY-03	§17	rule	fixture	Under --dry-run, diagnostics print to stderr exactly as a real build would
+DRY-04	§17	rule	fixture	--dry-run states the address it is building for (base-url, or the domain root when unset), and each write/copy row carries the URL that file answers to
 CFG-01	§18	rule	targeted	unify.yaml keys are the long option names: source output clean exclude pretty-urls base-url strict port; exclude replaces the default like the flag
 CFG-02	§18	rule	targeted	CLI flags win over unify.yaml on conflict
 CFG-03	§18	rule	targeted	No behavior exists that only the file can express; the file itself is never emitted

@@ -1,12 +1,12 @@
 {
  "fixture": "landmines",
- "description": "The adversarial set: every edge case, ambiguity, and interaction the v0.7.0 spec had to settle, each with its EXACT declared outcome \u2014 which problem/advisory fires at what severity and location, or that the case builds clean. Cases that cannot live in git (case-only twins, symlinks, nested .git, --clean containment) are generated at runtime by runtime-cases.mjs and share this expectation schema.",
+ "description": "The adversarial set: every edge case, ambiguity, and interaction the v0.7.0 spec had to settle, each with its EXACT declared outcome — which problem/advisory fires at what severity and location, or that the case builds clean. Cases that cannot live in git (case-only twins, symlinks, nested .git, --clean containment) are generated at runtime by runtime-cases.mjs and share this expectation schema.",
  "harnessContract": {
-  "run": "per case: unify build -s <case>/src -o <tmp>/dist <flags>, wrapped in a hard 30s timeout \u2014 the v0.6 engine hung forever on a missing <include>; a hang is a failure, never a wait.",
-  "diagnostics": "stderr parsed via the stable `FILE:LINE: SEVERITY: ` prefix (line optional). Declared lists are exhaustive when diagnosticsExhaustive=true: one undeclared diagnostic of either severity fails the case. This is the mechanical enforcement of the closed problem/advisory catalogue (conformance spec \u00a714.2/\u00a714.3) and of the content-loss law's flip side \u2014 nothing may fire that the spec does not name.",
+  "run": "per case: unify build -s <case>/src -o <tmp>/dist <flags>, wrapped in a hard 30s timeout — the v0.6 engine hung forever on a missing <include>; a hang is a failure, never a wait.",
+  "diagnostics": "stderr parsed via the stable `FILE:LINE: SEVERITY: ` prefix (line optional). Declared lists are exhaustive when diagnosticsExhaustive=true: one undeclared diagnostic of either severity fails the case. This is the mechanical enforcement of the closed problem/advisory catalogue (conformance spec §14.2/§14.3) and of the content-loss law's flip side — nothing may fire that the spec does not name.",
   "trees": "when expectedTree is set, comparison is byte-exact and bidirectional. expectFiles/expectAbsent assert presence/absence relative to the output dir. expectContains maps output files to required substrings; expectNotContains to forbidden ones.",
   "publish": "published=false cases pre-seed the output dir with a sentinel tree and assert it byte-untouched after the run (PUB-01), and assert exit matches.",
-  "stdout": "stdoutContains/stdoutNotContains assert substrings of stdout (the build summary). Used by the runtime-built \u00a74.4 defaulted-source-notice cases, whose entries also carry omitSourceFlag (the harness injects no implicit -s \u2014 EXC-11's predicate is the absence of --source) and outputDir (where expectFiles are asserted); diagnostics stay a stderr-only claim.",
+  "stdout": "stdoutContains/stdoutNotContains assert substrings of stdout (the build summary). Used by the runtime-built §4.4 defaulted-source-notice cases, whose entries also carry omitSourceFlag (the harness injects no implicit -s — EXC-11's predicate is the absence of --source) and outputDir (where expectFiles are asserted); diagnostics stay a stderr-only claim.",
   "severityTokens": "the parser accepts only 'problem' and 'advisory' as severity tokens; any 'warning'/'error:' line fails the case (DIA-01)."
  },
  "harnessRules": [
@@ -77,7 +77,7 @@
     }
    ],
    "diagnosticsExhaustive": true,
-   "note": "R1 promoted to spec text (2026-08-12): conformance \u00a76.3 now says outright that 'anywhere in any source file' includes excluded files \u2014 build material is scanned; only the never-shipped list escapes."
+   "note": "R1 promoted to spec text (2026-08-12): conformance §6.3 now says outright that 'anywhere in any source file' includes excluded files — build material is scanned; only the never-shipped list escapes."
   },
   "missing-include": {
    "rules": [
@@ -120,14 +120,14 @@
      "line": 5,
      "severity": "problem",
      "containsAll": [
-      "\u2192",
+      "→",
       "a.html",
       "b.html"
      ]
     }
    ],
    "diagnosticsExhaustive": true,
-   "note": "Attribution at the outermost include site \u2014 R3, promoted to contract in conformance \u00a714.1 (2026-08-12)."
+   "note": "Attribution at the outermost include site — R3, promoted to contract in conformance §14.1 (2026-08-12)."
   },
   "include-depth-10": {
    "rules": [
@@ -143,7 +143,7 @@
      "<p>deep</p>"
     ]
    },
-   "note": "Fencepost: a chain of exactly 10 nested expansions builds clean; 11 fails (next case). R2 promoted to spec text (2026-08-12): conformance \u00a75.1 now states the cap is inclusive \u2014 the stack holds ten files, the include pushing an eleventh is the problem."
+   "note": "Fencepost: a chain of exactly 10 nested expansions builds clean; 11 fails (next case). R2 promoted to spec text (2026-08-12): conformance §5.1 now states the cap is inclusive — the stack holds ten files, the include pushing an eleventh is the problem."
   },
   "include-depth-11": {
    "rules": [
@@ -160,7 +160,7 @@
      "line": 5,
      "severity": "problem",
      "containsAll": [
-      "\u2192"
+      "→"
      ]
     }
    ],
@@ -205,7 +205,7 @@
     }
    ],
    "diagnosticsExhaustive": true,
-   "note": "The include target exists; exactly one problem fires \u2014 the content one. Includes are verbatim, never components."
+   "note": "The include target exists; exactly one problem fires — the content one. Includes are verbatim, never components."
   },
   "include-escape": {
    "rules": [
@@ -303,29 +303,6 @@
    ],
    "diagnosticsExhaustive": true
   },
-  "og-path-base": {
-   "rules": [
-    "A15"
-   ],
-   "flags": [
-    "--base-url",
-    "/repo/"
-   ],
-   "exit": 0,
-   "published": true,
-   "diagnostics": [
-    {
-     "file": "src/post.md",
-     "severity": "advisory",
-     "containsAll": [
-      "og:image",
-      "/repo/card.png"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true,
-   "note": "Ratification round 13 (2026-08-13): five of five weakest-model authors published a subpath site whose og:image no crawler could fetch, with exit 0, and reported the sharing requirement verified. The path form of --base-url declares a subpath without an origin, so a root-relative og:/twitter: value is known-unresolvable the moment it is emitted; the fix line names the full form. Line deliberately undeclared: metas emitted from Markdown frontmatter locate at the provenance file with an output-derived line (same approximation P13 has always had there)."
-  },
   "layout-bare-name-html": {
    "rules": [
     "LAY-03",
@@ -369,7 +346,7 @@
     }
    ],
    "diagnosticsExhaustive": true,
-   "note": "C7 / FIX-14: a layout that declares data-layout is P15 \u2014 layout chaining is not supported in v0.7.0 and is never a silent no-op. The declared target (_base.html) exists, so the only diagnostic is P15 itself."
+   "note": "C7 / FIX-14: a layout that declares data-layout is P15 — layout chaining is not supported in v0.7.0 and is never a silent no-op. The declared target (_base.html) exists, so the only diagnostic is P15 itself."
   },
   "layout-missing": {
    "rules": [
@@ -616,7 +593,7 @@
    ],
    "diagnosticsExhaustive": true,
    "expectedTree": "expected",
-   "note": "C9: the template's slot is not unify's \u2014 the fill gets advisory 2, the template ships byte-identical, the fill's content stays in the page flow."
+   "note": "C9: the template's slot is not unify's — the fill gets advisory 2, the template ships byte-identical, the fill's content stays in the page flow."
   },
   "slot-attr-edge": {
    "rules": [
@@ -642,7 +619,7 @@
    "diagnostics": [],
    "diagnosticsExhaustive": true,
    "expectedTree": "expected",
-   "note": "R4 promoted to spec text (2026-08-12): conformance \u00a77.2 now says the first <main> unwraps at any depth \u2014 the main inside the div unwraps; the div survives."
+   "note": "R4 promoted to spec text (2026-08-12): conformance §7.2 now says the first <main> unwraps at any depth — the main inside the div unwraps; the div survives."
   },
   "main-in-main": {
    "rules": [
@@ -655,7 +632,7 @@
    "diagnostics": [],
    "diagnosticsExhaustive": true,
    "expectedTree": "expected",
-   "note": "Unwrap happens exactly once \u2014 now explicit in conformance \u00a77.2 (R4): the outer main's tags are deleted, the inner main survives into the output (the author's own nesting, preserved)."
+   "note": "Unwrap happens exactly once — now explicit in conformance §7.2 (R4): the outer main's tags are deleted, the inner main survives into the output (the author's own nesting, preserved)."
   },
   "empty-default-main": {
    "rules": [
@@ -693,7 +670,7 @@
    "diagnostics": [],
    "diagnosticsExhaustive": true,
    "expectedTree": "expected",
-   "note": "A zero-byte .md page builds: .html swap happens, no h1 means no page title, the layout's title stands alone (separator included \u2014 that is the specified behavior), the layout main keeps its children."
+   "note": "A zero-byte .md page builds: .html swap happens, no h1 means no page title, the layout's title stands alone (separator included — that is the specified behavior), the layout main keeps its children."
   },
   "head-in-markdown": {
    "rules": [
@@ -757,7 +734,7 @@
     }
    ],
    "diagnosticsExhaustive": true,
-   "note": "One problem naming both sources; attribution at the path-ordered first source \u2014 R3, promoted to contract in conformance \u00a714.1. No last-write-wins: nothing publishes."
+   "note": "One problem naming both sources; attribution at the path-ordered first source — R3, promoted to contract in conformance §14.1. No last-write-wins: nothing publishes."
   },
   "collision-pretty-landing": {
    "rules": [
@@ -852,7 +829,7 @@
    "diagnostics": [],
    "diagnosticsExhaustive": true,
    "expectedTree": "expected",
-   "note": "The conformance \u00a74.2 recipe verbatim: _headers/_redirects ship (non-page files, guard passes them), _layout.html/_includes stay excluded and still drive composition. The A14 side of the coin: with the deployment files shipping, the deployment-file advisory must stay silent \u2014 an advisory that fires on a correct site is a bug, and diagnosticsExhaustive asserts the silence."
+   "note": "The conformance §4.2 recipe verbatim: _headers/_redirects ship (non-page files, guard passes them), _layout.html/_includes stay excluded and still drive composition. The A14 side of the coin: with the deployment files shipping, the deployment-file advisory must stay silent — an advisory that fires on a correct site is a bug, and diagnosticsExhaustive asserts the silence."
   },
   "deploy-file-excluded": {
    "rules": [
@@ -892,7 +869,7 @@
    ],
    "diagnosticsExhaustive": true,
    "expectedTree": "expected",
-   "note": "Default excludes hold back root-level _headers/_redirects/_routes.json \u2014 known deployment files (conformance \u00a74.2), so each draws advisory A14 naming the file and the --exclude line that ships it. The advisory is the whole mechanism: the files stay excluded (expected tree is index.html alone), the build publishes, exit 0. blog/_headers draws nothing \u2014 recognition is by name at the source root only."
+   "note": "Default excludes hold back root-level _headers/_redirects/_routes.json — known deployment files (conformance §4.2), so each draws advisory A14 naming the file and the --exclude line that ships it. The advisory is the whole mechanism: the files stay excluded (expected tree is index.html alone), the build publishes, exit 0. blog/_headers draws nothing — recognition is by name at the source root only."
   },
   "stranded-underscore-asset": {
    "rules": [
@@ -916,7 +893,7 @@
     }
    ],
    "diagnosticsExhaustive": true,
-   "note": "The spec's own \u00a711.1 trap: the include's relative logo resolves to /_includes/logo.png, which the default exclude keeps out of the output \u2014 the reference check must fail loudly. Attribution at the provenance file \u2014 R3, promoted to contract in conformance \u00a714.1."
+   "note": "The spec's own §11.1 trap: the include's relative logo resolves to /_includes/logo.png, which the default exclude keeps out of the output — the reference check must fail loudly. Attribution at the provenance file — R3, promoted to contract in conformance §14.1."
   },
   "broken-link": {
    "rules": [
@@ -1013,7 +990,7 @@
    "diagnostics": [],
    "diagnosticsExhaustive": true,
    "expectedTree": "expected",
-   "note": "url() inside <style> and style= is never rewritten (byte-equality proves it) while BOTH are reference-checked \u2014 B5 closed (2026-08-12): \u00a712 now covers style-attribute url() too; dot.png exists, so this side builds clean. The firing twin is style-attr-url-broken."
+   "note": "url() inside <style> and style= is never rewritten (byte-equality proves it) while BOTH are reference-checked — B5 closed (2026-08-12): §12 now covers style-attribute url() too; dot.png exists, so this side builds clean. The firing twin is style-attr-url-broken."
   },
   "style-attr-url-broken": {
    "rules": [
@@ -1034,7 +1011,7 @@
     }
    ],
    "diagnosticsExhaustive": true,
-   "note": "B5's firing side: a url() in a style ATTRIBUTE pointing at nothing is a broken reference like any other \u2014 rewriting stays exempt (\u00a711.1), checking does not (\u00a712). The v0.6-shaped alternative was shipping the 404 silently."
+   "note": "B5's firing side: a url() in a style ATTRIBUTE pointing at nothing is a broken reference like any other — rewriting stays exempt (§11.1), checking does not (§12). The v0.6-shaped alternative was shipping the 404 silently."
   },
   "dollar-patterns": {
    "rules": [
@@ -1114,7 +1091,7 @@
     }
    ],
    "diagnosticsExhaustive": true,
-   "note": "Under --strict the same advisories flip the exit code and block publish \u2014 a stray .psd can never cost a publish silently. | CORRECTED: --strict changes the exit code, never what is published (product-spec \u00a74, conformance \u00a714.1) \u2014 a stray .psd must not cost you a publish. This asserted published:false, the same defect as the kitchen-sink strict profile; both were written from one wrong reading of the rule."
+   "note": "Under --strict the same advisories flip the exit code and block publish — a stray .psd can never cost a publish silently. | CORRECTED: --strict changes the exit code, never what is published (product-spec §4, conformance §14.1) — a stray .psd must not cost you a publish. This asserted published:false, the same defect as the kitchen-sink strict profile; both were written from one wrong reading of the rule."
   },
   "include-also-page": {
    "rules": [
@@ -1153,7 +1130,7 @@
    "diagnostics": [],
    "diagnosticsExhaustive": true,
    "expectedTree": "expected",
-   "note": "draft:true publishes; date/permalink/slug/tags are inert plain metas; permalink does NOT move the output (dist/post.html). B6 closed (2026-08-12): \u00a710.2 value serialization pinned exact \u2014 plain scalars as source text ('true', '2026-01-01', '0.50' keeps its zero), quoted scalars unquoted ('Colons: kept\u2026'), empty value \u2192 content=\"\". The no-text-form firing twin is frontmatter-deep-nest (P17)."
+   "note": "draft:true publishes; date/permalink/slug/tags are inert plain metas; permalink does NOT move the output (dist/post.html). B6 closed (2026-08-12): §10.2 value serialization pinned exact — plain scalars as source text ('true', '2026-01-01', '0.50' keeps its zero), quoted scalars unquoted ('Colons: kept…'), empty value → content=\"\". The no-text-form firing twin is frontmatter-deep-nest (P17)."
   },
   "frontmatter-deep-nest": {
    "rules": [
@@ -1174,7 +1151,7 @@
     }
    ],
    "diagnosticsExhaustive": true,
-   "note": "P17: a mapping nested below a block (og: \u2192 image: \u2192 url:) has no text form \u2014 frontmatter flattens exactly one level, and both inventing a serialization and dropping the value would be silent lies. Located at the key whose value nests (line 4). The list-item-that-is-a-mapping branch is the same problem."
+   "note": "P17: a mapping nested below a block (og: → image: → url:) has no text form — frontmatter flattens exactly one level, and both inventing a serialization and dropping the value would be silent lies. Located at the key whose value nests (line 4). The list-item-that-is-a-mapping branch is the same problem."
   },
   "charset-differs": {
    "rules": [
@@ -1216,7 +1193,7 @@
    "diagnostics": [],
    "diagnosticsExhaustive": true,
    "expectedTree": "expected",
-   "note": "Layout declares no charset: the page's is kept and moved to the head's first position on its own line with the first-content-line indentation \u2014 byte-exact."
+   "note": "Layout declares no charset: the page's is kept and moved to the head's first position on its own line with the first-content-line indentation — byte-exact."
   },
   "md-include-element": {
    "rules": [
@@ -1233,7 +1210,7 @@
    "diagnostics": [],
    "diagnosticsExhaustive": true,
    "expectedTree": "expected",
-   "note": "B2 resolved (2026-08-12): conversion first, includes resolve on the converted HTML, and a line-initial <include> is a block (the \u00a710.1 type-6 extension). Exact tree pins all three placements: line-initial paired form splices as a clean block (never <p>-wrapped), an include inside a sentence splices inline within the paragraph, and a code-fenced include is escaped text that resolution never touches. The page is layout-less, so the \u00a710.7 shell wraps it (MD-20)."
+   "note": "B2 resolved (2026-08-12): conversion first, includes resolve on the converted HTML, and a line-initial <include> is a block (the §10.1 type-6 extension). Exact tree pins all three placements: line-initial paired form splices as a clean block (never <p>-wrapped), an include inside a sentence splices inline within the paragraph, and a code-fenced include is escaped text that resolution never touches. The page is layout-less, so the §10.7 shell wraps it (MD-20)."
   },
   "srcset-poster-rewrite": {
    "rules": [
@@ -1264,7 +1241,7 @@
    "diagnostics": [],
    "diagnosticsExhaustive": true,
    "expectedTree": "expected",
-   "note": "B3's exact trap, pinned fixed (2026-08-12): a full base URL whose path is not / must absolutize og:/twitter:/canonical as origin + path prefix \u2014 og:image /assets/hero.jpg emits https://example.com/repo/assets/hero.jpg, never https://example.com/assets/hero.jpg. href/src get the path part only; the absolute og:url is untouched (URL-12); the reference check must strip the full base to keep the absolutized values checkable (REF-02)."
+   "note": "B3's exact trap, pinned fixed (2026-08-12): a full base URL whose path is not / must absolutize og:/twitter:/canonical as origin + path prefix — og:image /assets/hero.jpg emits https://example.com/repo/assets/hero.jpg, never https://example.com/assets/hero.jpg. href/src get the path part only; the absolute og:url is untouched (URL-12); the reference check must strip the full base to keep the absolutized values checkable (REF-02)."
   },
   "no-layout-anywhere": {
    "rules": [
@@ -1277,7 +1254,7 @@
    "diagnostics": [],
    "diagnosticsExhaustive": true,
    "expectedTree": "expected",
-   "note": "Selection step 5: no layout found anywhere \u2014 the page is emitted from its own text, byte-identical."
+   "note": "Selection step 5: no layout found anywhere — the page is emitted from its own text, byte-identical."
   },
   "layout-none-md": {
    "rules": [
@@ -1294,7 +1271,7 @@
    "diagnostics": [],
    "diagnosticsExhaustive": true,
    "expectedTree": "expected",
-   "note": "B4 resolved (2026-08-12): a layout-less .md page emits inside the \u00a710.7 minimal shell \u2014 this tree is the spec's own \u00a710.7 fixture verbatim. Exact assertions: charset first, title from the first h1, metas in source order, lang on <html>, class on <body>, converted body in <body>; the present _layout.html did not apply (bidirectional exactness proves its title never leaked in) and is not emitted."
+   "note": "B4 resolved (2026-08-12): a layout-less .md page emits inside the §10.7 minimal shell — this tree is the spec's own §10.7 fixture verbatim. Exact assertions: charset first, title from the first h1, metas in source order, lang on <html>, class on <body>, converted body in <body>; the present _layout.html did not apply (bidirectional exactness proves its title never leaked in) and is not emitted."
   },
   "stray-header-footer": {
    "rules": [
@@ -1386,7 +1363,7 @@
     }
    ],
    "diagnosticsExhaustive": true,
-   "note": "Best-effort composition: both problems in one run, ordered by path \u2014 authors never fix errors one build at a time."
+   "note": "Best-effort composition: both problems in one run, ordered by path — authors never fix errors one build at a time."
   },
   "fragment-links-ok": {
    "rules": [
@@ -1419,7 +1396,7 @@
     }
    ],
    "diagnosticsExhaustive": true,
-   "note": "P18: the frontmatter does not parse as YAML. Distinct from P17, which is about a value's shape in frontmatter that parsed fine \u2014 the fix here is repairing syntax, not flattening a structure. NOTE ON THE LINE: this fixture originally asserted line 3, where the unterminated `[` is opened. That was written from intuition rather than from what a parser reports, and it was wrong: js-yaml marks line 4, where it discovers the fault, which is what every compiler does for an unterminated construct and the only position actually known without reimplementing YAML. The diagnostic carries the parser's own reason so the construct is still named."
+   "note": "P18: the frontmatter does not parse as YAML. Distinct from P17, which is about a value's shape in frontmatter that parsed fine — the fix here is repairing syntax, not flattening a structure. NOTE ON THE LINE: this fixture originally asserted line 3, where the unterminated `[` is opened. That was written from intuition rather than from what a parser reports, and it was wrong: js-yaml marks line 4, where it discovers the fault, which is what every compiler does for an unterminated construct and the only position actually known without reimplementing YAML. The diagnostic carries the parser's own reason so the construct is still named."
   },
   "frontmatter-flat-key-nest": {
    "rules": [
@@ -1439,7 +1416,7 @@
     }
    ],
    "diagnosticsExhaustive": true,
-   "note": "P17 via the flat spelling: og:image: with a block under it is the same defect as og: -> image: -> url:, because both name the key og:image and it already carries its prefix. Pins that P17 eligibility is decided by the key's NAME, not by counting recursion levels \u2014 a depth-counting implementation would accept this one and reject its block-spelled twin, breaking the spelling equivalence \u00a710.2 guarantees."
+   "note": "P17 via the flat spelling: og:image: with a block under it is the same defect as og: -> image: -> url:, because both name the key og:image and it already carries its prefix. Pins that P17 eligibility is decided by the key's NAME, not by counting recursion levels — a depth-counting implementation would accept this one and reject its block-spelled twin, breaking the spelling equivalence §10.2 guarantees."
   },
   "named-slot-in-sink-main": {
    "rules": [
@@ -1460,7 +1437,7 @@
     }
    ],
    "diagnosticsExhaustive": true,
-   "note": "P19: with no bare <slot>, <main> is the default-content sink AND contains a named slot, so \u00a77.4's wholesale child replacement and \u00a77.3's fill target overlapping spans. Found by implementing \u00a77 \u2014 a literal implementation crashes here, and the obvious repair (let main win) silently discards the page's slot=\"hero\" fill, which is exactly the content loss \u00a714 forbids. Ruled a problem so the layout says it is ambiguous instead of picking a loser."
+   "note": "P19: with no bare <slot>, <main> is the default-content sink AND contains a named slot, so §7.4's wholesale child replacement and §7.3's fill target overlapping spans. Found by implementing §7 — a literal implementation crashes here, and the obvious repair (let main win) silently discards the page's slot=\"hero\" fill, which is exactly the content loss §14 forbids. Ruled a problem so the layout says it is ambiguous instead of picking a loser."
   },
   "dry-run-diagnostics": {
    "caseDir": "broken-link",
@@ -1483,7 +1460,7 @@
     }
    ],
    "diagnosticsExhaustive": true,
-   "note": "DRY-03: the twin of broken-link with --dry-run added \u2014 the identical problem prints to stderr, byte-for-byte the same diagnostic a real build would produce, and (like any blocked publish) nothing is written; the sentinel output stays untouched."
+   "note": "DRY-03: the twin of broken-link with --dry-run added — the identical problem prints to stderr, byte-for-byte the same diagnostic a real build would produce, and (like any blocked publish) nothing is written; the sentinel output stays untouched."
   },
   "dry-run-mixed-outcome": {
    "rules": [
@@ -1507,9 +1484,9 @@
    ],
    "diagnosticsExhaustive": true,
    "stdoutContains": [
-    "write dist/bad.html \u2190 bad.html (no layout)\nwrite dist/good.html \u2190 good.html (no layout)"
+    "write dist/bad.html (/bad.html) ← bad.html (no layout)\nwrite dist/good.html (/good.html) ← good.html (no layout)"
    ],
-   "note": "Pins a reading the spec leaves implicit: \u00a717's report is scoped to steps 1-9 (\u00a715 \u2014 'the entire pipeline through step 9 ... plus the report'), one step short of the transactional gate (step 10), which --dry-run never reaches at all. So the report lists every page the pipeline actually composed (best-effort, PIP-02 \u2014 the same principle that puts both good.html's and bad.html's own diagnostics in one pass) even though a REAL build of this exact tree would publish NEITHER file (\u00a715: any problem anywhere blocks the whole site). The alternative reading \u2014 suppress or annotate write/copy/delete rows when reporter.canPublish is false \u2014 is defensible too and not textually excluded; flagged in the implementation report as an ambiguity worth an explicit spec sentence, not silently picked."
+   "note": "Pins a reading the spec leaves implicit: §17's report is scoped to steps 1-9 (§15 — 'the entire pipeline through step 9 ... plus the report'), one step short of the transactional gate (step 10), which --dry-run never reaches at all. So the report lists every page the pipeline actually composed (best-effort, PIP-02 — the same principle that puts both good.html's and bad.html's own diagnostics in one pass) even though a REAL build of this exact tree would publish NEITHER file (§15: any problem anywhere blocks the whole site). The alternative reading — suppress or annotate write/copy/delete rows when reporter.canPublish is false — is defensible too and not textually excluded; flagged in the implementation report as an ambiguity worth an explicit spec sentence, not silently picked."
   }
  }
 }

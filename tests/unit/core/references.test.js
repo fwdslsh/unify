@@ -77,8 +77,8 @@ function firstProblem(reporter) {
 // ============================================================ hand-built
 
 describe("stripBaseUrl (REF-02)", () => {
-  test("path-only base strips the prefix", () => {
-    const base = parseBaseUrl("/coffee/");
+  test("the path prefix is stripped from href/src values, which never carry the origin", () => {
+    const base = parseBaseUrl("https://meridian.coffee/coffee/");
     expect(stripBaseUrl("/coffee/menu/", base)).toBe("/menu/");
     expect(stripBaseUrl("/other/x", base)).toBe("/other/x"); // no match -> unchanged
   });
@@ -141,7 +141,7 @@ describe("checkReferences — hand-built", () => {
       htmlFiles: new Map([["index.html", '<a href="/handbook/missing.html">x</a>']]),
       cssFiles: new Map(),
       emittedPaths: new Set(["index.html"]),
-      base: parseBaseUrl("/handbook/"),
+      base: parseBaseUrl("https://site.example/handbook/"),
       reporter,
     });
     const p = firstProblem(reporter);
@@ -151,44 +151,6 @@ describe("checkReferences — hand-built", () => {
     expect(p.message).toContain("/missing.html");
     expect(p.message).not.toContain("/handbook/");
     expect(p.context).toBe("/missing.html");
-  });
-
-  test("A15: path-only --base-url + root-relative og: content fires the advisory, with the full form in the fix", () => {
-    const reporter = silentReporter();
-    checkReferences({
-      // Final output under --base-url /outreach/ — §11.3 prefixed the value, but it is still root-relative.
-      htmlFiles: new Map([["post.html", '<meta property="og:image" content="/outreach/card.png">']]),
-      cssFiles: new Map(),
-      emittedPaths: new Set(["post.html", "card.png"]),
-      base: parseBaseUrl("/outreach/"),
-      reporter,
-    });
-    // The target resolves, so no P13 — the advisory is about the FORM.
-    expect(reporter.problemCount).toBe(0);
-    const a = reporter.diagnostics.find((d) => d.severity === "advisory");
-    expect(a).toBeDefined();
-    expect(a.message).toContain("og:image");
-    expect(a.message).toContain("/outreach/card.png");
-    expect((a.fixes ?? []).join(" ")).toContain("https://your-domain/outreach/");
-  });
-
-  test("A15 never fires under the full-URL form (§11.3 absolutized it) or with no --base-url at all", () => {
-    for (const [html, base] of [
-      // Full-URL base: the value is absolute in output — and still reference-checked via REF-02.
-      ['<meta property="og:image" content="https://example.com/outreach/card.png">', parseBaseUrl("https://example.com/outreach/")],
-      // No base: the spec's own worked examples ship root-relative og: legitimately (§10.6/FIX-13).
-      ['<meta property="og:image" content="/card.png">', null],
-    ]) {
-      const reporter = silentReporter();
-      checkReferences({
-        htmlFiles: new Map([["post.html", html]]),
-        cssFiles: new Map(),
-        emittedPaths: new Set(["post.html", "card.png"]),
-        base,
-        reporter,
-      });
-      expect(reporter.diagnostics).toEqual([]);
-    }
   });
 
   test("REF-02: a BROKEN og:image absolutized by a full-URL base still fails the reference check", () => {
@@ -226,7 +188,7 @@ describe("checkReferences — hand-built", () => {
       htmlFiles: new Map([["index.html", '<meta property="og:site_name" content="Meridian Coffee"><meta name="twitter:card" content="summary">']]),
       cssFiles: new Map(),
       emittedPaths: new Set(["index.html"]),
-      base: parseBaseUrl("/coffee/"),
+      base: parseBaseUrl("https://meridian.coffee/coffee/"),
       reporter,
     });
     expect(reporter.diagnostics).toEqual([]);
