@@ -116,6 +116,7 @@ REF-03	§12	rule	fixture	A directory URL (trailing / or empty path) checks for i
 REF-04	§12	rule	fixture	A URL resolving to no emitted file is a problem naming the source file, the reference, and the line where known
 REF-05	§12	rule	fixture	Case is compared byte-for-byte; a reference matching only case-insensitively fails
 REF-06	§12	rule	fixture	#fragment targets are not validated against ids
+REF-07	§12	rule	fixture	A reference resolving to the output path of a source page that exists but failed to compose is NOT reported (its own problem already blocks the publish); a target with no source file, and an excluded-but-existing target, still fail
 COL-01	§13	rule	fixture	Two sources producing one output path is a problem naming both sources
 COL-02	§13	rule	fixture	A --pretty-urls move landing on another source's output is a problem naming both sources
 COL-03	§13	rule	targeted	Two outputs differing only by letter case: advisory A11
@@ -131,6 +132,7 @@ DIA-08	§14.1	rule	fixture	Cycle and depth messages print the full chain joined 
 DIA-09	§14.1	rule	targeted	DEBUG=1 adds stack traces
 DIA-10	§14.3	rule	e2e	Advisory discipline: unify init && unify build --dry-run --strict exits 0; an advisory firing on a correct site is a bug in the advisory
 DIA-11	§14.1	rule	fixture	Attribution conventions are contract: cycle/depth problems locate at the outermost include site; collision problems at the path-ordered first source; reference problems at the reference's provenance file, at its line there when known
+DIA-12	§14.1	rule	fixture	Diagnostics are deduplicated before counting or printing: same file, line, severity, message, in: and fix: lines = one diagnostic; genuinely distinct faults that print identically (a relative url() in shared chrome resolving per consumer) are distinguished by resolved target and both printed
 P01	§14.2	diag	fixture	Problem: include target missing, wrong extension, or escaping the source root
 P02	§14.2	diag	fixture	Problem: include cycle or depth over 10, chain printed
 P03	§14.2	diag	fixture	Problem: <include> without src; <include> with non-whitespace content

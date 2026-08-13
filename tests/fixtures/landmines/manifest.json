@@ -1487,6 +1487,36 @@
     "write dist/bad.html (/bad.html) ← bad.html (no layout)\nwrite dist/good.html (/good.html) ← good.html (no layout)"
    ],
    "note": "Pins a reading the spec leaves implicit: §17's report is scoped to steps 1-9 (§15 — 'the entire pipeline through step 9 ... plus the report'), one step short of the transactional gate (step 10), which --dry-run never reaches at all. So the report lists every page the pipeline actually composed (best-effort, PIP-02 — the same principle that puts both good.html's and bad.html's own diagnostics in one pass) even though a REAL build of this exact tree would publish NEITHER file (§15: any problem anywhere blocks the whole site). The alternative reading — suppress or annotate write/copy/delete rows when reporter.canPublish is false — is defensible too and not textually excluded; flagged in the implementation report as an ambiguity worth an explicit spec sentence, not silently picked."
+  },
+  "cascade-and-dedup": {
+   "rules": [
+    "REF-07",
+    "DIA-12",
+    "PUB-01"
+   ],
+   "flags": [],
+   "exit": 1,
+   "published": false,
+   "diagnostics": [
+    {
+     "file": "src/_includes/nav.html",
+     "line": 4,
+     "severity": "problem",
+     "containsAll": [
+      "/team.html"
+     ]
+    },
+    {
+     "file": "src/about.html",
+     "line": 2,
+     "severity": "problem",
+     "containsAll": [
+      "nope"
+     ]
+    }
+   ],
+   "diagnosticsExhaustive": true,
+   "note": "Both §12/§14.1 noise rules in one site, and the exhaustive list is the assertion. Four pages compose and all four carry the nav, so /team.html — a target with no source file at all — is a real fault that used to print four times and now prints once (DIA-12). /about.html DOES exist in source and failed to compose (P04), so links to it are the cascade case and are silent (REF-07) — before the exemption they printed four more times, at the fragment, advising a spelling check on a correctly-spelled path, and sorted ABOVE the one problem that mattered. Measured on a 20-page version of this shape: 21 problems, 1 real, the real one printed last."
   }
  }
 }

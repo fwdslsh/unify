@@ -37,6 +37,13 @@
  * length; see build.js's own comment on its `locate` for the honest
  * accounting of where that stops being exact and why every fixture this
  * module is checked against still resolves correctly.
+ *
+ * `unbuiltPagePaths` is the second thing this module cannot derive from the
+ * output tree and so takes from the caller. An absence in `emittedPaths` has
+ * two causes that look identical from here — the target was never a source
+ * file (§12's real subject) or the target IS a source page that failed to
+ * compose and therefore emitted nothing. Only the caller ran composition, so
+ * only the caller knows which. See `isCascade` for why the second is silent.
  */
 import { posix } from "node:path";
 import { findAll, getAttr, getAttrNode, isElement, lineOf, parse } from "./html.js";
@@ -206,32 +213,70 @@ export function resolveReference(url, containingOutputPath) {
  * @param {Set<string>} args.emittedPaths - every emitted output path,
  *   HTML/CSS/every other asset alike (superset of htmlFiles/cssFiles keys) —
  *   membership is what "resolves to an emitted file" means (REF-04)
+ * @param {Set<string>} [args.unbuiltPagePaths] - the output paths that pages
+ *   which EXIST IN SOURCE but failed to compose would have occupied. Empty
+ *   (the default) means "every absence is a real absence", which is what a
+ *   caller with no composition failures to report should pass. See
+ *   `isCascade` for why these are not reported.
  * @param {import('./urls.js').BaseUrlConfig|null} [args.base] - the
  *   `--base-url` config, or null/omitted when not set
  * @param {Locate} [args.locate]
  * @param {import('./diagnostics.js').Reporter} args.reporter
  * @returns {void} reports P13 problems via `reporter`
  */
-export function checkReferences({ htmlFiles, cssFiles, emittedPaths, base = null, locate, reporter }) {
+export function checkReferences({ htmlFiles, cssFiles, emittedPaths, unbuiltPagePaths = new Set(), base = null, locate, reporter }) {
   const resolveLocate = locate ?? defaultLocate(htmlFiles, cssFiles);
+  const ctx = { base, emittedPaths, unbuiltPagePaths, reporter, locate: resolveLocate };
 
   for (const [outputPath, text] of htmlFiles) {
-    for (const ref of collectHtmlReferences(text)) {
-      checkOne(ref, outputPath, { base, emittedPaths, reporter, locate: resolveLocate });
-    }
+    for (const ref of collectHtmlReferences(text)) checkOne(ref, outputPath, ctx);
   }
   for (const [outputPath, text] of cssFiles) {
-    for (const ref of findCssUrls(text, 0)) {
-      checkOne(ref, outputPath, { base, emittedPaths, reporter, locate: resolveLocate });
-    }
+    for (const ref of findCssUrls(text, 0)) checkOne(ref, outputPath, ctx);
   }
 }
 
-function checkOne({ raw, offset }, containingOutputPath, { base, emittedPaths, reporter, locate }) {
+/**
+ * §12's one exemption that is NOT about the URL's form: a reference whose
+ * target is a source page that exists and simply failed to compose.
+ *
+ * That page emitted no file, so every link to it fails `emittedPaths` — and
+ * the failure is reported at the LINK's provenance (§14.1 R3), which for site
+ * chrome is a shared fragment, with `fix: check the path spelling and casing`.
+ * All three halves of that are wrong: the path is spelled correctly, the
+ * fragment is not where the fault is, and the page the author must actually
+ * open is named only by its OWN diagnostic — which, since diagnostics are
+ * path-ordered, may print far below. Measured on a 40-page fixture with one
+ * page failing to compose: 40 problems printed, 1 of them real, and the real
+ * one printed last, behind 39 identical false ones. Deduplication alone would
+ * not fix this; it would leave one confidently wrong line instead of forty.
+ *
+ * Nothing is lost by staying quiet. The target page reported its own problem,
+ * that problem already blocks the publish (§15 — one problem anywhere and the
+ * previous output is untouched), and when the author fixes it this reference
+ * resolves with no further edit. A cascade diagnostic can only ever describe
+ * a consequence of a fault that is already on screen.
+ *
+ * The two absences that are NOT this, and that must keep failing loudly,
+ * because they are what §12 exists for: a target with no source file at all
+ * (the renamed page, the typo), and a target whose source file exists but is
+ * EXCLUDED — §12 names that one itself, "an asset stranded in an underscore
+ * folder". Neither is in this set: the caller builds it from pages it
+ * actually attempted to compose and failed on.
+ * @param {string} resolved
+ * @param {Set<string>} unbuiltPagePaths
+ * @returns {boolean}
+ */
+function isCascade(resolved, unbuiltPagePaths) {
+  return unbuiltPagePaths.has(resolved);
+}
+
+function checkOne({ raw, offset }, containingOutputPath, { base, emittedPaths, unbuiltPagePaths, reporter, locate }) {
   const stripped = base ? stripBaseUrl(raw, base) : raw;
   const resolved = resolveReference(stripped, containingOutputPath);
   if (resolved === null) return; // out of scope: external/mailto/tel/data/fragment-only/escaping
   if (emittedPaths.has(resolved)) return; // REF-05: exact, case-sensitive membership
+  if (isCascade(resolved, unbuiltPagePaths)) return;
 
   const { file, line } = locate(containingOutputPath, offset);
   // §14.1: the `in:` continuation is the offending SOURCE text. `raw` is the
@@ -247,6 +292,18 @@ function checkOne({ raw, offset }, containingOutputPath, { base, emittedPaths, r
     message: `${stripped} does not resolve to any emitted file`,
     context: stripped,
     fixes: [CHECK_SPELLING],
+    // The reporter deduplicates byte-identical diagnostics (diagnostics.js's
+    // own `_record` doc): one broken href in a fragment included into forty
+    // pages is one fault located at one line of one file, and printing it
+    // forty times told the author nothing extra. But the printed form quotes
+    // the SOURCE spelling, and §12 resolves a relative reference against the
+    // containing OUTPUT file — so one relative URL in shared chrome can be
+    // two genuinely different faults with identical text. §11.1 rewrites
+    // href/src/srcset/poster out of that situation (provenance-relative
+    // becomes root-relative); it deliberately never touches `url()` in
+    // <style>/style= (URL-03), which this module checks anyway, so the case
+    // is live there. `resolved` is exactly what distinguishes them.
+    discriminator: resolved,
   });
 }
 

@@ -93,7 +93,14 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
   /** @type {{relPath: string, html: string, spans: {start:number,end:number,file:string,fileOffset:number}[], layoutFile: string|null}[]} */
   const composedPages = [];
   for (const page of pageFiles) {
-    const problemsBefore = reporter.problemCount;
+    // `problemsReported`, not `problemCount`: this bracket asks "did THIS page
+    // report a problem of its own", and the Reporter's dedup (diagnostics.js)
+    // is precisely what erases identity across steps. Three pages including
+    // one fragment with a broken <include src> report byte-identical P01s, so
+    // a deduplicated count sees no change for pages two and three and lets
+    // their malformed remnants downstream — reintroducing the spurious second
+    // diagnostic the comment below exists to prevent.
+    const problemsBefore = reporter.problemsReported;
     try {
       const composed = await buildPage(page, { sourceRoot, reporter, layoutCache, convertMarkdown, consumedAsIncludeOrLayout });
       // A page whose OWN processing reported a new problem (an unresolved
@@ -108,7 +115,7 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
       // which has no notion of unify's own markup and would otherwise raise a
       // second, undeclared "does not resolve to any emitted file" on top of
       // the include's own already-reported problem.
-      const hadNewProblem = reporter.problemCount > problemsBefore;
+      const hadNewProblem = reporter.problemsReported > problemsBefore;
       if (composed !== null && !hadNewProblem) {
         composedPages.push({ relPath: page.relPath, html: composed.text, spans: composed.spans, layoutFile: composed.layoutFile });
       }
@@ -214,6 +221,19 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
   references.checkReferences({
     htmlFiles, cssFiles, emittedPaths: new Set(tempFiles.keys()), base: baseConfig, reporter,
     locate: makeReferenceLocator(pageSpansByOutputPath, sourceRoot, htmlFiles, cssFiles),
+    // §12's cascade exemption: the output paths of pages that exist in source
+    // and failed to compose. Only this loop knows which absences are that —
+    // from inside the check, a page that emitted nothing and a page that never
+    // existed look identical. Both spellings are computed because a link to a
+    // failed page is never pretty-rewritten (rewriting only moves links to
+    // pages that emitted), so it arrives as `/about.html` even in a pretty
+    // build, while a hand-written `/about/` arrives as `about/index.html`.
+    unbuiltPagePaths: new Set(
+      pageFiles
+        .filter((f) => !composedPageRelPaths.has(f.relPath))
+        .flatMap((f) => [false, settings.prettyUrls].map((prettyUrls) =>
+          collisions.computeOutputPath({ path: f.relPath, kind: "page" }, { prettyUrls }))),
+    ),
   });
 
   relocateDiagnosticsToCwd(reporter, sourceRoot);
