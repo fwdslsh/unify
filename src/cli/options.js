@@ -136,6 +136,15 @@ export function loadConfig(sourceRoot) {
   let listKey = null;
 
   for (const raw of readFileSync(path, "utf8").split(/\r?\n/)) {
+    // A whole-line comment is the commonest thing in a YAML file and used to
+    // be a fatal usage error here: the trailing-comment strip below requires
+    // whitespace before the `#`, so a `# Build settings` at column 0 reached
+    // the key/value match, failed it, and exited 2. Found by a ratification
+    // round whose fixture carried one (round 18).
+    if (/^\s*#/.test(raw)) continue;
+    // Trailing comments still need the preceding whitespace, which is what
+    // keeps a `#` inside a value — `base-url: https://x.example/#frag` — from
+    // being eaten.
     const line = raw.replace(/\s+#.*$/, "");
     if (line.trim() === "") continue;
 

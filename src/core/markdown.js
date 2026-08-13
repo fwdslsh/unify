@@ -367,7 +367,17 @@ function parseFrontmatterYaml(yamlText, { file, reporter }) {
       // the parser's own reason is carried along to name the construct.
       line: Number.isInteger(markLine) ? markLine + 2 : 2,
       message: reason ? `frontmatter is not valid YAML: ${reason}` : "frontmatter is not valid YAML",
-      fixes: ["check quoting, indentation, and that every [ and { is closed"],
+      // The parser's own reason names a construct the author never wrote
+      // ("incomplete explicit mapping pair"), so the fix has to name the
+      // cause instead. A colon in an unquoted value is the one that actually
+      // happens: two of five ratification samples broke a build with
+      // `title: Something: with a colon` in round 7, and four of six in round
+      // 18 said this line did not tell them that — the three with no docs at
+      // all got there only by knowing YAML.
+      fixes: [
+        'quote any value containing a colon — title: "Pruning: a short guide"',
+        "otherwise check indentation, and that every [ and { is closed",
+      ],
     });
     return {};
   }

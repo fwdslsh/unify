@@ -1,4 +1,4 @@
-# Ratification rounds 7–17 — the build becomes the judge, and the diagnostics get tested
+# Ratification rounds 7–18 — the build becomes the judge, and the diagnostics get tested
 
 **Date:** 2026-08-12. Continues `_notes/ratification-round-1.md` and the results table in
 `docs/ratification-protocol.md`.
@@ -684,3 +684,105 @@ moving the line; it cannot rule out a small one.
 round 11's failure is to be genuinely caught rather than mentioned, the evidence points at
 something with teeth — a diagnostic that a subpath-shaped situation can raise — not at where
 a summary line prints. Recorded, not recommended.
+
+---
+
+## Round 18 — the diagnostics, re-tested (and the first measurement of their absence)
+
+**Fixture:** a ten-page community-orchard site carrying eight problems and three advisories
+deliberately chosen *outside* round 8's set — P02, P04, P07, P11, P13, P14, P18, P19, A03,
+A11, A13 — with fifteen `MARKER-*` sentences. **Arms:** 3 Haiku with the CLI alone, 3 with
+the CLI plus the 60 lines.
+
+**6 of 6 reached a clean build. Zero markers lost, zero pages deleted, zero assets deleted.**
+Round 8's destructive-repair failure — a sample deleting a page's content to silence a
+collision — did not recur in any form. All six resolved the case-collision (A11) by merging
+first and removing second, with no `fix:` line telling them to. 65 of 66 planted-fault
+repairs were correct.
+
+### The one wrong repair, and the message that caused it
+
+A sample turned `layout: news` into `layout: /_layout.html` — then propagated that literal
+into three more files. Both news articles now build against the site layout instead of
+`news/_layout.html`, losing the section's body class and stylesheet. Exit 0, no diagnostic.
+
+It was following the message exactly:
+
+```
+fix: layouts are paths — write layout: /_layout.html (or a relative path ending in .html)
+```
+
+Round 8 fixed this line's *kind* (`layout:` vs `data-layout=`). Round 18 shows the *path*
+was still one hardcoded literal — and in any site with a section layout that literal is a
+real, resolvable, **wrong** answer. This is the project's single most repeated finding —
+*a rule that shows exactly one literal will have that literal copied* — reappearing inside
+a diagnostic. **Fixed:** the suggestion is now the layout the page would actually discover
+(`/news/_layout.html`), and the second fix line names it too. New fixture
+`layout-bare-name-section`; the existing two cover the no-layout fallback wording.
+
+Also resolved by this round: round 10 recorded that the "or drop the layout selection" line
+"did not fully land" for one sample. Three of six named that line as the one they followed.
+
+### Two more messages amended
+
+**P18 never named the colon.** Four of six flagged it; all three no-docs samples said they
+got there by knowing YAML rather than by reading the message, and two of three doc-armed
+samples were carried by the doc's line instead. The parser's own reason ("incomplete
+explicit mapping pair") names a construct the author never wrote. The fix line now leads
+with `quote any value containing a colon — title: "Pruning: a short guide"`.
+
+**A whole-line comment in `unify.yaml` was a fatal usage error.** `# Build settings` at
+column 0 exited 2: the trailing-comment strip requires whitespace before the `#`, so a
+comment at the start of a line fell through to the key/value match and failed it. The
+agent had to delete it from the fixture to keep it from swallowing the round. Fixed, with
+tests that also pin the two things that must keep working — trailing comments, and a `#`
+inside a value like `https://x.example/#frag`.
+
+### The dedup fix, confirmed on an independent fixture
+
+The round's fixture was built before the cascade/dedup commit landed. Re-run against the
+current binary: **30 diagnostics become 13**, and A13 — which printed once per composed
+page, six times — prints once. Twelve phantom cascade P13s are gone.
+
+### Recorded, not fixed
+
+- **Compose-stage diagnostics report line numbers from the include-inlined text.** Verified
+  minimally: a stray bare `<slot>` on line 7 of a 9-line layout is reported at **line 13**,
+  because a 6-line nav fragment was inlined above it. §14.1 makes `FILE:LINE` stable
+  contract, and this points the author past the end of the file. Affects A13, P19, P20 and
+  P16 on any layout that includes a fragment above the fault. The machinery to fix it
+  exists (`spansToLocator` already maps offsets back to provenance), so this is tractable,
+  but it touches every diagnostic site in `compose.js` and wants its own change.
+- **A03 has no `fix:` line and, under `--strict`, forces a change to markup that composed
+  correctly.** Six samples produced five different repairs; four invented a named slot in
+  the *shared* layout that exactly one page fills. §14.3 says advisories never instruct
+  restructuring of correctly-composed markup — this one does, and says nothing about what
+  to write.
+- **P14's fix names a CLI flag for a fault in a config file**, and the arms diverged on it:
+  all three no-docs samples appended the one missing directory to `unify.yaml`'s hand-written
+  list (silencing the symptom, leaving the convention broken for the next `_` directory),
+  while all three doc-armed samples collapsed it to `_*` — the durable fix — two of them
+  citing the doc's *"`--exclude` **replaces** the `_*` default"* line.
+- **A page can vanish from the `--dry-run` report with nothing said.** While the layout
+  carried an include cycle, one page produced no `write` line and no diagnostic; it
+  reappeared when the cycle was fixed.
+
+### The accidental control — the first measurement of the diagnostics' *absence*
+
+The round's first launch inherited a harness default without `Bash`, so six samples repaired
+the site **from the source alone, never running the tool**. Preserved rather than discarded:
+
+**0 of 6 reached a clean build** (17, 12 and 7 problems remaining in the no-docs arm). Every
+one wrote a confident report; three stated plainly they could not verify. Two copied the
+*broken* pattern from a neighbouring file. None found P14, P18 or P04.
+
+Round 8 established that the error contract is sufficient documentation for repair. This is
+the converse, and it is the stronger claim: **without it, the same model on the same site
+fixes roughly half the faults and cannot tell that it failed.** The diagnostics are not a
+supplement to the 60 lines — for repair, they are the documentation.
+
+### Arm A vs arm B
+
+Both 3/3 clean. The doc bought **speed and durability, not success**: 3.7 builds against
+4.7, and it changed the outcome on exactly two faults — P18 (guessed vs read) and P14
+(symptom vs convention).

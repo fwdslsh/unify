@@ -71,7 +71,7 @@ export function resolveHtmlLayout({ root, text, pageAbsPath, sourceRoot, reporte
     if (value === "none") return { none: true };
     return resolveExplicitPath(value, {
       declaringDir: dirname(pageAbsPath), sourceRoot, file, line: lineOf(text, attr.start), reporter,
-      spelling: 'data-layout="/_layout.html"',
+      spelling: (p) => `data-layout="${p}"`,
     });
   }
 
@@ -213,19 +213,27 @@ function reportMisplaced(misplaced, { text, file, reporter }) {
  * path, checked before any existence check) then P05 (missing or escaping
  * the source root, same shape as include-not-found).
  */
-function resolveExplicitPath(value, { declaringDir, sourceRoot, file, line, reporter, spelling = "layout: /_layout.html" }) {
+function resolveExplicitPath(value, { declaringDir, sourceRoot, file, line, reporter, spelling = (p) => `layout: ${p}` }) {
   if (!value.endsWith(".html")) {
+    // Name the layout this page would actually get, not a fixed literal.
+    // Round 8's repair fixed the *kind* (`layout:` vs `data-layout=`); round
+    // 18 showed the *path* was still one hardcoded `/_layout.html`, which in
+    // any site with a section layout is a real, resolvable, WRONG answer — a
+    // sample followed it, both news articles silently lost their section's
+    // body class and stylesheet, exit 0. "A rule that shows exactly one
+    // literal will have that literal copied" is this project's most repeated
+    // finding; it applies to diagnostics too, so the literal has to be right.
+    const nearest = walkForLayout(declaringDir, sourceRoot);
+    const suggestion = nearest ? `/${toRelative(sourceRoot, nearest)}` : "/_layout.html";
     reporter.problem({
       file,
       line,
-      // The fix names the spelling of *this* file's kind: round 8 sent two
-      // repair samples looking for a `layout:` key in an HTML page because
-      // this line always printed the Markdown form. The second line is the
-      // other real repair — dropping the selection restores discovery.
       message: `layout is not a path: "${value}"`,
       fixes: [
-        `layouts are paths — write ${spelling} (or a relative path ending in .html)`,
-        "or drop the layout selection to use the nearest _layout.html",
+        `layouts are paths — write ${spelling(suggestion)} (or a relative path ending in .html)`,
+        nearest
+          ? `or drop the layout selection: this page's nearest layout is ${toRelative(sourceRoot, nearest)}`
+          : "or drop the layout selection to use the nearest _layout.html",
       ],
     });
     return { problem: true };

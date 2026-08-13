@@ -1391,12 +1391,13 @@
      "line": 4,
      "severity": "problem",
      "containsAll": [
-      "YAML"
+      "YAML",
+      "quote any value containing a colon"
      ]
     }
    ],
    "diagnosticsExhaustive": true,
-   "note": "P18: the frontmatter does not parse as YAML. Distinct from P17, which is about a value's shape in frontmatter that parsed fine — the fix here is repairing syntax, not flattening a structure. NOTE ON THE LINE: this fixture originally asserted line 3, where the unterminated `[` is opened. That was written from intuition rather than from what a parser reports, and it was wrong: js-yaml marks line 4, where it discovers the fault, which is what every compiler does for an unterminated construct and the only position actually known without reimplementing YAML. The diagnostic carries the parser's own reason so the construct is still named."
+   "note": "P18: the frontmatter does not parse as YAML. Distinct from P17, which is about a value's shape in frontmatter that parsed fine — the fix here is repairing syntax, not flattening a structure. NOTE ON THE LINE: this fixture originally asserted line 3, where the unterminated `[` is opened. That was written from intuition rather than from what a parser reports, and it was wrong: js-yaml marks line 4, where it discovers the fault, which is what every compiler does for an unterminated construct and the only position actually known without reimplementing YAML. The diagnostic carries the parser's own reason so the construct is still named. ROUND 18: the fix line now names the colon. Four of six repair samples said the old wording (check quoting, indentation, and that every bracket is closed) did not tell them the cause, and the three with no documentation at all reached it only by knowing YAML. An unquoted colon is the fault that actually happens - two of five samples shipped one in round 7."
   },
   "frontmatter-flat-key-nest": {
    "rules": [
@@ -1517,6 +1518,28 @@
    ],
    "diagnosticsExhaustive": true,
    "note": "Both §12/§14.1 noise rules in one site, and the exhaustive list is the assertion. Four pages compose and all four carry the nav, so /team.html — a target with no source file at all — is a real fault that used to print four times and now prints once (DIA-12). /about.html DOES exist in source and failed to compose (P04), so links to it are the cascade case and are silent (REF-07) — before the exemption they printed four more times, at the fragment, advising a spelling check on a correctly-spelled path, and sorted ABOVE the one problem that mattered. Measured on a 20-page version of this shape: 21 problems, 1 real, the real one printed last."
+  },
+  "layout-bare-name-section": {
+   "rules": [
+    "LAY-03",
+    "P04"
+   ],
+   "flags": [],
+   "exit": 1,
+   "published": false,
+   "diagnostics": [
+    {
+     "file": "src/news/spring.md",
+     "line": 2,
+     "severity": "problem",
+     "containsAll": [
+      "news",
+      "/news/_layout.html"
+     ]
+    }
+   ],
+   "diagnosticsExhaustive": true,
+   "note": "Ratification round 18: the P04 fix line used to print a hardcoded /_layout.html, which in a site with a section layout is a real, resolvable, WRONG answer — a repair sample followed it and both news articles silently lost their section body class and stylesheet at exit 0. The suggestion is now the layout this page would actually discover. layout-bare-name and -html cover the fallback wording when no layout exists at all."
   }
  }
 }

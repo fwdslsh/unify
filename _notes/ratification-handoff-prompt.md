@@ -27,8 +27,8 @@ improvise around it.
 
 ## Where things stand
 
-Seventeen rounds are logged in the protocol's results table; rounds 7–17 are written up in
-`_notes/ratification-rounds-7-17.md`, with two pre-registrations beside it. The engine is
+Eighteen rounds are logged in the protocol's results table; rounds 7–18 are written up in
+`_notes/ratification-rounds-7-18.md`, with two pre-registrations beside it. The engine is
 complete and all five gates are green (unit, conformance+e2e, suite hygiene, static
 traceability, and the runtime release signal).
 
@@ -45,10 +45,14 @@ Since then the loop has produced, and shipped:
   unquoted colon in a YAML title (2/5 → 0), `--base-url` not named beside `--pretty-urls`
   (one sample invented a GitHub Pages behaviour to cover the gap), and "run first" not
   saying who runs it.
-- **Three misleading diagnostics**, found by the round-8 experiment that hands an agent a
-  *broken* site with the CLI as its only documentation. Seven of seven repaired it, four
-  with no docs at all — but one deleted a page's content following a `fix:` line that said
-  "remove one of the sources".
+- **Five misleading diagnostics**, found by the round-8/18 experiment that hands an agent a
+  *broken* site with the CLI as its only documentation. Seven of seven repaired it in round
+  8, six of six in round 18, several with no docs at all — but one deleted a page's content
+  following a `fix:` line that said "remove one of the sources", and one silently stripped a
+  section's chrome following a `fix:` line that shipped a hardcoded layout path. Round 18's
+  accidental control is the sharpest result in the log: **0 of 6 samples reached a clean
+  build with the CLI withheld**, and every one of them reported confidently. For repair, the
+  diagnostics are not a supplement to the 60 lines — they are the documentation.
 - **Two implementation defects** found by reading while probing: a diagnostic quoting a URL
   absent from the author's file, and og: values under a base URL never reference-checked at
   all.
@@ -76,8 +80,12 @@ Since then the loop has produced, and shipped:
    read the line, quoted it, drawn the right conclusion, and then run a different command
    anyway. Leave the line where it is. What is still open is whether that failure deserves
    something with teeth (a diagnostic) rather than a summary line — see round 17's notes.
-3. **Re-test the diagnostics.** No agent has read them since round 10, and several messages
-   have changed. Same method as round 8, current problem set.
+3. **Fix the compose-stage line numbers.** Round 18 verified that a stray bare `<slot>` on
+   line 7 of a 9-line layout is reported at line 13 — compose reports positions in the
+   include-inlined text, so any fragment inlined above a fault shifts every diagnostic below
+   it, often past the end of the file. §14.1 makes `FILE:LINE` stable contract. The
+   machinery exists (`spansToLocator` already maps offsets back to provenance); it touches
+   every diagnostic site in `compose.js` and wants its own change.
 4. **The human half is still untested.** Every round has measured models. A person who
    knows HTML but not this tool fails differently — they stop and re-read where a model
    guesses and moves on.
