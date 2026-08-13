@@ -245,7 +245,7 @@ Frontmatter is YAML: quote any value containing a colon — `title: "Finish: the
 `layout`, `class` (on `<body>`), `lang`, `dir` are the only keys with meaning; every other becomes
 `<meta name=…>` with the value as written, so `date`/`tags`/`permalink`/`slug` do nothing and `draft: true`
 publishes (hold pages back with a leading underscore instead). A key named `og:…` emits `property=` instead
-(`og:image: /card.png`; two levels deep is an error). No `title:` → first `# Heading`; headings get slug `id`s. Canonical and JSON-LD have no frontmatter key: put them in the layout, or write the page in HTML.
+(`og:image: /card.png`; two levels deep is an error). No `title:` → first `# Heading`; headings get slug `id`s. Canonical and JSON-LD have no frontmatter key: JSON-LD belongs in the layout; a canonical is one page's own address, which a layout must never set — that stamps every page with the same URL — so write that page in HTML, or leave it off.
 
 ## Styles, scripts, finishing
 unify never scopes, rewrites, or injects CSS/JS, and rewrites only HTML's own URL attributes (`href`, `src`) — a `url()` in CSS and a `fetch()`/`hx-get` address ship as written, so a root-relative one misses the `--base-url` prefix and 404s:

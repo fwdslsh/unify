@@ -23,6 +23,10 @@ unshare -m bash -c '
   mount --bind /var/empty-ratify /home/user/unify
   P=/root/.claude/projects/-home-user-unify
   [ -e "$P" ] && mount --bind /var/empty-ratify "$P"
+  # Samples run with cwd /sandbox, so their transcripts all land (and are in
+  # principle readable) in projects/-sandbox — mask it too (round-21 lesson).
+  S=/root/.claude/projects/-sandbox
+  mkdir -p "$S" && mount --bind /var/empty-ratify "$S"
   cd /sandbox || exit 1
   printf "%s" "$(cat "/sandbox/$PROMPT")" | timeout "$TMO" claude -p \
       --model "$MODEL" --permission-mode acceptEdits --allowedTools "$@" \

@@ -1,7 +1,7 @@
 # Ratification — what eighteen rounds of agent experiments changed
 
 **Status**: v0.7.0, historical record and argument
-**Role**: This document is the narrative and the evidence behind `docs/ratification-protocol.md`. The protocol is the procedure — how to run a round, how to triage what it finds. This is the account of running it: what was measured, what broke, what the results changed in the documentation, the specification, the implementation, and the product itself. The round-by-round primary source is `_notes/ratification-rounds-7-20.md`, with round 1 and two pre-registrations beside it.
+**Role**: This document is the narrative and the evidence behind `docs/ratification-protocol.md`. The protocol is the procedure — how to run a round, how to triage what it finds. This is the account of running it: what was measured, what broke, what the results changed in the documentation, the specification, the implementation, and the product itself. The round-by-round primary source is `_notes/ratification-rounds-7-21.md`, with round 1 and two pre-registrations beside it.
 
 ---
 

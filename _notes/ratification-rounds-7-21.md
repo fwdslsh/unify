@@ -1026,3 +1026,89 @@ twelve independent authors all excluded `varieties.json` correctly and eight sti
 published its private fields. sonnet-1 is the exception in both rounds: its generator names
 the fields it emits rather than spreading the record. That is now the advice in
 `examples/README.md` — the generator is the only place privacy can be enforced.
+
+
+---
+
+# Round 21 — round 13's brief, byte-unchanged, against two rounds' worth of amendments it never met
+
+Nearly every fix in this record is *fitted* — measured only by the round that produced it.
+Round 21 re-runs round 13's brief and prompt byte-identical (same seeded `images/`, same
+runner discipline as rounds 19-20, mount-namespace isolation) against today's doc and a
+binary built from HEAD. What that tests is everything amended since round 15 that was NOT
+written for this brief: the round-16 slot=/scaffold clauses, the round-18 diagnostic work,
+P21, the A03 retirement, the round-19/20 url()/fetch clause. What it cannot re-credit is
+the round-13-era repairs themselves — the full-URL literal, the collapsed flag, A15's
+retirement — which rounds 14/15 already measured on this same family and which stay
+fitted-to-family.
+
+**Result: 6/6 WORKS, 18/18 root-relative frontmatter values, zero final diagnostics —
+the family's round-15 result survives every amendment since.** Every sample, all five
+Haiku and the control, published with the full-URL `--base-url` on its first base-url'd
+command; every `og:image` in every built entry is absolute at the deploy address. Nobody
+hit the collapsed flag's usage error (round 15 again); two samples ran their first
+`--dry-run --strict` flagless, met `serving from / — the domain root (no --base-url)`,
+and adopted the full form — the §17 line's first mid-run saves. Five P13s fired during
+iteration — images not yet under `src/`, directory links before `--pretty-urls`, one
+sample hand-prefixing `/outreach/` into source paths — and produced five correct repairs;
+haiku-2's report narrates the last one: "I cannot include the base-url prefix myself…
+I must use root-relative paths and let unify rewrite them." Round 13's lesson, now taught
+by the toolchain mid-run. And round 13's pathology — reports *claiming* verification of
+dead metadata — is absent by construction: the claims are all true this time.
+
+**The amendments that could act, acted; the ones this brief cannot reach stayed idle.**
+The url()/fetch clause is quoted verbatim in three of five Haiku reports, and haiku-4
+derived its asset strategy from it ("Since I used img tags and meta properties for all
+images, they all got the correct absolute URLs") — read, used, harmless, on a brief it
+was not written for. Its protective half stays unexercised: no sample in this family has
+ever written a `url()`. P21 was never provoked (six complete-document sites) and never
+misfired — tested for silence, with its presence proven by the pre-round probe. P20 had
+nothing to fire on: zero stray `<slot>` in pages, round 7's 4/5 failure mode extinct.
+The r16 fill-scope and fills-the-contents clauses and the A03 retirement were untouched —
+no named slots, no `init`, no top-level landmarks. Honest nulls, still fitted.
+
+**The finding: a canonical in the layout stamps every page with one URL — and the doc
+told authors to put it there.** haiku-2 and haiku-3's shared entries each declare
+`rel="canonical"` → the home page, layout-supplied, exit 0 — on the one feature this
+brief is about, since Facebook consolidates shares by canonical. haiku-3's report says
+why: "Left as site-root canonical in the layout since individual page-specific canonicals
+were not required by the brief." The control is the doc-defect signature verbatim — it
+quotes "Canonical and JSON-LD have no frontmatter key: put them in the layout, or write
+the page in HTML" and answers it: "a single canonical value hard-coded into _layout.html
+would be wrong for every page except one… Rather than ship a canonical tag that lies for
+two out of three entries, I left canonical off." Judged retroactively, the family already
+carried it: r14 haiku-4/-5 stamped home on their entries, r15 haiku-2/-3 stamped the log
+index and haiku-4 home — **seven of eighteen samples across three rounds**, unmeasured
+because the preregistration's verdict reads og:image only. The chain that lit it up:
+the sentence dates to round 5 and round 13's samples wrote zero canonicals; the round-13
+repair put "canonical" into the `--base-url` clause every author now reads, samples
+started writing canonicals in round 14, and the round-5 sentence routed half of them into
+the layout. Fixing one silent share-crawler failure surfaced its dormant neighbor.
+Triage: documentation — the sentence's first alternative is only ever right for JSON-LD;
+for canonical on a Markdown-entry site the layout value is unfixable per page (§8's
+replace rule needs an HTML head). **Amended this round, in both documents**: the rules
+doc now says JSON-LD belongs in the layout while a canonical is one page's own address a
+layout must never set, and the spec's §10 honest-gap paragraph says the same with the
+mechanism. Fitted until a later round it was not written for comes back clean. The
+spec-level companion — an advisory when the same canonical URL is emitted on more than
+one page (mechanically checkable; at most one page can be right; three catalogue slots
+free) — is recorded as the maintainer's call, not taken.
+
+**Recorded, not amended: URL-shaped CSS dies against rewritten HTML in a third spelling.**
+haiku-2 and haiku-5 highlight the active nav item with attribute selectors —
+`body.about nav a[href="/about/"]` — dead against anchors rewritten to `/outreach/…`,
+silently, exit 0. The same pattern shipped in r13 and r14 (where the control instead
+hardcoded `/outreach/` into its selectors — round-20's fetch hardcode, in CSS), so it
+predates every amendment under test. haiku-2 quoted the url()/fetch clause and tripped
+anyway: a selector is neither `url()` nor `fetch()`. haiku-1 pasted the doc's own recipe
+(`body.home .nav-home a`) and is immune — the one literal shown carried the one sample
+that copied it. Cosmetic, unrequired by the brief, watched: if a brief that needs the
+highlight reproduces it, the clause's list becomes "anything in CSS or JS that names an
+address".
+
+Also watched: `name="description"` slipped to 4/6 (r15: 6/6) — two samples shipped
+`og:description` only, on an unchanged rule. And two harness notes acted on for the next
+round: sandboxed samples were all appending transcripts to one shared
+`projects/-sandbox/<orchestrator-id>.jsonl` — readable in principle from inside the
+namespace — so `isolate.sh` now masks it; and rounds now overlap on the machine, so every
+transcript sweep is bounded by the round's own `.exit` times.
