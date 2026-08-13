@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **unify** (`@fwdslsh/unify`) — a static site generator for front-end designers and hobbyists: HTML-native composition with no expression language and no client runtime. The authoring surface is four primitives — `<include>`, layouts (`_layout.html` / `data-layout`), slots (`<slot name>` in layouts, `slot=` on page elements, `<main>` as the default), and the underscore exclusion.
 
-**The v0.7.0 specification set in `docs/` is authoritative, and `src/` now implements it.** The rewrite is complete: every normative rule in `docs/conformance-spec.md` is covered by a test that ran against the real CLI (`tests/conformance/check-traceability.mjs --runtime`), and `tests/legacy-v0.6/` is quarantined out of CI and slated for deletion. The retired v0.6 vocabulary — `data-unify`, `unify-*` area classes, DOM Cascade machinery — exists only as *diagnostics*: encountering it is a build error naming the v0.7.0 replacement, never a working feature.
+**The v0.7.0 specification set in `docs/` is authoritative, and `src/` now implements it.** The rewrite is complete: every normative rule in `docs/conformance-spec.md` is covered by a test that ran against the real CLI (`tests/conformance/check-traceability.mjs --runtime`), and `tests/legacy-v0.6/` has been deleted along with the v0.6 fixture trees only it read — `bun test` runs the whole repo and is green. The retired v0.6 vocabulary — `data-unify`, `unify-*` area classes, DOM Cascade machinery — exists only as *diagnostics*: encountering it is a build error naming the v0.7.0 replacement, never a working feature.
 
 ## Development Commands
 
@@ -98,7 +98,7 @@ Path traversal safety in include/layout resolution is internal engineering — a
 - **`docs/conformance-spec.md`** — the normative implementer reference: exact algorithms, the splice model (S1–S12), the head-merge table, the collision matrix, the complete problem/advisory catalogue, and fixture-grade worked examples.
 - **`docs/authoring-rules.md`** — the complete authoring surface in under 60 lines; hand this to any agent writing site content.
 - **`docs/getting-started.md`** — the human tutorial. **`docs/cli-reference.md`** — every command and flag.
-- **`docs/testing-strategy.md`** — the tier model and the traceability gate. **`docs/ratification-protocol.md`** — how to validate `authoring-rules.md` empirically by having agents author from it in isolation, and how to triage a failure into doc / spec / implementation / outlier. **Read the protocol before editing the authoring rules**: it is the procedure that decides whether an edit is warranted.
+- **`docs/testing-strategy.md`** — the tier model and the traceability gate. **`docs/ratification-protocol.md`** — how to validate `authoring-rules.md` empirically by having agents author from it in isolation, and how to triage a failure into doc / spec / implementation / outlier. **Read the protocol before editing the authoring rules**: it is the procedure that decides whether an edit is warranted. **`docs/ratification.md`** — the evidence: eighteen rounds of agent experiments, what each finding was triaged as, and the doc/spec/implementation changes they produced.
 - **Working documents**: `_notes/` (analyses and drafts; `_notes/unbiased-design-synthesis.md` records the v0.7.0 design rationale).
 
 ## Important Implementation Notes

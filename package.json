@@ -41,12 +41,8 @@
   },
   "homepage": "https://github.com/fwdslsh/unify#readme",
   "dependencies": {
-    "gray-matter": "^4.0.3",
     "js-yaml": "^3.14.1",
-    "linkedom": "^0.18.12",
-    "markdown-it": "^14.1.0",
-    "minimatch": "^9.0.3",
-    "yauzl": "^3.2.0"
+    "markdown-it": "^14.1.0"
   },
   "devDependencies": {
     "@types/bun": "latest"
