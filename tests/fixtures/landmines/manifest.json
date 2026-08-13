@@ -410,6 +410,30 @@
    ],
    "diagnosticsExhaustive": true
   },
+  "data-layout-after-include": {
+   "rules": [
+    "LAY-09",
+    "P07",
+    "INC-12",
+    "DIA-06",
+    "DIA-11"
+   ],
+   "flags": [],
+   "exit": 1,
+   "published": false,
+   "diagnostics": [
+    {
+     "file": "src/index.html",
+     "line": 6,
+     "severity": "problem",
+     "containsAll": [
+      "include"
+     ]
+    }
+   ],
+   "diagnosticsExhaustive": true,
+   "note": "data-layout-on-div, with one line of the page replaced by a five-line fragment above the fault. §6's layout diagnostics were measured in the include-inlined text the same way §7's were: the <div> is on line 6 of an 8-line index.html and the pre-fix engine printed line 11 — past the end of the file it named, so there was nothing at that address to check. Nothing here is about includes as a feature; the fragment exists only to make the two possible answers differ, exactly as in line-after-include (compose) and charset-after-include (head merge)."
+  },
   "content-nowhere": {
    "rules": [
     "MRG-14",
@@ -1202,6 +1226,38 @@
    "diagnosticsExhaustive": true,
    "note": "P17: a mapping nested below a block (og: → image: → url:) has no text form — frontmatter flattens exactly one level, and both inventing a serialization and dropping the value would be silent lies. Located at the key whose value nests (line 4). The list-item-that-is-a-mapping branch is the same problem."
   },
+  "markdown-body-line-unknown": {
+   "rules": [
+    "DIA-13",
+    "DIA-06",
+    "P20",
+    "P17",
+    "MD-21"
+   ],
+   "flags": [],
+   "exit": 1,
+   "published": false,
+   "diagnostics": [
+    {
+     "file": "src/post.md",
+     "line": null,
+     "severity": "problem",
+     "containsAll": [
+      "slot"
+     ]
+    },
+    {
+     "file": "src/post.md",
+     "line": 4,
+     "severity": "problem",
+     "containsAll": [
+      "og:image"
+     ]
+    }
+   ],
+   "diagnosticsExhaustive": true,
+   "note": "DIA-13, and the boundary that makes it non-obvious — both halves in one file. §10.1 converts a Markdown page BEFORE inlining its includes, so a span attributed to post.md carries an offset into the CONVERTED HTML: counting newlines in the .md to reach it would name a real-looking line in the wrong place, so the line is omitted and the FILE: SEVERITY: form of DIA-06 is used (the stray <slot>, P20, first diagnostic). Frontmatter is the exception, and it is not an exception to the rule but a consequence of it: frontmatterKeyLine reads the RAW source, ahead of conversion, so P17 keeps its exact line 4 (as layout-bare-name keeps src/about.md:2 and frontmatter-invalid-yaml its line 4). The omission is a body-derived fact, not a Markdown-wide one. Closing it properly needs a converted-offset → source-line map out of markdown.js; until that exists, declining is the contract."
+  },
   "charset-differs": {
    "rules": [
     "HED-01",
@@ -1231,6 +1287,41 @@
      "utf-16"
     ]
    }
+  },
+  "charset-after-include": {
+   "rules": [
+    "HED-01",
+    "A08",
+    "INC-12",
+    "DIA-06",
+    "DIA-11"
+   ],
+   "flags": [],
+   "exit": 0,
+   "published": true,
+   "diagnostics": [
+    {
+     "file": "src/index.html",
+     "line": 5,
+     "severity": "advisory",
+     "containsAll": [
+      "charset"
+     ]
+    }
+   ],
+   "diagnosticsExhaustive": true,
+   "expectContains": {
+    "index.html": [
+     "<meta charset=\"utf-8\">",
+     "og:site_name"
+    ]
+   },
+   "expectNotContains": {
+    "index.html": [
+     "utf-16"
+    ]
+   },
+   "note": "charset-differs, with a three-line fragment inlined into the page's own <head> above its <meta charset> (INC-12: includes work in the head). The charset is on line 5 of an 11-line index.html and the pre-fix engine printed line 8 — the worst shape of wrong, since line 8 exists (<body>) and looks checkable, where data-layout-after-include's overshoot at least fell off the end of the file. A08 is the only located diagnostic §8 raises, so this case is head-merge.js's whole §14.1 surface."
   },
   "charset-page-only": {
    "rules": [

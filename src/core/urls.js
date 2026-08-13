@@ -39,9 +39,19 @@
  * — they operate on already-§11.1-rewritten (mostly root-relative) URLs and
  * the site's own output-path manifest, so they are unaffected by any of the
  * above.
+ *
+ * That is also why the §14.1 DIAGNOSTIC LOCATION primitives live in this
+ * §11 module rather than in `diagnostics.js`: `spansToSourceLocator` — the
+ * span arithmetic itself — was placed here because §11.1 was its first
+ * consumer, and the one thing this arithmetic must never be is implemented
+ * twice (a second copy is precisely how a diagnostic came to name one file
+ * while measuring its line in another). `spansToDiagnosticLocator` and
+ * `verbatimLineResolver` below are that same mapping composed with an
+ * offset→line step, shared verbatim by compose.js (§7), layout.js (§6) and
+ * head-merge.js (§8) so all three locate a fault the same way.
  */
 import { posix } from "node:path";
-import { applyEdits, findAll, getAttr, getAttrNode, parse, tokens } from "./html.js";
+import { applyEdits, findAll, getAttr, getAttrNode, lineOf, parse, tokens } from "./html.js";
 
 // --------------------------------------------------------------- URL basics
 
@@ -157,6 +167,94 @@ export function spansToSourceLocator(spans, fallbackFile) {
 export function spansToLocator(spans, fallbackFile) {
   const locate = spansToSourceLocator(spans, fallbackFile);
   return (offset) => locate(offset).file;
+}
+
+// -------------------------------------------------- §14.1 diagnostic location
+
+/**
+ * A single whole-text span attributing every byte of `text` to `file` — the
+ * spans a caller that did no splicing (no includes to inline, a unit test
+ * composing from strings) honestly has.
+ * @param {string} text
+ * @param {string} file
+ * @returns {{start:number,end:number,file:string,fileOffset:number}[]}
+ */
+export function wholeTextSpan(text, file) {
+  return text.length > 0 ? [{ start: 0, end: text.length, file, fileOffset: 0 }] : [];
+}
+
+/**
+ * `(offset) => {file, line}` for one text whose provenance is `spans`: the
+ * §14.1 `FILE:LINE` pair, both halves answered from the SAME span, so they
+ * can never disagree. `file` is whoever the spans say authored the byte — a
+ * page, a layout, or a fragment several includes deep — and `line` is
+ * measured in THAT file's own raw text, never in the include-inlined text the
+ * offset came from. Those two answers differ by every line any fragment
+ * inlined above the fault contributed, which is how a `data-layout` on line 6
+ * of an 8-line page came to be reported at line 11 (ratification round 18;
+ * pinned by tests/fixtures/landmines/line-after-include and
+ * layout-line-after-include).
+ *
+ * `line` is `undefined` (§14.1: "line omitted when unknown") rather than a
+ * plausible-looking number whenever the pair cannot be produced honestly: no
+ * span covers the offset (only reachable at end-of-text — spans are
+ * contiguous), or `resolveLine` has no raw text for that file. An omitted line
+ * costs the author one file-wide search; a fabricated one sends them to the
+ * wrong place with full confidence, which is the defect this whole mechanism
+ * exists to remove.
+ *
+ * `resolveLine` is INJECTED rather than computed here because turning a
+ * file-relative offset into a line needs that file's own raw text, and none of
+ * the `src/core` modules that raise these diagnostics reads the filesystem —
+ * see compose.js's DIAGNOSTIC LOCATION note and build.js's
+ * `makeSourceLineResolver`, the one real implementation.
+ * @param {{start:number,end:number,file:string,fileOffset:number}[]} spans
+ * @param {string} fallbackFile
+ * @param {(file: string, fileOffset: number) => number|undefined} resolveLine
+ * @returns {(offset: number) => {file: string, line: number|undefined}}
+ */
+export function spansToDiagnosticLocator(spans, fallbackFile, resolveLine) {
+  const locate = spansToSourceLocator(spans, fallbackFile);
+  return (offset) => {
+    const { file, fileOffset } = locate(offset);
+    return { file, line: fileOffset === null ? undefined : resolveLine(file, fileOffset) };
+  };
+}
+
+/**
+ * The `resolveLine` a core module uses when its caller injects none — every
+ * unit test, and any future in-memory caller. It can answer for exactly the
+ * files whose raw text the module was handed, which it recognizes
+ * structurally: a text whose spans are the single whole-text span of its own
+ * file IS that file's raw source (`fileOffset` is then an offset in the text
+ * in hand), so `lineOf` on it is exact. That covers every page and layout with
+ * no includes of its own — precisely the case where a caller has no spans to
+ * pass in the first place.
+ *
+ * For anything else (a fragment's text, which no core module ever sees; a page
+ * or layout that WAS include-inlined, whose offsets no longer index the text in
+ * hand) it returns undefined rather than guessing. The real pipeline always
+ * injects a resolver, so this degradation never reaches a `unify build`.
+ * @param {{file: string|undefined, text: string, spans: {start:number,end:number,file:string,fileOffset:number}[]}[]} candidates
+ * @returns {(file: string, fileOffset: number) => number|undefined}
+ */
+export function verbatimLineResolver(candidates) {
+  const rawSources = new Map();
+  for (const { file, text, spans } of candidates) {
+    if (file !== undefined && isVerbatimSourceText(text, spans, file)) rawSources.set(file, text);
+  }
+  return (file, fileOffset) => {
+    const text = rawSources.get(file);
+    return text === undefined ? undefined : lineOf(text, fileOffset);
+  };
+}
+
+/** True when `spans` say `text` is `file`'s own raw source, byte for byte, unspliced. */
+function isVerbatimSourceText(text, spans, file) {
+  if (text.length === 0) return spans.length === 0;
+  const [only] = spans;
+  return spans.length === 1 && only.file === file
+    && only.start === 0 && only.end === text.length && only.fileOffset === 0;
 }
 
 // ---------------------------------------------------------- §11.1 rewriting

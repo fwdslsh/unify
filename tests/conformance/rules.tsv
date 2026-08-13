@@ -131,7 +131,8 @@ DIA-07	§14.1	rule	fixture	Continuation lines indented two spaces: in: and fix:;
 DIA-08	§14.1	rule	fixture	Cycle and depth messages print the full chain joined with " → "
 DIA-09	§14.1	rule	targeted	DEBUG=1 adds stack traces
 DIA-10	§14.3	rule	e2e	Advisory discipline: unify init && unify build --dry-run --strict exits 0; an advisory firing on a correct site is a bug in the advisory
-DIA-11	§14.1	rule	fixture	Attribution conventions are contract: cycle/depth problems locate at the outermost include site; collision problems at the path-ordered first colliding source; reference problems at the reference's provenance file and line; composition diagnostics (§7) at the provenance file of the offending markup and its line IN that file — never the host's post-inlining line
+DIA-11	§14.1	rule	fixture	Attribution conventions are contract: cycle/depth problems locate at the outermost include site; collision problems at the path-ordered first colliding source; every other located diagnostic — §6 layout selection, §7 composition, §8 charset advisory, §12 references — at the provenance file of the offending markup and its line IN that file, never the host post-inlining line
+DIA-13	§14.1	rule	fixture	A line that cannot be mapped to the named file is omitted, not guessed: the FILE: SEVERITY: form is used (a .md page converts before inlining, so an offset attributed to Markdown source indexes converted HTML)
 DIA-12	§14.1	rule	fixture	Diagnostics are deduplicated before counting or printing: same file, line, severity, message, in: and fix: lines = one diagnostic; genuinely distinct faults that print identically (a relative url() in shared chrome resolving per consumer) are distinguished by resolved target and both printed
 P01	§14.2	diag	fixture	Problem: include target missing, wrong extension, or escaping the source root
 P02	§14.2	diag	fixture	Problem: include cycle or depth over 10, chain printed

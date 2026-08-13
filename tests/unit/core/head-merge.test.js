@@ -10,8 +10,10 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { applyEdits, elementChildren, findFirst, isElement, parse } from "../../../src/core/html.js";
+import { applyEdits, elementChildren, findFirst, isElement, lineOf, parse } from "../../../src/core/html.js";
 import { mergeHead } from "../../../src/core/head-merge.js";
+import { inlineIncludes } from "../../../src/core/includes.js";
+import { spansToDiagnosticLocator } from "../../../src/core/urls.js";
 import { compareHtml } from "../../../tests/conformance/compare.mjs";
 import { Reporter } from "../../../src/core/diagnostics.js";
 
@@ -24,10 +26,10 @@ function headOf(text) {
 }
 
 /** Run mergeHead and return the composed <head>...</head> fragment. */
-function run(layoutText, layoutFile, pageText, pageFile, reporter = new Reporter({ stderr: { write() {} }, stdout: { write() {} } })) {
+function run(layoutText, layoutFile, pageText, pageFile, reporter = new Reporter({ stderr: { write() {} }, stdout: { write() {} } }), pageAt) {
   const layoutHead = headOf(layoutText);
   const pageHead = headOf(pageText);
-  const edits = mergeHead({ layoutHead, layoutText, layoutFile, pageHead, pageText, pageFile, reporter });
+  const edits = mergeHead({ layoutHead, layoutText, layoutFile, pageHead, pageText, pageFile, pageAt, reporter });
   const composed = applyEdits(layoutText, edits);
   const newHead = headOf(composed);
   return composed.slice(newHead.start, newHead.end);
@@ -213,6 +215,50 @@ describe("head-merge: row-by-row behavior", () => {
     const kids = elementChildren(root.children[0]);
     expect(kids.map((k) => k.tag)).toEqual(["meta", "meta", "link"]);
     expect(getAttrValue(kids[1], "name")).toBe("viewport");
+  });
+});
+
+describe("§14.1 — where A08 lands (the module's only located diagnostic)", () => {
+  const dir = join(ROOT, "tests", "fixtures", "landmines", "charset-after-include");
+  const silent = () => new Reporter({ stderr: { write() {} }, stdout: { write() {} } });
+  const layoutText = () => readFileSync(join(dir, "src", "_layout.html"), "utf8");
+
+  /** The page with its head fragment inlined — what compose.js hands mergeHead in a real build. */
+  async function inlinedPage(reporter) {
+    return inlineIncludes({
+      text: readFileSync(join(dir, "src", "index.html"), "utf8"),
+      file: join(dir, "src", "index.html"),
+      sourceRoot: join(dir, "src"),
+      reporter,
+      convertMarkdown: async () => "",
+    });
+  }
+
+  test("a charset below an inlined fragment reports its line in the page, not in the inlined text", async () => {
+    const reporter = silent();
+    const { text: pageText, spans } = await inlinedPage(reporter);
+    const pageAt = spansToDiagnosticLocator(spans, "index.html", (file, fileOffset) =>
+      lineOf(readFileSync(join(dir, "src", file), "utf8"), fileOffset));
+
+    run(layoutText(), "_layout.html", pageText, "index.html", reporter, pageAt);
+    expect(reporter.diagnostics.length).toBe(1);
+    expect(reporter.diagnostics[0].file).toBe("index.html");
+    expect(reporter.diagnostics[0].line).toBe(5);
+
+    // What the pre-fix measurement said, and why it was worse than an
+    // out-of-range number: line 8 of index.html exists (it is `<body>`), so a
+    // reader who opened it found a real line with no charset on it.
+    expect(lineOf(pageText, pageText.indexOf('charset="utf-16"'))).toBe(8);
+    expect(readFileSync(join(dir, "src", "index.html"), "utf8").trimEnd().split("\n").length).toBe(11);
+  });
+
+  test("with no pageAt, `pageText` is taken to be the page's own raw source — exact for a page with no includes", () => {
+    const reporter = silent();
+    const page = `<!doctype html>\n<html>\n<head>\n<meta charset="utf-16">\n</head>\n<body></body>\n</html>\n`;
+    run(layoutText(), "_layout.html", page, "index.html", reporter);
+    expect(reporter.diagnostics.length).toBe(1);
+    expect(reporter.diagnostics[0].file).toBe("index.html");
+    expect(reporter.diagnostics[0].line).toBe(4);
   });
 });
 

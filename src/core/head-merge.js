@@ -16,6 +16,23 @@
  * in place (extra same-key layout elements are removed); a page element
  * with no layout counterpart is queued for the row-7 append; a layout
  * element with no page counterpart is simply never edited (S1).
+ *
+ * DIAGNOSTIC LOCATION (§14.1): this module raises exactly one located
+ * diagnostic — A08, the charset-differs advisory — and it locates at the
+ * PROVENANCE of the page-side `<meta charset>`, which is not always `pageFile`
+ * at `lineOf(pageText, …)`. `pageText` is the page's INCLUDE-INLINED text
+ * (INC-12: includes work in the head), so a fragment spliced in above the
+ * charset shifts every offset below it — measured that way, the line-5
+ * charset of tests/fixtures/landmines/charset-after-include reported as line
+ * 8, which is the quiet kind of wrong: line 8 of that file exists, so a reader
+ * who opened it found a real line with no charset on it. `pageAt` —
+ * compose.js's own `spansToDiagnosticLocator` over the same spans it composes
+ * with — answers both halves from one span, so file and line can never
+ * disagree. It is an ADDITIONAL parameter rather than a replacement for
+ * `pageText`, which the six other rows still need as raw text (`rawSpan`,
+ * `innerText`, `dedupKey`); omitting it falls back to exactly the previous
+ * behavior, which is exact for a direct caller passing a page's unspliced
+ * source (every unit test).
  */
 import {
   contentSpan, elementChildren, getAttr, hasAttr, innerText, isElement,
@@ -104,11 +121,16 @@ const isAssetKey = (key) => ASSET_KEY_PREFIXES.some((p) => key.startsWith(p));
  * @param {import('./html.js').ElementNode} args.pageHead
  * @param {string} args.pageText
  * @param {string} args.pageFile
+ * @param {(offset: number) => {file: string, line: number|undefined}} [args.pageAt] -
+ *   §14.1 provenance locator for an offset in `pageText` (see this module's
+ *   DIAGNOSTIC LOCATION note); defaults to "`pageText` is `pageFile`'s own
+ *   raw source", which is true for every caller that inlined no includes.
  * @param {import('./diagnostics.js').Reporter} args.reporter
  * @returns {{start:number,end:number,replacement:string}[]} edits scoped to `layoutText`
  */
-export function mergeHead({ layoutHead, layoutText, layoutFile, pageHead, pageText, pageFile, reporter }) {
+export function mergeHead({ layoutHead, layoutText, layoutFile, pageHead, pageText, pageFile, pageAt, reporter }) {
   if (!layoutHead) return [];
+  const at = pageAt ?? ((offset) => ({ file: pageFile, line: lineOf(pageText, offset) }));
   /** @type {{start:number,end:number,replacement:string}[]} */
   const edits = [];
   const layoutChildren = elementChildren(layoutHead);
@@ -125,8 +147,7 @@ export function mergeHead({ layoutHead, layoutText, layoutFile, pageHead, pageTe
       const pv = getAttr(pageCharset, "charset") ?? "";
       if (lv.toLowerCase() !== pv.toLowerCase()) {
         reporter.advisory({
-          file: pageFile,
-          line: lineOf(pageText, pageCharset.start),
+          ...at(pageCharset.start),
           message: `page charset "${pv}" differs from the layout's charset "${lv}"; the layout's is kept`,
         });
       }

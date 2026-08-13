@@ -77,16 +77,17 @@
  * 18; pinned by tests/fixtures/landmines/line-after-include, and its
  * counterpart slot-inside-include pins the file half: a `<slot>` a fragment
  * contributed is reported IN that fragment, at its own line, not at the host
- * that included it). See `locatorFor` for the mechanism and `resolveLine`
- * for why the offset→line half is injected rather than computed here.
+ * that included it). See `spansToDiagnosticLocator` (urls.js) for the
+ * mechanism and `resolveLine` for why the offset→line half is injected rather
+ * than computed here.
  */
 import {
   attrValueOrEmpty, contentSpan, elementChildren, findAll,
-  findFirst, getAttr, getAttrNode, hasAttr, isBlank, isElement, lineOf, parse,
+  findFirst, getAttr, getAttrNode, hasAttr, isBlank, isElement, parse,
   rawSpan, removeAttrEdit, spanWithAttrRemoved, tokens,
 } from "./html.js";
 import { mergeHead } from "./head-merge.js";
-import { spansToSourceLocator } from "./urls.js";
+import { spansToDiagnosticLocator, verbatimLineResolver, wholeTextSpan } from "./urls.js";
 
 const DATA_LAYOUT = "data-layout";
 const SLOT_ATTR = "slot";
@@ -198,11 +199,6 @@ function spliceTrackingSpans(text, spans, edits, fallbackFile) {
   return { text: out, spans: result };
 }
 
-/** A single whole-text span attributing every byte of `text` to `file`, for a caller with no finer-grained provenance. */
-function wholeTextSpan(text, file) {
-  return text.length > 0 ? [{ start: 0, end: text.length, file, fileOffset: 0 }] : [];
-}
-
 // -------------------------------------------------- §14.1 diagnostic location
 //
 // WHERE THE OFFSET→LINE CONVERSION BELONGS, and why it is not here.
@@ -221,70 +217,11 @@ function wholeTextSpan(text, file) {
 // component that already knows how to obtain any source file's text —
 // `src/cli/commands/build.js`, which does the same thing for the §12
 // reference check (`makeReferenceLocator`). This module only ever composes
-// the two halves.
-
-/**
- * `(offset) => {file, line}` for one text this module is holding, given that
- * text's provenance spans. `file` is the file the spans say authored the
- * byte — a page, a layout, or a fragment several includes deep — which is
- * also the file `line` is measured in, so the pair can never disagree.
- *
- * `line` is `undefined` (§14.1: "line omitted when unknown") rather than a
- * plausible-looking number whenever the resolver cannot honestly produce
- * one: no span covers the offset (only reachable at end-of-text — spans are
- * contiguous), or the resolver has no raw text for that file. An omitted
- * line costs the author one file-wide search; a fabricated one sends them to
- * the wrong place with full confidence, which is the defect this whole
- * mechanism exists to remove.
- * @param {{start:number,end:number,file:string,fileOffset:number}[]} spans
- * @param {string} fallbackFile
- * @param {(file: string, fileOffset: number) => number|undefined} resolveLine
- * @returns {(offset: number) => {file: string, line: number|undefined}}
- */
-function locatorFor(spans, fallbackFile, resolveLine) {
-  const locate = spansToSourceLocator(spans, fallbackFile);
-  return (offset) => {
-    const { file, fileOffset } = locate(offset);
-    return { file, line: fileOffset === null ? undefined : resolveLine(file, fileOffset) };
-  };
-}
-
-/**
- * The `resolveLine` used when the caller injects none — every unit test, and
- * any future in-memory caller. It can answer for exactly the files whose raw
- * text this module was handed, which it recognizes structurally: a text whose
- * spans are the single whole-text span of its own file IS that file's raw
- * source (`fileOffset` is then the offset in the text in hand), so `lineOf`
- * on it is exact. That covers every page and layout with no includes of its
- * own — precisely the case where a caller has no spans to pass in the first
- * place.
- *
- * For anything else (a fragment's text, which this module never sees; a page
- * or layout that WAS include-inlined, whose offsets no longer index the text
- * in hand) it returns undefined rather than guessing. The real pipeline
- * always injects a resolver, so this degradation never reaches a `unify
- * build`.
- * @param {{file: string|undefined, text: string, spans: {start:number,end:number,file:string,fileOffset:number}[]}[]} candidates
- * @returns {(file: string, fileOffset: number) => number|undefined}
- */
-function defaultResolveLine(candidates) {
-  const rawSources = new Map();
-  for (const { file, text, spans } of candidates) {
-    if (file !== undefined && isVerbatimSourceText(text, spans, file)) rawSources.set(file, text);
-  }
-  return (file, fileOffset) => {
-    const text = rawSources.get(file);
-    return text === undefined ? undefined : lineOf(text, fileOffset);
-  };
-}
-
-/** True when `spans` say `text` is `file`'s own raw source, byte for byte, unspliced. */
-function isVerbatimSourceText(text, spans, file) {
-  if (text.length === 0) return spans.length === 0;
-  const [only] = spans;
-  return spans.length === 1 && only.file === file
-    && only.start === 0 && only.end === text.length && only.fileOffset === 0;
-}
+// the two halves, via `spansToDiagnosticLocator` (urls.js — shared with
+// layout.js's §6 diagnostics and head-merge.js's §8 advisory, so all three
+// stages locate a fault identically); `verbatimLineResolver` is the
+// no-injection fallback for unit tests, and returns undefined rather than
+// guessing whenever the text in hand is not the named file's raw source.
 
 /**
  * `html.js`'s `spanWithAttrRemoved` (an element's raw span with one
@@ -413,7 +350,7 @@ function escapeAttr(s) {
  * @param {(file: string, fileOffset: number) => number|undefined} [args.resolveLine] -
  *   turns a provenance position into a 1-based line in that file, for §14.1
  *   diagnostic locations (see the DIAGNOSTIC LOCATION note above and
- *   `defaultResolveLine` for the omitted case). Injected because this module
+ *   `verbatimLineResolver` for the omitted case). Injected because this module
  *   never reads the filesystem.
  * @param {import('./diagnostics.js').Reporter} args.reporter
  * @returns {{text: string, spans: {start:number,end:number,file:string,fileOffset:number}[]}}
@@ -421,7 +358,7 @@ function escapeAttr(s) {
 export function compose({ pageText, pageFile, pageSpans, layoutText, layoutFile, layoutSpans, resolveLine, reporter }) {
   const pSpans = pageSpans ?? wholeTextSpan(pageText, pageFile);
   const lSpans = layoutText ? (layoutSpans ?? wholeTextSpan(layoutText, layoutFile)) : [];
-  const resolve = resolveLine ?? defaultResolveLine([
+  const resolve = resolveLine ?? verbatimLineResolver([
     { file: pageFile, text: pageText, spans: pSpans },
     { file: layoutFile, text: layoutText ?? "", spans: lSpans },
   ]);
@@ -435,7 +372,7 @@ export function compose({ pageText, pageFile, pageSpans, layoutText, layoutFile,
 
 function composeNoLayout({ pageText, pageFile, pageSpans, resolveLine, reporter }) {
   const { root } = parse(pageText);
-  const at = locatorFor(pageSpans, pageFile, resolveLine);
+  const at = spansToDiagnosticLocator(pageSpans, pageFile, resolveLine);
   const excluded = checkNestedSlots(root, at, reporter);
   const edits = collectStraySlotEdits(root, pageText, pageSpans, at, reporter, excluded, true);
 
@@ -457,13 +394,13 @@ function composeNoLayout({ pageText, pageFile, pageSpans, resolveLine, reporter 
 function composeWithLayout({ pageText, pageFile, pageSpans, layoutText, layoutFile, layoutSpans, resolveLine, reporter }) {
   // ---- Pass A: neutralize stray slots (§7.1 MRG-04/A04), both documents.
   const c0 = parse(pageText);
-  const cAt = locatorFor(pageSpans, pageFile, resolveLine);
+  const cAt = spansToDiagnosticLocator(pageSpans, pageFile, resolveLine);
   const cExcluded = checkNestedSlots(c0.root, cAt, reporter);
   const cEdits0 = collectStraySlotEdits(c0.root, pageText, pageSpans, cAt, reporter, cExcluded, true);
   const preparedC = spliceTrackingSpans(pageText, pageSpans, cEdits0, pageFile);
 
   const l0 = parse(layoutText);
-  const lAt = locatorFor(layoutSpans, layoutFile, resolveLine);
+  const lAt = spansToDiagnosticLocator(layoutSpans, layoutFile, resolveLine);
   const lHead0 = findFirst(l0.root, (n) => isElement(n, "head"));
   const lHeadExcluded = lHead0 ? checkNestedSlots(lHead0, lAt, reporter) : new Set();
   const lEdits0 = lHead0 ? collectStraySlotEdits(lHead0, layoutText, layoutSpans, lAt, reporter, lHeadExcluded) : [];
@@ -491,7 +428,7 @@ function composeWithLayout({ pageText, pageFile, pageSpans, layoutText, layoutFi
   // §7.1 sink detection, including P16 (checked once, fresh, on the stable body).
   // Offsets are now Pass-A text offsets, so the locator is rebuilt over the
   // PREPARED spans — the same bytes, still carrying their original provenance.
-  const lPreparedAt = locatorFor(preparedL.spans, layoutFile, resolveLine);
+  const lPreparedAt = spansToDiagnosticLocator(preparedL.spans, layoutFile, resolveLine);
   const lBodyExcluded = checkNestedSlots(lBody, lPreparedAt, reporter);
   const sinks = detectSinks(lBody, lBodyExcluded, lPreparedAt, layoutFile, reporter);
 
@@ -510,10 +447,16 @@ function composeWithLayout({ pageText, pageFile, pageSpans, layoutText, layoutFi
     }));
   }
 
-  // §8 head merge.
+  // §8 head merge. `cPreparedAt` is the page-side counterpart of `lPreparedAt`
+  // — head-merge.js's own A08 advisory locates through it, so a `<meta
+  // charset>` a fragment pushed down the page's head is still reported at its
+  // true line (§14.1). Built over preparedC rather than reusing `cAt`, whose
+  // offsets index the PRE-Pass-A text, and separately from composeSinkedBody's
+  // `pageAt`, whose offsets index the post-`<main>`-unwrap text.
+  const cPreparedAt = spansToDiagnosticLocator(preparedC.spans, pageFile, resolveLine);
   edits.push(...mergeHeadWithProvenance({
     layoutHead: lHead, layoutText: preparedL.text, layoutFile,
-    pageHead: cHead, pageText: preparedC.text, pageSpans: preparedC.spans, pageFile, reporter,
+    pageHead: cHead, pageText: preparedC.text, pageSpans: preparedC.spans, pageFile, pageAt: cPreparedAt, reporter,
   }));
 
   // §9/S11 root attributes, and defensive data-layout/slot stripping on the layout's own tags.
@@ -548,7 +491,7 @@ function composeSinkedBody({ preparedC, cBody, preparedL, sinks, pageFile, layou
     body = findFirst(parse(bodyText).root, (n) => isElement(n, "body"));
   }
   // Built AFTER the unwrap: A02/A03 below carry offsets into `bodyText`.
-  const pageAt = locatorFor(bodySpans, pageFile, resolveLine);
+  const pageAt = spansToDiagnosticLocator(bodySpans, pageFile, resolveLine);
 
   // §7.2 — classify top-level children into fills (by slot name) and default content.
   const topKids = elementChildren(body);
@@ -676,7 +619,7 @@ function composeSinkedBody({ preparedC, cBody, preparedL, sinks, pageFile, layou
  * first `<main>` — plus every duplicate (advisory A13, first occurrence wins)
  * and, when there is no default slot, every named slot nested inside
  * `firstMain` (§7.4 P19 — see `composeSinkedBody`).
- * `at` locates a layout-text offset at its true source (`locatorFor`);
+ * `at` locates a layout-text offset at its true source (`spansToDiagnosticLocator`);
  * `layoutFile` is still named in the A13 messages themselves, because "which
  * layout is this page composing against" is the fact the author needs there
  * and stays true even when the duplicate arrived from a fragment.
@@ -748,7 +691,7 @@ function detectSinks(lBody, excluded, at, layoutFile, reporter) {
  * checked once per region, at the point that region is stable. Reports each
  * violation once, located at the inner (nested) slot — in whichever file
  * actually wrote it, which for a fragment-contributed slot is the fragment
- * (`at`, from `locatorFor`) — and returns the set of both slots in the pair
+ * (`at`, from `spansToDiagnosticLocator`) — and returns the set of both slots in the pair
  * so callers can exclude them from further processing.
  */
 function checkNestedSlots(scopeRoot, at, reporter) {
@@ -812,14 +755,16 @@ function collectStraySlotEdits(scopeRoot, text, spans, at, reporter, excluded, i
 // ------------------------------------------------------------ §8 provenance
 
 /**
- * Calls the real `mergeHead` (head-merge.js, untouched) and reconciles
- * provenance onto its returned edits — see this file's header doc for why
- * this is possible without re-deriving head-merge.js's own dedup logic.
- * `pageSpans` must already be valid against `pageText` (i.e. `preparedC`,
- * post-Pass-A) — same text head-merge.js itself is called with.
+ * Calls the real `mergeHead` (head-merge.js) and reconciles provenance onto
+ * its returned edits — see this file's header doc for why this is possible
+ * without re-deriving head-merge.js's own dedup logic. `pageSpans` must
+ * already be valid against `pageText` (i.e. `preparedC`, post-Pass-A) — same
+ * text head-merge.js itself is called with — and `pageAt` must be the locator
+ * built over those same spans, which head-merge.js's one located diagnostic
+ * (A08) reports through.
  */
-function mergeHeadWithProvenance({ layoutHead, layoutText, layoutFile, pageHead, pageText, pageSpans, pageFile, reporter }) {
-  const rawEdits = mergeHead({ layoutHead, layoutText, layoutFile, pageHead, pageText, pageFile, reporter });
+function mergeHeadWithProvenance({ layoutHead, layoutText, layoutFile, pageHead, pageText, pageSpans, pageFile, pageAt, reporter }) {
+  const rawEdits = mergeHead({ layoutHead, layoutText, layoutFile, pageHead, pageText, pageFile, pageAt, reporter });
   if (!pageHead || rawEdits.length === 0) return rawEdits;
   const candidates = elementChildren(pageHead).map((el) => ({
     rawText: rawSpan(pageText, el),

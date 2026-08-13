@@ -493,7 +493,10 @@ async function buildPage(page, { sourceRoot, reporter, layoutCache, convertMarkd
     // §10.1: includes resolve AFTER conversion, on the converted body — same
     // machinery as an HTML page, applied to `md.html` instead of raw source.
     const inlinedBody = await includes.inlineIncludes({
-      text: md.html, file: page.absPath, sourceRoot, reporter, convertMarkdown,
+      // DIA-13: `md.html` is converted output, so its newline count numbers a
+      // document the author never wrote — includes.js omits the line rather
+      // than guessing one (the file is still exact).
+      text: md.html, file: page.absPath, sourceRoot, reporter, convertMarkdown, linesAreSource: false,
     });
     trackIncludedFiles(inlinedBody.spans, pageFile, consumedAsIncludeOrLayout);
     const assembled = { ...md, html: inlinedBody.text, htmlSpans: inlinedBody.spans };
@@ -503,7 +506,7 @@ async function buildPage(page, { sourceRoot, reporter, layoutCache, convertMarkd
       return { ...compose.compose({ pageText, pageFile, pageSpans, layoutText: null, resolveLine, reporter }), layoutFile: null };
     }
 
-    const loaded = await loadLayout(resolution.path, { sourceRoot, reporter, convertMarkdown, layoutCache, consumedAsIncludeOrLayout });
+    const loaded = await loadLayout(resolution.path, { sourceRoot, reporter, convertMarkdown, layoutCache, consumedAsIncludeOrLayout, resolveLine });
     if (loaded.broken) return null; // P15 already reported once for the layout itself
     const { text: pageText, spans: pageSpans } = compose.assembleMarkdownDocument(assembled, { standalone: false, pageFile });
     return {
@@ -521,14 +524,20 @@ async function buildPage(page, { sourceRoot, reporter, layoutCache, convertMarkd
   const inlined = await includes.inlineIncludes({ text: raw, file: page.absPath, sourceRoot, reporter, convertMarkdown });
   trackIncludedFiles(inlined.spans, pageFile, consumedAsIncludeOrLayout);
   const { root } = html.parse(inlined.text);
-  const resolution = layout.resolveHtmlLayout({ root, text: inlined.text, pageAbsPath: page.absPath, sourceRoot, reporter });
+  // Same `spans`/`resolveLine` pair `compose()` gets below: §6's diagnostics
+  // (P07 on a misplaced data-layout, P04/P05 on a bad path) are measured in
+  // the include-inlined text too, so they need the same translation back to a
+  // real source line as §7's — layout.js's own DIAGNOSTIC LOCATION note.
+  const resolution = layout.resolveHtmlLayout({
+    root, text: inlined.text, spans: inlined.spans, resolveLine, pageAbsPath: page.absPath, sourceRoot, reporter,
+  });
   if (resolution.problem) return null;
 
   if (resolution.none) {
     return { ...compose.compose({ pageText: inlined.text, pageFile, pageSpans: inlined.spans, layoutText: null, resolveLine, reporter }), layoutFile: null };
   }
 
-  const loaded = await loadLayout(resolution.path, { sourceRoot, reporter, convertMarkdown, layoutCache, consumedAsIncludeOrLayout });
+  const loaded = await loadLayout(resolution.path, { sourceRoot, reporter, convertMarkdown, layoutCache, consumedAsIncludeOrLayout, resolveLine });
   if (loaded.broken) return null;
   return {
     ...compose.compose({
@@ -550,7 +559,7 @@ async function buildPage(page, { sourceRoot, reporter, layoutCache, convertMarkd
  * A10 "used as a layout" fact is likewise recorded exactly once here rather
  * than once per referencing page.
  */
-function loadLayout(absPath, { sourceRoot, reporter, convertMarkdown, layoutCache, consumedAsIncludeOrLayout }) {
+function loadLayout(absPath, { sourceRoot, reporter, convertMarkdown, layoutCache, consumedAsIncludeOrLayout, resolveLine }) {
   if (layoutCache.has(absPath)) return layoutCache.get(absPath);
   const promise = (async () => {
     const file = toRelative(sourceRoot, absPath);
@@ -564,7 +573,9 @@ function loadLayout(absPath, { sourceRoot, reporter, convertMarkdown, layoutCach
     const inlined = await includes.inlineIncludes({ text: raw, file: absPath, sourceRoot, reporter, convertMarkdown });
     trackIncludedFiles(inlined.spans, file, consumedAsIncludeOrLayout);
     const { root } = html.parse(inlined.text);
-    const { broken } = layout.checkLayoutDocument({ root, text: inlined.text, file, reporter });
+    const { broken } = layout.checkLayoutDocument({
+      root, text: inlined.text, spans: inlined.spans, resolveLine, file, reporter,
+    });
     return { text: inlined.text, spans: inlined.spans, file, broken };
   })();
   layoutCache.set(absPath, promise);

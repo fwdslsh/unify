@@ -105,13 +105,22 @@ export async function inlineIncludes({
   convertMarkdown,
   stack = [file],
   origin = null,
+  linesAreSource = true,
 }) {
   const relFile = toRelative(sourceRoot, file);
   /** @type {{index:number,length:number,text:string,spans:{start:number,end:number,file:string,fileOffset:number}[]}[]} */
   const edits = [];
 
   for (const { match, spec, form, index, content } of findIncludes(text)) {
-    const at = { file: toRelative(sourceRoot, file), line: lineOf(text, index) };
+    // §14.1/DIA-13: a line that cannot be mapped to the named file is
+    // omitted, not guessed. For a `.md` host `text` is markdown.js's
+    // CONVERTED HTML (§10.1 converts before inlining), so counting newlines
+    // in it numbers a document the author never wrote — an <include> on line
+    // 11 of an 11-line post.md was reported at line 4, a blank line. The file
+    // is right either way; only the line is unknowable, so it is left out.
+    const at = linesAreSource
+      ? { file: relFile, line: lineOf(text, index) }
+      : { file: relFile };
     // §14.1/DIA-11: cycle and depth problems locate at the OUTERMOST include
     // site — the one the author wrote — not at the recursion frame that
     // happened to notice. `origin` is null at the top level, where `at` is
@@ -189,6 +198,9 @@ export async function inlineIncludes({
       convertMarkdown,
       stack: [...stack, target.path],
       origin: chainAt,
+      // Same DIA-13 reason one level down: a `.md` include target was
+      // converted above, so the child frame is walking converted HTML too.
+      linesAreSource: extname(target.path).toLowerCase() !== ".md",
     });
     edits.push({ index, length: match.length, text: child.text, spans: child.spans });
   }
