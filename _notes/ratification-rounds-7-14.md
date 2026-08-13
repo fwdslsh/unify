@@ -1,4 +1,4 @@
-# Ratification rounds 7–13 — the build becomes the judge, and the diagnostics get tested
+# Ratification rounds 7–14 — the build becomes the judge, and the diagnostics get tested
 
 **Date:** 2026-08-12. Continues `_notes/ratification-round-1.md` and the results table in
 `docs/ratification-protocol.md`.
@@ -454,3 +454,45 @@ Same brief, byte-identical, against the amended doc + the live advisory: measure
 the doc's full-URL literal or the advisory (via `--dry-run --strict`, which rules.md tells
 every author to run) carries samples to working metadata — and which of the two does the
 carrying.
+
+---
+
+## Round 14 — measuring round 13's repairs
+
+Round 13's brief and prompt, byte-identical, against the amended doc and an A15-bearing
+binary. Fitted, and stated as such.
+
+**6 of 6 WORKS** (round 13: 0 of 5 Haiku): every sample — all five Haiku and the control —
+published with `--base-url https://saltmarsh.github.io/outreach/`, the full form, and every
+`og:image` in every built entry is an absolute URL a crawler can fetch.
+
+**The attribution is unusually clean: no sample ever saw the advisory.** Zero occurrences
+of A15's text in any agent transcript — they all reached the full form from the doc alone,
+on the first build. So round 14 measures the doc's new literal (the one literal shown is
+the one copied, in the correct direction this time), and A15 remains what it was designed
+as: the layer that catches the author who uses the path form anyway, as twelve of twelve
+samples did across rounds 11–12. Its fire-behavior is pinned by the landmine, the
+kitchen-sink pretty-base profile, and unit tests — but **no agent has ever repaired a site
+from its message**, which is the same untested-as-documentation state every diagnostic was
+in before round 8. A future broken-site round should plant a path-form base over og: metas.
+
+Judge note, recorded twice now: three samples authored at the sandbox root, and re-running
+their command with `-o` redirected turns their existing `dist/` into source material —
+false failures. Judged in place with their command verbatim, all three are clean. The
+judge must respect the sample's own output path.
+
+One observation, not a finding: root-authoring samples split on the harness files — two
+underscored them (`_rules.md`, `_BRIEF-r13.md`, even `_unify`) exactly as the doc teaches
+for non-site files; one shipped brief, rules, and the 100 MB binary into its published
+site. "Everything in the source root ships" working as documented, on files a real
+author's directory wouldn't contain. Sandbox artifact; watch whether a realistic brief
+ever reproduces it.
+
+### Updated fix-status for the round-13 repairs
+
+| Fix | Evidence | Tested by a round it was not written for? |
+|---|---|---|
+| Doc shows the full-URL `--base-url` literal | 5/5 dead metadata in r13 | No — fitted (r14, 6/6, zero advisory sightings) |
+| A15 advisory | same | Fire-behavior pinned by tests; never yet read by an agent in anger |
+| `--help` says `<url>` / both forms | 2 r11 samples cited `--help` | Untested — no r14 sample mentioned `--help` |
+| REF-02 collector widened | found by reading, not by a sample | Unit tests only; no round has ever broken an og: target under a full base |
