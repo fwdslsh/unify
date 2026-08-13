@@ -1,4 +1,4 @@
-# Ratification rounds 7–14 — the build becomes the judge, and the diagnostics get tested
+# Ratification rounds 7–15 — the build becomes the judge, and the diagnostics get tested
 
 **Date:** 2026-08-12. Continues `_notes/ratification-round-1.md` and the results table in
 `docs/ratification-protocol.md`.
@@ -496,3 +496,49 @@ ever reproduces it.
 | A15 advisory | same | Fire-behavior pinned by tests; never yet read by an agent in anger |
 | `--help` says `<url>` / both forms | 2 r11 samples cited `--help` | Untested — no r14 sample mentioned `--help` |
 | REF-02 collector widened | found by reading, not by a sample | Unit tests only; no round has ever broken an og: target under a full base |
+
+---
+
+## Round 15 — one `--base-url` form, and the address in the report
+
+Round 13's brief byte-identical, against the collapsed flag (a bare `--base-url` is now a
+usage error) and the `--dry-run` report that names the deploy address. Fitted.
+
+**6 of 6 WORKS.** Every sample published with the full URL and every `og:image` in the
+built output is absolute. Two headline numbers beyond that:
+
+- **18 of 18 frontmatter values are root-relative** (`og:image: /images/card-tide.png`) —
+  zero hardcoded FQDNs, where round 14 still had one sample baking the domain into its
+  content. The design is now doing the work it was built to do: authors write portable
+  paths, the build supplies the address. A hardcoded FQDN survives a domain move as a dead
+  link and is skipped by the reference check as external, so this is the outcome worth
+  having.
+- **Nobody hit the usage error.** Zero samples passed a bare path. The rejection is a
+  backstop that this round never needed, because the doc's literal is now the full form —
+  the same pattern as A15, and the reason removing the weak form beat warning about it.
+
+### The report change is still unexercised
+
+`serving from …` appears in the `--dry-run` report, and **five of six samples never ran
+`--dry-run` at all** — they went straight to `unify build`. Only the Sonnet ran it, per the
+rules doc's own instruction, and its report says so.
+
+So change 2 is verified by fixtures and unverified by agents. Two honest readings, and the
+evidence does not yet separate them:
+
+1. The address line is in the right place and this brief simply did not need it (nothing
+   was wrong to catch).
+2. The address line is in the *wrong* place — the failure it exists for (round 11's
+   sample, which shipped a site whose every link 404'd) happens in a plain `unify build`,
+   and a plain `unify build` still says nothing about the address it assumed.
+
+Reading 2 has a real argument behind it: `--dry-run` is where you look when you suspect a
+problem, and this is a class of problem nobody suspects. The counter-argument is that the
+build summary is deliberately terse and §17 is the report's home. **Do not resolve this by
+preference** — the discriminating experiment is a brief that deploys to a subpath and
+never mentions it in a way the author can act on, run once with the line in `--dry-run`
+only and once with it in every build. That is a real round, not a code change.
+
+Recorded as the open question. Meanwhile the rules doc tells every author to run
+`unify build --dry-run --strict`, and five of six ignored it — which is its own finding
+about how much weight that instruction can carry.
