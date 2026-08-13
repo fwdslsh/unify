@@ -107,26 +107,56 @@ export function resolveProvenanceUrl(url, provenanceFile) {
 }
 
 /**
+ * The whole of what a span list answers: given an offset in a composed
+ * (include-inlined, layout-merged) text, WHICH source file authored that byte
+ * and WHERE it sits in that file's OWN raw text —
+ * `fileOffset + (offset - start)`, exactly as includes.js's span contract
+ * defines it. `fileOffset` is `null` when no span covers the query (spans
+ * need not cover the whole document; only offsets a caller actually queries),
+ * in which case `file` is `fallbackFile` and the caller knows the position is
+ * a guess it must not turn into a line number.
+ *
+ * This is the single implementation of that arithmetic in the codebase: the
+ * §11.1 rewriter's `provenanceOf` (below), compose.js's §14.1 diagnostic
+ * locations, and build.js's reference locator are three consumers of one
+ * mapping, and three hand-rolled span scans were how a diagnostic came to
+ * name one file while measuring its line in another (the round-18 defect:
+ * a nine-line layout reporting a fault at line 13, the fragment above it
+ * having shifted every offset below).
+ * @param {{start:number, end:number, file:string, fileOffset:number}[]} spans
+ * @param {string} fallbackFile
+ * @returns {(offset:number) => {file: string, fileOffset: number|null}}
+ */
+export function spansToSourceLocator(spans, fallbackFile) {
+  const sorted = [...spans].sort((a, b) => a.start - b.start);
+  return (offset) => {
+    // Linear scan is fine here: documents are small (product-spec's own
+    // non-goals rule out perf gates) and this runs once per URL occurrence
+    // and once per diagnostic, never per byte.
+    for (const span of sorted) {
+      if (offset >= span.start && offset < span.end) {
+        return { file: span.file, fileOffset: span.fileOffset + (offset - span.start) };
+      }
+    }
+    return { file: fallbackFile, fileOffset: null };
+  };
+}
+
+/**
  * Build a `provenanceOf` lookup (see the module-level PROVENANCE note) from
  * a sorted, non-overlapping list of spans (`includes.js`/`compose.js`'s
- * `{start, end, file, fileOffset}` shape — only `start`/`end`/`file` matter
- * here) that together cover every offset of interest in a composed
- * document. Spans do not need to cover the *whole* document — only offsets a
- * caller actually queries — but any gap queried falls back to `fallbackFile`.
- * @param {{start:number, end:number, file:string}[]} spans
+ * `{start, end, file, fileOffset}` shape) that together cover every offset of
+ * interest in a composed document. §11.1 needs only the file half of
+ * `spansToSourceLocator`'s answer — a URL is resolved against its provenance
+ * file's directory, and no line number is involved — so this is that function
+ * with the position discarded. Any gap queried falls back to `fallbackFile`.
+ * @param {{start:number, end:number, file:string, fileOffset:number}[]} spans
  * @param {string} fallbackFile
  * @returns {(offset:number) => string}
  */
 export function spansToLocator(spans, fallbackFile) {
-  const sorted = [...spans].sort((a, b) => a.start - b.start);
-  return (offset) => {
-    // Linear scan is fine here: documents are small (product-spec's own
-    // non-goals rule out perf gates) and this runs once per URL occurrence.
-    for (const span of sorted) {
-      if (offset >= span.start && offset < span.end) return span.file;
-    }
-    return fallbackFile;
-  };
+  const locate = spansToSourceLocator(spans, fallbackFile);
+  return (offset) => locate(offset).file;
 }
 
 // ---------------------------------------------------------- §11.1 rewriting

@@ -26,7 +26,7 @@ import { fileURLToPath } from "node:url";
 import {
   applyBaseUrl, applyPrettyLinks, isSkippedUrl, pageWillMove, parseBaseUrl,
   prettyLinkTarget, prettyOutputPath, resolveProvenanceUrl, rewriteProvenanceUrls,
-  rewriteSrcsetValue, rewriteUrls, spansToLocator, splitUrl,
+  rewriteSrcsetValue, rewriteUrls, spansToLocator, spansToSourceLocator, splitUrl,
 } from "../../../src/core/urls.js";
 import { inlineIncludes } from "../../../src/core/includes.js";
 import { assembleMarkdownDocument, compose } from "../../../src/core/compose.js";
@@ -166,6 +166,32 @@ describe("spansToLocator", () => {
     expect(locate(20)).toBe("b.html");
     expect(locate(5)).toBe("fallback.html");
     expect(locate(35)).toBe("fallback.html");
+  });
+});
+
+describe("spansToSourceLocator", () => {
+  test("recovers the position in the SOURCE file, not the offset in the inlined text", () => {
+    // The shape a fragment inlined into a host produces: host bytes, then the
+    // fragment's own bytes at host offset 10, then the host again — whose
+    // fileOffset has moved on by the fragment's length, which is precisely
+    // the shift a diagnostic must not inherit.
+    const locate = spansToSourceLocator(
+      [
+        { start: 0, end: 10, file: "index.html", fileOffset: 0 },
+        { start: 10, end: 40, file: "_includes/nav.html", fileOffset: 0 },
+        { start: 40, end: 60, file: "index.html", fileOffset: 25 },
+      ],
+      "index.html",
+    );
+    expect(locate(3)).toEqual({ file: "index.html", fileOffset: 3 });
+    expect(locate(10)).toEqual({ file: "_includes/nav.html", fileOffset: 0 });
+    expect(locate(37)).toEqual({ file: "_includes/nav.html", fileOffset: 27 });
+    expect(locate(45)).toEqual({ file: "index.html", fileOffset: 30 });
+  });
+
+  test("an uncovered offset yields the fallback file and a null position — never a guessed one", () => {
+    const locate = spansToSourceLocator([{ start: 10, end: 20, file: "a.html", fileOffset: 5 }], "fallback.html");
+    expect(locate(70)).toEqual({ file: "fallback.html", fileOffset: null });
   });
 });
 

@@ -504,6 +504,31 @@
    "diagnosticsExhaustive": true,
    "expectedTree": "expected"
   },
+  "line-after-include": {
+   "rules": [
+    "MRG-02",
+    "A13",
+    "INC-12",
+    "DIA-06",
+    "S04"
+   ],
+   "flags": [],
+   "exit": 0,
+   "published": true,
+   "diagnostics": [
+    {
+     "file": "src/_layout.html",
+     "line": 7,
+     "severity": "advisory",
+     "containsAll": [
+      "slot"
+     ]
+    }
+   ],
+   "diagnosticsExhaustive": true,
+   "expectedTree": "expected",
+   "note": "The line half of §14.1's FILE:LINE contract, measured in the file the diagnostic NAMES. The duplicate bare <slot> is on line 7 of a 9-line _layout.html; the five-line masthead fragment inlined above it (line 5) used to push the reported line to 12 — past the end of the file the author was told to open (ratification round 18; the pre-fix engine prints src/_layout.html:12 on this exact tree). Nothing here is about includes as a feature: the fragment exists only to make the two possible answers differ."
+  },
   "dup-main": {
    "rules": [
     "MRG-05",
@@ -547,6 +572,30 @@
    ],
    "diagnosticsExhaustive": true,
    "note": "A04 became P20 on 2026-08-13 (ratification round 7): a <slot> outside a layout's <body> is inert, and letting it publish shipped pages whose author's intent had silently not happened. The S4 children-replacement still runs — best-effort composition (§2) — it just never reaches publish."
+  },
+  "slot-inside-include": {
+   "rules": [
+    "MRG-04",
+    "P20",
+    "INC-12",
+    "DIA-06",
+    "S04"
+   ],
+   "flags": [],
+   "exit": 1,
+   "published": false,
+   "diagnostics": [
+    {
+     "file": "src/_includes/aside.html",
+     "line": 2,
+     "severity": "problem",
+     "containsAll": [
+      "slot"
+     ]
+    }
+   ],
+   "diagnosticsExhaustive": true,
+   "note": "The file half of the same contract: the <slot> INC-12 lets a fragment contribute is the fragment's own text, so P20 locates in the fragment (aside.html:2), not in the host page that included it (the pre-fix engine printed src/index.html:7 here — an existing line of index.html holding an unrelated </body>, which is the worst kind of wrong: checkable-looking). Same convention §12 already uses for a reference written in a fragment (stranded-underscore-asset, cascade-and-dedup) — one authored fault, one location the author can open, reported once however many pages include it. §14.1 does not yet spell this out for compose-stage diagnostics; see the report accompanying this fixture for the sentence proposed for it."
   },
   "slot-in-layout-head": {
    "rules": [
