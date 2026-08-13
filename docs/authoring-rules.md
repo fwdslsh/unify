@@ -32,7 +32,7 @@ an error — on a layout too, because layouts don't chain (a section layout is a
 - **Named slots.** The layout writes `<slot name="footer">fallback…</slot>`; the page fills it with `slot=`
   on a real element — `<footer slot="footer">…</footer>`, never a `<slot>` tag, which in a page fills nothing
   — and that element replaces the slot, tag and all, shipping exactly as written. Omit the fill and the
-  fallback ships; `slot=` counts only on direct children of `<body>`. `grep -o '<slot[^>]*>' src/_layout.html` lists a layout's slots.
+  fallback ships; `slot=` counts on direct children of `<body>` — or of your `<main>`, unwrapped first — and silently does nothing deeper. `grep -o '<slot[^>]*>' src/_layout.html` lists a layout's slots.
 - **Everything else** replaces the layout's bare `<slot></slot>` if it has one — `<main><slot></slot></main>`
   is the usual shape — otherwise the children of its `<main>`. A `<main>` you wrote is dropped and its children used, so write complete semantic
   documents. A bare `<header>`/`<footer>` does **not** replace the layout's — only `slot=` fills.

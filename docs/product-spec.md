@@ -75,9 +75,7 @@ Scaffolding into `src/` is what makes zero-config safe: the source root holds on
   </head>
   <body>
     <include src="/_includes/nav.html"></include>
-    <main>
-      <p>Page content appears here.</p>
-    </main>
+    <main><slot></slot></main>
     <footer class="site-footer">
       <!-- footer: the site byline, or whatever a page puts here instead -->
       <slot name="footer"><p>© My Site</p></slot>

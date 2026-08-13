@@ -33,11 +33,9 @@ export function layoutHtml(siteName) {
   </head>
   <body>
     <include src="/_includes/nav.html"></include>
-    <main>
-      <p>Page content appears here.</p>
-    </main>
+    <main><slot></slot></main>
     <footer class="site-footer">
-      <!-- Site-wide footer; pages may replace it with slot="footer" -->
+      <!-- footer: the site byline, or whatever a page puts here instead -->
       <slot name="footer"><p>© ${siteName}</p></slot>
     </footer>
   </body>
