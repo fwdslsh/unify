@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>— Fernhollow Seed Library</title>
+  <meta name="og:type" content="website">
+  <meta name="og:site_name" content="Fernhollow Seed Library">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      line-height: 1.6;
+      color: #2d5016;
+      background: #f9faf7;
+    }
+
+    header {
+      background: #fff;
+      border-bottom: 2px solid #d4e4c1;
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 2rem;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      text-decoration: none;
+      color: #2d5016;
+      font-weight: bold;
+      font-size: 1.1rem;
+    }
+
+    .logo svg {
+      flex-shrink: 0;
+    }
+
+    nav {
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+    }
+
+    nav a {
+      text-decoration: none;
+      color: #2d5016;
+      font-size: 0.95rem;
+    }
+
+    nav a:hover {
+      border-bottom: 2px solid #d4e4c1;
+    }
+
+    main {
+      max-width: 800px;
+      margin: 2rem auto;
+      padding: 0 2rem;
+    }
+
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+      color: #1a3a0a;
+    }
+
+    h2 {
+      font-size: 1.5rem;
+      margin-top: 1.5rem;
+      margin-bottom: 0.75rem;
+      color: #1a3a0a;
+    }
+
+    h3 {
+      font-size: 1.2rem;
+      margin-top: 1.25rem;
+      margin-bottom: 0.5rem;
+      color: #1a3a0a;
+    }
+
+    p {
+      margin-bottom: 1rem;
+    }
+
+    a {
+      color: #2d5016;
+      text-decoration: underline;
+    }
+
+    a:hover {
+      color: #1a3a0a;
+    }
+
+    ul, ol {
+      margin-left: 2rem;
+      margin-bottom: 1rem;
+    }
+
+    li {
+      margin-bottom: 0.5rem;
+    }
+
+    .membership-terms {
+      background: #f0f5eb;
+      padding: 1.5rem;
+      border-radius: 4px;
+      margin: 1.5rem 0;
+    }
+
+    footer {
+      background: #d4e4c1;
+      border-top: 2px solid #c8d9b3;
+      padding: 2rem;
+      margin-top: 3rem;
+      text-align: center;
+    }
+
+    .membership-footer {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .membership-footer p {
+      margin-bottom: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <include src="/_includes/header.html"></include>
+
+  <main>
+    <slot></slot>
+  </main>
+
+  <footer>
+    <div class="membership-footer">
+      <p><strong>Questions about membership?</strong></p>
+      <p>Email: membership@fernhollow.example</p>
+      <p>Visit us: Saturdays 10am–2pm during the growing season</p>
+    </div>
+  </footer>
+</body>
+</html>

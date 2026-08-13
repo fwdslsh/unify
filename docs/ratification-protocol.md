@@ -32,7 +32,19 @@ printf '%s' "$PROMPT" | claude -p --model haiku \
   --permission-mode acceptEdits --allowedTools Read Write Edit Glob Grep
 ```
 
-Verify it rather than trusting it: a run configured this way answers **"NO"** when asked whether it has any project context describing the tool. Do that check once per protocol change.
+Verify it rather than trusting it — and verify the right thing. Asking the agent whether
+it has project context is necessary and **not sufficient**: `cwd` is not isolation,
+because `Read` and `Bash` both take absolute paths. A round-19 probe answered **"NO"** to
+that question and, in the same file, listed three copies of `conformance-spec.md` and six
+harness copies it had just found on disk. Rounds 16–18 ran with the full specification
+readable, and their samples would have answered NO too.
+
+Run each sample in a private mount namespace instead (`/tmp/ratify/harness/isolate.sh`):
+bind the sample directory to `/sandbox`, bind a fresh writable `/tmp` over the real one —
+masking every other copy at once, since enumerating leak paths by hand was wrong twice —
+and mask the repo and the session transcripts. The check is then empirical: the sample
+answers NO **and** a whole-filesystem search for the tool's documentation returns nothing.
+Do both once per protocol change.
 
 Copy the task, the rules, and the report format **into** each sandbox so no path outside cwd is ever referenced. Regenerate the rules file from the doc each round, so every sample is provably given byte-identical input:
 
@@ -253,6 +265,7 @@ Stated plainly, because a method with no known limitations has not been examined
 | 16 | 4 Haiku, 1 Sonnet | the first round to start from `unify init` — do the scaffolded templates teach? | **5/5 clean, the first round with zero diagnostics anywhere.** The scaffold erases the doc's two worst failures without anyone re-reading a rule: 5/5 correct `slot=` fills (was 1/5). It also taught one thing wrong — 4/4 kept a placeholder in the position of structure and 3/4 copied it into new code. Scaffold defect, not a doc defect. |
 | 17 | 16 Haiku, two arms | where `serving from …` belongs: `--dry-run` only, or every build | **Null result — the arms are indistinguishable**, and the one sample that shipped a broken site had already read the line and reasoned correctly from it before running a different command. Line stays put. |
 | 18 | 6 Haiku, two arms (+6 accidental blind) | the diagnostics re-tested on a fault set chosen outside round 8 | **6/6 clean, zero content lost** — round 8's destructive repair is closed. One wrong repair, caused by a `fix:` line shipping a hardcoded path that is a real but wrong answer in any site with a section layout. The accidental control is the finding: **0/6 reached a clean build without the CLI**, and every one reported confidently. |
+| 19 | 5 Haiku, 1 Sonnet | an advanced site: pages generated from a JSON export, client-side filtering, a subpath deploy — and the first round under true filesystem isolation | **6/6 exit 0, zero content lost.** 6/6 wrote a generator and got the chrome-less embed right. 2/6 shipped `.html` addresses at exit 0, one having "verified" that unify would serve them. 5/6 rendered private data from an excluded file onto public pages — file-level exclusion protects files, not fields. The client-side seam went untouched: a brief defect, since 0/6 wrote an endpoint. |
 
 Round 6 is the clearest single result: with the rule keyed off the key's name, **six of six** wrote the flat spelling — including the control. The nested-only rule would have failed every sample on that brief.
 

@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>— Fernhollow Seed Library</title>
+    <link rel="icon" href="/assets/leaf.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/styles.css">
+    <link rel="stylesheet" href="/seasonal-notes/notes.css">
+    <meta property="og:site_name" content="Fernhollow Seed Library">
+  </head>
+  <body class="seasonal-notes">
+    <include src="/_includes/header.html"></include>
+    <main><slot></slot></main>
+    <footer class="site-footer">
+      <slot name="footer"><include src="/_includes/footer.html"></include></slot>
+    </footer>
+  </body>
+</html>

@@ -864,3 +864,72 @@ nothing and still ships its attribute. No diagnostic was added for it: the catal
 three free slots and this is a case where the evidence does not yet say whether authors
 write that markup at all. The experiment that would settle it is a brief compelling a fill
 from inside a styled wrapper — not a guess.
+
+---
+
+# Round 19 — an advanced site: generated pages, client-side filtering, a subpath deploy
+
+6 samples (5 Haiku, 1 Sonnet control), 45-minute cap, first round run under true
+filesystem isolation. Brief: a seed library with a catalogue generated from a JSON export,
+client-side family/name filtering, a redesigned section sharing chrome, a chrome-less
+embed for another organisation's CMS, and a subdirectory deploy.
+
+**Result: 6/6 exit 0 on their own publish commands, 40-43 markers preserved each, zero
+content lost.** The tool composed an advanced site every time. 6/6 wrote a generator under
+`src/_scripts/` producing 28-29 pages from the export; 6/6 got `data-layout="none"` right
+for the embed; 6/6 used a section `_layout.html`. The build-step seam works, unprompted.
+
+Four findings.
+
+**1. `--pretty-urls` omitted, and confidently "verified" (2/6).** haiku-4 and haiku-5
+published 172 and 177 `.html` links against a brief requiring extensionless addresses,
+both at exit 0. haiku-4's report: "Verified using `--pretty-urls` is NOT needed; the site
+uses `.html` in all links but unify will serve these correctly." unify serves nothing —
+it is a build tool. This is round 11's shape exactly (a sample invented hosting behaviour
+to cover a flag it had not used), but the flag here IS named in the doc, so it is not the
+round-11 defect recurring. Authoring error, watched not amended.
+
+**2. File-level exclusion does not protect data (5/6).** The export carries
+`seed_keeper` and `keeper_contact` per variety. 0/6 published `varieties.json` itself —
+the exclusion rules worked — but 3/6 rendered keepers' private email addresses onto public
+variety pages (81, 54, 54 occurrences) and 5/6 published keeper names. Only the control
+published neither. No diagnostic is possible: once a generator copies a field into a page,
+that page is ordinary content. Not a doc defect — the 60 lines describe file-level
+exclusion accurately and claim nothing about data — but it is the sharpest thing the round
+found about the *shape* of the tool, and it is now the "what these examples do not show"
+section of `examples/README.md`.
+
+**3. The client-side data seam went unexercised — a brief defect.** 0/6 used `fetch`,
+`hx-get`, or any endpoint; every sample rendered the catalogue at build time and filtered
+the DOM. That is the correct pattern for a static site, so the brief compelled good work —
+but it means the seam this round was designed to probe was never touched. Two defects
+found by hand during brief design remain untested by any sample:
+  - a `.html` file with no `<html>` element beside a `_layout.html` fails with
+    `internal error building this page: null is not an object (evaluating 'node.children')`
+    — no line, no `fix:`, no P-code, and the transactional gate blocks the whole publish.
+    This is the shape of every htmx partial endpoint.
+  - `hx-get="/x.json"` and `fetch("/x.json")` are neither rewritten by `--base-url` nor
+    reference-checked, while `src="/app.js"` beside them is rewritten. Silent 404s on a
+    subpath deploy at exit 0.
+A brief that compels a partial endpoint would reach both. Named, not guessed.
+
+**4. Named slots still under-reached (3/6 used none).** The footer-exception requirement
+was satisfied by a second layout as often as by a slot. Both are legal, so this is not a
+violation, but the historically weakest rule remains the least exercised.
+
+## The protocol defect this round closed
+
+`cwd` was never isolation. Asked the protocol's own project-context question, a probe agent
+answered **NO** and then listed three copies of `conformance-spec.md` and six harness
+copies it had just found — `Read` and `Bash` both take absolute paths. Rounds 16-18 ran
+from `/tmp/r16`../tmp/r18` with the full specification readable, and their samples would
+have answered NO too. Samples now run in a private mount namespace: own directory at
+`/sandbox`, fresh writable `/tmp` (masking every other copy at once — enumerating leak
+paths was wrong twice), repo and session transcripts masked. Re-probed: NO, and NONE on a
+whole-filesystem search. `/tmp/ratify/harness/isolate.sh`.
+
+**Judging traps hit again, both self-inflicted:** a regex that truncated a sample's own
+publish command turned a clean sample into an exit-2 failure, and a domain-level grep for
+leaked addresses matched a public contact address the samples had invented, briefly showing
+a 5/6 leak that was 0/6 for that string. Judge with the sample's exact command; grep for
+the exact private value, not its domain.
