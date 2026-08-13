@@ -27,8 +27,8 @@ improvise around it.
 
 ## Where things stand
 
-Fifteen rounds are logged in the protocol's results table; rounds 7–15 are written up in
-`_notes/ratification-rounds-7-15.md`, with two pre-registrations beside it. The engine is
+Seventeen rounds are logged in the protocol's results table; rounds 7–17 are written up in
+`_notes/ratification-rounds-7-17.md`, with two pre-registrations beside it. The engine is
 complete and all five gates are green (unit, conformance+e2e, suite hygiene, static
 traceability, and the runtime release signal).
 
@@ -61,16 +61,21 @@ Since then the loop has produced, and shipped:
 
 ## What to do next
 
-1. **Start a round from `unify init`.** Fifteen rounds and not one has begun from the
-   scaffold — every sample authored into an empty directory. That is not how the product is
-   used; `unify init && unify dev` is the golden path the product spec leads with. A round
-   that scaffolds first and then asks for changes tests whether the *templates* teach,
-   which is untested ground.
+1. **Keep testing the scaffold.** Round 16 was the first round to start from `unify init`,
+   and it found that the templates teach better than the prose does — 5/5 on the two
+   constructs the 60 lines have historically failed at — while also teaching one thing
+   wrong, which four of four inherited. The scaffold is now a documentation surface under
+   test like any other, and the constructs it does NOT demonstrate (a section layout, an
+   explicit `data-layout=`, a bare `<slot></slot>`, `<include>` outside a layout, a `title:`
+   key) are exactly where samples diverged. Extend it, or test the gaps.
 2. **Settle where `serving from …` belongs.** `--dry-run` now names the address the build
    assumed, because a site built for a subpath with no `--base-url` passes every check and
-   404s once deployed (round 11). But five of six round-15 samples never ran `--dry-run` at
-   all, so the line is fixture-verified and agent-unverified. One brief, run twice — line in
-   `--dry-run` only, then line in every build — settles it. Do not settle it by preference.
+   404s once deployed (round 11). Round 17 ran the A/B — the line in `--dry-run` only, versus
+   also printed by a real build — and returned a **null result on placement**: 16 of 16
+   samples published correctly, and the one sample that did ship a broken site had already
+   read the line, quoted it, drawn the right conclusion, and then run a different command
+   anyway. Leave the line where it is. What is still open is whether that failure deserves
+   something with teeth (a diagnostic) rather than a summary line — see round 17's notes.
 3. **Re-test the diagnostics.** No agent has read them since round 10, and several messages
    have changed. Same method as round 8, current problem set.
 4. **The human half is still untested.** Every round has measured models. A person who

@@ -1,4 +1,4 @@
-# Ratification rounds 7–15 — the build becomes the judge, and the diagnostics get tested
+# Ratification rounds 7–17 — the build becomes the judge, and the diagnostics get tested
 
 **Date:** 2026-08-12. Continues `_notes/ratification-round-1.md` and the results table in
 `docs/ratification-protocol.md`.
@@ -519,9 +519,15 @@ built output is absolute. Two headline numbers beyond that:
 
 ### The report change is still unexercised
 
-`serving from …` appears in the `--dry-run` report, and **five of six samples never ran
-`--dry-run` at all** — they went straight to `unify build`. Only the Sonnet ran it, per the
-rules doc's own instruction, and its report says so.
+`serving from …` appears in the `--dry-run` report, and **only one of six samples ever saw
+it in its warning form**. (Corrected 2026-08-13 — this section first said five of six never
+ran `--dry-run` at all. That was wrong, and wrong in an instructive way: I grepped each
+sample's `.agent-stdout.txt`, which is the agent's final *report text*, not its tool calls.
+The session transcripts show **six of six ran `unify build --dry-run --strict`**, exactly as
+the rules doc instructs. What is actually rare is seeing the warning form: five of six passed
+`--base-url` to their very first `--dry-run`, so the line they saw read `serving from
+https://…`. The line is under-exercised because the doc now gets authors to the flag before
+their first build — not because anyone skips the step.)
 
 So change 2 is verified by fixtures and unverified by agents. Two honest readings, and the
 evidence does not yet separate them:
@@ -539,6 +545,142 @@ preference** — the discriminating experiment is a brief that deploys to a subp
 never mentions it in a way the author can act on, run once with the line in `--dry-run`
 only and once with it in every build. That is a real round, not a code change.
 
-Recorded as the open question. Meanwhile the rules doc tells every author to run
-`unify build --dry-run --strict`, and five of six ignored it — which is its own finding
-about how much weight that instruction can carry.
+Recorded as the open question, and settled in round 17 below.
+
+**Method note, from getting this wrong.** Judge what a sample *did* from its transcript, not
+from its report. Round 16 hit the same thing independently — a sample's report claimed it had
+used `data-layout=` on pages that actually carry the Markdown `layout:` spelling, and another
+declared the site free of a placeholder string its own files still contained. The self-report
+is the best evidence available about what a sample found *ambiguous*; it is not evidence about
+what a sample ran or wrote. Those are in the transcript and the files.
+
+---
+
+## Round 16 — the scaffold as teacher (the first round to start from `unify init`)
+
+**Samples:** 4 Haiku + 1 Sonnet, each running `./unify init` first and then modifying what
+it got. Fifteen rounds had all begun from an empty directory; `unify init && unify dev` is
+the golden path the product spec leads with, so this was the largest untested surface left.
+
+**5 of 5 built clean — the first round in the log with zero diagnostics anywhere.**
+
+### The scaffold teaches, and it erases the doc's worst historical failures
+
+Every construct the template demonstrates was reproduced correctly by every sample:
+
+| Construct | Round 16 | Best prior |
+|---|---|---|
+| `<include>` for shared chrome, in both layouts | **5/5** | 10/11 (rounds 7+9) |
+| Named-slot fill, zero `<slot>` tags in any page | **5/5** | 1/5 (round 7) |
+| `data-layout="none"` | 5/5 | 5/5 |
+| Title separator in the layout | 5/5 | 6/6 |
+| Standalone section layout, zero P15 | 5/5 | — |
+
+The named-slot row is the striking one. Round 7 had three of five paste the layout-side
+`<slot name="footer">` into a page — the failure severe enough that A04 became problem P20.
+It did not happen once here, and no sample reported re-reading the rule. Sonnet said why:
+*"kept the `slot="footer"` pattern verbatim … this is exactly the mechanism the brief's
+contact-page requirement needed, so I reused the shape."* **Working code teaches a shape
+that prose has to argue for.**
+
+A structural bonus: because `init` scaffolds into `src/`, the harness files sat outside the
+source root, so round 14's artifact — a sample publishing `rules.md` and the binary into its
+own site — was impossible by construction.
+
+### Finding — a placeholder in the position of structure (scaffold defect)
+
+The template's sink was `<main><p>Page content appears here.</p></main>`. The brief forbade
+that exact string. **Four of four Haiku left it in place; three of four copied it verbatim
+into the brand-new section layout they wrote**; two then reported the site clean of it.
+
+It did not ship only because every page happened to supply content. Verified against the
+live binary: a page whose only top-level element is a `slot=` fill publishes that paragraph
+verbatim, exit 0, no diagnostic. §7.4 is doing the right thing — the template chose
+placeholder prose to be `<main>`'s children.
+
+The tell is the control's replacement: `<main><slot></slot></main>` — *the rules doc's own
+literal*, the shape those 60 lines call "the usual", **and a shape the scaffold did not
+contain.** The one construct the doc names as usual was absent from the working example the
+golden path hands every new author.
+
+Triage: not doc (the doc says the right thing), not spec, not implementation — **scaffold**,
+`src/templates/shared.js`. Four samples, one identical outcome, three propagating it: the
+protocol's step-2 signal pointed at a template instead of at prose. Fixed, with the three
+golden-path documents that show what `init` produces updated to match.
+
+### Finding — the doc's `slot=` placement rule was wrong in both directions (documentation)
+
+One sample quoted it as *the* unclear sentence; another relied on the half that is too
+strict. Both halves verified against the engine:
+
+| Page markup | Doc said | Engine does |
+|---|---|---|
+| `<main>…<p slot="footer">` | does not fill | **fills** (§7.2 unwraps `<main>` first) |
+| `<div>…<p slot="footer">` | does not fill | does not fill — **and ships `slot="footer"` into the published HTML**, exit 0 |
+
+Too strict for `<main>` — the wrapper the scaffold teaches everyone to write — and
+unenforced for every other wrapper. Spec and engine agree; the doc misdescribed both. Fixed.
+
+### Open, not acted on — the silent mis-nested fill
+
+A `slot=` one wrapper too deep is the only unreported near-miss in the catalogue: the fill
+does not fill, nothing is said, and unify's own attribute leaks into output that is
+supposed to contain no tool vocabulary. That is the same argument that promoted A04 to P20,
+but it is a further spec change on an open release PR, so it is recorded for the owner. The
+advisory catalogue has two free slots if an advisory is preferred to a problem.
+
+### Also recorded
+
+- The layout's footer comment was instructional to the site author (*"pages may replace it
+  with `slot=`…"*) and shipped into seven of one sample's ten published pages. It now names
+  the region, which is all §19 asks. 1/5 — outlier, zero-cost fix.
+- The scaffold demonstrates each primitive exactly once, and **the constructs it omits are
+  exactly where samples diverged**: a second `_layout.html` in a subdirectory, an explicit
+  `data-layout=`, a bare `<slot></slot>`, `<include>` outside a layout, a `title:` key. Four
+  samples produced two legal shapes for the section layout. Valid-but-different, not a
+  failure — but it maps the gap precisely.
+- Frontmatter `date` with no visible date: 2/4 Haiku shipped notes with no date a reader can
+  see, having reasoned correctly that `date:` becomes a `<meta>`. The control hit the same
+  wall and inferred its way out: *"Rules never says how to display a value from frontmatter
+  in the page body — because you can't; there's no templating."* Documentation-by-omission;
+  no amendment proposed, because the doc is capped and the missing thing is a worked example.
+  Watch for recurrence on any brief wanting a value both visible and machine-readable.
+
+---
+
+## Round 17 — where does `serving from …` belong? (A/B, null result)
+
+**Design:** one brief, 8 Haiku per arm, both binaries compiled from one `git archive HEAD`
+base so they differ only in where the address line is printed. Arm A (shipped): the line
+appears under `--dry-run` only. Arm B: a real `unify build` prints it too. The brief states
+a GitHub Pages subpath address plainly and names no flag.
+
+**Result: the arms are indistinguishable.** 16/16 recorded the full-URL `--base-url` in
+their publish command; 16/16 ran `--dry-run`. Published output was 8/8 correct in arm A and
+**7/8 in arm B** — the difference runs the wrong way.
+
+Only **two of sixteen** samples ever ran a real build without `--base-url` — the sole case
+where the binaries differ at all:
+
+- *Arm A* (no line printed): got a silent exit 0, and two commands later rebuilt with
+  `--base-url`. Recovered unprompted.
+- *Arm B* (line printed): the build printed `serving from / — the domain root (no
+  --base-url)`, exited 0, and the agent **stopped there and declared done** — shipping 41
+  root-relative links, every one a 404 at the deploy address. Its own report records the
+  correct publish command and quotes the warning line, reasoning correctly from it.
+
+**Reading (2) is not supported.** The one time the target failure occurred with the line
+printed in a real build, the line did not prevent it — the sample had already read it, drawn
+the right conclusion, and then run a different command. The gap is between knowing the flag
+and typing it, and a terse summary at exit 0 does not close that gap. **The line stays where
+it is.**
+
+Honest limits: the decisive comparison is n=1 per arm, because the control failure rate is
+now effectively zero — 22 consecutive samples have got `--base-url` right since the doc
+named it (rounds 12, 14, 15, 17). The round rules out a *large* protective effect from
+moving the line; it cannot rule out a small one.
+
+**What it points at instead:** the one real failure was silent at exit 0 in *both* arms. If
+round 11's failure is to be genuinely caught rather than mentioned, the evidence points at
+something with teeth — a diagnostic that a subpath-shaped situation can raise — not at where
+a summary line prints. Recorded, not recommended.
