@@ -261,6 +261,8 @@ src/_layout.html:14: problem: class "unify-footer" is the v0.6 area vocabulary
 
 For each page: C is the page document (after includes and Markdown conversion), L its selected layout (§6.1).
 
+**The merge requires a `<body>` element on both sides.** C or L without one — a fragment, a bare `<main>`, a head-only shell with no body tag, an empty file — is a **problem (P21)** attributed to the file that lacks it, and the page is not built: the merge is undefined, and both previous behaviors were worse (a body-less L silently published its own text *as* the page, dropping C entirely at exit 0 — a §7.6 violation; a body-less C crashed with an unlocated internal error). One rule, two vantage-specific messages: C's names the complete-document shape to wrap the content in; L's names the one-keystroke repair, because a layout with an *empty* `<body></body>` is the legitimate head-only pattern (§7.5) — the fault is only the element's absence. A resolved layout file that is empty is this problem, not a silent no-layout: `.md` conversion always synthesizes a body (§10.7), so P21's page side is reachable only from `.html` sources, and a page with no layout does not merge and is outside this rule.
+
 ### 7.1 Sink detection
 
 L's **sinks** are the `<slot>` elements in L's `<body>` (skipping any inside `<template>`), plus L's first `<main>`. If L's body has no slot and no `<main>`, L is **sink-less** (§7.5).
@@ -771,7 +773,7 @@ No layout wanted.
 
 ### 11.1 Provenance rewriting
 
-Applies to every URL in `href`, `src`, `srcset` (each URL in the comma-separated list, descriptors untouched), and `poster`, in the composed page — after includes and layouts, before §11.2/§11.3. Skipped entirely: URLs with a scheme or `//` prefix, `mailto:`/`tel:`/`data:`/`javascript:`, fragment-only (`#x`), and empty values. Never reached: `url()` inside `<style>` blocks or `style` attributes — a `url()` written in a layout or fragment must be root-relative or live in a stylesheet file (mirror copy keeps stylesheet-internal references working untouched).
+Applies to every URL in `href`, `src`, `srcset` (each URL in the comma-separated list, descriptors untouched), and `poster`, in the composed page — after includes and layouts, before §11.2/§11.3. Skipped entirely: URLs with a scheme or `//` prefix, `mailto:`/`tel:`/`data:`/`javascript:`, fragment-only (`#x`), and empty values. Never reached: `url()` inside `<style>` blocks or `style` attributes — those values ship as written (§12 still checks them against the output tree). The consequence under §11.3 is stated here because the old advice in this sentence was itself the trap: a root-relative `url()` never receives the base's path prefix, so it resolves in the output tree (and passes §12) while 404ing at any subdirectory deploy address. A `url()` therefore belongs in a stylesheet file, written **relative to that file** — mirror copy keeps stylesheet-internal references working at every deploy address — and the same is true of any URL inside JavaScript, which no build step reads.
 
 Per URL `u` in an element whose provenance (§1) is file `A`:
 
@@ -874,6 +876,7 @@ The bold IDs are the stable identifiers used by `tests/conformance/rules.tsv` an
 17. **P18** — Frontmatter is not valid YAML (§10.2). Distinct from P17, which is about a value's *shape*: P18 is a parse failure, and its fix is different — repair the syntax, rather than flatten a structure
 18. **P19** — A named `<slot>` inside the layout's default-content sink `<main>`, with no bare `<slot>` (§7.4). Located at the named slot
 19. **P20** — A `<slot>` outside a layout's `<body>` — anywhere in a page, or in a layout's `<head>` (§7.1). Inert in both cases; the message names the spelling that belongs in that file (`slot=` on a real element for a page, the layout's `<body>` for a head slot). Was advisory A04 until 2026-08-13
+20. **P21** — A page or layout with no `<body>` element where a merge requires one (§7). Attributed to the file that lacks it, file-level (there is no line to point at); the fix line is spelled for that file's kind — the complete-document shape for a page, `<body></body>` (the §7.5 head-only pattern) for a layout
 
 ### 14.3 Advisories (the closed catalogue — capped at twelve; at the cap, adding one means removing one)
 

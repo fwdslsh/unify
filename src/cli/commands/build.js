@@ -134,7 +134,11 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
       // (a genuine crash is not itself a closed-catalogue diagnostic); every
       // *known* failure mode above already reports its own problem/advisory
       // and returns null instead of throwing.
-      reporter.problem({ file: page.relPath, message: `internal error building this page: ${err.message}` });
+      reporter.problem({
+        file: page.relPath,
+        message: `internal error building this page: ${err.message}`,
+        fixes: ["this is a bug in unify, not in your site — re-run with DEBUG=1 for the stack trace, and please report it"],
+      });
     }
   }
 

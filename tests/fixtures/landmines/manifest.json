@@ -1675,6 +1675,68 @@
    "diagnosticsExhaustive": true,
    "expectedTree": "expected",
    "note": "slot= is collected from the direct children of <body> and of the page's first <main>, wherever that <main> sits — the wrapper <div> does not break the fill, and the consumed attribute never ships. One wrapper deeper is still the author's own markup: untouched, unreported, attribute intact. Before this, the author watched their <main> tags vanish from the output while the fill silently did nothing and slot= shipped at exit 0."
+  },
+  "page-no-body": {
+   "rules": [
+    "MRG-20",
+    "P21"
+   ],
+   "flags": [],
+   "exit": 1,
+   "published": false,
+   "diagnostics": [
+    {
+     "file": "src/index.html",
+     "severity": "problem",
+     "containsAll": [
+      "no <body>",
+      "complete HTML document"
+     ]
+    }
+   ],
+   "diagnosticsExhaustive": true,
+   "note": "A page with no <body> — a bare fragment, exactly the shape of an htmx partial endpoint — under a layout. Until 2026-08-13 this crashed with an unlocated internal error (null is not an object) that blocked the whole publish; found while designing round 19. Now P21, file-level (there is no line to point at), fix naming the complete-document shape."
+  },
+  "layout-no-body": {
+   "rules": [
+    "MRG-20",
+    "P21"
+   ],
+   "flags": [],
+   "exit": 1,
+   "published": false,
+   "diagnostics": [
+    {
+     "file": "src/_layout.html",
+     "severity": "problem",
+     "containsAll": [
+      "no <body>",
+      "head-only"
+     ]
+    }
+   ],
+   "diagnosticsExhaustive": true,
+   "note": "A layout with no <body> element. Until 2026-08-13 this published the layout's own text AS the page — the author's entire body silently dropped at exit 0, a direct §7.6 content-loss violation (the round-19 shape matrix caught it). Now P21 at the layout, whose fix names the one-keystroke repair: an empty <body></body> is the legitimate §7.5 head-only pattern."
+  },
+  "layout-empty-file": {
+   "rules": [
+    "MRG-20",
+    "P21"
+   ],
+   "flags": [],
+   "exit": 1,
+   "published": false,
+   "diagnostics": [
+    {
+     "file": "src/_layout.html",
+     "severity": "problem",
+     "containsAll": [
+      "no <body>"
+     ]
+    }
+   ],
+   "diagnosticsExhaustive": true,
+   "note": "A resolved layout file that is empty. Until 2026-08-13 an accident of truthiness (`if (!layoutText)`) made a zero-byte _layout.html silently identical to having no layout at all; discovery had resolved it, so its missing <body> is P21 like any other, never a silent pass-through."
   }
  }
 }

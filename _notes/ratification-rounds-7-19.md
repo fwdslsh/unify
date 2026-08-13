@@ -933,3 +933,38 @@ publish command turned a clean sample into an exit-2 failure, and a domain-level
 leaked addresses matched a public contact address the samples had invented, briefly showing
 a 5/6 leak that was 0/6 for that string. Judge with the sample's exact command; grep for
 the exact private value, not its domain.
+
+## Post-round fixes (2026-08-13, same day)
+
+The two engine defects finding 3 recorded as "named, not guessed" are fixed, and the fix
+grew when a deterministic shape matrix (`_notes/shape-matrix.sh`, 10 page shapes × 5
+layout shapes against the real binary) mapped the whole family:
+
+- **P21** (new problem, §7/MRG-20): the merge requires a `<body>` on both sides. The
+  fragment-page crash — unlocated `internal error`, the shape of every htmx partial —
+  became a file-level problem at the page naming the complete-document shape. The matrix
+  found worse next to it: a **layout** with no `<body>` published its own text *as* the
+  page, silently dropping the author's entire body at exit 0 — a direct §7.6 violation
+  that had sat behind a "fail soft" comment. Now P21 at the layout, whose fix names the
+  one-keystroke repair (`<body></body>` is the legitimate §7.5 head-only pattern). A third
+  member fell out of a truthiness accident: `if (!layoutText)` routed a resolved-but-empty
+  `_layout.html` into the no-layout path, so a zero-byte layout was silently identical to
+  no layout at all — now P21 like its siblings. Three landmine fixtures pin one cell each;
+  all 50 matrix cells are now located-problem or correct composition, no green cell changed.
+- **The url() advice was inverted, in both documents.** §11.1 said a `url()` in inline
+  styles "must be root-relative" and the rules doc repeated it — root-relative is exactly
+  what misses the `--base-url` path prefix and 404s at any subdirectory deploy, while
+  passing §12 (the check runs against the output tree, where the file exists — the
+  round-13 class). Both now say the true thing: `url()` belongs in a stylesheet file,
+  written relative to that file, and script/`hx-get` addresses ship as written. The rules
+  doc names the pair in one breath (the round-11 corollary: naming one of a pair is worse
+  than naming neither).
+
+Open question, deliberately not taken tonight: should §11.1 rewrite `url()` in a page's
+own `<style>`/`style=`? Inline url() currently has no correct static spelling under
+`--pretty-urls` + `--base-url` together (relative breaks when the page moves, root-relative
+misses the prefix, a full URL hardcodes the domain). Rewriting is spec-coherent — inline
+styles are page content, not mirror-copied files, and §12 already parses the same values —
+but it is a §11 amendment with fixture obligations, and the doc's new "keep url() in a
+stylesheet file" advice removes the need for most sites. Decide with evidence: a brief that
+compels an inline background image would show whether authors actually write them.

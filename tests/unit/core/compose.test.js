@@ -549,3 +549,64 @@ describe("landmines: composition family", () => {
     expect(noLayout.text).not.toContain("unify-polyfill.js");
   });
 });
+
+describe("P21: the merge requires a <body> on both sides (§7/MRG-20)", () => {
+  const LAYOUT = '<!doctype html><html><head><title>— S</title></head><body><main><slot></slot></main></body></html>';
+  const PAGE = '<!doctype html><html><head><title>P</title></head><body><p>the author wrote this</p></body></html>';
+
+  test("a fragment page under a layout is P21 at the page, not a crash", () => {
+    const reporter = silentReporter();
+    const out = compose({
+      pageText: "<ul><li>an htmx-partial-shaped fragment</li></ul>", pageFile: "index.html",
+      layoutText: LAYOUT, layoutFile: "_layout.html", reporter,
+    });
+    expect(out).toBeNull();
+    const p = reporter.diagnostics.filter((d) => d.severity === "problem");
+    expect(p).toHaveLength(1);
+    expect(p[0].file).toBe("index.html");
+    expect(p[0].line).toBeUndefined(); // no line to point at — omitted, never guessed (§14.1)
+    expect(p[0].message).toContain("no <body>");
+    expect(p[0].fixes.join(" ")).toContain("<!doctype html>"); // the complete-document shape, spelled out
+  });
+
+  test("a body-less layout is P21 at the layout — never the layout's own text as the page", () => {
+    const reporter = silentReporter();
+    const out = compose({
+      pageText: PAGE, pageFile: "index.html",
+      layoutText: '<!doctype html><html><head><title>— S</title></head></html>', layoutFile: "_layout.html", reporter,
+    });
+    expect(out).toBeNull(); // the old behavior returned the layout text — the page's body silently dropped at exit 0
+    const p = reporter.diagnostics.filter((d) => d.severity === "problem");
+    expect(p).toHaveLength(1);
+    expect(p[0].file).toBe("_layout.html");
+    expect(p[0].fixes.join(" ")).toContain("head-only"); // the one-keystroke repair: an empty <body></body> (§7.5)
+  });
+
+  test("an empty resolved layout file is P21, not a silent no-layout", () => {
+    const reporter = silentReporter();
+    const out = compose({ pageText: PAGE, pageFile: "index.html", layoutText: "", layoutFile: "_layout.html", reporter });
+    expect(out).toBeNull(); // `!layoutText` used to route "" into the no-layout path by truthiness
+    const p = reporter.diagnostics.filter((d) => d.severity === "problem");
+    expect(p).toHaveLength(1);
+    expect(p[0].file).toBe("_layout.html");
+    expect(p[0].message).toContain("no <body>");
+  });
+
+  test("both sides body-less: two problems, one per file", () => {
+    const reporter = silentReporter();
+    const out = compose({
+      pageText: "<p>fragment</p>", pageFile: "index.html",
+      layoutText: "<html><head></head></html>", layoutFile: "_layout.html", reporter,
+    });
+    expect(out).toBeNull();
+    const files = reporter.diagnostics.filter((d) => d.severity === "problem").map((d) => d.file).sort();
+    expect(files).toEqual(["_layout.html", "index.html"]);
+  });
+
+  test("layoutText null still means no layout: a fragment with no layout passes through unchanged", () => {
+    const reporter = silentReporter();
+    const out = compose({ pageText: "<ul><li>x</li></ul>", pageFile: "index.html", layoutText: null, reporter });
+    expect(reporter.diagnostics).toEqual([]);
+    expect(out.text).toContain("<ul><li>x</li></ul>");
+  });
+});

@@ -357,12 +357,15 @@ function escapeAttr(s) {
  */
 export function compose({ pageText, pageFile, pageSpans, layoutText, layoutFile, layoutSpans, resolveLine, reporter }) {
   const pSpans = pageSpans ?? wholeTextSpan(pageText, pageFile);
-  const lSpans = layoutText ? (layoutSpans ?? wholeTextSpan(layoutText, layoutFile)) : [];
+  const lSpans = layoutText != null ? (layoutSpans ?? wholeTextSpan(layoutText, layoutFile)) : [];
   const resolve = resolveLine ?? verbatimLineResolver([
     { file: pageFile, text: pageText, spans: pSpans },
     { file: layoutFile, text: layoutText ?? "", spans: lSpans },
   ]);
-  if (!layoutText) return composeNoLayout({ pageText, pageFile, pageSpans: pSpans, resolveLine: resolve, reporter });
+  // `== null` and not falsy: an EMPTY layout file is a resolved layout whose
+  // missing <body> is P21's business below — `!layoutText` silently treated
+  // it as "no layout at all", an accident of truthiness, not a decision.
+  if (layoutText == null) return composeNoLayout({ pageText, pageFile, pageSpans: pSpans, resolveLine: resolve, reporter });
   return composeWithLayout({
     pageText, pageFile, pageSpans: pSpans, layoutText, layoutFile, layoutSpans: lSpans, resolveLine: resolve, reporter,
   });
@@ -416,11 +419,31 @@ function composeWithLayout({ pageText, pageFile, pageSpans, layoutText, layoutFi
   const cBody = findFirst(C.root, (n) => isElement(n, "body"));
   const cHead = findFirst(C.root, (n) => isElement(n, "head"));
 
-  if (!lBody) {
-    // A layout with no <body> at all is outside anything the spec describes
-    // (layouts are complete documents). Fail soft — one malformed layout
-    // must not crash best-effort analysis of the rest of the site.
-    return preparedL;
+  // §7.0/P21 — the merge needs a <body> on both sides, and a missing one is a
+  // located problem, never a soft fall-through. This branch used to `return
+  // preparedL` for a body-less layout, which published the layout's own text
+  // as the page — the author's entire body silently gone at exit 0, a direct
+  // §7.6 content-loss violation (caught by the round-19 shape matrix). The
+  // page side never had a guard at all: a fragment page crashed downstream on
+  // a null <body> with an unlocated "internal error". One rule covers the
+  // family; each message is spelled for the file it points at, and the layout
+  // fix names the one-keystroke repair (§7.5's empty-body pass-through).
+  if (!lBody || !cBody) {
+    if (!lBody) {
+      reporter.problem({
+        file: layoutFile,
+        message: "this layout has no <body> element, so no page can merge with it",
+        fixes: ["add one — a layout with an empty <body></body> is the head-only pattern (§7.5): each page's own content passes through it unchanged"],
+      });
+    }
+    if (!cBody) {
+      reporter.problem({
+        file: pageFile,
+        message: "this page has no <body> element, so there is nothing to merge into its layout",
+        fixes: ["a page is a complete HTML document — wrap the content: <!doctype html><html><head><title>…</title></head><body>…</body></html>"],
+      });
+    }
+    return null;
   }
 
   const edits = [];
