@@ -968,3 +968,61 @@ styles are page content, not mirror-copied files, and §12 already parses the sa
 but it is a §11 amendment with fixture obligations, and the doc's new "keep url() in a
 stylesheet file" advice removes the need for most sites. Decide with evidence: a brief that
 compels an inline background image would show whether authors actually write them.
+
+
+---
+
+# Round 20 — the client-side fetch seam, and the first fix measured by quotation
+
+6 samples (5 Haiku, 1 Sonnet control), 45-minute cap. Brief: the round-19 seed library at
+scale — 225 varieties across 12 families — with the client stating outright that opening
+the browse page must not pull down the whole catalogue, so a per-family fetch is the only
+honest answer. Round 19 never reached this seam because inlining 27 varieties was easier
+than fetching; at 225 it is not.
+
+**The brief changed on the way in, and that is itself a finding.** The plan was a brief
+compelling an htmx partial endpoint. Checking satisfiability first — the round-19 judges'
+lesson — showed there is no way to ship one: a bare fragment `.html` is P21; a wrapper
+`<div data-layout="none">` is P07 *and* P21; a `.md` with `layout: none` is synthesized
+into a complete document (§10.7); a non-`.html` extension mirror-copies but gets the wrong
+content-type from the host. **unify cannot emit a bare HTML fragment.** That brief would
+have measured a missing feature six times over. Recorded as a product gap, not run.
+
+**Result: 6/6 exit 0, zero diagnostics, no content lost** (markers 220-466 per sample).
+5/6 fetched per family; haiku-1 inlined a 96 KB page, the one brief violation.
+
+**The finding: 5 of 5 fetching samples produced URLs that resolve correctly at the deploy
+address, and four of them quote the rule that told them so.** The §11.1/rules-doc fix
+shipped hours earlier — that unify rewrites only HTML's own URL attributes, so a
+root-relative `fetch()` misses the `--base-url` prefix — appears verbatim in the reports:
+
+- haiku-3 quotes it and uses `../data/public-varieties.json`
+- haiku-5 quotes it and uses `../varieties-public.json`
+- haiku-4 paraphrases it exactly ("rewrites root-relative paths in HTML href/src, BUT NOT
+  in CSS url() or JavaScript fetch()") and uses `apiBase = '..'`
+- haiku-2 quotes it, then hardcodes `/library/` into the JavaScript
+
+This is the strongest attribution shape available: the sample quotes the sentence and acts
+correctly on it. It is still *fitted* — the fix was written for this exact failure and this
+is the round that measured it. It becomes *tested* when a later brief it was not written
+for comes back clean.
+
+**A doc improvement, from a self-report rather than a failure.** haiku-2's site is correct
+and exits 0, so by triage step 0 it is not a violation — but its report says the rules
+"don't explain how to handle fetch() URLs in scripts that need a base-URL prefix", and it
+picked the one strategy that breaks silently the day the site moves. The clause named the
+trap and gave the remedy only for `url()`. It now gives one for fetched addresses too:
+*relative to the page — or read it back from an `href` unify rewrote.* Still 60 lines.
+
+**The control's pattern is the round's best artifact.** sonnet-1 never writes the URL in
+JavaScript at all: each family is a real anchor, `<a href="/catalogue/data/allium.json"
+data-family="Allium">`, which unify rewrites like any other link; the script intercepts the
+click and fetches `link.href`, already absolute and already correct. The deploy address
+appears nowhere in the JS and the page still works with JS off. Kept as
+`examples/seed-library-ondemand`.
+
+**The privacy result reproduced, and one sample solved it.** Across rounds 19 and 20,
+twelve independent authors all excluded `varieties.json` correctly and eight still
+published its private fields. sonnet-1 is the exception in both rounds: its generator names
+the fields it emits rather than spreading the record. That is now the advice in
+`examples/README.md` — the generator is the only place privacy can be enforced.

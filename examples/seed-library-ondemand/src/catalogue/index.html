@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+<title>Browse the catalogue</title>
+<meta name="description" content="Pick a plant family to see this season's seed varieties at the Fernhollow Seed Library.">
+</head>
+<body class="catalogue-page">
+<h1>Browse the catalogue</h1>
+<p>Fernhollow keeps this page itself small on purpose — pick a family below and only
+that family's varieties are fetched, so the page stays light on a slow connection.</p>
+
+<nav class="family-picker" id="family-picker" aria-label="Plant families">
+<include src="./_family-nav.html"></include>
+</nav>
+
+<div id="catalogue-results" aria-live="polite">
+<p class="catalogue-hint">Choose a family above to see its varieties.</p>
+</div>
+
+<script src="/assets/catalogue.js"></script>
+</body>
+</html>

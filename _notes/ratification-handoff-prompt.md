@@ -28,7 +28,7 @@ improvise around it.
 ## Where things stand
 
 Eighteen rounds are logged in the protocol's results table; rounds 7–18 are written up in
-`_notes/ratification-rounds-7-19.md`, with two pre-registrations beside it. The engine is
+`_notes/ratification-rounds-7-20.md`, with two pre-registrations beside it. The engine is
 complete and all five gates are green (unit, conformance+e2e, suite hygiene, static
 traceability, and the runtime release signal).
 

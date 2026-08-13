@@ -249,7 +249,7 @@ publishes (hold pages back with a leading underscore instead). A key named `og:�
 
 ## Styles, scripts, finishing
 unify never scopes, rewrites, or injects CSS/JS, and rewrites only HTML's own URL attributes (`href`, `src`) — a `url()` in CSS and a `fetch()`/`hx-get` address ship as written, so a root-relative one misses the `--base-url` prefix and 404s:
-keep every `url()` in a stylesheet file, written relative to that file; scope fragment styles yourself (`@scope`, `@layer`, a class prefix).
+keep every `url()` in a stylesheet file and every fetched address relative to the page — or read it back from an `href` unify rewrote. Scope fragment styles yourself (`@scope`, `@layer`, a class prefix).
 `unify build --dry-run --strict` is the whole build and every check, writing nothing: every problem in one pass,
 and a list naming each page with the layout it resolved to. Then `unify build` — exit 0 means `dist/` is the complete
 site; non-zero means nothing was published and `dist/` is untouched, so never report success on a non-zero exit. `--exclude` **replaces** the `_*` default; keep `_*` in your list.
