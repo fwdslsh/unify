@@ -1175,3 +1175,52 @@ wanted "a local dev server" from a tool whose `--help` (which it never ran) name
 `unify dev` on line two — authoring miss, not a gap. The `.fragment.html` suffix was
 adopted unprompted by two samples for `_includes/` fragments — harmless where it is not
 needed, and evidence the new vocabulary reads.
+
+
+---
+
+# Round 23 — the fragment feature, ratified on first exposure
+
+6 samples (5 Haiku, 1 Sonnet control), the binary compiled from the freshly merged
+`release/0.7.0` head, rules regenerated from the merged doc. The brief (Holt Fen
+Windmill, `/tmp/ratify/harness/BRIEF-r23.md`) compels the day-old `.fragment.html`
+feature three ways without ever naming it: a district council whose loader "rejects any
+response that carries its own `<html>`, `<head>`, or `<body>`" fetching a fixed address
+that must never change; the same hours panel on the site's own Visit page, "one panel,
+maintained in one place"; and a month flip on the home page where each list "is only
+fetched when the visitor asks for it" — at a subdirectory deploy with `.html`-free
+addresses.
+
+**Result: 6/6 exit 0, zero diagnostics, and 6/6 shipped bare `.fragment.html` panels
+— three to four each, none containing a document wrapper.** The council requirement was
+met by every sample including all five Haiku, on a feature that shipped the day before.
+Every report quotes the doc's one clause (line 8: "a bare snippet shipped as written, for
+`<include>`, embeds, or `fetch`/`hx-get`") as the sentence that taught it; the control
+singled out "shipped **as written**" as the phrase that carried the decision. The
+transcripts contain **zero P21 encounters**: nobody needed the error-message route — the
+doc clause alone carried all six. The diagnostic's teaching half remains unratified
+(nothing has yet provoked it), which is the correct price for a clause that works.
+
+**Dual use held 6/6, single-source 4/6.** Four samples pointed `<include>` at the
+shipped fragment itself — one file serving the Visit page at build time and the council
+at runtime, exactly the design. haiku-1 and haiku-3 instead kept a hand-copied twin under
+`_includes/` and shipped a separate root copy (byte-identical / trailing-newline apart):
+the "one edit updates both" requirement soft-missed by duplication that no build check
+can see — the round-19 field-vs-file lesson in miniature. Watched, not amended: the
+include-the-shipped-file spelling is what four of six found unaided.
+
+**The round-20 fetch clause moved further from fitted to tested.** Five of six wrote
+month-flip fetch URLs relative to the page (or read them back from element data), all
+resolving at the deploy address; haiku-2 hardcoded `/mill/` into its fetch literals —
+round-20's hardcode shape recurring 1/6, correct at this address and dead the day the
+site moves. All markers preserved (36+ across the round); `drafts/` excluded 6/6.
+
+**Harness findings, both acted on.** The round-21 transcript mask bound a read-only
+empty dir; root ignores permission bits, so all six samples silently wrote their
+transcripts into the mask directory itself — shared between samples again, and worse,
+sitting inside the dir that masks the repo. `isolate.sh` now binds a per-sample
+writable `.transcripts/` dir instead (preserved evidence: `round23/.transcripts-shared.jsonl`).
+And haiku-1 over-generalized the underscore rule onto the harness's own files — renamed
+`.agent-stdout.txt` and moved `rules.md`, the brief, and its own `REPORT.md` into a
+`_docs/` folder, then could not run the binary it had displaced; its site still judges
+clean with the harness binary. An authoring outlier, recorded.
