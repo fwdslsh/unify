@@ -1277,3 +1277,31 @@ run on copies only. And the round itself had a false start: a mis-ordered `cd` t
 the harness `rules.md` to an empty fence after two samples were already seeded — caught
 by checking the seeded sandboxes, killed, re-seeded from scratch. A round that had run
 that way would have measured "Haiku with no documentation" and looked like a finding.
+
+
+---
+
+# Round 25 — the integration guidance, measured: counterfeits to zero
+
+Round 24's brief byte-unchanged (the rule for measuring a fix), with exactly one
+treatment: `docs/integrations.md` seeded beside `rules.md` — the compile-to-asset
+contract in four lines, the minimal verified Svelte recipe, the counterfeit hazard by
+name, and the mechanical markup test. Round 24 is the control arm.
+
+**Result: 6/6 real compiler pipelines (control: 4/6), 0 counterfeits (control: 2), and
+6/6 pass the structural mutation probe** — edit the component's markup, run the sample's
+own stated commands, find the change in `dist/`. All six adopted the doc's exact recipe
+shape (`esbuild-svelte`, a `build-components.mjs`, a mount entry, a 48 KB bundle):
+the record's most repeated finding — a rule that shows exactly one literal will have that
+literal copied — used deliberately, and it carried all five Haiku past the counterfeit
+temptation that took two of them in the control. 6/6 strict exit 0, all markers, the
+protocol's 4-of-5 bar cleared with room. Fitted, not yet tested: this round was run for
+the document it measures.
+
+**The judging cost more than the round.** The mutation probe produced three false
+"structural change did not propagate" verdicts before hand-tracing each one: build
+scripts living at `src/_scripts/` depth my find missed, builds run from the wrong cwd,
+and a bare-number value grep that matches minified noise. Each false negative was a real
+vite/esbuild pipeline judged broken by the experimenter — the same failure class as
+every false verdict in this record. The mutation probe belongs in `judge-round.mjs` as
+a mode, not in ad-hoc shell.
