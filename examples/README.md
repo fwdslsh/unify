@@ -1,11 +1,11 @@
 # Advanced examples
 
-Three complete sites, each built by an agent that had never seen unify before — it was given
+Four complete sites, each built by an agent that had never seen unify before — it was given
 `docs/authoring-rules.md`, a client brief, and the compiled CLI, in a sandbox with no other
 documentation. They are kept because they passed review, not because they were written to
 be examples: what they show is what the 60 lines actually lead someone to build.
 
-The first two are one brief solved two ways; the third is a later, larger brief. All build clean:
+The first two are one brief solved two ways; the third is a later, larger brief; the fourth integrates a Svelte component (its extra step: `npm install && npm run build:calculator`). All build clean:
 
 ```bash
 cd seed-library
@@ -76,6 +76,22 @@ organisation's CMS, so it carries `data-layout="none"` and ships as bare content
 **Deploying under a subdirectory.** Every link is written root-relative and the address is
 supplied once at build time. Nothing in the source hardcodes the domain, so the same tree
 publishes to a different host by changing one flag.
+
+**A Svelte component on one page, without adopting a framework for the site.**
+`forge-svelte` integrates a fee estimator maintained as a `.svelte` file by someone
+else. The shape: `npm i svelte esbuild esbuild-svelte`, a ~20-line `_scripts/` build
+that compiles and bundles the component to one plain JS file under `assets/`, and a
+`<script src="/assets/js/fee-calculator.js">` that unify rewrites like any other URL.
+unify needs to know nothing about Svelte: the bundle is an ordinary asset, mirror-copied;
+`node_modules/` at the source root never ships (it is on the never-shipped list); and
+the repeatable pipeline is two npm scripts plus `unify build`. The one hazard is not
+unify's: in the same experiment that produced this example, two of six authors quietly
+*re-implemented* the component in vanilla JS and labelled the copy "compiled from
+FeeCalculator.svelte" — one even imported the real compiler and never called it. A value
+tweak in the .svelte still propagated (their scripts regex-extracted the numbers); a
+structural change vanished silently. If a component must stay maintainable in its own
+language, test that: change its markup, run the build, and look for the change in the
+output.
 
 ## What these examples do not show
 

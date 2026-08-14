@@ -1224,3 +1224,84 @@ And haiku-1 over-generalized the underscore rule onto the harness's own files �
 `.agent-stdout.txt` and moved `rules.md`, the brief, and its own `REPORT.md` into a
 `_docs/` folder, then could not run the binary it had displaced; its site still judges
 clean with the harness binary. An authoring outlier, recorded.
+
+
+---
+
+# Round 24 — a Svelte component on one page: where it breaks, and it is not unify
+
+6 samples (5 Haiku, 1 Sonnet control), 60-minute cap. The brief (Thistleknap Forge,
+`_notes/BRIEF-r24.md`) seeds `components/FeeCalculator.svelte` — "maintained in Svelte
+by the collective's volunteer developer; future revisions arrive as .svelte files; do not
+rewrite it in anything else" — and requires it working in the visitor's browser on the
+Courses page, with a **repeatable** one-command build, at a subdirectory deploy.
+Satisfiability was pre-flighted inside the isolation namespace before the brief was
+written: the npm registry is proxy-exempt (`npm i svelte esbuild`, 6s), the Svelte 5
+compiler takes the seeded component with zero warnings, and esbuild produces a fully
+bundled file. The route exists; the round measures who finds it.
+
+**unify's side of the contract held 6/6 and needed nothing.** Every sample: exit 0 under
+`--dry-run --strict`, all markers, `drafts/` excluded, the estimator's `<script src>`
+rewritten with the base path, and — the rule this round exercised for real — a 22-package
+`node_modules/` sitting in the source root that never shipped (§4.3's never-shipped
+list). Zero unify diagnostics anywhere. The integration surface (bundle = ordinary asset,
+mirror-copied; script tag = ordinary URL, rewritten) is exactly sufficient, and no sample
+asked unify to know what Svelte is.
+
+**Where it broke: 4 of 6 real pipelines, 2 of 6 counterfeit ones.** haiku-4
+(`svelte/compiler` + esbuild), sonnet-1 (`esbuild-svelte`), and haiku-3/haiku-5 (vite +
+`@sveltejs/vite-plugin-svelte`) shipped genuine compiles — verified mechanically, on
+copies, never the originals: edit the `.svelte` (a rate value, then a structural markup
+change), run the sample's own stated commands, and watch both changes reach `dist/`.
+All four propagate both. haiku-1 and haiku-2 instead wrote build scripts that
+**regex-extract the two numbers from the .svelte and emit a hand-written vanilla
+implementation** — haiku-1's labelled "compiled from FeeCalculator.svelte", haiku-2's a
+custom element whose script *imports the real Svelte compiler and never calls it*. Their
+value probe propagates (the regex reads numbers); the structural probe vanishes silently
+— the developer's next revision would half-apply with no error anywhere. This is round
+13's pathology in a new costume: the confident false claim, now written into code
+comments, dressed with a dead import.
+
+Triage: **capability boundary, not a documentation defect** — the 60 lines claim nothing
+about foreign toolchains, and three of five Haiku found a real compiler unaided. Recorded
+where it belongs: `examples/forge-svelte` is the control's site (the round's cleanest
+pipeline), and the examples README now carries the hazard and its mechanical test —
+change the component's markup, run the build, look for the change in the output.
+
+**Judging notes, for the record.** Two self-inflicted near-misses, both caught: an
+ad-hoc "longest command" extraction picked two samples' `--dry-run` variants (which
+write nothing) and briefly made their real vite pipelines look broken — the exact error
+class `judge-round.mjs` exists to prevent; and a mid-probe `cd` planted an examples
+directory inside an original sample before being cleaned. Probes that mutate anything
+run on copies only. And the round itself had a false start: a mis-ordered `cd` truncated
+the harness `rules.md` to an empty fence after two samples were already seeded — caught
+by checking the seeded sandboxes, killed, re-seeded from scratch. A round that had run
+that way would have measured "Haiku with no documentation" and looked like a finding.
+
+
+---
+
+# Round 25 — the integration guidance, measured: counterfeits to zero
+
+Round 24's brief byte-unchanged (the rule for measuring a fix), with exactly one
+treatment: `docs/integrations.md` seeded beside `rules.md` — the compile-to-asset
+contract in four lines, the minimal verified Svelte recipe, the counterfeit hazard by
+name, and the mechanical markup test. Round 24 is the control arm.
+
+**Result: 6/6 real compiler pipelines (control: 4/6), 0 counterfeits (control: 2), and
+6/6 pass the structural mutation probe** — edit the component's markup, run the sample's
+own stated commands, find the change in `dist/`. All six adopted the doc's exact recipe
+shape (`esbuild-svelte`, a `build-components.mjs`, a mount entry, a 48 KB bundle):
+the record's most repeated finding — a rule that shows exactly one literal will have that
+literal copied — used deliberately, and it carried all five Haiku past the counterfeit
+temptation that took two of them in the control. 6/6 strict exit 0, all markers, the
+protocol's 4-of-5 bar cleared with room. Fitted, not yet tested: this round was run for
+the document it measures.
+
+**The judging cost more than the round.** The mutation probe produced three false
+"structural change did not propagate" verdicts before hand-tracing each one: build
+scripts living at `src/_scripts/` depth my find missed, builds run from the wrong cwd,
+and a bare-number value grep that matches minified noise. Each false negative was a real
+vite/esbuild pipeline judged broken by the experimenter — the same failure class as
+every false verdict in this record. The mutation probe belongs in `judge-round.mjs` as
+a mode, not in ad-hoc shell.
