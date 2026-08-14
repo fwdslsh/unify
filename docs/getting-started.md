@@ -166,10 +166,10 @@ Deploying under a subpath (GitHub Pages project sites)? Give `--base-url` the si
 A blog index, a feed, a gallery page — anything computed from a set of files — is a script you own, run before the build:
 
 ```bash
-node _scripts/gen-blog.mjs && unify build
+node _scripts/gen.mjs && unify build
 ```
 
-The script writes real pages into `src/`, where they get layouts, head merging, and reference checking like everything else (`unify init blog` ships a working ~40-line example). unify itself has no collections, no data files, and no template language — that's the point.
+The script writes real pages into `src/`, where they get layouts, head merging, and reference checking like everything else (`unify init blog` ships a working example, generator and data file included). One habit matters the day the script reads a data file: **name the fields you emit — never spread the whole record**. The underscore keeps `_data/` itself out of `dist/`, but no build check can catch a private field once your script copies it into a page. unify itself has no collections, no data files, and no template language — that's the point.
 
 ## Where to go next
 

@@ -25,6 +25,7 @@ EXC-08	§4.3	rule	fixture	Never-shipped list exactly: output dir inside root, .g
 EXC-09	§4.4	rule	fixture	Mirror copy: every emitted asset copied byte-for-byte to the same source-root-relative path
 EXC-10	§4.4	rule	targeted	Symlinks followed only while resolving inside the source root; outside → treated as absent with advisory A12
 EXC-11	§4.4	rule	targeted	Defaulted-source notice: when the source root defaulted to the working directory (no --source flag, no unify.yaml source key, no src/), the stdout summary reports the copied-file count and points at --dry-run; explicit --source (even .) or an existing src/ suppresses it; never a diagnostic, never affects exit
+EXC-12	§4.4	rule	fixture	Fragments: a name ending .fragment.html is not a page - mirror-copied byte-for-byte, never composed or rewritten, never moved by --pretty-urls, insides not reference-checked (runtime resolution base is the consuming page), still an ordinary include target; references to it are checked and rewritten normally; underscore still excludes it
 INC-01	§5.1	rule	fixture	SSI virtual="P" resolves against the source root; leading / permitted and equivalent
 INC-02	§5.1	rule	fixture	SSI file="P" must be relative and resolves against dirname of the including file
 INC-03	§5.1	rule	fixture	<include src="P">: leading / resolves from source root, else relative to the including file
@@ -67,6 +68,7 @@ MRG-16	§7.5	rule	fixture	Sink-less layout: whole <body> is the default slot; pa
 MRG-17	§7.6	rule	fixture	A <header>/<footer> that is not a fill is default content: it ships in place and is not reported (A03 retired)
 MRG-18	§7.6	rule	structural	The content-loss law: authored content is never dropped without failing the build; every rule places content or raises a problem (enforced across all fixtures via diagnosticsExhaustive + tree assertions)
 MRG-19	§7.1	rule	fixture	Slots do not nest: a <slot> inside another slot's fallback content is a problem P16 - fallback content is plain markup
+MRG-20	§7	rule	fixture	The merge requires a <body> on both sides: a missing one is P21 at the file that lacks it and the page is not built; an empty resolved layout file is this problem, never a silent no-layout; a body-less layout never publishes its own text as the page
 HED-01	§8 row 1	rule	fixture	Charset: page's dropped in favor of layout's which stays first; layout without one -> page's kept and moved first; identical silent; different -> advisory A08
 HED-02	§8 row 2	rule	fixture	Title joined per S10 in the layout title's position; empty/whitespace page title counts as absent; layout without <title> → page's title appends with its own text
 HED-03	§8 row 3	rule	fixture	Meta name/property keyed ASCII case-insensitively: replaces in place (S08); multiple page elements with one key all kept; dedup only crosses the layout/page boundary; no layout counterpart → appends (fixture M1); http-equiv not keyed → appends
@@ -153,6 +155,7 @@ P17	§14.2	diag	fixture	Problem: a frontmatter value with no text form - a mappi
 P18	§14.2	diag	fixture	Problem: frontmatter is not valid YAML - a parse failure, distinct from P17's shape rule
 P19	§14.2	diag	fixture	Problem: a named slot inside the layout's default-content sink main, with no bare slot - the two rules target overlapping spans
 P20	§14.2	diag	fixture	Problem: <slot> outside a layout's <body> (anywhere in a page, or in a layout's <head>); the fix names the spelling that belongs in that file. Was advisory A04
+P21	§14.2	diag	fixture	Problem: a page or layout with no <body> element where a merge requires one; attributed file-level to the file that lacks it, fix spelled for that file's kind
 A01	§14.3	diag	fixture	Advisory: void <include> used
 A02	§14.3	diag	fixture	Advisory: fill names a slot the layout doesn't have; content stayed in the page flow
 A08	§14.3	diag	fixture	Advisory: page charset differs from the layout's, layout's kept
@@ -182,8 +185,9 @@ CFG-02	§18	rule	targeted	CLI flags win over unify.yaml on conflict
 CFG-03	§18	rule	targeted	No behavior exists that only the file can express; the file itself is never emitted
 SCF-01	§19	rule	e2e	Every template scaffolds into src/ beside a dist-free root and exercises each primitive exactly once: one include (nav), automatic _layout.html, one named slot with fallback (footer) plus a page filling it, one data-layout=none page (404.html), and _includes/
 SCF-02	§19	rule	e2e	Scaffolded layout declares <meta charset="utf-8">; a plain HTML comment above each slot; starter stylesheet includes slot { display: contents }; built pages contain no <slot> elements
-SCF-03	§19	rule	e2e	The blog template ships _scripts/gen-blog.mjs (zero dependencies) writing blog.html and feed.xml into the source tree
+SCF-03	§19	rule	e2e	The blog template ships _scripts/gen.mjs (zero dependencies, opening comment naming the authoring rules' literal node _scripts/gen.mjs && unify build) reading posts/*.md and _data/authors.json and writing blog.html and feed.xml into the source tree, shipped pre-generated: rerunning the script reproduces the checked-in tree byte-for-byte
 SCF-04	§19	rule	e2e	unify init && unify build --dry-run --strict exits 0 (asserted per template)
+SCF-05	§19	rule	e2e	The blog generator teaches field privacy: _data/authors.json carries a private email beside public fields; gen.mjs names the fields it emits (never spreads the record), so the email appears in no generated file and nowhere in built output; both generated files carry the "generated by _scripts/gen.mjs — edit the data, not this file" marker
 FIX-01	§5.2	fixture	fixture	Worked example: nested include with relative resolution, exact
 FIX-02	§7.7 C1	fixture	fixture	Worked example C1: golden path, <main> default with unwrap, exact
 FIX-03	§7.7 C2	fixture	fixture	Worked example C2: named slot replaces the element, exact body

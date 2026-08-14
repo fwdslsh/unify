@@ -93,3 +93,6 @@ tts_output.wav
 
 # Conformance runtime ledger (rebuilt per test run; CI removes it before bun test)
 .conformance-ledger.jsonl
+
+# Claude Code agent worktrees (live working copies, never repo content)
+.claude/worktrees/

@@ -134,7 +134,11 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
       // (a genuine crash is not itself a closed-catalogue diagnostic); every
       // *known* failure mode above already reports its own problem/advisory
       // and returns null instead of throwing.
-      reporter.problem({ file: page.relPath, message: `internal error building this page: ${err.message}` });
+      reporter.problem({
+        file: page.relPath,
+        message: `internal error building this page: ${err.message}`,
+        fixes: ["this is a bug in unify, not in your site — re-run with DEBUG=1 for the stack trace, and please report it"],
+      });
     }
   }
 
@@ -649,7 +653,12 @@ function scanSourceTree(sourceRoot, output, excludePatterns, reporter) {
   return files;
 
   function pushFile(abs, rel) {
-    const isPage = extname(rel) === ".html" || extname(rel) === ".md";
+    // §4.4 — a name ending `.fragment.html` opts out of page-ness: it mirror
+    // copies byte-for-byte (never composed, never rewritten, never moved by
+    // --pretty-urls) so a bare HTML snippet can ship at a URL for <include>,
+    // embed, or fetch. Everything downstream keys off this one classification.
+    const ext = extname(rel);
+    const isPage = (ext === ".html" || ext === ".md") && !rel.endsWith(".fragment.html");
     files.push({ absPath: abs, relPath: rel, isPage, excluded: isExcluded(rel, excludePatterns) });
   }
 

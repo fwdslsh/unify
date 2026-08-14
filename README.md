@@ -200,8 +200,8 @@ unify composes plain HTML at build time. No template language, variables, loops,
 `<slot>`, `slot=` — plus `<include>` and `data-layout`. Derived files (a post index, a feed) come from a script you write and run yourself: `node _scripts/gen.mjs && unify build`.
 
 ## Files
-- Source root is `src/` if it exists, else the current directory. `.html`/`.md` are pages; every other file
-  copies byte-for-byte to the same path. A leading `/` means the source root, in any path you write. Always
+- Source root is `src/` if it exists, else the current directory. `.html`/`.md` are pages — except a name
+  ending `.fragment.html`, a bare snippet shipped as written, for `<include>`, embeds, or `fetch`/`hx-get` — and every other file copies byte-for-byte to the same path. A leading `/` means the source root, in any path you write. Always
   link the real filename — `/about.html`, never `/about/`; a directory link (`/guides/`) resolves only if you
   wrote a `guides/index.html`. `--pretty-urls` rewrites links; `--base-url https://you.example/handbook/` — the site's whole address, never a bare path — prefixes them and makes `og:`/`canonical` absolute for share crawlers.
 - **Everything in the source root ships.** Anything that is not part of the site — notes, drafts,
@@ -245,11 +245,11 @@ Frontmatter is YAML: quote any value containing a colon — `title: "Finish: the
 `layout`, `class` (on `<body>`), `lang`, `dir` are the only keys with meaning; every other becomes
 `<meta name=…>` with the value as written, so `date`/`tags`/`permalink`/`slug` do nothing and `draft: true`
 publishes (hold pages back with a leading underscore instead). A key named `og:…` emits `property=` instead
-(`og:image: /card.png`; two levels deep is an error). No `title:` → first `# Heading`; headings get slug `id`s. Canonical and JSON-LD have no frontmatter key: put them in the layout, or write the page in HTML.
+(`og:image: /card.png`; two levels deep is an error). No `title:` → first `# Heading`; headings get slug `id`s. Canonical and JSON-LD have no frontmatter key: JSON-LD belongs in the layout; a canonical is one page's own address, which a layout must never set — that stamps every page with the same URL — so write that page in HTML, or leave it off.
 
 ## Styles, scripts, finishing
-unify never scopes, rewrites, or injects CSS/JS — scope fragment styles yourself (`@scope`, `@layer`, a
-class prefix); a `url()` inside `<style>`/`style=` is never rewritten, so make it root-relative.
+unify never scopes, rewrites, or injects CSS/JS, and rewrites only HTML's own URL attributes (`href`, `src`) — a `url()` in CSS and a `fetch()`/`hx-get` address ship as written, so a root-relative one misses the `--base-url` prefix and 404s:
+keep every `url()` in a stylesheet file and every fetched address relative to the page — or read it back from an `href` unify rewrote. Scope fragment styles yourself (`@scope`, `@layer`, a class prefix).
 `unify build --dry-run --strict` is the whole build and every check, writing nothing: every problem in one pass,
 and a list naming each page with the layout it resolved to. Then `unify build` — exit 0 means `dist/` is the complete
 site; non-zero means nothing was published and `dist/` is untouched, so never report success on a non-zero exit. `--exclude` **replaces** the `_*` default; keep `_*` in your list.

@@ -864,3 +864,314 @@ nothing and still ships its attribute. No diagnostic was added for it: the catal
 three free slots and this is a case where the evidence does not yet say whether authors
 write that markup at all. The experiment that would settle it is a brief compelling a fill
 from inside a styled wrapper — not a guess.
+
+---
+
+# Round 19 — an advanced site: generated pages, client-side filtering, a subpath deploy
+
+6 samples (5 Haiku, 1 Sonnet control), 45-minute cap, first round run under true
+filesystem isolation. Brief: a seed library with a catalogue generated from a JSON export,
+client-side family/name filtering, a redesigned section sharing chrome, a chrome-less
+embed for another organisation's CMS, and a subdirectory deploy.
+
+**Result: 6/6 exit 0 on their own publish commands, 40-43 markers preserved each, zero
+content lost.** The tool composed an advanced site every time. 6/6 wrote a generator under
+`src/_scripts/` producing 28-29 pages from the export; 6/6 got `data-layout="none"` right
+for the embed; 6/6 used a section `_layout.html`. The build-step seam works, unprompted.
+
+Four findings.
+
+**1. `--pretty-urls` omitted, and confidently "verified" (2/6).** haiku-4 and haiku-5
+published 172 and 177 `.html` links against a brief requiring extensionless addresses,
+both at exit 0. haiku-4's report: "Verified using `--pretty-urls` is NOT needed; the site
+uses `.html` in all links but unify will serve these correctly." unify serves nothing —
+it is a build tool. This is round 11's shape exactly (a sample invented hosting behaviour
+to cover a flag it had not used), but the flag here IS named in the doc, so it is not the
+round-11 defect recurring. Authoring error, watched not amended.
+
+**2. File-level exclusion does not protect data (5/6).** The export carries
+`seed_keeper` and `keeper_contact` per variety. 0/6 published `varieties.json` itself —
+the exclusion rules worked — but 3/6 rendered keepers' private email addresses onto public
+variety pages (81, 54, 54 occurrences) and 5/6 published keeper names. Only the control
+published neither. No diagnostic is possible: once a generator copies a field into a page,
+that page is ordinary content. Not a doc defect — the 60 lines describe file-level
+exclusion accurately and claim nothing about data — but it is the sharpest thing the round
+found about the *shape* of the tool, and it is now the "what these examples do not show"
+section of `examples/README.md`.
+
+**3. The client-side data seam went unexercised — a brief defect.** 0/6 used `fetch`,
+`hx-get`, or any endpoint; every sample rendered the catalogue at build time and filtered
+the DOM. That is the correct pattern for a static site, so the brief compelled good work —
+but it means the seam this round was designed to probe was never touched. Two defects
+found by hand during brief design remain untested by any sample:
+  - a `.html` file with no `<html>` element beside a `_layout.html` fails with
+    `internal error building this page: null is not an object (evaluating 'node.children')`
+    — no line, no `fix:`, no P-code, and the transactional gate blocks the whole publish.
+    This is the shape of every htmx partial endpoint.
+  - `hx-get="/x.json"` and `fetch("/x.json")` are neither rewritten by `--base-url` nor
+    reference-checked, while `src="/app.js"` beside them is rewritten. Silent 404s on a
+    subpath deploy at exit 0.
+A brief that compels a partial endpoint would reach both. Named, not guessed.
+
+**4. Named slots still under-reached (3/6 used none).** The footer-exception requirement
+was satisfied by a second layout as often as by a slot. Both are legal, so this is not a
+violation, but the historically weakest rule remains the least exercised.
+
+## The protocol defect this round closed
+
+`cwd` was never isolation. Asked the protocol's own project-context question, a probe agent
+answered **NO** and then listed three copies of `conformance-spec.md` and six harness
+copies it had just found — `Read` and `Bash` both take absolute paths. Rounds 16-18 ran
+from `/tmp/r16`../tmp/r18` with the full specification readable, and their samples would
+have answered NO too. Samples now run in a private mount namespace: own directory at
+`/sandbox`, fresh writable `/tmp` (masking every other copy at once — enumerating leak
+paths was wrong twice), repo and session transcripts masked. Re-probed: NO, and NONE on a
+whole-filesystem search. `/tmp/ratify/harness/isolate.sh`.
+
+**Judging traps hit again, both self-inflicted:** a regex that truncated a sample's own
+publish command turned a clean sample into an exit-2 failure, and a domain-level grep for
+leaked addresses matched a public contact address the samples had invented, briefly showing
+a 5/6 leak that was 0/6 for that string. Judge with the sample's exact command; grep for
+the exact private value, not its domain.
+
+## Post-round fixes (2026-08-13, same day)
+
+The two engine defects finding 3 recorded as "named, not guessed" are fixed, and the fix
+grew when a deterministic shape matrix (`_notes/shape-matrix.sh`, 10 page shapes × 5
+layout shapes against the real binary) mapped the whole family:
+
+- **P21** (new problem, §7/MRG-20): the merge requires a `<body>` on both sides. The
+  fragment-page crash — unlocated `internal error`, the shape of every htmx partial —
+  became a file-level problem at the page naming the complete-document shape. The matrix
+  found worse next to it: a **layout** with no `<body>` published its own text *as* the
+  page, silently dropping the author's entire body at exit 0 — a direct §7.6 violation
+  that had sat behind a "fail soft" comment. Now P21 at the layout, whose fix names the
+  one-keystroke repair (`<body></body>` is the legitimate §7.5 head-only pattern). A third
+  member fell out of a truthiness accident: `if (!layoutText)` routed a resolved-but-empty
+  `_layout.html` into the no-layout path, so a zero-byte layout was silently identical to
+  no layout at all — now P21 like its siblings. Three landmine fixtures pin one cell each;
+  all 50 matrix cells are now located-problem or correct composition, no green cell changed.
+- **The url() advice was inverted, in both documents.** §11.1 said a `url()` in inline
+  styles "must be root-relative" and the rules doc repeated it — root-relative is exactly
+  what misses the `--base-url` path prefix and 404s at any subdirectory deploy, while
+  passing §12 (the check runs against the output tree, where the file exists — the
+  round-13 class). Both now say the true thing: `url()` belongs in a stylesheet file,
+  written relative to that file, and script/`hx-get` addresses ship as written. The rules
+  doc names the pair in one breath (the round-11 corollary: naming one of a pair is worse
+  than naming neither).
+
+Open question, deliberately not taken tonight: should §11.1 rewrite `url()` in a page's
+own `<style>`/`style=`? Inline url() currently has no correct static spelling under
+`--pretty-urls` + `--base-url` together (relative breaks when the page moves, root-relative
+misses the prefix, a full URL hardcodes the domain). Rewriting is spec-coherent — inline
+styles are page content, not mirror-copied files, and §12 already parses the same values —
+but it is a §11 amendment with fixture obligations, and the doc's new "keep url() in a
+stylesheet file" advice removes the need for most sites. Decide with evidence: a brief that
+compels an inline background image would show whether authors actually write them.
+
+
+---
+
+# Round 20 — the client-side fetch seam, and the first fix measured by quotation
+
+6 samples (5 Haiku, 1 Sonnet control), 45-minute cap. Brief: the round-19 seed library at
+scale — 225 varieties across 12 families — with the client stating outright that opening
+the browse page must not pull down the whole catalogue, so a per-family fetch is the only
+honest answer. Round 19 never reached this seam because inlining 27 varieties was easier
+than fetching; at 225 it is not.
+
+**The brief changed on the way in, and that is itself a finding.** The plan was a brief
+compelling an htmx partial endpoint. Checking satisfiability first — the round-19 judges'
+lesson — showed there is no way to ship one: a bare fragment `.html` is P21; a wrapper
+`<div data-layout="none">` is P07 *and* P21; a `.md` with `layout: none` is synthesized
+into a complete document (§10.7); a non-`.html` extension mirror-copies but gets the wrong
+content-type from the host. **unify cannot emit a bare HTML fragment.** That brief would
+have measured a missing feature six times over. Recorded as a product gap, not run.
+
+**Result: 6/6 exit 0, zero diagnostics, no content lost** (markers 220-466 per sample).
+5/6 fetched per family; haiku-1 inlined a 96 KB page, the one brief violation.
+
+**The finding: 5 of 5 fetching samples produced URLs that resolve correctly at the deploy
+address, and four of them quote the rule that told them so.** The §11.1/rules-doc fix
+shipped hours earlier — that unify rewrites only HTML's own URL attributes, so a
+root-relative `fetch()` misses the `--base-url` prefix — appears verbatim in the reports:
+
+- haiku-3 quotes it and uses `../data/public-varieties.json`
+- haiku-5 quotes it and uses `../varieties-public.json`
+- haiku-4 paraphrases it exactly ("rewrites root-relative paths in HTML href/src, BUT NOT
+  in CSS url() or JavaScript fetch()") and uses `apiBase = '..'`
+- haiku-2 quotes it, then hardcodes `/library/` into the JavaScript
+
+This is the strongest attribution shape available: the sample quotes the sentence and acts
+correctly on it. It is still *fitted* — the fix was written for this exact failure and this
+is the round that measured it. It becomes *tested* when a later brief it was not written
+for comes back clean.
+
+**A doc improvement, from a self-report rather than a failure.** haiku-2's site is correct
+and exits 0, so by triage step 0 it is not a violation — but its report says the rules
+"don't explain how to handle fetch() URLs in scripts that need a base-URL prefix", and it
+picked the one strategy that breaks silently the day the site moves. The clause named the
+trap and gave the remedy only for `url()`. It now gives one for fetched addresses too:
+*relative to the page — or read it back from an `href` unify rewrote.* Still 60 lines.
+
+**The control's pattern is the round's best artifact.** sonnet-1 never writes the URL in
+JavaScript at all: each family is a real anchor, `<a href="/catalogue/data/allium.json"
+data-family="Allium">`, which unify rewrites like any other link; the script intercepts the
+click and fetches `link.href`, already absolute and already correct. The deploy address
+appears nowhere in the JS and the page still works with JS off. Kept as
+`examples/seed-library-ondemand`.
+
+**The privacy result reproduced, and one sample solved it.** Across rounds 19 and 20,
+twelve independent authors all excluded `varieties.json` correctly and eight still
+published its private fields. sonnet-1 is the exception in both rounds: its generator names
+the fields it emits rather than spreading the record. That is now the advice in
+`examples/README.md` — the generator is the only place privacy can be enforced.
+
+
+---
+
+# Round 21 — round 13's brief, byte-unchanged, against two rounds' worth of amendments it never met
+
+Nearly every fix in this record is *fitted* — measured only by the round that produced it.
+Round 21 re-runs round 13's brief and prompt byte-identical (same seeded `images/`, same
+runner discipline as rounds 19-20, mount-namespace isolation) against today's doc and a
+binary built from HEAD. What that tests is everything amended since round 15 that was NOT
+written for this brief: the round-16 slot=/scaffold clauses, the round-18 diagnostic work,
+P21, the A03 retirement, the round-19/20 url()/fetch clause. What it cannot re-credit is
+the round-13-era repairs themselves — the full-URL literal, the collapsed flag, A15's
+retirement — which rounds 14/15 already measured on this same family and which stay
+fitted-to-family.
+
+**Result: 6/6 WORKS, 18/18 root-relative frontmatter values, zero final diagnostics —
+the family's round-15 result survives every amendment since.** Every sample, all five
+Haiku and the control, published with the full-URL `--base-url` on its first base-url'd
+command; every `og:image` in every built entry is absolute at the deploy address. Nobody
+hit the collapsed flag's usage error (round 15 again); two samples ran their first
+`--dry-run --strict` flagless, met `serving from / — the domain root (no --base-url)`,
+and adopted the full form — the §17 line's first mid-run saves. Five P13s fired during
+iteration — images not yet under `src/`, directory links before `--pretty-urls`, one
+sample hand-prefixing `/outreach/` into source paths — and produced five correct repairs;
+haiku-2's report narrates the last one: "I cannot include the base-url prefix myself…
+I must use root-relative paths and let unify rewrite them." Round 13's lesson, now taught
+by the toolchain mid-run. And round 13's pathology — reports *claiming* verification of
+dead metadata — is absent by construction: the claims are all true this time.
+
+**The amendments that could act, acted; the ones this brief cannot reach stayed idle.**
+The url()/fetch clause is quoted verbatim in three of five Haiku reports, and haiku-4
+derived its asset strategy from it ("Since I used img tags and meta properties for all
+images, they all got the correct absolute URLs") — read, used, harmless, on a brief it
+was not written for. Its protective half stays unexercised: no sample in this family has
+ever written a `url()`. P21 was never provoked (six complete-document sites) and never
+misfired — tested for silence, with its presence proven by the pre-round probe. P20 had
+nothing to fire on: zero stray `<slot>` in pages, round 7's 4/5 failure mode extinct.
+The r16 fill-scope and fills-the-contents clauses and the A03 retirement were untouched —
+no named slots, no `init`, no top-level landmarks. Honest nulls, still fitted.
+
+**The finding: a canonical in the layout stamps every page with one URL — and the doc
+told authors to put it there.** haiku-2 and haiku-3's shared entries each declare
+`rel="canonical"` → the home page, layout-supplied, exit 0 — on the one feature this
+brief is about, since Facebook consolidates shares by canonical. haiku-3's report says
+why: "Left as site-root canonical in the layout since individual page-specific canonicals
+were not required by the brief." The control is the doc-defect signature verbatim — it
+quotes "Canonical and JSON-LD have no frontmatter key: put them in the layout, or write
+the page in HTML" and answers it: "a single canonical value hard-coded into _layout.html
+would be wrong for every page except one… Rather than ship a canonical tag that lies for
+two out of three entries, I left canonical off." Judged retroactively, the family already
+carried it: r14 haiku-4/-5 stamped home on their entries, r15 haiku-2/-3 stamped the log
+index and haiku-4 home — **seven of eighteen samples across three rounds**, unmeasured
+because the preregistration's verdict reads og:image only. The chain that lit it up:
+the sentence dates to round 5 and round 13's samples wrote zero canonicals; the round-13
+repair put "canonical" into the `--base-url` clause every author now reads, samples
+started writing canonicals in round 14, and the round-5 sentence routed half of them into
+the layout. Fixing one silent share-crawler failure surfaced its dormant neighbor.
+Triage: documentation — the sentence's first alternative is only ever right for JSON-LD;
+for canonical on a Markdown-entry site the layout value is unfixable per page (§8's
+replace rule needs an HTML head). **Amended this round, in both documents**: the rules
+doc now says JSON-LD belongs in the layout while a canonical is one page's own address a
+layout must never set, and the spec's §10 honest-gap paragraph says the same with the
+mechanism. Fitted until a later round it was not written for comes back clean. The
+spec-level companion — an advisory when the same canonical URL is emitted on more than
+one page (mechanically checkable; at most one page can be right; three catalogue slots
+free) — is recorded as the maintainer's call, not taken.
+
+**Recorded, not amended: URL-shaped CSS dies against rewritten HTML in a third spelling.**
+haiku-2 and haiku-5 highlight the active nav item with attribute selectors —
+`body.about nav a[href="/about/"]` — dead against anchors rewritten to `/outreach/…`,
+silently, exit 0. The same pattern shipped in r13 and r14 (where the control instead
+hardcoded `/outreach/` into its selectors — round-20's fetch hardcode, in CSS), so it
+predates every amendment under test. haiku-2 quoted the url()/fetch clause and tripped
+anyway: a selector is neither `url()` nor `fetch()`. haiku-1 pasted the doc's own recipe
+(`body.home .nav-home a`) and is immune — the one literal shown carried the one sample
+that copied it. Cosmetic, unrequired by the brief, watched: if a brief that needs the
+highlight reproduces it, the clause's list becomes "anything in CSS or JS that names an
+address".
+
+Also watched: `name="description"` slipped to 4/6 (r15: 6/6) — two samples shipped
+`og:description` only, on an unchanged rule. And two harness notes acted on for the next
+round: sandboxed samples were all appending transcripts to one shared
+`projects/-sandbox/<orchestrator-id>.jsonl` — readable in principle from inside the
+namespace — so `isolate.sh` now masks it; and rounds now overlap on the machine, so every
+transcript sweep is bounded by the round's own `.exit` times.
+
+
+---
+
+# Round 22 — inline url(): the open question, closed by evidence (pre-registered)
+
+6 samples (5 Haiku, 1 Sonnet control), 45-minute cap, mount-namespace isolation. The
+round-19 post-fixes left one question deliberately open: should §11.1 rewrite `url()` in
+a page's own `<style>`/`style=`, where no correct static spelling exists under
+`--pretty-urls` + `--base-url` together — or does the doc's "keep every url() in a
+stylesheet file" line carry the load? Pre-registered decision rule
+(`_notes/ratification-round-22-preregistration.md`, written before any sample ran):
+≥2 of 5 Haiku shipping an inline `url()` that 404s at the deploy address at exit 0 →
+rewrite; ≤1 → no engine change, record and close. The advisory middle ground was barred
+in advance by §14.3's operational tests. Brief: Alderfen Arboretum
+(`_notes/BRIEF-r22.md`), a full-width photo banner with text over it on the home page
+and a narrower one on each of two section landings — banners-with-text-over being the
+strongest content-side pull toward CSS backgrounds — at a subdirectory deploy with
+`.html`-free addresses, images seeded.
+
+**Result: 0 of 5 — the question closes with no engine change.** 6/6 exit 0 on their own
+publish commands, zero diagnostics anywhere in the round's final state, 36/36 markers,
+6/6 `--pretty-urls` (round 19's omission did not recur), all six isolation answers NO.
+
+**The finding is *which* mechanism authors reach for: 5 of 6 built every banner as
+`<img>` + `object-fit: cover` with an absolutely-positioned overlay — zero `url()`
+tokens in their entire output, stylesheets included.** The modern prior for
+image-with-text-over is no longer the CSS background; it is the pattern that happens to
+sit exactly on unify's rewritten path (`src=` gets §11.1/§11.3, and the reference check
+covers it). H1 — that most samples would follow the clause's remedy into a stylesheet
+file — was falsified in the best direction available: 0/6 wrote a stylesheet `url()` at
+all. The clause carried the round by **deterrence**, and explicitly so: the control's
+report says it treated "the CSS-background route as the one to avoid" because "the rules
+explicitly warn that `url()` inside CSS is never rewritten by `--base-url`".
+
+**The one sample that did write inline `url()` traversed the whole trap and shipped
+correct.** haiku-1 wrote `url(/images/banner-*.png)` into all three banner pages — the
+silent spelling — and had a green build with three dead banners for half a minute.
+Nothing in the tool flags that state; what closed it was the author reading the emitted
+output ("I notice the CSS image URLs need to be fixed - they use root-relative paths
+which won't be rewritten by unify") — and its report quotes the doc's `url()` clause in
+full as the sentence that taught it what to look for. Its first repair (`../images/`
+everywhere) was caught loudly — `src/index.html:5: problem: ../images/banner-home.png
+does not resolve to any emitted file` — confirming the pre-registered geometry: every
+wrong inline spelling except root-relative-with-base fails §12 at exit 1. Its second
+repair shipped three relative inline `url()` values that all fetch at the deploy
+address, legal because every page is authored as `dir/index.html` and never moves.
+
+**Verdict, per the pre-registered rule: ≤1 of 5 — no engine change; the doc line
+carries the load; the catalogue stays at nine of twelve; closed.** The silent window is
+real (one sample stood in it this round), but no sample shipped it, the doc clause is
+what pulled the one visitor out, and both neighbouring escapes — `<img>` and loud §12
+failures — worked every time they were reached. Re-open only if a later round shows a
+shipped inline 404 in the wild.
+
+Recorded, not acted on: what `--pretty-urls` does to the root `index.html` is unstated
+in the 60 lines — the control scratch-built a test site to learn it and haiku-5 "had to
+infer" it; both were right, the spec states it, and the dry-run's per-file report
+answers it, so hesitation-without-failure does not clear the amendment bar. haiku-4
+wanted "a local dev server" from a tool whose `--help` (which it never ran) names
+`unify dev` on line two — authoring miss, not a gap. The `.fragment.html` suffix was
+adopted unprompted by two samples for `_includes/` fragments — harmless where it is not
+needed, and evidence the new vocabulary reads.

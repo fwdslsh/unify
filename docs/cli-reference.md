@@ -38,7 +38,7 @@ The same watch contract as `dev`, no server — for pairing with a server you al
 
 ### `unify init [template]`
 
-Scaffolds a starter site into `src/`. Templates: `default`, `basic`, `blog`, `docs`, `portfolio`. Every template exercises each primitive once — an include, the automatic `_layout.html`, a named slot with a page that fills it, a `data-layout="none"` page, and the underscore convention. The `blog` template also ships `_scripts/gen-blog.mjs`, the ~40-line generator that writes `blog.html` and `feed.xml` into the source tree. `init` never creates `unify.yaml`. Guaranteed: `unify init && unify build --dry-run --strict` exits `0`.
+Scaffolds a starter site into `src/`. Templates: `default`, `basic`, `blog`, `docs`, `portfolio`. Every template exercises each primitive once — an include, the automatic `_layout.html`, a named slot with a page that fills it, a `data-layout="none"` page, and the underscore convention. The `blog` template also ships the generator pattern worked: `_scripts/gen.mjs` reads `posts/*.md` and `_data/authors.json` and regenerates `blog.html` and `feed.xml` (`node _scripts/gen.mjs && unify build`); both ship pre-generated, and the generator names the fields it emits, so the authors file's private `email` never reaches a page. `init` never creates `unify.yaml`. Guaranteed: `unify init && unify build --dry-run --strict` exits `0`.
 
 ## Options
 

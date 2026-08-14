@@ -109,7 +109,7 @@ This is the mechanism that makes "fully implemented" a measurable claim.
 | `WCH-*` | §16 watch/dev | 7 |
 | `DRY-*` | §17 dry-run report | 3 |
 | `CFG-*` | §18 unify.yaml | 3 |
-| `SCF-*` | §19 scaffold contract | 4 |
+| `SCF-*` | §19 scaffold contract | 5 |
 | `FIX-01–14` (FIX-08 retired) | the spec's worked examples | 13 |
 
 A row's `testkind` is `fixture`, `targeted`, `e2e`, or `structural`. The three `structural` rows (MRG-18 the content-loss law, COL-04 no-last-write-wins, WCH-07 the closed dev scope) are invariants asserted *by the shape of the whole suite* (exhaustive diagnostics + full expected trees + closed CLI test) rather than by one test; they are exempt from the per-rule gate and documented as such in the TSV.
@@ -130,7 +130,7 @@ Two declaration channels, both machine-read:
 
 - **Spec→inventory sync** (both modes): the checker parses the conformance spec's countable structures — the `**S<n> —**` bullets (12), the §14.2 numbered problems (16), the §14.3 numbered advisories (11), the §8 table body rows (7) — and fails on any drift from the inventory, so an edit that adds an S13 or a fifteenth problem breaks CI until `rules.tsv` (and therefore a test) catches up. Prose rules can't be machine-extracted; for them the sync check enforces the weaker invariant that every spec section has inventory rows, and the human review rule is: **a PR touching `docs/conformance-spec.md` must touch `rules.tsv` in the same commit or say why in the PR description**. That last clause is the one non-automated step in this section, named honestly.
 
-**Current status (2026-08-12, `--static`)**: 193 rules; **171 of 190 gated rules covered** by the shipped fixture sets; 20 open gaps (`tests/conformance/phase-gaps/baseline.txt`), each assigned to a named planned test file (CLI/dry-run/config/publish targeted tests → Phase 3; watch/dev/scaffold E2E → Phase 4; see the migration plan). All thirteen FIX rows are already realized, and the §7 spec-bug set (B1–B7) plus the four pinned readings are closed — every gate-blocking flag on the inventory is gone. The checker's output is the authoritative gap list at any moment; the gate goes from advisory to blocking at Phase 2 (see migration plan §4).
+**Current status (2026-08-13, `--static`)**: 202 rules (199 gated, 3 structural); **every gated rule covered** — `tests/conformance/phase-gaps/baseline.txt` is empty, so the phase gate and the release semantics are the same check. All thirteen FIX rows are realized, and the §7 spec-bug set (B1–B7) plus the four pinned readings are closed — every gate-blocking flag on the inventory is gone. The checker's output is the authoritative gap list at any moment; the gate goes from advisory to blocking at Phase 2 (see migration plan §4).
 
 ### 3.4 Why declaration ≠ vacuous claiming
 
