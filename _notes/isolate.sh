@@ -24,9 +24,12 @@ unshare -m bash -c '
   P=/root/.claude/projects/-home-user-unify
   [ -e "$P" ] && mount --bind /var/empty-ratify "$P"
   # Samples run with cwd /sandbox, so their transcripts all land (and are in
-  # principle readable) in projects/-sandbox — mask it too (round-21 lesson).
+  # principle readable) in projects/-sandbox — give each sample its OWN
+  # writable transcript dir (round-21 lesson; round 23 showed a read-only
+  # mask silently discards the transcripts triage depends on).
   S=/root/.claude/projects/-sandbox
-  mkdir -p "$S" && mount --bind /var/empty-ratify "$S"
+  mkdir -p "$S" "$DIR/.transcripts"
+  mount --bind "$DIR/.transcripts" "$S"
   cd /sandbox || exit 1
   printf "%s" "$(cat "/sandbox/$PROMPT")" | timeout "$TMO" claude -p \
       --model "$MODEL" --permission-mode acceptEdits --allowedTools "$@" \
