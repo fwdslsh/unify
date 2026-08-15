@@ -96,3 +96,4 @@ tts_output.wav
 
 # Claude Code agent worktrees (live working copies, never repo content)
 .claude/worktrees/
+package-lock.json

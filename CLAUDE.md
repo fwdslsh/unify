@@ -57,11 +57,9 @@ Layouts do not chain in v0.7.0: a layout that itself declares `data-layout` is a
 
 **The content-loss law**: content the author wrote is never dropped without failing the build. Two severities only — `problem` (blocks publish, exit 1) and `advisory` (never blocks; exits 1 only under `--strict`). Exit codes 0/1/2. Build is transactional: any problem leaves the previous `dist/` untouched.
 
-## Implementation Map (rewrite in progress)
+## Implementation Map
 
-Survives (harvested or as-is): `ssi-processor.js` (the only correct include-path resolution — becomes the include engine), `head-merger.js` (dedup keys, `_normalizeAssetPath`; title logic replaced by the prepend rule), `markdown-processor.js` (trimmed to spec §3.5 keys; keeps the `<h1>` title fallback; gains heading ids), `file-watcher.js`, the static server + SSE transport (into `unify dev`), `link-normalizer.js`/`html-minifier.js` (harvest), `path-validator.js` (invisible internal safety), `init`, binary builds, `dry-run-reporter.js` (rewired).
-
-Deleted with v0.6: `html-processor.js`, all of `src/core/cascade/` (area/landmark/ordered-fill/attribute matchers), `dom-cascade-linter.js`, `security-scanner.js`, `glob-pattern-processor.js`, `incremental-builder.js`, `build-cache.js`, `dependency-tracker.js`, `asset-tracker.js`, short-name/default-layout/layout resolvers. Newly written: the slot filler, the layout discovery walk, URL provenance rewriter, reference checker, collision detection, transactional publisher, the problem/advisory reporter.
+`src/cli.js` (flag parsing + dispatch) → `src/cli/options.js`, `src/cli/commands/{build,dev,watch,init}.js`. Core, one module per §: `includes.js` (§5 inline, SSI comment alias), `layout.js` (§6 discovery walk + data-layout), `compose.js` (§7 slots/merge + §9 root attrs), `head-merge.js` (§8), `markdown.js` (§10), `urls.js` (§11 provenance rewriting, --pretty-urls, --base-url), `references.js` (§12), `collisions.js` (§13), `diagnostics.js` (§14 reporter, dedup), `publish.js` (§15 transactional publish + §17 dry-run report), `watcher.js` + `dev-server.js` (§16), `html.js` (the span-based parser everything shares), `paths.js` (never-shipped list, containment). Templates for `init` live in `src/templates/`. The v0.6→v0.7 migration that produced this tree is history, recorded in `docs/migration-plan.md`.
 
 ## Testing Strategy
 
@@ -98,7 +96,7 @@ Path traversal safety in include/layout resolution is internal engineering — a
 - **`docs/conformance-spec.md`** — the normative implementer reference: exact algorithms, the splice model (S1–S12), the head-merge table, the collision matrix, the complete problem/advisory catalogue, and fixture-grade worked examples.
 - **`docs/authoring-rules.md`** — the complete authoring surface in under 60 lines; hand this to any agent writing site content.
 - **`docs/getting-started.md`** — the human tutorial. **`docs/cli-reference.md`** — every command and flag. **`docs/integrations.md`** — the compile-to-asset pattern for Svelte and kin, every literal tested.
-- **`docs/testing-strategy.md`** — the tier model and the traceability gate. **`docs/ratification-protocol.md`** — how to validate `authoring-rules.md` empirically by having agents author from it in isolation, and how to triage a failure into doc / spec / implementation / outlier. **Read the protocol before editing the authoring rules**: it is the procedure that decides whether an edit is warranted. **`docs/ratification.md`** — the evidence: eighteen rounds of agent experiments, what each finding was triaged as, and the doc/spec/implementation changes they produced.
+- **`docs/testing-strategy.md`** — the tier model and the traceability gate. **`docs/ratification-protocol.md`** — how to validate `authoring-rules.md` empirically by having agents author from it in isolation, and how to triage a failure into doc / spec / implementation / outlier. **Read the protocol before editing the authoring rules**: it is the procedure that decides whether an edit is warranted. **`docs/ratification.md`** — the evidence: the ratification rounds — what each finding was triaged as, and the doc/spec/implementation changes they produced.
 - **Working documents**: `_notes/` (analyses and drafts; `_notes/unbiased-design-synthesis.md` records the v0.7.0 design rationale).
 
 ## Important Implementation Notes

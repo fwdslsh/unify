@@ -29,11 +29,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # The binary build stamps its version from this tag (APP_VERSION, see
-      # bun-build-binaries.yml) while `unify --version` reports package.json
-      # (src/cli.js). If they disagree, npm publish also fails outright — but
-      # only after every binary has already been built and uploaded. Catch it
-      # here instead, before anything is built or published.
+      # `unify --version` — compiled binary and npm package alike — reports
+      # package.json's version (src/cli.js imports it). A tag that disagrees
+      # would ship artifacts that self-report a different version, and npm
+      # publish would fail only after every binary had already been built and
+      # uploaded. Catch it here instead, before anything is built or published.
       - name: Tag must match package.json version
         shell: bash
         run: |

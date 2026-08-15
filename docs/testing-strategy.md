@@ -63,7 +63,7 @@ The heart of the suite. A **generic harness** (one file, ~200 lines) iterates fi
 
 - `tests/conformance/spec-fixtures/` — the conformance spec's worked examples, transcribed verbatim. The spec's own sentence is the assertion: *an implementation conforms when it reproduces each example's output exactly in structure, attributes, and text content, with only inter-block whitespace waived.* Ten of the thirteen FIX rows are checked in here; FIX-06, FIX-10, and FIX-14 are realized as the landmines `misaddressed-fill`, `slot-in-template`, and `layout-declares-layout`.
 - `tests/fixtures/kitchen-sink/` — one realistic site (Meridian Coffee Roasters: a site layout plus a standalone section layout, both slot kinds, includes in five positions, Markdown with the full frontmatter surface, every head-merge row, three URL flag profiles, the underscore ecology, mirror-copied binaries) built under **four profiles** (default / `--pretty-urls --base-url https://…/coffee/` / `--base-url https://…/` / `--strict`), each with an expected tree or declared publish-block. Realism is the point: rules interact here (an include contributing head elements that then merge; include-authored URL provenance inside a section layout) the way they never do in one-rule micro-fixtures.
-- `tests/fixtures/landmines/` + `runtime-cases.mjs` — 65 checked-in + 6 runtime-built adversarial cases; every problem and advisory in the closed catalogues (16 problems, 11 advisories) fires at least once at its declared location and severity, every "builds clean" edge is pinned, the include depth-cap fenceposts (10 passes, 11 fails) are nailed down, and `diagnosticsExhaustive` means an *undeclared* diagnostic anywhere is itself a failure — the closed catalogue is enforced closed.
+- `tests/fixtures/landmines/` + `runtime-cases.mjs` — the checked-in and runtime-built adversarial cases; every problem and advisory in the closed catalogues (20 problems, 9 advisories) fires at least once at its declared location and severity, every "builds clean" edge is pinned, the include depth-cap fenceposts (10 passes, 11 fails) are nailed down, and `diagnosticsExhaustive` means an *undeclared* diagnostic anywhere is itself a failure — the closed catalogue is enforced closed.
 
 *Proves*: each normative rule, including exact output and exact diagnostics, against the real CLI.
 *Cannot prove*: time-dependent behavior (watch), long-running processes (dev), or that the rules compose over arbitrary sites — Tiers 0 and 2 and the property harness cover those.
@@ -86,28 +86,28 @@ This is the mechanism that makes "fully implemented" a measurable claim.
 
 ### 3.1 The rule inventory
 
-`tests/conformance/rules.tsv` — **193 rows** (190 gated + 3 structural), one per normative claim in `docs/conformance-spec.md`, extracted section by section. IDs are stable, never reused, and namespaced by area, reusing the spec's own labels wherever the spec numbers things. Retired IDs stay retired: `LAY-06`–`LAY-08`, `HED-08`, `P06`, and `FIX-08` died with layout chaining; `A05`–`A07` were merged into `A13` (the duplicated-construct advisory); no test may reference them.
+`tests/conformance/rules.tsv` — **202 rows** (199 gated + 3 structural), one per normative claim in `docs/conformance-spec.md`, extracted section by section. IDs are stable, never reused, and namespaced by area, reusing the spec's own labels wherever the spec numbers things. Retired IDs stay retired: `LAY-06`–`LAY-08`, `HED-08`, `P06`, and `FIX-08` died with layout chaining; `A05`–`A07` were merged into `A13` (the duplicated-construct advisory); `A03`, `A04`, and `A15` were retired by the ratification rounds (A04 became problem P20); no test may reference them.
 
 | Prefix | Source | Count |
 |---|---|---|
 | `PIP-*` | §2 pipeline order & best-effort | 2 |
 | `S01–S12`, `SHL-01` | §3 splice rules + shell rule | 13 |
-| `EXC-*` | §4 classification/exclusion/never-shipped/copy | 11 |
+| `EXC-*` | §4 classification/exclusion/never-shipped/copy | 12 |
 | `INC-*` | §5 includes | 12 |
 | `LAY-*` | §6 layout resolution (incl. the no-chaining problem) | 11 |
-| `MRG-*` | §7 composition (incl. the no-nested-slots problem) | 19 |
+| `MRG-*` | §7 composition (incl. the no-nested-slots problem) | 20 |
 | `HED-01–07` | §8 head-merge table rows | 7 |
 | `ATT-*` | §9 root attributes | 3 |
 | `MD-*` | §10 Markdown | 21 |
 | `URL-*` | §11 URL phases | 12 |
-| `REF-*` | §12 reference check | 6 |
+| `REF-*` | §12 reference check | 7 |
 | `COL-*` | §13 collisions | 4 |
-| `DIA-*` | §14 diagnostics contract | 11 |
-| `P01–P17` (P06 retired) | §14.2 closed problem list | 16 |
-| `A01–A14` (A05–A07 merged into A13) | §14.3 closed advisory catalogue | 11 |
+| `DIA-*` | §14 diagnostics contract | 13 |
+| `P01–P21` (P06 retired) | §14.2 closed problem list | 20 |
+| `A01–A14` (A05–A07 merged into A13; A03, A04, A15 retired) | §14.3 closed advisory catalogue | 9 |
 | `PUB-*` | §15 transactional publish | 4 |
 | `WCH-*` | §16 watch/dev | 7 |
-| `DRY-*` | §17 dry-run report | 3 |
+| `DRY-*` | §17 dry-run report | 4 |
 | `CFG-*` | §18 unify.yaml | 3 |
 | `SCF-*` | §19 scaffold contract | 5 |
 | `FIX-01–14` (FIX-08 retired) | the spec's worked examples | 13 |
@@ -125,12 +125,12 @@ Two declaration channels, both machine-read:
 
 `tests/conformance/check-traceability.mjs`, two modes, both exit 1 on failure:
 
-- **`--static`** (pre-implementation, runs today): unions manifest rules + `covers()`/`@covers` declarations, diffs against the inventory. Any gated rule with no declaration → fail, listed by ID. Any declared ID not in the inventory → fail (typos; rules retired from the spec but still claimed).
+- **`--static`** (no ledger needed): unions manifest rules + `covers()`/`@covers` declarations, diffs against the inventory. Any gated rule with no declaration → fail, listed by ID. Any declared ID not in the inventory → fail (typos; rules retired from the spec but still claimed).
 - **`--runtime <ledger>`** (the release-gate mode): diffs the inventory against rules **recorded by tests that actually executed and passed** in this CI run. This closes the skip hole mechanically: a `test.skip` records nothing, so its rules go uncovered and CI fails — a skipped test cannot silently keep its checkmark. CI order: `bun test && bun tests/conformance/check-traceability.mjs --runtime .conformance-ledger.jsonl`.
 
-- **Spec→inventory sync** (both modes): the checker parses the conformance spec's countable structures — the `**S<n> —**` bullets (12), the §14.2 numbered problems (16), the §14.3 numbered advisories (11), the §8 table body rows (7) — and fails on any drift from the inventory, so an edit that adds an S13 or a fifteenth problem breaks CI until `rules.tsv` (and therefore a test) catches up. Prose rules can't be machine-extracted; for them the sync check enforces the weaker invariant that every spec section has inventory rows, and the human review rule is: **a PR touching `docs/conformance-spec.md` must touch `rules.tsv` in the same commit or say why in the PR description**. That last clause is the one non-automated step in this section, named honestly.
+- **Spec→inventory sync** (both modes): the checker parses the conformance spec's countable structures — the `**S<n> —**` bullets (12), the §14.2 numbered problems (20), the §14.3 numbered advisories (9), the §8 table body rows (7) — and fails on any drift from the inventory, so an edit that adds an S13 or a fifteenth problem breaks CI until `rules.tsv` (and therefore a test) catches up. Prose rules can't be machine-extracted; for them the sync check enforces the weaker invariant that every spec section has inventory rows, and the human review rule is: **a PR touching `docs/conformance-spec.md` must touch `rules.tsv` in the same commit or say why in the PR description**. That last clause is the one non-automated step in this section, named honestly.
 
-**Current status (2026-08-13, `--static`)**: 202 rules (199 gated, 3 structural); **every gated rule covered** — `tests/conformance/phase-gaps/baseline.txt` is empty, so the phase gate and the release semantics are the same check. All thirteen FIX rows are realized, and the §7 spec-bug set (B1–B7) plus the four pinned readings are closed — every gate-blocking flag on the inventory is gone. The checker's output is the authoritative gap list at any moment; the gate goes from advisory to blocking at Phase 2 (see migration plan §4).
+**Current status (2026-08-13, `--static`)**: 202 rules (199 gated, 3 structural); **every gated rule covered** — `tests/conformance/phase-gaps/baseline.txt` is empty, so the phase gate and the release semantics are the same check. All thirteen FIX rows are realized, and the §7 spec-bug set (B1–B7) plus the four pinned readings are closed — every gate-blocking flag on the inventory is gone. The checker's output is the authoritative gap list at any moment; the gate is blocking in CI (see `docs/cicd-workflows.md`).
 
 ### 3.4 Why declaration ≠ vacuous claiming
 
@@ -173,7 +173,7 @@ The release ships when a clean CI run on the release commit satisfies **all** of
 | # | Gate | Check |
 |---|---|---|
 | G1 | Suite green | `bun test` exits 0 (includes Tiers 0–3; every behavior test under its hard timeout) |
-| G2 | Traceability | `check-traceability.mjs --runtime .conformance-ledger.jsonl` exits 0: 190/190 gated rules recorded by passing tests; zero unknown IDs; spec↔inventory sync clean |
+| G2 | Traceability | `check-traceability.mjs --runtime .conformance-ledger.jsonl` exits 0: every gated rule recorded by passing tests; zero unknown IDs; spec↔inventory sync clean |
 | G3 | Kitchen sink | all four kitchen-sink profiles tree-exact (§2 comparator) / publish-state-exact |
 | G4 | Landmines | every declared diagnostic fires with declared severity/location; zero undeclared diagnostics suite-wide; both publish-block sentinels byte-untouched |
 | G5 | Golden path | all five `init` templates: scaffold → `build --dry-run --strict` exit 0 → `build` → reference-clean output; dev smoke passes |
@@ -181,7 +181,7 @@ The release ships when a clean CI run on the release commit satisfies **all** of
 | G7 | Watch equivalence | scripted edit sequence under `watch` yields a tree byte-identical to a fresh `build`; a no-op save rewrites nothing (mtime check) |
 | G8 | No dead modules | every `src/**` file reachable from `src/cli.js` in the import graph |
 | G9 | Suite hygiene | `check-suite-hygiene.mjs` exits 0 |
-| G10 | Docs lockstep | `docs/authoring-rules.md` ≤ 60 lines and byte-embedded in README (the product-spec §7.5 identity test) |
+| G10 | Docs lockstep | `docs/authoring-rules.md` ≤ 60 lines and byte-embedded in README (product-spec §7, item 5) |
 | G11 | Binary parity | the compiled Linux binary passes the Tier-0 golden path (macOS/Windows binaries built; parity run where runners exist) |
 
 Coverage is reported alongside the gates for the record. It gates nothing.

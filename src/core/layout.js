@@ -51,7 +51,7 @@ import { findAll, getAttrNode, hasAttr, isElement, lineOf, parse, tokens } from 
 import { spansToDiagnosticLocator, verbatimLineResolver, wholeTextSpan } from "./urls.js";
 
 /** §6.1 step 4 — the automatic layout, discovered by name alone. */
-export const LAYOUT_FILENAME = "_layout.html";
+const LAYOUT_FILENAME = "_layout.html";
 
 const DATA_LAYOUT = "data-layout";
 const DATA_UNIFY = "data-unify";

@@ -2,7 +2,7 @@
 
 unify is a Bun-native static site generator for **HTML-native composition**: includes, layouts, and slots written in plain HTML, with no expression language and no client runtime. The output is the HTML and CSS the author wrote; unify adds no JavaScript of its own.
 
-**The v0.7.0 specification set in `docs/` is authoritative. Learn the product from those documents, not from `src/`** — the composition core is being rewritten against them, so code you find in the tree may implement the retired v0.6 product.
+**The v0.7.0 specification set in `docs/` is authoritative, and `src/` implements it.** When code and a document disagree, the document wins and the disagreement is a defect to report.
 
 ## Read before suggesting anything
 

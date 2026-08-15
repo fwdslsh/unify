@@ -125,7 +125,7 @@ describe.each(TEMPLATE_NAMES)('template "%s" — SCF-01/SCF-02 structure (in-mem
   test("built pages contain no <slot> elements outside the design-time layout itself", () => {
     // The layout is the one file that legitimately carries <slot> (its own
     // browser preview, product-spec §2). Every *page* must not — a stray
-    // <slot> in a page is advisory A04, not the SCF-01 primitive.
+    // <slot> in a page is problem P20 (was advisory A04), not the SCF-01 primitive.
     for (const p of paths.filter((x) => isPage(x) && !isUnderscored(x))) {
       expect(files[p]).not.toMatch(/<slot[\s>]/i);
     }

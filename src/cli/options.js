@@ -7,10 +7,10 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { UsageError } from "../core/diagnostics.js";
 
-export const COMMANDS = ["build", "dev", "watch", "init"];
+const COMMANDS = ["build", "dev", "watch", "init"];
 
 /** Long name → kind. `list` repeats, `string` takes a value, `flag` does not. */
-export const OPTIONS = {
+const OPTIONS = {
   source: { kind: "string", short: "s" },
   output: { kind: "string", short: "o" },
   clean: { kind: "flag" },
@@ -25,7 +25,7 @@ export const OPTIONS = {
 };
 
 /** Keys `unify.yaml` may carry — the long option names, minus the ones that make no sense to save. */
-export const CONFIG_KEYS = ["source", "output", "clean", "exclude", "pretty-urls", "base-url", "strict", "port"];
+const CONFIG_KEYS = ["source", "output", "clean", "exclude", "pretty-urls", "base-url", "strict", "port"];
 
 const SHORT = Object.fromEntries(
   Object.entries(OPTIONS)

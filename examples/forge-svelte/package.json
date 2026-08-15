@@ -5,7 +5,7 @@
   "scripts": {
     "build:calculator": "node _scripts/build-fee-calculator.mjs",
     "build:notes": "node _scripts/gen-notes-index.mjs",
-    "publish": "npm run build:calculator && npm run build:notes && ./unify build --clean --pretty-urls --base-url https://thistleknap.pages.dev/forge/"
+    "publish": "npm run build:calculator && npm run build:notes && unify build --clean --pretty-urls --base-url https://thistleknap.pages.dev/forge/"
   },
   "devDependencies": {
     "esbuild": "^0.28.2",

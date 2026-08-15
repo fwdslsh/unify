@@ -4,7 +4,7 @@
 
 The method is small: give a model **nothing but those 60 lines and a plain-English brief**, in a sandbox it cannot escape, and see whether it authors a compliant site. Run several samples. Look for patterns. Change one thing. Run again.
 
-This document is the procedure. `docs/ratification.md` is its companion: what eighteen rounds actually found, how each finding was triaged, and what changed in the documentation, the specification, the implementation, and the product as a result.
+This document is the procedure. `docs/ratification.md` is its companion: what the rounds actually found, how each finding was triaged, and what changed in the documentation, the specification, the implementation, and the product as a result.
 
 ## Why this works when review does not
 

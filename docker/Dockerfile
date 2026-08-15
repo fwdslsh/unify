@@ -20,16 +20,10 @@ WORKDIR /build
 
 # Copy source files and package configuration
 COPY src/ ./src/
-COPY package.json ./
+COPY package.json bun.lock ./
 
-# Copy tests if they exist (optional)
-RUN mkdir -p ./tests
-
-# Install dependencies using Bun
+# Install dependencies using Bun (CI is the test gate; this build just compiles)
 RUN bun install --frozen-lockfile
-
-# Run tests if available
-RUN bun test 2>/dev/null || echo "No tests configured, skipping..."
 
 # Build the binary using Bun
 RUN bun build src/cli.js --compile --outfile /usr/local/bin/unify && \

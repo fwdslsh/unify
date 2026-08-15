@@ -4,7 +4,7 @@
 
 unify is a static site generator for front-end designers and hobbyists: people fluent in HTML and CSS who have no interest in JavaScript frameworks, templating languages, or build tooling. Define a header, footer, nav, or page layout once, in plain HTML files, and have it rendered into every page of the site. The output is the HTML and CSS you wrote — unify adds no JavaScript of its own. It replaces copy-paste chrome, hand-edited HTML, and Apache SSI; it does not compete with Hugo, Eleventy, or Astro.
 
-The entire authoring surface is four things, learnable in five minutes:
+The entire authoring surface is five things, learnable in five minutes:
 
 | You want to… | You write… |
 |---|---|
@@ -12,8 +12,9 @@ The entire authoring surface is four things, learnable in five minutes:
 | Wrap pages in a layout | nothing (the nearest `_layout.html` applies) — `data-layout="/path.html"` to pick one, `data-layout="none"` to opt out |
 | Mark where page content lands, or let pages replace a named region | `<main>` for the default; `<slot name="footer">…</slot>` in the layout, `slot="footer"` on a page element |
 | Keep a page or folder out of the built site | name it with a leading underscore: `_draft.html`, `_includes/` |
+| Ship a bare snippet exactly as written (for `<include>`, embeds, fetch) | name it `*.fragment.html` |
 
-If a capability cannot be expressed with these four, it does not belong in unify.
+If a capability cannot be expressed with these five, it does not belong in unify.
 
 > **Status.** v0.7.0 is a clean break from 0.6.x: `data-unify`, `unify-*` area classes, `serve`, `--minify`, and `--fail-on` are gone, and a 0.6 site will not build. The composition model is standard HTML — `<main>`, `<slot>`, `slot=` — plus `<include src>` and `data-layout`. The specification set in [`docs/`](docs/) is authoritative; every normative rule in it is covered by a test that runs against the real CLI.
 
@@ -25,7 +26,7 @@ If a capability cannot be expressed with these four, it does not belong in unify
 curl -fsSL https://raw.githubusercontent.com/fwdslsh/unify/main/install.sh | bash
 ```
 
-Installs to `~/.local/bin` by default. The script accepts `--global` (system-wide, needs write access to `/usr/local/bin`), `--dir PATH`, `--version vX.Y.Z`, `--force`, and `--dry-run`. Prebuilt binaries for Linux and macOS (x86_64 and arm64) are attached to each [GitHub release](https://github.com/fwdslsh/unify/releases) — nothing else to install. No Windows binary yet — use the Bun or npm install below.
+Installs to `~/.local/bin` by default. The script accepts `--global` (system-wide, needs write access to `/usr/local/bin`), `--dir PATH`, `--version vX.Y.Z`, `--force`, and `--dry-run`. Prebuilt binaries for Linux and macOS (x86_64 and arm64) are attached to releases from v0.7.0 onward ([GitHub releases](https://github.com/fwdslsh/unify/releases)) — nothing else to install. No Windows binary yet — use the Bun or npm install below.
 
 ### Bun or npm — the developer path
 
@@ -154,7 +155,7 @@ Options:
       --clean              empty the output directory first
       --exclude <glob>     globs never emitted, still usable by the build (repeatable; default: _*)
       --pretty-urls        about.html → about/index.html, and rewrite internal links to match
-      --base-url <path>    site served from a subpath: prefix root-relative links in the output
+      --base-url <url>     the site's whole address (https://site.example/repo/): prefix root-relative links, and make og:/canonical absolute for share crawlers
       --dry-run            run the full build and every check, print the report, write nothing
       --strict             advisories count as problems for the exit code
   -p, --port <n>           port for `unify dev` (default: 3000)

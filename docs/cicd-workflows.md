@@ -46,6 +46,6 @@ There is no coverage threshold anywhere in CI, deliberately. This project shippe
 
 ## `release.yml`
 
-Triggered by GitHub releases: publishes to npm and builds the Docker image (delegating to a shared workflow in `fwdslsh/toolkit`). The release body comes from `.github/workflows/release_notes.md` — that file ships to users on every release, so it is worth reading before tagging.
+Triggered by pushing a `v*` tag (or manual dispatch). It first checks the tag against `package.json`'s version and fails early on a mismatch, then builds the binaries, creates the GitHub release with them attached (body = a generated install section plus `.github/workflows/release_notes.md` — that file ships to users, so read it before tagging), and publishes npm and the Docker image, all via shared workflows in `fwdslsh/toolkit`.
 
 Before tagging, the eleven release gates in `docs/testing-strategy.md` §6 should be green. `release-signal` covers G1 and G2; the rest — determinism, watch-equivalence, module reachability, the README embed, and the compiled binary walking the golden path — are checkable locally and documented there.

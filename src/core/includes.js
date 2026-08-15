@@ -34,7 +34,7 @@ import { CHECK_SPELLING, formatChain } from "./diagnostics.js";
 import { contains, toRelative } from "./paths.js";
 
 /** Inclusive: ten include files may be on the stack; the eleventh is the problem. */
-export const MAX_DEPTH = 10;
+const MAX_DEPTH = 10;
 
 /** `<include src="…">` — paired or void — captured with its full span. */
 const INCLUDE_TAG = /<include\b([^>]*)>(?:([\s\S]*?)<\/include\s*>)?/gi;
@@ -60,7 +60,7 @@ function srcOf(attrs) {
  * @param {string} args.sourceRoot
  * @returns {{path: string}|{escapes: true}}
  */
-export function resolveTarget({ spec, form, fromFile, sourceRoot }) {
+function resolveTarget({ spec, form, fromFile, sourceRoot }) {
   let resolved;
   if (form === "virtual") {
     resolved = resolve(sourceRoot, spec.replace(/^\//, ""));

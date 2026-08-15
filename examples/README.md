@@ -16,11 +16,11 @@ unify build -s src -o dist --pretty-urls --base-url https://fernhollow.pages.dev
 | | `seed-library` | `seed-library-alt` | `seed-library-ondemand` |
 |---|---|---|---|
 | varieties | 27 | 27 | 225 |
-| pages | 41 | 42 | 240 |
+| pages | 41 | 42 | 232 |
 | layouts | 2 | 3 | 2 |
-| `<include>` | 4 | 5 | 4 |
+| `<include>` | 4 | 5 | 5 |
 | named slots | 1 | 0 | 1 |
-| `data-layout="none"` | 2 | 1 | 0 |
+| `data-layout="none"` | 1 | 1 | 0 |
 | catalogue loading | in page | in page | fetched per family |
 
 `AUTHORS-NOTES.md` in each is the author's own write-up, unedited — including what it found
@@ -65,7 +65,7 @@ works with JavaScript off, because the anchors are real links. Writing the fetch
 relative to the page (`../data/allium.json`) is also correct and simpler; hardcoding
 `/library/` works until the day the site moves.
 
-**A section that looks different but shares chrome.** `notes/_layout.html` is a complete
+**A section that looks different but shares chrome.** `seasonal-notes/_layout.html` (in `seed-library`) is a complete
 standalone document with its own styling, and pulls the same header and footer fragments the
 site layout uses — which is what `<include>` is for. One page in that section opts back out
 to the site layout with `data-layout`.
@@ -107,11 +107,14 @@ output.
 
 ## What these examples do not show
 
-Two of the three seed-library sites leak private data into published pages. The catalogue export carries a
-seed-keeper name and contact address for each variety; `seed-library` and
-`seed-library-alt` both put the keeper's name on every public variety page. Only
-`seed-library-ondemand` publishes neither the names nor the addresses — its generator
-selects the fields it emits instead of spreading the whole record.
+One of the three seed-library sites leaks private data into published pages. The catalogue
+export carries a seed-keeper name and contact address for each variety; `seed-library-alt`
+puts the keeper's name on every public variety page. `seed-library` and
+`seed-library-ondemand` publish neither the names nor the addresses — their generators
+select the fields they emit instead of spreading the whole record. (The `@…example`
+addresses you will find in the built pages are *public* contact addresses the authors
+invented — grep for the exact private values before concluding anything, which is itself
+a lesson this file's first draft got wrong.)
 
 Every one of them correctly kept `varieties.json` itself out of the output, which is the
 point: the underscore rule and the never-shipped list exclude *files*, and once a generator
@@ -119,4 +122,4 @@ has copied a field into a page, that page is ordinary content. Across two rounds
 independent authors, all twelve excluded the file and eight still published its private
 fields. **The generator is the only place that privacy can be enforced, and no diagnostic
 exists to catch you** — so name the fields you emit rather than spreading the record, the
-way `seed-library-ondemand` does.
+way `seed-library` and `seed-library-ondemand` do.

@@ -1,7 +1,7 @@
-# Ratification — what eighteen rounds of agent experiments changed
+# Ratification — what the agent-experiment rounds changed
 
 **Status**: v0.7.0, historical record and argument
-**Role**: This document is the narrative and the evidence behind `docs/ratification-protocol.md`. The protocol is the procedure — how to run a round, how to triage what it finds. This is the account of running it: what was measured, what broke, what the results changed in the documentation, the specification, the implementation, and the product itself. The round-by-round primary source is `_notes/ratification-rounds-7-25.md`, with round 1 and two pre-registrations beside it.
+**Role**: This document is the narrative and the evidence behind `docs/ratification-protocol.md`. The protocol is the procedure — how to run a round, how to triage what it finds. This is the account of running it: what was measured, what broke, what the results changed in the documentation, the specification, the implementation, and the product itself. The round-by-round primary source is `_notes/ratification-rounds-7-25.md`, with round 1 and the pre-registrations beside it.
 
 ---
 
@@ -134,7 +134,7 @@ An empirical loop with no constraints becomes overfitting with extra steps. Thes
 
 ## 8. Running it again, and what is still untested
 
-`docs/ratification-protocol.md` is the procedure — setup, the harness traps, the triage order, the two amendment rules, and the results table for all eighteen rounds. `_notes/ratification-handoff-prompt.md` is the self-contained block to hand a fresh agent, including the five gates that must be green before any commit.
+`docs/ratification-protocol.md` is the procedure — setup, the harness traps, the triage order, the two amendment rules, and the results table for every round. `_notes/ratification-handoff-prompt.md` is the self-contained block to hand a fresh agent, including the five gates that must be green before any commit.
 
 Known limits of the method, stated because a method with no acknowledged limitations has not been examined: it reaches only the authoring surface, roughly a fifth of the spec — splice rules, head-merge tables, collision matrices, URL rewriting and publish semantics are unreachable by an agent writing HTML. Samples are correlated, since models share training data. And the bar is a model, so "Haiku gets it right" is a moving target; a doc that passed a year ago is not thereby passing today.
 

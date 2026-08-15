@@ -88,9 +88,9 @@ export class Reporter {
    * `fix:` lines — plus the optional `discriminator`. Two reasons it is not
    * the narrower (file, line, severity, message):
    *
-   * - `fix:` lines can carry what the message doesn't. A04's message is
-   *   "<slot> is outside a layout's <body>" with no name in it, while its fix
-   *   names the slot; two stray slots on ONE source line differ only in their
+   * - `fix:` lines can carry what the message doesn't. P20's in-page message
+   *   is "<slot> in a page fills nothing" with no slot name in it, while its
+   *   fix names the slot (P20 was advisory A04); two stray slots on ONE source line differ only in their
    *   fixes. Keying on the message alone would silently eat the second one's
    *   advice — dropping something the author needs to see, the failure mode
    *   this repository calls a content-loss bug everywhere else.

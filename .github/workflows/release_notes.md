@@ -26,6 +26,7 @@ unify watch --source src --output dist
 - **Includes**: `<include src="/_includes/nav.html"></include>`, plus the Apache SSI comment form for migrating SSI sites
 - **Layouts**: the nearest `_layout.html` wraps every page automatically; `data-layout` to pick one or opt out
 - **Slots**: `<slot name>` in layouts, `slot=` on page elements, `<main>` as the zero-vocabulary default
+- **Fragments**: name a file `*.fragment.html` and it ships byte-for-byte — a bare snippet for `<include>`, embeds, or client-side fetch, never composed
 - **Markdown**: equal citizen, with YAML frontmatter supplying the head and slug `id`s on every heading
 - **Underscore exclusion**: `_draft.html` and `_includes/` are build material that never ships
 - **Safe publishing**: builds are all-or-nothing — problems mean nothing is written and the previous output is untouched

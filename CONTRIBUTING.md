@@ -1,6 +1,6 @@
 # Contributing to unify
 
-unify is a static site generator for HTML-native composition. The v0.7.0 specification set in [`docs/`](docs/) is authoritative and the composition core is being rewritten against it — **learn the product from those documents, not from `src/`.** Finding v0.6 machinery in the tree is the expected state, not a discovery; its disposition is already decided in [`docs/migration-plan.md`](docs/migration-plan.md).
+unify is a static site generator for HTML-native composition. The v0.7.0 specification set in [`docs/`](docs/) is authoritative and `src/` implements it — **learn the product from those documents first.** When a document and the code disagree, that is a defect to report, never a license to reinterpret either. ([`docs/migration-plan.md`](docs/migration-plan.md) records how the v0.6 tree became this one.)
 
 ## Setup
 
@@ -101,7 +101,7 @@ The release metric is the conformance ledger: every gated rule recorded green, b
 4. Run `bun test`, both gate scripts above, and confirm the CLI surface is still exactly what `docs/cli-reference.md` lists — a surviving retired flag is a finding, not a feature.
 5. Describe what changed and which rule IDs it affects.
 
-Release gates G1–G11 in `docs/testing-strategy.md` §6 define when v0.7.0 ships. Each is a command with an exit code; none is a judgment call. **The CI badge stays red for the whole migration** — that is the honest state of a product being rewritten, and progress is reported as the ledger fraction, not as a partially green pipeline.
+Release gates G1–G11 in `docs/testing-strategy.md` §6 define when v0.7.0 ships. Each is a command with an exit code; none is a judgment call. **CI is green and must stay green** — every gate is a command with an exit code, and a red run is a regression, never progress.
 
 ## Reporting issues
 

@@ -5,7 +5,7 @@
 ```
 unify [build]              build the site (default command)
 unify dev                  build, watch, serve, and reload — the inner loop
-unify watch                build + rebuild on change, no server (pair with your own)
+unify watch                build + rebuild on change, no server
 unify init [template]      scaffold a starter site
 
 Options:
@@ -38,7 +38,7 @@ The same watch contract as `dev`, no server — for pairing with a server you al
 
 ### `unify init [template]`
 
-Scaffolds a starter site into `src/`. Templates: `default`, `basic`, `blog`, `docs`, `portfolio`. Every template exercises each primitive once — an include, the automatic `_layout.html`, a named slot with a page that fills it, a `data-layout="none"` page, and the underscore convention. The `blog` template also ships the generator pattern worked: `_scripts/gen.mjs` reads `posts/*.md` and `_data/authors.json` and regenerates `blog.html` and `feed.xml` (`node _scripts/gen.mjs && unify build`); both ship pre-generated, and the generator names the fields it emits, so the authors file's private `email` never reaches a page. `init` never creates `unify.yaml`. Guaranteed: `unify init && unify build --dry-run --strict` exits `0`.
+Scaffolds a starter site into `src/`. Templates: `default`, `basic`, `blog`, `docs`, `portfolio`. Every template exercises the core primitives once — an include, the automatic `_layout.html`, a named slot with a page that fills it, a `data-layout="none"` page, and the underscore convention. The `blog` template also ships the generator pattern worked: `_scripts/gen.mjs` reads `posts/*.md` and `_data/authors.json` and regenerates `blog.html` and `feed.xml` (`node _scripts/gen.mjs && unify build`); both ship pre-generated, and the generator names the fields it emits, so the authors file's private `email` never reaches a page. `init` never creates `unify.yaml`. Guaranteed: `unify init && unify build --dry-run --strict` exits `0`.
 
 ## Options
 
@@ -48,7 +48,7 @@ Source root and output directory. Pages (`.html`, `.md`) are processed; **every 
 
 ### `--clean`
 
-Empties the output directory before building. Refuses to run (exit `2`) when the output directory is, contains, or is contained by the source root or the working directory — `-o . --clean` is an error, not a deleted project. Under `watch`/`dev` it applies only at startup.
+Empties the output directory before building. Refuses to run (exit `2`) when the output directory is, or contains, the source root or the working directory — `-o . --clean` is an error, not a deleted project. It does not refuse when the output merely sits inside them: `-s . -o dist` is fine. Under `watch`/`dev` it applies only at startup.
 
 ### `--exclude <glob>` (repeatable)
 

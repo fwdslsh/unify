@@ -55,7 +55,7 @@
  *
  *   Pass A neutralizes constructs that are structurally invisible to the
  *   rest of composition before it starts — stray `<slot>` elements (§7.1:
- *   "a slot anywhere in a page, or in a layout's head" is not a sink; A04 +
+ *   "a slot anywhere in a page, or in a layout's head" is not a sink; P20 +
  *   S4) and P16 nested-slot violations (§7.1) — and reparses. Reparsing
  *   after Pass A means every offset Pass B computes is valid in exactly one
  *   text, with no risk of an attribute-removal edit landing inside a span
@@ -395,7 +395,7 @@ function composeNoLayout({ pageText, pageFile, pageSpans, resolveLine, reporter 
 // ------------------------------------------------------------- with layout
 
 function composeWithLayout({ pageText, pageFile, pageSpans, layoutText, layoutFile, layoutSpans, resolveLine, reporter }) {
-  // ---- Pass A: neutralize stray slots (§7.1 MRG-04/A04), both documents.
+  // ---- Pass A: neutralize stray slots (§7.1 MRG-04/P20), both documents.
   const c0 = parse(pageText);
   const cAt = spansToDiagnosticLocator(pageSpans, pageFile, resolveLine);
   const cExcluded = checkNestedSlots(c0.root, cAt, reporter);
@@ -732,7 +732,7 @@ function detectSinks(lBody, excluded, at, layoutFile, reporter) {
   };
 }
 
-// -------------------------------------------------------- shared: P16, A04
+// -------------------------------------------------------- shared: P16, P20
 
 /**
  * §7.1 P16: a `<slot>` nested inside another slot's fallback content. Scoped

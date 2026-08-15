@@ -10,7 +10,7 @@ import { existsSync, statSync } from "node:fs";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 
 /** Never emitted, independent of --exclude and not replaceable by it (§4.3). */
-export const NEVER_SHIPPED = [".git", ".hg", ".svn", "node_modules", ".env", "unify.yaml"];
+const NEVER_SHIPPED = [".git", ".hg", ".svn", "node_modules", ".env", "unify.yaml"];
 
 /**
  * Is `candidate` inside `root` (or the root itself)?

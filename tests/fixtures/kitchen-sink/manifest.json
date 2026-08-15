@@ -104,7 +104,7 @@
     "INC-03": "leading-/ branch only here; the relative branch is FIX-01 (spec 5.2) and landmine include-relative",
     "URL-01": "href/src branches; srcset/poster branches live in landmine srcset-poster-rewrite",
     "HED-01": "branches: page-without-charset (index, about, beans) and identical-charset-silent (contact); the moved-first and differing branches are landmines charset-page-only / charset-differs",
-    "MRG-13": "non-empty default branch; the empty-default-keeps-layout-children branch is landmine empty-page",
+    "MRG-13": "non-empty default branch; the empty-default-keeps-layout-children branch is landmine empty-default-main",
     "HED-05": "replace branch: contact.html declares its own icon, replacing the layout's favicon; the kept-when-page-declares-none branch is FIX-11"
    }
   },
@@ -171,7 +171,7 @@
    "flags": [
     "--strict"
    ],
-   "expectedTree": null,
+   "expectedTree": "expected",
    "exit": 1,
    "published": true,
    "diagnostics": [
@@ -187,7 +187,7 @@
     "DIA-03"
    ],
    "ruleNotes": {
-    "DIA-03": "the single advisory flips the exit code under --strict and blocks publish; the pre-seeded dist sentinel must be byte-untouched"
+    "DIA-03": "the single advisory flips the exit code under --strict; publish proceeds unchanged (published stays true — --strict never blocks publish)"
    },
    "note": "--strict changes the exit code, never what is published (product-spec §4, conformance §14.1): a stray .psd must not cost you a publish. This fixture asserted published:false and was WRONG — the first fixture defect found in the rewrite, and it did real damage: an implementer read it as authority and rewired build.js's publish gate from problems-only to exitCode===0 to satisfy it, believing it was fixing a bug. Exit stays 1 so CI still gates."
   }
