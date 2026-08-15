@@ -1,11 +1,11 @@
 # Advanced examples
 
-Four complete sites, each built by an agent that had never seen unify before — it was given
+Five sites. Four were built by an agent that had never seen unify before — it was given
 `docs/authoring-rules.md`, a client brief, and the compiled CLI, in a sandbox with no other
 documentation. They are kept because they passed review, not because they were written to
 be examples: what they show is what the 60 lines actually lead someone to build.
 
-The first two are one brief solved two ways; the third is a later, larger brief; the fourth integrates a Svelte component (its extra step: `npm install && npm run build:calculator`). All build clean:
+The first two are one brief solved two ways; the third is a later, larger brief; the fourth integrates a Svelte component (its extra steps: `npm install`, then `npm run build:calculator && npm run build:notes` — the build scripts live in `_scripts/` at the example root). The fifth, `htmx-fragments`, is the one hand-maintained exception: no sandboxed agent could download htmx, so it is written and tested by the maintainers to document the fragment + htmx pattern. All build clean:
 
 ```bash
 cd seed-library
@@ -77,6 +77,18 @@ organisation's CMS, so it carries `data-layout="none"` and ships as bare content
 supplied once at build time. Nothing in the source hardcodes the domain, so the same tree
 publishes to a different host by changing one flag.
 
+**Fragments fetched by htmx, with a no-JS fallback.** `htmx-fragments` is the
+`.fragment.html` feature working end to end: the month lists are bare fragments a button
+swaps in with `hx-get`, htmx itself is **vendored** (`src/assets/js/htmx.min.js`, copied
+from the npm package — the site loads nothing from another origin, and unify rewrites the
+script tag like any URL), and the opening-hours panel is one file consumed twice — spliced
+into the Visit page by `<include>` at build time, fetched raw by anyone else at runtime.
+Two details carry the pattern. The `hx-get` values are **page-relative** on purpose:
+unify rewrites `href`/`src` but never `hx-get`, so a root-relative value would silently
+miss the `--base-url` prefix — relative to the page, they resolve at any deploy address.
+And the default month is *included* into the page at build time, so the content is there
+before htmx loads, with JavaScript off, and for every crawler; the buttons only swap it.
+
 **A Svelte component on one page, without adopting a framework for the site.**
 `forge-svelte` integrates a fee estimator maintained as a `.svelte` file by someone
 else. The shape: `npm i svelte esbuild esbuild-svelte`, a ~20-line `_scripts/` build
@@ -95,7 +107,7 @@ output.
 
 ## What these examples do not show
 
-Two of the three leak private data into published pages. The catalogue export carries a
+Two of the three seed-library sites leak private data into published pages. The catalogue export carries a
 seed-keeper name and contact address for each variety; `seed-library` and
 `seed-library-alt` both put the keeper's name on every public variety page. Only
 `seed-library-ondemand` publishes neither the names nor the addresses — its generator

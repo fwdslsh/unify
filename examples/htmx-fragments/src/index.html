@@ -1,0 +1,26 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Home</title>
+  </head>
+  <body>
+    <main>
+      <h1>Holt Fen Windmill</h1>
+      <p>A restored smock mill on the fen edge, run by volunteers and the east wind.</p>
+
+      <section class="milling-days">
+        <h2>Milling days</h2>
+        <!-- hx-get values are PAGE-RELATIVE on purpose: unify rewrites href/src, never
+             hx-get, so a root-relative path here would silently miss the --base-url
+             prefix. Relative to this page they resolve correctly at any deploy address. -->
+        <nav class="tabs">
+          <button hx-get="months/this.fragment.html" hx-target="#months" hx-swap="innerHTML">This month</button>
+          <button hx-get="months/next.fragment.html" hx-target="#months" hx-swap="innerHTML">Next month</button>
+        </nav>
+        <div id="months">
+          <include src="/months/this.fragment.html"></include>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
