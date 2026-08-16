@@ -13,7 +13,7 @@ This repository ships **one** container image: the unify CLI, built from [`docke
 | Working directory | `/workspace` |
 | User | non-root `appuser` (uid 1001, gid 1001) |
 
-The image is published by the `docker` job in [`.github/workflows/release.yml`](../.github/workflows/release.yml) when a `v*` tag is pushed, as `fwdslsh/unify`.
+The image is published by the `docker` job in [`.github/workflows/release.yml`](../.github/workflows/release.yml) when a `v*` tag is pushed, as `fwdslsh/unify` — built from `docker/Dockerfile` in this repo, tagged with the release tag and `latest`.
 
 ```bash
 docker pull fwdslsh/unify:latest

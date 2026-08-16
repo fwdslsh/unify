@@ -1,5 +1,18 @@
 name: Release
 
+# Everything this workflow does is in this file. It used to delegate to four
+# shared workflows in fwdslsh/toolkit; that indirection cost more than it saved
+# — the shared release step generated a download table for a different tool
+# (catalog-*), and the shared build step ran `bun test || echo skipping`, so a
+# red tree could ship. Both are fixed here by being here.
+#
+# Two ways in, and a prerelease is decided by the version, never by the route:
+#   - push a tag `v*` (`v0.7.0`, or `v0.7.1-rc.1` from a release branch)
+#   - run it manually from any branch; the tag defaults to package.json's version
+# A version with a hyphen (`0.7.1-rc.1`) is a semver prerelease, so the GitHub
+# release is marked pre-release, npm publishes under the `next` dist-tag, and
+# `docker …:latest` is left pointing at the last stable build.
+
 on:
   push:
     tags:
@@ -7,75 +20,181 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to release (e.g., v1.0.0)'
-        required: true
+        description: 'Tag to release (default: v + the version in package.json)'
+        required: false
         type: string
 
 permissions:
   contents: write
-  packages: write
+  id-token: write # npm trusted publishing (OIDC) — this replaces NPM_TOKEN
 
 jobs:
-  init:
-    name: Initialize
+  release:
+    name: Verify, build, and publish the release
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.rel.outputs.tag }}
+      prerelease: ${{ steps.rel.outputs.prerelease }}
     steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
 
-      - name: Env Check
-        run: |
-          echo "Release: ${{ github.event.inputs.tag || github.ref_name }}"
-        shell: bash
-
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
 
       # `unify --version` — compiled binary and npm package alike — reports
-      # package.json's version (src/cli.js imports it). A tag that disagrees
-      # would ship artifacts that self-report a different version, and npm
-      # publish would fail only after every binary had already been built and
-      # uploaded. Catch it here instead, before anything is built or published.
-      - name: Tag must match package.json version
-        shell: bash
+      # package.json's version (src/cli.js imports it), so package.json is the
+      # single source of truth here and a tag may only agree with it.
+      - name: Resolve the release, and check the tag against package.json
+        id: rel
         run: |
-          tag="${{ github.event.inputs.tag || github.ref_name }}"
-          pkg="v$(jq -r .version package.json)"
-          [ "$tag" = "$pkg" ] || { echo "::error::tag $tag does not match package.json version $pkg — bump package.json or retag"; exit 1; }
+          version="$(jq -r .version package.json)"
+          tag="${{ inputs.tag }}"
+          [ -n "$tag" ] || tag="v${version}"
+          if [ "$tag" != "v${version}" ]; then
+            echo "::error::tag $tag does not match package.json version v$version — bump package.json or retag"
+            exit 1
+          fi
+          case "$version" in
+            *-*) prerelease=true ;;   # semver prerelease: 0.7.1-rc.1
+            *)   prerelease=false ;;
+          esac
+          {
+            echo "tag=$tag"
+            echo "version=$version"
+            echo "prerelease=$prerelease"
+            if [ "$prerelease" = true ]; then echo "npm_tag=next"; else echo "npm_tag=latest"; fi
+          } >> "$GITHUB_OUTPUT"
+          echo "Releasing $tag from ${GITHUB_REF} (prerelease=$prerelease)"
 
-  # First, build all binaries
-  build:
-    name: Build Binaries
-    needs: init
-    uses: fwdslsh/toolkit/.github/workflows/bun-build-binaries.yml@main
-    with:
-      upload-artifacts: true
+      # The release gates, the same commands CI runs on every push. A tag can
+      # be pushed at any commit, so this is the only thing standing between a
+      # red tree and a published release.
+      - name: Release gates
+        run: |
+          rm -f .conformance-ledger.jsonl
+          bun test
+          bun tests/conformance/check-suite-hygiene.mjs
+          bun tests/conformance/check-traceability.mjs --runtime .conformance-ledger.jsonl
 
-  # Then create the release
-  release:
-    name: Create Release
-    needs: build
-    if: ${{ !cancelled() && needs.build.result == 'success' }}
-    uses: fwdslsh/toolkit/.github/workflows/create-gh-release.yml@main
-    with:
-      tag: ${{ github.event.inputs.tag || github.ref_name }}
-    secrets: inherit
+      # One runner cross-compiles every target, so there is no build matrix.
+      # These names are the contract install.sh downloads by ("unify-$os-$arch",
+      # detect_platform) — changing one means changing that script too.
+      - name: Build binaries
+        run: |
+          bun build --compile --target=bun-linux-x64     ./src/cli.js --outfile unify-linux-x86_64
+          bun build --compile --target=bun-linux-arm64   ./src/cli.js --outfile unify-linux-arm64
+          bun build --compile --target=bun-darwin-x64    ./src/cli.js --outfile unify-darwin-x86_64
+          bun build --compile --target=bun-darwin-arm64  ./src/cli.js --outfile unify-darwin-arm64
+          ls -l unify-*
 
+      # Gate G11: the artifact users download walks the golden path, not just
+      # `--version`. Only the runner's own architecture can be executed here.
+      - name: Smoke the linux binary
+        run: |
+          bin="$PWD/unify-linux-x86_64"
+          [ "$("$bin" --version)" = "${{ steps.rel.outputs.version }}" ] || { echo "::error::binary reports the wrong version"; exit 1; }
+          tmp="$(mktemp -d)"
+          cd "$tmp"
+          "$bin" init
+          "$bin" build --dry-run --strict
+          "$bin" build
+          [ -f dist/index.html ] || { echo "::error::binary built no index.html"; exit 1; }
 
-  # Call Docker publishing workflow
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.rel.outputs.tag }}
+        run: |
+          {
+            echo "## Install"
+            echo
+            echo '```bash'
+            echo "curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/main/install.sh | bash"
+            echo '```'
+            echo
+            echo "Or download a binary below, \`chmod +x\` it, and put it on your PATH."
+            if [ "${{ steps.rel.outputs.prerelease }}" = "true" ]; then
+              echo "npm: \`npm install -g @fwdslsh/unify@next\` — Bun: \`bun add -g @fwdslsh/unify@next\`"
+              echo
+              echo "> This is a **pre-release**. \`install.sh\` and \`@fwdslsh/unify\` keep resolving to the latest stable build."
+            else
+              echo "npm: \`npm install -g @fwdslsh/unify\` — Bun: \`bun add -g @fwdslsh/unify\`"
+            fi
+            echo
+            echo "| Platform | Download |"
+            echo "|---|---|"
+            for f in unify-linux-x86_64 unify-linux-arm64 unify-darwin-x86_64 unify-darwin-arm64; do
+              echo "| \`$f\` | [download](https://github.com/${{ github.repository }}/releases/download/$TAG/$f) |"
+            done
+            echo
+            cat .github/workflows/release_notes.md
+          } > release-body.md
+          pre="${{ steps.rel.outputs.prerelease == 'true' && '--prerelease' || '' }}"
+          assets="unify-linux-x86_64 unify-linux-arm64 unify-darwin-x86_64 unify-darwin-arm64"
+          # Re-runnable on purpose: publishing to npm is the step most likely
+          # to fail for reasons outside this repo (the trusted-publisher entry
+          # on npmjs.com), and a re-run must not die because the release it
+          # already created exists.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "release $TAG already exists — updating its notes and assets"
+            gh release edit "$TAG" --notes-file release-body.md $pre
+            gh release upload "$TAG" $assets --clobber
+          else
+            # --target makes this work when the tag does not exist yet (a manual
+            # run from a release branch): the tag is created at this commit.
+            gh release create "$TAG" --target "$GITHUB_SHA" --title "$TAG" \
+              --notes-file release-body.md $pre $assets
+          fi
+
+      # Trusted publishing: npm mints a short-lived credential from this job's
+      # OIDC identity, so there is no token to store or rotate. It requires
+      # `id-token: write` above, npm >= 11.5.1, and the package configured on
+      # npmjs.com with this repository and this workflow filename as a trusted
+      # publisher. Provenance is attached automatically.
+      - name: Publish to npm
+        run: |
+          npm install -g npm@latest
+          npm --version
+          npm publish --access public --tag "${{ steps.rel.outputs.npm_tag }}"
+
   docker:
-    name: Publish Docker Image
-    needs: [build]
-    if: ${{ !cancelled() && needs.build.result == 'success' }}
-    uses: fwdslsh/toolkit/.github/workflows/publish-docker.yml@main
-    with:
-      tag:  ${{ github.event.inputs.tag || github.ref_name }}
-      description: Unify is a SSG that provides a minimal tool set to allow developers to build lightweight web sites
-    secrets: inherit
-  
+    name: Publish the Docker image
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
 
-  # Call NPM publishing workflow
-  publish-npm:
-    name: Publish NPM Package
-    needs: [build]
-    if: ${{ !cancelled() && needs.build.result == 'success' }}
-    uses: fwdslsh/toolkit/.github/workflows/publish-npm.yml@main
-    secrets: inherit
+      - name: Require Docker Hub credentials
+        env:
+          USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          [ -n "$USERNAME" ] && [ -n "$TOKEN" ] || { echo "::error::DOCKERHUB_USERNAME and DOCKERHUB_TOKEN secrets are required"; exit 1; }
+
+      # A prerelease gets its own tag only: `:latest` keeps pointing at the
+      # last stable image, so `docker pull fwdslsh/unify` never surprises.
+      - name: Image tags
+        id: tags
+        env:
+          TAG: ${{ needs.release.outputs.tag }}
+          PRERELEASE: ${{ needs.release.outputs.prerelease }}
+        run: |
+          {
+            echo 'list<<TAGS_EOF'
+            echo "fwdslsh/unify:${TAG}"
+            if [ "$PRERELEASE" != "true" ]; then echo "fwdslsh/unify:latest"; fi
+            echo 'TAGS_EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: docker/Dockerfile
+          push: true
+          tags: ${{ steps.tags.outputs.list }}
