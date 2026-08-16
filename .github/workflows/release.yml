@@ -130,14 +130,22 @@ jobs:
             echo
             cat .github/workflows/release_notes.md
           } > release-body.md
-          # --target makes this work when the tag does not exist yet (a manual
-          # run from a release branch): the tag is created at this commit.
-          gh release create "$TAG" \
-            --target "$GITHUB_SHA" \
-            --title "$TAG" \
-            --notes-file release-body.md \
-            ${{ steps.rel.outputs.prerelease == 'true' && '--prerelease' || '' }} \
-            unify-linux-x86_64 unify-linux-arm64 unify-darwin-x86_64 unify-darwin-arm64
+          pre="${{ steps.rel.outputs.prerelease == 'true' && '--prerelease' || '' }}"
+          assets="unify-linux-x86_64 unify-linux-arm64 unify-darwin-x86_64 unify-darwin-arm64"
+          # Re-runnable on purpose: publishing to npm is the step most likely
+          # to fail for reasons outside this repo (the trusted-publisher entry
+          # on npmjs.com), and a re-run must not die because the release it
+          # already created exists.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "release $TAG already exists — updating its notes and assets"
+            gh release edit "$TAG" --notes-file release-body.md $pre
+            gh release upload "$TAG" $assets --clobber
+          else
+            # --target makes this work when the tag does not exist yet (a manual
+            # run from a release branch): the tag is created at this commit.
+            gh release create "$TAG" --target "$GITHUB_SHA" --title "$TAG" \
+              --notes-file release-body.md $pre $assets
+          fi
 
       # Trusted publishing: npm mints a short-lived credential from this job's
       # OIDC identity, so there is no token to store or rotate. It requires
