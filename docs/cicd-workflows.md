@@ -46,6 +46,21 @@ There is no coverage threshold anywhere in CI, deliberately. This project shippe
 
 ## `release.yml`
 
-Triggered by pushing a `v*` tag (or manual dispatch). It first checks the tag against `package.json`'s version and fails early on a mismatch, then builds the binaries, creates the GitHub release with them attached (body = a generated install section plus `.github/workflows/release_notes.md` — that file ships to users, so read it before tagging), and publishes npm and the Docker image, all via shared workflows in `fwdslsh/toolkit`.
+Triggered by pushing a `v*` tag (or manual dispatch). Two jobs, both defined in this repo:
 
-Before tagging, the eleven release gates in `docs/testing-strategy.md` §6 should be green. `release-signal` covers G1 and G2; the rest — determinism, watch-equivalence, module reachability, the README embed, and the compiled binary walking the golden path — are checkable locally and documented there.
+**`release`** does everything up to and including npm, in order, on one runner:
+
+1. **Tag must match `package.json`'s version.** `unify --version` reports package.json for the binary and the npm package alike, so a tag that disagrees would ship artifacts that self-report a different version. Checked before anything is built.
+2. **The release gates** — `bun test`, suite hygiene, runtime traceability: the same commands `test.yml` runs. A tag can be pushed at any commit, so this is the only thing standing between a red tree and a published release.
+3. **Four binaries, one runner.** Bun cross-compiles every target, so there is no build matrix: `unify-linux-x86_64`, `unify-linux-arm64`, `unify-darwin-x86_64`, `unify-darwin-arm64`. **Those names are a contract with `install.sh`**, which downloads `unify-$os-$arch` from the release; renaming one means editing that script in the same commit.
+4. **Smoke the linux binary** (gate G11): it reports the right version, then scaffolds and builds a site — `init`, `build --dry-run --strict`, `build`, and `dist/index.html` exists. Only the runner's own architecture can be executed; the other three are built and shipped unrun.
+5. **Create the release** with the four binaries attached. The body is a generated install section — the download table is built from the same list the build step uses, so the links cannot drift from the assets — followed by `.github/workflows/release_notes.md` verbatim. That file ships to users on every release, so read it before tagging.
+6. **Publish to npm** (`NPM_TOKEN`).
+
+**`docker`** needs `release`, builds `docker/Dockerfile`, and pushes `fwdslsh/unify:<tag>` and `:latest` (`DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`).
+
+Required secrets, all three checked with a clear error rather than failing obscurely: `NPM_TOKEN`, `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`.
+
+**Why it is all in one file.** This workflow used to delegate to four shared workflows in `fwdslsh/toolkit`. The indirection cost more than it saved: the shared release step generated a "Manual Downloads" table for a different tool (`catalog-*` binaries, plus a Windows row unify does not build), so every release page advertised dead links; and the shared build step ran `bun test || echo "No tests configured, skipping..."`, which swallowed failures, so nothing in the release path ever gated on the suite. Both defects were invisible from this repo and unfixable from it. Local, boring, and readable beats shared and remote for a workflow that runs a handful of times a year.
+
+Before tagging, the eleven release gates in `docs/testing-strategy.md` §6 should be green. `test.yml` covers G1 and G2 on every push, and `release.yml` re-runs them plus G11 (the compiled binary walking the golden path) at tag time; the rest — determinism, watch-equivalence, module reachability, the README embed — are checkable locally and documented there.
