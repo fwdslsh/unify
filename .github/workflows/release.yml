@@ -20,7 +20,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to release (default: v + the version in package.json)'
+        description: 'Version to release — leave blank to use package.json. "0.7.0" and "v0.7.0" both work.'
         required: false
         type: string
 
@@ -49,12 +49,23 @@ jobs:
         id: rel
         run: |
           version="$(jq -r .version package.json)"
-          tag="${{ inputs.tag }}"
-          [ -n "$tag" ] || tag="v${version}"
-          if [ "$tag" != "v${version}" ]; then
-            echo "::error::tag $tag does not match package.json version v$version — bump package.json or retag"
+          # What the run was asked for: the pushed tag, or the dispatch input.
+          # (On a dispatch, github.ref_name is the branch, so it must not be
+          # used as a fallback — an empty input means "use package.json".)
+          if [ "${{ github.event_name }}" = "push" ]; then
+            asked="${{ github.ref_name }}"
+          else
+            asked="${{ inputs.tag }}"
+          fi
+          # Compare versions, not spellings: `v0.7.0-beta.1` and `0.7.0-beta.1`
+          # are the same request, and an empty input means package.json's.
+          asked="${asked#v}"
+          [ -n "$asked" ] || asked="$version"
+          if [ "$asked" != "$version" ]; then
+            echo "::error::asked to release $asked but package.json says $version — bump package.json, or release the version it already declares"
             exit 1
           fi
+          tag="v${version}"
           case "$version" in
             *-*) prerelease=true ;;   # semver prerelease: 0.7.1-rc.1
             *)   prerelease=false ;;
