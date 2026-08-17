@@ -1,0 +1,199 @@
+Phase 0 expected-fail record — the conformance harness vs the v0.6 engine
+=========================================================================
+
+Date:    2026-08-12
+Engine:  @fwdslsh/unify v0.6.6 (spawned as `bun src/cli.js`, banner "Unify v0.6.0")
+Runner:  bun 1.3.14, linux x64
+Command: rm -f .conformance-ledger.jsonl && bun test tests/conformance   (83.6 s)
+
+WHY A RED HARNESS IS THE PHASE-0 PASS CONDITION — READ BEFORE "FIXING" ANYTHING
+-------------------------------------------------------------------------------
+This run is the harness's proof of detection. The v0.6 suite reported 93%
+coverage and a green badge on a product whose golden path was broken
+(docs/testing-strategy.md §1). Phase 0 lands the new authority: a harness
+that drives the real CLI against the spec's own fixtures. Run against the
+v0.6 engine it MUST be red — 81 of 86 cases fail below — because the engine
+does not implement the v0.7.0 conformance spec. That red is the evidence the
+harness can see the broken product the old suite blessed (migration-plan §3,
+Phase 0 item 3, and Gate P0).
+
+Therefore: any change that turns these cases green WITHOUT the v0.7 engine —
+loosening the comparator in compare.mjs, widening its single whitespace
+normalization, raising or removing the 30 s hang timeout or the 16 MB
+runaway-output cap, softening diagnosticsExhaustive, or editing expected
+trees to match observed output — is the exact failure mode this migration
+exists to kill (strategy §1 M2/M3/M5, hygiene rule H5). The only legitimate
+path from red to green is the Phase 1–4 engine work.
+
+RESULT SUMMARY
+--------------
+  tests registered   86   (10 spec-fixtures + 4 kitchen-sink profiles
+                           + 65 checked-in landmines + 6 runtime landmines
+                           + 1 strict variant + 1 machinery-summary test)
+  failed             81
+  passed              5   (accidental v0.6 conformance — see below)
+
+  failure modes, mutually exclusive per case:
+    conformance assertion failures  70   wrong trees / diagnostics / exit
+                                         codes / publish-sentinel violations
+    runaway output (killed @16 MB)   5   the v0.6 "missing include" bug is an
+                                         unbounded output loop, not a quiet
+                                         hang: missing-include, include-escape,
+                                         include-bad-ext, include-md-fragment,
+                                         empty-include
+    hard hang (killed @30 s)         2   include-cycle, dollar-patterns
+    died by signal (exit null)       3   spec-fixtures/FIX-13,
+                                         landmines/frontmatter-junk-keys,
+                                         landmines/md-include-element — all
+                                         three also produced nonconforming
+                                         trees, so they fail on substance
+                                         regardless; standalone reruns exit 0,
+                                         the signal death reproduces only
+                                         under the full-suite run
+    machinery summary                1   landmines/harness-contract fails by
+                                         design while any landmine case fails
+
+THE FIVE ACCIDENTAL PASSES
+--------------------------
+Five landmines pass because v0.6's include engine happens to satisfy their
+declared outcome. Each was inspected; none is a weak assertion:
+  landmines/include-relative              full-tree compare; v0.6 output is
+                                          byte-different (one extra blank
+                                          line) but equal under the §2
+                                          comparator's single waived class —
+                                          whitespace-only text between block
+                                          elements. The comparator is doing
+                                          exactly, and only, what the
+                                          contract says.
+  landmines/include-depth-10              10-deep include chain builds clean
+                                          (its twin include-depth-11 fails)
+  landmines/no-layout-anywhere            layoutless page emitted as-is
+  landmines/fragment-links-ok             fragment-only links, passthrough
+  landmines/collision-pretty-landing-noflag  both files ship without
+                                          --pretty-urls (its flagged twin
+                                          fails)
+The migration plan predicted "every case fails"; the observed truth is 81/86,
+with the five exceptions confined to the narrow overlap between v0.6's SSI
+machinery and the v0.7 spec. They will keep passing under the v0.7 engine.
+
+EXHIBITS (the historical bugs, now machine-visible)
+---------------------------------------------------
+landmines/content-nowhere — the silent content deletion v0.6 shipped:
+  - exit code: declared 1, got 0
+  - declared diagnostic missing: problem at src/about.html:1 containing ["_layout.html"]
+  - publish block (PUB-01) — previous output must be byte-untouched: about.html: absent sentinel, appeared post-run output
+  (v0.6 deleted the page's content, printed success, and published anyway —
+   caught three independent ways.)
+
+landmines/missing-include — the "infinite loop" M-item:
+  - CLI runaway output; killed after 16777216 bytes on one stream
+  (Detected and contained in ~0.6 s. An earlier harness draft buffered this
+   output unbounded and OOM-killed the test process itself — the 16 MB cap
+   exists so a runaway CLI fails its case, never the run.)
+
+kitchen-sink/default — composition and mirror-copy gaps, first lines:
+  - tree: missing from output: menu/beans.html
+  - tree: missing from output: robots.txt
+  - tree: 404.html > html[0] > body[1]: attribute count differs: expected <body>, got <body data-layout="none">
+  - tree: legal/privacy.html > html[0]: attribute count differs: expected <html lang="en">, got <html>
+
+RELEASE-SIGNAL STATE ON THIS RUN
+--------------------------------
+  covered (runtime): 8 of 189 gated rules — the CI release job is red, as designed.
+
+PER-CASE RESULTS
+----------------
+  FAIL  spec-fixtures/FIX-01                                 conformance assertions
+  FAIL  spec-fixtures/FIX-02                                 conformance assertions
+  FAIL  spec-fixtures/FIX-03                                 conformance assertions
+  FAIL  spec-fixtures/FIX-04                                 conformance assertions
+  FAIL  spec-fixtures/FIX-05                                 conformance assertions
+  FAIL  spec-fixtures/FIX-07                                 conformance assertions
+  FAIL  spec-fixtures/FIX-09                                 conformance assertions
+  FAIL  spec-fixtures/FIX-11                                 conformance assertions
+  FAIL  spec-fixtures/FIX-12                                 conformance assertions
+  FAIL  spec-fixtures/FIX-13                                 died by signal (exit null)
+  FAIL  kitchen-sink/default                                 conformance assertions
+  FAIL  kitchen-sink/pretty-base                             conformance assertions
+  FAIL  kitchen-sink/origin                                  conformance assertions
+  FAIL  kitchen-sink/strict                                  conformance assertions
+  FAIL  landmines/retired-data-unify                         conformance assertions
+  FAIL  landmines/retired-unify-class                        conformance assertions
+  FAIL  landmines/retired-vocab-in-excluded                  conformance assertions
+  FAIL  landmines/missing-include                            runaway output, killed @16MB
+  FAIL  landmines/include-cycle                              hang, killed @30s
+  FAIL  landmines/include-depth-11                           conformance assertions
+  FAIL  landmines/include-no-src                             conformance assertions
+  FAIL  landmines/include-with-content                       conformance assertions
+  FAIL  landmines/include-escape                             runaway output, killed @16MB
+  FAIL  landmines/include-bad-ext                            runaway output, killed @16MB
+  FAIL  landmines/include-md-fragment                        runaway output, killed @16MB
+  FAIL  landmines/layout-bare-name                           conformance assertions
+  FAIL  landmines/layout-declares-layout                     conformance assertions
+  FAIL  landmines/layout-missing                             conformance assertions
+  FAIL  landmines/layout-escape                              conformance assertions
+  FAIL  landmines/data-layout-on-div                         conformance assertions
+  FAIL  landmines/content-nowhere                            conformance assertions
+  FAIL  landmines/misaddressed-fill                          conformance assertions
+  FAIL  landmines/duplicate-slot-name                        conformance assertions
+  FAIL  landmines/second-bare-slot                           conformance assertions
+  FAIL  landmines/dup-main                                   conformance assertions
+  FAIL  landmines/slot-in-page                               conformance assertions
+  FAIL  landmines/slot-in-layout-head                        conformance assertions
+  FAIL  landmines/slot-in-template                           conformance assertions
+  FAIL  landmines/slot-attr-edge                             conformance assertions
+  FAIL  landmines/nested-main-in-div                         conformance assertions
+  FAIL  landmines/main-in-main                               conformance assertions
+  FAIL  landmines/empty-default-main                         conformance assertions
+  FAIL  landmines/empty-default-slot                         conformance assertions
+  FAIL  landmines/empty-md                                   conformance assertions
+  FAIL  landmines/head-in-markdown                           conformance assertions
+  FAIL  landmines/frontmatter-in-html                        conformance assertions
+  FAIL  landmines/collision-md-html                          conformance assertions
+  FAIL  landmines/collision-pretty-landing                   conformance assertions
+  FAIL  landmines/underscore-guard                           conformance assertions
+  FAIL  landmines/netlify-headers                            conformance assertions
+  FAIL  landmines/stranded-underscore-asset                  conformance assertions
+  FAIL  landmines/broken-link                                conformance assertions
+  FAIL  landmines/case-mismatch-link                         conformance assertions
+  FAIL  landmines/handwritten-pretty-url                     conformance assertions
+  FAIL  landmines/css-url-broken                             conformance assertions
+  FAIL  landmines/style-url-not-rewritten                    conformance assertions
+  FAIL  landmines/style-attr-url-broken                      conformance assertions
+  FAIL  landmines/dollar-patterns                            hang, killed @30s
+  FAIL  landmines/working-format                             conformance assertions
+  FAIL  landmines/working-format-strict                      conformance assertions
+  FAIL  landmines/include-also-page                          conformance assertions
+  FAIL  landmines/frontmatter-junk-keys                      died by signal (exit null)
+  FAIL  landmines/frontmatter-deep-nest                      conformance assertions
+  FAIL  landmines/charset-differs                            conformance assertions
+  FAIL  landmines/charset-page-only                          conformance assertions
+  FAIL  landmines/md-include-element                         died by signal (exit null)
+  FAIL  landmines/srcset-poster-rewrite                      conformance assertions
+  FAIL  landmines/base-url-subpath                           conformance assertions
+  FAIL  landmines/layout-none-md                             conformance assertions
+  FAIL  landmines/stray-header-footer                        conformance assertions
+  FAIL  landmines/empty-include                              runaway output, killed @16MB
+  FAIL  landmines/slot-in-filled-fallback                    conformance assertions
+  FAIL  landmines/two-problems-one-pass                      conformance assertions
+  FAIL  landmines-runtime/case-twin-outputs                  conformance assertions
+  FAIL  landmines-runtime/case-twin-outputs--strict          conformance assertions
+  FAIL  landmines-runtime/symlink-escape                     conformance assertions
+  FAIL  landmines-runtime/never-shipped-vcs                  conformance assertions
+  FAIL  landmines-runtime/clean-containment                  conformance assertions
+  FAIL  landmines-runtime/defaulted-source-notice            conformance assertions
+  FAIL  landmines-runtime/explicit-source-suppresses-notice  conformance assertions
+  FAIL  landmines/harness-contract                           conformance assertions
+  pass  landmines/collision-pretty-landing-noflag            accidental v0.6 conformance
+  pass  landmines/fragment-links-ok                          accidental v0.6 conformance
+  pass  landmines/include-depth-10                           accidental v0.6 conformance
+  pass  landmines/include-relative                           accidental v0.6 conformance
+  pass  landmines/no-layout-anywhere                         accidental v0.6 conformance
+
+REGENERATING THIS RECORD
+------------------------
+  bun install
+  rm -f .conformance-ledger.jsonl
+  bun test tests/conformance
+Numbers will shift as fixture sets grow; the invariant that must hold until
+the v0.7 engine exists is: the harness runs, and it is red.

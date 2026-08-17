@@ -1,0 +1,613 @@
+/**
+ * Unit tests for src/core/compose.js (Tier 3 — no conformance authority;
+ * testing-strategy §2). Drives compose() directly against the exact source
+ * trees used by the conformance spec's own worked examples
+ * (tests/conformance/spec-fixtures/) and the composition-family landmines
+ * (tests/fixtures/landmines/), using compare.mjs's compareHtml — the same
+ * comparator the conformance harness gates on — rather than a hand-rolled
+ * one (H5 discipline).
+ *
+ * This file exists because the conformance harness itself cannot exercise
+ * compose.js yet: `unify build` (src/cli/commands/build.js) is still the
+ * Phase 1 NOT_IMPLEMENTED placeholder, and layout resolution (§6) and
+ * Markdown conversion (§10) — both prerequisites compose() is handed
+ * already-resolved input by — are other agents' modules. These tests are
+ * the verification available without that wiring: they call compose()
+ * exactly as its documented contract says a future build.js will.
+ */
+import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { assembleMarkdownDocument, compose } from "../../../src/core/compose.js";
+import { inlineIncludes } from "../../../src/core/includes.js";
+import { convert } from "../../../src/core/markdown.js";
+import { Reporter } from "../../../src/core/diagnostics.js";
+import { compareHtml } from "../../../tests/conformance/compare.mjs";
+import { findFirst, isElement, lineOf, parse } from "../../../src/core/html.js";
+
+/**
+ * Chains the real includes.js (§5) ahead of compose() — stronger fidelity
+ * than hand-splicing. Returns the full `{text, spans}` (most callers below
+ * only need `.text`, matching the pre-provenance shape of this helper; the
+ * few that need real span-based provenance destructure `.spans` too).
+ */
+async function withIncludesInlined(caseDir, pageRel, reporter) {
+  const sourceRoot = join(caseDir, "src");
+  const file = join(sourceRoot, pageRel);
+  const text = readFileSync(file, "utf8");
+  return inlineIncludes({
+    text, file, sourceRoot, reporter,
+    convertMarkdown: async () => { throw new Error("no .md includes expected in these fixtures"); },
+  });
+}
+
+/**
+ * compose()'s injected `resolveLine` (§14.1), the same thing
+ * src/cli/commands/build.js builds for a real build: a provenance position
+ * `{file, fileOffset}` turned into a line by reading that file. compose.js
+ * cannot do this itself — it never touches the filesystem — which is exactly
+ * why the parameter exists.
+ */
+function sourceLineResolver(caseDir) {
+  const sourceRoot = join(caseDir, "src");
+  return (file, fileOffset) => lineOf(readFileSync(join(sourceRoot, file), "utf8"), fileOffset);
+}
+
+const ROOT = join(import.meta.dir, "..", "..", "..");
+const SPEC_FIXTURES = join(ROOT, "tests", "conformance", "spec-fixtures");
+const LANDMINES = join(ROOT, "tests", "fixtures", "landmines");
+
+function silentReporter() {
+  return new Reporter({ stderr: { write() {} }, stdout: { write() {} } });
+}
+
+/**
+ * @param {string} caseDir - absolute path to a fixture's directory (contains src/, optionally expected/)
+ * @param {string} pageRel - page path relative to src/, e.g. "index.html" or "deep/page.html"
+ * @param {string} [layoutRel] - layout path relative to src/; omit for no-layout cases
+ */
+function composeFixture(caseDir, pageRel, layoutRel = "_layout.html") {
+  const pageText = readFileSync(join(caseDir, "src", pageRel), "utf8");
+  const layoutPath = join(caseDir, "src", layoutRel);
+  let layoutText;
+  try {
+    layoutText = readFileSync(layoutPath, "utf8");
+  } catch {
+    layoutText = null;
+  }
+  const reporter = silentReporter();
+  const { text: composed } = compose({
+    pageText, pageFile: pageRel,
+    layoutText, layoutFile: layoutText ? layoutRel : undefined,
+    reporter,
+  });
+  return { composed, reporter };
+}
+
+function expectTreeMatch(caseDir, pageRel, composed) {
+  const expectedText = readFileSync(join(caseDir, "expected", pageRel), "utf8");
+  const diffs = compareHtml(expectedText, composed, pageRel);
+  expect(diffs).toEqual([]);
+}
+
+// ---------------------------------------------------------- spec-fixtures
+
+describe("spec-fixtures: composition family", () => {
+  test("FIX-01: data-layout=none page, no layout — emitted from its own text (data-layout stripped)", async () => {
+    const dir = join(SPEC_FIXTURES, "FIX-01");
+    // compose.js never sees <include> — includes.js (§5) resolves those first
+    // in the real pipeline. Chain the REAL includes.js module here (owned by
+    // this same task's neighboring boundary, safe to import) rather than
+    // hand-splicing, for end-to-end fidelity through two of the three pieces.
+    const reporter = silentReporter();
+    const { text: pageText, spans: pageSpans } = await withIncludesInlined(dir, "index.html", reporter);
+    const { text: composed } = compose({ pageText, pageFile: "index.html", pageSpans, layoutText: null, reporter });
+    expect(reporter.diagnostics).toEqual([]);
+    const diffs = compareHtml(readFileSync(join(dir, "expected", "index.html"), "utf8"), composed, "index.html");
+    expect(diffs).toEqual([]);
+  });
+
+  test("FIX-02/C1: golden path — <main> default content with unwrap, title join", () => {
+    const dir = join(SPEC_FIXTURES, "FIX-02");
+    const { composed, reporter } = composeFixture(dir, "index.html");
+    expect(reporter.diagnostics).toEqual([]);
+    expectTreeMatch(dir, "index.html", composed);
+  });
+
+  test("FIX-03/C2: named slot replaces the element, wrapper footer persists", () => {
+    const dir = join(SPEC_FIXTURES, "FIX-03");
+    const { composed, reporter } = composeFixture(dir, "contact.html");
+    expect(reporter.diagnostics).toEqual([]);
+    expectTreeMatch(dir, "contact.html", composed);
+  });
+
+  test("FIX-04/C3: unfilled slot renders its fallback", () => {
+    const dir = join(SPEC_FIXTURES, "FIX-04");
+    const { composed, reporter } = composeFixture(dir, "about.html");
+    expect(reporter.diagnostics).toEqual([]);
+    expectTreeMatch(dir, "about.html", composed);
+  });
+
+  test("FIX-05/C4: multiple fills, one name, page order", () => {
+    const dir = join(SPEC_FIXTURES, "FIX-05");
+    const { composed, reporter } = composeFixture(dir, "index.html");
+    expect(reporter.diagnostics).toEqual([]);
+    expectTreeMatch(dir, "index.html", composed);
+  });
+
+  test("FIX-07/C6: bare slot inside <main> — pinning without a rule (launch and plain)", () => {
+    const dir = join(SPEC_FIXTURES, "FIX-07");
+    for (const page of ["launch.html", "plain.html"]) {
+      const { composed, reporter } = composeFixture(dir, page);
+      expect(reporter.diagnostics).toEqual([]);
+      expectTreeMatch(dir, page, composed);
+    }
+  });
+
+  test("FIX-09/C8: sink-less layout — head-only passthrough, page's own <main> ships verbatim", () => {
+    const dir = join(SPEC_FIXTURES, "FIX-09");
+    const { composed, reporter } = composeFixture(dir, "index.html");
+    expect(reporter.diagnostics).toEqual([]);
+    expectTreeMatch(dir, "index.html", composed);
+  });
+
+  test("FIX-12: root-attribute merge — class union, new attribute appended", () => {
+    const dir = join(SPEC_FIXTURES, "FIX-12");
+    const { composed, reporter } = composeFixture(dir, "index.html");
+    expect(reporter.diagnostics).toEqual([]);
+    expectTreeMatch(dir, "index.html", composed);
+  });
+
+  test("FIX-13: real markdown.js output, assembled and composed exactly as an HTML page would be", () => {
+    // Chains the REAL markdown.js (owned by another agent on this same task)
+    // through this module's assembleMarkdownDocument() seam and into
+    // compose() — genuine cross-module integration, not a hand-reproduction.
+    const dir = join(SPEC_FIXTURES, "FIX-13");
+    const source = readFileSync(join(dir, "src", "about.md"), "utf8");
+    const reporter = silentReporter();
+    const md = convert(source, { path: join(dir, "src", "about.md"), sourceRoot: join(dir, "src"), reporter });
+    expect(reporter.diagnostics).toEqual([]); // no P17/P11 in this fixture
+    const { text: pageText, spans: pageSpans } = assembleMarkdownDocument(md, { standalone: false, pageFile: "about.md" });
+    const layoutText = readFileSync(join(dir, "src", "_layout.html"), "utf8");
+    const { text: composed } = compose({ pageText, pageFile: "about.md", pageSpans, layoutText, layoutFile: "_layout.html", reporter });
+    expect(reporter.diagnostics).toEqual([]);
+    const diffs = compareHtml(readFileSync(join(dir, "expected", "about.html"), "utf8"), composed, "about.html");
+    expect(diffs).toEqual([]);
+  });
+});
+
+// ------------------------------ assembleMarkdownDocument (§10.7 / SHL-01) --
+
+describe("assembleMarkdownDocument: the markdown.js <-> compose() seam", () => {
+  test("layout-none-md: real markdown.js output assembled into the exact §10.7 shell (standalone)", () => {
+    const dir = join(LANDMINES, "layout-none-md");
+    const source = readFileSync(join(dir, "src", "standalone.md"), "utf8");
+    const reporter = silentReporter();
+    const md = convert(source, { path: join(dir, "src", "standalone.md"), sourceRoot: join(dir, "src"), reporter });
+    expect(reporter.diagnostics).toEqual([]);
+    const { text: composed } = assembleMarkdownDocument(md, { standalone: true, pageFile: "standalone.md" });
+    const diffs = compareHtml(readFileSync(join(dir, "expected", "standalone.html"), "utf8"), composed, "standalone.html");
+    expect(diffs).toEqual([]);
+  });
+
+  test("md-include-element: markdown.js -> includes.js -> assembleMarkdownDocument, block/inline/code-fence placement", async () => {
+    const dir = join(LANDMINES, "md-include-element");
+    const sourceRoot = join(dir, "src");
+    const file = join(sourceRoot, "page.md");
+    const source = readFileSync(file, "utf8");
+    const reporter = silentReporter();
+    // §10.1: conversion first — includes resolve on the CONVERTED body.
+    const md = convert(source, { path: file, sourceRoot, reporter });
+    const includedHtml = await inlineIncludes({
+      text: md.html, file, sourceRoot, reporter,
+      convertMarkdown: async () => { throw new Error("no .md include targets in this fixture"); },
+    });
+    expect(reporter.diagnostics).toEqual([]);
+    const { text: composed } = assembleMarkdownDocument(
+      { ...md, html: includedHtml.text, htmlSpans: includedHtml.spans },
+      { standalone: true, pageFile: "page.md" },
+    );
+    const diffs = compareHtml(readFileSync(join(dir, "expected", "page.html"), "utf8"), composed, "page.html");
+    expect(diffs).toEqual([]);
+  });
+});
+
+// ------------------------------------------------------------- landmines
+
+describe("landmines: composition family", () => {
+  test("misaddressed-fill: MRG-10/A02 — content stays in place, advisory fires", () => {
+    const dir = join(LANDMINES, "misaddressed-fill");
+    const { composed, reporter } = composeFixture(dir, "index.html");
+    expect(reporter.diagnostics.length).toBe(1);
+    expect(reporter.diagnostics[0].severity).toBe("advisory");
+    expect(reporter.diagnostics[0].file).toBe("index.html");
+    expect(reporter.diagnostics[0].line).toBe(6);
+    expect(reporter.diagnostics[0].message).toContain("footer");
+    expectTreeMatch(dir, "index.html", composed);
+  });
+
+  test("duplicate-slot-name: MRG-03/A13 — first wins, second renders fallback", () => {
+    const dir = join(LANDMINES, "duplicate-slot-name");
+    const { composed, reporter } = composeFixture(dir, "index.html");
+    expect(reporter.diagnostics.length).toBe(1);
+    expect(reporter.diagnostics[0].file).toBe("_layout.html");
+    expect(reporter.diagnostics[0].line).toBe(9);
+    expect(reporter.diagnostics[0].message).toContain("x");
+    expectTreeMatch(dir, "index.html", composed);
+  });
+
+  test("second-bare-slot: MRG-02/A13", () => {
+    const dir = join(LANDMINES, "second-bare-slot");
+    const { composed, reporter } = composeFixture(dir, "index.html");
+    expect(reporter.diagnostics.length).toBe(1);
+    expect(reporter.diagnostics[0].line).toBe(6);
+    expect(reporter.diagnostics[0].message).toContain("slot");
+    expectTreeMatch(dir, "index.html", composed);
+  });
+
+  test("dup-main: MRG-05/A13", () => {
+    const dir = join(LANDMINES, "dup-main");
+    const { composed, reporter } = composeFixture(dir, "index.html");
+    expect(reporter.diagnostics.length).toBe(1);
+    expect(reporter.diagnostics[0].line).toBe(8);
+    expect(reporter.diagnostics[0].message).toContain("main");
+    expectTreeMatch(dir, "index.html", composed);
+  });
+
+  test("slot-in-page: MRG-04/P20 — a page's own slot is a problem, and is still neutralized", () => {
+    const dir = join(LANDMINES, "slot-in-page");
+    const { composed, reporter } = composeFixture(dir, "index.html");
+    expect(reporter.diagnostics.length).toBe(1);
+    expect(reporter.diagnostics[0].severity).toBe("problem");
+    expect(reporter.diagnostics[0].file).toBe("index.html");
+    expect(reporter.diagnostics[0].line).toBe(5);
+    expect(reporter.diagnostics[0].message).toContain("slot");
+    // Ratification round 7: three of five samples wrote the layout-side
+    // spelling into a page, so the message names the one that belongs in a
+    // page. It became a problem (was advisory A04) because the advisory let
+    // each of those samples publish at exit 0 with the fill never applied.
+    expect((reporter.diagnostics[0].fixes ?? []).join(" ")).toContain('slot="');
+    // The S4 children-replacement still runs — best-effort composition (§2)
+    // produces a tree to report on even though it will never be published.
+    expectTreeMatch(dir, "index.html", composed);
+  });
+
+  test("slot-in-layout-head: MRG-04/P20 — a head slot is a problem, with head-side advice", () => {
+    const dir = join(LANDMINES, "slot-in-layout-head");
+    const { composed, reporter } = composeFixture(dir, "index.html");
+    expect(reporter.diagnostics.length).toBe(1);
+    expect(reporter.diagnostics[0].severity).toBe("problem");
+    expect(reporter.diagnostics[0].file).toBe("_layout.html");
+    expect(reporter.diagnostics[0].line).toBe(5);
+    // A head slot is a different mistake from a page-side one, so it must not
+    // carry the fill spelling: nothing can fill it, and a page's own <head>
+    // reaches the output by the §8 merge instead.
+    const fixes = (reporter.diagnostics[0].fixes ?? []).join(" ");
+    expect(fixes).toContain("<body>");
+    expect(fixes).not.toContain('slot="');
+    expectTreeMatch(dir, "index.html", composed);
+  });
+
+  test("slot-in-template: MRG-01/MRG-11 — template's slot is invisible, fill misaddressed", () => {
+    const dir = join(LANDMINES, "slot-in-template");
+    const { composed, reporter } = composeFixture(dir, "index.html");
+    expect(reporter.diagnostics.length).toBe(1);
+    expect(reporter.diagnostics[0].line).toBe(6);
+    expect(reporter.diagnostics[0].message).toContain("x");
+    expectTreeMatch(dir, "index.html", composed);
+    expect(composed).toContain('<template shadowrootmode="open"><slot name="x"><p>shadow default</p></slot></template>');
+  });
+
+  test("slot-attr-edge: nested slot= and slot=\"\" are never fills — zero diagnostics", () => {
+    const dir = join(LANDMINES, "slot-attr-edge");
+    const { composed, reporter } = composeFixture(dir, "index.html");
+    expect(reporter.diagnostics).toEqual([]);
+    expectTreeMatch(dir, "index.html", composed);
+  });
+
+  test("nested-main-in-div: R4 — unwraps at any depth, wrapper survives", () => {
+    const dir = join(LANDMINES, "nested-main-in-div");
+    const { composed, reporter } = composeFixture(dir, "index.html");
+    expect(reporter.diagnostics).toEqual([]);
+    expectTreeMatch(dir, "index.html", composed);
+  });
+
+  test("main-in-main: unwrap happens exactly once", () => {
+    const dir = join(LANDMINES, "main-in-main");
+    const { composed, reporter } = composeFixture(dir, "index.html");
+    expect(reporter.diagnostics).toEqual([]);
+    expectTreeMatch(dir, "index.html", composed);
+  });
+
+  test("empty-default-main: empty default content leaves main's children untouched", () => {
+    const dir = join(LANDMINES, "empty-default-main");
+    const { composed, reporter } = composeFixture(dir, "index.html");
+    expect(reporter.diagnostics).toEqual([]);
+    expectTreeMatch(dir, "index.html", composed);
+  });
+
+  test("empty-default-slot: empty default content renders the default slot's fallback", () => {
+    const dir = join(LANDMINES, "empty-default-slot");
+    const { composed, reporter } = composeFixture(dir, "index.html");
+    expect(reporter.diagnostics).toEqual([]);
+    expectTreeMatch(dir, "index.html", composed);
+  });
+
+  test("stray-header-footer: MRG-17 — both ship in place, nothing is reported", () => {
+    // A03 fired here until it was retired, and this expected tree is
+    // byte-for-byte what it used to narrate: the markup had composed exactly
+    // as its author drew it. See §7.6 for the three reproductions that
+    // condemned the advisory rather than its wording.
+    const dir = join(LANDMINES, "stray-header-footer");
+    const { composed, reporter } = composeFixture(dir, "index.html");
+    expect(reporter.diagnostics).toEqual([]);
+    expectTreeMatch(dir, "index.html", composed);
+  });
+
+  test("fill-in-wrapped-main: MRG-07 — a fill inside a wrapped <main> counts; one wrapper deeper does not", () => {
+    const dir = join(LANDMINES, "fill-in-wrapped-main");
+    const { composed, reporter } = composeFixture(dir, "index.html");
+    expect(reporter.diagnostics).toEqual([]);
+    // The fill was lifted out of the wrapper and its slot= consumed…
+    expect(composed).toContain("<aside>FILLED FROM INSIDE A WRAPPED MAIN</aside>");
+    // …while the one a wrapper deeper stays the author's own markup, attribute intact.
+    expect(composed).toContain('<aside slot="aside">not a fill — one wrapper deeper</aside>');
+    expectTreeMatch(dir, "index.html", composed);
+  });
+
+  test("content-nowhere: MRG-14/P09 — content would vanish, located at the page, names the layout", () => {
+    const dir = join(LANDMINES, "content-nowhere");
+    const { reporter } = composeFixture(dir, "about.html");
+    expect(reporter.diagnostics.length).toBe(1);
+    expect(reporter.diagnostics[0].severity).toBe("problem");
+    expect(reporter.diagnostics[0].file).toBe("about.html");
+    expect(reporter.diagnostics[0].line).toBe(1);
+    expect(reporter.diagnostics[0].message).toContain("_layout.html");
+  });
+
+  test("slot-in-filled-fallback: MRG-19/P16 — nested slot is a problem regardless of fills", () => {
+    const dir = join(LANDMINES, "slot-in-filled-fallback");
+    const { reporter } = composeFixture(dir, "index.html");
+    expect(reporter.diagnostics.length).toBe(1);
+    expect(reporter.diagnostics[0].severity).toBe("problem");
+    expect(reporter.diagnostics[0].file).toBe("_layout.html");
+    expect(reporter.diagnostics[0].line).toBe(8);
+    expect(reporter.diagnostics[0].message).toContain("slot");
+    expect(reporter.diagnostics[0].message).toContain("nest");
+  });
+
+  test("line-after-include: a diagnostic's line is measured in the file it NAMES, not in the inlined text", async () => {
+    // The round-18 defect, at library level: the layout's duplicate bare
+    // <slot> is on line 7 of a 9-line file, with a five-line fragment inlined
+    // above it on line 5. Measured in the inlined text the same slot sits on
+    // line 12 — a line that file does not have (verified against the engine
+    // before this fix: it printed `src/_layout.html:12`).
+    const dir = join(LANDMINES, "line-after-include");
+    const reporter = silentReporter();
+    const { text: layoutText, spans: layoutSpans } = await withIncludesInlined(dir, "_layout.html", reporter);
+    const pageText = readFileSync(join(dir, "src", "index.html"), "utf8");
+    compose({
+      pageText, pageFile: "index.html",
+      layoutText, layoutFile: "_layout.html", layoutSpans,
+      resolveLine: sourceLineResolver(dir), reporter,
+    });
+    expect(reporter.diagnostics.length).toBe(1);
+    expect(reporter.diagnostics[0].file).toBe("_layout.html");
+    expect(reporter.diagnostics[0].line).toBe(7);
+    const layoutLineCount = readFileSync(join(dir, "src", "_layout.html"), "utf8").trimEnd().split("\n").length;
+    expect(layoutLineCount).toBe(9); // the reported line must be a line the file HAS
+    expect(lineOf(layoutText, layoutText.indexOf("second default"))).toBe(12); // what the bug reported
+  });
+
+  test("line-after-include: with no resolveLine injected, the line is omitted — never guessed", async () => {
+    // §14.1 prints without a line when the line is unknown. A caller that
+    // hands compose() include-inlined text but no way to read source files
+    // gets `undefined`, not the offset counted in whatever text happened to
+    // be in hand — the failure mode that produced line 11 above.
+    const dir = join(LANDMINES, "line-after-include");
+    const reporter = silentReporter();
+    const { text: layoutText, spans: layoutSpans } = await withIncludesInlined(dir, "_layout.html", reporter);
+    const pageText = readFileSync(join(dir, "src", "index.html"), "utf8");
+    compose({ pageText, pageFile: "index.html", layoutText, layoutFile: "_layout.html", layoutSpans, reporter });
+    expect(reporter.diagnostics.length).toBe(1);
+    expect(reporter.diagnostics[0].file).toBe("_layout.html");
+    expect(reporter.diagnostics[0].line).toBeUndefined();
+  });
+
+  test("slot-inside-include: a fragment's own <slot> is P20 IN THE FRAGMENT, at its own line", async () => {
+    // INC-12: a fragment's top-level elements become the host's, including a
+    // <slot> it contributes. The author wrote that slot in aside.html, so
+    // that is where the problem is reported — the same convention §12
+    // already uses for a reference written in a fragment (P13, pinned by
+    // landmines/stranded-underscore-asset).
+    const dir = join(LANDMINES, "slot-inside-include");
+    const reporter = silentReporter();
+    const { text: pageText, spans: pageSpans } = await withIncludesInlined(dir, "index.html", reporter);
+    const layoutText = readFileSync(join(dir, "src", "_layout.html"), "utf8");
+    compose({
+      pageText, pageFile: "index.html", pageSpans,
+      layoutText, layoutFile: "_layout.html",
+      resolveLine: sourceLineResolver(dir), reporter,
+    });
+    expect(reporter.diagnostics.length).toBe(1);
+    expect(reporter.diagnostics[0].severity).toBe("problem");
+    expect(reporter.diagnostics[0].file).toBe("_includes/aside.html");
+    expect(reporter.diagnostics[0].line).toBe(2);
+  });
+
+  test("dollar-patterns: $&, $1, $', $`, $$ survive byte-for-byte through slot fills", async () => {
+    const dir = join(LANDMINES, "dollar-patterns");
+    const reporter = silentReporter();
+    const { text: pageText, spans: pageSpans } = await withIncludesInlined(dir, "index.html", reporter);
+    const layoutText = readFileSync(join(dir, "src", "_layout.html"), "utf8");
+    const { text: composed } = compose({ pageText, pageFile: "index.html", pageSpans, layoutText, layoutFile: "_layout.html", reporter });
+    expect(reporter.diagnostics).toEqual([]);
+    const diffs = compareHtml(readFileSync(join(dir, "expected", "index.html"), "utf8"), composed, "index.html");
+    expect(diffs).toEqual([]);
+  });
+
+  test("no-layout-anywhere: an HTML page with no data-layout and nothing to neutralize ships byte-identical", () => {
+    const dir = join(LANDMINES, "no-layout-anywhere");
+    const pageText = readFileSync(join(dir, "src", "index.html"), "utf8");
+    const reporter = silentReporter();
+    const { text: composed } = compose({ pageText, pageFile: "index.html", layoutText: null, reporter });
+    expect(reporter.diagnostics).toEqual([]);
+    expect(composed).toBe(pageText); // byte-identical, not just structurally equal
+  });
+
+  test("empty-md: real markdown.js on a zero-byte file, assembled and composed — layout's default persists", () => {
+    const dir = join(LANDMINES, "empty-md");
+    const source = readFileSync(join(dir, "src", "about.md"), "utf8");
+    expect(source).toBe("");
+    const reporter = silentReporter();
+    const md = convert(source, { path: join(dir, "src", "about.md"), sourceRoot: join(dir, "src"), reporter });
+    expect(reporter.diagnostics).toEqual([]);
+    const { text: pageText, spans: pageSpans } = assembleMarkdownDocument(md, { standalone: false, pageFile: "about.md" });
+    const layoutText = readFileSync(join(dir, "src", "_layout.html"), "utf8");
+    const { text: composed } = compose({ pageText, pageFile: "about.md", pageSpans, layoutText, layoutFile: "_layout.html", reporter });
+    expect(reporter.diagnostics).toEqual([]); // no title to join, no A02/A03/P09 — nothing to report
+    const diffs = compareHtml(readFileSync(join(dir, "expected", "about.html"), "utf8"), composed, "about.html");
+    expect(diffs).toEqual([]);
+  });
+
+  test("P19: a named slot nested inside <main> (no default slot) is a problem, not a silent resolution", () => {
+    // This exact shape used to be an undocumented spec gap this test only
+    // asserted "does not crash" for ("main's wholesale content wins,
+    // silently"). §7.4 has since ruled it explicitly: P19, because letting
+    // main win is exactly the silent content-loss the spec forbids (the
+    // page's fill for "x" would vanish with no diagnostic). The real
+    // fixture is landmines/named-slot-in-sink-main (conformance-authority
+    // Tier 1); this unit test keeps the hand-built shape for a quick,
+    // library-level regression check of the same rule.
+    const layoutText = `<!doctype html>
+<html>
+  <head><title>— S</title></head>
+  <body>
+    <main><h2>Static</h2><slot name="x"><em>fallback</em></slot></main>
+  </body>
+</html>
+`;
+    const pageText = `<!doctype html>
+<html>
+  <head><title>P</title></head>
+  <body>
+    <p>Default text</p>
+  </body>
+</html>
+`;
+    const reporter = silentReporter();
+    let result;
+    expect(() => {
+      result = compose({ pageText, pageFile: "index.html", layoutText, layoutFile: "_layout.html", reporter });
+    }).not.toThrow();
+    expect(reporter.diagnostics.length).toBe(1);
+    expect(reporter.diagnostics[0].severity).toBe("problem");
+    expect(reporter.diagnostics[0].file).toBe("_layout.html");
+    expect(reporter.diagnostics[0].message).toContain("x");
+    expect(reporter.diagnostics[0].message).toContain("main");
+    // Neither the wholesale replacement nor the fill/fallback resolved —
+    // main's own original markup (both branches of the ambiguity) survives.
+    const { root } = parse(result.text);
+    const main = findFirst(root, (n) => isElement(n, "main"));
+    expect(main).not.toBeNull();
+  });
+
+  test("§6.4/LAY-13: a <script data-polyfill> is stripped from built output, with or without a layout", () => {
+    const layoutText = `<!doctype html>
+<html>
+  <head>
+    <title>— S</title>
+    <script src="/assets/unify-polyfill.js" data-polyfill></script>
+  </head>
+  <body>
+    <main><p>here</p></main>
+  </body>
+</html>
+`;
+    const pageText = `<!doctype html>
+<html>
+  <head><title>P</title></head>
+  <body><main><h1>Hi</h1></main></body>
+</html>
+`;
+    const reporter = silentReporter();
+    const withLayout = compose({ pageText, pageFile: "index.html", layoutText, layoutFile: "_layout.html", reporter });
+    expect(withLayout.text).not.toContain("data-polyfill");
+    expect(withLayout.text).not.toContain("unify-polyfill.js");
+
+    const standaloneText = `<!doctype html>
+<html>
+  <head>
+    <title>P</title>
+    <script src="/assets/unify-polyfill.js" data-polyfill></script>
+  </head>
+  <body><h1>Hi</h1></body>
+</html>
+`;
+    const noLayout = compose({ pageText: standaloneText, pageFile: "index.html", layoutText: null, reporter });
+    expect(noLayout.text).not.toContain("data-polyfill");
+    expect(noLayout.text).not.toContain("unify-polyfill.js");
+  });
+});
+
+describe("P21: the merge requires a <body> on both sides (§7/MRG-20)", () => {
+  const LAYOUT = '<!doctype html><html><head><title>— S</title></head><body><main><slot></slot></main></body></html>';
+  const PAGE = '<!doctype html><html><head><title>P</title></head><body><p>the author wrote this</p></body></html>';
+
+  test("a fragment page under a layout is P21 at the page, not a crash", () => {
+    const reporter = silentReporter();
+    const out = compose({
+      pageText: "<ul><li>an htmx-partial-shaped fragment</li></ul>", pageFile: "index.html",
+      layoutText: LAYOUT, layoutFile: "_layout.html", reporter,
+    });
+    expect(out).toBeNull();
+    const p = reporter.diagnostics.filter((d) => d.severity === "problem");
+    expect(p).toHaveLength(1);
+    expect(p[0].file).toBe("index.html");
+    expect(p[0].line).toBeUndefined(); // no line to point at — omitted, never guessed (§14.1)
+    expect(p[0].message).toContain("no <body>");
+    expect(p[0].fixes.join(" ")).toContain("<!doctype html>"); // the complete-document shape, spelled out
+    expect(p[0].fixes.join(" ")).toContain("index.fragment.html"); // and the rename, for the intended-partial case (§4.4)
+  });
+
+  test("a body-less layout is P21 at the layout — never the layout's own text as the page", () => {
+    const reporter = silentReporter();
+    const out = compose({
+      pageText: PAGE, pageFile: "index.html",
+      layoutText: '<!doctype html><html><head><title>— S</title></head></html>', layoutFile: "_layout.html", reporter,
+    });
+    expect(out).toBeNull(); // the old behavior returned the layout text — the page's body silently dropped at exit 0
+    const p = reporter.diagnostics.filter((d) => d.severity === "problem");
+    expect(p).toHaveLength(1);
+    expect(p[0].file).toBe("_layout.html");
+    expect(p[0].fixes.join(" ")).toContain("head-only"); // the one-keystroke repair: an empty <body></body> (§7.5)
+  });
+
+  test("an empty resolved layout file is P21, not a silent no-layout", () => {
+    const reporter = silentReporter();
+    const out = compose({ pageText: PAGE, pageFile: "index.html", layoutText: "", layoutFile: "_layout.html", reporter });
+    expect(out).toBeNull(); // `!layoutText` used to route "" into the no-layout path by truthiness
+    const p = reporter.diagnostics.filter((d) => d.severity === "problem");
+    expect(p).toHaveLength(1);
+    expect(p[0].file).toBe("_layout.html");
+    expect(p[0].message).toContain("no <body>");
+  });
+
+  test("both sides body-less: two problems, one per file", () => {
+    const reporter = silentReporter();
+    const out = compose({
+      pageText: "<p>fragment</p>", pageFile: "index.html",
+      layoutText: "<html><head></head></html>", layoutFile: "_layout.html", reporter,
+    });
+    expect(out).toBeNull();
+    const files = reporter.diagnostics.filter((d) => d.severity === "problem").map((d) => d.file).sort();
+    expect(files).toEqual(["_layout.html", "index.html"]);
+  });
+
+  test("layoutText null still means no layout: a fragment with no layout passes through unchanged", () => {
+    const reporter = silentReporter();
+    const out = compose({ pageText: "<ul><li>x</li></ul>", pageFile: "index.html", layoutText: null, reporter });
+    expect(reporter.diagnostics).toEqual([]);
+    expect(out.text).toContain("<ul><li>x</li></ul>");
+  });
+});

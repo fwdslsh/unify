@@ -1,4 +1,4 @@
-# Multi-stage Dockerfile for Inform CLI
+# Multi-stage Dockerfile for the unify CLI
 # Uses Ubuntu for glibc compatibility with Bun executables
 
 # Build stage
@@ -20,16 +20,10 @@ WORKDIR /build
 
 # Copy source files and package configuration
 COPY src/ ./src/
-COPY package.json ./
+COPY package.json bun.lock ./
 
-# Copy tests if they exist (optional)
-RUN mkdir -p ./tests
-
-# Install dependencies using Bun
+# Install dependencies using Bun (CI is the test gate; this build just compiles)
 RUN bun install --frozen-lockfile
-
-# Run tests if available
-RUN bun test 2>/dev/null || echo "No tests configured, skipping..."
 
 # Build the binary using Bun
 RUN bun build src/cli.js --compile --outfile /usr/local/bin/unify && \
@@ -63,7 +57,7 @@ USER appuser
 
 # Add metadata labels
 LABEL org.opencontainers.image.title="Unify CLI" \
-    org.opencontainers.image.description="Modern static site generator with server-side includes, DOM templating, and live development features." \
+    org.opencontainers.image.description="Static site generator for HTML-native composition: includes, layouts, and slots in plain HTML — no expression language, no client runtime." \
     org.opencontainers.image.url="https://github.com/fwdslsh/unify" \
     org.opencontainers.image.source="https://github.com/fwdslsh/unify" \
     org.opencontainers.image.vendor="fwdslsh" \

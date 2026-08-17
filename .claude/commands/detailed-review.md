@@ -1,201 +1,91 @@
-# Detailed Implementation Review Instructions
+# Detailed Implementation Review
 
-## Overview
+Produce an evidence-based status report of the unify implementation against the v0.7.0 specification set, in `_notes/detailed-review.md`.
 
-This command initiates a comprehensive, systematic review of the current unify implementation against the formal specifications. The review must be **evidence-based**, relying solely on actual test results and code analysis.
+## The authorities
 
-## Objective
+- `docs/product-spec.md` — the product contract: what unify is (§1), the composition model (§3), the complete CLI (§4), the non-goals (§5), and what v0.7.0 requires (§7).
+- `docs/conformance-spec.md` — the normative implementer reference: exact algorithms, the splice model, the head-merge table, the collision matrix, the closed problem/advisory catalogues, and the worked examples that are the fixtures.
+- `docs/cli-reference.md` — every command, option, and exit code. There are no others.
+- `docs/testing-strategy.md` — what "implemented" means as a machine-checkable claim (§3 traceability, §6 the release gates).
+- `docs/authoring-rules.md` — the complete authoring surface in under sixty lines.
 
-Produce a complete status report in `_notes/detailed-review.md` that maps every section of both specification documents to:
-- Current implementation status
-- Test coverage details  
-- Code location and quality
-- Gaps and issues identified
+`CLAUDE.md` carries the framing: **the implementation in `src/` and the suite in `tests/` predate the spec and are being rewritten against it.** Finding v0.6 machinery is the expected result, not a discovery — its disposition is already decided in CLAUDE.md ("Implementation Map") and `docs/migration-plan.md`. Report status against the spec; do not re-litigate what was cut.
 
-## Review Process
+## Method
 
-### Phase 1: Preparation
+The compliance question is already partly mechanized. Start there, then do by hand only what the machine cannot do.
 
-1. **Read the specifications completely**
-   - `specs/app-spec.md` - CLI behavior, options, build pipeline
-   - `specs/dom-spec.md` - DOM composition behavior, cascade rules
+1. **Read the gap list.**
 
-2. **Initialize the report**
-   - Create `_notes/detailed-review.md` with the template structure (see below)
-   - Document review date, reviewer, and methodology
+   ```bash
+   bun tests/conformance/check-traceability.mjs --static
+   ```
 
-### Phase 2: Systematic Section Review
+   `tests/conformance/rules.tsv` is the rule inventory (one row per normative claim, IDs namespaced by area). The checker's output is the authoritative gap list at any moment. Record the counts and the open IDs verbatim — do not re-derive them by reading test names.
 
-For **each section** in both specification documents:
+2. **Run the suite and the hygiene gate.**
 
-#### Step 1: Specification Analysis
-- Read the section completely
-- Identify all requirements, behaviors, and rules
-- Note any acceptance criteria or success metrics
+   ```bash
+   bun test
+   bun tests/conformance/check-suite-hygiene.mjs
+   ```
 
-#### Step 2: Test Coverage Investigation  
-- Search for related test files using patterns from the section
-- Run specific tests: `bun test -t "pattern"` 
-- Document test results with exact pass/fail counts
-- Identify missing test coverage
+3. **Walk the spec by area**, using the inventory prefixes as the section list (includes, layout resolution, the merge, head, root attributes, Markdown, URLs, the reference check, collisions, diagnostics, publish, watch/dev, dry-run, config, scaffold). For each area:
+   - Name the rules and the fixture or targeted test that pins each.
+   - Locate the implementing code (`file.js:line`), or record that it does not exist yet.
+   - State the status from evidence only.
 
-#### Step 3: Code Implementation Review
-- Locate implementing code using file/function search
-- Analyze code quality and completeness
-- Check for TODO comments or incomplete implementations
-- Verify code matches specification requirements
+4. **Check the CLI surface as a closed set.** Every command and flag in `docs/cli-reference.md` exists; nothing outside it exists. A surviving retired flag (`--minify`, `--fail-on`, `--host`, `--log-level`, `--copy`/`--ignore`/`--render`, the `serve` command) is a finding, not a feature.
 
-#### Step 4: Status Assessment
-- Assign status based on **evidence only**:
-  - `NOT_STARTED` - No implementation found
-  - `IN_PROGRESS` - Partial implementation, failing tests
-  - `IMPLEMENTED` - Code exists, tests passing
-  - `FULLY_COMPLIANT` - Complete implementation, comprehensive tests
-  - `NEEDS_INVESTIGATION` - Unclear status, requires deeper analysis
+5. **Check the golden path end to end**, as a user would:
 
-#### Step 5: Documentation
-- Update the report section immediately
-- Include specific file paths, line numbers, test names
-- Document exact test results with timestamps
-- Note any discrepancies between spec and implementation
+   ```bash
+   bun src/cli.js init && bun src/cli.js build --dry-run --strict; echo "exit=$?"
+   ```
 
-### Phase 3: Validation
+   Product-spec §2 and §8 require this to work in one sitting; testing-strategy §6 G5 requires exit `0` for all five templates.
 
-1. **Run full test suite**: `bun test`
-2. **Document complete results** with pass/fail breakdown
-3. **Cross-reference** test failures with spec sections
-4. **Identify priority gaps** for immediate attention
+## Status values
 
-## Report Template Structure
+Assign from evidence, per rule or per area:
+
+- `NOT_IMPLEMENTED` — no code implements it.
+- `IN_PROGRESS` — partial code, or a fixture that fails.
+- `IMPLEMENTED` — code exists and its rules are recorded green by tests that ran against the real CLI.
+- `CONFORMANT` — as above, and the area's worked examples reproduce exactly under the §2 comparator, with exhaustive diagnostics.
+- `NEEDS_INVESTIGATION` — unclear. Use it rather than guessing.
+
+Two things that are **not** evidence: a coverage percentage (it measures execution, not verification — testing-strategy §1 M4 and §4), and a passing unit test (Tier 3 carries no conformance authority — §2).
+
+## Report shape
 
 ```markdown
 # Detailed Implementation Review
 
-**Date**: [Current Date]
-**Reviewer**: [Name/Agent]
-**Test Suite Results**: [X pass, Y fail, Z total]
-**Review Methodology**: Section-by-section analysis with test verification
+**Date**: …
+**Suite**: [X pass, Y fail] · **Traceability**: [N/184 gated rules] · **Hygiene**: [pass/fail]
 
-## Executive Summary
+## Executive summary
 
-[High-level status overview]
+## <Area> — <STATUS>
+- Rules: <IDs from rules.tsv>, pinned by <fixture/test paths>
+- Code: `src/…:line` (or: absent)
+- Evidence: <exact command output>
+- Findings: <gap, with the spec sentence it violates>
 
-## App Specification Review (specs/app-spec.md)
+## Retired vocabulary still present
+<file:line for each surviving v0.6 construct>
 
-### [Section Name] - [Status]
+## Spec defects found
+<contradictions between documents, or rules that cannot be implemented as written — these are defects to raise, never a license to reinterpret>
 
-**Specification Requirements:**
-- [Requirement 1]
-- [Requirement 2]
-
-**Implementation Analysis:**
-- **Code Location**: `path/to/file.js:line-range`
-- **Key Functions**: `functionName()`, `anotherFunction()`
-- **Implementation Quality**: [Assessment]
-
-**Test Coverage:**
-- **Test Files**: `test/path/test.js`
-- **Test Results**: [X pass, Y fail] at [timestamp]
-- **Coverage Gaps**: [Missing test scenarios]
-
-**Status Details:**
-[Detailed explanation of current state]
-
-**Issues Identified:**
-- [Issue 1 with file:line reference]
-- [Issue 2 with test failure details]
-
----
-
-## DOM Specification Review (specs/dom-spec.md)
-
-[Same structure repeated for each DOM spec section]
-
-## Cross-Specification Analysis
-
-**Integration Issues:**
-[Issues spanning multiple spec sections]
-
-**Architecture Compliance:**
-[Overall adherence to architectural principles]
-
-## Priority Action Items
-
-1. **Critical**: [High-priority issues blocking functionality]
-2. **Important**: [Significant gaps affecting quality]
-3. **Enhancement**: [Non-critical improvements]
-
-## Test Suite Analysis
-
-**Overall Health**: [Assessment]
-**Key Failures**: [Critical test failures with details]
-**Performance**: [Test execution timing]
-**Coverage Gaps**: [Major untested areas]
+## Priority actions
 ```
 
-## Critical Guidelines
+## Rules
 
-### Evidence-Based Assessment
-- **Never guess** - if unsure, mark as `NEEDS_INVESTIGATION`
-- **Always verify** - run tests, check code, don't assume
-- **Document sources** - include file paths, line numbers, test names
-- **Timestamp results** - test results can change
-
-### Code Analysis Standards
-- Check actual implementation, not just function signatures
-- Look for error handling, edge cases, validation
-- Verify compliance with architectural patterns
-- Note any deviations from specification
-
-### Test Analysis Standards
-- Run tests multiple times if results seem inconsistent
-- Check for flaky tests or timing issues
-- Verify test scenarios match specification requirements
-- Document both unit and integration test coverage
-
-### Status Assignment Criteria
-
-**NOT_STARTED**
-- No code found implementing the requirement
-- No related tests exist
-
-**IN_PROGRESS** 
-- Partial implementation exists
-- Tests exist but are failing
-- Code structure present but incomplete
-
-**IMPLEMENTED**
-- Working code that handles the basic requirement
-- Tests passing for normal scenarios
-- May lack edge case handling or full compliance
-
-**FULLY_COMPLIANT**
-- Complete implementation matching all spec details
-- Comprehensive test coverage including edge cases
-- Code quality meets project standards
-
-### Update Protocol
-
-1. **Work incrementally** - complete each section before moving on
-2. **Commit frequently** - save progress in the report file
-3. **Cross-reference** - link related sections across specifications
-4. **Flag blockers** - immediately escalate critical gaps
-
-## Execution Command
-
-To run this review:
-
-1. Execute: `task detailed-review`
-2. Follow the systematic process above
-3. Update `_notes/detailed-review.md` continuously
-4. Flag any critical issues for immediate attention
-
-## Success Criteria
-
-- Every specification section has been reviewed
-- All test results are documented with timestamps
-- All implementation code has been located and assessed
-- Priority action items are clearly identified
-- Report is ready for development planning
-
-The review is complete when every requirement in both specifications has a clear, evidence-based status assessment.
+- **Never guess.** If unsure, mark `NEEDS_INVESTIGATION` and say what would settle it.
+- **Cite everything**: file paths with line numbers, rule IDs, exact command output.
+- **A document contradiction is a finding.** The specs are written to agree; a divergence is a defect to report, not to resolve by preference.
+- This command reviews and reports. It does not change `src/`, `tests/`, or `docs/`.

@@ -2,7 +2,7 @@
 
 # Unify Installation Script
 # This script downloads and installs the latest unify binary from GitHub releases
-# Supports Linux, macOS, and Windows across x86_64 and arm64 architectures
+# Supports Linux and macOS across x86_64 and arm64 architectures
 
 set -e
 
@@ -28,7 +28,6 @@ REPO="fwdslsh/${PROJECT_NAME}"
 
 GITHUB_API_URL="https://api.github.com/repos/${REPO}"
 GITHUB_RELEASES_URL="https://github.com/${REPO}/releases"
-FALLBACK_VERSION="v0.4.8"  # Fallback version if API is unreachable
 
 
 # ASCII Banner
@@ -69,8 +68,8 @@ ENVIRONMENT VARIABLES:
     UNIFY_FORCE         Force reinstall (set to any value)
 
 EXAMPLES:
-    $0                           # Install latest version system-wide
-    $0 --user                    # Install to ~/.local/bin
+    $0                           # Install latest version to ~/.local/bin
+    $0 --global                  # Install system-wide to /usr/local/bin
     $0 --version v1.0.0          # Install specific version
     $0 --dir /opt/bin --force    # Force install to custom directory
 
@@ -108,8 +107,13 @@ detect_platform() {
     case "$(uname -s)" in
         Linux*)   os="linux" ;;
         Darwin*)  os="darwin" ;;
-        CYGWIN*|MINGW*|MSYS*) os="windows" ;;
-        *)        
+        CYGWIN*|MINGW*|MSYS*)
+            log_error "No Windows binary is published yet — only linux-x86_64, linux-arm64, darwin-x86_64, and darwin-arm64 are built."
+            log_error "Install via npm instead:  npm install -g @fwdslsh/unify"
+            log_error "Or via Bun:                bun add -g @fwdslsh/unify"
+            exit 1
+            ;;
+        *)
             log_error "Unsupported operating system: $(uname -s)"
             exit 1
             ;;
@@ -210,7 +214,7 @@ setup_install_dir() {
             log_info "Creating directory: $INSTALL_DIR"
             mkdir -p "$INSTALL_DIR" || {
                 log_error "Failed to create directory: $INSTALL_DIR"
-                log_error "Try using --user flag or --dir flag with a writable directory"
+                log_error "Try --dir with a writable directory, or drop --global to install to ~/.local/bin"
                 exit 1
             }
         fi
@@ -220,7 +224,7 @@ setup_install_dir() {
     if [[ "$DRY_RUN" == "false" ]] && [[ ! -w "$INSTALL_DIR" ]]; then
         log_error "No write permission to $INSTALL_DIR"
         if [[ "$INSTALL_DIR" == "/usr/local/bin" ]]; then
-            log_error "Try running with sudo or use --user flag"
+            log_error "Try running with sudo, or drop --global to install to ~/.local/bin"
         fi
         exit 1
     fi
@@ -286,14 +290,7 @@ install_unify() {
     log_info "Detected platform: $platform"
     
     # Construct binary name based on platform
-    case "$platform" in
-        windows-*)
-            binary_name="${PROJECT_NAME}-${platform}.exe"
-            ;;
-        *)
-            binary_name="${PROJECT_NAME}-${platform}"
-            ;;
-    esac
+    binary_name="${PROJECT_NAME}-${platform}"
     
     # Get version to install
     if [[ -z "$VERSION" ]]; then
@@ -305,8 +302,10 @@ install_unify() {
         set -e
         
         if [[ $api_result -ne 0 ]] || [[ -z "$VERSION" ]]; then
-            log_warn "Failed to fetch latest version from GitHub API, using fallback version: $FALLBACK_VERSION"
-            VERSION="$FALLBACK_VERSION"
+            log_error "Failed to fetch the latest version from the GitHub API"
+            log_error "Pick a version yourself: $0 --version vX.Y.Z"
+            log_error "Available releases: ${GITHUB_RELEASES_URL}"
+            exit 1
         fi
     fi
     
@@ -335,11 +334,7 @@ install_unify() {
         # Make executable and move to final location
         chmod +x "$temp_file"
         final_path="$INSTALL_DIR/$PROJECT_NAME"
-        
-        if [[ "$platform" == windows-* ]]; then
-            final_path="${final_path}.exe"
-        fi
-        
+
         log_info "Installing to: $final_path"
         mv "$temp_file" "$final_path"
         

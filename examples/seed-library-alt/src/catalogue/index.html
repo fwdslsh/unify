@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Catalogue</title>
+  <meta name="og:type" content="website">
+  <meta name="og:title" content="Seed Catalogue — Fernhollow Seed Library">
+  <meta name="og:description" content="Browse our collection of 25 heritage vegetable varieties">
+  <style>
+    .filter-controls {
+      margin: 2rem 0;
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .filter-controls select,
+    .filter-controls input {
+      padding: 0.5rem;
+      border: 1px solid #d4e4c1;
+      border-radius: 4px;
+      font-size: 0.95rem;
+    }
+
+    .filter-controls input {
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .varieties-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 1.5rem;
+      margin: 2rem 0;
+    }
+
+    .variety-card {
+      background: #fff;
+      border: 1px solid #d4e4c1;
+      border-radius: 4px;
+      padding: 1.5rem;
+      text-decoration: none;
+      color: inherit;
+      transition: box-shadow 0.2s;
+    }
+
+    .variety-card:hover {
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+
+    .variety-card h3 {
+      margin: 0 0 0.5rem 0;
+      color: #1a3a0a;
+    }
+
+    .variety-card p {
+      margin: 0.5rem 0;
+      font-size: 0.9rem;
+      color: #666;
+    }
+
+    .family-tag {
+      display: inline-block;
+      background: #e8f0dc;
+      color: #2d5016;
+      padding: 0.25rem 0.75rem;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      margin-top: 0.5rem;
+    }
+
+    .no-results {
+      text-align: center;
+      padding: 2rem;
+      color: #999;
+    }
+  </style>
+</head>
+<body>
+  <h1>Seed Catalogue</h1>
+
+  <p>Fernhollow keeps 25 heritage vegetable varieties. Browse or search to find what interests you, then visit us on a Saturday to borrow seeds.</p>
+
+  <div class="filter-controls">
+    <select id="familyFilter" onchange="filterVarieties()">
+      <option value="">All families</option>
+      <option value="Brassica">Brassica (cabbage, kale, broccoli)</option>
+      <option value="Solanum">Solanum (tomatoes)</option>
+      <option value="Fabaceae">Fabaceae (peas, beans)</option>
+      <option value="Cucurbita">Cucurbita (squashes)</option>
+      <option value="Allium">Allium (onions)</option>
+      <option value="Apiaceae">Apiaceae (carrots, parsnips)</option>
+    </select>
+    <input type="text" id="searchInput" placeholder="Search variety names..." onkeyup="filterVarieties()">
+  </div>
+
+  <div id="resultCount"></div>
+  <div class="varieties-grid" id="varietiesContainer"></div>
+
+  <script>
+    const varieties = [
+      {"slug":"bere-kale","name":"Bere Kale","family":"Brassica","packets":13},
+      {"slug":"nine-star-broccoli","name":"Nine Star Broccoli","family":"Brassica","packets":26},
+      {"slug":"red-russian-kale","name":"Red Russian Kale","family":"Brassica","packets":39},
+      {"slug":"purple-sprouting","name":"Purple Sprouting","family":"Brassica","packets":12},
+      {"slug":"daubenton-kale","name":"Daubenton Kale","family":"Brassica","packets":25},
+      {"slug":"ragged-jack","name":"Ragged Jack","family":"Brassica","packets":38},
+      {"slug":"bere-barley-tomato","name":"Bere Barley Tomato","family":"Solanum","packets":11},
+      {"slug":"latah-tomato","name":"Latah Tomato","family":"Solanum","packets":24},
+      {"slug":"stupice","name":"Stupice","family":"Solanum","packets":37},
+      {"slug":"black-krim","name":"Black Krim","family":"Solanum","packets":10},
+      {"slug":"aunt-ruby","name":"Aunt Ruby","family":"Solanum","packets":23},
+      {"slug":"pink-brandywine","name":"Pink Brandywine","family":"Solanum","packets":36},
+      {"slug":"yellow-pear","name":"Yellow Pear","family":"Solanum","packets":9},
+      {"slug":"carlin-pea","name":"Carlin Pea","family":"Fabaceae","packets":22},
+      {"slug":"champion-of-england","name":"Champion of England","family":"Fabaceae","packets":35},
+      {"slug":"robinson-broad-bean","name":"Robinson Broad Bean","family":"Fabaceae","packets":8},
+      {"slug":"cherokee-wax","name":"Cherokee Wax","family":"Fabaceae","packets":21},
+      {"slug":"lazy-housewife","name":"Lazy Housewife","family":"Fabaceae","packets":34},
+      {"slug":"uchiki-kuri","name":"Uchiki Kuri","family":"Cucurbita","packets":7},
+      {"slug":"crown-prince","name":"Crown Prince","family":"Cucurbita","packets":20},
+      {"slug":"boston-marrow","name":"Boston Marrow","family":"Cucurbita","packets":33},
+      {"slug":"table-dainty","name":"Table Dainty","family":"Cucurbita","packets":6},
+      {"slug":"ailsa-craig","name":"Ailsa Craig","family":"Allium","packets":19},
+      {"slug":"bedfordshire-champion","name":"Bedfordshire Champion","family":"Allium","packets":32},
+      {"slug":"welsh-onion","name":"Welsh Onion","family":"Allium","packets":5},
+      {"slug":"chantenay-red","name":"Chantenay Red","family":"Apiaceae","packets":18},
+      {"slug":"autumn-king","name":"Autumn King","family":"Apiaceae","packets":31}
+    ];
+
+    function filterVarieties() {
+      const familyFilter = document.getElementById('familyFilter').value;
+      const searchInput = document.getElementById('searchInput').value.toLowerCase();
+
+      const filtered = varieties.filter(v => {
+        const matchesFamily = !familyFilter || v.family === familyFilter;
+        const matchesSearch = !searchInput || v.name.toLowerCase().includes(searchInput);
+        return matchesFamily && matchesSearch;
+      });
+
+      const container = document.getElementById('varietiesContainer');
+      const resultCount = document.getElementById('resultCount');
+
+      if (filtered.length === 0) {
+        container.innerHTML = '<div class="no-results">No varieties match your search.</div>';
+        resultCount.innerHTML = '';
+        return;
+      }
+
+      resultCount.innerHTML = `<p><strong>${filtered.length}</strong> varieties found</p>`;
+
+      container.innerHTML = filtered.map(v => `
+        <a href="/library/catalogue/${v.slug}/" class="variety-card">
+          <h3>${v.name}</h3>
+          <p>${v.packets} packets available</p>
+          <span class="family-tag">${v.family}</span>
+        </a>
+      `).join('');
+    }
+
+    // Initialize on load
+    filterVarieties();
+  </script>
+</body>
+</html>

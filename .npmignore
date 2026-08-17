@@ -1,26 +1,22 @@
 # Development and testing files
-test/
+tests/
 docs/
-examples/
 docker/
-Dockerfile
-.dockerignore
 .github/
 .claude/
 CLAUDE.md
-.notes/
+CONTRIBUTING.md
+_notes/
 
 *.test.js
 *.spec.js
 
-# Build and development tools
-.github/
+# Editor and IDE
 .vscode/
 .idea/
-
-# Documentation drafts
-Implementation Plan*
-roadmap.md
+*.swp
+*.swo
+*~
 
 # Development dependencies
 node_modules/
@@ -44,11 +40,12 @@ temp/
 *.temp
 
 # Coverage and test results
-coverage/
-.nyc_output/
+.coverage/
+*.lcov
 test-results/
 
-# Editor files
-*.swp
-*.swo
-*~
+# Compiled executables
+unify-linux*
+unify-macos*
+unify-windows*
+examples/

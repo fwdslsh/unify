@@ -1,385 +1,206 @@
-# Getting Started with Unify
+# Getting started with unify
 
-This guide walks you through creating your first Unify site using DOM Cascade v1 for area-based composition.
+unify turns a folder of plain HTML (and Markdown) into a finished site with shared navs, headers, and footers — no templating language, no JavaScript framework, no configuration. If you can write HTML and CSS, you already know almost everything unify does.
 
-## Installation
+This guide takes you from nothing to a deployed-ready site. It matches unify v0.7.0 exactly; the complete rule set fits on one screen in [`authoring-rules.md`](authoring-rules.md).
 
-### Using the Init Command (Recommended)
+## Install
 
-```bash
-# Initialize a new project with a starter template
-unify init
+Download the standalone binary for Linux or macOS from the releases page and put it on your `PATH` — no runtime, no package manager. (No Windows binary yet — Windows users, or developers who already use Bun, can `bun add -g @fwdslsh/unify` instead.)
 
-# Or choose a specific template
-unify init blog
-unify init docs
-unify init portfolio
-```
-
-### Manual Setup
+## Two commands
 
 ```bash
-# Install globally
-npm install -g @fwdslsh/unify
-
-# Or use with npx
-npx @fwdslsh/unify --help
+unify init          # scaffold a starter site into src/
+unify dev           # build, watch, serve, and reload — one terminal
 ```
 
-## Your First Site
-
-### 1. Create Project Structure
+Open `http://localhost:3000`, edit a file under `src/`, save — the browser reloads. When you're happy:
 
 ```bash
-mkdir my-site
-cd my-site
-
-# Create source directory with conventional structure
-mkdir -p src/_includes
+unify build         # write the final site to dist/
 ```
 
-### 2. Create a Layout
+Upload `dist/` anywhere: GitHub Pages, Netlify, any static host.
 
-Create `src/_layout.html` (auto-discovered layout):
+## What `init` gave you
+
+```
+my-site/
+└── src/                  # the source root — everything here ships
+    ├── _layout.html      # the site chrome — one complete HTML page
+    ├── _includes/
+    │   └── nav.html      # a fragment
+    ├── index.html        # a page
+    ├── about.md          # a Markdown page
+    ├── contact.html      # a page that overrides the footer
+    ├── 404.html          # a page with no layout
+    └── assets/
+        └── style.css
+```
+
+Everything in `src/` ships to the site **except** files and folders whose name starts with `_` — those are the build's working material (layouts, fragments, notes, scripts). Files *inside* an underscore folder don't need their own prefix: `_includes/nav.html` is already held back.
+
+## The layout
+
+`src/_layout.html` is a complete HTML page — open it directly in a browser and you'll see the site chrome with its default content:
 
 ```html
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html>
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>My Site</title>
-    <style data-unify-docs="v1">
-      /* Public areas exposed by this layout */
-      .unify-hero {
-        /* Hero section area */
-      }
-      .unify-content {
-        /* Main content area */
-      }
-      .unify-sidebar {
-        /* Optional sidebar area */
-      }
-    </style>
+    <meta charset="utf-8">
+    <title>— My Site</title>
+    <link rel="stylesheet" href="/assets/style.css">
   </head>
   <body>
-    <header>
-      <h1>My Website</h1>
-      <nav>
-        <a href="/">Home</a>
-        <a href="/about">About</a>
-      </nav>
-    </header>
-    <main>
-      <section class="unify-hero">
-        <h1>Default Hero</h1>
-      </section>
-      <div class="content-wrapper">
-        <article class="unify-content">
-          <p>Default main content</p>
-        </article>
-        <aside class="unify-sidebar">
-          <p>Default sidebar</p>
-        </aside>
-      </div>
-    </main>
-    <footer>
-      <p>&copy; 2024 My Site. Built with Unify.</p>
+    <include src="/_includes/nav.html"></include>
+    <main><slot></slot></main>
+    <footer class="site-footer">
+      <!-- footer: the site byline, or whatever a page puts here instead -->
+      <slot name="footer"><p>© My Site</p></slot>
     </footer>
   </body>
 </html>
 ```
 
-### 3. Create Pages with Area-Based Composition
+Three things are happening:
 
-Create `src/index.html`:
+1. **`<include src="…">`** pulls in a fragment. Paths starting with `/` resolve from `src/`; anything else is relative to the file doing the including. Always write the closing `</include>` tag — it's what makes the source file preview correctly in a browser.
+2. **`<main>`** is where page content lands. That's not a unify invention — the HTML spec already defines `<main>` as the content unique to each page, as opposed to repeated chrome.
+3. **`<slot name="footer">`** marks a region a page may replace. What's inside the slot is the default (and what a browser shows when you open the layout directly). The starter stylesheet includes `slot { display: contents }` so the design-time wrapper adds no box; built pages contain no `<slot>` elements at all. Name slots for what they hold (`footer`, `hero`, `cta`), not where they sit (`top`, `col2`) — content names outlive redesigns. A plain comment above each slot, like the scaffold's, is all the documentation a layout needs.
+
+## Pages
+
+`src/index.html` is also a complete page. It never mentions the layout — the nearest `_layout.html` (in its own folder, or any parent) applies automatically:
 
 ```html
-<body data-unify="/_layout.html">
-  <section class="unify-hero">
-    <h1>Welcome to My Site</h1>
-    <p>Building modern static sites with DOM Cascade</p>
-  </section>
-  
-  <article class="unify-content">
-    <h2>Getting Started</h2>
-    <p>This site uses Unify's DOM Cascade v1 for area-based composition.</p>
-    <p>Content is matched to layout areas using CSS classes.</p>
-  </article>
-  
-  <aside class="unify-sidebar">
-    <h3>Quick Links</h3>
-    <ul>
-      <li><a href="/docs">Documentation</a></li>
-      <li><a href="/examples">Examples</a></li>
-    </ul>
-  </aside>
-</body>
+<!doctype html>
+<html>
+  <head>
+    <title>Home</title>
+  </head>
+  <body>
+    <main>
+      <h1>Welcome!</h1>
+      <p>This content lands in the layout's &lt;main&gt;.</p>
+    </main>
+  </body>
+</html>
 ```
 
-Create `src/about.md` (Markdown with frontmatter):
+Built result: the layout's `<main>` content is replaced by the page's, and the page's title is joined onto the layout's — `<title>Home — My Site</title>`. The layout carries the separator, so pages write only their own name.
+
+Two details worth knowing:
+
+- Your page's own `<main>` wrapper is unwrapped during composition, so nothing ends up nested. Writing complete, semantic documents is exactly right.
+- A page's `<body class="home">` is merged onto the built page's `<body>` — which is how you do active-nav highlighting: `body.home .nav-home { font-weight: bold; }` in your stylesheet. No feature needed.
+
+## Overriding a region
+
+`src/contact.html` replaces the footer by using the slot's name — one standard HTML attribute on a top-level element:
+
+```html
+<!doctype html>
+<html>
+  <head>
+    <title>Contact</title>
+  </head>
+  <body>
+    <h1>Contact</h1>
+    <p>Ordinary content as usual.</p>
+    <p slot="footer">© My Site — <a href="mailto:hi@example.com">email us</a></p>
+  </body>
+</html>
+```
+
+The built footer contains exactly the `<p>` you wrote — tag, attributes, and all. Pages that don't mention the footer keep the layout's default. Note what does *not* override anything: a plain `<header>` or `<footer>` element in your page is just content. Only `slot=` fills a region, and only on top-level elements (direct children of `<body>`).
+
+## Markdown pages
+
+`src/about.md`:
 
 ```markdown
 ---
-title: "About Us"
-description: "Learn more about our mission"
-head:
-  meta:
-    - name: author
-      content: "My Team"
+description: Who we are
+og:
+  image: /assets/team.jpg
 ---
 
-# About Us
+# About
 
-This page demonstrates Markdown processing with DOM Cascade composition.
-
-The content will be placed in the layout's main content area automatically.
-
-## Our Mission
-
-We build great static sites with modern web standards.
+Everything here is converted to HTML and dropped into the layout
+exactly like an HTML page's content.
 ```
 
-### 4. Create Components
+Frontmatter supplies the head: `title` (if you skip it, the first `# Heading` is the title), `layout`, `class`, `lang`, `dir`, and any other key becomes a `<meta>` tag (`description`, `author`; an `og:` block becomes `property=` metas). Headings get anchor `id`s automatically. There is no `draft:`, `date:`, or `tags:` behavior — `draft: true` would just publish a page with a meta tag; hold pages back by renaming them with a leading underscore (`_draft.md`).
 
-Create `src/_includes/feature-card.html`:
+Two rules that save you from silent mistakes (unify makes both hard errors): HTML pages never have frontmatter — use `<head>`. Markdown pages never contain a `<head>` element — use frontmatter.
+
+## Opting out of the layout
+
+`src/404.html` carries `data-layout="none"` on its `<body>` — it ships as-is, with includes and URL rules still applied. Use the same attribute with a path to pick a different layout: `data-layout="/other.html"` (in Markdown: `layout: /other.html`). Layouts are always paths ending in `.html`, never bare names.
+
+Section layouts work by placement: put a `_layout.html` in `blog/` and every page under `blog/` uses it instead of the site layout. A section layout is a complete standalone page like any other layout — write the shared chrome into it too. Layouts do not chain: a layout that itself carries `data-layout` is a build error (unify tells you rather than silently ignoring it).
+
+## A snippet that ships as written
+
+Sometimes you want a bare piece of HTML at its own URL — a panel another site embeds, or
+something a bit of JavaScript fetches after the page loads. A page cannot do that: every
+page is a complete document. Name the file `*.fragment.html` instead:
 
 ```html
-<div class="card">
-  <style data-unify-docs="v1">
-    /* Public areas for the feature card */
-    .unify-card-title {
-      /* Card title area */
-    }
-    .unify-card-content {
-      /* Card content area */
-    }
-    .unify-card-actions {
-      /* Card actions area */
-    }
-  </style>
-  
-  <header class="unify-card-title">
-    <h3>Default Title</h3>
-  </header>
-  
-  <div class="unify-card-content">
-    <p>Default content</p>
-  </div>
-  
-  <footer class="unify-card-actions">
-    <button>Learn More</button>
-  </footer>
+<!-- src/hours.fragment.html -->
+<div class="hours">
+  <h3>Opening hours</h3>
+  <p>Saturday 10am–4pm</p>
 </div>
 ```
 
-Use the component in `src/features.html`:
+It ships byte-for-byte at `/hours.fragment.html` — no layout, no composition, nothing
+added. And it is still an ordinary include target, so the same file can appear inside a
+page of yours *and* be fetched by someone else:
 
 ```html
-<body data-unify="/_layout.html">
-  <section class="unify-hero">
-    <h1>Our Features</h1>
-  </section>
-  
-  <div class="unify-content">
-    <h2>What We Offer</h2>
-    
-    <!-- Import and customize the component -->
-    <div data-unify="/_includes/feature-card.html">
-      <h3 class="unify-card-title">DOM Cascade</h3>
-      <div class="unify-card-content">
-        <p>CSS-like composition with areas and matching</p>
-      </div>
-      <div class="unify-card-actions">
-        <a href="/docs/cascade">Learn More</a>
-        <button>Try It</button>
-      </div>
-    </div>
-    
-    <div data-unify="/_includes/feature-card.html">
-      <h3 class="unify-card-title">Live Development</h3>
-      <div class="unify-card-content">
-        <p>Hot reload and incremental builds</p>
-      </div>
-    </div>
-  </div>
-</body>
+<include src="/hours.fragment.html"></include>
 ```
 
-### 5. Build and Serve
+One file, one place to edit it, two consumers. (`examples/htmx-fragments` is this,
+worked end to end.)
+
+## Links and assets
+
+- Write paths that are correct for the file you're editing — relative or root-relative, both work. unify resolves URLs written in layouts and fragments against the file that wrote them, so composed pages are correct at every depth.
+- **Always link the real file**: `href="about.html"`, never a hand-written `/about/`. If you want pretty URLs, build with `--pretty-urls` — pages move to `about/index.html` and every internal link is rewritten for you.
+- Every non-page file in `src/` is copied through byte-for-byte to the same path. What you see in the folder is what ships — compress images before adding them.
+- unify does not scope styles. If a fragment's CSS should not leak, use the platform: `@scope`, `@layer`, nesting, or a class prefix.
+
+## Checking and publishing
 
 ```bash
-# Build the site
-unify build
-
-# Start development server with live reload
-unify serve
-
-# Watch for changes without serving
-unify watch
+unify build --dry-run --strict   # the whole build and every check, writing nothing
+unify build                      # publish to dist/ — all-or-nothing
 ```
 
-Visit `http://localhost:3000` to see your site!
+`--dry-run` prints what would be written and which layout each page composed from. The build checks every internal reference against the emitted files — a renamed page, a typo'd image path, or a case mismatch is a located error, not a quiet 404. If anything is wrong, **nothing is published**: exit 0 means `dist/` is the complete site, non-zero means the previous `dist/` is untouched.
 
-## Core Concepts
+Deploying under a subpath (GitHub Pages project sites)? Give `--base-url` the site's whole address: `unify build --pretty-urls --base-url https://you.github.io/repo-name/`. The path part prefixes every root-relative link; the domain absolutizes `og:` and canonical URLs, which is what Facebook, LinkedIn and Slack fetch when someone shares a page. A bare `/repo-name/` is rejected — it would prefix the links and leave the share metadata unfetchable.
 
-### DOM Cascade v1
+## Anything derived from other files
 
-Unify implements the DOM Cascade specification for predictable composition:
-
-- **Layers**: `layout → components → page` (CSS-like precedence)
-- **Areas**: Public regions exposed via `.unify-*` classes
-- **Scoping**: Each import creates an independent composition boundary
-- **Matching**: Area → Landmark → Ordered fill precedence
-
-### Area-Based Composition
-
-Instead of traditional templating, Unify uses CSS-like area matching:
-
-```html
-<!-- Layout exposes areas -->
-<section class="unify-hero">Default hero</section>
-<main class="unify-content">Default content</main>
-
-<!-- Page targets areas by class -->
-<section class="unify-hero">Custom hero content</section>
-<article class="unify-content">Custom main content</article>
-```
-
-### File Organization
-
-- **Pages**: `.html` or `.md` files that generate output
-- **Fragments**: Files prefixed with `_` (layouts, components, partials)
-- **Auto-discovery**: `_layout.html` files are automatically applied
-- **Includes**: Use `data-unify` for area-based composition
-
-### Convention-Based Architecture
-
-```
-src/
-├── _includes/          # Shared components and site-wide layout
-│   ├── layout.html     # Site-wide fallback layout
-│   ├── header.html     # Header component
-│   └── nav.html        # Navigation component
-├── _layout.html        # Root-level layout (auto-discovered)
-├── blog/
-│   ├── _layout.html    # Blog-specific layout
-│   ├── _sidebar.html   # Blog sidebar component
-│   └── post1.md        # Blog post
-├── index.html          # Homepage
-└── about.md            # About page
-```
-
-## Include System
-
-Unify supports both modern area-based composition and legacy Apache SSI:
-
-### Area-Based (Recommended)
-
-```html
-<!-- Component with areas -->
-<div data-unify="/_includes/card.html">
-  <h3 class="unify-title">Custom Title</h3>
-  <p class="unify-body">Custom content</p>
-</div>
-```
-
-### Legacy Apache SSI (Backwards Compatibility)
-
-```html
-<!--#include virtual="/_includes/header.html" -->
-<!--#include file="../shared/nav.html" -->
-```
-
-## Layout Discovery
-
-Unify discovers layouts in this order:
-
-1. **Explicit**: `data-unify` attribute on `<html>` or `<body>`
-2. **Frontmatter**: `layout: name` in Markdown
-3. **Auto-discovery**: `_layout.html` in page directory or parents
-4. **Site fallback**: `_includes/layout.html`
-5. **No layout**: Raw page content
-
-## Development Workflow
-
-1. **Create layouts** with documented public areas
-2. **Build pages** that target those areas
-3. **Import components** with `data-unify`
-4. **Live reload** sees changes instantly
-
-## CLI Commands
+A blog index, a feed, a gallery page — anything computed from a set of files — is a script you own, run before the build:
 
 ```bash
-# Initialize new project
-unify init [template]
-
-# Build site
-unify build --source src --output dist
-
-# Development server
-unify serve --port 3000 --host localhost
-
-# Build with options
-unify build --pretty-urls --minify --clean
-
-# Production build with security checks
-unify build --fail-on security --minify
+node _scripts/gen.mjs && unify build
 ```
 
-## Next Steps
+The script writes real pages into `src/`, where they get layouts, head merging, and reference checking like everything else (`unify init blog` ships a working example, generator and data file included). One habit matters the day the script reads a data file: **name the fields you emit — never spread the whole record**. The underscore keeps `_data/` itself out of `dist/`, but no build check can catch a private field once your script copies it into a page. unify itself has no collections, no data files, and no template language — that's the point.
 
-- Read the [Complete App Specification](app-spec.md)
-- Learn about [DOM Cascade v1](dom-spec.md)
-- Try the [Example Projects](../example/)
-- Explore [CLI Reference](cli-reference.md)
+## Where to go next
 
-## Common Patterns
-
-### Blog Site
-
-```
-src/
-├── _includes/
-│   └── layout.html     # Site-wide layout
-├── blog/
-│   ├── _layout.html    # Blog-specific layout with areas
-│   ├── post1.md        # Uses blog layout
-│   └── post2.md
-├── index.html          # Homepage
-└── about.md            # About page
-```
-
-### Multi-Section Site
-
-```
-src/
-├── _layout.html        # Root layout for all pages
-├── docs/
-│   ├── _layout.html    # Documentation layout
-│   ├── guide.html
-│   └── api.html
-├── blog/
-│   ├── _layout.html    # Blog layout
-│   └── posts/
-└── index.html
-```
-
-### Component Library
-
-```
-src/
-├── _includes/
-│   ├── card.html       # Reusable card component
-│   ├── button.html     # Button component
-│   └── nav.html        # Navigation component
-├── components.html     # Showcase page
-└── index.html
-```
-
-## Security Features
-
-- **Path traversal prevention**: All file operations are validated
-- **Security scanning**: Built-in checks for XSS and injection vectors
-- **Build-time validation**: `--fail-on security` for CI/CD pipelines
-- **Content policy support**: Works with CSP headers
+- [`authoring-rules.md`](authoring-rules.md) — every authoring rule on one screen
+- [`cli-reference.md`](cli-reference.md) — every command and flag
+- [`product-spec.md`](product-spec.md) — the product contract, including what unify refuses to do and why
+- [`conformance-spec.md`](conformance-spec.md) — the exact composition rules, for implementers and the curious
+- [`integrations.md`](integrations.md) — putting a Svelte component (or anything else with a compiler) on one page
+- [`../examples/README.md`](../examples/README.md) — five complete sites, and the pattern each one shows

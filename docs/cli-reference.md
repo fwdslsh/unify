@@ -1,474 +1,122 @@
-# CLI Reference
+# unify CLI reference
 
-Complete reference for all Unify CLI commands and options implementing DOM Cascade v1.
+**Matches unify v0.7.0.** This page lists every command, every option, and every exit code — there are no others. The behavior behind each is specified in [`product-spec.md`](product-spec.md) §4 and, rule by rule, in [`conformance-spec.md`](conformance-spec.md).
 
-## Application
+```
+unify [build]              build the site (default command)
+unify dev                  build, watch, serve, and reload — the inner loop
+unify watch                build + rebuild on change, no server
+unify init [template]      scaffold a starter site
 
-`unify` - Modern static site generator with area-based composition
+Options:
+  -s, --source <dir>       source directory (default: src/ if it exists, else .)
+  -o, --output <dir>       output directory (default: dist)
+      --clean              empty the output directory first
+      --exclude <glob>     globs never emitted, still usable by the build (repeatable; default: _*)
+      --pretty-urls        about.html → about/index.html, and rewrite internal links to match
+      --base-url <url>     the site's whole address (https://site.example/repo/): prefix root-relative links, and make og:/canonical absolute for share crawlers
+      --dry-run            run the full build and every check, print the report, write nothing
+      --strict             advisories count as problems for the exit code
+  -p, --port <n>           port for `unify dev` (default: 3000)
+  -v, --version            print version
+  -h, --help               print help
+```
 
 ## Commands
 
-### `unify [command] [options]`
+### `unify build` (the default — `unify` alone does the same)
 
-If no command is specified, Unify defaults to `build`.
+Builds the site, all-or-nothing: composition and every check run into a temporary tree, and the output directory is updated only if there were **zero problems**. A build that reports problems exits `1` and leaves the previous output byte-for-byte untouched. After composing, every internal reference in the output is checked against the emitted files; a URL that resolves to nothing is a problem like any other.
 
-### `unify build [options]`
+### `unify dev`
 
-Build your static site from source files using DOM Cascade v1.
+Build + watch + a static server on `localhost:<port>` (default 3000) serving the output directory, with live reload on every rebuild. The server is deliberately minimal and permanently so: static files, directory indexes, a 404 page, reload. No proxying, HTTPS, middleware, or config. The reload script is injected only into pages `dev` serves — it never exists in the output directory. While watching, a page that fails to build is served as an error page carrying the located diagnostics, replaced by the next successful rebuild.
 
-**Examples:**
-```bash
-# Basic build
-unify build
+### `unify watch`
 
-# Build with custom directories
-unify build --source content --output public
-
-# Build with pretty URLs and minification
-unify build --pretty-urls --minify --clean
-
-# Production build with security checks
-unify build --fail-on security --minify
-```
-
-### `unify serve [options]`
-
-Start development server with live reload and incremental builds.
-
-**Examples:**
-```bash
-# Start dev server on default port 3000
-unify serve
-
-# Custom port and host for external access
-unify serve --port 8080 --host 0.0.0.0
-
-# Serve from custom directories
-unify serve --source content --output tmp
-```
-
-### `unify watch [options]`
-
-Watch files and rebuild on changes without serving.
-
-**Examples:**
-```bash
-# Watch and rebuild
-unify watch
-
-# Watch with custom directories
-unify watch --source src --output dist
-```
+The same watch contract as `dev`, no server — for pairing with a server you already run. Saves are coalesced into one full rebuild (a save landing mid-rebuild queues exactly one follow-up); writes are atomic and minimal (unchanged files are not rewritten, deletions are precise), so external tools can consume the output directory safely.
 
 ### `unify init [template]`
 
-Initialize a new project by downloading a starter template from GitHub.
+Scaffolds a starter site into `src/`. Templates: `default`, `basic`, `blog`, `docs`, `portfolio`. Every template exercises the core primitives once — an include, the automatic `_layout.html`, a named slot with a page that fills it, a `data-layout="none"` page, and the underscore convention. The `blog` template also ships the generator pattern worked: `_scripts/gen.mjs` reads `posts/*.md` and `_data/authors.json` and regenerates `blog.html` and `feed.xml` (`node _scripts/gen.mjs && unify build`); both ship pre-generated, and the generator names the fields it emits, so the authors file's private `email` never reaches a page. `init` never creates `unify.yaml`. Guaranteed: `unify init && unify build --dry-run --strict` exits `0`.
 
-**Examples:**
+## Options
+
+### `-s, --source <dir>` / `-o, --output <dir>`
+
+Source root and output directory. Pages (`.html`, `.md`) are processed; **every other file mirror-copies byte-for-byte** to the same relative path. Independent of everything else, these never ship: the output directory, `.git/`/`.hg/`/`.svn/`, `node_modules/`, `.env` and `.env.*`, and `unify.yaml`. Dotfiles ship (`.htaccess`, `.nojekyll` are deploy files). When no `--source` is given and no `src/` exists — a directory `init` did not scaffold — the build summary reports how many files it is copying and points at `--dry-run`; passing `--source` yourself (even `.`) turns that notice off.
+
+### `--clean`
+
+Empties the output directory before building. Refuses to run (exit `2`) when the output directory is, or contains, the source root or the working directory — `-o . --clean` is an error, not a deleted project. It does not refuse when the output merely sits inside them: `-s . -o dist` is fine. Under `watch`/`dev` it applies only at startup.
+
+### `--exclude <glob>` (repeatable)
+
+Globs whose matches are never emitted but remain build material (includable, usable as layouts). Default: `_*`. A glob without `/` matches any path segment, so the single default covers `_layout.html`, `_includes/`, `_scripts/`, and `blog/_draft.md`; a glob with `/` matches the source-root-relative path (`drafts/**`).
+
+Your globs **replace** the default — keep `_*` in your list if you still want it: `--exclude '_*' --exclude 'drafts/**'`. Replacing it cannot silently publish the build's working files: an emitted `_`-prefixed page, or a path containing a `_`-prefixed directory, is a problem naming the fix. Root-level non-page files like `_headers` and `_redirects` are deliberately outside that guard — to ship them on Netlify, replace the default with globs that spare them (until you do, holding a known deployment file back is an advisory naming this exact recipe, so the miss is never silent):
+
 ```bash
-# Initialize with default template
-unify init
-
-# Initialize with specific template
-unify init blog
-unify init docs
-unify init portfolio
+unify build --exclude '_*.html' --exclude '_*.md' --exclude '_includes' --exclude '_scripts'
 ```
 
-## Global Options
+### `--pretty-urls`
 
-### Directory Options
+Moves every page `X.html` to `X/index.html` — except `index.html` files (already pretty) and the root `404.html` (hosts require that exact path) — and rewrites every internal link to match (`/about.html` → `/about/`, queries and fragments preserved; links to assets and external URLs untouched). Relative asset references inside moved pages are re-emitted root-relative so they keep working. Author pages always link the real file (`about.html`); this flag owns the pretty form.
 
-#### `--source, -s <directory>`
-Source directory containing your site files.
-- **Default:** current directory
-- **Example:** `--source content`
-- **Validation:** Must be existing directory
+### `--base-url <url>`
 
-#### `--output, -o <directory>`
-Output directory for generated static files.
-- **Default:** `dist`
-- **Example:** `--output public`
-- **Behavior:** Created if doesn't exist
+The address the site will be served from, scheme and domain included: `--base-url https://example.com/repo/`. Its path part prefixes every root-relative URL in the built HTML — `href`, `src`, `srcset`, `poster`, and `og:`/`twitter:` meta values; source files stay rooted at `/` so local preview keeps working. Its origin additionally absolutizes root-relative `og:`/`twitter:`/`rel="canonical"` values, which crawlers require to be absolute: `/assets/x.jpg` becomes `https://example.com/repo/assets/x.jpg` — origin **and** subpath, so the URL points where the file is actually served.
 
-#### `--copy <glob>` (repeatable)
-Adds paths to the copy set beyond automatic asset detection.
-- **Default:** `null` (only copies assets/** and referenced assets)
-- **Format:** Ripgrep/gitignore-style glob patterns
-- **Example:** `--copy "docs/**/*.pdf" --copy "config/*.json"`
-- **Behavior:** Copies matching files preserving relative paths
-- **Note:** `assets/**` is implicitly copied unless excluded
+A bare path (`--base-url /repo-name/`) is a usage error naming the full form. It used to be accepted, and prefixed links correctly while leaving `og:`/`canonical` root-relative — valid-looking metadata no share crawler can fetch. Give the whole address; for a local preview of a subpath site, `http://localhost:3000/repo-name/` is one.
 
-#### `--ignore <glob>` (repeatable)
-Ignore paths for both rendering and copying.
-- **Default:** `null` (respects .gitignore by default)
-- **Format:** Ripgrep/gitignore-style glob patterns
-- **Example:** `--ignore "**/drafts/**" --ignore "!important/**"`
-- **Behavior:** Last flag wins when patterns overlap
-- **Note:** Applies to both render and copy pipelines
+### `--dry-run`
 
-#### `--ignore-render <glob>` (repeatable)
-Ignore paths only in the render/emitting pipeline.
-- **Default:** `null`
-- **Format:** Ripgrep/gitignore-style glob patterns
-- **Behavior:** Files won't be rendered but may still be copied
+The entire build — composition, URL rewriting, collision detection, the reference check, every problem and advisory — with no writes. Stdout lists what would be written, copied, and deleted, each page naming what it composed from:
 
-#### `--ignore-copy <glob>` (repeatable)
-Ignore paths only in the copy pipeline.
-- **Default:** `null`
-- **Format:** Ripgrep/gitignore-style glob patterns
-- **Behavior:** Files won't be copied but may still be rendered
+```
+serving from https://example.com/repo/
+write dist/about/index.html (/repo/about/) ← about.md + _layout.html
+write dist/blog/post/index.html (/repo/blog/post/) ← blog/post.html + blog/_layout.html
+write dist/404.html (/repo/404.html) ← 404.html (no layout)
+copy dist/assets/style.css (/repo/assets/style.css) ← assets/style.css
+delete dist/stale.html
+```
 
-#### `--render <glob>` (repeatable)
-Force rendering of matching files even if otherwise ignored.
-- **Default:** `null`
-- **Format:** Ripgrep/gitignore-style glob patterns
-- **Example:** `--render "experiments/**"`
-- **Behavior:** Overrides ignore rules for rendering
-- **Precedence:** Render wins if file matches both render and copy rules
+The first line is the address the build assumed — `serving from / — the domain root` when no `--base-url` is set. Each write/copy carries the URL that file answers to, so a site built for the wrong address shows it here rather than after deployment.
 
-#### `--default-layout <value>` (repeatable)
-Set default layouts for files matching glob patterns.
-- **Default:** `null`
-- **Format:** 
-  - Filename only: `_layout.html` (global fallback)
-  - Key-value: `blog/**=_post.html` (pattern-specific)
-- **Example:** `--default-layout "_base.html" --default-layout "blog/**=_post.html"`
-- **Behavior:** Last matching rule wins
+### `--strict`
 
-#### `--dry-run`
-Show file classification decisions without writing output.
-- **Default:** `false`
-- **Behavior:** Shows EMIT, COPY, SKIP, and IGNORED classifications
-- **Output:** Explains layout resolution and processing decisions
-- **Debug:** SKIP and IGNORED only shown with `--log-level=debug`
+Advisories affect the exit code (non-zero) — never what is published. `unify build --dry-run --strict` is the one-line CI lint.
 
-#### `--auto-ignore <boolean>`
-Control automatic ignoring of layouts, components, and .gitignore.
-- **Default:** `true`
-- **Values:** `true` or `false`
-- **Behavior:** When true, automatically ignores:
-  - Files specified as layouts
-  - Files referenced as includes
-  - Files listed in .gitignore
-
-### Build Options
-
-#### `--pretty-urls`
-Generate pretty URLs (page.html → page/index.html).
-- **Default:** `false`
-- **Example:** `--pretty-urls`
-- **Effect:** Creates directory structure for clean URLs
-- **Link Normalization:** Transforms HTML links to match structure
-
-#### `--clean`
-Clean output directory before build.
-- **Default:** `false`
-- **Example:** `--clean`
-
-#### `--fail-level <level>`
-Fail build if errors of specified level or higher occur.
-- **Default:** `null` (only fail on fatal build errors)
-- **Valid levels:** `warning`, `error`
-- **Used by:** `build` command only
-- **Example:** `--fail-level warning`
-
-#### `--fail-on <types>`
-Fail build on specific issue types (comma-separated).
-- **Default:** `null`
-- **Valid types:** `security`, `warning`, `error`, `U001`, `U002`, `U003`, `U004`, `U005`, `U006`, `U008`
-- **Used by:** `build` command only
-- **Examples:**
-  - `--fail-on security`
-  - `--fail-on security,warning,U002`
-- **Security Integration:** Essential for CI/CD pipelines
-- **Linting Integration:** Implements DOM Cascade v1 linter rules
-
-#### `--minify`
-Enable HTML minification for production builds.
-- **Default:** `false`
-- **Example:** `--minify`
-- **Behavior:** Removes whitespace and optimizes HTML output
-
-### Server Options
-
-#### `--port, -p <number>`
-Development server port.
-- **Default:** `3000`
-- **Range:** `1-65535`
-- **Used by:** `serve` command only
-- **Example:** `--port 8080`
-
-#### `--host <hostname>`
-Development server host.
-- **Default:** `localhost`
-- **Used by:** `serve` command only
-- **Example:** `--host 0.0.0.0` (for external access)
-
-### Global Options
-
-#### `--help, -h`
-Display help information and exit.
-- **Behavior:** Shows usage, commands, options, and examples
-- **Exit code:** 0
-
-#### `--version, -v`
-Display version number and exit.
-- **Format:** `unify v{version}`
-- **Exit code:** 0
-
-#### `--log-level <level>`
-Set logging verbosity level.
-- **Default:** `info`
-- **Valid levels:** `error`, `warn`, `info`, `debug`, `trace`
-- **Example:** `--log-level debug`
-- **Behavior:** Controls console output verbosity
-
-## Exit Codes
+## Exit codes
 
 | Code | Meaning |
-|------|---------|
-| `0` | Success |
-| `1` | Build error or failed validation |
-| `2` | Fatal error or invalid usage |
+|---|---|
+| `0` | The site was published (with `--dry-run`: would have been). |
+| `1` | Problems found — nothing was published, the previous output is untouched. Under `--strict`, advisories alone also exit `1`. |
+| `2` | Invalid usage or fatal environment error (unknown flag, missing source directory, the `--clean` refusal, port in use). |
 
-## Environment Variables
+## Diagnostics
 
-### `DEBUG`
-Enable debug mode with detailed output and stack traces.
-- **Example:** `DEBUG=1 unify build`
-- **Effect:** Shows detailed processing information
+Two severities exist: `problem` and `advisory` — no other words, no rule codes. Diagnostics go to stderr; the summary and `--dry-run` list go to stdout; both are ordered by path then line. Every line starts with a stable prefix:
 
-### `LOG_LEVEL`
-Override log level via environment.
-- **Example:** `LOG_LEVEL=debug unify build`
-- **Values:** `error`, `warn`, `info`, `debug`, `trace`
-
-### `UNIFY_DEBUG`
-Additional debug information for troubleshooting.
-- **Example:** `UNIFY_DEBUG=1 unify build`
-
-### `CLAUDECODE`
-Claude Code environment flag for specialized behavior.
-- **Example:** `CLAUDECODE=1 unify test --coverage`
-
-## File Processing Precedence
-
-Unify uses a three-tier precedence system:
-
-### Tier 1: Explicit Overrides (Highest Priority)
-- `--render <pattern>` → Forces rendering even if ignored
-- `--auto-ignore=false` → Disables automatic ignoring
-
-### Tier 2: Ignore Rules (Medium Priority)
-- `--ignore <pattern>` → Ignores for both render and copy
-- `--ignore-render <pattern>` → Render ignore only
-- `--ignore-copy <pattern>` → Copy ignore only
-- `.gitignore` patterns (when `--auto-ignore=true`)
-
-### Tier 3: Default Behavior (Lowest Priority)
-- Renderables (`.html`, `.md`) are emitted
-- Assets matching `assets/**` or `--copy` patterns are copied
-- Files starting with `_` are ignored (unless in `--copy`)
-
-**Resolution:** Higher tiers always win. Within same tier, last pattern wins.
-
-## Advanced Usage
-
-### Production Build Pipeline
-
-```bash
-# Complete production build
-unify build \
-  --source src \
-  --output dist \
-  --clean \
-  --pretty-urls \
-  --minify \
-  --fail-on security,warning \
-  --copy "static/**" \
-  --ignore "**/drafts/**"
+```
+src/index.html:8: problem: include not found: /_includes/navv.html
+  in: <include src="/_includes/navv.html">
+  fix: create src/_includes/navv.html, or point src at an existing file
+  fix: check the path spelling and casing
 ```
 
-### Development Workflow
+Cycle and depth errors print the full chain (`_layout.html → _includes/nav.html → _layout.html`). Set `DEBUG=1` for stack traces — the only environment variable unify reads.
 
-```bash
-# Development with live reload
-unify serve --host 0.0.0.0 --port 3000
+## `unify.yaml`
 
-# File watching without server
-unify watch --log-level debug
-
-# Test build classification
-unify build --dry-run --log-level debug
-```
-
-### CI/CD Integration
-
-```bash
-# Security-focused production build
-NODE_ENV=production unify build \
-  --minify \
-  --fail-on security \
-  --clean
-
-# Development build with warnings
-unify build --fail-level warning
-```
-
-### Asset Management
-
-```bash
-# Copy additional files beyond automatic detection
-unify build \
-  --copy "docs/**/*.pdf" \
-  --copy "config/*.json" \
-  --ignore-copy "assets/raw/**"
-
-# Force render experimental content
-unify build \
-  --render "experiments/**" \
-  --ignore "**/node_modules/**"
-```
-
-## DOM Cascade Integration
-
-### Layout Configuration
-
-```bash
-# Set default layouts for different sections
-unify build \
-  --default-layout "_base.html" \
-  --default-layout "blog/**=_post.html" \
-  --default-layout "docs/**=_doc.html"
-```
-
-### Linter Integration
-
-```bash
-# Fail on specific DOM Cascade linter rules
-unify build --fail-on U001,U002,U004
-
-# Enable all DOM Cascade warnings
-unify build --fail-on warning --log-level debug
-```
-
-## Error Handling
-
-### Common Error Patterns
-
-**Source directory not found:**
-```
-Error: Source directory not found: src
-Suggestions:
-  • Create source directory: mkdir src
-  • Specify different source: --source content
-  • Check current working directory
-```
-
-**Layout not found:**
-```
-Warning: Layout not found for short name 'blog'
-  Searched: _blog.layout.html, _includes/blog.layout.html
-Suggestions:
-  • Create layout file: src/_blog.layout.html
-  • Use full path: data-unify="/_layouts/blog.html"
-  • Check layout naming conventions
-```
-
-**Security validation failure:**
-```
-[SECURITY] Path traversal attempt detected: ../../../etc/passwd
-Build failed due to security issues (use --fail-on security)
-```
-
-### Debugging Commands
-
-```bash
-# Verbose output with classification details
-unify build --dry-run --log-level debug
-
-# Security-focused debug
-DEBUG=1 unify build --fail-on security
-
-# Full trace logging
-unify build --log-level trace
-```
-
-## Performance Tips
-
-### Large Sites
-
-```bash
-# Optimize for large projects
-unify build \
-  --ignore "node_modules/**" \
-  --ignore-copy "**/*.psd" \
-  --copy "assets/images/**/*.{jpg,png,webp}"
-```
-
-### Development Speed
-
-```bash
-# Minimal logging for faster builds
-LOG_LEVEL=warn unify serve
-
-# Serve from faster storage
-unify serve --output /tmp/dev-build
-```
-
-## Integration Examples
-
-### npm scripts
-
-```json
-{
-  "scripts": {
-    "build": "unify build --pretty-urls --minify",
-    "build:prod": "unify build --clean --minify --fail-on security",
-    "dev": "unify serve --host 0.0.0.0",
-    "preview": "unify build && python -m http.server -d dist 8080",
-    "test:build": "unify build --dry-run --log-level debug"
-  }
-}
-```
-
-### GitHub Actions
+Optional, at the source root: saved flags, nothing more. Keys are the long option names (`source`, `output`, `clean`, `exclude` — a list, `pretty-urls`, `base-url`, `strict`, `port`); CLI flags win on conflict. No behavior exists that only the file can express; the file itself never ships.
 
 ```yaml
-- name: Build site with security checks
-  run: |
-    unify build \
-      --clean \
-      --pretty-urls \
-      --minify \
-      --fail-on security \
-      --copy "static/**"
+# unify.yaml — the committed invocation
+output: dist
+pretty-urls: true
+base-url: https://example.com/
 ```
-
-### Docker Integration
-
-```bash
-# Build in container
-docker run --rm \
-  -v $(pwd):/workspace \
-  -w /workspace \
-  fwdslsh/unify:cli \
-  build --source src --output dist --pretty-urls
-
-# Development server in container
-docker run --rm \
-  -p 3000:3000 \
-  -v $(pwd):/workspace \
-  -w /workspace \
-  fwdslsh/unify:cli \
-  serve --host 0.0.0.0
-```
-
-## See Also
-
-- [Getting Started Guide](getting-started.md)
-- [Include System Documentation](include-syntax.md)
-- [Application Specification](app-spec.md)
-- [DOM Cascade Specification](dom-spec.md)
-- [Docker Usage Guide](docker-usage.md)

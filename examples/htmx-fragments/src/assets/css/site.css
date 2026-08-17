@@ -1,0 +1,6 @@
+body { font-family: system-ui, sans-serif; margin: 0 auto; max-width: 42rem; padding: 1rem; }
+.site-header { display: flex; gap: 1rem; align-items: center; }
+.site-header nav a { margin-right: .75rem; }
+.tabs button { padding: .4rem .8rem; }
+.hours-panel dl { display: grid; grid-template-columns: auto 1fr; gap: .25rem .75rem; }
+.site-footer { margin-top: 2rem; border-top: 1px solid #ccc; padding-top: .5rem; }

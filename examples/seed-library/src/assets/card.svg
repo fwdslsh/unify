@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-labelledby="t">
+  <title id="t">Fernhollow Seed Library</title>
+  <rect width="1200" height="630" fill="#f4ead8"/>
+  <rect x="40" y="40" width="1120" height="550" fill="none" stroke="#3d6b3d" stroke-width="6"/>
+  <path d="M600 200c-70 0-120 60-120 130 0 55 40 100 110 106 8 0 16-1 24-2-6-90 0-170 0-234Z" fill="#3d6b3d"/>
+  <path d="M600 200c70 0 120 60 120 130 0 55-40 100-110 106-8 0-16-1-24-2 6-90 0-170 0-234Z" fill="#5a8f52"/>
+  <text x="600" y="470" font-family="Georgia, serif" font-size="54" fill="#2c4f2c" text-anchor="middle">Fernhollow Seed Library</text>
+  <text x="600" y="520" font-family="Georgia, serif" font-size="28" fill="#4a4a3f" text-anchor="middle">seed-saving, plot to plot</text>
+</svg>

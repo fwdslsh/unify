@@ -1,382 +1,133 @@
 # Docker Usage Guide
 
-unify provides three different Docker container options for different use cases. This guide explains when to use each container type and how to deploy them.
+This repository ships **one** container image: the unify CLI, built from [`docker/Dockerfile`](../docker/Dockerfile). Use it to build a site in a pipeline or on a machine that has no unify install. It is a build tool, not a web server — serving the built site is the job of whatever host or server you deploy `dist/` to.
 
-## Container Types Overview
+## The image
 
-| Container | Best For | Web Server | Use Case |
-|-----------|----------|------------|----------|
-| **Apache** | Production static hosting | Apache HTTP Server | High-performance static site serving |
-| **Nginx** | Production with build automation | Nginx | Auto-build and serve with better performance |
-| **CLI** | Development and CI/CD | None | Building sites in pipelines, development |
+`docker/Dockerfile` is a two-stage build. The first stage installs Bun, runs `bun install --frozen-lockfile`, and compiles `src/cli.js` into a single executable with `bun build --compile`. The second stage copies that binary into `ubuntu:latest` — no Bun, no Node, no npm in the runtime image.
 
-## Automated Builds and Publishing
+| | |
+|---|---|
+| Entrypoint | `unify` (arguments you pass are appended to it) |
+| Default command | `--help` |
+| Working directory | `/workspace` |
+| User | non-root `appuser` (uid 1001, gid 1001) |
 
-Docker images are automatically built and published through our [CI/CD workflows](cicd-workflows.md):
+The image is published by the `docker` job in [`.github/workflows/release.yml`](../.github/workflows/release.yml) when a `v*` tag is pushed, as `fwdslsh/unify` — built from `docker/Dockerfile` in this repo, tagged with the release tag and `latest`.
 
-- **Pull Requests**: Docker images are built and tested (validation only)
-- **Releases**: Docker images are built, tested, and published to Docker Hub
-- **Image Tags**: Available on Docker Hub as `fwdslsh/unify`, `fwdslsh/unify-nginx`, `fwdslsh/unify-apache`
-
-For the latest images:
 ```bash
-docker pull fwdslsh/unify:latest        # CLI container
-docker pull fwdslsh/unify-nginx:latest  # Nginx container  
-docker pull fwdslsh/unify-apache:latest # Apache container
+docker pull fwdslsh/unify:latest
 ```
 
-## Apache Container (`Dockerfile.apache`)
-
-### When to Use Apache Container
-
-- **Production hosting** of static sites
-- **High traffic** websites requiring proven performance
-- **Enterprise environments** where Apache is preferred
-- **Security-focused deployments** with minimal attack surface
-- **Pure static serving** without build requirements
-
-### Benefits of Apache Container
-
-- **Lightweight**: Only Apache and static files, no Node.js runtime
-- **Secure**: Runs as non-root user, minimal packages installed
-- **Fast**: Optimized for static file serving
-- **Reliable**: Apache's proven stability and performance
-- **Configurable**: Easy to customize Apache configuration
-
-### Apache Container Usage
-
-#### Basic Static Hosting
+To build it yourself from a checkout:
 
 ```bash
-# Build your site first (locally or in CI)
-unify build --source src --output dist
-
-# Serve with Apache container
-docker run -d \
-  --name my-site \
-  -p 8080:8080 \
-  -v $(pwd)/dist:/var/www/html:ro \
-  unify:apache
+docker build -f docker/Dockerfile -t unify:local .
 ```
 
-#### Production Deployment
+## Usage
+
+Mount your project at `/workspace` and pass a unify command. The complete CLI is in [`cli-reference.md`](cli-reference.md); the image adds nothing to it and takes nothing away.
+
+### Build a site
 
 ```bash
-# Production setup with restart policy
-docker run -d \
-  --name production-site \
-  --restart unless-stopped \
-  -p 80:8080 \
-  -v /path/to/built/site:/var/www/html:ro \
-  unify:apache
-```
-
-#### Custom Apache Configuration
-
-```bash
-# Mount custom Apache config
-docker run -d \
-  --name custom-apache \
-  -p 8080:8080 \
-  -v $(pwd)/dist:/var/www/html:ro \
-  -v $(pwd)/custom-apache.conf:/etc/apache2/sites-available/000-default.conf:ro \
-  unify:apache
-```
-
-### Apache Container Features
-
-- **Port**: Serves on port 8080 internally
-- **Document Root**: `/var/www/html`
-- **User**: Runs as `htmluser` (non-root)
-- **Security**: Minimal packages, disabled unused modules
-- **Performance**: Optimized for static content delivery
-
-## Nginx Container (`Dockerfile.nginx`)
-
-### When to Use Nginx Container
-
-- **Production with automatic building** from source files
-- **Continuous deployment** scenarios
-- **High-performance serving** with modern features
-- **Sites that need rebuilding** when source changes
-- **Development-to-production** consistency
-
-### Benefits of Nginx Container
-
-- **Auto-building**: Automatically builds site from source
-- **High performance**: Nginx optimized for concurrent connections
-- **Modern features**: HTTP/2, compression, advanced caching
-- **Development friendly**: Can rebuild on file changes
-- **All-in-one**: Build tool + web server in single container
-
-### Nginx Container Usage
-
-#### Auto-Build and Serve
-
-```bash
-# Automatically build from source and serve
-docker run -d \
-  --name auto-build-site \
-  -p 80:80 \
-  -v $(pwd)/src:/site:ro \
-  unify:nginx
-```
-
-#### Production with Health Checks
-
-```bash
-# Production deployment with health monitoring
-docker run -d \
-  --name nginx-site \
-  --restart unless-stopped \
-  --health-cmd="curl -f http://localhost/ || exit 1" \
-  --health-interval=30s \
-  -p 80:80 \
-  -v $(pwd)/src:/site:ro \
-  unify:nginx
-```
-
-#### Development with Live Rebuild
-
-```bash
-# Development mode with file watching
-docker run -d \
-  --name dev-nginx \
-  -p 3000:80 \
-  -v $(pwd)/src:/site \
-  -e NODE_ENV=development \
-  unify:nginx
-```
-
-### Nginx Container Features
-
-- **Port**: Serves on port 80
-- **Source Mount**: `/site` (your source files)
-- **Output**: `/var/www/html` (automatically generated)
-- **Health Check**: Built-in HTTP health monitoring
-- **Auto-Build**: Runs unify build automatically
-- **Environment**: Supports `NODE_ENV` for development mode
-
-## CLI Container (`Dockerfile.cli`)
-
-### When to Use CLI Container
-
-- **CI/CD pipelines** for building static sites
-- **Development environments** without local Node.js
-- **Build automation** in containerized workflows
-- **Testing** unify in isolated environments
-- **Cross-platform development** with consistent tooling
-
-### Benefits of CLI Container
-
-- **Minimal**: Just Node.js and unify CLI
-- **Flexible**: Run any unify command
-- **Consistent**: Same environment across all platforms
-- **CI-friendly**: Perfect for automated builds
-- **Development**: No local Node.js installation required
-
-### CLI Container Usage
-
-#### CI/CD Build Pipeline
-
-```bash
-# Build site in CI pipeline
 docker run --rm \
-  -v $(pwd):/workspace \
-  -w /workspace \
-  unify:cli \
-  build --source src --output dist --pretty-urls
+  -v "$(pwd)":/workspace \
+  -u "$(id -u):$(id -g)" \
+  fwdslsh/unify:latest \
+  build --source src --output dist
 ```
 
-#### Development Environment
+`unify build` publishes all-or-nothing and exits `0` on success, `1` when problems were found (nothing published, the previous output untouched), and `2` on invalid usage or a fatal environment error — so the container's exit code is directly usable as a pipeline gate.
+
+### Lint in CI
 
 ```bash
-# Development server without local Node.js
-docker run --rm \
-  -p 3000:3000 \
-  -v $(pwd):/workspace \
-  -w /workspace \
-  unify:cli \
-  serve --source src --host 0.0.0.0
+docker run --rm -v "$(pwd)":/workspace -u "$(id -u):$(id -g)" \
+  fwdslsh/unify:latest \
+  build --dry-run --strict
 ```
 
-#### Watch Mode for Development
+`--dry-run` runs the entire build and every check and writes nothing; `--strict` makes advisories affect the exit code. This is the one-line CI lint.
+
+### Scaffold a new site
 
 ```bash
-# File watching with live rebuild
-docker run --rm \
-  -v $(pwd):/workspace \
-  -w /workspace \
-  unify:cli \
+docker run --rm -v "$(pwd)":/workspace -u "$(id -u):$(id -g)" \
+  fwdslsh/unify:latest \
+  init blog
+```
+
+Templates: `default`, `basic`, `blog`, `docs`, `portfolio`.
+
+### Watch
+
+```bash
+docker run --rm -v "$(pwd)":/workspace -u "$(id -u):$(id -g)" \
+  fwdslsh/unify:latest \
   watch --source src --output dist
 ```
 
-#### Custom Build Commands
+`unify watch` rebuilds on change and runs no server, which is exactly what pairs with a server you already run. Mount the volume writable (not `:ro`) so rebuilds can write, and note that file-change events do not always propagate into containers on macOS and Windows.
 
-```bash
-# Advanced build with custom options
-docker run --rm \
-  -v $(pwd):/workspace \
-  -w /workspace \
-  unify:cli \
-  build \
-    --source content \
-    --output public \
-    --layouts templates \
-    --components partials \
-    --base-url https://mysite.com \
-    --pretty-urls
-```
+### About `unify dev` in a container
 
-### CLI Container Features
+`unify dev` serves the output on `localhost:<port>` and unify has **no `--host` flag** — the dev server's scope is fixed at static files, directory indexes, a 404 page, and reload ([`product-spec.md`](product-spec.md) §4). Publishing a port from a container whose server is bound to loopback does not reach the host, so the supported patterns are: run `unify dev` on the host, or use the container for `build`/`watch` and point a real web server at the output.
 
-- **Base Image**: Node.js LTS
-- **Global Install**: unify available globally
-- **Working Directory**: Configurable (use `-w` flag)
-- **Volume Mount**: Mount your project directory
-- **Command Override**: Run any unify command
+## Docker Compose
 
-## Docker Compose Examples
-
-### Production Stack
+Build with the CLI image, serve the result with a stock static web server:
 
 ```yaml
-version: '3.8'
 services:
-  # Build service (runs once)
   builder:
-    image: unify:cli
-    volumes:
-      - ./src:/workspace
-      - site-dist:/workspace/dist
+    image: fwdslsh/unify:latest
     working_dir: /workspace
-    command: build --source . --output dist --pretty-urls
-    
-  # Serve with Apache
-  web:
-    image: unify:apache
-    ports:
-      - "80:8080"
     volumes:
-      - site-dist:/var/www/html:ro
+      - ./:/workspace
+      - site-dist:/workspace/dist
+    command: build --source src --output dist --pretty-urls
+
+  web:
+    image: nginx:alpine
     depends_on:
-      - builder
+      builder:
+        condition: service_completed_successfully
+    ports:
+      - "8080:80"
+    volumes:
+      - site-dist:/usr/share/nginx/html:ro
     restart: unless-stopped
 
 volumes:
   site-dist:
 ```
 
-### Development Stack
+`web` is an ordinary nginx image with no unify in it; unify's involvement ends when `dist/` is written.
 
-```yaml
-version: '3.8'
-services:
-  # All-in-one development
-  dev:
-    image: unify:nginx
-    ports:
-      - "3000:80"
-    volumes:
-      - ./src:/site
-    environment:
-      - NODE_ENV=development
-    restart: unless-stopped
-```
+## Notes
 
-### Multi-Site Setup
-
-```yaml
-version: '3.8'
-services:
-  # Site 1
-  site1:
-    image: unify:nginx
-    ports:
-      - "8080:80"
-    volumes:
-      - ./site1:/site:ro
-    labels:
-      - "traefik.http.routers.site1.rule=Host(\`site1.local\`)"
-      
-  # Site 2  
-  site2:
-    image: unify:nginx
-    ports:
-      - "8081:80"
-    volumes:
-      - ./site2:/site:ro
-    labels:
-      - "traefik.http.routers.site2.rule=Host(\`site2.local\`)"
-```
-
-## Best Practices
-
-### Security
-
-- **Read-only mounts**: Use `:ro` for source files in production
-- **Non-root users**: All containers run as non-root
-- **Minimal packages**: Only essential software installed
-- **Health checks**: Monitor container health in production
-
-### Performance
-
-- **Apache for static**: Use Apache container for pure static hosting
-- **Nginx for dynamic**: Use Nginx container when rebuilding is needed
-- **Volume optimization**: Use named volumes for better I/O performance
-- **Resource limits**: Set memory and CPU limits in production
-
-### Development
-
-- **CLI for building**: Use CLI container in development workflows
-- **File watching**: Use appropriate tools for live reload
-- **Environment variables**: Configure behavior with env vars
-- **Port mapping**: Use different ports for multiple development sites
-
-### Production Deployment
-
-1. **Build once**: Use CLI container to build in CI/CD
-2. **Serve optimized**: Use Apache/Nginx containers for serving
-3. **Health monitoring**: Implement proper health checks
-4. **Logging**: Configure proper log collection
-5. **Scaling**: Use load balancers for high traffic
+- **Mount the project root, not just `src/`.** Layout discovery walks up from a page's directory to the source root, and `--source`/`--output` are resolved relative to the working directory.
+- **What never ships.** Independent of `--exclude`, unify never emits the output directory, `.git/`/`.hg/`/`.svn/`, `node_modules/`, `.env` and `.env.*`, or `unify.yaml` — so mounting a whole project directory does not leak them into `dist/`.
+- **Environment.** `DEBUG=1` (stack traces) is the only environment variable unify reads. There is no `NODE_ENV` behavior.
+- **Saved flags.** A `unify.yaml` at the source root holds the same long option names as the CLI and never ships; CLI flags win on conflict. It keeps a containerized invocation short.
 
 ## Troubleshooting
 
-### Common Issues
+**Files written as the wrong user.** The image runs as uid 1001. Pass `-u "$(id -u):$(id -g)"` so build output is owned by you.
 
-**Permission errors**: Ensure volume mount permissions are correct
+**Permission denied reading the source.** The mounted tree must be readable by the container user:
+
 ```bash
-chmod -R 755 src/
+chmod -R a+rX src/
 ```
 
-**Port conflicts**: Use different port mappings
-```bash
-docker run -p 8080:80 unify:nginx  # Instead of default 80:80
-```
+**Nothing was published and the exit code is 1.** That is the transactional publish working as specified: problems were found, so `dist/` was left untouched. The diagnostics on stderr name the file, line, and fix.
 
-**File watching not working**: Ensure volume is mounted as writable
-```bash
--v $(pwd)/src:/site  # Not :ro for development
-```
-
-**Build failures**: Check container logs
-```bash
-docker logs container-name
-```
-
-### Debug Commands
+**Inspecting a run.**
 
 ```bash
-# Check container logs
-docker logs -f container-name
-
-# Access container shell
-docker exec -it container-name /bin/bash
-
-# Inspect container
-docker inspect container-name
-
-# Monitor resource usage
-docker stats container-name
+docker logs -f <container>
+docker run --rm -it --entrypoint /bin/bash -v "$(pwd)":/workspace fwdslsh/unify:latest
 ```

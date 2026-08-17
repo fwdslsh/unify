@@ -1,0 +1,56 @@
+/* Growing guides section: its own look, layered on top of site.css. */
+.guides-section main {
+  max-width: 40rem;
+  background: #fbf6ec;
+  border: 1px solid #e4d9b8;
+  border-radius: 10px;
+  padding: 2rem 1.75rem;
+  margin-top: 1.5rem;
+  margin-bottom: 1.5rem;
+  font-family: "Charter", "Palatino Linotype", Georgia, serif;
+}
+
+.guides-section h1,
+.guides-section h2 {
+  color: #6a4a1e;
+}
+
+.guides-section .guide-kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.78rem;
+  color: #8a6a3a;
+  margin-bottom: 0.25rem;
+}
+
+.guides-section .guide-list {
+  list-style: none;
+  padding: 0;
+  margin: 1.5rem 0;
+}
+
+.guides-section .guide-list li {
+  padding: 0.9rem 0;
+  border-top: 1px dashed #cbb984;
+}
+
+.guides-section .guide-list li:first-child { border-top: none; }
+
+.guides-section .guide-list a {
+  font-size: 1.05rem;
+  font-weight: bold;
+  text-decoration: none;
+}
+
+.guides-section .guide-list p {
+  margin: 0.25rem 0 0;
+  color: #5a5240;
+}
+
+.guides-section blockquote {
+  border-left: 4px solid #cbb984;
+  margin: 1rem 0;
+  padding: 0.25rem 1rem;
+  color: #5a5240;
+  font-style: italic;
+}

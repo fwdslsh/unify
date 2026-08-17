@@ -1,0 +1,203 @@
+id	spec	kind	testkind	summary
+PIP-01	§2	rule	fixture	Pipeline order is normative: includes inline before parsing (a .md page converts first, then inlines — §10.1); layouts before URL phases; §11.1→§11.2→§11.3; collisions before write; reference check on temp tree; publish last
+PIP-02	§2	rule	fixture	Best-effort composition: a problem in one page never stops analysis of others; all problems in the site reported in one pass
+S01	§3	rule	fixture	Preservation: all bytes outside an edited span are preserved exactly; the layout's text is the base document
+S02	§3	rule	fixture	Include splice: the include element or SSI comment is replaced by the included file's processed contents
+S03	§3	rule	fixture	Slot fill: the slot element is replaced by the fill elements in page order; the consumed slot attribute is removed; nothing else about a fill's markup changes
+S04	§3	rule	fixture	Slot fallback: slot start/end tags removed, inner bytes kept as written
+S05	§3	rule	fixture	Children replacement: the element's children are replaced by the default content; the element itself, tag and attributes, stays
+S06	§3	rule	fixture	Unwrap: page's first <main> start tag and matching end tag deleted; inner bytes stay in place
+S07	§3	rule	fixture	Removal: removed elements are removed entirely; removed attributes (data-layout, consumed slot) are removed cleanly; removal changes nothing else
+S08	§3	rule	fixture	Head replacement in place: the page's element(s) take the layout element's position in page order; other same-key layout elements removed per S07
+S09	§3	rule	fixture	Head append: appended head elements land at the end of the layout's head content, in page-source order
+S10	§3	rule	fixture	Title join: layout title inner text becomes pageText + " " + layoutText, both trimmed; layout's title tag kept
+S11	§3	rule	fixture	Root attributes: class = layout tokens then page tokens not already present; overridden attr edited in place; new attr inserted before closing > in page order
+S12	§3	rule	fixture	Default content: nodes kept in source order with interior text preserved as written; boundary whitespace-only text nodes are not significant
+SHL-01	§3	rule	fixture	Output shell (doctype, html, head, body tags) is the layout's; page's doctype/shell not emitted; page with no layout emitted from its own text (layout-less .md: converted body inside the §10.7 shell)
+EXC-01	§4.1	rule	fixture	--exclude repeatable; unify.yaml key exclude is a list; default is the single glob _*; user globs replace the default
+EXC-02	§4.1	rule	fixture	Pattern without / tested against every path segment of the source-root-relative path
+EXC-03	§4.1	rule	targeted	Pattern with / tested against the full source-root-relative path with * ** ? […] semantics
+EXC-04	§4.1	rule	fixture	A matched directory segment excludes the entire subtree; files inside a _-directory need no own underscore
+EXC-05	§1/§4	rule	fixture	Excluded files are never emitted but remain build material: includable and usable as layouts
+EXC-06	§4.2	rule	fixture	Underscore guard: an emitted _-prefixed page or a path containing a _-prefixed directory segment is a problem naming the file and the fixing --exclude line
+EXC-07	§4.2	rule	fixture	The guard does not cover _-prefixed non-page files; the exclude-replacement recipe ships _headers/_redirects cleanly
+EXC-08	§4.3	rule	fixture	Never-shipped list exactly: output dir inside root, .git/.hg/.svn, node_modules, .env and .env.*, unify.yaml; not replaceable; never scanned; dotfiles ship
+EXC-09	§4.4	rule	fixture	Mirror copy: every emitted asset copied byte-for-byte to the same source-root-relative path
+EXC-10	§4.4	rule	targeted	Symlinks followed only while resolving inside the source root; outside → treated as absent with advisory A12
+EXC-11	§4.4	rule	targeted	Defaulted-source notice: when the source root defaulted to the working directory (no --source flag, no unify.yaml source key, no src/), the stdout summary reports the copied-file count and points at --dry-run; explicit --source (even .) or an existing src/ suppresses it; never a diagnostic, never affects exit
+EXC-12	§4.4	rule	fixture	Fragments: a name ending .fragment.html is not a page - mirror-copied byte-for-byte, never composed or rewritten, never moved by --pretty-urls, insides not reference-checked (runtime resolution base is the consuming page), still an ordinary include target; references to it are checked and rewritten normally; underscore still excludes it
+INC-01	§5.1	rule	fixture	SSI virtual="P" resolves against the source root; leading / permitted and equivalent
+INC-02	§5.1	rule	fixture	SSI file="P" must be relative and resolves against dirname of the including file
+INC-03	§5.1	rule	fixture	<include src="P">: leading / resolves from source root, else relative to the including file
+INC-04	§5.1	rule	fixture	Resolved include path escaping the source root is a problem (not-found shape); traversal safety internal and always on
+INC-05	§5.1	rule	fixture	Include target must exist and end .html/.md; otherwise a located problem with fix lines including spelling-and-casing
+INC-06	§5.1	rule	fixture	A .md include target is converted first (frontmatter stripped and ignored, heading ids applied); .html used verbatim
+INC-07	§5.1	rule	fixture	Include targets' own includes process recursively before splicing
+INC-08	§5.1	rule	fixture	Include cycle detection by resolved-path stack; depth cap 10 inclusive (a chain ten deep builds, the include pushing an eleventh is the problem); both problems print the full chain
+INC-09	§5.1	rule	fixture	<include> without src is a problem
+INC-10	§5.1	rule	fixture	<include> with non-whitespace content between its tags is a problem; includes never take fills
+INC-11	§5.1	rule	fixture	Void <include> builds identically and carries advisory A01
+INC-12	§5.1	rule	fixture	Inlining is textual and pre-parse for HTML hosts (in Markdown: post-conversion, §10.1 — timing is the only difference): includes work anywhere (head, Markdown); fragment top-level elements become the host's (may carry slot= fills or contribute <slot> elements)
+LAY-01	§6.1	rule	fixture	Layout selection order, first match wins: data-layout=none / frontmatter layout:none; data-layout=V; frontmatter layout:V; nearest _layout.html walking up; else none
+LAY-02	§6.1	rule	fixture	Discovery walk is by file name; the layout file's excluded status is irrelevant
+LAY-03	§6.1	rule	fixture	Explicit layout value not ending .html (bare name) is a problem before any existence check
+LAY-04	§6.1	rule	fixture	Layout path resolution: / from source root, else relative to the declaring file
+LAY-05	§6.1	rule	fixture	Layout target missing or escaping the source root is a problem with the include-not-found shape including the casing fix line
+LAY-09	§6.3	rule	fixture	data-layout on a non-root element is a problem naming <include src> as the replacement
+LAY-10	§6.3	rule	fixture	Any data-unify attribute anywhere in any source file — excluded files included; only the never-shipped list escapes scanning — is a problem naming the v0.7.0 spelling
+LAY-11	§6.3	rule	fixture	Any class token beginning unify- anywhere in any source file (excluded files included) is a problem naming the slot spelling
+LAY-12	§6.4	rule	fixture	data-layout never appears in output (removed per S07, including the none form)
+LAY-13	§6.4	rule	fixture	A <script> carrying data-polyfill is removed entirely from built output
+LAY-14	§6.2	rule	fixture	A layout that itself declares data-layout (any value, including none) is a problem P15 - layout chaining is not supported in v0.7.0; never a silent no-op
+MRG-01	§7.1	rule	fixture	Sinks are the <slot> elements in the layout's <body> (skipping any inside <template>) plus the layout's first <main>; neither → sink-less
+MRG-02	§7.1	rule	fixture	First bare <slot> is the default slot; further bare slots get advisory A13 (duplicated construct) and render their fallback
+MRG-03	§7.1	rule	fixture	First <slot name=X> per X receives X's fills; a repeated name gets advisory A13 and later ones render their fallback
+MRG-04	§7.1	rule	fixture	A <slot> outside a layout's <body> (in any page, or a layout's <head>) is problem P20 and is replaced by its own children
+MRG-05	§7.1	rule	fixture	Duplicate <main> in a layout: the first wins, advisory A13
+MRG-06	§7.2	rule	fixture	When the layout has at least one sink, the page's first <main> — in document order, at any depth, not only top level — is unwrapped once (S06); a <main> inside the first survives; no other element is unwrapped
+MRG-07	§7.2	rule	fixture	Fills are the direct element children of the page body and of the page's first <main> wherever it sat, carrying a non-empty slot attribute; slot="" counts as absent; slot anywhere else is never touched or reported
+MRG-08	§7.2	rule	fixture	Default content is everything else in the page body - elements, text, comments - in source order (S12)
+MRG-09	§7.3	rule	fixture	For each name with fills, <slot name> is replaced by the fills in page order (S03)
+MRG-10	§7.3	rule	fixture	A fill naming a slot the layout lacks: advisory A02, slot attribute consumed, element stays in place in the default-content sequence
+MRG-11	§7.3	rule	fixture	Each unfilled named slot is replaced by its own children (S04); fallback content is plain markup (a nested slot is P16/MRG-19); slots inside <template> ship as written
+MRG-12	§7.4	rule	fixture	Default slot present → default content replaces it; empty default content → the default slot renders its fallback
+MRG-13	§7.4	rule	fixture	No default slot, layout has <main> → default content replaces <main>'s children (S05); empty default content → <main> keeps its children
+MRG-14	§7.4	rule	fixture	No default slot, no <main>, named slots exist, default content non-empty → problem (content would vanish)
+MRG-15	§7.4	rule	targeted	Every message about a slot or a layout names the layout file it was checked against
+MRG-16	§7.5	rule	fixture	Sink-less layout: whole <body> is the default slot; page body children replace layout body children verbatim (S05, no unwrap); head-only layout is legitimate
+MRG-17	§7.6	rule	fixture	A <header>/<footer> that is not a fill is default content: it ships in place and is not reported (A03 retired)
+MRG-18	§7.6	rule	structural	The content-loss law: authored content is never dropped without failing the build; every rule places content or raises a problem (enforced across all fixtures via diagnosticsExhaustive + tree assertions)
+MRG-19	§7.1	rule	fixture	Slots do not nest: a <slot> inside another slot's fallback content is a problem P16 - fallback content is plain markup
+MRG-20	§7	rule	fixture	The merge requires a <body> on both sides: a missing one is P21 at the file that lacks it and the page is not built; an empty resolved layout file is this problem, never a silent no-layout; a body-less layout never publishes its own text as the page
+HED-01	§8 row 1	rule	fixture	Charset: page's dropped in favor of layout's which stays first; layout without one -> page's kept and moved first; identical silent; different -> advisory A08
+HED-02	§8 row 2	rule	fixture	Title joined per S10 in the layout title's position; empty/whitespace page title counts as absent; layout without <title> → page's title appends with its own text
+HED-03	§8 row 3	rule	fixture	Meta name/property keyed ASCII case-insensitively: replaces in place (S08); multiple page elements with one key all kept; dedup only crosses the layout/page boundary; no layout counterpart → appends (fixture M1); http-equiv not keyed → appends
+HED-04	§8 row 4	rule	fixture	link rel=canonical replaces in place; one canonical, never two
+HED-05	§8 row 5	rule	fixture	link with icon in its rel token list (covers shortcut icon, ASCII case-insensitive): all layout icon links removed, page set takes the first one's position; apple-touch-icon not keyed
+HED-06	§8 row 6	rule	fixture	Stylesheet/script-src dedup by URL compared after §11.1 resolution — page copy dropped, layout position stands; inline script/style with byte-identical content: page copy dropped
+HED-07	§8 row 7	rule	fixture	Everything else appends after the layout's head content in page-source order (S09); page CSS loads last
+ATT-01	§9	rule	fixture	On html/body only: page class tokens appended to the layout's without repeats
+ATT-02	§9	rule	fixture	Any other attribute the page sets wins: edited in place if the layout had it, inserted before > otherwise
+ATT-03	§9	rule	fixture	data-layout and consumed slot attributes are removed before the root-attribute merge; a page cannot remove a layout attribute; attributes merge nowhere else
+MD-01	§10.1	rule	fixture	CommonMark, no extensions beyond §10.4 heading ids; output filename swaps .md for .html
+MD-02	§10.1	rule	fixture	Include timing in Markdown: conversion first — include tags/SSI comments pass through the converter as raw HTML and resolve on the converted output; fragment contents are spliced verbatim, never converted; a .md include target converts exactly once
+MD-03	§10.1	rule	fixture	Layout rules apply exactly as for an HTML page whose body is the converted output and whose head is synthesized from frontmatter
+MD-04	§10.2	rule	fixture	Frontmatter is YAML between --- fences at the very start of the file
+MD-05	§10.2	rule	fixture	title key becomes the page's <title>, then merges per §8 row 2
+MD-06	§10.2	rule	fixture	layout key drives layout selection per §6.1
+MD-07	§10.2	rule	fixture	class key adds class tokens to the page's <body>
+MD-08	§10.2	rule	fixture	lang and dir keys set those attributes on <html>
+MD-09	§10.2	rule	fixture	Any other scalar key becomes <meta name="KEY" content="VALUE">
+MD-10	§10.2	rule	fixture	og: block entries become <meta property="og:K" content="V">
+MD-11	§10.2	rule	fixture	Any other block (twitter: …) entries become <meta name="BLOCK:K" content="V">
+MD-12	§10.2	rule	fixture	A list value emits one <meta> per item, in order
+MD-13	§10.2	rule	fixture	Synthesized elements merge per §8 as if page-written; serialization fixed: double-quoted attributes, name/property before content, <title>TEXT</title>
+MD-14	§10.2	rule	fixture	No other reserved keys: date/tags/categories/draft/permalink/slug become plain metas; draft:true publishes; a leading underscore holds a page back
+MD-15	§10.3	rule	fixture	No frontmatter title → text of the first <h1> in the converted body with inline markup stripped; neither → no page title, the layout's stands alone
+MD-16	§10.4	rule	fixture	Heading id algorithm: lowercase, whitespace runs to single hyphens, drop non-letter/digit/hyphen (Unicode kept), trim hyphens, -2/-3 on repeats; explicit id kept; HTML pages never touched
+MD-17	§10.5	rule	fixture	Frontmatter fence at byte 0 of an .html page is a problem
+MD-18	§10.5	rule	fixture	A literal <head> element in a Markdown body is a problem
+MD-19	§10.1	rule	fixture	The include-block extension: a line beginning <include starts an HTML block (as if include were on CommonMark's type-6 list); line-initial include/SSI splices as a block, in-paragraph include splices inline; include syntax in a code fence or code span is escaped text, never a directive
+MD-20	§10.7	rule	fixture	Layout-less .md emits inside the minimal synthesized shell: doctype; <html> with frontmatter lang/dir; <head> with charset first, then title when one exists, then metas in source order; <body> with frontmatter class holding the converted body; nothing else synthesized
+MD-21	§10.2	rule	fixture	Value serialization: plain scalars as source text (true, 2026-01-01, 0.50 as written — no YAML coercion); quoted scalars unquoted; block scalars as YAML defines; empty value → empty string; lists compose with blocks (one meta per item)
+URL-01	§11.1	rule	fixture	Provenance rewriting applies to every URL in href, src, srcset (each URL, descriptors untouched), poster — after includes and layouts, before §11.2/§11.3
+URL-02	§11.1	rule	fixture	Skipped: scheme or // prefix, mailto/tel/data/javascript, fragment-only, empty values
+URL-03	§11.1	rule	fixture	Never reached: url() inside <style> blocks or style attributes — write those root-relative or in stylesheet files
+URL-04	§11.1	rule	fixture	A URL starting with / is unchanged by §11.1
+URL-05	§11.1	rule	fixture	A relative URL whose provenance is a layout or include file resolves against that file's directory and is emitted root-relative
+URL-06	§11.1	rule	fixture	A relative URL whose provenance is the page stays exactly as written — unless the page's output moved (--pretty-urls), then resolved and emitted root-relative
+URL-07	§11.2	rule	fixture	Pretty files: every page output X.html moves to X/index.html except any index.html and the root 404.html
+URL-08	§11.2	rule	fixture	Pretty links: after §11.1, every internal URL resolving to an emitted page's .html output is rewritten resolve-first then transformed, emitted root-relative (the eight-row table)
+URL-09	§11.2	rule	fixture	Pretty preserves untouched: external URLs, mailto/tel/data, fragment-only, URLs to non-page files; query and fragment always survive
+URL-10	§11.3	rule	fixture	base-url is the whole address (scheme+domain); a bare path is a usage error, exit 2. Its path part prefixes every root-relative URL in href/src/srcset/poster plus root-relative og:/twitter: meta content
+URL-11	§11.3	rule	fixture	base-url origin is prepended to og:/twitter: content and canonical href — absolutization is always origin + path prefix (og:image /assets/x.jpg under https://host/repo/ emits https://host/repo/assets/x.jpg)
+URL-12	§11.3	rule	fixture	base-url leaves non-root-relative values untouched; source files stay rooted at /; order §11.1→§11.2→§11.3
+REF-01	§12	rule	fixture	Check scope: every emitted HTML file's href/src/srcset/poster, link href for every rel, root-relative og:/twitter: meta content; url() in emitted CSS files, <style> blocks, and style attributes (rewriting-exempt but checked)
+REF-02	§12	rule	fixture	Internal = after stripping the base-url prefix (path prefix, or the full origin+path base when a full URL was given — absolutized values stay checkable), root-relative or relative (resolved against the containing output file's URL); query/fragment stripped; external and mailto/tel/data/fragment-only skipped
+REF-03	§12	rule	fixture	A directory URL (trailing / or empty path) checks for index.html within it
+REF-04	§12	rule	fixture	A URL resolving to no emitted file is a problem naming the source file, the reference, and the line where known
+REF-05	§12	rule	fixture	Case is compared byte-for-byte; a reference matching only case-insensitively fails
+REF-06	§12	rule	fixture	#fragment targets are not validated against ids
+REF-07	§12	rule	fixture	A reference resolving to the output path of a source page that exists but failed to compose is NOT reported (its own problem already blocks the publish); a target with no source file, and an excluded-but-existing target, still fail
+COL-01	§13	rule	fixture	Two sources producing one output path is a problem naming both sources
+COL-02	§13	rule	fixture	A --pretty-urls move landing on another source's output is a problem naming both sources
+COL-03	§13	rule	targeted	Two outputs differing only by letter case: advisory A11
+COL-04	§13	rule	structural	Pages and assets cannot collide by construction; collisions detected before any write; no last-write-wins anywhere
+DIA-01	§14.1	rule	fixture	Two severities only: problem and advisory; never "warning", "error:", or rule codes
+DIA-02	§14.1	rule	fixture	Exit 0: published (with --dry-run: would have)
+DIA-03	§14.1	rule	fixture	Exit 1: problems found (or advisories under --strict); nothing published; previous output untouched
+DIA-04	§14.1	rule	targeted	Exit 2: invalid usage or fatal environment error (unknown flag, missing source dir, --clean containment refusal, port in use)
+DIA-05	§14.1	rule	fixture	Diagnostics to stderr; build summary and --dry-run list to stdout; both ordered by path then line; two runs print the same bytes
+DIA-06	§14.1	rule	fixture	Every diagnostic line begins FILE:LINE: SEVERITY: (line omitted when unknown); prefix and severity token are stable contract, message prose is not
+DIA-07	§14.1	rule	fixture	Continuation lines indented two spaces: in: and fix:; path-shaped messages always include the spelling-and-casing fix line
+DIA-08	§14.1	rule	fixture	Cycle and depth messages print the full chain joined with " → "
+DIA-09	§14.1	rule	targeted	DEBUG=1 adds stack traces
+DIA-10	§14.3	rule	e2e	Advisory discipline: unify init && unify build --dry-run --strict exits 0; an advisory firing on a correct site is a bug in the advisory
+DIA-11	§14.1	rule	fixture	Attribution conventions are contract: cycle/depth problems locate at the outermost include site; collision problems at the path-ordered first colliding source; every other located diagnostic — §6 layout selection, §7 composition, §8 charset advisory, §12 references — at the provenance file of the offending markup and its line IN that file, never the host post-inlining line
+DIA-13	§14.1	rule	fixture	A line that cannot be mapped to the named file is omitted, not guessed: the FILE: SEVERITY: form is used (a .md page converts before inlining, so an offset attributed to Markdown source indexes converted HTML)
+DIA-12	§14.1	rule	fixture	Diagnostics are deduplicated before counting or printing: same file, line, severity, message, in: and fix: lines = one diagnostic; genuinely distinct faults that print identically (a relative url() in shared chrome resolving per consumer) are distinguished by resolved target and both printed
+P01	§14.2	diag	fixture	Problem: include target missing, wrong extension, or escaping the source root
+P02	§14.2	diag	fixture	Problem: include cycle or depth over 10, chain printed
+P03	§14.2	diag	fixture	Problem: <include> without src; <include> with non-whitespace content
+P04	§14.2	diag	fixture	Problem: layout reference not a .html path (bare name)
+P05	§14.2	diag	fixture	Problem: layout target missing or escaping the source root
+P07	§14.2	diag	fixture	Problem: data-layout on a non-root element
+P08	§14.2	diag	fixture	Problem: data-unify attribute; unify- class token
+P09	§14.2	diag	fixture	Problem: unaddressed page content with no sink in a slotted layout
+P10	§14.2	diag	fixture	Problem: frontmatter in an .html page
+P11	§14.2	diag	fixture	Problem: literal <head> in a Markdown body
+P12	§14.2	diag	fixture	Problem: output collision
+P13	§14.2	diag	fixture	Problem: broken internal reference
+P14	§14.2	diag	fixture	Problem: emitted _-prefixed page or _-directory path
+P15	§14.2	diag	fixture	Problem: a layout declares data-layout - layout chaining is not supported in v0.7.0
+P16	§14.2	diag	fixture	Problem: a <slot> nested inside another slot's fallback content - slots do not nest
+P17	§14.2	diag	fixture	Problem: a frontmatter value with no text form - a mapping nested below a key that already names one, or a list item that is itself a mapping or list
+P18	§14.2	diag	fixture	Problem: frontmatter is not valid YAML - a parse failure, distinct from P17's shape rule
+P19	§14.2	diag	fixture	Problem: a named slot inside the layout's default-content sink main, with no bare slot - the two rules target overlapping spans
+P20	§14.2	diag	fixture	Problem: <slot> outside a layout's <body> (anywhere in a page, or in a layout's <head>); the fix names the spelling that belongs in that file. Was advisory A04
+P21	§14.2	diag	fixture	Problem: a page or layout with no <body> element where a merge requires one; attributed file-level to the file that lacks it, fix spelled for that file's kind
+A01	§14.3	diag	fixture	Advisory: void <include> used
+A02	§14.3	diag	fixture	Advisory: fill names a slot the layout doesn't have; content stayed in the page flow
+A08	§14.3	diag	fixture	Advisory: page charset differs from the layout's, layout's kept
+A09	§14.3	diag	fixture	Advisory: working-format file emitted; closed extension list .psd .ai .sketch .fig .xcf
+A10	§14.3	diag	fixture	Advisory: a file used as a layout or include also ships as its own page
+A11	§14.3	diag	targeted	Advisory: output paths differing only by case
+A12	§14.3	diag	targeted	Advisory: symlink resolving outside the source root, treated as absent
+A13	§14.3	diag	fixture	Advisory: duplicated construct of which only the first counts - second bare <slot>, repeated slot name, or second <main>; message names the construct
+A14	§14.3	diag	fixture	Advisory: known deployment file at the source root held back by the exclude set (maintained list, non-normative; today _headers, _redirects, _routes.json, _worker.js); names the file and the --exclude line that ships it; source-root names only
+PUB-01	§15	rule	fixture	Transactional publish: zero problems → publish; any problem → previous output byte-for-byte untouched and exit 1
+PUB-02	§15	rule	targeted	Publish sync: unchanged files not rewritten; files no longer produced deleted; new/changed land via temp-then-rename
+PUB-03	§15	rule	targeted	--clean empties the output directory first; refuses with exit 2 when the output directory is, or contains, the source root or the working directory - not when it merely sits inside them
+PUB-04	§15	rule	targeted	--dry-run runs the entire pipeline through the report with no writes at all
+WCH-01	§16	rule	targeted	Saves coalesce into one rebuild; a save landing mid-rebuild queues exactly one follow-up; no change dropped
+WCH-02	§16	rule	targeted	Every rebuild is full; watch output after any edit sequence is identical to a fresh unify build
+WCH-03	§16	rule	targeted	Watch writes are minimal and atomic: unchanged files untouched, temp-then-rename, precise deletions; --clean applies only at startup
+WCH-04	§16	rule	targeted	While watching, a failing page is emitted as a default error page carrying the located diagnostics, replaced on next success; unify build never emits error pages
+WCH-05	§16	rule	targeted	unify dev = watch + static server on localhost:port (default 3000) serving the output directory with directory indexes and a 404 page, plus a reload event stream
+WCH-06	§16	rule	targeted	The reload script is injected only into HTML responses dev serves and never exists in the output directory
+WCH-07	§16	rule	structural	No proxying, HTTPS, middleware, or config in dev — permanently (asserted by the closed CLI surface test: unknown flags exit 2)
+DRY-01	§17	rule	fixture	--dry-run report: stdout, one list ordered by output path, one line per action, verbs write/copy/delete only
+DRY-02	§17	rule	fixture	Every write line names its inputs: the source page and the layout it resolved to
+DRY-03	§17	rule	fixture	Under --dry-run, diagnostics print to stderr exactly as a real build would
+DRY-04	§17	rule	fixture	--dry-run states the address it is building for (base-url, or the domain root when unset), and each write/copy row carries the URL that file answers to
+CFG-01	§18	rule	targeted	unify.yaml keys are the long option names: source output clean exclude pretty-urls base-url strict port; exclude replaces the default like the flag
+CFG-02	§18	rule	targeted	CLI flags win over unify.yaml on conflict
+CFG-03	§18	rule	targeted	No behavior exists that only the file can express; the file itself is never emitted
+SCF-01	§19	rule	e2e	Every template scaffolds into src/ beside a dist-free root and exercises each primitive exactly once: one include (nav), automatic _layout.html, one named slot with fallback (footer) plus a page filling it, one data-layout=none page (404.html), and _includes/
+SCF-02	§19	rule	e2e	Scaffolded layout declares <meta charset="utf-8">; a plain HTML comment above each slot; starter stylesheet includes slot { display: contents }; built pages contain no <slot> elements
+SCF-03	§19	rule	e2e	The blog template ships _scripts/gen.mjs (zero dependencies, opening comment naming the authoring rules' literal node _scripts/gen.mjs && unify build) reading posts/*.md and _data/authors.json and writing blog.html and feed.xml into the source tree, shipped pre-generated: rerunning the script reproduces the checked-in tree byte-for-byte
+SCF-04	§19	rule	e2e	unify init && unify build --dry-run --strict exits 0 (asserted per template)
+SCF-05	§19	rule	e2e	The blog generator teaches field privacy: _data/authors.json carries a private email beside public fields; gen.mjs names the fields it emits (never spreads the record), so the email appears in no generated file and nowhere in built output; both generated files carry the "generated by _scripts/gen.mjs — edit the data, not this file" marker
+FIX-01	§5.2	fixture	fixture	Worked example: nested include with relative resolution, exact
+FIX-02	§7.7 C1	fixture	fixture	Worked example C1: golden path, <main> default with unwrap, exact
+FIX-03	§7.7 C2	fixture	fixture	Worked example C2: named slot replaces the element, exact body
+FIX-04	§7.7 C3	fixture	fixture	Worked example C3: unfilled slot renders its fallback, exact body
+FIX-05	§7.7 C4	fixture	fixture	Worked example C4: multiple fills one name, in page order
+FIX-06	§7.7 C5	fixture	fixture	Worked example C5: fill to a nonexistent slot — advisory A02, content preserved
+FIX-07	§7.7 C6	fixture	fixture	Worked example C6: bare slot inside <main>, pinning by markup
+FIX-09	§7.7 C8	fixture	fixture	Worked example C8: sink-less head-only passthrough, exact
+FIX-10	§7.7 C9	fixture	fixture	Worked example C9: slots inside <template> never touched
+FIX-11	§8.1	fixture	fixture	Worked example: the whole head-merge table at once, exact
+FIX-12	§9	fixture	fixture	Worked example: root-attribute merge one-liner
+FIX-13	§10.6	fixture	fixture	Worked example: Markdown end to end, exact
+FIX-14	§7.7 C7	fixture	fixture	Worked example C7: a layout declaring data-layout is a problem P15 (realized as landmine layout-declares-layout)

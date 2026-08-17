@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>Catalogue</title>
+    <meta name="description" content="This season's full seed catalogue at Fernhollow Seed Library — 27 varieties across 6 families.">
+  </head>
+  <body>
+    <main>
+      <h1>This season's catalogue</h1>
+      <p>Fernhollow keeps 27 varieties on the shelf this season,
+      across 6 families. Narrow the list below, or browse the
+      whole thing.</p>
+
+      <div class="filters">
+        <input type="search" id="q" placeholder="Search by name…" aria-label="Search varieties by name">
+        <div class="family-filter" id="family-filter" role="group" aria-label="Filter by family">
+        <button type="button" data-family="all" aria-pressed="true">All</button>
+        <button type="button" data-family="Allium" aria-pressed="false">Allium</button>
+        <button type="button" data-family="Apiaceae" aria-pressed="false">Apiaceae</button>
+        <button type="button" data-family="Brassica" aria-pressed="false">Brassica</button>
+        <button type="button" data-family="Cucurbita" aria-pressed="false">Cucurbita</button>
+        <button type="button" data-family="Fabaceae" aria-pressed="false">Fabaceae</button>
+        <button type="button" data-family="Solanum" aria-pressed="false">Solanum</button>
+        </div>
+      </div>
+
+      <p id="count" aria-live="polite"></p>
+
+      <ul class="variety-grid" id="variety-grid">
+        <li class="variety-card" data-name="ailsa craig" data-family="Allium">
+          <h3><a href="/varieties/ailsa-craig.html">Ailsa Craig</a></h3>
+          <p class="family">Allium</p>
+          <p>19 packets available &middot; sow June–August</p>
+        </li>
+        <li class="variety-card" data-name="aunt ruby" data-family="Solanum">
+          <h3><a href="/varieties/aunt-ruby.html">Aunt Ruby</a></h3>
+          <p class="family">Solanum</p>
+          <p>23 packets available &middot; sow April–August</p>
+        </li>
+        <li class="variety-card" data-name="autumn king" data-family="Apiaceae">
+          <h3><a href="/varieties/autumn-king.html">Autumn King</a></h3>
+          <p class="family">Apiaceae</p>
+          <p>31 packets available &middot; sow May–August</p>
+        </li>
+        <li class="variety-card" data-name="bedfordshire champion" data-family="Allium">
+          <h3><a href="/varieties/bedfordshire-champion.html">Bedfordshire Champion</a></h3>
+          <p class="family">Allium</p>
+          <p>32 packets available &middot; sow February–May</p>
+        </li>
+        <li class="variety-card" data-name="bere barley tomato" data-family="Solanum">
+          <h3><a href="/varieties/bere-barley-tomato.html">Bere Barley Tomato</a></h3>
+          <p class="family">Solanum</p>
+          <p>11 packets available &middot; sow May–August</p>
+        </li>
+        <li class="variety-card" data-name="bere kale" data-family="Brassica">
+          <h3><a href="/varieties/bere-kale.html">Bere Kale</a></h3>
+          <p class="family">Brassica</p>
+          <p>13 packets available &middot; sow April–June</p>
+        </li>
+        <li class="variety-card" data-name="black krim" data-family="Solanum">
+          <h3><a href="/varieties/black-krim.html">Black Krim</a></h3>
+          <p class="family">Solanum</p>
+          <p>10 packets available &middot; sow March–July</p>
+        </li>
+        <li class="variety-card" data-name="boston marrow" data-family="Cucurbita">
+          <h3><a href="/varieties/boston-marrow.html">Boston Marrow</a></h3>
+          <p class="family">Cucurbita</p>
+          <p>33 packets available &middot; sow April–June</p>
+        </li>
+        <li class="variety-card" data-name="carlin pea" data-family="Fabaceae">
+          <h3><a href="/varieties/carlin-pea.html">Carlin Pea</a></h3>
+          <p class="family">Fabaceae</p>
+          <p>22 packets available &middot; sow February–July</p>
+        </li>
+        <li class="variety-card" data-name="champion of england" data-family="Fabaceae">
+          <h3><a href="/varieties/champion-of-england.html">Champion of England</a></h3>
+          <p class="family">Fabaceae</p>
+          <p>35 packets available &middot; sow March–August</p>
+        </li>
+        <li class="variety-card" data-name="chantenay red" data-family="Apiaceae">
+          <h3><a href="/varieties/chantenay-red.html">Chantenay Red</a></h3>
+          <p class="family">Apiaceae</p>
+          <p>18 packets available &middot; sow April–July</p>
+        </li>
+        <li class="variety-card" data-name="cherokee wax" data-family="Fabaceae">
+          <h3><a href="/varieties/cherokee-wax.html">Cherokee Wax</a></h3>
+          <p class="family">Fabaceae</p>
+          <p>21 packets available &middot; sow May–June</p>
+        </li>
+        <li class="variety-card" data-name="crown prince" data-family="Cucurbita">
+          <h3><a href="/varieties/crown-prince.html">Crown Prince</a></h3>
+          <p class="family">Cucurbita</p>
+          <p>20 packets available &middot; sow March–May</p>
+        </li>
+        <li class="variety-card" data-name="daubenton kale" data-family="Brassica">
+          <h3><a href="/varieties/daubenton-kale.html">Daubenton Kale</a></h3>
+          <p class="family">Brassica</p>
+          <p>25 packets available &middot; sow March–June</p>
+        </li>
+        <li class="variety-card" data-name="latah tomato" data-family="Solanum">
+          <h3><a href="/varieties/latah-tomato.html">Latah Tomato</a></h3>
+          <p class="family">Solanum</p>
+          <p>24 packets available &middot; sow June–May</p>
+        </li>
+        <li class="variety-card" data-name="lazy housewife" data-family="Fabaceae">
+          <h3><a href="/varieties/lazy-housewife.html">Lazy Housewife</a></h3>
+          <p class="family">Fabaceae</p>
+          <p>34 packets available &middot; sow June–July</p>
+        </li>
+        <li class="variety-card" data-name="nine star broccoli" data-family="Brassica">
+          <h3><a href="/varieties/nine-star-broccoli.html">Nine Star Broccoli</a></h3>
+          <p class="family">Brassica</p>
+          <p>26 packets available &middot; sow May–July</p>
+        </li>
+        <li class="variety-card" data-name="pink brandywine" data-family="Solanum">
+          <h3><a href="/varieties/pink-brandywine.html">Pink Brandywine</a></h3>
+          <p class="family">Solanum</p>
+          <p>36 packets available &middot; sow May–May</p>
+        </li>
+        <li class="variety-card" data-name="purple sprouting" data-family="Brassica">
+          <h3><a href="/varieties/purple-sprouting.html">Purple Sprouting</a></h3>
+          <p class="family">Brassica</p>
+          <p>12 packets available &middot; sow February–May</p>
+        </li>
+        <li class="variety-card" data-name="ragged jack" data-family="Brassica">
+          <h3><a href="/varieties/ragged-jack.html">Ragged Jack</a></h3>
+          <p class="family">Brassica</p>
+          <p>38 packets available &middot; sow April–July</p>
+        </li>
+        <li class="variety-card" data-name="red russian kale" data-family="Brassica">
+          <h3><a href="/varieties/red-russian-kale.html">Red Russian Kale</a></h3>
+          <p class="family">Brassica</p>
+          <p>39 packets available &middot; sow June–August</p>
+        </li>
+        <li class="variety-card" data-name="robinson broad bean" data-family="Fabaceae">
+          <h3><a href="/varieties/robinson-broad-bean.html">Robinson Broad Bean</a></h3>
+          <p class="family">Fabaceae</p>
+          <p>8 packets available &middot; sow April–May</p>
+        </li>
+        <li class="variety-card" data-name="stupice" data-family="Solanum">
+          <h3><a href="/varieties/stupice.html">Stupice</a></h3>
+          <p class="family">Solanum</p>
+          <p>37 packets available &middot; sow February–June</p>
+        </li>
+        <li class="variety-card" data-name="table dainty" data-family="Cucurbita">
+          <h3><a href="/varieties/table-dainty.html">Table Dainty</a></h3>
+          <p class="family">Cucurbita</p>
+          <p>6 packets available &middot; sow May–July</p>
+        </li>
+        <li class="variety-card" data-name="uchiki kuri" data-family="Cucurbita">
+          <h3><a href="/varieties/uchiki-kuri.html">Uchiki Kuri</a></h3>
+          <p class="family">Cucurbita</p>
+          <p>7 packets available &middot; sow February–August</p>
+        </li>
+        <li class="variety-card" data-name="welsh onion" data-family="Allium">
+          <h3><a href="/varieties/welsh-onion.html">Welsh Onion</a></h3>
+          <p class="family">Allium</p>
+          <p>5 packets available &middot; sow March–June</p>
+        </li>
+        <li class="variety-card" data-name="yellow pear" data-family="Solanum">
+          <h3><a href="/varieties/yellow-pear.html">Yellow Pear</a></h3>
+          <p class="family">Solanum</p>
+          <p>9 packets available &middot; sow June–June</p>
+        </li>
+      </ul>
+
+      <p id="no-results" hidden>No varieties match that search.</p>
+    </main>
+    <script>
+      (function () {
+        var q = document.getElementById("q");
+        var grid = document.getElementById("variety-grid");
+        var cards = Array.prototype.slice.call(grid.querySelectorAll(".variety-card"));
+        var buttons = Array.prototype.slice.call(document.querySelectorAll("#family-filter button"));
+        var countEl = document.getElementById("count");
+        var noResults = document.getElementById("no-results");
+        var activeFamily = "all";
+
+        function apply() {
+          var term = q.value.trim().toLowerCase();
+          var shown = 0;
+          cards.forEach(function (card) {
+            var matchesFamily = activeFamily === "all" || card.getAttribute("data-family") === activeFamily;
+            var matchesTerm = term === "" || card.getAttribute("data-name").indexOf(term) !== -1;
+            var show = matchesFamily && matchesTerm;
+            card.hidden = !show;
+            if (show) shown++;
+          });
+          countEl.textContent = shown + " of " + cards.length + " varieties shown";
+          noResults.hidden = shown !== 0;
+        }
+
+        q.addEventListener("input", apply);
+        buttons.forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            buttons.forEach(function (b) { b.setAttribute("aria-pressed", "false"); });
+            btn.setAttribute("aria-pressed", "true");
+            activeFamily = btn.getAttribute("data-family");
+            apply();
+          });
+        });
+
+        apply();
+      })();
+    </script>
+  </body>
+</html>

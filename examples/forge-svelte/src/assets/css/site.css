@@ -1,0 +1,131 @@
+:root {
+  --iron: #2b2723;
+  --ember: #b5502f;
+  --coal: #1b1815;
+  --ash: #6f665c;
+  --paper: #f5f1e9;
+  --line: #ddd3c2;
+  font-family: "Iowan Old Style", Georgia, "Times New Roman", serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--coal);
+  line-height: 1.55;
+}
+
+a { color: var(--ember); }
+a:hover { color: var(--iron); }
+
+.site-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  background: var(--iron);
+  color: var(--paper);
+}
+
+.site-header .brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--paper);
+  text-decoration: none;
+  font-weight: bold;
+  font-size: 1.2rem;
+}
+
+.anvil-mark { color: var(--paper); }
+
+.site-nav { display: flex; gap: 1.25rem; }
+.site-nav a { color: var(--paper); text-decoration: none; }
+.site-nav a:hover { text-decoration: underline; }
+
+main {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 3rem;
+}
+
+main h1 { margin-top: 0; }
+
+.site-footer {
+  border-top: 1px solid var(--line);
+  padding: 1.5rem;
+  text-align: center;
+  color: var(--ash);
+  font-size: 0.9rem;
+}
+
+.site-footer a { color: var(--ash); }
+
+.notice, .safety {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--ember);
+  padding: 1rem 1.25rem;
+  margin: 1.5rem 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5rem 0;
+}
+
+th, td {
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.note-list {
+  list-style: none;
+  padding: 0;
+}
+
+.note-list li {
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.note-list time {
+  display: block;
+  color: var(--ash);
+  font-size: 0.85rem;
+}
+
+.fee-calc {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--ember);
+  padding: 1.25rem 1.5rem;
+  margin: 1.5rem 0;
+  max-width: 22rem;
+}
+
+.fee-calc label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin: 0.5rem 0;
+}
+
+.fee-calc input {
+  width: 5rem;
+  padding: 0.3rem;
+  border: 1px solid var(--line);
+}
+
+.fee-calc p {
+  font-weight: bold;
+  font-size: 1.1rem;
+  margin-bottom: 0;
+}
