@@ -141,12 +141,25 @@ exactly like an HTML page's content.
 
 That is the whole product. There is nothing else to learn.
 
+## Worked examples
+
+[`examples/`](examples/) holds five complete sites, each building clean under
+`unify build --dry-run --strict`. Four were authored by an agent given nothing but the
+sixty lines of authoring rules and a client brief, and kept because they passed review —
+so they show what the rules actually lead someone to build, not what a maintainer wishes
+they would. Between them they cover pages generated from a data file, client-side
+filtering with and without fetch, a section with its own look sharing the site's chrome,
+a page with no chrome for embedding elsewhere, deploying under a subdirectory, htmx
+swapping `.fragment.html` panels, and a Svelte component compiled to an ordinary asset.
+[`examples/README.md`](examples/README.md) names the pattern in each — including the one
+thing they get wrong, which no build check can catch.
+
 ## CLI
 
 ```
 unify [build]              build the site (default command)
 unify dev                  build, watch, serve, and reload — the inner loop
-unify watch                build + rebuild on change, no server (pair with your own)
+unify watch                build + rebuild on change, no server
 unify init [template]      scaffold a starter site
 
 Options:
@@ -258,13 +271,27 @@ site; non-zero means nothing was published and `dist/` is untouched, so never re
 
 ## Documentation
 
+**Using unify**
+
 - **[Getting Started](docs/getting-started.md)** — the tutorial.
-- **[CLI Reference](docs/cli-reference.md)** — every command, option, and exit code.
 - **[Authoring Rules](docs/authoring-rules.md)** — the complete authoring surface (embedded above).
+- **[CLI Reference](docs/cli-reference.md)** — every command, option, and exit code.
+- **[Integrations](docs/integrations.md)** — the compile-to-asset pattern: Svelte, TypeScript, or anything else with a compiler, without adopting a framework for the site.
+- **[Docker Usage](docs/docker-usage.md)** — running the CLI in a container.
+- **[Examples](examples/README.md)** — five complete sites and the patterns they demonstrate.
+
+**How unify is defined**
+
 - **[Product Specification](docs/product-spec.md)** — what unify is, the composition model, the non-goals.
 - **[Conformance Specification](docs/conformance-spec.md)** — the normative implementer reference: exact algorithms, the head-merge table, the closed problem and advisory catalogues.
 - **[Testing Strategy](docs/testing-strategy.md)** — the testing contract and the release gates.
-- **[Docker Usage](docs/docker-usage.md)** — running the CLI in a container.
+- **[CI/CD Workflows](docs/cicd-workflows.md)** — what each job runs and what it is allowed to mean.
+
+**How the documentation was validated**
+
+- **[Ratification](docs/ratification.md)** — the evidence: agents authoring from the sixty lines in isolation, what each round found, and what it changed in the docs, the spec, and the engine.
+- **[Ratification Protocol](docs/ratification-protocol.md)** — the procedure, for running another round.
+- **[Migration Plan](docs/migration-plan.md)** — how the v0.6 tree became this one. History, not current work.
 
 ## Contributing
 

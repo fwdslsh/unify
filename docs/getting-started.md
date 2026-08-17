@@ -143,6 +143,31 @@ Two rules that save you from silent mistakes (unify makes both hard errors): HTM
 
 Section layouts work by placement: put a `_layout.html` in `blog/` and every page under `blog/` uses it instead of the site layout. A section layout is a complete standalone page like any other layout — write the shared chrome into it too. Layouts do not chain: a layout that itself carries `data-layout` is a build error (unify tells you rather than silently ignoring it).
 
+## A snippet that ships as written
+
+Sometimes you want a bare piece of HTML at its own URL — a panel another site embeds, or
+something a bit of JavaScript fetches after the page loads. A page cannot do that: every
+page is a complete document. Name the file `*.fragment.html` instead:
+
+```html
+<!-- src/hours.fragment.html -->
+<div class="hours">
+  <h3>Opening hours</h3>
+  <p>Saturday 10am–4pm</p>
+</div>
+```
+
+It ships byte-for-byte at `/hours.fragment.html` — no layout, no composition, nothing
+added. And it is still an ordinary include target, so the same file can appear inside a
+page of yours *and* be fetched by someone else:
+
+```html
+<include src="/hours.fragment.html"></include>
+```
+
+One file, one place to edit it, two consumers. (`examples/htmx-fragments` is this,
+worked end to end.)
+
 ## Links and assets
 
 - Write paths that are correct for the file you're editing — relative or root-relative, both work. unify resolves URLs written in layouts and fragments against the file that wrote them, so composed pages are correct at every depth.
@@ -177,3 +202,5 @@ The script writes real pages into `src/`, where they get layouts, head merging, 
 - [`cli-reference.md`](cli-reference.md) — every command and flag
 - [`product-spec.md`](product-spec.md) — the product contract, including what unify refuses to do and why
 - [`conformance-spec.md`](conformance-spec.md) — the exact composition rules, for implementers and the curious
+- [`integrations.md`](integrations.md) — putting a Svelte component (or anything else with a compiler) on one page
+- [`../examples/README.md`](../examples/README.md) — five complete sites, and the pattern each one shows
