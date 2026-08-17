@@ -143,20 +143,36 @@ jobs:
           } > release-body.md
           pre="${{ steps.rel.outputs.prerelease == 'true' && '--prerelease' || '' }}"
           assets="unify-linux-x86_64 unify-linux-arm64 unify-darwin-x86_64 unify-darwin-arm64"
-          # Re-runnable on purpose: publishing to npm is the step most likely
-          # to fail for reasons outside this repo (the trusted-publisher entry
-          # on npmjs.com), and a re-run must not die because the release it
-          # already created exists.
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "release $TAG already exists — updating its notes and assets"
-            gh release edit "$TAG" --notes-file release-body.md $pre
-            gh release upload "$TAG" $assets --clobber
-          else
-            # --target makes this work when the tag does not exist yet (a manual
-            # run from a release branch): the tag is created at this commit.
-            gh release create "$TAG" --target "$GITHUB_SHA" --title "$TAG" \
-              --notes-file release-body.md $pre $assets
-          fi
+          # Re-runnable on purpose: publishing APIs are the steps most likely
+          # to fail for reasons outside this repo. Re-check state after every
+          # failed attempt: a create may have reached GitHub even if its client
+          # saw a transient 5xx, and the next pass must update, not duplicate.
+          published=false
+          for attempt in 1 2 3 4 5 6; do
+            if gh release view "$TAG" >/dev/null 2>&1; then
+              echo "release $TAG already exists — updating its notes and assets"
+              if gh release edit "$TAG" --notes-file release-body.md $pre && \
+                 gh release upload "$TAG" $assets --clobber; then
+                published=true
+                break
+              fi
+            else
+              # --target makes this work when the tag does not exist yet (a
+              # manual run from a release branch): the tag is created here.
+              if gh release create "$TAG" --target "$GITHUB_SHA" --title "$TAG" \
+                   --notes-file release-body.md $pre $assets; then
+                published=true
+                break
+              fi
+            fi
+
+            if [ "$attempt" -lt 6 ]; then
+              delay=$((attempt * 5))
+              echo "GitHub release API attempt $attempt failed — retrying in ${delay}s"
+              sleep "$delay"
+            fi
+          done
+          [ "$published" = true ] || { echo "::error::failed to create or update $TAG after 6 attempts"; exit 1; }
 
       # Trusted publishing: npm mints a short-lived credential from this job's
       # OIDC identity, so there is no token to store or rotate. It requires
