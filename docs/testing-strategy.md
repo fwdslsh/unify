@@ -182,7 +182,7 @@ The release ships when a clean CI run on the release commit satisfies **all** of
 | G8 | No dead modules | every `src/**` file reachable from `src/cli.js` in the import graph |
 | G9 | Suite hygiene | `check-suite-hygiene.mjs` exits 0 |
 | G10 | Docs lockstep | `docs/authoring-rules.md` ≤ 60 lines and byte-embedded in README (product-spec §7, item 5) |
-| G11 | Binary parity | the compiled Linux binary passes the Tier-0 golden path (macOS/Windows binaries built; parity run where runners exist) |
+| G11 | Binary parity | the compiled Linux x86_64 binary passes the Tier-0 golden path; Linux ARM64 and macOS x86_64/ARM64 release binaries build successfully (parity runs where runners exist) |
 
 Coverage is reported alongside the gates for the record. It gates nothing.
 

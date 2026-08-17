@@ -1,3 +1,7 @@
+## Upgrading from 0.6.x
+
+v0.7.0 is a clean break from the 0.6 composition model. A 0.6 site must be updated before it will build: replace `data-unify` and `unify-*` area classes with `data-layout`, `<main>`, `<slot name>`, and `slot=`; replace the retired `serve` command with `dev`; and remove the retired `--minify` and `--fail-on` options. The build reports every retired composition spelling at its source location and names the v0.7 replacement—it never silently interprets 0.6 markup as something else.
+
 ## Usage
 
 ```bash
