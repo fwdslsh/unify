@@ -198,6 +198,45 @@ test("URL-06: §11.1 canonicalizes an authored escape rather than re-encoding it
   covers("MAN-05");
 }, TEST_MS);
 
+test("REF-08: a backslash in a POSIX filename round-trips — only %2F is refused", async () => {
+  // A backslash is legal in a POSIX filename, so a%5Cb.html is a real address
+  // §20.5 publishes and §12 must accept. Refusing it made the site's own
+  // advertised address unresolvable — the %2F self-contradiction one character
+  // over. It cannot arise on Windows, where a filename may not contain one.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": page("Home", '<a href="/a%5Cb.html">backslash</a>'),
+    "a\\b.html": page("Backslash"),
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", BASE], tmp);
+  expectExit(r, 0, "a legal POSIX filename containing a backslash");
+  const xml = read(tmp, "dist", "sitemap.xml");
+  if (!xml.includes("<loc>https://example.com/a%5Cb.html</loc>")) {
+    throw new Error(`§20.5: the published address must be the encoded one:\n${xml}`);
+  }
+  covers("REF-08");
+}, TEST_MS);
+
+test("URL-06: an include-relative reference round-trips whether written raw or encoded", async () => {
+  // Two references to ONE file in ONE build, from the same include: raw must be
+  // canonicalized, already-encoded must survive unchanged. The four-case test
+  // above varies the file per case; this varies only the spelling.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "_inc/nav.html": '<nav><img src="../assets/my logo.png" alt="raw"><img src="../assets/my%20logo.png" alt="encoded"></nav>\n',
+    "index.html": page("Home", '<include src="/_inc/nav.html"></include>'),
+    "assets/my logo.png": "PNG",
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist"], tmp);
+  expectExit(r, 0, "both spellings of one file, one build");
+  const out = read(tmp, "dist", "index.html");
+  const srcs = [...out.matchAll(/src="([^"]*)"/g)].map((m) => m[1]);
+  if (srcs.length !== 2 || srcs[0] !== "/assets/my%20logo.png" || srcs[1] !== "/assets/my%20logo.png") {
+    throw new Error(`§20.5: both must canonicalize to the same address, got ${JSON.stringify(srcs)}:\n${out}`);
+  }
+  covers("MAN-05");
+}, TEST_MS);
+
 test("REF-08/URL-08: an ENCODED authored link is pretty-rewritten like a raw one", async () => {
   // Pins applyPrettyLinks' own decode. Without it a link written in the exact
   // spelling the site publishes stops being rewritten and then fails §12 as

@@ -120,16 +120,24 @@ export function canonicalizePathSegments(path) {
  * reserved characters escaped, so `/a%26b.html` would keep its `%26` and never
  * match the emitted `a&b.html`.
  *
- * A segment that would decode to contain a path separator is **left encoded**.
- * `%2F` is not a separator — it is one segment whose name contains a slash,
- * which no filesystem can hold — so the reference names nothing, and the right
- * outcome is for it to match nothing and be reported. Decoding it and rejoining
- * would silently turn `/a%2Fb.html` into `/a/b.html`: a one-segment URL
- * reinterpreted as a two-segment path, resolving to a different file, and under
+ * A segment that would decode to contain `/` is **left encoded**. `%2F` is not
+ * a separator — it is one segment whose name contains a slash, which no
+ * filesystem can hold — so the reference names nothing, and the right outcome
+ * is for it to match nothing and be reported. Decoding it and rejoining would
+ * silently turn `/a%2Fb.html` into `/a/b.html`: a one-segment URL reinterpreted
+ * as a two-segment path, resolving to a different file, and under
  * `--pretty-urls` rewriting the author's bytes to an address naming a different
  * resource. Leaving the segment as written makes `emittedPaths.has(...)` fail
  * naturally — the same technique, and the same reasoning, as the `..`-escaping
  * case documented in `references.js`'s `resolveReference`.
+ *
+ * `%5C` is deliberately NOT treated the same way, though an earlier version of
+ * this function did. A backslash is a perfectly legal character in a POSIX
+ * filename, so `a\b.html` is a real file that §20.5 publishes as
+ * `/a%5Cb.html`; refusing to decode that segment would make the site's own
+ * advertised address unresolvable — the same self-contradiction, one character
+ * over. It cannot help on Windows either, where a filename may not contain a
+ * backslash at all, so the case never arises.
  *
  * This is RFC 3986's own line, not a local invention: percent-encoded
  * *unreserved* characters are equivalent to their decoded form (so `%2E` is
@@ -152,7 +160,7 @@ export function decodePathSegments(path) {
       } catch {
         return seg; // malformed escape — unmatchable, and reported as such
       }
-      return decoded.includes("/") || decoded.includes("\\") ? seg : decoded;
+      return decoded.includes("/") ? seg : decoded;
     })
     .join("/");
 }

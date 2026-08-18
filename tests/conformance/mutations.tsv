@@ -1,5 +1,5 @@
 file	id	old	new	why
-src/core/urls.js	url-rejoin-decoded	return decoded.includes("/") \|\| decoded.includes("\\\\") ? seg : decoded;	return decoded;	REF-08: a decoded %2F must not become a path separator — it names one segment and must match nothing
+src/core/urls.js	url-rejoin-decoded	return decoded.includes("/") ? seg : decoded;	return decoded;	REF-08: a decoded %2F must not become a path separator — it names one segment and must match nothing
 src/core/urls.js	url-no-prettylinks-decode	const decoded = decodePathSegments(path);	const decoded = path;	§11.2: an encoded authored link must reach the same pretty target a raw one does
 src/core/urls.js	url-no-malformed-catch	return seg; // malformed escape — unmatchable, and reported as such	throw new URIError("mutation");	§14: an undecodable escape must stay a located diagnostic, never an unlocated fatal
 src/core/urls.js	url-no-provenance-encode	return canonicalizePathSegments(resolvedPath) + query + fragment;	return resolvedPath + query + fragment;	§20.5: §11.1 re-roots into a URL it constructs, so the result is canonicalized
@@ -19,7 +19,7 @@ src/core/manifest.js	man-last-record-wins	for (const rec of drafts) if (!byOutpu
 src/core/manifest.js	man-og-dims-on-twitter	          width: fromOg ? intOrNull(ogWidth.kept) : null,	          width: intOrNull(ogWidth.kept),	§20.3: og:image:width describes the og image, not a twitter one
 src/core/manifest.js	man-int-unbounded	  return Number.isSafeInteger(n) ? n : null;	  return n;	§20.3: a dimension is an integer or null, never a float
 src/core/entities.js	ent-case-insensitive	    return NAMED.get(body) ?? whole;	    return NAMED.get(body) ?? NAMED.get(body.toLowerCase()) ?? whole;	§20.3: HTML named references are case-sensitive
-src/core/entities.js	ent-replace-invalid	      return isValidCodePoint(n) ? String.fromCodePoint(n) : whole;	      return isValidCodePoint(n) ? String.fromCodePoint(n) : "\\uFFFD";	§20.3: an unrecognised reference is left as written, never rewritten
+src/core/entities.js	ent-replace-invalid	    }\n    return NAMED.get(body) ?? whole;	    }\n    return NAMED.get(body) ?? "\\uFFFD";	§20.3: an unrecognised reference is left as written, never rewritten
 src/core/sitemap.js	sit-no-p22	    for (const path of occupied.sort()) {	    for (const path of []) {	P22: an occupied generated path is reported, and generation suppressed
 src/core/sitemap.js	sit-regex-locs	  const elements = findAll(root, (n) => n.type === "element" && /(^\|:)loc$/i.test(n.tag));	  const elements = findAll(root, (n) => n.type === "element" && /^loc$/i.test(n.tag));	§21.6: a namespace-prefixed <sm:loc> is a loc
 src/core/sitemap.js	sit-lastmod-from-raw	    out.push({ loc: record.url, lastmod: record.dateModified?.iso ?? null });	    out.push({ loc: record.url, lastmod: record.dateModified?.raw ?? null });	§21.3: <lastmod> comes from the validated iso, never the raw text
