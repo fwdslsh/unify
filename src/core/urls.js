@@ -59,15 +59,6 @@ import { applyEdits, findAll, getAttr, getAttrNode, lineOf, parse, tokens } from
 const SCHEME_RE = /^[a-z][a-z0-9+.-]*:/i;
 
 /**
- * True for every URL §11.1/§11.2 skip entirely: a scheme, a `//`-prefixed
- * (protocol-relative) URL, a fragment-only URL, or an empty value. This is
- * also exactly head-merge.js's `resolveForCompare` skip set (both need "is
- * this a same-site path at all", just for different purposes), and §12's
- * "external/mailto/tel/data/fragment-only URLs are skipped".
- * @param {string} url
- * @returns {boolean}
- */
-/**
  * §20.5 — percent-encode every segment of an output path, leaving the `/`
  * separators intact.
  *
@@ -89,11 +80,27 @@ export function encodePathSegments(outputPath) {
  *
  * Per segment, and never `decodeURI`: that function deliberately leaves
  * reserved characters escaped, so `/a%26b.html` would keep its `%26` and never
- * match the emitted `a&b.html`. Decoding per segment also keeps `%2F` from
- * inventing a path separator — it becomes a literal `/` inside one segment's
- * name, which matches no real file, which is the correct answer. A malformed
- * escape keeps its segment verbatim rather than throwing: a URL unify cannot
- * decode is one it reports on, not one it crashes over.
+ * match the emitted `a&b.html`.
+ *
+ * A segment that would decode to contain a path separator is **left encoded**.
+ * `%2F` is not a separator — it is one segment whose name contains a slash,
+ * which no filesystem can hold — so the reference names nothing, and the right
+ * outcome is for it to match nothing and be reported. Decoding it and rejoining
+ * would silently turn `/a%2Fb.html` into `/a/b.html`: a one-segment URL
+ * reinterpreted as a two-segment path, resolving to a different file, and under
+ * `--pretty-urls` rewriting the author's bytes to an address naming a different
+ * resource. Leaving the segment as written makes `emittedPaths.has(...)` fail
+ * naturally — the same technique, and the same reasoning, as the `..`-escaping
+ * case documented in `references.js`'s `resolveReference`.
+ *
+ * This is RFC 3986's own line, not a local invention: percent-encoded
+ * *unreserved* characters are equivalent to their decoded form (so `%2E` is
+ * `.`, `%41` is `A`), while a *reserved* delimiter left encoded is deliberately
+ * not a delimiter. Decoding `%2F` into a separator would be the one
+ * transformation the encoding exists to prevent.
+ *
+ * A malformed escape keeps its segment verbatim rather than throwing: a URL
+ * unify cannot decode is one it reports on, not one it crashes over.
  * @param {string} path
  * @returns {string}
  */
@@ -101,15 +108,26 @@ export function decodePathSegments(path) {
   return path
     .split("/")
     .map((seg) => {
+      let decoded;
       try {
-        return decodeURIComponent(seg);
+        decoded = decodeURIComponent(seg);
       } catch {
-        return seg;
+        return seg; // malformed escape — unmatchable, and reported as such
       }
+      return decoded.includes("/") || decoded.includes("\\") ? seg : decoded;
     })
     .join("/");
 }
 
+/**
+ * True for every URL §11.1/§11.2 skip entirely: a scheme, a `//`-prefixed
+ * (protocol-relative) URL, a fragment-only URL, or an empty value. This is
+ * also exactly head-merge.js's `resolveForCompare` skip set (both need "is
+ * this a same-site path at all", just for different purposes), and §12's
+ * "external/mailto/tel/data/fragment-only URLs are skipped".
+ * @param {string} url
+ * @returns {boolean}
+ */
 export function isSkippedUrl(url) {
   return url === "" || url.startsWith("#") || url.startsWith("//") || SCHEME_RE.test(url);
 }
@@ -336,7 +354,20 @@ export function rewriteProvenanceUrls(composedHtml, { provenanceOf, pageFile, pa
     const resolvedPath = resolveProvenanceUrl(url, file);
     if (resolvedPath === null) return null; // out of scope after all (defensive; isSkippedUrl already caught this)
     const { query, fragment } = splitUrl(url);
-    return resolvedPath + query + fragment;
+    // §20.5's line: this branch CONSTRUCTS a root-relative URL — a string that
+    // appears in no source file — so it is percent-encoded, exactly as
+    // `urlForOutputPath` and `prettyLinkTarget` encode theirs. The branch above
+    // preserves what the author wrote and is the other side of that line.
+    // Without this an included `<img src="../assets/my logo.png">` emitted a
+    // raw space while the same asset's dry-run row and sitemap loc were
+    // encoded — one file, two addresses, from one build.
+    //
+    // Encoding a path already resolved from authored text is safe because
+    // `resolveProvenanceUrl` returns a path built from decoded source segments;
+    // `encodePathSegments` is total, so an authored `%20` becomes `%2520` and
+    // keeps naming the file literally called `a%20b.png`, which is what
+    // RFC 3986 says it named all along.
+    return encodePathSegments(resolvedPath) + query + fragment;
   };
 
   for (const el of findAll(root, (n) => n.type === "element")) {

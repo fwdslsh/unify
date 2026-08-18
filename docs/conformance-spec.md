@@ -830,11 +830,11 @@ A URL is internal when, after stripping the `--base-url` prefix — the path pre
 
 One absence is **not** reported: a URL that resolves to the output path of a **source page that exists but failed to compose**. That page emitted no file because of a problem of its own — already reported, and already blocking the publish — so a second diagnostic located at the *link* sends the author to a correctly-spelled path in the wrong file, and, diagnostics being path-ordered, usually prints above the one problem that matters. Measured on a twenty-page site with one page failing to compose: twenty-one problems printed, one of them real, the real one last. A reference to a target with no source file at all, and a reference to a source file that exists but is *excluded* (the stranded underscore asset above), are not this case and still fail here, loudly.
 
----
-
 **A reference is percent-decoded, per segment, before it is matched.** §20.5 makes `/two%20words.html` the address a file named `two words.html` answers to — that is what the sitemap publishes, what `--dry-run` prints, and what a browser sends — so a link written that way must resolve. Both spellings name the same file and both pass; neither is rewritten into the other, because the author's bytes are theirs. Decoding is per segment, so `%2F` becomes a literal slash inside one name rather than a new path separator: it then matches no file, which is the right answer, since no filesystem holds a name containing `/`. A malformed escape leaves its segment as written rather than failing the build with a parse error.
 
 Without this rule the build contradicts itself: it advertises an address in a standards artifact and then refuses to let the author link to it. That was true for one commit, and it is the reason the rule is stated here rather than left to each consumer.
+
+---
 
 ## 13. Output paths and collisions
 
@@ -1051,7 +1051,9 @@ When two or more accepted declarations exist and their values **differ**, the ma
 
 Each segment derived from an output path is **percent-encoded**, because a filesystem name is not a URI and the manifest's job is to say what a page answers to: `two words.html` → `/two%20words.html`, `a&b.html` → `/a%26b.html`, `caf%C3%A9.html` for a UTF-8 `café.html`. A literal `%` encodes to `%25`, so the transform is total and never double-encodes. The path prefix supplied by `--base-url` is **not** re-encoded — the author wrote it as a URL already, and re-encoding it would corrupt a prefix that legitimately contains an escape.
 
-The line this draws, once, for the whole build: **a URL unify constructs is percent-encoded; a URL the author wrote is passed through as written.** §11.1 relocates an authored URL and keeps its spelling; §11.2's directory form, `urlForOutputPath`, the `--dry-run` address, and every projection of this manifest are unify's own constructions and are encoded. §12 percent-decodes before matching, so both spellings of the same file resolve and neither is rewritten into the other.
+The line this draws, once, for the whole build: **a URL unify constructs is percent-encoded; a URL the author wrote is preserved.** `urlForOutputPath`, the `--dry-run` address, §11.1's re-rooted URLs, §11.2's directory form, and every projection of this manifest are constructions and are encoded. A URL the author wrote in the page that ships it, on a page that did not move, is preserved untouched (§11.1's URL-06 branch). §11.2 is the stated exception: it *replaces* an authored URL with a constructed one by design, which is what `--pretty-urls` is, so its output is encoded like any other construction. §12 percent-decodes before matching, so both spellings of the same file resolve and neither is rewritten into the other.
+
+One visible consequence, stated so it is not later read as drift: in a build without `--pretty-urls` an emitted page can carry `href="/two words.html"` — the author's own bytes, preserved — while the sitemap and the `--dry-run` report say `/two%20words.html` for that same target. Both name the file, both resolve, and neither is wrong. The difference is the line above doing exactly what it says, not two components disagreeing.
 
 `url` is `base.origin + path` when `--base-url` was supplied, and `null` otherwise. unify does not know a site's public address unless it is told, and a feature that needs an absolute URL must therefore say so rather than invent an origin. Because §11.3 makes a bare-path `--base-url` a usage error, `url` is either a complete absolute URL or `null` — never a half-built one.
 
