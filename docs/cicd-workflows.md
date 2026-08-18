@@ -2,11 +2,27 @@
 
 What actually runs, and what each job is allowed to mean. Two workflow files exist: `.github/workflows/test.yml` (every push and PR) and `.github/workflows/release.yml` (releases and prereleases).
 
-## `test.yml` — three jobs
+## `test.yml` — five jobs
 
-### `release-signal` — the release condition itself
+### `release-signal` — runtime coverage against the phase baseline
 
-Runs the whole suite against the real CLI, then checks the runtime traceability ledger:
+Runs the whole suite against the real CLI, then checks the runtime traceability ledger against the committed phase baseline:
+
+```bash
+rm -f .conformance-ledger.jsonl
+bun test
+bun tests/conformance/check-traceability.mjs --runtime .conformance-ledger.jsonl --baseline tests/conformance/phase-gaps/baseline.txt
+```
+
+Green means the gap set computed from rules a test **actually ran and passed** equals the baseline exactly: a new uncovered rule fails, and a gap that closed fails until the baseline shrinks in the same commit. It is the runtime twin of `traceability-static`, and it is the job that closes the skipped-test hole — a `test.skip` records nothing, so its rules go uncovered and this fails.
+
+This job checked the *release* condition directly (no `--baseline`, so any gap fails) from the end of the v0.7 migration until the v0.8 work opened §20's manifest rows. It is baselined again for the same reason it was during the rewrite: a spec section can be written before any CLI surface exists to observe it, and the honest record of that is a baseline entry rather than a red that people are instructed to ignore — the "warn instead of fail" mechanism `docs/testing-strategy.md` §1 (M2) blames for the suite this one replaced.
+
+The failure mode to guard against is not this job failing; it is someone making it pass. Do not weaken the harness, the comparator, or the checker to turn it green. Progress is the covered count it prints, and the baseline shrinking.
+
+### `release-gate` — the release condition itself
+
+The same commands with **release semantics** — no `--baseline`, so *any* uncovered rule fails:
 
 ```bash
 rm -f .conformance-ledger.jsonl
@@ -14,9 +30,15 @@ bun test
 bun tests/conformance/check-traceability.mjs --runtime .conformance-ledger.jsonl
 ```
 
-**This job going green *is* the v0.7.0 release condition** — every gated rule in `tests/conformance/rules.tsv` recorded by a test that actually ran and passed in this run. It was red by design for the whole rewrite, and `tests/conformance/phase-gaps/p0-expected-fail.txt` records why a red harness was the correct Phase 0 *pass* condition. That phase is over: the ledger is full and the job is green, so a red run is now a regression rather than progress.
+**This job going green is the release condition.** It carries `continue-on-error: true` for exactly as long as `tests/conformance/phase-gaps/baseline.txt` is non-empty, so the expected-red state is declared mechanically rather than in a comment. `release.yml` runs the identical check **blocking** at tag time, so a phase-baselined tree cannot be released. Emptying the baseline is what turns this back into a blocking push-time gate; it is part of shipping v0.8.0, not part of the phase.
 
-The failure mode to guard against is not this job failing; it is someone making it pass. Do not weaken the harness, the comparator, or the checker to turn it green. Progress is the covered count it prints.
+### `module-graph` — gate G8
+
+```bash
+bun tests/conformance/check-module-graph.mjs
+```
+
+Every file under `src/**` must be reachable from `src/cli.js` by static `import` specifiers. A module nothing imports is either a cut feature left behind or one written and never wired, and a green suite sees neither: a unit test importing a module directly makes it *covered* without making it *reachable*. Static analysis only, so the gate never executes CLI code and cannot be satisfied by a dynamic import written to fool it. One caveat worth knowing: only extension-bearing relative specifiers resolve, so an extensionless or computed import would read as a dead module.
 
 ### `suite-hygiene` — gate G9
 
@@ -32,7 +54,7 @@ Enforces the anti-rot rules H1–H5 from `docs/testing-strategy.md` §5 — no f
 bun tests/conformance/check-traceability.mjs --static --baseline tests/conformance/phase-gaps/baseline.txt
 ```
 
-Compares the computed gap set against the committed baseline and fails on **any** difference. A new gap fails; so does a gap that closed, until the baseline shrinks in the same commit. `baseline.txt` is now empty — every gated rule is covered — so any regression surfaces immediately.
+Compares the computed gap set against the committed baseline and fails on **any** difference. A new gap fails; so does a gap that closed, until the baseline shrinks in the same commit. `baseline.txt` currently holds the v0.8 manifest rows that no CLI surface can yet observe (`docs/conformance-spec.md` §20); each is closed by the consumer that makes its field observable, and the file is empty again before v0.8.0 ships.
 
 The static check also enforces spec↔inventory sync: if `docs/conformance-spec.md` gains or loses an enumerable rule (a splice rule, a problem, an advisory, a head-merge row) without `rules.tsv` being updated in the same commit, it exits 1.
 
@@ -70,4 +92,4 @@ Required secrets: `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`, both checked with 
 
 **Why it is all in one file.** This workflow used to delegate to four shared workflows in `fwdslsh/toolkit`. The indirection cost more than it saved: the shared release step generated a "Manual Downloads" table for a different tool (`catalog-*` binaries, plus a Windows row unify does not build), so every release page advertised dead links; and the shared build step ran `bun test || echo "No tests configured, skipping..."`, which swallowed failures, so nothing in the release path ever gated on the suite. Both defects were invisible from this repo and unfixable from it. Local, boring, and readable beats shared and remote for a workflow that runs a handful of times a year.
 
-Before tagging, the eleven release gates in `docs/testing-strategy.md` §6 should be green. `test.yml` covers G1 and G2 on every push, and `release.yml` re-runs them plus G11 (the compiled binary walking the golden path) at tag time; the rest — determinism, watch-equivalence, module reachability, the README embed — are checkable locally and documented there.
+Before tagging, the eleven release gates in `docs/testing-strategy.md` §6 should be green. `test.yml` covers G1, G2, G8, and G9 on every push, and `release.yml` re-runs them plus G11 (the compiled binary walking the golden path) at tag time; the rest — determinism, watch-equivalence, the README embed — are checkable locally and documented there.

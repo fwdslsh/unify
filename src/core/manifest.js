@@ -33,6 +33,7 @@
  * consumer emits and a URL the report shows cannot drift apart (§20.5).
  */
 
+import { decodeEntities } from "./entities.js";
 import { getAttr, isElement, findAll, findFirst, innerText, parse } from "./html.js";
 import { urlForOutputPath } from "./publish.js";
 import { isSkippedUrl, splitUrl } from "./urls.js";
@@ -114,22 +115,27 @@ const INLINE = new Set([
  * — which is exactly the "visible text" mistake that makes duplicate-content
  * detection report two pages as identical when only their inline analytics
  * snippet is.
- * @param {string} text - the whole emitted document
  * @param {import('./html.js').Node} el
  * @returns {string}
  */
-function textContent(text, el) {
+function textContent(el) {
   let out = "";
   const visit = (node) => {
     if (node.type === "text") { out += node.data; return; }
     if (node.type !== "element" && node.type !== "root") return;
     const tag = node.type === "element" ? node.tag.toLowerCase() : "";
     if (INVISIBLE.has(tag)) return;
+    // Entering AND leaving: leaving alone fuses a parent's own text with a
+    // block child's ("<div>Intro<p>Para</p></div>" -> "IntroPara"). The
+    // doubled separator between two adjacent blocks costs nothing, because
+    // `collapse` runs over the result.
+    const separates = node.type === "element" && !INLINE.has(tag);
+    if (separates) out += " ";
     for (const child of node.children ?? []) visit(child);
-    if (node.type === "element" && !INLINE.has(tag)) out += " ";
+    if (separates) out += " ";
   };
   for (const child of el.children ?? []) visit(child);
-  return collapse(out);
+  return collapse(decodeEntities(out));
 }
 
 /** Collapse every run of ASCII whitespace to one space and trim (§20.3). */
@@ -137,10 +143,14 @@ function collapse(s) {
   return s.replace(/[ \t\n\r\f]+/g, " ").trim();
 }
 
-/** `""` and whitespace-only both mean "declared nothing" (§20.3). */
+/**
+ * `""` and whitespace-only both mean "declared nothing" (§20.3). Character
+ * references resolve here too: an attribute carries them exactly as element
+ * text does, so `content="Tea &amp; Coffee"` is `Tea & Coffee` in the record.
+ */
 function nonEmpty(s) {
   if (typeof s !== "string") return null;
-  const trimmed = s.trim();
+  const trimmed = decodeEntities(s).trim();
   return trimmed === "" ? null : trimmed;
 }
 
@@ -156,17 +166,29 @@ function nonEmpty(s) {
 export function isoDate(raw) {
   if (typeof raw !== "string") return null;
   const s = raw.trim();
-  const m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(Z|[+-]\d{2}:\d{2})?)?$/.exec(s);
+  // W3C-DTF exactly (§20.10): the literal `T`, and a time-zone designator
+  // whenever a time is present. A space separator and a bare local time are
+  // the two forms other tools accept and this one must not — each is invalid
+  // wherever unify would emit it (a sitemap <lastmod>, a JSON-LD dateModified).
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(Z|[+-]\d{2}:\d{2}))?$/.exec(s);
   if (!m) return null;
-  const [, y, mo, d, hh, mm, ss] = m;
+  const [, y, mo, d, hh, mm, ss, tzd] = m;
   const year = Number(y), month = Number(mo), day = Number(d);
   if (month < 1 || month > 12 || day < 1) return null;
   // Real calendar day, leap years included: Date.UTC normalizes an overflow
   // (2026-02-30 → March 2), so comparing the parts back is the check.
   const dt = new Date(Date.UTC(year, month - 1, day));
   if (dt.getUTCFullYear() !== year || dt.getUTCMonth() !== month - 1 || dt.getUTCDate() !== day) return null;
-  if (hh !== undefined && (Number(hh) > 23 || Number(mm) > 59 || (ss !== undefined && Number(ss) > 60))) return null;
-  return s;
+  if (hh !== undefined) {
+    if (Number(hh) > 23 || Number(mm) > 59) return null;
+    if (ss !== undefined && Number(ss) > 59) return null;
+    if (tzd !== "Z") {
+      const offsetHours = Number(tzd.slice(1, 3));
+      const offsetMinutes = Number(tzd.slice(4, 6));
+      if (offsetMinutes > 59 || offsetHours * 60 + offsetMinutes > 14 * 60) return null;
+    }
+  }
+  return s; // verbatim, never normalized — reformatting is an edit to content
 }
 
 /** A `{raw, iso}` date value, or null when nothing was declared (§20.3). */
@@ -175,10 +197,17 @@ function dateValue(raw) {
   return value === null ? null : { raw: value, iso: isoDate(value) };
 }
 
-/** An integer-valued dimension, or null — never a coercion (§20.3). */
+/**
+ * An integer-valued dimension, or null — never a coercion (§20.3). Bounded at
+ * the safe-integer ceiling: a twenty-digit `content` is not a pixel count, and
+ * emitting the float it silently becomes would be a value the page never
+ * declared.
+ */
 function intOrNull(raw) {
   const v = nonEmpty(raw);
-  return v !== null && /^\d+$/.test(v) ? Number(v) : null;
+  if (v === null || !/^\d+$/.test(v)) return null;
+  const n = Number(v);
+  return Number.isSafeInteger(n) ? n : null;
 }
 
 /**
@@ -317,7 +346,7 @@ function extract(page, base) {
     } else if (/^h[1-6]$/.test(tag)) {
       headings.push({
         level: Number(tag.slice(1)),
-        text: textContent(html, node),
+        text: textContent(node),
         id: nonEmpty(getAttr(node, "id")),
       });
     } else if (tag === "a") {
@@ -331,8 +360,12 @@ function extract(page, base) {
   const body = main ?? findFirst(root, (n) => isElement(n, "body"));
   const textHost = body ?? root;
 
-  // §20.3 — og:image wins over twitter:image whichever came first in the
+  // §20.3/§20.4 — og:image wins over twitter:image whichever came first in the
   // document; the fallback is between *spellings*, not a document-order race.
+  // Dimensions are read only when og:image supplied the url: og:image:width
+  // describes the og image, and attaching it to a twitter:image would report a
+  // size the page never claimed for that file.
+  const fromOg = ogImage.kept !== null;
   const imageUrl = ogImage.kept ?? twitterImage.kept;
 
   const conflicts = [
@@ -361,10 +394,16 @@ function extract(page, base) {
     lang: lang.kept,
     canonical: canonical.kept,
     robots: parseRobots(robotsRaw.kept),
-    h1: headings.find((h) => h.level === 1)?.text ?? null,
+    h1: nonEmpty(headings.find((h) => h.level === 1)?.text ?? null),
     headings,
-    text: textContent(html, textHost),
-    image: imageUrl === null ? null : { url: imageUrl, width: intOrNull(ogWidth.kept), height: intOrNull(ogHeight.kept) },
+    text: textContent(textHost),
+    image: imageUrl === null
+      ? null
+      : {
+          url: imageUrl,
+          width: fromOg ? intOrNull(ogWidth.kept) : null,
+          height: fromOg ? intOrNull(ogHeight.kept) : null,
+        },
     author: author.kept,
     datePublished: dateValue(published.kept),
     dateModified: dateValue(modified.kept),
@@ -392,7 +431,13 @@ export function buildManifest({ pages, base = null }) {
   const ordered = [...pages].sort((a, b) =>
     a.outputPath < b.outputPath ? -1 : a.outputPath > b.outputPath ? 1 : 0);
   const drafts = ordered.map((p) => extract(p, base));
-  const byOutputPath = new Map(drafts.map((r) => [r.outputPath, r]));
+  // First record wins a duplicated output path. Two sources resolving to one
+  // path is P12 and blocks publish, so this branch only ever feeds a build
+  // that is already failing — but "which record" must still be a function of
+  // the input rather than of iteration order, or a diagnostic could differ
+  // between runs of the same tree.
+  const byOutputPath = new Map();
+  for (const rec of drafts) if (!byOutputPath.has(rec.outputPath)) byOutputPath.set(rec.outputPath, rec);
 
   // §20.9 — the link graph, second pass: a link participates only when it
   // names a page that HAS a record, which is knowable only now.

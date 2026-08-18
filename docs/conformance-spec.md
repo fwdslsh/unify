@@ -1001,13 +1001,13 @@ Every record carries every field. A field with nothing to read is `null` (scalar
 | `lang` | string\|null | the `lang` attribute of `<html>`, trimmed; empty is `null` |
 | `canonical` | string\|null | `<link rel="canonical">` `href`, exactly as emitted |
 | `robots` | object | §20.6 — `{raw, directives, indexable, followable}` |
-| `h1` | string\|null | text content of the first `<h1>`, whitespace-collapsed and trimmed |
+| `h1` | string\|null | text content of the first `<h1>`, whitespace-collapsed and trimmed; empty is `null` |
 | `headings` | array | every `h1`–`h6` in document order: `{level, text, id}`; `id` is `null` when unset |
 | `text` | string | §20.7 — the page's visible main text |
-| `image` | object\|null | `{url, width, height}` from `og:image` (else `twitter:image`); dimensions from `og:image:width`/`og:image:height`, `null` when unset or not an integer |
+| `image` | object\|null | `{url, width, height}` from `og:image`, else `twitter:image`; `width`/`height` come from `og:image:width`/`og:image:height` and are read **only when the url came from `og:image`**, `null` otherwise or when the value is not an integer |
 | `author` | string\|null | `<meta name="author">` `content`, trimmed |
-| `datePublished` | object\|null | `{raw, iso}` from `<meta property="article:published_time">` or `<meta name="date">` |
-| `dateModified` | object\|null | `{raw, iso}` from `<meta property="article:modified_time">` or `<meta name="lastmod">` |
+| `datePublished` | object\|null | §20.10 — `{raw, iso}` from `<meta property="article:published_time">` or `<meta name="date">` |
+| `dateModified` | object\|null | §20.10 — `{raw, iso}` from `<meta property="article:modified_time">` or `<meta name="lastmod">` |
 | `schemaType` | string\|null | §20.8 — the declared structured-data type |
 | `jsonLd` | array | §20.8 — one entry per `<script type="application/ld+json">`, in document order |
 | `linksOut` | string[] | §20.9 — output paths of internal pages this page links to, deduplicated, sorted |
@@ -1016,7 +1016,11 @@ Every record carries every field. A field with nothing to read is `null` (scalar
 
 **Text content** everywhere in this table means the concatenated character data of the element and its descendants, with `<script>`, `<style>`, `<template>`, and `<noscript>` subtrees omitted, each run of ASCII whitespace collapsed to one space, and the result trimmed. Comments contribute nothing.
 
-Element boundaries participate: leaving an element contributes one space unless it is one of the closed set of **inline** elements below, whose boundaries contribute nothing. Without that rule `<p>Kept</p><p>Also kept</p>` reads as `KeptAlso kept` — a word that appears on no page and in no index — and with an unconditional space `Hello <em>world</em>!` reads as `Hello world !`. The list is closed and stated rather than derived, so two consumers cannot tokenize the same page differently:
+**Character references are resolved.** "Character data" means the text a reader sees, not the markup that encodes it: `C++ &amp; Rust!` in the emitted document is `C++ & Rust!` in the record. This is not an edge case — §10.1's Markdown converter escapes `&`, `<`, `>`, and `"` on every page it writes, so an unresolved field would make the *default* authoring path produce text no reader ever sees, no search index could match, and any consumer that escapes on output would double-escape into `&amp;amp;`. Resolution covers the numeric forms (`&#8212;`, `&#x2014;`) and the named references of HTML 4.01's three entity sets — Latin-1, symbols/mathematical/Greek, and special — which is a closed, citable list rather than an implementation's habit. A reference outside that set, or malformed, is left exactly as written: unrecognised markup is not silently deleted. The same resolution applies to values read from attributes (`description`, `author`, `canonical`, `image`, the dates), because an attribute carries character references too.
+
+Resolution happens **only here**. §3's splice engine and every module it feeds must keep treating source bytes as bytes — the manifest is a reading of the output, not another pass over it.
+
+Element boundaries participate: **entering and leaving** an element each contribute one space unless it is one of the closed set of **inline** elements below, whose boundaries contribute nothing. Both halves are needed. Leaving alone leaves `<div>Intro<p>Para</p></div>` reading as `IntroPara`; without the rule at all `<p>Kept</p><p>Also kept</p>` reads as `KeptAlso kept`; and with an unconditional space `Hello <em>world</em>!` reads as `Hello world !`. Since runs of whitespace collapse and the result is trimmed, the doubled separator between two adjacent blocks costs nothing. The list is closed and stated rather than derived, so two consumers cannot tokenize the same page differently:
 
 ```
 a abbr b bdi bdo cite code data dfn em i img kbd mark q rp rt ruby
@@ -1032,6 +1036,8 @@ Several fields are single-valued while the emitted document may declare them mor
 When two or more accepted declarations exist and their values **differ**, the manifest keeps the first and appends one `conflicts` entry naming the field, the kept value, and every discarded value in document order. Identical repeats lose nothing and so are not conflicts. A conflict entry is **data on the record, not a diagnostic**: §14.2's problem list and §14.3's advisory catalogue are both closed, ordinary `build` is not the place to reject content quality (product-spec §6.1), and the evaluation command of product-spec §6.3.4 is what renders these to a human. The rule is total — the fields subject to it are `title`, `description`, `lang`, `canonical`, `robots`, `image`, `author`, `datePublished`, `dateModified`, and `schemaType` — and no consumer may re-decide a winner.
 
 `headings`, `jsonLd`, `linksOut`, and `linksIn` are multi-valued by definition and never produce conflicts.
+
+`image` is the one field whose accepted declarations are **ranked rather than ordered**: `og:image` is the representative image whenever the document declares one, and `twitter:image` is consulted only in its absence (§20.3). The conflict rule applies within the winning spelling — two differing `og:image` values conflict, as do two differing `twitter:image` values on a page with no `og:image` — and a `twitter:image` that merely differs from a present `og:image` is not a conflict, because it is not a competing answer to the same question. Stated here because §20.4 calls itself total, and a rule that is total needs its one exception named rather than inferred.
 
 ### 20.5 Public URLs
 
@@ -1058,6 +1064,8 @@ A crawler-specific meta (`<meta name="googlebot">`) is **not** read: unify does 
 ### 20.9 The internal link graph
 
 `linksOut` holds the output paths of the pages this page links to. A link participates when it is an `<a href>` in the emitted document whose value, after `--base-url` stripping (§12's own rule, reused), resolves to an output path that has a page record. Fragment-only, external, `mailto:`, `tel:`, and `data:` URLs never participate, and a link to a non-page asset never participates; the query and fragment of a participating URL are discarded before matching. A page linking to itself records itself. Values are deduplicated and sorted.
+
+A `<noscript>` link participates even though `<noscript>` text does not reach `text` (§20.3). The two sections are asking different questions: `text` is what a reader sees, and a `noscript` block is by definition what they do not; `linksOut` is which pages this page can be reached from, and a `noscript` link is a real navigation for the readers it is written for. Named here so the asymmetry reads as a decision rather than an oversight.
 
 `linksIn` is the exact reverse relation, computed after every record exists: `B` is in `A.linksIn` if and only if `A` is in `B.linksOut`. Deduplicated and sorted. Orphan detection (product-spec §6.3.4) is `linksIn.length === 0`, which is why the relation is built here once rather than by the consumer.
 
@@ -1110,3 +1118,20 @@ If generation proceeds and a path it would write is already occupied by a file t
 Every `<loc>` in an emitted sitemap — generated or authored — whose value names a location inside this site must resolve to a file the site emits. "Inside this site" means the value, after `--base-url` stripping (§12's rule), is root-relative or relative; a URL on another origin is not checkable offline and is skipped, because network access is an explicit audit operation and never a build dependency (product-spec §6.1). A `<loc>` that does not resolve is **P13**, the same broken-internal-reference problem §12 raises for a page, located at the sitemap file.
 
 For generated sitemaps this check can only pass — every `<loc>` came from a record whose output path exists. It runs anyway, and that is the point: it is the executable form of the claim that the sitemap and the published tree agree, so a future change that lets the two drift fails here instead of at a crawler.
+
+### 20.10 Dates: `raw` and `iso`
+
+A date field is `{raw, iso}` precisely so the two questions never collapse into one. `raw` is the value exactly as the document declared it, so nothing an author wrote is lost. `iso` is that value **only when it is a well-formed [W3C-DTF](https://www.w3.org/TR/NOTE-datetime) date or date-time**, and `null` otherwise; it is the field every consumer that emits a date must read, and `raw` is never emitted anywhere.
+
+The accepted grammar is W3C-DTF's, no more:
+
+```
+YYYY-MM-DD
+YYYY-MM-DDThh:mmTZD
+YYYY-MM-DDThh:mm:ssTZD
+YYYY-MM-DDThh:mm:ss.sTZD          TZD = Z | +hh:mm | -hh:mm
+```
+
+The literal `T` is required — `2026-01-02 03:04:05` is not W3C-DTF, and a space-separated value emitted verbatim into a sitemap `<lastmod>` or a JSON-LD `dateModified` is invalid where it lands. A time-zone designator is required whenever a time is present, since a local time with no offset names no instant. The date must be a real calendar day (`2026-02-30` and `2025-02-29` are not), the clock must be a real time of day (`24:00` and `23:60` are not), and the offset must be one that exists (`±14:00` is the outer bound). `iso` is the accepted value verbatim, not a normalization: unify does not rewrite `+00:00` to `Z` or pad a fractional second, because reformatting an author's timestamp is an edit to their content.
+
+No date is ever derived. The build clock, the filesystem's mtime, the filename, and Git history are not consulted by this section or by anything reading it — product-spec §6.1's no-invented-claims constraint, in the one place it is most tempting to break.

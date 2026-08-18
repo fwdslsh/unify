@@ -8,15 +8,25 @@ on:
   workflow_dispatch:
 
 jobs:
-  # The release signal (docs/migration-plan.md §1). Green here means every
-  # gated rule in tests/conformance/rules.tsv was recorded by a test that
-  # actually ran and passed against the real CLI in this run. It was red by
-  # design for the whole rewrite; the migration is complete and it is green
-  # now, so a red run is a regression. Do not "fix" this job by weakening the
-  # harness or the checker — a skipped test records nothing and fails the gate
-  # rather than hiding in it.
+  # The runtime signal (docs/migration-plan.md §1). Green here means the gap
+  # set computed from rules a test actually RAN and PASSED equals the committed
+  # phase baseline exactly — a new uncovered rule fails, and a gap that closed
+  # fails until the baseline shrinks in the same commit.
+  #
+  # This job checked the RELEASE condition (no --baseline, so any gap fails)
+  # from the end of the v0.7 migration until the v0.8 work opened §20's manifest
+  # rows. It is baselined again for the same reason it was during the rewrite:
+  # a spec section can be written before any CLI surface exists to observe it,
+  # and the honest record of that is a baseline entry rather than a red anyone
+  # is told to ignore — the exact "warn instead of fail" mechanism
+  # docs/testing-strategy.md §1 (M2) blames for the suite this one replaced.
+  # `release-gate` below is the unbaselined form, and shipping v0.8.0 means
+  # emptying the baseline so the two become the same check again.
+  #
+  # Do not "fix" either job by weakening the harness or the checker — a skipped
+  # test records nothing and fails the gate rather than hiding in it.
   release-signal:
-    name: Release signal (conformance ledger complete)
+    name: Runtime traceability (vs phase-gaps baseline)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -30,7 +40,40 @@ jobs:
         run: |
           rm -f .conformance-ledger.jsonl
           bun test
+          bun tests/conformance/check-traceability.mjs --runtime .conformance-ledger.jsonl --baseline tests/conformance/phase-gaps/baseline.txt
+
+  # The release condition itself, stated separately so it is visible rather
+  # than implied: no --baseline, so ANY uncovered rule fails. Expected red for
+  # as long as tests/conformance/phase-gaps/baseline.txt is non-empty, and
+  # `continue-on-error` says so mechanically instead of in a comment nobody
+  # reads. Emptying the baseline is what turns this into a blocking gate again;
+  # v0.8.0 does not ship before it is green.
+  release-gate:
+    name: Release gate G2 (advisory until the phase baseline is empty)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Full suite + runtime traceability, release semantics
+        run: |
+          rm -f .conformance-ledger.jsonl
+          bun test
           bun tests/conformance/check-traceability.mjs --runtime .conformance-ledger.jsonl
+
+  # Always-on gate G8: every src/** file reachable from src/cli.js. A module
+  # nothing imports is either a cut feature left behind or a written-and-never-
+  # wired one, and a green suite sees neither — a unit test importing a module
+  # directly makes it covered without making it reachable.
+  module-graph:
+    name: No dead modules (G8)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun tests/conformance/check-module-graph.mjs
 
   # Always-on gate G9: the anti-rot rules for the suite itself (H1-H5).
   suite-hygiene:

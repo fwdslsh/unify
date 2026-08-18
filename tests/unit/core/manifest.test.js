@@ -211,6 +211,30 @@ describe("§20.3 fields (MAN-03)", () => {
     expect(r.image).toEqual({ url: "/card.png", width: null, height: null });
   });
 
+  test("dimensions attach only when og:image supplied the url", () => {
+    const r = only(
+      doc(
+        `<meta name="twitter:image" content="/tw.png">\n` +
+          `<meta property="og:image:width" content="1200">\n` +
+          `<meta property="og:image:height" content="630">`,
+      ),
+    );
+    expect(r.image).toEqual({ url: "/tw.png", width: null, height: null });
+  });
+
+  test("an absurd dimension is null, not a float", () => {
+    const r = only(
+      doc(`<meta property="og:image" content="/c.png">\n<meta property="og:image:width" content="99999999999999999999">`),
+    );
+    expect(r.image).toEqual({ url: "/c.png", width: null, height: null });
+  });
+
+  test("an empty first h1 is null, like an empty title", () => {
+    const r = only(doc("", "<h1></h1><h1>Real</h1>"));
+    expect(r.h1).toBeNull();
+    expect(r.headings[0]).toEqual({ level: 1, text: "", id: null });
+  });
+
   test("no image declaration is null, never the first <img>", () => {
     const r = only(doc("", `<img src="/photo.jpg" alt="a photo">`));
     expect(r.image).toBeNull();
@@ -244,6 +268,87 @@ describe("§20.3 fields (MAN-03)", () => {
     const recs = records({ "2026-01-01-post.html": doc() });
     expect(recs[0].datePublished).toBeNull();
     expect(recs[0].dateModified).toBeNull();
+  });
+});
+
+describe("§20.3 character references (MAN-03)", () => {
+  test("the five predefined references resolve in element text and attributes", () => {
+    const r = only(
+      doc(
+        `<title>Tea &amp; Coffee</title>\n<meta name="description" content="Beans, brews &amp; more">\n` +
+          `<meta name="author" content="O&apos;Brien">`,
+        `<h1>C++ &amp; Rust!</h1><p>We serve &quot;single-origin&quot; beans &lt;3 &mdash; 5 &lt; 6.</p>`,
+      ),
+    );
+    expect(r.title).toBe("Tea & Coffee");
+    expect(r.description).toBe("Beans, brews & more");
+    expect(r.author).toBe("O'Brien");
+    expect(r.h1).toBe("C++ & Rust!");
+    expect(r.headings).toEqual([{ level: 1, text: "C++ & Rust!", id: null }]);
+    expect(r.text).toBe('C++ & Rust! We serve "single-origin" beans <3 — 5 < 6.');
+  });
+
+  test("numeric references resolve in both spellings", () => {
+    const r = only(doc("<title>A &#8212; B &#x2014; C</title>"));
+    expect(r.title).toBe("A — B — C");
+  });
+
+  test("HTML 4.01 named references resolve", () => {
+    const r = only(doc("<title>caf&eacute; &laquo;menu&raquo;</title>", "<p>&plusmn;1 &deg;C &mdash; 50&percnt;</p>"));
+    expect(r.title).toBe("café «menu»");
+    // &percnt; is outside HTML 4.01's sets, so it stays as written.
+    expect(r.text).toBe("±1 °C — 50&percnt;");
+  });
+
+  test("a decoded nbsp survives collapse — §20.3 collapses ASCII whitespace, not every space-like character", () => {
+    // U+00A0 is a character the author chose (it forbids a line break), so
+    // rewriting it to U+0020 would be an edit to their content.
+    const r = only(doc("", "<p>10&nbsp;kg</p>"));
+    expect(r.text).toBe("10\u00a0kg");
+    expect(r.text).not.toBe("10 kg");
+  });
+
+  test("an unknown or malformed reference is left exactly as written", () => {
+    const r = only(doc("<title>AT&T &notareal; &amp &#xZZ;</title>"));
+    expect(r.title).toBe("AT&T &notareal; &amp &#xZZ;");
+  });
+
+  test("a reference naming an impossible codepoint is left as written", () => {
+    const r = only(doc("<title>&#xD800; &#0; &#1114112;</title>"));
+    expect(r.title).toBe("&#xD800; &#0; &#1114112;");
+  });
+
+  test("decoding happens once — an encoded ampersand does not decode twice", () => {
+    // The page literally shows "&amp;" to a reader; it wrote &amp;amp; to do so.
+    const r = only(doc("<title>&amp;amp;</title>"));
+    expect(r.title).toBe("&amp;");
+  });
+});
+
+describe("§20.3 element-boundary separators (MAN-03)", () => {
+  test("a parent's own text is separated from a block child", () => {
+    const r = only(doc("", "<div>Intro<p>Para</p></div>"));
+    expect(r.text).toBe("Intro Para");
+  });
+
+  test("an inline element separates nothing", () => {
+    const r = only(doc("", "<p>Hello <em>world</em>!</p>"));
+    expect(r.text).toBe("Hello world!");
+  });
+
+  test("every element in the closed inline list separates nothing", () => {
+    const r = only(doc("", "<p>a<b>b</b><span>c</span><code>d</code><strong>e</strong><i>f</i>g</p>"));
+    expect(r.text).toBe("abcdefg");
+  });
+
+  test("br separates, because it separates lines and therefore words", () => {
+    const r = only(doc("", "<p>Line one<br>Line two</p>"));
+    expect(r.text).toBe("Line one Line two");
+  });
+
+  test("a non-inline element not in the list separates", () => {
+    const r = only(doc("", "<ul><li>One</li><li>Two</li></ul>"));
+    expect(r.text).toBe("One Two");
   });
 });
 
@@ -599,5 +704,42 @@ describe("isoDate", () => {
   test("rejects a non-string", () => {
     expect(isoDate(null)).toBeNull();
     expect(isoDate(undefined)).toBeNull();
+  });
+
+  test("requires the literal T — a space separator is not W3C-DTF", () => {
+    expect(isoDate("2026-01-02 03:04:05Z")).toBeNull();
+    expect(isoDate("2026-01-02 03:04:05")).toBeNull();
+  });
+
+  test("requires a time-zone designator whenever a time is present", () => {
+    expect(isoDate("2026-01-02T03:04")).toBeNull();
+    expect(isoDate("2026-01-02T03:04:05")).toBeNull();
+    expect(isoDate("2026-01-02T03:04Z")).toBe("2026-01-02T03:04Z");
+  });
+
+  test("rejects an impossible time of day", () => {
+    expect(isoDate("2026-01-02T24:00:00Z")).toBeNull();
+    expect(isoDate("2026-01-02T23:60:00Z")).toBeNull();
+    expect(isoDate("2026-01-02T23:59:60Z")).toBeNull();
+    expect(isoDate("2026-01-02T23:59:59Z")).toBe("2026-01-02T23:59:59Z");
+  });
+
+  test("rejects an offset that does not exist, and accepts the outer bound", () => {
+    expect(isoDate("2026-01-02T03:04:05+99:99")).toBeNull();
+    expect(isoDate("2026-01-02T03:04:05+15:00")).toBeNull();
+    expect(isoDate("2026-01-02T03:04:05+14:30")).toBeNull();
+    expect(isoDate("2026-01-02T03:04:05+14:00")).toBe("2026-01-02T03:04:05+14:00");
+    expect(isoDate("2026-01-02T03:04:05-12:00")).toBe("2026-01-02T03:04:05-12:00");
+  });
+
+  test("accepts a real leap day and rejects a false one", () => {
+    expect(isoDate("2024-02-29")).toBe("2024-02-29");
+    expect(isoDate("2025-02-29")).toBeNull();
+    expect(isoDate("2100-02-29")).toBeNull();
+  });
+
+  test("returns the value verbatim rather than normalizing it", () => {
+    expect(isoDate("2026-01-02T03:04:05+00:00")).toBe("2026-01-02T03:04:05+00:00");
+    expect(isoDate("2026-01-02T03:04:05.6Z")).toBe("2026-01-02T03:04:05.6Z");
   });
 });

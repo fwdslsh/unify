@@ -86,7 +86,7 @@ This is the mechanism that makes "fully implemented" a measurable claim.
 
 ### 3.1 The rule inventory
 
-`tests/conformance/rules.tsv` — **202 rows** (199 gated + 3 structural), one per normative claim in `docs/conformance-spec.md`, extracted section by section. IDs are stable, never reused, and namespaced by area, reusing the spec's own labels wherever the spec numbers things. Retired IDs stay retired: `LAY-06`–`LAY-08`, `HED-08`, `P06`, and `FIX-08` died with layout chaining; `A05`–`A07` were merged into `A13` (the duplicated-construct advisory); `A03`, `A04`, and `A15` were retired by the ratification rounds (A04 became problem P20); no test may reference them.
+`tests/conformance/rules.tsv` — one row per normative claim in `docs/conformance-spec.md`, extracted section by section. It held **202 rows** (199 gated + 3 structural) at v0.7.0 and grows with the spec; the checker prints the current count, which is the number to trust. IDs are stable, never reused, and namespaced by area, reusing the spec's own labels wherever the spec numbers things. Retired IDs stay retired: `LAY-06`–`LAY-08`, `HED-08`, `P06`, and `FIX-08` died with layout chaining; `A05`–`A07` were merged into `A13` (the duplicated-construct advisory); `A03`, `A04`, and `A15` were retired by the ratification rounds (A04 became problem P20); no test may reference them.
 
 | Prefix | Source | Count |
 |---|---|---|
@@ -130,7 +130,11 @@ Two declaration channels, both machine-read:
 
 - **Spec→inventory sync** (both modes): the checker parses the conformance spec's countable structures — the `**S<n> —**` bullets (12), the §14.2 numbered problems (20), the §14.3 numbered advisories (9), the §8 table body rows (7) — and fails on any drift from the inventory, so an edit that adds an S13 or a fifteenth problem breaks CI until `rules.tsv` (and therefore a test) catches up. Prose rules can't be machine-extracted; for them the sync check enforces the weaker invariant that every spec section has inventory rows, and the human review rule is: **a PR touching `docs/conformance-spec.md` must touch `rules.tsv` in the same commit or say why in the PR description**. That last clause is the one non-automated step in this section, named honestly.
 
-**Current status (2026-08-13, `--static`)**: 202 rules (199 gated, 3 structural); **every gated rule covered** — `tests/conformance/phase-gaps/baseline.txt` is empty, so the phase gate and the release semantics are the same check. All thirteen FIX rows are realized, and the §7 spec-bug set (B1–B7) plus the four pinned readings are closed — every gate-blocking flag on the inventory is gone. The checker's output is the authoritative gap list at any moment; the gate is blocking in CI (see `docs/cicd-workflows.md`).
+**Status at v0.7.0 (2026-08-13, `--static`)**: 202 rules (199 gated, 3 structural); **every gated rule covered** — `baseline.txt` empty, so the phase gate and the release semantics were the same check. All thirteen FIX rows realized, the §7 spec-bug set (B1–B7) and the four pinned readings closed.
+
+**During v0.8.x**, `baseline.txt` is non-empty again. Conformance-spec §20 (the final-output page manifest) is an *implementation boundary*: product-spec §6.2 forbids exposing it as an author-facing format, so a rule about it can be specified before any CLI surface exists for a behavior test to observe. Those rows are baselined rather than claimed, and each is closed by the consumer that makes its field observable — the sitemap closed MAN-01/05/06 in the commit that landed it. Baselining is the honest record of "specified, not yet observable"; claiming coverage from a Tier-3 unit test would not be, since §3.2's declaration channels deliberately read only `tests/conformance` and `tests/e2e`.
+
+The release semantics are unchanged and still blocking: `release.yml` runs `--runtime` with **no** baseline at tag time, so v0.8.0 cannot ship until the file is empty again. The checker's output is the authoritative gap list at any moment (see `docs/cicd-workflows.md` for which job means what).
 
 ### 3.4 Why declaration ≠ vacuous claiming
 
@@ -179,7 +183,7 @@ The release ships when a clean CI run on the release commit satisfies **all** of
 | G5 | Golden path | all five `init` templates: scaffold → `build --dry-run --strict` exit 0 → `build` → reference-clean output; dev smoke passes |
 | G6 | Determinism | two consecutive builds of kitchen-sink: identical output trees, identical stdout bytes, identical stderr bytes |
 | G7 | Watch equivalence | scripted edit sequence under `watch` yields a tree byte-identical to a fresh `build`; a no-op save rewrites nothing (mtime check) |
-| G8 | No dead modules | every `src/**` file reachable from `src/cli.js` in the import graph |
+| G8 | No dead modules | `check-module-graph.mjs` exits 0: every `src/**` file reachable from `src/cli.js` in the static import graph |
 | G9 | Suite hygiene | `check-suite-hygiene.mjs` exits 0 |
 | G10 | Docs lockstep | `docs/authoring-rules.md` ≤ 60 lines and byte-embedded in README (product-spec §7, item 5) |
 | G11 | Binary parity | the compiled Linux x86_64 binary passes the Tier-0 golden path; Linux ARM64 and macOS x86_64/ARM64 release binaries build successfully (parity runs where runners exist) |
