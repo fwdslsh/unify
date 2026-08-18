@@ -147,8 +147,37 @@ function collectHtmlReferences(text) {
  * @returns {string}
  */
 export function stripBaseUrl(url, base) {
-  if (url.startsWith(base.origin)) {
-    const rest = url.slice(base.origin.length); // expected to start with "/"
+  // An absolute or protocol-relative URL is PARSED, never string-matched.
+  //
+  // Byte comparison against `base.origin` was wrong three ways at once, and
+  // each way blocked the publish of a legal site:
+  //
+  //   - **No authority boundary.** Any host whose name merely begins with the
+  //     base origin read as an internal path, so a site at `example.com` could
+  //     not link to `example.community`, `example.company`, or an attacker's
+  //     `example.com.evil.test` — each became a P13 quoting a fragment of the
+  //     HOST (`.evil.test/x.css`) as a path the author had mistyped.
+  //   - **No host equivalence.** `https://EXAMPLE.com:443/about.html` is the
+  //     same URL by RFC 3986 §6.2.2.1 and §6.2.3, and raised a P13 quoting
+  //     `:443/about.html`, a string in no file.
+  //   - **Two encoding spaces.** `parseBaseUrl` stores `pathPrefix` as
+  //     `new URL().pathname` gives it — percent-encoded — while the authored
+  //     value carries whatever the author typed. Deploying under
+  //     `--base-url https://example.com/café/` therefore failed to strip its
+  //     own prefix and reported every page of an ordinary two-page site.
+  //
+  // `URL.pathname` answers all three: it normalizes the host, applies the
+  // default-port and case rules, and returns the path in the same encoding
+  // `pathPrefix` was stored in, so the two are comparable by construction.
+  if (/^([a-z][a-z0-9+.-]*:)?\/\//i.test(url)) {
+    let u;
+    try {
+      u = new URL(url, base.origin);
+    } catch {
+      return url; // not a URL this build can reason about — treat it as written
+    }
+    if (u.host !== new URL(base.origin).host) return url; // another site
+    const rest = u.pathname + u.search + u.hash;
     if (rest.startsWith(base.pathPrefix)) return `/${rest.slice(base.pathPrefix.length)}`;
     return rest || "/";
   }

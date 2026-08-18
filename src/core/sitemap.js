@@ -126,29 +126,24 @@ export function isSelfCanonical(record, base) {
 export function classifyCanonical(record, base) {
   if (record.canonical === null) return "none";
 
-  // "Another site" is a question about the HOST, and it is answered by
-  // comparing hosts — never by asking whether a byte-prefix strip happened.
-  // `stripBaseUrl` matches `base.origin` literally, so every spelling of this
-  // site's own address that is not byte-identical survives it:
-  // `HTTPS://EXAMPLE.COM/x`, `https://EXAMPLE.com/x`, `//example.com/x`, and
-  // `http://example.com/x` are all the same page by RFC 3986 §6.2.2.1 (scheme
-  // and host are case-insensitive) and were all reported as consolidating
-  // elsewhere. Parsing answers it and case-folds for free.
+  // ONE owner for "is this URL on this site?" — `stripBaseUrl`, which parses.
+  // It returns a path for this site, in every spelling of the address
+  // (`HTTPS://EXAMPLE.COM/x`, `https://EXAMPLE.com/x`, `//example.com/x`,
+  // `http://example.com/x`, `https://example.com:443/x` are all this page by
+  // RFC 3986 §6.2.2.1 and §6.2.3), and the URL untouched for any other host.
+  // So a value still carrying an authority HERE is, by that function's own
+  // answer, another site.
   //
-  // The scheme is deliberately not part of the comparison. `http:` versus
-  // `https:` on one host is a deployment detail, and "this page nominates a
-  // replacement" is not a true thing to say about it.
-  if (base && /^([a-z][a-z0-9+.-]*:)?\/\//i.test(record.canonical)) {
-    let host = null;
-    try {
-      host = new URL(record.canonical, base.origin).host;
-    } catch {
-      return "unknown"; // not a URL this build can reason about
-    }
-    if (host !== new URL(base.origin).host) return "elsewhere";
-  }
-
+  // This block used to parse the URL a second time and compare hosts itself.
+  // That was written before §12's own comparison was fixed, and mutation
+  // testing then showed the two agreeing on every input — a second
+  // interpretation of a question §12 already answers, which is the defect
+  // product-spec §6.1 exists to forbid rather than a safety net. What is
+  // load-bearing is the *classification*: without this line an off-origin
+  // canonical reads as `unknown`, and neither finding fires.
   const stripped = base ? stripBaseUrl(record.canonical, base) : record.canonical;
+  if (base && /^([a-z][a-z0-9+.-]*:)?\/\//i.test(stripped)) return "elsewhere";
+
   if (isSkippedUrl(stripped)) return "unknown";
   const target = resolveReference(stripped, record.outputPath);
   if (target === null) return "unknown";

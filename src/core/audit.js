@@ -301,7 +301,7 @@ export function auditManifest({ records, byOutputPath, base = null, sitemapLocs 
 
     // ---- discovery-artifact agreement --------------------------------------
     // Both cross-artifact findings turn on ONE question — WHICH page does this
-    // page's canonical name? — so both read §21.2's own `canonicalTarget`.
+    // page's canonical name? — so both read §21.2's own `classifyCanonical`.
     //
     // Two readings of that question have already produced a finding whose
     // evidence quoted the page's own URL back at it, and both are excluded

@@ -290,9 +290,21 @@ function main() {
 
     // Every anchor must resolve, and resolve UNIQUELY: `String.replace` edits
     // the first occurrence, so an ambiguous anchor mutates something other than
-    // the row it names — a silent mis-measurement rather than a loud one.
+    // the row it names — a silent mis-measurement rather than a loud one. An
+    // absent anchor is worse: `replace` returns the string unchanged, the file
+    // is rewritten identical, and the row is scored KILLED or SURVIVED on a
+    // mutation that never happened.
+    //
+    // EVERY row, not the selected ones. This loop used to iterate `selected`,
+    // so a prefix-filtered sweep validated only what it ran — and three rows
+    // sat stale across two review rounds while sweep after sweep reported "all
+    // killed", one of them the row certifying the rule the round existed to
+    // protect. A stale row anywhere means the inventory is claiming a rule is
+    // pinned when nothing tests it, which is exactly the class this file was
+    // written to detect; scoping the check to the subset made the detector
+    // inherit the blind spot.
     let bad = 0;
-    for (const row of selected) {
+    for (const row of rows) {
       const text = readFileSync(join(work, row.file), "utf8");
       const hits = text.split(row.old).length - 1;
       if (hits === 0) { console.error(`BAD-ANCHOR ${row.id} — ${row.file} no longer contains it; update mutations.tsv`); bad++; }

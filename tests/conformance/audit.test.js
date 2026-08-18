@@ -1048,3 +1048,143 @@ test("DIA-01: a diagnostic is one line, whatever the URL contains", async () => 
   }
   covers("DIA-01");
 }, TEST_MS);
+
+// ------------------------------------------------- review round 4 regressions
+
+test("SIT-02: every spelling of a page's own address keeps it IN the sitemap", async () => {
+  // The membership half of the same fold. Answering only the finding half left
+  // a matching host falling through to a byte compare, so four correct pages
+  // vanished from a generated discovery artifact with no diagnostic at all —
+  // the quieter direction of the same defect.
+  const spellings = [
+    "https://example.com/about.html",
+    "HTTPS://EXAMPLE.COM/about.html",
+    "https://EXAMPLE.com/about.html",
+    "//example.com/about.html",
+    "http://example.com/about.html",
+    "https://example.com:443/about.html",
+    "/about.html",
+    "about.html",
+  ];
+  for (const href of spellings) {
+    const tmp = mkTmp();
+    writeTree(join(tmp, "src"), {
+      ...linked(["About"]),
+      "about.html": page("About", '<p>Words about About.</p><a href="/">Home</a>')
+        .replace("<head>", `<head>\n<link rel="canonical" href="${href}">`),
+    });
+    const r = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", BASE], tmp);
+    expectExit(r, 0, `canonical spelled ${href}`);
+    const sitemap = readFileSync(join(tmp, "dist", "sitemap.xml"), "utf8");
+    if (!sitemap.includes("about.html")) {
+      throw new Error(`§21.2: ${href} names this page, so it is self-canonical and listed:\n${sitemap}`);
+    }
+  }
+
+  // And a canonical naming another page still consolidates it away.
+  const away = mkTmp();
+  writeTree(join(away, "src"), {
+    ...linked(["About"]),
+    "about.html": page("About", '<p>Words about About.</p><a href="/">Home</a>')
+      .replace("<head>", '<head>\n<link rel="canonical" href="https://example.com/">'),
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", BASE], away);
+  expectExit(r, 0, "a page consolidated onto the root");
+  if (readFileSync(join(away, "dist", "sitemap.xml"), "utf8").includes("about.html")) {
+    throw new Error("§21.2: a page whose canonical names another page is not listed");
+  }
+  covers("SIT-02");
+}, TEST_MS);
+
+test("SIT-02: a canonical this build cannot resolve is not a self-canonical page", async () => {
+  // The membership direction of `unknown`. §21.2 clause 4 asks the canonical to
+  // resolve to this page's own output path; a value naming nothing resolvable
+  // has not done that, so the page is consolidated away rather than listed on
+  // the strength of a claim unify could not check.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    ...linked(["About"]),
+    "about.html": page("About", '<p>Words about About.</p><a href="/">Home</a>')
+      .replace("<head>", '<head>\n<link rel="canonical" href="mailto:hi@example.com">'),
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", BASE], tmp);
+  expectExit(r, 0, "a canonical that names no page at all");
+  const sitemap = readFileSync(join(tmp, "dist", "sitemap.xml"), "utf8");
+  if (sitemap.includes("about.html")) {
+    throw new Error(`§21.2: a canonical unify cannot resolve is not this page:\n${sitemap}`);
+  }
+  if (!sitemap.includes("https://example.com/")) {
+    throw new Error(`§21.2: its clean neighbour is still listed:\n${sitemap}`);
+  }
+  covers("SIT-02");
+}, TEST_MS);
+
+test("REF-02: an origin match needs a boundary, and host equivalence is not a byte compare", async () => {
+  // A site at example.com could not link to example.community: `startsWith`
+  // matched the origin as text, so the rest of the HOST was read as a path.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": page("Home", '<p>x</p>'
+      + '<a href="https://example.com.evil.test/phish.html">a</a>'
+      + '<a href="https://example.commerce.test/b.html">b</a>'
+      + '<a href="https://example.community/c.html">c</a>')
+      .replace("<head>", '<head>\n<meta property="og:image" content="https://example.commerce.test/card.png">'),
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", BASE], tmp);
+  expectExit(r, 0, "external hosts whose names begin with the base origin");
+  if (r.stderr.trim() !== "") {
+    throw new Error(`§12: these are other sites, not paths on this one.\nstderr:\n${r.stderr}`);
+  }
+
+  // The default port and a case-varied host ARE this site, so they still strip
+  // and still resolve — including when the target is missing.
+  const same = mkTmp();
+  writeTree(join(same, "src"), {
+    "index.html": page("Home", '<p>x</p><a href="https://EXAMPLE.com:443/gone.html">g</a>'),
+  });
+  const b = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", BASE], same);
+  expectExit(b, 1, "an equivalent spelling of this site naming nothing");
+  if (!/\/gone\.html/.test(b.stderr) || /:443/.test(b.stderr)) {
+    throw new Error(`§12: resolved as this site's path, not quoted as one.\nstderr:\n${b.stderr}`);
+  }
+  covers("REF-02");
+}, TEST_MS);
+
+test("REF-02: a non-ASCII --base-url path strips in either spelling", async () => {
+  // `parseBaseUrl` stores pathPrefix as `new URL().pathname` gives it —
+  // percent-encoded — while the authored value carries what the author typed.
+  // Comparing the two as raw text meant an ordinary two-page site deployed
+  // under a path with an accent could not strip its own prefix, and reported
+  // every page. Parsing puts both sides in one encoding space.
+  for (const spelling of ["https://example.com/caf\u00e9/", "https://example.com/caf%C3%A9/"]) {
+    const tmp = mkTmp();
+    writeTree(join(tmp, "src"), {
+      ...linked(["About"]),
+      "robots.txt": `User-agent: *\nSitemap: ${spelling}sitemap.xml\n`,
+    });
+    const r = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", "https://example.com/caf\u00e9/"], tmp);
+    expectExit(r, 0, `a Sitemap: spelled ${spelling}`);
+    if (r.stderr.trim() !== "") {
+      throw new Error(`§12: both spellings name the site's own prefix.\nstderr:\n${r.stderr}`);
+    }
+  }
+  covers("REF-02");
+}, TEST_MS);
+
+test("DIA-01: a value carrying a newline is escaped, not collapsed", async () => {
+  // Folding gives one line while showing `/x .css` — a string the file does
+  // not contain, under a fix line telling the reader to check the spelling.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": page("Home", '<p>x</p><a href="/gone&#10;.css">broken</a>'),
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist"], tmp);
+  expectExit(r, 1, "a reference containing a newline");
+  if (!r.stderr.includes("/gone\\n.css")) {
+    throw new Error(`§14.1: the newline is shown, not silently removed.\nstderr:\n${r.stderr}`);
+  }
+  if (/\/gone \.css/.test(r.stderr)) {
+    throw new Error(`§14.1: a space is a different string from a newline.\nstderr:\n${r.stderr}`);
+  }
+  covers("DIA-01");
+}, TEST_MS);
