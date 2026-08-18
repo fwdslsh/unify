@@ -78,7 +78,27 @@ const xmlUnescape = decodeXmlEntities;
  * @param {import('./urls.js').BaseUrlConfig|null} base
  * @returns {boolean}
  */
-function isSelfCanonical(record, base) {
+/**
+ * "Does this page's canonical name this page?" — §21.2's second clause, and
+ * §24.4's own test for two findings that are *about* that question rather than
+ * about membership.
+ *
+ * Exported for the same reason `isCompletablePage` is: a lookalike drifts. The
+ * evaluator first asked it by way of `!isCompletablePage(...)`, which is a
+ * different question with the same answer on most pages and the wrong answer on
+ * a `noindex` page that names itself — membership fails there for the robots
+ * reason, and reading that as "the canonical disagrees" produced a finding
+ * whose evidence quoted the page's own URL back at it.
+ *
+ * A canonical unify cannot resolve — another origin, `mailto:`, empty — is not
+ * self-canonical. It names something this build cannot confirm is this page,
+ * and the conservative reading is the one that does not claim agreement.
+ *
+ * @param {import('./manifest.js').PageRecord} record
+ * @param {import('./urls.js').BaseUrlConfig|null} base
+ * @returns {boolean}
+ */
+export function isSelfCanonical(record, base) {
   if (record.canonical === null) return true;
   const stripped = base ? stripBaseUrl(record.canonical, base) : record.canonical;
   if (isSkippedUrl(stripped)) return false;
@@ -260,6 +280,51 @@ export function generateSitemap({ records, base, emittedFromSource, reporter }) 
  * @param {import('./diagnostics.js').Reporter} args.reporter
  */
 export function checkSitemapLocs({ sitemaps, emittedPaths, base, reporter }) {
+  for (const { file, stripped, resolved } of internalLocs({ sitemaps, base })) {
+    if (resolved !== null && emittedPaths.has(resolved)) continue;
+    reporter.problem({
+      file,
+      message: `${stripped} does not resolve to any emitted file`,
+      context: stripped,
+      fixes: [CHECK_SPELLING],
+    });
+  }
+}
+
+/**
+ * §24.4 — which pages a sitemap emitted by this build actually lists.
+ *
+ * The evaluation command needs the same question §21.6 asks — "what output
+ * path does this `<loc>` name?" — for a different purpose: comparing a listing
+ * against the page's own robots and canonical. Both callers go through
+ * `internalLocs` so there is exactly one answer, which is the one-interpretation
+ * law product-spec §6.1 states for URLs. A second resolver here would be the
+ * defect that law exists to forbid, and it would be invisible: the two would
+ * agree on every ASCII path and diverge on the first escaped one.
+ *
+ * @param {object} args
+ * @param {Map<string, {text: string, file: string}>} args.sitemaps
+ * @param {import('./urls.js').BaseUrlConfig|null} args.base
+ * @returns {Map<string, string>} output path -> the file that lists it (first wins)
+ */
+export function sitemapListings({ sitemaps, base }) {
+  const out = new Map();
+  for (const { file, resolved } of internalLocs({ sitemaps, base })) {
+    if (resolved !== null && !out.has(resolved)) out.set(resolved, file);
+  }
+  return out;
+}
+
+/**
+ * Every internal `<loc>` across the emitted sitemaps, resolved once.
+ *
+ * @param {object} args
+ * @param {Map<string, {text: string, file: string}>} args.sitemaps
+ * @param {import('./urls.js').BaseUrlConfig|null} args.base
+ * @returns {{file: string, raw: string, stripped: string, resolved: string|null}[]}
+ */
+function internalLocs({ sitemaps, base }) {
+  const out = [];
   for (const [outputPath, { text, file }] of [...sitemaps].sort((a, b) => (a[0] < b[0] ? -1 : 1))) {
     for (const raw of locValues(text)) {
       // EXACTLY §12's order — strip the base from the RAW value, then let
@@ -285,16 +350,10 @@ export function checkSitemapLocs({ sitemaps, emittedPaths, base, reporter }) {
       const stripped = base ? stripBaseUrl(raw, base) : raw;
       if (isSkippedUrl(stripped)) continue; // another origin, or nothing to check
       if (splitUrl(stripped).path === "") continue;
-      const resolved = resolveReference(stripped, outputPath);
-      if (resolved === null || emittedPaths.has(resolved)) continue;
-      reporter.problem({
-        file,
-        message: `${stripped} does not resolve to any emitted file`,
-        context: stripped,
-        fixes: [CHECK_SPELLING],
-      });
+      out.push({ file, raw, stripped, resolved: resolveReference(stripped, outputPath) });
     }
   }
+  return out;
 }
 
 /**

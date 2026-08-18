@@ -2,7 +2,7 @@
 
 unify turns a folder of plain HTML (and Markdown) into a finished site with shared navs, headers, and footers — no templating language, no JavaScript framework, no configuration. If you can write HTML and CSS, you already know almost everything unify does.
 
-This guide takes you from nothing to a deployed-ready site. It matches unify v0.7.0 exactly; the complete rule set fits on one screen in [`authoring-rules.md`](authoring-rules.md).
+This guide takes you from nothing to a deployed-ready site. It matches the 0.8 development line — v0.7.0's authoring surface unchanged, plus the commands and flags 0.8 has added so far; the complete rule set fits on one screen in [`authoring-rules.md`](authoring-rules.md).
 
 ## Install
 
@@ -183,6 +183,14 @@ unify build                      # publish to dist/ — all-or-nothing
 ```
 
 `--dry-run` prints what would be written and which layout each page composed from. The build checks every internal reference against the emitted files — a renamed page, a typo'd image path, or a case mismatch is a located error, not a quiet 404. If anything is wrong, **nothing is published**: exit 0 means `dist/` is the complete site, non-zero means the previous `dist/` is untouched.
+
+A separate command answers a separate question — not *is this build sound?* but *is this site complete?*:
+
+```bash
+unify audit                      # what the build would publish, evaluated; writes nothing
+```
+
+It reports the things a build has no business refusing over: a page with no description, two pages sharing a title, a heading and a `<title>` that disagree, a link to `#section` where nothing has that id, a page nothing links to. Each one prints what was seen and one thing to do about it. There is no score and nothing counts characters — a short title is not a problem, an absent one is. `unify audit --strict` exits non-zero on any finding, which is the CI gate; plain `unify build` never runs these checks at all, so none of them can hold up a release.
 
 Deploying under a subpath (GitHub Pages project sites)? Give `--base-url` the site's whole address: `unify build --pretty-urls --base-url https://you.github.io/repo-name/`. The path part prefixes every root-relative link; the domain absolutizes `og:` and canonical URLs, which is what Facebook, LinkedIn and Slack fetch when someone shares a page. A bare `/repo-name/` is rejected — it would prefix the links and leave the share metadata unfetchable.
 

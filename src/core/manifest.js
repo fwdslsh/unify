@@ -86,6 +86,9 @@ import { stripBaseUrl, resolveReference } from "./references.js";
  * @property {JsonLdEntry[]} jsonLd
  * @property {string[]} linksOut
  * @property {string[]} linksIn
+ * @property {string[]} ids - every id the page declares, document order, repeats kept
+ * @property {{target:string, id:string}[]} fragmentLinks - one entry per distinct
+ *   internal link carrying a fragment: the output path it names and the id it asks for
  * @property {Conflict[]} conflicts
  */
 
@@ -136,6 +139,15 @@ function textContent(el) {
   };
   for (const child of el.children ?? []) visit(child);
   return readText(out);
+}
+
+/** A fragment is percent-encoded like any URL part; an undecodable one stays verbatim. */
+function decodeURIComponentSafe(s) {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s;
+  }
 }
 
 /** Collapse every run of ASCII whitespace to one space and trim (§20.3). */
@@ -329,12 +341,18 @@ function extract(page, base) {
   const headings = [];
   /** @type {string[]} */
   const hrefs = [];
+  /** @type {string[]} */
+  const ids = [];
 
   // One document-order pass. `findAll` already refuses to descend into
   // `<template>` (§20.2), which is why every collector below can trust that
   // what it sees is markup the shipped page actually declares.
   for (const node of findAll(root, (n) => n.type === "element")) {
     const tag = node.tag.toLowerCase();
+    // Every id, in document order, repeats kept — §20.3. Repeats are the point:
+    // "this page declares one id twice" is only answerable if they survive.
+    const idAttr = nonEmpty(getAttr(node, "id"));
+    if (idAttr !== null) ids.push(idAttr);
     if (tag === "html") {
       lang.add(nonEmpty(getAttr(node, "lang")));
     } else if (tag === "title") {
@@ -442,8 +460,10 @@ function extract(page, base) {
     dateModified: dateValue(modified.kept),
     schemaType: schemaType.kept,
     jsonLd,
+    ids,
     linksOut: [],
     linksIn: [],
+    fragmentLinks: [],
     conflicts,
     _hrefs: hrefs,
   };
@@ -476,19 +496,38 @@ export function buildManifest({ pages, base = null }) {
   // names a page that HAS a record, which is knowable only now.
   for (const rec of drafts) {
     const out = new Set();
+    /** @type {Map<string, {target: string, id: string}>} deduplicated by target#id */
+    const fragments = new Map();
     for (const href of rec._hrefs) {
       const stripped = base ? stripBaseUrl(href, base) : href;
+      const { path, fragment } = splitUrl(stripped);
+      // A fragment-only link names an id on THIS page. It has to be read before
+      // `isSkippedUrl`, which classifies `#a` as skipped — correctly for §12,
+      // whose question is "does this reach a file", and wrongly for this one,
+      // whose question is "does this reach an id".
+      if (path === "" && fragment.length > 1 && !/^[a-z][a-z0-9+.-]*:/i.test(stripped)) {
+        const id = decodeURIComponentSafe(fragment.slice(1));
+        fragments.set(`${rec.outputPath}#${id}`, { target: rec.outputPath, id });
+        continue;
+      }
       if (isSkippedUrl(stripped)) continue;
-      const { path } = splitUrl(stripped);
-      if (path === "") continue; // query/fragment-only: not a navigation
+      if (path === "") continue; // query-only: not a navigation
       // `resolveReference` percent-decodes (REF-08), so a link written in the
       // spelling §20.5 publishes — `/two%20words.html` — joins the graph like
       // the raw form. Both name the same page; the graph must not depend on
       // which one the author typed.
       const resolved = resolveReference(stripped, rec.outputPath);
-      if (resolved !== null && byOutputPath.has(resolved)) out.add(resolved);
+      if (resolved !== null && byOutputPath.has(resolved)) {
+        out.add(resolved);
+        if (fragment.length > 1) {
+          const id = decodeURIComponentSafe(fragment.slice(1));
+          fragments.set(`${resolved}#${id}`, { target: resolved, id });
+        }
+      }
     }
     rec.linksOut = [...out].sort();
+    rec.fragmentLinks = [...fragments.values()].sort((a, b) =>
+      a.target === b.target ? (a.id < b.id ? -1 : a.id > b.id ? 1 : 0) : a.target < b.target ? -1 : 1);
     delete rec._hrefs;
   }
   for (const rec of drafts) {

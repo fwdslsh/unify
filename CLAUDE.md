@@ -24,15 +24,18 @@ bun run build:linux                        # Linux x64 binary
 bun run build:macos                        # macOS ARM64 binary
 bun run build:windows                      # Windows x64 binary
 
-# The v0.7.0 CLI (complete — there are no other commands or flags)
+# The CLI (complete — there are no other commands or flags)
 bun src/cli.js build  [-s src] [-o dist] [--clean] [--exclude <glob>]... \
-                      [--pretty-urls] [--base-url <path|url>] [--dry-run] [--strict]
+                      [--pretty-urls] [--base-url <url>] [--canonical auto] [--dry-run] [--strict]
+bun src/cli.js audit  [-s src] [-o dist] [--base-url <url>] [--strict]   # 0.8: evaluate, write nothing
 bun src/cli.js dev    [-p 3000]            # build + watch + serve + reload
 bun src/cli.js watch                       # build + rebuild on change, no server
 bun src/cli.js init [template]             # default | basic | blog | docs | portfolio
 ```
 
-There is no `serve` command, no `--minify` (post-MVP), no `--fail-on`, no `--host`, no `--log-level`, and no glob pipeline (`--copy`/`--ignore`/`--render`/…) in v0.7.0. `DEBUG=1` is the only environment variable (stack traces).
+There is no `serve` command, no `--minify` (post-MVP), no `--fail-on`, no `--host`, no `--log-level`, and no glob pipeline (`--copy`/`--ignore`/`--render`/…). `DEBUG=1` is the only environment variable (stack traces).
+
+**The 0.8 work shipped so far** (conformance-spec §20–§24, all on the v0.7.0 composition core, which is unchanged): the final-output page manifest (§20) — one internal record per emitted page, derived from the emitted bytes, which every discovery and evaluation feature consumes; `sitemap.xml` generation under `--base-url` (§21); `--canonical auto` completion (§22); the `Sitemap:` reference check in an authored `robots.txt` (§23); and `unify audit` (§24), which runs the whole pipeline, publishes nothing, and reports `broken`/`incomplete` **findings** — a severity axis of its own, separate from §14's `problem`/`advisory`, which `build` never consults. No score, no character counts, no similarity thresholds: see §24.4.
 
 ## Composition Model (v0.7.0)
 

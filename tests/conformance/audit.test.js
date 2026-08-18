@@ -1,0 +1,546 @@
+/**
+ * §24 `unify audit` — AUD-01..08.
+ *
+ * The command's whole contract is that it decides nothing. Most of what is
+ * asserted below is therefore a *restraint*: it writes nothing, it never
+ * changes what `build` does, it prints no score, and it narrows three
+ * plain-language checks — duplicate, mismatch, and "too short" — to the only
+ * forms that are decidable without a threshold nobody could defend (§24.4).
+ *
+ * Real CLI spawns only (hygiene H3); no mocks (H1).
+ */
+import { test } from "bun:test";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { covers, mkTmp, runCli, writeTree } from "./support.mjs";
+
+const TEST_MS = 30_000;
+const BASE = "https://example.com/";
+
+/** A complete, finding-free page: title, description, lang, one h1, own text. */
+const page = (name, body = `<p>Words about ${name}.</p>`) =>
+  `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>${name}</title>
+<meta name="description" content="The ${name} page of the example site.">
+</head>
+<body>
+<h1>${name}</h1>
+${body}
+</body>
+</html>
+`;
+
+/** Every page links to every other, so nothing is an orphan by accident. */
+function linked(names) {
+  const nav = names.map((n) => `<a href="/${n.toLowerCase()}.html">${n}</a>`).join(" ");
+  const files = { "index.html": page("Home", `<p>Welcome.</p><nav>${nav}</nav>`) };
+  for (const n of names) {
+    files[`${n.toLowerCase()}.html`] = page(n, `<p>Words about ${n}.</p><nav><a href="/">Home</a> ${nav}</nav>`);
+  }
+  return files;
+}
+
+function expectExit(r, code, what) {
+  if (r.exit !== code) {
+    throw new Error(`${what}: expected exit ${code}, got ${r.exit}\nstdout:\n${r.stdout}\nstderr:\n${r.stderr}`);
+  }
+}
+
+/** The finding ids the report declares, in the order printed. */
+function ids(stdout) {
+  return [...stdout.matchAll(/\[([a-z0-9-]+)\]$/gm)].map((m) => m[1]);
+}
+
+function expectFinding(r, id, what) {
+  if (!ids(r.stdout).includes(id)) {
+    throw new Error(`${what}: expected a ${id} finding\nstdout:\n${r.stdout}\nstderr:\n${r.stderr}`);
+  }
+}
+
+function expectNoFinding(r, id, what) {
+  if (ids(r.stdout).includes(id)) {
+    throw new Error(`${what}: expected NO ${id} finding\nstdout:\n${r.stdout}`);
+  }
+}
+
+// ------------------------------------------------------------------- §24.1
+
+test("AUD-01: audit runs the whole pipeline and evaluates emitted bytes, not source files", async () => {
+  const tmp = mkTmp();
+  // The title, the description, and lang exist ONLY in the layout. A reader of
+  // the source files would report three findings on a page that emits none.
+  writeTree(join(tmp, "src"), {
+    "_layout.html": `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Example Site</title>
+<meta name="description" content="A site assembled entirely by its layout."></head>
+<body><main></main></body>
+</html>
+`,
+    "index.html": "<!doctype html>\n<html>\n<body>\n<h1>Example Site</h1>\n<p>Composed from a layout.</p>\n</body>\n</html>\n",
+  });
+  const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
+  expectExit(r, 0, "a page whose metadata comes from its layout");
+  for (const id of ["title-missing", "description-missing", "lang-missing", "h1-missing"]) {
+    expectNoFinding(r, id, "§24.1: the manifest reads what the page EMITS");
+  }
+  covers("AUD-01");
+}, TEST_MS);
+
+test("AUD-01: audit publishes nothing and prints no dry-run report", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), linked(["About"]));
+  const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
+  expectExit(r, 0, "a clean site");
+  if (existsSync(join(tmp, "dist"))) {
+    throw new Error(`§24.2: audit created dist/: ${readdirSync(join(tmp, "dist")).join(", ")}`);
+  }
+  if (/would publish|^copy |^write /m.test(r.stdout)) {
+    throw new Error(`§24.1: the report audit prints is the finding list, not §17's plan.\nstdout:\n${r.stdout}`);
+  }
+  covers("AUD-01");
+}, TEST_MS);
+
+test("AUD-01: --base-url and --canonical auto still run, so their findings can exist", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    ...linked(["About"]),
+    // Listed in the generated sitemap only if §21 ran; noindex makes that a
+    // contradiction, which is the finding. Without the pipeline there is no
+    // sitemap and no finding — so this asserts §21 ran inside audit.
+    "notes.html": page("Notes").replace("<head>", '<head>\n<meta name="robots" content="noindex">'),
+  });
+  const withBase = await runCli(["audit", "-s", "src", "-o", "dist", "--base-url", BASE], tmp);
+  // A noindex page is not in the sitemap (§21.2), so the pair that IS reportable
+  // is the orphan: prove instead that generation happened by auditing a page the
+  // sitemap does list and a canonical §22 completed.
+  expectExit(withBase, 0, "audit with --base-url");
+  const completed = await runCli(
+    ["audit", "-s", "src", "-o", "dist", "--base-url", BASE, "--canonical", "auto"], tmp);
+  expectExit(completed, 0, "audit with --canonical auto");
+  if (existsSync(join(tmp, "dist"))) throw new Error("§24.2: audit wrote output");
+  covers("AUD-01");
+}, TEST_MS);
+
+// ------------------------------------------------------------------- §24.2
+
+test("AUD-02: audit never touches or reads an existing output directory", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), linked(["About"]));
+  writeTree(join(tmp, "dist"), { "stale.html": "<p>from an older build</p>\n" });
+  const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
+  expectExit(r, 0, "audit beside an existing dist/");
+  const after = readdirSync(join(tmp, "dist")).sort();
+  if (after.join(",") !== "stale.html") {
+    throw new Error(`§24.2: audit writes nothing, anywhere. dist/ now holds: ${after.join(", ")}`);
+  }
+  if (readFileSync(join(tmp, "dist", "stale.html"), "utf8") !== "<p>from an older build</p>\n") {
+    throw new Error("§24.2: audit rewrote a file in the output directory");
+  }
+  // §17's delete plan is the one step that READS dist/, and it belongs to
+  // --dry-run: a stranded file must not appear in audit's report.
+  if (r.stdout.includes("stale.html")) {
+    throw new Error(`§24.2: audit does not consult the output directory.\nstdout:\n${r.stdout}`);
+  }
+  covers("AUD-02");
+}, TEST_MS);
+
+test("AUD-02: --clean and --dry-run are usage errors, never accepted inertly", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), linked(["About"]));
+  writeTree(join(tmp, "dist"), { "stale.html": "<p>older</p>\n" });
+
+  const cleaned = await runCli(["audit", "-s", "src", "-o", "dist", "--clean"], tmp);
+  expectExit(cleaned, 2, "audit --clean");
+  if (!/--clean/.test(cleaned.stderr)) {
+    throw new Error(`§24.2: the error names the flag.\nstderr:\n${cleaned.stderr}`);
+  }
+  if (!existsSync(join(tmp, "dist", "stale.html"))) {
+    throw new Error("§24.2: a refused --clean must not have emptied anything");
+  }
+
+  const dry = await runCli(["audit", "-s", "src", "-o", "dist", "--dry-run"], tmp);
+  expectExit(dry, 2, "audit --dry-run");
+  if (!/--dry-run/.test(dry.stderr)) {
+    throw new Error(`§24.2: the error names the flag.\nstderr:\n${dry.stderr}`);
+  }
+  covers("AUD-02");
+}, TEST_MS);
+
+// ------------------------------------------------------------------- §24.3
+
+test("AUD-03: build never audits — the same site is clean and silent under build", async () => {
+  const files = {
+    "index.html": page("Home", "<p>Welcome.</p>"),
+    // Every incomplete finding at once: no title, no description, no lang, no h1,
+    // and nothing links here. Plus a broken one: a repeated id.
+    "about.html": '<html><head><meta charset="utf-8"></head><body><p id="x">a</p><p id="x">b</p></body></html>\n',
+  };
+  const built = mkTmp();
+  writeTree(join(built, "src"), files);
+  const b = await runCli(["build", "-s", "src", "-o", "dist"], built);
+  expectExit(b, 0, "build on a site full of findings");
+  if (ids(b.stdout).length || /\bincomplete\b|\bbroken\b/.test(b.stdout)) {
+    throw new Error(`§24.7: build never calls the evaluator.\nstdout:\n${b.stdout}`);
+  }
+  if (!existsSync(join(built, "dist", "about.html"))) {
+    throw new Error("§24.3: no finding ever blocks a publish");
+  }
+
+  const audited = mkTmp();
+  writeTree(join(audited, "src"), files);
+  const a = await runCli(["audit", "-s", "src", "-o", "dist"], audited);
+  expectExit(a, 0, "audit on the same site");
+  for (const id of ["title-missing", "description-missing", "lang-missing", "h1-missing", "page-orphan", "id-duplicate"]) {
+    expectFinding(a, id, "§24.4");
+  }
+  covers("AUD-03");
+  covers("AUD-04");
+}, TEST_MS);
+
+test("AUD-03: severity is objective — wrong output is broken, absent output is incomplete", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": page("Home", '<p>Welcome.</p><a href="/notes.html#nowhere">Notes</a>'),
+    "notes.html": page("Notes", '<p id="dup">a</p><p id="dup">b</p><a href="/">Home</a>')
+      .replace('<meta name="description" content="The Notes page of the example site.">\n', ""),
+  });
+  const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
+  expectExit(r, 0, "a site with both severities");
+  const severity = (id) => (new RegExp(`: (broken|incomplete): [^\\n]*\\[${id}\\]$`, "m").exec(r.stdout) ?? [])[1];
+  for (const [id, want] of [["fragment-missing", "broken"], ["id-duplicate", "broken"], ["description-missing", "incomplete"]]) {
+    if (severity(id) !== want) {
+      throw new Error(`§24.3: ${id} is ${want}, reported as ${severity(id)}\nstdout:\n${r.stdout}`);
+    }
+  }
+  covers("AUD-03");
+}, TEST_MS);
+
+// ------------------------------------------------------------------- §24.4
+
+test("AUD-04: the metadata and heading findings", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": page("Home", '<p>Welcome.</p><a href="/a.html">A</a> <a href="/b.html">B</a> <a href="/c.html">C</a> <a href="/d.html">D</a>'),
+    // Same title and same description as b.html — a duplicate needs a pair.
+    "a.html": page("Shared").replace("The Shared page", "One shared description"),
+    "b.html": page("Shared").replace("The Shared page", "One shared description"),
+    // Two extra h1s beside the one page() already writes.
+    "c.html": page("Ledger", "<h1>Alpha</h1><h1>Beta</h1><p>Two headings.</p>"),
+    // Exactly one h1, and a title neither string contains. The page above
+    // cannot also carry this finding: §24.4 runs the check only on a page with
+    // exactly one h1, because with several there is no "the heading" to compare.
+    "d.html": page("Ledger", "<p>One heading.</p>").replace("<h1>Ledger</h1>", "<h1>Contact Us</h1>"),
+  });
+  const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
+  expectExit(r, 0, "metadata findings");
+  for (const id of ["title-duplicate", "description-duplicate", "h1-multiple", "title-h1-mismatch"]) {
+    expectFinding(r, id, "§24.4");
+  }
+  covers("AUD-04");
+}, TEST_MS);
+
+test("AUD-04: structured data, social image, and duplicated text", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": page("Home", '<p>Welcome.</p><a href="/post.html">Post</a> <a href="/twin.html">Twin</a> <a href="/copy.html">Copy</a>'),
+    "post.html": page("Post", "<p>Unique words here.</p>")
+      .replace("</head>", `<script type="application/ld+json">{ not json }</script>
+<meta property="og:image" content="/card.png">
+<meta property="og:image:width" content="1200">
+</head>`),
+    "card.png": "a real file, so the reference resolves\n",
+    // Byte-identical visible text.
+    "twin.html": page("Twin", "<p>Exactly the same words.</p>").replace("<h1>Twin</h1>", "<h1>Same</h1>"),
+    "copy.html": page("Copy", "<p>Exactly the same words.</p>").replace("<h1>Copy</h1>", "<h1>Same</h1>"),
+  });
+  const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
+  expectExit(r, 0, "content findings");
+  expectFinding(r, "jsonld-invalid", "§24.4: a block that does not parse is broken output");
+  expectFinding(r, "image-missing-dimensions", "§24.4: og:image with no declared size");
+  // An og:image naming NO emitted file is P13 from §12 and never a finding
+  // (§24.4) — one question, one mechanism, and P13 is the stronger one.
+  expectNoFinding(r, "image-missing-target", "§24.4");
+  expectFinding(r, "text-duplicate", "§24.4: identical visible text");
+  covers("AUD-04");
+}, TEST_MS);
+
+test("AUD-04: a declared Article missing the fields structured data is built from", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": page("Home", '<p>Welcome.</p><a href="/post.html">Post</a>'),
+    "post.md": `---
+schema: Article
+title: A Post
+---
+
+# A Post
+
+Words in the post.
+
+[Home](/)
+`,
+  });
+  const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
+  expectExit(r, 0, "an Article with no date");
+  expectFinding(r, "schema-incomplete", "§24.4: declared Article, no authored ISO 8601 date");
+  if (!/date/i.test(r.stdout)) {
+    throw new Error(`§24.5: evidence names the missing field.\nstdout:\n${r.stdout}`);
+  }
+  covers("AUD-04");
+}, TEST_MS);
+
+test("AUD-04: sitemap disagreement — a listed page that refuses indexing", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    ...linked(["About"]),
+    // An AUTHORED sitemap lists a page the page itself marks noindex. §21.5
+    // suppresses generation, so this pair is only reachable through an
+    // authored file — and it is exactly the conflict §6.3.2 names.
+    "sitemap.xml": `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<url><loc>https://example.com/</loc></url>
+<url><loc>https://example.com/about.html</loc></url>
+</urlset>
+`,
+    "about.html": page("About", '<p>Words about About.</p><a href="/">Home</a>')
+      .replace("<head>", '<head>\n<meta name="robots" content="noindex">'
+        + '\n<link rel="canonical" href="https://example.com/about.html">'),
+  });
+  const r = await runCli(["audit", "-s", "src", "-o", "dist", "--base-url", BASE], tmp);
+  expectExit(r, 0, "an authored sitemap listing a noindex page");
+  expectFinding(r, "sitemap-noindex", "§24.4: the sitemap and the page contradict each other");
+  // The page's canonical names ITSELF, so there is no disagreement to report.
+  // Deriving that from §21.2's membership predicate would be wrong here: a
+  // noindex page fails membership for the robots reason, and reading that as
+  // "the canonical disagrees" invents a second finding whose evidence quotes
+  // the page's own URL back at it.
+  expectNoFinding(r, "sitemap-canonical-disagree", "§24.4: the canonical names this very page");
+  covers("AUD-04");
+  covers("AUD-06");
+}, TEST_MS);
+
+// ------------------------------------------------------------------- §24.4 (narrowings)
+
+test("AUD-05: duplicate means identical — similar titles are not a finding", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": page("Home", '<p>Welcome.</p><a href="/a.html">A</a> <a href="/b.html">B</a> <a href="/c.html">C</a>'),
+    // Case and whitespace only — the same title, and never authorial intent.
+    "a.html": page("Our  Services").replace("<h1>Our  Services</h1>", "<h1>Our Services</h1>"),
+    "b.html": page("our services"),
+    // Genuinely similar, genuinely different. No threshold exists that could
+    // separate this pair from the one above without inventing a number.
+    "c.html": page("Our Services in Leeds"),
+  });
+  const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
+  expectExit(r, 0, "similar titles");
+  const dupes = r.stdout.split("\n").filter((l) => l.includes("[title-duplicate]"));
+  const files = dupes.map((l) => l.split(":")[0]).sort();
+  if (files.join(",") !== "a.html,b.html") {
+    throw new Error(`§24.4: identical after folding, and nothing looser.\nreported: ${files.join(", ")}\nstdout:\n${r.stdout}`);
+  }
+  // And each names its one partner. Reading only the file column let a grouping
+  // key that over-matches survive: it reports the same two files and accuses a
+  // third page inside the evidence, where nothing was looking.
+  const named = dupes.map((l) => `${l.split(":")[0]} -> ${/is also used by ([^\[]+)/.exec(l)[1].trim()}`).sort();
+  if (named.join(" | ") !== "a.html -> b.html | b.html -> a.html") {
+    throw new Error(`§24.4: the evidence names the page that actually shares the title.\ngot: ${named.join(" | ")}`);
+  }
+  covers("AUD-05");
+}, TEST_MS);
+
+test("AUD-05: title/heading mismatch is containment, so a layout's title suffix is not one", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "_layout.html": `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title> — Example Site</title>
+<meta name="description" content="The example site."></head>
+<body><main></main></body>
+</html>
+`,
+    // §8 row 2 PREPENDS, so this emits "About — Example Site" over an h1 of "About".
+    "index.html": "<!doctype html>\n<html>\n<head><title>About</title></head>\n<body>\n<h1>About</h1>\n<p>Words.</p>\n</body>\n</html>\n",
+  });
+  const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
+  expectExit(r, 0, "a prepended title suffix");
+  expectNoFinding(r, "title-h1-mismatch", "§24.4: containment in either direction is the whole test");
+  covers("AUD-05");
+}, TEST_MS);
+
+test("AUD-05: nothing counts characters — a 2-character title and a 400-character description are clean", async () => {
+  const tmp = mkTmp();
+  const long = `${"Words about the page, repeated at length. ".repeat(10)}`;
+  writeTree(join(tmp, "src"), {
+    "index.html": page("Hi", "<p>Short.</p>").replace(
+      "The Home page of the example site.", long),
+  });
+  const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
+  expectExit(r, 0, "extreme lengths");
+  if (ids(r.stdout).length !== 0) {
+    throw new Error(`§24.4: absence is checkable; length is opinion.\nstdout:\n${r.stdout}`);
+  }
+  covers("AUD-05");
+}, TEST_MS);
+
+// ------------------------------------------------------------------- §24.4 (absences)
+
+test("AUD-06: a self-canonical noindex page is redundant, not contradictory", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    ...linked(["About"]),
+    "about.html": page("About", '<p>Words about About.</p><a href="/">Home</a>').replace(
+      "<head>",
+      '<head>\n<meta name="robots" content="noindex">\n<link rel="canonical" href="https://example.com/about.html">'),
+  });
+  const r = await runCli(["audit", "-s", "src", "-o", "dist", "--base-url", BASE], tmp);
+  expectExit(r, 0, "noindex naming itself");
+  expectNoFinding(r, "canonical-noindex", "§24.4: a canonical naming its own page contradicts nothing");
+
+  // The cross-canonical shape IS the finding §6.3.2 names.
+  const cross = mkTmp();
+  writeTree(join(cross, "src"), {
+    ...linked(["About"]),
+    "about.html": page("About", '<p>Words about About.</p><a href="/">Home</a>').replace(
+      "<head>",
+      '<head>\n<meta name="robots" content="noindex">\n<link rel="canonical" href="https://example.com/">'),
+  });
+  const c = await runCli(["audit", "-s", "src", "-o", "dist", "--base-url", BASE], cross);
+  expectExit(c, 0, "noindex naming another page");
+  expectFinding(c, "canonical-noindex", "§24.4");
+  covers("AUD-06");
+}, TEST_MS);
+
+test("AUD-06: a canonical naming nothing emitted stays P13, and never becomes a finding", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": page("Home").replace("<head>", '<head>\n<link rel="canonical" href="/gone.html">'),
+  });
+  const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
+  expectExit(r, 1, "a broken canonical target");
+  if (!/gone\.html/.test(r.stderr)) {
+    throw new Error(`§24.4: this is §12's broken reference, on stderr.\nstderr:\n${r.stderr}`);
+  }
+  if (ids(r.stdout).some((id) => id.startsWith("canonical"))) {
+    throw new Error(`§24.4: the build already refuses to publish it — no finding is added.\nstdout:\n${r.stdout}`);
+  }
+  covers("AUD-06");
+}, TEST_MS);
+
+// ------------------------------------------------------------------- §24.5
+
+test("AUD-07: the report is two lines a finding plus a count, ordered by path then id", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": page("Home", '<p>Welcome.</p><a href="/a.html">A</a> <a href="/b.html">B</a>'),
+    // a.html's only finding sorts LAST by id; b.html's two sort first. Path
+    // order and id order therefore disagree, which is what makes the assertion
+    // below discriminate between them rather than pass under either rule.
+    "a.html": page("A", '<p>Words about A.</p><a href="/">Home</a>').replace("<title>A</title>\n", ""),
+    "b.html": '<html><head><meta charset="utf-8"><title>B</title></head><body><h1>B</h1><p>x</p><a href="/">Home</a></body></html>\n',
+  });
+  const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
+  expectExit(r, 0, "the report shape");
+  const lines = r.stdout.trimEnd().split("\n");
+  const finding = /^[^\n]+: (broken|incomplete): .+ \[[a-z0-9-]+\]$/;
+  for (let i = 0; i < lines.length - 1; i += 2) {
+    if (!finding.test(lines[i])) throw new Error(`§24.5: line ${i + 1} is not a finding line: ${lines[i]}`);
+    if (!lines[i + 1].startsWith("  fix: ")) throw new Error(`§24.5: line ${i + 2} is not a fix line: ${lines[i + 1]}`);
+  }
+  if (!/^audit: \d+ broken, \d+ incomplete$/.test(lines[lines.length - 1])) {
+    throw new Error(`§24.5: the report ends with a count line, got: ${lines[lines.length - 1]}`);
+  }
+  const order = lines.filter((l) => finding.test(l)).map((l) => `${l.split(":")[0]}\t${/\[([a-z0-9-]+)\]$/.exec(l)[1]}`);
+  const sorted = [...order].sort();
+  if (order.join("|") !== sorted.join("|")) {
+    throw new Error(`§24.5: ordered by source path then id.\ngot:\n${order.join("\n")}`);
+  }
+  covers("AUD-07");
+}, TEST_MS);
+
+test("AUD-07: nothing to report says so, and no report ever carries a score", async () => {
+  const clean = mkTmp();
+  writeTree(join(clean, "src"), linked(["About"]));
+  const c = await runCli(["audit", "-s", "src", "-o", "dist"], clean);
+  expectExit(c, 0, "a clean site");
+  if (c.stdout.trim() !== "audit: nothing to report") {
+    throw new Error(`§24.5: a clean site says so.\nstdout:\n${c.stdout}`);
+  }
+
+  const messy = mkTmp();
+  writeTree(join(messy, "src"), {
+    "index.html": "<html><body><p>bare</p></body></html>\n",
+    "other.html": "<html><body><p>bare</p></body></html>\n",
+  });
+  const m = await runCli(["audit", "-s", "src", "-o", "dist"], messy);
+  expectExit(m, 0, "a site with many findings");
+  if (/\bscore\b|\bgrade\b|\brating\b|\bhealth\b|%|\/100\b|\bout of \d/i.test(m.stdout)) {
+    throw new Error(`§24.5: unify assigns no score, in any form.\nstdout:\n${m.stdout}`);
+  }
+  covers("AUD-07");
+}, TEST_MS);
+
+test("AUD-07: findings go to stdout, §14 diagnostics keep stderr", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": '<html><body><p>bare</p><a href="/gone.html">gone</a></body></html>\n',
+  });
+  const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
+  expectExit(r, 1, "a site with a problem and findings");
+  if (!/gone\.html/.test(r.stderr)) throw new Error(`§24.5: diagnostics stay on stderr.\nstderr:\n${r.stderr}`);
+  if (ids(r.stderr).length) throw new Error(`§24.5: findings are not diagnostics.\nstderr:\n${r.stderr}`);
+  if (!ids(r.stdout).includes("title-missing")) {
+    throw new Error(`§24.5: the finding list is stdout.\nstdout:\n${r.stdout}`);
+  }
+  covers("AUD-07");
+}, TEST_MS);
+
+// ------------------------------------------------------------------- §24.6
+
+test("AUD-08: findings exit 0; --strict makes any finding exit 1", async () => {
+  const files = {
+    "index.html": page("Home", '<p>Welcome.</p><a href="/b.html">B</a>'),
+    // One `incomplete` finding and nothing else: the weakest thing --strict gates on.
+    "b.html": '<html lang="en"><head><meta charset="utf-8"><title>B</title></head><body><h1>B</h1><p>x</p><a href="/">Home</a></body></html>\n',
+  };
+  const loose = mkTmp();
+  writeTree(join(loose, "src"), files);
+  const l = await runCli(["audit", "-s", "src", "-o", "dist"], loose);
+  expectExit(l, 0, "findings without --strict");
+  expectFinding(l, "description-missing", "§24.6");
+
+  const strict = mkTmp();
+  writeTree(join(strict, "src"), files);
+  const s = await runCli(["audit", "-s", "src", "-o", "dist", "--strict"], strict);
+  expectExit(s, 1, "the same findings with --strict");
+  expectFinding(s, "description-missing", "§24.6: --strict changes the exit code, not the report");
+  covers("AUD-08");
+}, TEST_MS);
+
+test("AUD-08: a clean site with --strict exits 0", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), linked(["About"]));
+  const r = await runCli(["audit", "-s", "src", "-o", "dist", "--strict"], tmp);
+  expectExit(r, 0, "--strict on a site with no findings");
+  covers("AUD-08");
+}, TEST_MS);
+
+test("AUD-08: a pipeline problem exits 1 with or without --strict, and 2 stays usage", async () => {
+  const files = { "index.html": `<h1>x</h1>\n<a href="/nowhere.html">nowhere</a>\n` };
+  const loose = mkTmp();
+  writeTree(join(loose, "src"), files);
+  expectExit(await runCli(["audit", "-s", "src", "-o", "dist"], loose), 1, "a problem without --strict");
+
+  const strict = mkTmp();
+  writeTree(join(strict, "src"), files);
+  expectExit(await runCli(["audit", "-s", "src", "-o", "dist", "--strict"], strict), 1, "a problem with --strict");
+
+  const bad = mkTmp();
+  writeTree(join(bad, "src"), files);
+  expectExit(await runCli(["audit", "-s", "src", "--no-such-flag"], bad), 2, "an unknown flag");
+  covers("AUD-08");
+}, TEST_MS);

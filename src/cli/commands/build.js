@@ -58,6 +58,7 @@ import * as publishModule from "../../core/publish.js";
 import * as references from "../../core/references.js";
 import * as urls from "../../core/urls.js";
 import { buildManifest } from "../../core/manifest.js";
+import { auditManifest, formatFindings } from "../../core/audit.js";
 import * as sitemap from "../../core/sitemap.js";
 import { completeCanonical } from "../../core/canonical.js";
 import * as robots from "../../core/robots.js";
@@ -311,6 +312,7 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
   // changed, and no flag opted them in. It is also the only coherent reading —
   // a <loc> is an absolute URL, and deciding whether one points inside THIS
   // site is not answerable without the site's address.
+  let sitemapLocs = new Map();
   if (baseConfig) {
     const sitemapFiles = new Map();
     for (const outPath of [sitemap.SITEMAP_PATH, ...generated.keys()]) {
@@ -338,6 +340,11 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
     sitemap.checkSitemapLocs({
       sitemaps: sitemapFiles, emittedPaths: new Set(tempFiles.keys()), base: baseConfig, reporter,
     });
+    // §24.4 — the same resolution, kept for the evaluator: which pages does a
+    // sitemap this build emits actually list? Computed here rather than in
+    // audit.js so the check and the comparison read one answer (§21.6's own
+    // note on why a second reader of a <loc> would be a defect).
+    sitemapLocs = sitemap.sitemapListings({ sitemaps: sitemapFiles, base: baseConfig });
   }
 
   references.checkReferences({
@@ -374,6 +381,29 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
       `building from the working directory (no src/ here): ${n} file${n === 1 ? "" : "s"} will be copied as-is` +
       ` — run unify build --dry-run to list them`,
     );
+  }
+
+  // ---- §24 — evaluation, for `unify audit` only. ---------------------------
+  // `build` never reaches this branch, which is §24.7 in one line: no finding
+  // can affect a build's output, its diagnostics, or its exit code. The
+  // pipeline above ran identically either way — that is what makes a finding a
+  // fact about the bytes the build would publish rather than about a cheaper
+  // approximation of them (§24.1).
+  if (settings.audit) {
+    const findings = auditManifest({
+      records: manifest.records,
+      byOutputPath: manifest.byOutputPath,
+      emittedPaths: new Set(tempFiles.keys()),
+      base: baseConfig,
+      sitemapLocs,
+    });
+    reporter.summary(formatFindings(findings));
+    // §24.6 — a pipeline problem exits 1 regardless: evaluating output that
+    // cannot be built is meaningless, and the findings printed beside it
+    // describe a site that would never ship. Otherwise --strict is the gate,
+    // on any finding of either severity.
+    if (reporter.exitCode !== 0) return reporter.exitCode;
+    return settings.strict && findings.length > 0 ? 1 : 0;
   }
 
   // ---- §15 — transactional publish. ----------------------------------------

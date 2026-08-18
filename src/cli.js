@@ -17,6 +17,7 @@ import { loadConfig, mergeConfig, parseArgs } from "./cli/options.js";
 const HELP = `unify — HTML-native composition: no expression language, no client runtime.
 
   unify [build]              build the site (default command)
+  unify audit                evaluate the site the build would publish — writes nothing
   unify dev                  build, watch, serve, and reload — the inner loop
   unify watch                build + rebuild on change, no server
   unify init [template]      scaffold a starter site
@@ -30,7 +31,7 @@ Options:
       --canonical auto     add a canonical link to pages that author none, from the site address
       --base-url <url>     the site's whole address (https://site.example/repo/): prefix root-relative links, make og:/canonical absolute for share crawlers, and generate sitemap.xml
       --dry-run            run the full build and every check, print the report, write nothing
-      --strict             advisories count as problems for the exit code
+      --strict             advisories count as problems for the exit code (with \`audit\`, findings too)
   -p, --port <n>           port for \`unify dev\` (default: 3000)
   -v, --version            print version
   -h, --help               print help
@@ -74,6 +75,9 @@ function resolveSettings(flags) {
       baseUrl: settings["base-url"],
       canonical: settings.canonical,
       dryRun: settings["dry-run"] === true,
+      // §24.1 — set by the audit command itself, never by a flag: there is no
+      // `--audit`, and `build` has no way to reach the evaluator.
+      audit: false,
       strict: settings.strict === true,
       port: settings.port === undefined ? 3000 : Number(settings.port),
     },
@@ -146,6 +150,20 @@ export async function run(argv) {
     ]);
   }
 
+  // §24.2 — `audit` writes nothing, so the two flags that describe writing are
+  // refused rather than accepted inertly. `--clean` especially: a reader could
+  // reasonably believe the output directory had been emptied, and a flag that
+  // silently does nothing is the failure §14 exists to forbid.
+  if (command === "audit") {
+    for (const flag of ["clean", "dry-run"]) {
+      if (options[flag] !== true) continue;
+      throw new UsageError(`unify audit does not take --${flag}: audit never writes`, [
+        `drop --${flag}`,
+        "audit runs the whole pipeline and reports on the site build would publish; run `unify build` to publish it",
+      ]);
+    }
+  }
+
   const output = resolve(process.cwd(), settings.output);
 
   if (settings.clean) {
@@ -163,6 +181,8 @@ export async function run(argv) {
   switch (command) {
     case "build":
       return (await import("./cli/commands/build.js")).build(context);
+    case "audit":
+      return (await import("./cli/commands/audit.js")).audit(context);
     case "dev":
       return (await import("./cli/commands/dev.js")).dev(context);
     case "watch":

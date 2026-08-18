@@ -1,9 +1,10 @@
 # unify CLI reference
 
-**Matches unify v0.7.0.** This page lists every command, every option, and every exit code — there are no others. The behavior behind each is specified in [`product-spec.md`](product-spec.md) §4 and, rule by rule, in [`conformance-spec.md`](conformance-spec.md).
+**Matches the 0.8 development line** (v0.7.0 plus the shipped 0.8 work: `unify audit`, `--canonical auto`, and sitemap generation). This page lists every command, every option, and every exit code — there are no others. The behavior behind each is specified in [`product-spec.md`](product-spec.md) §4 and, rule by rule, in [`conformance-spec.md`](conformance-spec.md).
 
 ```
 unify [build]              build the site (default command)
+unify audit                evaluate the site the build would publish — writes nothing
 unify dev                  build, watch, serve, and reload — the inner loop
 unify watch                build + rebuild on change, no server
 unify init [template]      scaffold a starter site
@@ -17,7 +18,7 @@ Options:
       --canonical auto     add a canonical link to pages that author none, from the site address
       --base-url <url>     the site's whole address (https://site.example/repo/): prefix root-relative links, make og:/canonical absolute for share crawlers, and generate sitemap.xml
       --dry-run            run the full build and every check, print the report, write nothing
-      --strict             advisories count as problems for the exit code
+      --strict             advisories count as problems for the exit code (with `audit`, findings too)
   -p, --port <n>           port for `unify dev` (default: 3000)
   -v, --version            print version
   -h, --help               print help
@@ -28,6 +29,32 @@ Options:
 ### `unify build` (the default — `unify` alone does the same)
 
 Builds the site, all-or-nothing: composition and every check run into a temporary tree, and the output directory is updated only if there were **zero problems**. A build that reports problems exits `1` and leaves the previous output byte-for-byte untouched. After composing, every internal reference in the output is checked against the emitted files; a URL that resolves to nothing is a problem like any other.
+
+### `unify audit`
+
+Runs the whole build — the same one, not a cheaper approximation — and then reports on the site that build **would** publish. It writes nothing: no output directory is created, cleaned, or read, which is why `--clean` and `--dry-run` are refused rather than quietly ignored.
+
+A finding is not a problem or an advisory. It answers a different question — *is this site complete?* rather than *is this build sound?* — and it has its own two words:
+
+| | means |
+|---|---|
+| `broken` | the output contradicts itself, or the standard it claims to follow: a link to `#section` where no element has that id, an id declared twice, JSON-LD that does not parse, a page in the sitemap that tells crawlers not to index it. Wrong whatever was intended. |
+| `incomplete` | something is absent or inconsistent that you may have chosen: no description, no `lang`, two pages sharing a title, a page nothing links to. |
+
+```
+$ unify audit
+about.html: incomplete: the emitted <head> declares no <meta name="description"> [description-missing]
+  fix: add a description describing this page; a layout-wide one repeats on every page
+notes.html: broken: #install in guide.html names no element [fragment-missing]
+  fix: add id="install" to the element it should reach, or correct the link
+audit: 1 broken, 1 incomplete
+```
+
+Findings never block a build — `unify build` does not run any of these checks, so a site full of them still publishes. `unify audit --strict` exits `1` on any finding, of either severity: that is the CI gate, and it is opt-in.
+
+**What it will not tell you.** There is no score, no grade, no percentage, and no character count anywhere in the output. A short title is not a finding and a long description is not a finding; absence is checkable, length is opinion. "Duplicate" means *identical*, never "similar" — a similarity threshold is a number nobody can defend to the author whose two pages fell either side of it. A title and a heading agree when either contains the other, which is why the layout suffix in `About — Example Site` does not conflict with an `<h1>` of `About`.
+
+A finding is also never raised for something the build already refuses to publish. A canonical or an `og:image` naming a file the site does not emit is a *problem* — it blocks the publish outright, which is stronger than reporting it.
 
 ### `unify dev`
 
@@ -115,7 +142,7 @@ Advisories affect the exit code (non-zero) — never what is published. `unify b
 | Code | Meaning |
 |---|---|
 | `0` | The site was published (with `--dry-run`: would have been). |
-| `1` | Problems found — nothing was published, the previous output is untouched. Under `--strict`, advisories alone also exit `1`. |
+| `1` | Problems found — nothing was published, the previous output is untouched. Under `--strict`, advisories alone also exit `1`, and for `audit` so does any finding. |
 | `2` | Invalid usage or fatal environment error (unknown flag, missing source directory, the `--clean` refusal, port in use). |
 
 ## Diagnostics

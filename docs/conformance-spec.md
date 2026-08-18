@@ -1018,7 +1018,9 @@ Every record carries every field. A field with nothing to read is `null` (scalar
 | `dateModified` | object\|null | §20.10 — `{raw, iso}` from `<meta property="article:modified_time">` or `<meta name="lastmod">` |
 | `schemaType` | string\|null | §20.8 — the declared structured-data type |
 | `jsonLd` | array | §20.8 — one entry per `<script type="application/ld+json">`, in document order |
+| `ids` | string[] | every `id` attribute in the emitted document, in document order, repeats included |
 | `linksOut` | string[] | §20.9 — output paths of internal pages this page links to, deduplicated, sorted |
+| `fragmentLinks` | array | §20.9 — `{target, id}` for each internal link carrying a fragment; `target` is the output path, `id` the fragment without `#` |
 | `linksIn` | string[] | §20.9 — output paths of internal pages that link to this one, deduplicated, sorted |
 | `conflicts` | array | §20.4 — `{field, kept, discarded}`, ordered by field name |
 
@@ -1080,6 +1082,8 @@ A crawler-specific meta (`<meta name="googlebot">`) is **not** read: unify does 
 ### 20.9 The internal link graph
 
 `linksOut` holds the output paths of the pages this page links to. A link participates when it is an `<a href>` in the emitted document whose value, after `--base-url` stripping (§12's own rule, reused), resolves to an output path that has a page record. Fragment-only, external, `mailto:`, `tel:`, and `data:` URLs never participate, and a link to a non-page asset never participates; the query and fragment of a participating URL are discarded before matching. A page linking to itself records itself. Values are deduplicated and sorted.
+
+`fragmentLinks` records the same links again, keeping the fragment §12 discards: `{target, id}` per internal link that carries one. §12 deliberately does not validate fragments (REF-06) because a missing one is a reader's judgement rather than a build gate — but it is a *checkable* judgement, so the manifest carries the pairs and the evaluation command decides. `ids` is the other half: every `id` in the emitted document, in document order and with repeats kept, so that both "this fragment names nothing" and "this page declares one id twice" are answerable from the record rather than by re-parsing.
 
 A `<noscript>` link participates even though `<noscript>` text does not reach `text` (§20.3). The two sections are asking different questions: `text` is what a reader sees, and a `noscript` block is by definition what they do not; `linksOut` is which pages this page can be reached from, and a `noscript` link is a real navigation for the readers it is written for. Named here so the asymmetry reads as a decision rather than an oversight.
 
@@ -1237,3 +1241,105 @@ This is the one check because it is the one **reference**. A `Sitemap:` line is 
 - **A page's own `noindex` versus what a sitemap lists** is a contradiction between two authored things, not a broken reference. Product-spec §6.3.4 assigns robots conflicts to `unify audit`, and §6.1 keeps subjective findings out of the publish path; §20.6 already records each page's directives as the data that command will read.
 
 Everything in this list is reportable — by the evaluation command, which is where a judgement belongs. None of it blocks a build.
+
+---
+
+## 24. `unify audit` — evaluation
+
+`build` decides whether a site can be published. `audit` decides nothing: it reads the prospective final output and reports what it observes. The two are kept apart deliberately — product-spec §6.1 states that ordinary `build` does not reject subjective content-quality findings, and §6.3.4 assigns those findings to this command instead.
+
+### 24.1 What the command runs
+
+`unify audit` runs **the whole pipeline** — §5 through §13, plus §21's generation and §22's completion when their flags are set — and then evaluates the §20 manifest. It does not publish, and it prints no `--dry-run` report; the report it prints is the finding list.
+
+Running the real pipeline rather than a cheaper approximation is the point. Every finding below is a fact about *emitted bytes*: a title that a layout supplied, a fragment link that §11.2 rewrote, a canonical §22 completed, a URL §21 put in a sitemap. An evaluator that read source files would be a second interpretation of the site, which is exactly what product-spec §6.2 exists to prevent.
+
+### 24.2 Read-only
+
+`audit` writes nothing, anywhere. It never creates, cleans, or touches the output directory, and it never consults it: §17's delete plan is the one pipeline step that reads `dist/`, and it belongs to `--dry-run`, not here.
+
+Two flags describe writing, so `audit` refuses them rather than accepting them inertly: `--clean` and `--dry-run` are usage errors (exit 2) naming the reason. An accepted flag that does nothing is the silent failure §14 exists to forbid — `--clean` especially, where a reader could reasonably believe output was emptied.
+
+### 24.3 Findings are not diagnostics
+
+A finding is not a `problem` and not an `advisory`. It has its own record shape, its own two severities, and its own effect on the exit code, because it answers a different question: §14's diagnostics say whether the build is sound, and a finding says whether the site is complete.
+
+| | severity means | blocks publish |
+|---|---|---|
+| `broken` | the output contradicts itself, or the standard it claims to follow. A fragment naming no id, a duplicated id, JSON-LD that does not parse. Wrong regardless of what the author intended. | never |
+| `incomplete` | something is absent or inconsistent that an author may have chosen. A missing description, an orphan page, two pages sharing a title. | never |
+
+Neither severity ever blocks a publish, because `audit` never publishes and `build` never audits. The severity distinction is objective — *is this wrong, or is this merely absent* — and carries no claim about importance.
+
+### 24.4 The catalogue
+
+Every finding is a predicate over the §20 manifest. `record` is the page being evaluated; "another page" always means another record in the same manifest.
+
+| id | severity | fires when |
+|---|---|---|
+| `title-missing` | incomplete | `title` is null |
+| `title-duplicate` | incomplete | another page's `title` is identical after case folding and whitespace collapse |
+| `description-missing` | incomplete | `description` is null |
+| `description-duplicate` | incomplete | another page's `description` is identical after case folding and whitespace collapse |
+| `h1-missing` | incomplete | the page emits no `h1` |
+| `h1-multiple` | incomplete | the page emits more than one `h1` |
+| `title-h1-mismatch` | incomplete | the page has a `title` and exactly one `h1`, and neither string contains the other after case folding and whitespace collapse |
+| `lang-missing` | incomplete | `lang` is null |
+| `page-orphan` | incomplete | `linksIn` is empty and the output path is neither `index.html` nor `404.html` |
+| `id-duplicate` | broken | an id appears more than once in `ids`; one finding per repeated id, in sorted order |
+| `fragment-missing` | broken | a `fragmentLinks` entry names a page in this manifest whose `ids` does not contain the id |
+| `jsonld-invalid` | broken | a `jsonLd` entry has a non-null `error` |
+| `schema-incomplete` | incomplete | `schemaType` is `Article` or `BlogPosting` and `title` is null, or `datePublished` is null or has a null `iso` |
+| `image-missing-dimensions` | incomplete | `image` is present and either `width` or `height` is null |
+| `canonical-noindex` | broken | the page is not `indexable` and its canonical names somewhere else — §21.2's own self-canonical test, negated |
+| `sitemap-noindex` | broken | a sitemap emitted by this build lists the page and the page is not `indexable` |
+| `sitemap-canonical-disagree` | broken | a sitemap lists the page and its canonical names somewhere else — the same test, not §21.2's membership predicate |
+| `text-duplicate` | incomplete | another page's `text` is byte-identical and non-empty |
+
+Three of these are narrower than the plain-language name suggests, and each narrowing has a reason rather than a preference:
+
+- **Duplicate means identical.** Product-spec §6.3.4 says "substantially duplicated page text"; this spec says *identical*, and titles and descriptions fold case and collapse whitespace before comparing because those two differences are never authorial intent. Anything looser needs a similarity threshold, and a threshold is a number nobody can defend to an author whose two pages fell either side of it. §6.1 forbids failing content on arbitrary rules; an arbitrary rule is no better for being a float.
+- **Title/heading mismatch is containment.** §8 row 2 *prepends* a page title to the layout's, so `About — Example Site` legitimately contains the `h1` `About`. Containment in either direction is therefore the whole test. A distance score would be the same undefendable number in another costume.
+- **Nothing counts characters.** A short title is not a finding, a long description is not a finding, and neither is an empty one *for its length*. §6.7 names fixed title lengths specifically as a myth that must not become a product rule merely because SEO advice repeats it. Absence is checkable; length is opinion.
+
+Three more absences are deliberate.
+
+- **A canonical naming its own page is not `canonical-noindex`.** On a `noindex` page that is redundant, not contradictory, and §22.4 declines to complete one there for the same reason. The contradiction product-spec §6.3.2 names is the *cross*-canonical shape.
+
+  Both findings that turn on this ask §21.2's `isSelfCanonical` **directly**. Neither may ask it by negating §21.2's *membership* predicate, which is a broader question a `noindex` page fails for an unrelated reason: doing so reports a self-canonical page for "disagreeing" with a sitemap and quotes its own URL as the evidence. A canonical this build cannot resolve — another origin, a `mailto:`, an empty value — is not self-canonical, because it names something unify cannot confirm is this page.
+- **A canonical naming a location the site does not emit is P13, not a finding.** §12 checks `link href` for every `rel`, so the build already refuses to publish it (§22.5).
+- **A share image naming a location the site does not emit is P13 too.** Product-spec §6.3.4 lists "missing social-image targets" among the findings this command should carry, and the intent is met — but it is met by v0.7.0's §12, which has always checked `content` on every `og:`/`twitter:` meta. Reporting it here as well would answer one question with two mechanisms, which is precisely what §6.1's single-interpretation constraint forbids, and it would answer it *worse*: a finding reports, while P13 blocks the publish. `image-missing-dimensions` remains a finding because a missing dimension is not a broken reference — nothing to resolve, nothing for §12 to check. An image on **another origin** is skipped by §12 and unreachable here, because verifying it needs the network; that is `audit --external`, never a build dependency (§6.1).
+
+### 24.5 The report
+
+Findings print to stdout, one finding as two lines:
+
+```
+<source path>: <severity>: <evidence> [<id>]
+  fix: <one concrete action>
+```
+
+followed by a count line: `audit: N broken, M incomplete`, or `audit: nothing to report` when there are none. Evidence quotes the output — the title that repeats, the id that collides, the sitemap that lists the page — so a reader can act without re-deriving what the command saw. The fix names one action.
+
+Ordering is by source path, then by finding id: deterministic, and stable across runs of an unchanged site, for the same reason §14.1 orders diagnostics.
+
+The report never contains a score, a grade, a percentage, a ranking, a keyword count, or a character count. This is a rule about the *output*, not only about the checks: a command that computed no score but printed "12 issues — 78% healthy" would be assigning one.
+
+Diagnostics keep their own stream. §14's problems and advisories print to stderr during an `audit` exactly as they do during a `build`, because the pipeline that produced them is the same pipeline.
+
+### 24.6 Exit codes
+
+| condition | exit |
+|---|---|
+| invalid usage | 2 |
+| the pipeline raised a problem | 1 |
+| findings, without `--strict` | 0 |
+| any finding, with `--strict` | 1 |
+
+`--strict` is the opt-in CI gate product-spec §6.3.4 describes, and it gates on **any** finding, of either severity. The flag keeps its §14.1 meaning as well — advisories still count — because it means one thing everywhere: *hold this build to the stricter standard*.
+
+A pipeline problem exits 1 whether or not `--strict` is set, and whether or not there are findings. Evaluating output that cannot be built is meaningless, and the findings printed alongside it describe a site that would never ship.
+
+### 24.7 What `build` does with all of this
+
+Nothing. `build` derives the manifest (§20.2 — it must, or the invariant that deriving it changes nothing would only be tested on the pages a discovery feature happens to touch), and never calls the evaluator. No finding in this section can affect a build's output, its diagnostics, or its exit code.

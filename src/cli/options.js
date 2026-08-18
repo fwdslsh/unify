@@ -7,7 +7,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { UsageError } from "../core/diagnostics.js";
 
-const COMMANDS = ["build", "dev", "watch", "init"];
+const COMMANDS = ["build", "audit", "dev", "watch", "init"];
 
 /**
  * Long name → kind. `list` repeats, `string` takes a value, `flag` does not.
