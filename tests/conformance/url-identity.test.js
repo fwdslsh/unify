@@ -198,6 +198,64 @@ test("URL-06: §11.1 canonicalizes an authored escape rather than re-encoding it
   covers("MAN-05");
 }, TEST_MS);
 
+test("REF-08: a file whose NAME contains %2F is addressed by %252F, and the impossible spelling fails", async () => {
+  // The narrowest case the one-interpretation law has, and the one where
+  // "matches nothing" was almost true: leaving the segment percent-encoded made
+  // it string-match a file literally named `a%2Fb.png`, so an include emitted a
+  // link that 404s while the report and sitemap advertised the correct address.
+  // "Matches nothing" is only true if it is true always.
+  const real = mkTmp();
+  writeTree(join(real, "src"), {
+    "_inc/nav.html": '<nav><img src="../assets/a%252Fb.png" alt="l"></nav>\n',
+    "index.html": page("Home", '<include src="/_inc/nav.html"></include>'),
+    "assets/a%2Fb.png": "PNG",
+  });
+  const dry = await runCli(["build", "-s", "src", "-o", "dist", "--dry-run"], real);
+  expectExit(dry, 0, "the file's real address");
+  const row = dry.stdout.split("\n").find((l) => l.includes("assets/a%2Fb.png"));
+  const reported = /\(([^)]*)\)/.exec(row ?? "")?.[1];
+  if (reported !== "/assets/a%252Fb.png") {
+    throw new Error(`§20.5: a % in a filename escapes to %25, got ${JSON.stringify(reported)} from:\n${dry.stdout}`);
+  }
+  const built = await runCli(["build", "-s", "src", "-o", "dist"], real);
+  expectExit(built, 0, "the real address resolves");
+  if (!read(real, "dist", "index.html").includes(`src="${reported}"`)) {
+    throw new Error(`§20.5: the emitted src must be the same string the report printed (${reported})`);
+  }
+
+  const impossible = mkTmp();
+  writeTree(join(impossible, "src"), {
+    "_inc/nav.html": '<nav><img src="../assets/a%2Fb.png" alt="l"></nav>\n',
+    "index.html": page("Home", '<include src="/_inc/nav.html"></include>'),
+    "assets/a%2Fb.png": "PNG",
+  });
+  const bad = await runCli(["build", "-s", "src", "-o", "dist"], impossible);
+  expectExit(bad, 1, "one segment whose name holds a slash names no file, even when a lookalike exists");
+  if (!bad.stderr.includes("a%2Fb.png") || bad.stderr.includes("\u0000")) {
+    throw new Error(`§14.1: the diagnostic must quote the author's spelling and carry no sentinel.\nstderr:\n${bad.stderr}`);
+  }
+  covers("REF-08", "MAN-05");
+}, TEST_MS);
+
+test("URL-06: canonicalization removes dot segments a decoded %2E introduces", async () => {
+  // resolveProvenanceUrl normalizes BEFORE this decodes, so `%2E%2E` would
+  // otherwise survive into the emitted URL as a literal `..` — a function named
+  // canonicalize emitting a non-canonical path.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "_inc/nav.html": '<nav><img src="../assets/%2E%2E/assets/z.png" alt="l"></nav>\n',
+    "index.html": page("Home", '<include src="/_inc/nav.html"></include>'),
+    "assets/z.png": "PNG",
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist"], tmp);
+  expectExit(r, 0, "a decoded dot segment");
+  const out = read(tmp, "dist", "index.html");
+  if (!out.includes('src="/assets/z.png"')) {
+    throw new Error(`§20.5: the constructed URL must be canonical, not carry a dot segment:\n${out}`);
+  }
+  covers("MAN-05");
+}, TEST_MS);
+
 test("REF-08: a backslash in a POSIX filename round-trips — only %2F is refused", async () => {
   // A backslash is legal in a POSIX filename, so a%5Cb.html is a real address
   // §20.5 publishes and §12 must accept. Refusing it made the site's own

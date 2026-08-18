@@ -78,6 +78,13 @@ import { applyEdits, findAll, getAttr, getAttrNode, lineOf, parse, tokens } from
 const SCHEME_RE = /^[a-z][a-z0-9+.-]*:/i;
 
 /**
+ * Stands in for a path segment that cannot name a file. NUL is the one byte no
+ * filename may contain on any filesystem unify runs on, so a path carrying it
+ * is absent from `emittedPaths` by construction rather than by luck.
+ */
+const UNMATCHABLE = "\u0000";
+
+/**
  * §20.5 — percent-encode every segment of an output path, leaving the `/`
  * separators intact.
  *
@@ -120,16 +127,25 @@ export function encodePathSegments(outputPath) {
  * @returns {string}
  */
 export function canonicalizePathSegments(path) {
-  return path
-    .split("/")
-    .map((seg) => {
-      try {
-        return encodeURIComponent(decodeURIComponent(seg));
-      } catch {
-        return seg; // malformed escape — preserved, and unmatchable, as everywhere else
-      }
-    })
-    .join("/");
+  const decoded = path.split("/").map((seg) => {
+    try {
+      return decodeURIComponent(seg);
+    } catch {
+      return null; // malformed escape — preserved verbatim below
+    }
+  });
+  // RFC 3986 §5.2.4 on the DECODED segments, because `%2E%2E` is `..` and
+  // `resolveProvenanceUrl` normalized before this function decoded it — so
+  // without this a canonicalized URL could still carry a dot segment, which is
+  // not canonical. Operating on the array rather than a joined string is what
+  // keeps a decoded `/` from becoming a separator on the way through.
+  const out = [];
+  for (const [i, seg] of decoded.entries()) {
+    if (seg === ".") continue;
+    if (seg === ".." && out.length > 1) { out.pop(); continue; }
+    out.push(seg === null ? path.split("/")[i] : encodeURIComponent(seg));
+  }
+  return out.join("/");
 }
 
 /**
@@ -139,16 +155,20 @@ export function canonicalizePathSegments(path) {
  * reserved characters escaped, so `/a%26b.html` would keep its `%26` and never
  * match the emitted `a&b.html`.
  *
- * A segment that would decode to contain `/` is **left encoded**. `%2F` is not
- * a separator — it is one segment whose name contains a slash, which no
- * filesystem can hold — so the reference names nothing, and the right outcome
- * is for it to match nothing and be reported. Decoding it and rejoining would
- * silently turn `/a%2Fb.html` into `/a/b.html`: a one-segment URL reinterpreted
- * as a two-segment path, resolving to a different file, and under
- * `--pretty-urls` rewriting the author's bytes to an address naming a different
- * resource. Leaving the segment as written makes `emittedPaths.has(...)` fail
- * naturally — the same technique, and the same reasoning, as the `..`-escaping
- * case documented in `references.js`'s `resolveReference`.
+ * A segment whose decoded form contains `/` names an **impossible file** — one
+ * segment whose name holds a slash, which no filesystem can store — so it is
+ * replaced by a sentinel no output path can equal, and the reference matches
+ * nothing. Decoding it and rejoining would instead turn `/a%2Fb.html` into
+ * `/a/b.html`: a one-segment URL reinterpreted as a two-segment path, resolving
+ * to a different file, and under `--pretty-urls` rewriting the author's bytes
+ * to an address naming a different resource.
+ *
+ * The sentinel is a NUL, which is the one byte no filename may contain on any
+ * filesystem unify runs on. Leaving the segment percent-encoded instead was
+ * *almost* right and shipped for one commit: it matched nothing in every case
+ * but one — a file literally named `a%2Fb.html`, whose real published address
+ * is `/a%252Fb.html`, would string-match the impossible spelling and emit a
+ * link that 404s. "Matches nothing" is only true if it is true always.
  *
  * `%5C` is deliberately NOT treated the same way, though an earlier version of
  * this function did. A backslash is a perfectly legal character in a POSIX
@@ -179,7 +199,7 @@ export function decodePathSegments(path) {
       } catch {
         return seg; // malformed escape — unmatchable, and reported as such
       }
-      return decoded.includes("/") ? seg : decoded;
+      return decoded.includes("/") ? UNMATCHABLE : decoded;
     })
     .join("/");
 }

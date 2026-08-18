@@ -16,11 +16,23 @@
  * unpinned, and the spec claims something the tests cannot distinguish from its
  * opposite.
  *
+ * WHICH PAIRS EARN THEIR PLACE. A replacement that is a no-op only asks "was
+ * this line load-bearing", which the suite usually answers anyway. The pairs
+ * that have caught real defects all encode a **plausible alternative
+ * implementation** — the thing a reasonable person would have written instead,
+ * or did write and had to correct. A reviewer proved the difference: two
+ * substitutions survived the whole suite while the deletion-shaped pair for the
+ * same function was killed, because the deletion changed behaviour everywhere
+ * and the substitution changed it only in the one case no test covered.
+ *
  * SCOPE, so a green run is not over-read: this file defends the rules its rows
  * name and no others. A survivor-free sweep means those anchors are pinned — it
  * is not a statement about the rest of the inventory.
  *
- * NEVER MUTATES THE WORKING TREE. Every run happens in a throwaway copy, for a
+ * NEVER MUTATES THE WORKING TREE. Every run happens in a throwaway copy, freshly
+ * restored before each row — the suite runs inside that copy and can delete its
+ * sources, which truncated a full run after seven rows. The runner therefore
+ * needs the copy to be restorable, not to survive. The isolation exists for a
  * reason this repository has already paid for three times: a mutation was swept
  * into a commit by an unrelated `git add -A`; an in-place loop timed out and its
  * restore never ran, silently reverting a real fix; and a reviewer's baseline
@@ -40,6 +52,9 @@
  *   bun tests/conformance/run-mutations.mjs man- url-    # only ids with a prefix
  *   bun tests/conformance/run-mutations.mjs --rev HEAD~1 # audit a past commit
  *
+ * To stop a run, kill it by PID: `pkill -f run-mutations` matches the shell
+ * that launched it and kills its own caller.
+ *
  * Defaults to the WORKING TREE, because the moment this check matters most is
  * before a commit — when a rule has just been written and the question is
  * whether anything would notice it being wrong.
@@ -52,7 +67,7 @@
  * KILLED, which turns "I mutated it" from an anecdote into a record.
  */
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -156,6 +171,13 @@ if (import.meta.main) {
     process.exit(2);
   }
 
+  // `--rev` needs a real repository. Running from a `git archive` extraction
+  // fails deep inside the copy step; saying so here costs nothing.
+  if (rev !== null && !existsSync(join(ROOT, ".git"))) {
+    console.error(`usage: --rev needs a git repository at ${ROOT} (this looks like an extracted copy)`);
+    process.exit(2);
+  }
+
   const work = mkdtempSync(join(tmpdir(), "unify-mutate-"));
   const runSuite = () => {
     const r = spawnSync("bun", ["test"], {
@@ -169,7 +191,14 @@ if (import.meta.main) {
     };
   };
 
-  try {
+  // Re-run before EVERY mutation, not once. The suite runs inside this copy and
+  // can destroy it: the landmine cases that exercise `-o . --clean` delete
+  // source files under a mutation that breaks path containment, and a full run
+  // was observed truncating after seven rows with `ENOENT ... src/core/urls.js`
+  // from its own revert step. Restoring per row costs milliseconds against a
+  // 30-second suite run and removes the assumption entirely — the runner no
+  // longer needs the copy to survive, only to be restorable.
+  const extract = () => {
     if (rev === null) {
       execFileSync("sh", ["-c",
         `tar -c -C ${JSON.stringify(ROOT)} --exclude=.git --exclude=node_modules --exclude=dist --exclude=.coverage . ` +
@@ -177,6 +206,10 @@ if (import.meta.main) {
     } else {
       execFileSync("sh", ["-c", `git -C ${JSON.stringify(ROOT)} archive ${JSON.stringify(rev)} | tar -x -C ${JSON.stringify(work)}`]);
     }
+  };
+
+  try {
+    extract();
     execFileSync("cp", ["-r", join(ROOT, "node_modules"), join(work, "node_modules")]);
 
     // Every anchor must resolve, and resolve UNIQUELY: `String.replace` edits
@@ -210,14 +243,22 @@ if (import.meta.main) {
       // only on a terminal. Piped to a file, \r does not erase, and the line
       // would be interleaved into the record the review protocol quotes.
       if (process.stdout.isTTY) process.stdout.write(`  ... ${row.id}\r`);
+      extract(); // whatever the previous row's suite did to the copy, undo it
       const target = join(work, row.file);
+      if (!existsSync(target)) {
+        console.error(`  ERROR    ${row.id} — ${row.file} is missing from a freshly extracted copy`);
+        unkilled++;
+        continue;
+      }
       const pristine = readFileSync(target, "utf8");
       writeFileSync(target, pristine.replace(row.old, row.next));
       let verdict;
       try {
         verdict = classify({ ...runSuite(), baselineFailures });
       } finally {
-        writeFileSync(target, pristine);
+        // Best-effort: the next row re-extracts anyway, so a failure here is
+        // not fatal the way it was when the copy had to survive the whole run.
+        try { writeFileSync(target, pristine); } catch { /* re-extracted next row */ }
       }
       if (verdict.outcome === "KILLED") {
         console.log(`  KILLED   ${row.id} — killed by ${verdict.killedBy.length}: ${verdict.killedBy.slice(0, 3).join("; ")}`);
