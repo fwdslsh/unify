@@ -27,6 +27,7 @@ Options:
       --clean              empty the output directory first
       --exclude <glob>     globs never emitted, still usable by the build (repeatable; default: _*)
       --pretty-urls        about.html → about/index.html, and rewrite internal links to match
+      --canonical auto     add a canonical link to pages that author none, from the site address
       --base-url <url>     the site's whole address (https://site.example/repo/): prefix root-relative links, make og:/canonical absolute for share crawlers, and generate sitemap.xml
       --dry-run            run the full build and every check, print the report, write nothing
       --strict             advisories count as problems for the exit code
@@ -71,6 +72,7 @@ function resolveSettings(flags) {
       exclude: settings.exclude ?? ["_*"],
       prettyUrls: settings["pretty-urls"] === true,
       baseUrl: settings["base-url"],
+      canonical: settings.canonical,
       dryRun: settings["dry-run"] === true,
       strict: settings.strict === true,
       port: settings.port === undefined ? 3000 : Number(settings.port),
@@ -118,6 +120,24 @@ export async function run(argv) {
   // ratification samples chose it, and five of five then published dead
   // preview images with a green build. There is no repair for that inside a
   // diagnostic — the fix is that the weaker form no longer exists.
+  // §22.1 — `auto` is the only accepted value, so a future mode cannot be
+  // silently misspelled into today's behaviour.
+  if (settings.canonical !== undefined && String(settings.canonical) !== "auto") {
+    throw new UsageError(`--canonical accepts only "auto", got: ${settings.canonical}`, [
+      "write it as: --canonical auto",
+      "unify completes a canonical only where a page authors none; an authored one always wins",
+    ]);
+  }
+  // §22.1 — a canonical must be an absolute URL, and §20.5 has no public
+  // address to build one from without --base-url. Saying so beats writing a
+  // root-relative canonical or silently doing nothing while the flag says
+  // otherwise.
+  if (settings.canonical !== undefined && settings.baseUrl === undefined) {
+    throw new UsageError("--canonical auto needs the site's address: --base-url is not set", [
+      "add it: --base-url https://your-domain.example/",
+      "a canonical must be absolute — a root-relative one is ignored by the crawlers it exists for",
+    ]);
+  }
   if (settings.baseUrl !== undefined && !/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(String(settings.baseUrl))) {
     const path = `/${String(settings.baseUrl).replace(/^\/+/, "")}`;
     throw new UsageError(`--base-url needs the site's whole address, got: ${settings.baseUrl}`, [

@@ -14,6 +14,7 @@ Options:
       --clean              empty the output directory first
       --exclude <glob>     globs never emitted, still usable by the build (repeatable; default: _*)
       --pretty-urls        about.html → about/index.html, and rewrite internal links to match
+      --canonical auto     add a canonical link to pages that author none, from the site address
       --base-url <url>     the site's whole address (https://site.example/repo/): prefix root-relative links, make og:/canonical absolute for share crawlers, and generate sitemap.xml
       --dry-run            run the full build and every check, print the report, write nothing
       --strict             advisories count as problems for the exit code
@@ -73,6 +74,16 @@ The address the site will be served from, scheme and domain included: `--base-ur
 Knowing the address is also what lets unify write the site's `sitemap.xml`, so `--base-url` is the whole opt-in — there is no second flag. The generated file lists every page that is indexable, is not `404.html`, and is not consolidated elsewhere by its own `rel="canonical"`; URLs are the same absolute ones the `--dry-run` report shows. A `<lastmod>` appears only where the page authored a real date (`<meta property="article:modified_time">`, or `lastmod:` in Markdown frontmatter) — unify never dates a page from the build clock, the filesystem, the filename, or Git history. If your source tree already contains a `sitemap.xml`, that file is the site's sitemap: unify ships it untouched and generates nothing.
 
 A bare path (`--base-url /repo-name/`) is a usage error naming the full form. It used to be accepted, and prefixed links correctly while leaving `og:`/`canonical` root-relative — valid-looking metadata no share crawler can fetch. Give the whole address; for a local preview of a subpath site, `http://localhost:3000/repo-name/` is one.
+
+### `--canonical auto`
+
+Adds `<link rel="canonical" href="…">` to every page that does not author one, using that page's own final public URL — the same address the `--dry-run` report prints and the sitemap lists. `auto` is the only accepted value, and the option needs `--base-url`: a canonical has to be absolute, so without the site's address there is nothing truthful to write.
+
+**A canonical you wrote always wins**, in every shape: one that names another page, several on one page, even one that names a file the site does not build (that last is reported as a broken reference, as it would be anywhere else). Completion fills a gap; it never overrules a value you chose.
+
+Pages that are `noindex`, that are `404.html`, or whose own canonical points elsewhere are skipped — the same set the sitemap lists. Stamping a canonical on a page you told crawlers to drop would create a contradiction rather than resolve one.
+
+Nothing else about the page changes: the element lands immediately before `</head>` at that tag's indentation, and every other byte is what it was.
 
 ### `--dry-run`
 

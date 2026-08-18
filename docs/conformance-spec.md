@@ -1159,3 +1159,46 @@ Every `<loc>` in an emitted sitemap — generated or authored — whose value na
 Scope is the output-root `sitemap.xml` plus any part `sitemap-N.xml` generation produced. A sitemap elsewhere in the tree (`blog/sitemap.xml`) is an ordinary asset — §21.5 scopes the whole feature to the output root, and a file unify would never generate is a file it does not interpret.
 
 For generated sitemaps this check can only pass — every `<loc>` came from a record whose output path exists. It runs anyway, and that is the point: it is the executable form of the claim that the sitemap and the published tree agree, so a future change that lets the two drift fails here instead of at a crawler.
+
+---
+
+## 22. Canonical completion
+
+The second projection of §20, and the first that writes into a page rather than beside it.
+
+### 22.1 Activation
+
+`--canonical auto`, or the identical `canonical: auto` in `unify.yaml`. `auto` is the only accepted value; anything else is a usage error naming it, so a future mode cannot be silently misspelled into today's behaviour. Without the option nothing in this section runs, no page changes, and nothing is reported — the v0.7 golden path.
+
+**`--canonical auto` requires `--base-url`**, and the combination is checked as a usage error (exit 2) rather than degrading. A canonical must be an absolute URL: that is why §11.3 absolutizes authored ones, and why a path-only base URL is itself a usage error. Without a public address §20.5 makes `url` null, so there is nothing truthful to write — and writing a root-relative canonical, or writing nothing while the flag says otherwise, are both worse than saying so.
+
+### 22.2 What is added, and where
+
+For every page record that §22.4 includes, a canonical link is inserted **at the end of the emitted `<head>`**, immediately before `</head>`:
+
+```html
+<link rel="canonical" href="https://example.com/about.html">
+```
+
+`href` is `record.url` — the same absolute URL §20.5 computes, the `--dry-run` report prints, and §21.3 writes into `<loc>`. Serialization is fixed, matching §10.2's rule for synthesized elements: double-quoted attributes, `rel` before `href`. The insertion reuses the whitespace immediately preceding `</head>`, so the element lands at that tag's own indentation and the rest of the document is byte-identical (§3's preservation rule).
+
+A page whose emitted document has no `<head>` gets nothing — there is nowhere to put it, and synthesizing a head would be a structural change this section does not make.
+
+### 22.3 Authored canonicals always win
+
+A page that declares any `rel="canonical"` is left exactly as written. That holds when it declares several (§20.4 keeps the first and records the conflict), when its canonical names another page, and when its canonical names nothing this site emits. Completion means *filling a gap*, never adjudicating a value the author chose.
+
+### 22.4 Membership is §21.2's, unchanged
+
+A page is completed when §21.2's sitemap membership holds — it has a record, is `indexable`, is not `404.html`, and is self-canonical — and it authors no canonical. The predicate is shared, not merely similar, for two reasons beyond tidiness:
+
+- Stamping a canonical onto a `noindex` page **manufactures** the contradiction product-spec §6.3.2 asks unify to report. A tool that creates the fault it warns about is worse than one that does neither.
+- A page consolidated onto another already has the canonical it wants; that is what excluded it from the sitemap in the first place.
+
+`404.html` is excluded because an error document is not a destination, exactly as in §21.2.
+
+### 22.5 What this section reports, and what it deliberately does not
+
+A canonical — authored or completed — that names a location this site does not emit is already **P13**. §12 checks `link href` for every `rel`, so no new rule is needed and none is added; the case is pinned two-sided.
+
+Multiple canonicals, a canonical on a `noindex` page, and disagreement between a canonical and the sitemap are content-quality judgements. Product-spec §6.3.4 assigns them to `unify audit`, and §6.1 states that ordinary `build` does not reject subjective findings. §20.4 already records the multiple-canonical case as data on the record, which is what the evaluation command will read. Adding any of them here would put a judgement in the publish path that the product contract puts outside it.

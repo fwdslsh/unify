@@ -94,13 +94,35 @@ function isSelfCanonical(record, base) {
 export function entriesFor(records, base) {
   const out = [];
   for (const record of records) {
-    if (!record.robots.indexable) continue;
-    if (record.outputPath === "404.html") continue;
-    if (!isSelfCanonical(record, base)) continue;
+    if (!isCompletablePage(record, base)) continue;
     if (record.url === null) continue; // unreachable while §21.1 gates on --base-url; stated, not assumed
     out.push({ loc: record.url, lastmod: record.dateModified?.iso ?? null });
   }
   return out;
+}
+
+/**
+ * §21.2's membership predicate, exported because §22.4 uses it **unchanged**
+ * rather than a lookalike.
+ *
+ * Sharing it is not tidiness. §22 stamps a canonical onto the pages this
+ * returns true for, and the two exclusions carry their weight in that direction
+ * too: a `noindex` page must not be stamped, because a canonical on a page the
+ * author told crawlers to drop manufactures the exact contradiction
+ * product-spec §6.3.2 asks unify to report; and a page consolidated onto
+ * another already has the canonical it wants, which is why it left the sitemap.
+ *
+ * The name says "completable" rather than "indexable" because that is the
+ * question both callers ask: is this page one the site presents as a
+ * destination in its own right?
+ * @param {import('./manifest.js').PageRecord} record
+ * @param {import('./urls.js').BaseUrlConfig|null} base
+ * @returns {boolean}
+ */
+export function isCompletablePage(record, base) {
+  if (!record.robots.indexable) return false;
+  if (record.outputPath === "404.html") return false;
+  return isSelfCanonical(record, base);
 }
 
 /** One `<url>` line, newline included. The single place an entry becomes bytes. */

@@ -17,6 +17,7 @@ const OPTIONS = {
   exclude: { kind: "list" },
   "pretty-urls": { kind: "flag" },
   "base-url": { kind: "string" },
+  canonical: { kind: "string" },
   "dry-run": { kind: "flag" },
   strict: { kind: "flag" },
   port: { kind: "string", short: "p" },
@@ -25,7 +26,7 @@ const OPTIONS = {
 };
 
 /** Keys `unify.yaml` may carry — the long option names, minus the ones that make no sense to save. */
-const CONFIG_KEYS = ["source", "output", "clean", "exclude", "pretty-urls", "base-url", "strict", "port"];
+const CONFIG_KEYS = ["source", "output", "clean", "exclude", "pretty-urls", "base-url", "canonical", "strict", "port"];
 
 const SHORT = Object.fromEntries(
   Object.entries(OPTIONS)

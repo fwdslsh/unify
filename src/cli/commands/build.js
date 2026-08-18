@@ -59,6 +59,7 @@ import * as references from "../../core/references.js";
 import * as urls from "../../core/urls.js";
 import { buildManifest } from "../../core/manifest.js";
 import * as sitemap from "../../core/sitemap.js";
+import { completeCanonical } from "../../core/canonical.js";
 
 /**
  * @param {object} context
@@ -229,6 +230,24 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
   // collision resolution — content never does).
   for (const asset of assetFiles) {
     tempFiles.set(outputPathOf.get(asset.relPath), readFileSync(asset.absPath));
+  }
+
+  // ---- §22 — canonical completion, before the manifest is derived. ---------
+  // A preliminary manifest decides which pages qualify, the completion is
+  // applied to the emitted text, and §20's manifest is then derived from the
+  // result — so §20.2's "every field is read from the emitted text" stays
+  // literally true rather than being patched around. The extra pass runs only
+  // under --canonical auto.
+  if (settings.canonical === "auto") {
+    const preliminary = buildManifest({ pages: manifestPages, base: baseConfig });
+    for (const page of manifestPages) {
+      const record = preliminary.byOutputPath.get(page.outputPath);
+      if (!record) continue;
+      const completed = completeCanonical(page.html, record, baseConfig);
+      if (completed === page.html) continue;
+      page.html = completed;
+      tempFiles.set(page.outputPath, completed);
+    }
   }
 
   // ---- §20 — the final-output page manifest. -------------------------------
