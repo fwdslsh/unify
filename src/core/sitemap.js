@@ -186,7 +186,24 @@ export function generateSitemap({ records, base, emittedFromSource, reporter }) 
 
   // §21.4 — a split claims the part paths as well as the index path.
   const claimed = parts.map((_, i) => partPath(i + 1));
-  // MUTATION PROBE: P22 detection removed entirely
+  const occupied = claimed.filter((p) => emittedFromSource.has(p));
+  if (occupied.length) {
+    // §21.5/P22 — suppress rather than overwrite. Reported per occupied path,
+    // located at the source file that occupies it, in path order so the
+    // message set is deterministic.
+    for (const path of occupied.sort()) {
+      reporter.problem({
+        file: emittedFromSource.get(path),
+        message: `${path} is where unify would write part of this site's generated sitemap`,
+        fixes: [
+          `rename ${emittedFromSource.get(path)} — unify claims sitemap-N.xml for every part when a site exceeds ${MAX_URLS_PER_FILE.toLocaleString("en-US")} URLs`,
+          "or write the whole sitemap yourself: a sitemap.xml in your source tree suppresses generation entirely",
+        ],
+      });
+    }
+    return new Map();
+  }
+
   for (const [i, part] of parts.entries()) generated.set(claimed[i], serializeUrlset(part));
   generated.set(SITEMAP_PATH, serializeIndex(claimed.map((p) => base.origin + base.pathPrefix + p)));
   return generated;

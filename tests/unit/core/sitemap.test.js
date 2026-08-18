@@ -19,10 +19,12 @@ import {
   MAX_BYTES_PER_FILE,
   MAX_URLS_PER_FILE,
   entriesFor,
+  generateSitemap,
   serializeIndex,
   serializeUrlset,
   splitEntries,
 } from "../../../src/core/sitemap.js";
+import { Reporter } from "../../../src/core/diagnostics.js";
 import { parseBaseUrl } from "../../../src/core/urls.js";
 
 /** N synthetic entries, distinct so a mis-split is visible in the boundary values. */
@@ -151,5 +153,102 @@ describe("§21.2 membership predicates", () => {
       .toBe("2026-01-02");
     expect(entriesFor([rec({ dateModified: { raw: "soon", iso: null } })], base)[0].lastmod).toBeNull();
     expect(entriesFor([rec({ dateModified: null })], base)[0].lastmod).toBeNull();
+  });
+});
+
+describe("§21.5 generated-path collisions under a real split (P22)", () => {
+  // The CLI-level P22 test can only reach the NO-split branch: claiming
+  // sitemap-N.xml needs 50,001 composed pages, which cannot build inside the
+  // suite's hard timeout. This is the other side, and it is not hypothetical
+  // rigour — a mutation that deleted P22 detection outright passed the entire
+  // 790-test suite, because nothing anywhere executed this branch.
+  const base = parseBaseUrl("https://example.com/");
+
+  /** Enough records to force a split, in manifest order. */
+  const splitRecords = () =>
+    Array.from({ length: MAX_URLS_PER_FILE + 1 }, (_, i) => ({
+      sourcePath: `p${i}.html`,
+      outputPath: `p${i}.html`,
+      path: `/p${i}.html`,
+      url: `https://example.com/p${i}.html`,
+      canonical: null,
+      robots: { raw: null, directives: [], indexable: true, followable: true },
+      dateModified: null,
+    }));
+
+  function collect() {
+    const problems = [];
+    const reporter = new Reporter({ stderr: { write() {} }, stdout: { write() {} } });
+    const original = reporter.problem.bind(reporter);
+    return {
+      reporter: Object.assign(reporter, {
+        problem(d) { problems.push(d); return original(d); },
+      }),
+      problems,
+    };
+  }
+
+  test("a split with no occupied path emits an index plus its parts", () => {
+    const { reporter, problems } = collect();
+    const generated = generateSitemap({
+      records: splitRecords(), base, emittedFromSource: new Map(), reporter,
+    });
+    expect([...generated.keys()].sort()).toEqual(["sitemap-1.xml", "sitemap-2.xml", "sitemap.xml"]);
+    expect(generated.get("sitemap.xml")).toContain("<sitemapindex");
+    expect(generated.get("sitemap.xml")).toContain("<loc>https://example.com/sitemap-1.xml</loc>");
+    expect(generated.get("sitemap.xml")).toContain("<loc>https://example.com/sitemap-2.xml</loc>");
+    expect(generated.get("sitemap-1.xml")).toContain("<urlset");
+    expect(problems).toEqual([]);
+  });
+
+  test("an occupied split path raises P22 at the occupying source file and suppresses generation", () => {
+    const { reporter, problems } = collect();
+    const generated = generateSitemap({
+      records: splitRecords(),
+      base,
+      emittedFromSource: new Map([["sitemap-1.xml", "sitemap-1.xml"]]),
+      reporter,
+    });
+    expect(generated.size).toBe(0); // §21.5 — suppress, never overwrite
+    expect(problems).toHaveLength(1);
+    expect(problems[0].file).toBe("sitemap-1.xml");
+    expect(problems[0].message).toContain("sitemap-1.xml");
+    expect(problems[0].fixes.join(" ")).toContain("sitemap.xml in your source tree");
+  });
+
+  test("several occupied paths each report, in path order", () => {
+    const { reporter, problems } = collect();
+    const generated = generateSitemap({
+      records: splitRecords(),
+      base,
+      emittedFromSource: new Map([
+        ["sitemap-2.xml", "extra/two.xml"],
+        ["sitemap-1.xml", "extra/one.xml"],
+      ]),
+      reporter,
+    });
+    expect(generated.size).toBe(0);
+    expect(problems.map((p) => p.file)).toEqual(["extra/one.xml", "extra/two.xml"]);
+  });
+
+  test("an authored sitemap.xml suppresses generation before any path is claimed, raising nothing", () => {
+    const { reporter, problems } = collect();
+    const generated = generateSitemap({
+      records: splitRecords(),
+      base,
+      emittedFromSource: new Map([["sitemap.xml", "sitemap.xml"], ["sitemap-1.xml", "sitemap-1.xml"]]),
+      reporter,
+    });
+    expect(generated.size).toBe(0);
+    expect(problems).toEqual([]); // §21.5 — not a collision, a deferral
+  });
+
+  test("no --base-url generates nothing and reports nothing", () => {
+    const { reporter, problems } = collect();
+    const generated = generateSitemap({
+      records: splitRecords(), base: null, emittedFromSource: new Map(), reporter,
+    });
+    expect(generated.size).toBe(0);
+    expect(problems).toEqual([]);
   });
 });

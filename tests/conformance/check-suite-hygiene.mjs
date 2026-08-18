@@ -30,6 +30,16 @@
  *      which blinded the one real comparison to text- and attribute-level
  *      bugs. Narrow and stated, or nothing.
  *
+ *  H6  No leftover experiment markers in shipped source. `src/**` is scanned
+ *      for MUTATION PROBE / DEBUG / XXX-style markers. This rule exists
+ *      because the review protocol asks reviewers to MUTATE src/** to prove a
+ *      test can fail, and one such probe — P22 detection deleted outright —
+ *      was committed and pushed when an unrelated `git add -A` ran while it
+ *      was live. The full 790-test suite passed with the check gone, so
+ *      nothing else in this repository would have caught it.
+ *
+ * H1-H5 police tests/conformance and tests/e2e; H6 polices src/**.
+ *
  * Exit 0 clean; 1 violations.
  */
 import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
@@ -50,6 +60,32 @@ const RULES = [
 ];
 
 let violations = 0;
+
+// ---- H6: shipped source carries no experiment markers -----------------------
+const SRC = join(ROOT, "src");
+// Spelled in pieces so this file's own docstring, which names the marker, is
+// not itself a match — the same trick check-traceability.mjs uses for covers().
+const MARKER = new RegExp(["MUTATION", "\\s+PROBE"].join("") + "|\\bDEBUG\\s+PROBE|\\bXXX\\b|\\bFIXME\\b|\\bHACK\\b", "i");
+function srcFiles(dir) {
+  const out = [];
+  for (const name of readdirSync(dir)) {
+    const p = join(dir, name);
+    if (statSync(p).isDirectory()) out.push(...srcFiles(p));
+    else if (p.endsWith(".js")) out.push(p);
+  }
+  return out;
+}
+for (const f of srcFiles(SRC)) {
+  const src = readFileSync(f, "utf8");
+  for (const [i, line] of src.split("\n").entries()) {
+    const m = line.match(MARKER);
+    if (m) {
+      console.error(`H-FAIL H6 ${relative(ROOT, f)}:${i + 1}: experiment marker left in shipped source (${JSON.stringify(m[0])})`);
+      violations++;
+    }
+  }
+}
+
 for (const dir of BEHAVIOR_DIRS) {
   if (!existsSync(dir)) continue;
   for (const f of readdirSync(dir, { recursive: true })) {
