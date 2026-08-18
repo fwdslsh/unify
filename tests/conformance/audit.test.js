@@ -884,3 +884,167 @@ test("URL-01: a layout's relative og:image is re-rooted, like every other URL it
   }
   covers("URL-01");
 }, TEST_MS);
+
+// ------------------------------------------------- review round 3 regressions
+
+test("AUD-06: every spelling of this site's own address is self-canonical", async () => {
+  // "Another site" is a question about the HOST. Deciding it by whether a
+  // byte-prefix strip happened accused four spellings of the page's OWN
+  // address — RFC 3986 §6.2.2.1 makes scheme and host case-insensitive, and a
+  // protocol-relative value borrows the page's own scheme.
+  const spellings = [
+    "https://example.com/about.html",
+    "HTTPS://EXAMPLE.COM/about.html",
+    "https://EXAMPLE.com/about.html",
+    "//example.com/about.html",
+    "http://example.com/about.html",
+    "/about.html",
+  ];
+  for (const href of spellings) {
+    const tmp = mkTmp();
+    writeTree(join(tmp, "src"), {
+      ...linked(["About"]),
+      "about.html": page("About", '<p>Words about About.</p><a href="/">Home</a>')
+        .replace("<head>", `<head>\n<meta name="robots" content="noindex">\n<link rel="canonical" href="${href}">`),
+    });
+    const r = await runCli(["audit", "-s", "src", "-o", "dist", "--base-url", BASE], tmp);
+    expectExit(r, 0, `canonical spelled ${href}`);
+    expectNoFinding(r, "canonical-noindex", `§24.4: ${href} is this page`);
+  }
+
+  // A genuinely different host still reports — the check is a comparison, not
+  // a blanket exemption for anything that parses.
+  const other = mkTmp();
+  writeTree(join(other, "src"), {
+    ...linked(["About"]),
+    "about.html": page("About", '<p>Words about About.</p><a href="/">Home</a>')
+      .replace("<head>", '<head>\n<meta name="robots" content="noindex">'
+        + '\n<link rel="canonical" href="//competitor.example/copy">'),
+  });
+  const r = await runCli(["audit", "-s", "src", "-o", "dist", "--base-url", BASE], other);
+  expectExit(r, 0, "a protocol-relative canonical on another host");
+  expectFinding(r, "canonical-noindex", "§24.4: a different host is a different site");
+  covers("AUD-06");
+}, TEST_MS);
+
+test("AUD-04: robots directives split across two metas are one policy, not a conflict", async () => {
+  // A crawler reads the union across every robots meta. Keeping the first left
+  // `indexable` true on a page whose second tag said noindex — so §21.2's
+  // noindex clause never fired and the generated sitemap advertised it.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": page("Home", '<p>Welcome.</p><a href="/secret.html">Secret</a>'),
+    "secret.html": page("Secret", '<p>Words.</p><a href="/">Home</a>')
+      .replace("<head>", '<head>\n<meta name="robots" content="nofollow">\n<meta name="robots" content="noindex">'),
+  });
+  const r = await runCli(["audit", "-s", "src", "-o", "dist", "--base-url", BASE], tmp);
+  expectExit(r, 0, "stacked robots directives");
+  expectNoFinding(r, "metadata-conflict", "§20.6: the union is one policy");
+
+  const built = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", BASE], tmp);
+  expectExit(built, 0, "the same site built");
+  const sitemap = readFileSync(join(tmp, "dist", "sitemap.xml"), "utf8");
+  if (sitemap.includes("secret.html")) {
+    throw new Error(`§21.2: a noindex page is not listed, however its directives were spelled:\n${sitemap}`);
+  }
+  covers("AUD-04");
+}, TEST_MS);
+
+test("AUD-04: metadata-conflict is exactly the fields HTML restricts to one", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    ...linked(["About"]),
+    // Two spellings of one date, and two authors: ordinary markup, not a
+    // contradiction. `date` and `article:published_time` both map to
+    // datePublished, at different granularities.
+    "about.html": page("About", '<p>Words about About.</p><a href="/">Home</a>')
+      .replace("<head>", '<head>'
+        + '\n<meta name="date" content="2026-01-02">'
+        + '\n<meta property="article:published_time" content="2026-01-02T09:00:00Z">'
+        + '\n<meta name="author" content="A. Writer">'
+        + '\n<meta name="author" content="B. Writer">'),
+  });
+  const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
+  expectExit(r, 0, "two date spellings and two authors");
+  expectNoFinding(r, "metadata-conflict", "§24.4: neither is restricted to one per document");
+
+  // The four that are still report.
+  const bad = mkTmp();
+  writeTree(join(bad, "src"), {
+    ...linked(["About"]),
+    "about.html": page("About", '<p>Words about About.</p><a href="/">Home</a>')
+      .replace("<head>", '<head>\n<meta name="description" content="A second one.">\n<title>A second title</title>'),
+  });
+  const b = await runCli(["audit", "-s", "src", "-o", "dist"], bad);
+  expectExit(b, 0, "two titles and two descriptions");
+  const fields = b.stdout.split("\n").filter((l) => l.includes("[metadata-conflict]"));
+  if (fields.length !== 2) {
+    throw new Error(`§24.4: title and description, one finding each.\nstdout:\n${b.stdout}`);
+  }
+  covers("AUD-04");
+}, TEST_MS);
+
+test("URL-10: a protocol-relative URL is absolute, so --base-url leaves it alone", async () => {
+  // §11.1 has always skipped `//host/...`; §11.3's own test was
+  // startsWith("/"), true of both, so it emitted
+  // https://example.com//cdn.example.com/card.png — the author's URL rewritten
+  // into a different one, pointing at a path on the wrong host.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Home</title>
+<meta name="description" content="The home page.">
+<link rel="canonical" href="//example.com/">
+<meta property="og:image" content="//cdn.example.com/card.png">
+<link rel="stylesheet" href="//cdn.example.com/x.css">
+</head>
+<body><h1>Home</h1><img src="//cdn.example.com/p.png" alt="p"><p>x</p></body>
+</html>
+`,
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", BASE], tmp);
+  expectExit(r, 0, "protocol-relative URLs under --base-url");
+  const out = readFileSync(join(tmp, "dist", "index.html"), "utf8");
+  if (out.includes("https://example.com//")) {
+    throw new Error(`§11.3: root-relative means ONE leading slash:\n${out}`);
+  }
+  for (const value of ["//example.com/", "//cdn.example.com/card.png", "//cdn.example.com/x.css", "//cdn.example.com/p.png"]) {
+    if (!out.includes(`"${value}"`)) {
+      throw new Error(`§11.3: ${value} ships as written:\n${out}`);
+    }
+  }
+  // And a genuinely root-relative value is still prefixed.
+  const rooted = mkTmp();
+  writeTree(join(rooted, "src"), {
+    "index.html": page("Home", '<p>x</p>').replace("<head>", '<head>\n<meta property="og:image" content="/card.png">'),
+    "card.png": "bytes\n",
+  });
+  const b = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", "https://example.com/repo/"], rooted);
+  expectExit(b, 0, "a root-relative og:image under a subpath base");
+  if (!readFileSync(join(rooted, "dist", "index.html"), "utf8").includes('content="https://example.com/repo/card.png"')) {
+    throw new Error("§11.3: one leading slash IS root-relative and is still absolutized");
+  }
+  covers("URL-10");
+}, TEST_MS);
+
+test("DIA-01: a diagnostic is one line, whatever the URL contains", async () => {
+  // §14.1 is a line-oriented contract, and a value carrying a newline broke it
+  // from the inside — one P13 rendered across four lines, two of them looking
+  // like diagnostics with no location.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": page("Home", '<p>x</p><a href="/gone&#10;.css">broken</a>'),
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist"], tmp);
+  expectExit(r, 1, "a reference containing a newline");
+  const lines = r.stderr.trimEnd().split("\n");
+  for (const line of lines) {
+    const located = /^[^\s].*: (problem|advisory): /.test(line);
+    const continuation = /^ {2}(in|fix): /.test(line);
+    if (!located && !continuation) {
+      throw new Error(`§14.1: every line is a located diagnostic or an indented continuation, got: ${JSON.stringify(line)}\nstderr:\n${r.stderr}`);
+    }
+  }
+  covers("DIA-01");
+}, TEST_MS);

@@ -691,6 +691,25 @@ function isCanonicalLink(el) {
 }
 
 /**
+ * Root-relative means one leading slash. `//host/path` is **protocol-relative**
+ * — an absolute URL that borrows the page's scheme — and §11.1 has always said
+ * so, skipping it with the other absolute forms.
+ *
+ * §11.3's own test was `startsWith("/")`, which is true of both, so it treated
+ * `//cdn.example.com/card.png` as a path on this site and emitted
+ * `https://example.com//cdn.example.com/card.png`: the author's URL rewritten
+ * into a different one, pointing at a path on the wrong host, shipped without a
+ * word. A CDN-hosted `og:image` and an authored `<link rel="canonical"
+ * href="//example.com/">` are both ordinary, and both were corrupted while the
+ * `<img src>` beside them was correctly left alone.
+ * @param {string} value
+ * @returns {boolean}
+ */
+function isRootRelative(value) {
+  return value.startsWith("/") && !value.startsWith("//");
+}
+
+/**
  * Apply the path prefix (and, when `includeOrigin`, the origin) to one
  * already-root-relative value. Query/fragment are preserved untouched.
  * @param {string} value - must start with "/"
@@ -726,18 +745,18 @@ export function applyBaseUrl(html, base) {
     const originEligible = isCanonicalLink(el);
     for (const attrName of SINGLE_URL_ATTRS) {
       const attr = getAttrNode(el, attrName);
-      if (!attr || !attr.value || !attr.value.startsWith("/")) continue;
+      if (!attr || !attr.value || !isRootRelative(attr.value)) continue;
       const next = prefixRootRelative(attr.value, base, originEligible);
       if (next !== attr.value) edits.push({ start: attr.valueStart, end: attr.valueEnd, replacement: next });
     }
     const srcset = getAttrNode(el, "srcset");
     if (srcset && srcset.value) {
-      const rewritten = rewriteSrcsetValue(srcset.value, (u) => (u.startsWith("/") ? prefixRootRelative(u, base, false) : null));
+      const rewritten = rewriteSrcsetValue(srcset.value, (u) => (isRootRelative(u) ? prefixRootRelative(u, base, false) : null));
       if (rewritten !== srcset.value) edits.push({ start: srcset.valueStart, end: srcset.valueEnd, replacement: rewritten });
     }
     if (isOgOrTwitterMeta(el)) {
       const content = getAttrNode(el, "content");
-      if (content && content.value && content.value.startsWith("/")) {
+      if (content && content.value && isRootRelative(content.value)) {
         const next = prefixRootRelative(content.value, base, true);
         if (next !== content.value) edits.push({ start: content.valueStart, end: content.valueEnd, replacement: next });
       }

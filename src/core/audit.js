@@ -62,14 +62,27 @@ import { classifyCanonical } from "./sitemap.js";
  *     routine and recommended, and every consumer parses every block, so the
  *     second is not "ignored".
  *
- * `author` is excluded too: a co-authored page names two authors, and the HTML
- * spec does not restrict `<meta name="author">` to one per document. What
- * remains is the set where a second differing value genuinely leaves consumers
- * without an answer.
+ * The list is not a judgement about which fields matter. It is exactly the
+ * fields whose own specification says **at most one per document**, which is
+ * the only line that can be defended to an author whose markup was called
+ * broken. Three more were on it and came off:
+ *
+ *   - **`author`.** The HTML spec defines the `author` metadata name as "the
+ *     name of *one of* the page's authors" — plural by construction.
+ *   - **`robots`.** Crawlers read the union of the directives across every
+ *     `robots` meta, so splitting `noindex, nofollow` across two tags is a
+ *     documented spelling of one policy. §20.6 now unions them, which removes
+ *     the conflict entirely rather than reclassifying it.
+ *   - **`datePublished`/`dateModified`.** `article:published_time` beside
+ *     `<meta name="date">` is ordinary belt-and-braces markup naming one
+ *     instant at two granularities, and §20.3 maps both spellings to one
+ *     field. Telling that author to "keep one" pushes them to drop the
+ *     property crawlers read. Two genuinely different dates *are* a
+ *     contradiction, but distinguishing them from two spellings of one date
+ *     needs a comparison §20.10 does not expose — so the conservative answer
+ *     is silence, which is the right default for a `broken` severity.
  */
-const SINGLE_VALUED = new Set([
-  "canonical", "title", "description", "lang", "robots", "datePublished", "dateModified",
-]);
+const SINGLE_VALUED = new Set(["canonical", "title", "description", "lang"]);
 
 /** Normalize a heading or title for comparison — case and whitespace only. */
 const norm = (s) => s.toLowerCase().replace(/\s+/g, " ").trim();

@@ -166,6 +166,22 @@ export function classify({ exitCode, output, timedOut, baselineFailures = [], fl
   }
   const failed = failingTests(output);
   const attributable = failed.filter((t) => !flakyTests.includes(t) && !baselineFailures.includes(t));
+  // A mutant that dies of a runtime error proves only that an identifier is
+  // referenced. This check exists because two rows passed as kills while
+  // testing nothing: both mutated a `message:` interpolation whose variable
+  // the replacement left unbound, so the CLI died with "raw is not defined"
+  // and the tests "failed" at a corpse. The original guard below missed them
+  // because a crashing CLI makes tests fail, which looked exactly like
+  // detection — the failure mode this file's own preamble says must never
+  // pass as evidence, arriving by the one route it did not check.
+  const crash = runtimeErrorIn(output);
+  if (crash) {
+    return {
+      outcome: "CRASHED",
+      killedBy: [],
+      note: `the mutated build raised ${JSON.stringify(crash)} — a malformed replacement, not a detected behaviour change`,
+    };
+  }
   if (attributable.length) {
     return { outcome: "KILLED", killedBy: attributable, note: "" };
   }
@@ -176,6 +192,30 @@ export function classify({ exitCode, output, timedOut, baselineFailures = [], fl
     return { outcome: "CRASHED", killedBy: [], note: why };
   }
   return { outcome: "SURVIVED", killedBy: [], note: "nothing distinguishes this from its opposite" };
+}
+
+/**
+ * The signature of a JavaScript runtime error in a suite's captured output.
+ *
+ * A heuristic, deliberately: the alternative — smoke the mutated CLI on a
+ * fixture and require a located diagnostic rather than an internal error — is
+ * more machinery than this class of mistake warrants, and a false CRASHED
+ * costs one second look at a row while a false KILLED costs a rule that
+ * nothing tests. Anchored on `unify:` where possible, because §14.1 routes
+ * every *located* diagnostic through `FILE:LINE: SEVERITY:` and only an
+ * unhandled throw reaches the `unify: ` prefix in cli.js.
+ *
+ * @param {string} output
+ * @returns {string|null} the matched error text, or null
+ */
+export function runtimeErrorIn(output) {
+  // Searched anywhere rather than anchored: a throw reaches stderr behind
+  // `unify: `, a `TypeError:` prefix, or nothing at all, depending on where it
+  // came from, and anchoring on one of those missed the others. A false
+  // CRASHED costs a second look at one row; a false KILLED costs a rule that
+  // nothing tests, which is what this whole check exists to stop.
+  const m = /((?:\w[\w.$]*) is not (?:defined|a function|an object|iterable)|Cannot read propert(?:y|ies)[^\n]{0,60}|undefined is not[^\n]{0,40})/.exec(output);
+  return m ? m[1].trim() : null;
 }
 
 // --------------------------------------------------------------------- main

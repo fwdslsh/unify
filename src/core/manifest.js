@@ -282,7 +282,16 @@ class Field {
  * @param {string|null} raw
  * @returns {RobotsValue}
  */
-function parseRobots(raw) {
+function parseRobots(values) {
+  // §20.6 — the union across every `<meta name="robots">` the page emits.
+  // `raw` keeps all of them, comma-joined in document order, because the
+  // report has to quote what the page actually says; the directives and the
+  // two booleans are computed from the whole set.
+  const raw = values.length === 0 ? null : values.join(", ");
+  return parseRobotsValue(raw);
+}
+
+function parseRobotsValue(raw) {
   if (raw === null) return { raw: null, directives: [], indexable: true, followable: true };
   const directives = raw.split(",").map((t) => t.trim().toLowerCase()).filter(Boolean);
   return {
@@ -330,7 +339,8 @@ function extract(page, base) {
   const description = new Field();
   const lang = new Field();
   const canonical = new Field();
-  const robotsRaw = new Field();
+  /** @type {(string|null)[]} every `<meta name="robots">` value, in document order (§20.6). */
+  const robotsAll = [];
   const author = new Field();
   const published = new Field();
   const modified = new Field();
@@ -394,7 +404,10 @@ function extract(page, base) {
       }
       if (name === "description") description.add(nonEmpty(content));
       else if (name === "author") author.add(nonEmpty(content));
-      else if (name === "robots") robotsRaw.add(nonEmpty(content));
+      // Every robots meta, not the first: a crawler reads the union of the
+      // directives across all of them, and splitting `noindex, nofollow`
+      // across two tags is a documented spelling of one policy.
+      else if (name === "robots") robotsAll.push(nonEmpty(content));
       else if (name === "schema") schemaType.add(nonEmpty(content));
       else if (name === "date") published.add(nonEmpty(content));
       else if (name === "lastmod") modified.add(nonEmpty(content));
@@ -459,7 +472,6 @@ function extract(page, base) {
     description.conflict("description"),
     (ogImage.values.length ? ogImage : twitterImage).conflict("image"),
     lang.conflict("lang"),
-    robotsRaw.conflict("robots"),
     schemaType.conflict("schemaType"),
     title.conflict("title"),
   ].filter(Boolean).sort((a, b) => (a.field < b.field ? -1 : a.field > b.field ? 1 : 0));
@@ -479,7 +491,7 @@ function extract(page, base) {
     description: description.kept,
     lang: lang.kept,
     canonical: canonical.kept,
-    robots: parseRobots(robotsRaw.kept),
+    robots: parseRobots(robotsAll.filter((v) => v !== null)),
     // `orNull`, never `nonEmpty`: this text came from `textContent`, which
     // already resolved references. Decoding it again reports a string the page
     // does not contain and makes `h1` disagree with `headings[0].text`.

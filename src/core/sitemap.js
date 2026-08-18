@@ -125,9 +125,30 @@ export function isSelfCanonical(record, base) {
  */
 export function classifyCanonical(record, base) {
   if (record.canonical === null) return "none";
+
+  // "Another site" is a question about the HOST, and it is answered by
+  // comparing hosts — never by asking whether a byte-prefix strip happened.
+  // `stripBaseUrl` matches `base.origin` literally, so every spelling of this
+  // site's own address that is not byte-identical survives it:
+  // `HTTPS://EXAMPLE.COM/x`, `https://EXAMPLE.com/x`, `//example.com/x`, and
+  // `http://example.com/x` are all the same page by RFC 3986 §6.2.2.1 (scheme
+  // and host are case-insensitive) and were all reported as consolidating
+  // elsewhere. Parsing answers it and case-folds for free.
+  //
+  // The scheme is deliberately not part of the comparison. `http:` versus
+  // `https:` on one host is a deployment detail, and "this page nominates a
+  // replacement" is not a true thing to say about it.
+  if (base && /^([a-z][a-z0-9+.-]*:)?\/\//i.test(record.canonical)) {
+    let host = null;
+    try {
+      host = new URL(record.canonical, base.origin).host;
+    } catch {
+      return "unknown"; // not a URL this build can reason about
+    }
+    if (host !== new URL(base.origin).host) return "elsewhere";
+  }
+
   const stripped = base ? stripBaseUrl(record.canonical, base) : record.canonical;
-  // Survived stripping with an origin intact, and we know ours: another site.
-  if (base && (stripped.startsWith("//") || /^https?:\/\//i.test(stripped))) return "elsewhere";
   if (isSkippedUrl(stripped)) return "unknown";
   const target = resolveReference(stripped, record.outputPath);
   if (target === null) return "unknown";

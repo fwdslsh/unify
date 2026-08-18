@@ -205,9 +205,17 @@ export class Reporter {
    */
   static format(d) {
     const where = d.line === undefined ? d.file : `${d.file}:${d.line}`;
-    const lines = [`${where}: ${d.severity}: ${d.message}`];
-    if (d.context) lines.push(`  in: ${d.context}`);
-    for (const fix of d.fixes ?? []) lines.push(`  fix: ${fix}`);
+    // §14.1 is a line-oriented contract — one diagnostic renders as its
+    // `FILE:LINE: SEVERITY:` line plus indented continuations — and a value
+    // carrying a newline breaks it from the inside. `<a href="/x&#10;.css">`
+    // is legal HTML whose VALUE (§12) contains a literal newline, and it
+    // rendered a single P13 across four lines, two of them looking like
+    // diagnostics with no location. Every part that interpolates a value
+    // folds, so a diagnostic is one line however the author spelled the URL.
+    const fold = (t) => String(t).replace(/\s+/g, " ").trim();
+    const lines = [`${where}: ${d.severity}: ${fold(d.message)}`];
+    if (d.context) lines.push(`  in: ${fold(d.context)}`);
+    for (const fix of d.fixes ?? []) lines.push(`  fix: ${fold(fix)}`);
     return lines.join("\n");
   }
 

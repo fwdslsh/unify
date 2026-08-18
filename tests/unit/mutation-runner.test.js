@@ -13,7 +13,7 @@
  */
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { classify, compareBaselines, failingTests, parseMutations, unescapeCell } from "../conformance/run-mutations.mjs";
+import { classify, compareBaselines, failingTests, parseMutations, runtimeErrorIn, unescapeCell } from "../conformance/run-mutations.mjs";
 
 /** A suite run that failed with these test names. */
 const red = (...names) => ({
@@ -85,6 +85,67 @@ describe("classify — the logic that inverted", () => {
     const v = classify({ exitCode: null, output: "", timedOut: true });
     expect(v.outcome).toBe("TIMEOUT");
     expect(v.note).toContain("hang");
+  });
+});
+
+describe("classify — a crash is not a kill", () => {
+  // The second way this file's answer could invert, found by a reviewer twice.
+  // Both times a row mutated a `message:` interpolation whose variable the
+  // replacement left unbound, so the CLI died with "raw is not defined" and
+  // the tests "failed" at a corpse. The runner called that KILLED, and the
+  // rule the row named was tested by nothing — for two review rounds.
+  const crashOutput = [
+    "unify: raw is not defined",
+    "(fail) SIT-06: a namespace-prefixed loc is a loc [12ms]",
+    "(fail) SIT-01: without --base-url an authored sitemap is an asset [9ms]",
+    " 907 pass",
+    " 2 fail",
+  ].join("\n");
+
+  test("a mutant that dies of a ReferenceError is CRASHED, not KILLED", () => {
+    const r = classify({ exitCode: 1, output: crashOutput, timedOut: false });
+    expect(r.outcome).toBe("CRASHED");
+    expect(r.killedBy).toEqual([]);
+    // The note has to name the error, or a reader cannot tell this apart from
+    // the older "does not parse" case it shares an outcome with.
+    expect(r.note).toContain("raw is not defined");
+  });
+
+  test("a real detection is still KILLED, with the tests that caught it", () => {
+    const output = [
+      "(fail) ROB-02: the diagnostic quotes the author's own line [14ms]",
+      " 909 pass",
+      " 1 fail",
+    ].join("\n");
+    const r = classify({ exitCode: 1, output, timedOut: false });
+    expect(r.outcome).toBe("KILLED");
+    expect(r.killedBy).toEqual(["ROB-02: the diagnostic quotes the author's own line"]);
+  });
+
+  test("a survivor is untouched by the check", () => {
+    expect(classify({ exitCode: 0, output: " 910 pass\n 0 fail", timedOut: false }).outcome).toBe("SURVIVED");
+  });
+
+  test("the signatures are the ones this class produces, and prose is not one", () => {
+    for (const line of [
+      "unify: raw is not defined",
+      "unify: isElement is not defined",
+      "TypeError: parse is not a function",
+      "Cannot read properties of undefined (reading 'value')",
+      "null is not an object (evaluating 'm[1]')",
+    ]) {
+      expect(runtimeErrorIn(line)).not.toBeNull();
+    }
+    // A diagnostic that merely talks about absence must not read as a crash —
+    // §14.1's own wording is full of "does not resolve" and "not found".
+    for (const line of [
+      "src/index.html:3: problem: /gone.html does not resolve to any emitted file",
+      "  fix: check the path spelling and casing",
+      "(fail) AUD-07: no evidence value can break the two-line report [11ms]",
+      "src/a.html:1: problem: include not found: /_includes/nav.html",
+    ]) {
+      expect(runtimeErrorIn(line)).toBeNull();
+    }
   });
 });
 
