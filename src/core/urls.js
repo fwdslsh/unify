@@ -54,6 +54,25 @@ import { posix } from "node:path";
 import { applyEdits, findAll, getAttr, getAttrNode, lineOf, parse, tokens } from "./html.js";
 
 // --------------------------------------------------------------- URL basics
+//
+// Three questions about a URL, three owners, one answer each. Every defect this
+// module has had was two components answering the same one differently, so the
+// division is stated here rather than left to be inferred:
+//
+//   "what URL does this OUTPUT PATH answer to?"   -> publish.js urlForOutputPath
+//                                                    (encodePathSegments inside)
+//   "what FILE do these authored bytes name?"     -> decodePathSegments
+//                                                    (references.js §12, urls.js
+//                                                     §11.2, head-merge.js identity,
+//                                                     sitemap.js <loc> checking)
+//   "what is the canonical form of this AUTHORED  -> canonicalizePathSegments
+//    URL unify is about to re-root?"                 (urls.js §11.1)
+//
+// The three are not interchangeable and take different input spaces: an output
+// path is a filesystem path whose segments are never pre-encoded, while an
+// authored URL may already carry escapes. Using the wrong one is wrong in both
+// directions at once — it has shipped twice, failing a correct site and silently
+// passing an incorrect one.
 
 /** A URL with a scheme (`http:`, `mailto:`, `tel:`, `data:`, `javascript:`, …). */
 const SCHEME_RE = /^[a-z][a-z0-9+.-]*:/i;

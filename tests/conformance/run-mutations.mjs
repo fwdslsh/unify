@@ -193,7 +193,7 @@ if (import.meta.main) {
     if (bad) { console.error(`mutation: ${bad} unusable row(s)`); process.exit(2); }
 
     // THE BASELINE GATE. Without it a red tree reports every mutation KILLED.
-    process.stdout.write("mutation: checking the baseline is green... ");
+    console.log("mutation: checking the baseline is green...");
     const baseline = runSuite();
     const baselineFailures = failingTests(baseline.output);
     if (baseline.timedOut || baseline.exitCode !== 0) {
@@ -201,12 +201,15 @@ if (import.meta.main) {
       for (const t of baselineFailures.slice(0, 10)) console.error(`  failing: ${t}`);
       process.exit(2);
     }
-    console.log("green");
+    console.log("mutation: baseline green");
     console.log(`mutation: ${selected.length} mutation(s) against ${rev ?? "the working tree"}, in ${work}`);
 
     let unkilled = 0;
     for (const row of selected) {
-      process.stdout.write(`  ... ${row.id}\r`);
+      // A transient "now running" line so a stuck row is identifiable — but
+      // only on a terminal. Piped to a file, \r does not erase, and the line
+      // would be interleaved into the record the review protocol quotes.
+      if (process.stdout.isTTY) process.stdout.write(`  ... ${row.id}\r`);
       const target = join(work, row.file);
       const pristine = readFileSync(target, "utf8");
       writeFileSync(target, pristine.replace(row.old, row.next));

@@ -237,6 +237,27 @@ test("URL-06: an include-relative reference round-trips whether written raw or e
   covers("MAN-05");
 }, TEST_MS);
 
+test("HED-06/REF-08: two spellings of one stylesheet dedup to one link", async () => {
+  // §8 row 6 dedups stylesheets by URL AFTER resolution, and §12 says both
+  // spellings name the same file — so the identity question must have one
+  // answer across the build. Without decoding in the head merge, a layout's
+  // raw href and a page's encoded one shipped as two <link> elements for one
+  // file. Newly reachable now that the encoded form is what unify publishes.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "_layout.html": '<!doctype html>\n<html><head><title>L</title><link rel="stylesheet" href="/assets/a b.css"></head><body><main></main></body></html>\n',
+    "index.html": '<!doctype html>\n<html><head><title>Home</title><link rel="stylesheet" href="/assets/a%20b.css"></head><body><main><p>x</p></main></body></html>\n',
+    "assets/a b.css": "body{color:#000}\n",
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist"], tmp);
+  expectExit(r, 0, "two spellings of one stylesheet");
+  const links = [...read(tmp, "dist", "index.html").matchAll(/<link rel="stylesheet"[^>]*>/g)].map((m) => m[0]);
+  if (links.length !== 1) {
+    throw new Error(`§8 row 6: one file must yield one <link>, got ${links.length}: ${JSON.stringify(links)}`);
+  }
+  covers("REF-08");
+}, TEST_MS);
+
 test("REF-08/URL-08: an ENCODED authored link is pretty-rewritten like a raw one", async () => {
   // Pins applyPrettyLinks' own decode. Without it a link written in the exact
   // spelling the site publishes stops being rewritten and then fails §12 as
