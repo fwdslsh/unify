@@ -13,7 +13,7 @@
  */
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { classify, failingTests, parseMutations, unescapeCell } from "../conformance/run-mutations.mjs";
+import { classify, compareBaselines, failingTests, parseMutations, unescapeCell } from "../conformance/run-mutations.mjs";
 
 /** A suite run that failed with these test names. */
 const red = (...names) => ({
@@ -51,16 +51,28 @@ describe("classify — the logic that inverted", () => {
     expect(classify({ ...red("already broken", "newly broken"), baselineFailures }).killedBy).toEqual(["newly broken"]);
   });
 
-  test("an environment-flaky test alone never counts as a kill", () => {
-    const v = classify(red("§16 dev server > WCH-06 — the reload script is served"));
+  test("an OBSERVED-flaky test alone never counts as a kill", () => {
+    const flakyTests = ["§16 dev server > WCH-05 — a taken port is a fatal environment fault"];
+    const v = classify({ ...red(flakyTests[0]), flakyTests });
     expect(v.outcome).not.toBe("KILLED");
     expect(v.note).toContain("flaky");
   });
 
   test("a flaky failure alongside a real one still credits only the real one", () => {
-    const v = classify(red("§16 dev server > WCH-06 — the reload script is served", "REF-08: real"));
+    const flakyTests = ["§16 dev server > WCH-05 — a taken port is a fatal environment fault"];
+    const v = classify({ ...red(flakyTests[0], "REF-08: real"), flakyTests });
     expect(v.outcome).toBe("KILLED");
     expect(v.killedBy).toEqual(["REF-08: real"]);
+  });
+
+  test("a deterministic §16 behaviour test is NOT excluded — flakiness is measured, not named", () => {
+    // The regression this replaced: a name-matched list excluded every test in
+    // watch-dev.test.js, so WCH-02 and WCH-03 — deterministic filesystem
+    // assertions — could never credit a kill, and the Tier-3 unit test got the
+    // credit instead. That inverts testing-strategy §2's authority order.
+    const v = classify(red("§16 watch > WCH-02 — watch output equals a fresh build"));
+    expect(v.outcome).toBe("KILLED");
+    expect(v.killedBy).toEqual(["§16 watch > WCH-02 — watch output equals a fresh build"]);
   });
 
   test("a non-zero exit with no failing test is CRASHED — a bad replacement is not evidence", () => {
@@ -115,5 +127,32 @@ describe("parseMutations", () => {
       expect(r.why.length).toBeGreaterThan(20); // a row without a rule is a mutation nobody can act on
       expect(r.old).not.toBe(r.next);
     }
+  });
+});
+
+describe("compareBaselines — flakiness by observation", () => {
+  test("a stable green pair yields no flaky and no hard failures", () => {
+    expect(compareBaselines([], [])).toEqual({ flaky: [], hard: [] });
+  });
+
+  test("a test failing in BOTH runs is genuinely red, not flaky", () => {
+    expect(compareBaselines(["a"], ["a"])).toEqual({ flaky: [], hard: ["a"] });
+  });
+
+  test("a test differing between two identical runs is flaky by observation", () => {
+    expect(compareBaselines(["port"], [])).toEqual({ flaky: ["port"], hard: [] });
+    expect(compareBaselines([], ["port"])).toEqual({ flaky: ["port"], hard: [] });
+  });
+
+  test("a mixed pair separates the two, deterministically ordered", () => {
+    const r = compareBaselines(["real", "port"], ["real"]);
+    expect(r.hard).toEqual(["real"]);
+    expect(r.flaky).toEqual(["port"]);
+  });
+
+  test("one environmental flake does not abort the sweep — only a hard failure does", () => {
+    // The habit this prevents: a fifteen-minute check that aborts on a known
+    // flake is one people re-run until it passes, which is M2 by another route.
+    expect(compareBaselines(["§16 dev server > WCH-05"], []).hard).toEqual([]);
   });
 });

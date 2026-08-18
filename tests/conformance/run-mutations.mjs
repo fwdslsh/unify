@@ -67,7 +67,7 @@
  * KILLED, which turns "I mutated it" from an anecdote into a record.
  */
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -79,12 +79,36 @@ const TSV = join(ROOT, "tests", "conformance", "mutations.tsv");
 export const SUITE_TIMEOUT_MS = 240_000;
 
 /**
- * Tests whose failure never proves a mutation was noticed: they bind ports and
- * touch timers, so they fail for environmental reasons no source mutation can
- * cause. Excluded from kill attribution so a coincidental flake cannot mask a
- * real survivor.
+ * Flakiness is MEASURED, not listed.
+ *
+ * An earlier version matched test names against `/^§16 dev server|^§16 watch/`,
+ * which excluded every test in `watch-dev.test.js` from kill attribution —
+ * including WCH-02 (watch output equals a fresh build) and WCH-03 (an unchanged
+ * file is not rewritten), which are deterministic filesystem assertions, not
+ * the ports-and-timers class the list was for. A reviewer showed the cost: a
+ * dev-server mutation was credited to a Tier-3 unit test while WCH-06, the
+ * authoritative behaviour test that also caught it, was filtered out — the tier
+ * with zero authority believed over the one with all of it, inverting
+ * testing-strategy §2. Any future row whose only coverage is the behaviour tier
+ * would have read SURVIVED forever, and the only available "fix" would be to
+ * weaken the regex further.
+ *
+ * So the baseline runs twice and the two failure sets are compared: a test that
+ * differs between two runs of identical source is flaky by observation. A test
+ * failing in BOTH is genuinely red and aborts the sweep. Nothing is
+ * hand-maintained, and the set shrinks to empty on a stable machine.
+ * @param {string[]} first
+ * @param {string[]} second
+ * @returns {{flaky: string[], hard: string[]}}
  */
-export const FLAKY = /^§16 dev server|^§16 watch|dev-server|reload script/i;
+export function compareBaselines(first, second) {
+  const a = new Set(first);
+  const b = new Set(second);
+  return {
+    flaky: [...new Set([...first, ...second])].filter((t) => !(a.has(t) && b.has(t))).sort(),
+    hard: [...a].filter((t) => b.has(t)).sort(),
+  };
+}
 
 /**
  * Decode one TSV cell. Single pass, because a chained `.replace` that handles
@@ -132,20 +156,22 @@ export function failingTests(output) {
  * @param {string} run.output - stdout + stderr
  * @param {boolean} run.timedOut
  * @param {string[]} [run.baselineFailures] - tests already failing unmutated
+ * @param {string[]} [run.flakyTests] - tests observed to differ between two
+ *   identical baseline runs; their failure proves nothing about a mutation
  * @returns {{outcome: 'KILLED'|'SURVIVED'|'CRASHED'|'TIMEOUT', killedBy: string[], note: string}}
  */
-export function classify({ exitCode, output, timedOut, baselineFailures = [] }) {
+export function classify({ exitCode, output, timedOut, baselineFailures = [], flakyTests = [] }) {
   if (timedOut) {
     return { outcome: "TIMEOUT", killedBy: [], note: "the suite did not finish — a hang is not a kill" };
   }
   const failed = failingTests(output);
-  const attributable = failed.filter((t) => !FLAKY.test(t) && !baselineFailures.includes(t));
+  const attributable = failed.filter((t) => !flakyTests.includes(t) && !baselineFailures.includes(t));
   if (attributable.length) {
     return { outcome: "KILLED", killedBy: attributable, note: "" };
   }
   if (exitCode !== 0) {
     const why = failed.length
-      ? `only pre-existing or environment-flaky failures (${failed.slice(0, 2).join("; ")})`
+      ? `only pre-existing or observed-flaky failures (${failed.slice(0, 2).join("; ")})`
       : "the suite exited non-zero with no failing test — the replacement probably does not parse";
     return { outcome: "CRASHED", killedBy: [], note: why };
   }
@@ -154,7 +180,7 @@ export function classify({ exitCode, output, timedOut, baselineFailures = [] }) 
 
 // --------------------------------------------------------------------- main
 
-if (import.meta.main) {
+function main() {
   const args = process.argv.slice(2);
   const revIdx = args.indexOf("--rev");
   if (revIdx !== -1 && (args[revIdx + 1] === undefined || args[revIdx + 1].startsWith("--"))) {
@@ -179,6 +205,11 @@ if (import.meta.main) {
   }
 
   const work = mkdtempSync(join(tmpdir(), "unify-mutate-"));
+  // Registered here, not left to the `finally`: `process.exit()` inside the
+  // try skips it, and those are exactly the paths a survivor makes you re-run.
+  // A leaked copy is ~1 GB each, and several accumulated in one session.
+  let finalExit = 0;
+  process.on("exit", () => { try { rmSync(work, { recursive: true, force: true }); } catch { /* best effort */ } });
   const runSuite = () => {
     const r = spawnSync("bun", ["test"], {
       cwd: work, encoding: "utf8", timeout: SUITE_TIMEOUT_MS,
@@ -199,6 +230,11 @@ if (import.meta.main) {
   // 30-second suite run and removes the assumption entirely — the runner no
   // longer needs the copy to survive, only to be restorable.
   const extract = () => {
+    // The DIRECTORY, not just its contents: a suite running inside the copy
+    // removed the copy's own root, and the next extraction then failed with
+    // "tar: Cannot open". Recreating it is the difference between a run that
+    // survives that and one that reports a tar error as its result.
+    mkdirSync(work, { recursive: true });
     if (rev === null) {
       execFileSync("sh", ["-c",
         `tar -c -C ${JSON.stringify(ROOT)} --exclude=.git --exclude=node_modules --exclude=dist --exclude=.coverage . ` +
@@ -223,18 +259,30 @@ if (import.meta.main) {
       else if (hits > 1) { console.error(`AMBIGUOUS ${row.id} — the anchor appears ${hits}x in ${row.file}; make it unique`); bad++; }
       if (row.old === row.next) { console.error(`NO-OP ${row.id} — the replacement equals the anchor`); bad++; }
     }
-    if (bad) { console.error(`mutation: ${bad} unusable row(s)`); process.exit(2); }
+    if (bad) { console.error(`mutation: ${bad} unusable row(s)`); finalExit = 2; return; }
 
     // THE BASELINE GATE. Without it a red tree reports every mutation KILLED.
-    console.log("mutation: checking the baseline is green...");
-    const baseline = runSuite();
-    const baselineFailures = failingTests(baseline.output);
-    if (baseline.timedOut || baseline.exitCode !== 0) {
-      console.error("\nmutation: the suite is not green unmutated — fix that first, or every mutation reads as killed");
-      for (const t of baselineFailures.slice(0, 10)) console.error(`  failing: ${t}`);
-      process.exit(2);
+    // Run TWICE: the second run costs one suite and buys the flake set by
+    // observation instead of by a hand-maintained name list. It also stops one
+    // environmental port flake from discarding a fifteen-minute sweep — which
+    // is the habit that trains people to re-run a check until it passes.
+    console.log("mutation: checking the baseline is green (twice, to measure flakiness)...");
+    const first = failingTests(runSuite().output);
+    const second = failingTests(runSuite().output);
+    const { flaky, hard } = compareBaselines(first, second);
+    if (hard.length) {
+      console.error("mutation: the suite is not green unmutated — fix that first, or every mutation reads as killed");
+      for (const t of hard.slice(0, 10)) console.error(`  failing in both runs: ${t}`);
+      finalExit = 2;
+      return;
     }
-    console.log("mutation: baseline green");
+    const baselineFailures = hard;
+    if (flaky.length) {
+      console.log(`mutation: baseline green; ${flaky.length} test(s) observed flaky and excluded from kill attribution:`);
+      for (const t of flaky) console.log(`  flaky: ${t}`);
+    } else {
+      console.log("mutation: baseline green, no flakiness observed");
+    }
     console.log(`mutation: ${selected.length} mutation(s) against ${rev ?? "the working tree"}, in ${work}`);
 
     let unkilled = 0;
@@ -254,7 +302,19 @@ if (import.meta.main) {
       writeFileSync(target, pristine.replace(row.old, row.next));
       let verdict;
       try {
-        verdict = classify({ ...runSuite(), baselineFailures });
+        verdict = classify({ ...runSuite(), baselineFailures, flakyTests: flaky });
+        // A kill resting on ONE test is confirmed by repeating it. A test that
+        // is genuinely flaky but happened to pass both baseline runs would
+        // otherwise be credited as the kill — reporting "this rule is pinned"
+        // when nothing pinned it, which is the inversion this file exists to
+        // prevent, one level down.
+        if (verdict.outcome === "KILLED" && verdict.killedBy.length === 1) {
+          const again = classify({ ...runSuite(), baselineFailures, flakyTests: flaky });
+          if (!again.killedBy.includes(verdict.killedBy[0])) {
+            verdict = { outcome: "SURVIVED", killedBy: [],
+              note: `the only failing test (${verdict.killedBy[0]}) did not fail again — flaky, not a kill` };
+          }
+        }
       } finally {
         // Best-effort: the next row re-extracts anyway, so a failure here is
         // not fatal the way it was when the copy had to survive the whole run.
@@ -269,9 +329,12 @@ if (import.meta.main) {
       }
     }
 
-    if (unkilled) { console.error(`mutation: ${unkilled} mutation(s) not killed — each names an unpinned rule`); process.exit(1); }
+    if (unkilled) { console.error(`mutation: ${unkilled} mutation(s) not killed — each names an unpinned rule`); finalExit = 1; return; }
     console.log(`mutation: OK — all ${selected.length} killed (these rows only; not a statement about the rest of the inventory)`);
   } finally {
     rmSync(work, { recursive: true, force: true });
+    process.exitCode = finalExit;
   }
 }
+
+if (import.meta.main) main();
