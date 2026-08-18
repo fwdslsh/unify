@@ -55,14 +55,19 @@ test("ROB-01: a robots.txt outside the output root is an ordinary asset, interpr
   covers("ROB-01");
 }, TEST_MS);
 
-test("ROB-01: without --base-url the file is not interpreted at all", async () => {
-  const files = { "index.html": page("Home"), "robots.txt": "Sitemap: https://example.com/nowhere.xml\n" };
+test("ROB-01: a root-relative Sitemap: is checked with or without --base-url", async () => {
+  // The rule §23.1 states, in the one fixture that can distinguish it. An
+  // ABSOLUTE value cannot: `isSkippedUrl` discards it as another origin before
+  // activation is ever consulted, so a test built on one passes with the gate,
+  // without the gate, and with no check at all — which is what the earlier
+  // version of this test did.
+  const files = { "index.html": page("Home"), "robots.txt": "Sitemap: /nowhere.xml\n" };
   const off = mkTmp();
   writeTree(join(off, "src"), files);
   const a = await runCli(["build", "-s", "src", "-o", "dist"], off);
-  expectExit(a, 0, "no --base-url");
-  if (a.stderr.trim() !== "") {
-    throw new Error(`§23.1: whether a URL points inside this site is unanswerable without its address.\nstderr:\n${a.stderr}`);
+  expectExit(a, 1, "a root-relative Sitemap: with no --base-url");
+  if (!/nowhere\.xml/.test(a.stderr)) {
+    throw new Error(`§23.1: root-relative is internal by inspection — no address needed.\nstderr:\n${a.stderr}`);
   }
 
   const on = mkTmp();
@@ -70,6 +75,78 @@ test("ROB-01: without --base-url the file is not interpreted at all", async () =
   const b = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", BASE], on);
   expectExit(b, 1, "the same file with an address supplied");
   covers("ROB-01");
+}, TEST_MS);
+
+test("ROB-01: an other-origin Sitemap: is skipped, address or no address", async () => {
+  const files = { "index.html": page("Home"), "robots.txt": "Sitemap: https://elsewhere.example/nowhere.xml\n" };
+  for (const args of [[], ["--base-url", BASE]]) {
+    const tmp = mkTmp();
+    writeTree(join(tmp, "src"), files);
+    const r = await runCli(["build", "-s", "src", "-o", "dist", ...args], tmp);
+    expectExit(r, 0, `another origin ${args.length ? "with" : "without"} --base-url`);
+    if (r.stderr.trim() !== "") {
+      throw new Error(`§23.3: verifying it needs the network.\nstderr:\n${r.stderr}`);
+    }
+  }
+  covers("ROB-01");
+  covers("ROB-02");
+}, TEST_MS);
+
+test("ROB-02: the diagnostic quotes the author's own line, at the author's own line number", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": page("Home"),
+    // The authored spelling is absolute; §23.1 rewrites no byte of this file,
+    // so the stripped form is a string that appears nowhere the author can grep.
+    "robots.txt": "# our policy\nUser-agent: *\n\nSitemap: https://example.com/no-such-sitemap.xml\n",
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", BASE], tmp);
+  expectExit(r, 1, "a Sitemap: naming nothing emitted");
+  const authored = "https://example.com/no-such-sitemap.xml";
+  if (!r.stderr.includes(`in: ${authored}`)) {
+    throw new Error(`§14.1: "in:" is the offending SOURCE text.\nstderr:\n${r.stderr}`);
+  }
+  if (r.stderr.includes("in: /no-such-sitemap.xml")) {
+    throw new Error(`§14.1: the stripped form appears in no file.\nstderr:\n${r.stderr}`);
+  }
+  // Line 4, not line 1: a comment, the group, and a blank line precede it.
+  if (!/robots\.txt:4: problem:/.test(r.stderr)) {
+    throw new Error(`§14.1: located at the line the value is on.\nstderr:\n${r.stderr}`);
+  }
+  covers("ROB-02");
+}, TEST_MS);
+
+test("ROB-03: RFC 9309 §2.3.1.5 — an unparseable line leaves the parseable ones working", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": page("Home"),
+    // A line with no colon at all, between two that parse. A crawler must use
+    // the parseable rules; so must this check — the Sitemap below still fails.
+    "robots.txt": "User-agent: *\nthis line has no field separator\nSitemap: /nowhere.xml\n",
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist"], tmp);
+  expectExit(r, 1, "a malformed line above a broken Sitemap:");
+  if (!/nowhere\.xml/.test(r.stderr)) {
+    throw new Error(`§23.4: the parseable rules are still used.\nstderr:\n${r.stderr}`);
+  }
+  if (/no field separator/.test(r.stderr)) {
+    throw new Error(`§23.4: an unparseable line is inert, never a problem.\nstderr:\n${r.stderr}`);
+  }
+  covers("ROB-03");
+}, TEST_MS);
+
+test("ROB-03: a bare-CR file is still records, per RFC 9309's NL", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": page("Home"),
+    // RFC 9309's NL is CR, LF, or CRLF. Splitting on /\r?\n/ made a
+    // classic-Mac file one long unparseable line, so its Sitemap: was never
+    // checked — silence, which is the direction that ships a broken promise.
+    "robots.txt": "User-agent: *\rSitemap: /nowhere.xml\r",
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist"], tmp);
+  expectExit(r, 1, "a bare-CR robots.txt");
+  covers("ROB-03");
 }, TEST_MS);
 
 // ------------------------------------------------------------------- §23.3

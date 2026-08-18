@@ -154,11 +154,16 @@ export async function run(argv) {
   // refused rather than accepted inertly. `--clean` especially: a reader could
   // reasonably believe the output directory had been emptied, and a flag that
   // silently does nothing is the failure §14 exists to forbid.
+  // The check reads the EFFECTIVE settings, not the parsed flags. §18 defines
+  // `unify.yaml` as saved CLI flags — its keys are the long option names — so a
+  // saved `clean: true` is `--clean`, and reading `options` let it through
+  // inertly on the one path a reader is least likely to check. The fix line
+  // names both spellings because the error cannot tell which one you used.
   if (command === "audit") {
-    for (const flag of ["clean", "dry-run"]) {
-      if (options[flag] !== true) continue;
+    for (const [flag, value] of [["clean", settings.clean], ["dry-run", settings.dryRun]]) {
+      if (value !== true) continue;
       throw new UsageError(`unify audit does not take --${flag}: audit never writes`, [
-        `drop --${flag}`,
+        `drop --${flag}, or remove \`${flag}\` from unify.yaml`,
         "audit runs the whole pipeline and reports on the site build would publish; run `unify build` to publish it",
       ]);
     }

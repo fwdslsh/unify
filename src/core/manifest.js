@@ -48,6 +48,9 @@ import { stripBaseUrl, resolveReference } from "./references.js";
  * @property {string} url
  * @property {number|null} width
  * @property {number|null} height
+ * @property {boolean} fromOg - true when og:image supplied the url, false when
+ *   twitter:image did; §20.3 reads the dimensions only in the first case, so a
+ *   consumer reporting their absence needs to know which page it is looking at
  *
  * @typedef {object} RobotsValue
  * @property {string|null} raw
@@ -452,6 +455,7 @@ function extract(page, base) {
       ? null
       : {
           url: imageUrl,
+          fromOg,
           width: fromOg ? intOrNull(ogWidth.kept) : null,
           height: fromOg ? intOrNull(ogHeight.kept) : null,
         },

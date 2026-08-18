@@ -52,6 +52,8 @@ audit: 1 broken, 1 incomplete
 
 Findings never block a build — `unify build` does not run any of these checks, so a site full of them still publishes. `unify audit --strict` exits `1` on any finding, of either severity: that is the CI gate, and it is opt-in.
 
+Worth knowing before you wire it up: **the `init` templates do not pass `unify audit --strict` yet.** Each ships with a handful of `incomplete` findings — mostly a missing `lang` or a page without its own description — so a fresh scaffold exits `1` under the gate while `unify build --dry-run --strict` exits `0` as it always has. Those are real findings about real gaps, and closing them is template work, not a reason to soften the gate.
+
 **What it will not tell you.** There is no score, no grade, no percentage, and no character count anywhere in the output. A short title is not a finding and a long description is not a finding; absence is checkable, length is opinion. "Duplicate" means *identical*, never "similar" — a similarity threshold is a number nobody can defend to the author whose two pages fell either side of it. A title and a heading agree when either contains the other, which is why the layout suffix in `About — Example Site` does not conflict with an `<h1>` of `About`.
 
 A finding is also never raised for something the build already refuses to publish. A canonical or an `og:image` naming a file the site does not emit is a *problem* — it blocks the publish outright, which is stronger than reporting it.
@@ -102,12 +104,6 @@ Knowing the address is also what lets unify write the site's `sitemap.xml`, so `
 
 A bare path (`--base-url /repo-name/`) is a usage error naming the full form. It used to be accepted, and prefixed links correctly while leaving `og:`/`canonical` root-relative — valid-looking metadata no share crawler can fetch. Give the whole address; for a local preview of a subpath site, `http://localhost:3000/repo-name/` is one.
 
-### `robots.txt`
-
-If your source tree has a `robots.txt` at its root, it ships exactly as written — unify never generates one, never rewrites one, and never decides what you should block. With `--base-url` set, one thing in it is checked: a `Sitemap:` line is a promise that a crawler can fetch that URL, so a value naming a file your site does not build is reported like any other broken reference. A `Sitemap:` on another host is left alone, because verifying it would need the network and a build never uses it.
-
-Nothing else is checked, on purpose. `Disallow: /admin/` on a site with no `/admin/` is defensive and correct. A line unify cannot parse, and a field it does not recognise, are both required to be ignored by the Robots Exclusion Protocol — failing your build over one would contradict the standard. And not declaring a sitemap is your choice, even when unify generated one.
-
 ### `--canonical auto`
 
 Adds `<link rel="canonical" href="…">` to every page that does not author one, using that page's own final public URL — the same address the `--dry-run` report prints and the sitemap lists. `auto` is the only accepted value, and the option needs `--base-url`: a canonical has to be absolute, so without the site's address there is nothing truthful to write.
@@ -136,6 +132,12 @@ The first line is the address the build assumed — `serving from / — the doma
 ### `--strict`
 
 Advisories affect the exit code (non-zero) — never what is published. `unify build --dry-run --strict` is the one-line CI lint.
+
+## `robots.txt`
+
+If your source tree has a `robots.txt` at its root, it ships exactly as written — unify never generates one, never rewrites one, and never decides what you should block. One thing in it is checked: a `Sitemap:` line is a promise that a crawler can fetch that URL, so a value naming a file your site does not build is reported like any other broken reference — the same check, and the same message, your `<a href>` links get. A `Sitemap:` on another host is left alone, because verifying it would need the network and a build never uses it.
+
+Nothing else is checked, on purpose. `Disallow: /admin/` on a site with no `/admin/` is defensive and correct. A line unify cannot parse is one the Robots Exclusion Protocol tells crawlers to skip while still using the rules around it, and a field unify does not recognise is one the protocol explicitly leaves room for — failing your build over either would contradict the standard. And not declaring a sitemap is your choice, even when unify generated one.
 
 ## Exit codes
 

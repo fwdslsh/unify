@@ -26,7 +26,7 @@
 
 import { CHECK_SPELLING } from "./diagnostics.js";
 import { resolveReference, stripBaseUrl } from "./references.js";
-import { isSkippedUrl, splitUrl } from "./urls.js";
+import { isSkippedUrl } from "./urls.js";
 
 /** The one path the Robots Exclusion Protocol gives meaning to (§23.1). */
 export const ROBOTS_PATH = "robots.txt";
@@ -41,8 +41,8 @@ export const ROBOTS_PATH = "robots.txt";
  * @param {string} text
  * @returns {{field: string|null, value: string, line: number}[]}
  */
-export function parseRobots(text) {
-  return text.split(/\r?\n/).map((raw, i) => {
+function parseRobots(text) {
+  return text.split(/\r\n|[\r\n]/).map((raw, i) => {
     const line = i + 1;
     const withoutComment = raw.replace(/#.*$/, "").trim();
     if (withoutComment === "") return { field: null, value: "", line };
@@ -57,9 +57,20 @@ export function parseRobots(text) {
  * resolve to a file it emits.
  *
  * "Names a location this site emits" is §12's own test, reused rather than
- * re-derived: strip the `--base-url` prefix, and a value left root-relative or
- * relative is internal. A value on another origin is skipped, because verifying
- * it needs the network and network access is an explicit audit operation.
+ * re-derived: strip the `--base-url` prefix when there is one, and a value left
+ * root-relative or relative is internal. A value on another origin is skipped,
+ * because verifying it needs the network and network access is an explicit
+ * audit operation. `base` may be null — a root-relative value is internal by
+ * inspection, and §23.1 says why this section is not gated on the flag.
+ *
+ * THE DIAGNOSTIC QUOTES THE AUTHOR'S OWN LINE. §14.1 defines `in:` as the
+ * offending *source text*, and §12 satisfies that by printing the stripped
+ * value because §11.3 rewrote the author's root-relative URL into the
+ * absolutized one — there, stripped IS what the author typed. §23.1 guarantees
+ * the opposite for this file: not one byte of it is rewritten, so the stripped
+ * form is a string that appears nowhere the author can grep, handed to them
+ * under "check the path spelling". Resolution still runs on the stripped value;
+ * only the report shows the authored one.
  *
  * @param {object} args
  * @param {string} args.text - the emitted robots.txt
@@ -73,14 +84,13 @@ export function checkRobots({ text, file, emittedPaths, base, reporter }) {
     if (record.field !== "sitemap" || record.value === "") continue;
     const stripped = base ? stripBaseUrl(record.value, base) : record.value;
     if (isSkippedUrl(stripped)) continue; // another origin — not checkable offline
-    if (splitUrl(stripped).path === "") continue;
     const resolved = resolveReference(stripped, ROBOTS_PATH);
     if (resolved === null || emittedPaths.has(resolved)) continue;
     reporter.problem({
       file,
       line: record.line,
-      message: `${stripped} does not resolve to any emitted file`,
-      context: stripped,
+      message: `${record.value} does not resolve to any emitted file`,
+      context: record.value,
       fixes: [CHECK_SPELLING],
     });
   }

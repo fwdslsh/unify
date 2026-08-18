@@ -32,7 +32,7 @@
  * publish path; `unify audit --strict` is the opt-in gate.
  */
 
-import { isSelfCanonical } from "./sitemap.js";
+import { canonicalTarget } from "./sitemap.js";
 
 /**
  * @typedef {object} Finding
@@ -48,18 +48,32 @@ import { isSelfCanonical } from "./sitemap.js";
 const norm = (s) => s.toLowerCase().replace(/\s+/g, " ").trim();
 
 /**
+ * §20.3's requirement on any consumer that compares `text`: fold U+00A0 and
+ * the other Unicode space separators **at index time**. §20.3 collapses ASCII
+ * whitespace only and says why — a `&nbsp;` is a character the author chose,
+ * and rewriting it in the shared record would push one consumer's
+ * normalization onto every other. The cost lands here, where the comparison
+ * happens, exactly as that clause says it must. JS `\s` is the fold: it covers
+ * U+00A0, U+2000..U+200A, U+202F, U+205F, U+3000 and the rest.
+ *
+ * This is normalization, not similarity. Two pages whose text differs only by
+ * a non-breaking space are the same text; two pages whose text differs by a
+ * word are not, at any threshold (§24.4).
+ */
+const foldSpaces = (s) => s.replace(/\s+/g, " ").trim();
+
+/**
  * §24 — evaluate a manifest.
  *
  * @param {object} args
  * @param {import('./manifest.js').PageRecord[]} args.records
  * @param {Map<string, import('./manifest.js').PageRecord>} args.byOutputPath
- * @param {Set<string>} args.emittedPaths
  * @param {import('./urls.js').BaseUrlConfig|null} args.base
  * @param {Map<string, string>} [args.sitemapLocs] - output path -> the sitemap
  *   file that lists it, for the discovery-artifact comparisons
  * @returns {Finding[]} ordered by source path, then by finding id
  */
-export function auditManifest({ records, byOutputPath, emittedPaths, base = null, sitemapLocs = new Map() }) {
+export function auditManifest({ records, byOutputPath, base = null, sitemapLocs = new Map() }) {
   /** @type {Finding[]} */
   const out = [];
   const add = (record, id, severity, evidence, fix) =>
@@ -78,7 +92,7 @@ export function auditManifest({ records, byOutputPath, emittedPaths, base = null
   };
   const byTitle = group((r) => (r.title === null ? null : norm(r.title)));
   const byDescription = group((r) => (r.description === null ? null : norm(r.description)));
-  const byText = group((r) => (r.text === "" ? null : r.text));
+  const byText = group((r) => (r.text === "" ? null : foldSpaces(r.text)));
 
   for (const record of records) {
     const others = (m, key) => (key === null ? [] : (m.get(norm(key)) ?? []).filter((r) => r !== record));
@@ -146,7 +160,12 @@ export function auditManifest({ records, byOutputPath, emittedPaths, base = null
     // The site root is reachable by definition and 404.html is never linked, so
     // neither is an orphan; every other page nothing links to is unreachable by
     // a reader who did not already have its URL.
-    if (record.linksIn.length === 0 && record.outputPath !== "index.html" && record.outputPath !== "404.html") {
+    // A self-link is not an incoming link. §20.9 records one (a permalink, a
+    // "back to top" href to the page's own URL), and counting it made a page
+    // nothing else links to unreportable — contradicting this finding's own
+    // evidence line, which has always said "no OTHER page links to this one".
+    const linksInFromElsewhere = record.linksIn.filter((p) => p !== record.outputPath);
+    if (linksInFromElsewhere.length === 0 && record.outputPath !== "index.html" && record.outputPath !== "404.html") {
       add(record, "page-orphan", "incomplete",
         "no other page links to this one",
         "link to it from a page that is reachable, or exclude it with a leading underscore");
@@ -165,8 +184,22 @@ export function auditManifest({ records, byOutputPath, emittedPaths, base = null
       const target = byOutputPath.get(link.target);
       if (!target || target.ids.includes(link.id)) continue;
       add(record, "fragment-missing", "broken",
-        `#${link.id} in ${link.target === record.outputPath ? "this page" : link.target} names no element`,
+        `${JSON.stringify(`#${link.id}`)} in ${link.target === record.outputPath ? "this page" : link.target} names no element`,
         `add id="${link.id}" to the element it should reach, or correct the link`);
+    }
+
+    // ---- contradictory declarations ----------------------------------------
+    // §20.4 keeps the first of two differing values and records the loser;
+    // §22.5 assigns the reporting of that to this command by name. Without
+    // this loop the record carried the data and nothing read it, so a page
+    // declaring two different canonicals — the case product-spec §6.3.2 asks
+    // to have reported — was silent in `build` AND in `audit`.
+    for (const conflict of record.conflicts) {
+      add(record, "metadata-conflict", "broken",
+        `the page declares ${conflict.discarded.length + 1} different values for ${conflict.field}: ` +
+        `${JSON.stringify(truncate(conflict.kept))} is used, ` +
+        `${conflict.discarded.map((d) => JSON.stringify(truncate(d))).join(", ")} ignored`,
+        `keep one — a page that declares two answers to one question has given consumers no answer`);
     }
 
     // ---- structured data ---------------------------------------------------
@@ -198,20 +231,36 @@ export function auditManifest({ records, byOutputPath, emittedPaths, base = null
     // records the reasoning; this is where it would otherwise have been added.
     if (record.image !== null) {
       if (record.image.width === null || record.image.height === null) {
-        add(record, "image-missing-dimensions", "incomplete",
-          "the share image declares no og:image:width and og:image:height",
-          "declare both — some crawlers skip an image whose size they cannot know in advance");
+        // §20.3 reads the dimensions only when og:image supplied the url, so a
+        // twitter:image-only page reaches here with og:image:width and
+        // og:image:height BOTH declared. Saying "declares no og:image:width"
+        // there is a false statement about the page, under a fix that changes
+        // nothing (§24.5). The action that clears it is the one named.
+        const [evidence, fix] = record.image.fromOg
+          ? ["the share image declares no og:image:width and og:image:height",
+             "declare both — some crawlers skip an image whose size they cannot know in advance"]
+          : ["the share image comes from twitter:image, which carries no dimensions",
+             "add an og:image with og:image:width and og:image:height — og:image is what dimensions attach to"];
+        add(record, "image-missing-dimensions", "incomplete", evidence, fix);
       }
     }
 
     // ---- discovery-artifact agreement --------------------------------------
-    // Both cross-artifact findings turn on ONE question — does this page's
-    // canonical name this page? — so both ask §21.2's own `isSelfCanonical`.
-    // Neither may ask it through `isCompletablePage`, which answers a broader
-    // question (membership) that a `noindex` page fails for an unrelated
-    // reason: doing so reported a self-canonical page for "disagreeing" with a
-    // sitemap, quoting its own URL as the evidence.
-    const elsewhere = record.canonical !== null && !isSelfCanonical(record, base);
+    // Both cross-artifact findings turn on ONE question — WHICH page does this
+    // page's canonical name? — so both read §21.2's own `canonicalTarget`.
+    //
+    // Two readings of that question have already produced a finding whose
+    // evidence quoted the page's own URL back at it, and both are excluded
+    // here by construction. It may not be asked through `isCompletablePage`,
+    // which answers a broader question (membership) that a `noindex` page
+    // fails for an unrelated reason. And an *unresolvable* canonical is not
+    // "somewhere else": with no --base-url every absolute canonical is
+    // unresolvable, so `null` must not accuse. The finding is therefore
+    // narrower without the site's address — a root-relative canonical still
+    // resolves, an absolute one cannot — and saying nothing is the only
+    // honest answer when unify does not know where the site lives.
+    const target = canonicalTarget(record, base);
+    const elsewhere = target !== null && target !== record.outputPath;
 
     // The cross-canonical shape, which is the contradiction: a page telling
     // crawlers not to index it while consolidating onto something else. A
@@ -219,13 +268,13 @@ export function auditManifest({ records, byOutputPath, emittedPaths, base = null
     // §22.4 declines to complete one on a noindex page for the same reason.
     if (!record.robots.indexable && elsewhere) {
       add(record, "canonical-noindex", "broken",
-        `the page is ${record.robots.raw} and its canonical points at ${JSON.stringify(record.canonical)}`,
+        `the page is ${JSON.stringify(foldSpaces(record.robots.raw))} and its canonical points at ${JSON.stringify(record.canonical)}`,
         "drop one of them — a page cannot both refuse indexing and nominate a replacement");
     }
     const listedBy = sitemapLocs.get(record.outputPath);
     if (listedBy !== undefined && !record.robots.indexable) {
       add(record, "sitemap-noindex", "broken",
-        `${listedBy} lists this page, but the page is ${record.robots.raw}`,
+        `${listedBy} lists this page, but the page is ${JSON.stringify(foldSpaces(record.robots.raw))}`,
         `remove it from ${listedBy}, or remove the robots meta`);
     }
     if (listedBy !== undefined && elsewhere) {
@@ -238,7 +287,7 @@ export function auditManifest({ records, byOutputPath, emittedPaths, base = null
     // IDENTICAL, not "substantially similar". A similarity threshold is a
     // number nobody can justify, so unify does not have one.
     if (record.text !== "") {
-      const dupes = (byText.get(record.text) ?? []).filter((r) => r !== record);
+      const dupes = (byText.get(foldSpaces(record.text)) ?? []).filter((r) => r !== record);
       if (dupes.length) {
         add(record, "text-duplicate", "incomplete",
           `the visible text is identical to ${listPaths(dupes)}`,

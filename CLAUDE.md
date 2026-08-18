@@ -27,7 +27,8 @@ bun run build:windows                      # Windows x64 binary
 # The CLI (complete — there are no other commands or flags)
 bun src/cli.js build  [-s src] [-o dist] [--clean] [--exclude <glob>]... \
                       [--pretty-urls] [--base-url <url>] [--canonical auto] [--dry-run] [--strict]
-bun src/cli.js audit  [-s src] [-o dist] [--base-url <url>] [--strict]   # 0.8: evaluate, write nothing
+bun src/cli.js audit  [-s src] [-o dist] [--exclude <glob>]... [--pretty-urls] \
+                      [--base-url <url>] [--canonical auto] [--strict]  # 0.8: evaluate, write nothing
 bun src/cli.js dev    [-p 3000]            # build + watch + serve + reload
 bun src/cli.js watch                       # build + rebuild on change, no server
 bun src/cli.js init [template]             # default | basic | blog | docs | portfolio

@@ -823,7 +823,9 @@ Order within the pipeline: §11.1 → §11.2 → §11.3.
 
 After the temporary tree is complete, every internal URL the output contains is checked against the emitted files — not only the ones rewriting touched:
 
-- In every emitted HTML file: all `href`, `src`, `srcset`, `poster` values; `<link>` `href` for every rel; root-relative `content` values of `og:*`/`twitter:*` metas.
+- In every emitted HTML file: all `href`, `src`, `srcset`, `poster` values; `<link>` `href` for every rel; the `content` of the **URL-valued** `og:`/`twitter:` metas — `og:url`, `og:image`, `og:audio`, `og:video`, `twitter:image`, `twitter:player`, and their `:url`/`:secure_url`/`:src`/`:stream` forms — in every spelling, root-relative, relative, or absolute.
+
+  The scope is a closed list of *properties* rather than a test on the *value* for a reason this document got wrong for its whole life. It cannot be every `og:`/`twitter:` meta, because `og:site_name` is "Meridian Coffee" and `twitter:card` is "summary", and checking those as relative references would fail every correct site that has one. It was therefore written as a test on the value — root-relative or `http(s):` — which checked the two spellings an author is least likely to get wrong and never checked the third. A **relative** `og:image` naming no file was collected by nothing and reported by nothing, and §24.4 went on to drop its own `image-missing-target` finding on the stated grounds that this rule already covered it. Naming the properties makes the *kind* of the value the criterion, so every spelling of a URL is checked and no prose ever is.
 - In every emitted CSS file, every `<style>` block, and every `style` attribute of emitted HTML: `url(…)` tokens. (Rewriting deliberately never reaches these — §11.1 — but checking is not rewriting: the exemption is about not editing the author's CSS, not about not reading it, and a `url()` the author got wrong must fail here, not 404 quietly.)
 
 A URL is internal when, after stripping the `--base-url` prefix — the path prefix, or the full base (origin + path) when a full URL was given, so values §11.3 absolutized stay checkable instead of masquerading as external — it is root-relative or relative (resolved against the containing output file's URL). Query and fragment are stripped; external/`mailto:`/`tel:`/`data:`/fragment-only URLs are skipped. A directory URL (trailing `/` or empty path) checks for `index.html` within it. A URL that resolves to no emitted file is a **problem** naming the source file, the reference, and the line where known — a renamed page, an asset stranded in an underscore folder, a hand-written pretty URL in a non-pretty build, and a path whose case doesn't match the file all fail here, loudly. (Case is compared exactly, byte for byte: a reference that only matches case-insensitively still fails — it would 404 on the Linux host.) `#fragment` targets are not validated against ids — that is a reader's judgment, not a build gate.
@@ -1218,15 +1220,19 @@ unify never writes a `robots.txt` and never decides what a site should block. Th
 
 ### 23.1 Scope
 
-The output-root `robots.txt`, when the site emits one from its own source. A `robots.txt` anywhere else in the tree is an ordinary mirror-copied asset: the Robots Exclusion Protocol only gives the root file meaning, and a file unify would never interpret is a file it does not interpret. Nothing here generates, rewrites, or reorders a byte of it — the author's policy ships exactly as written.
+The output-root `robots.txt`, when the site emits one from its own source. A `robots.txt` anywhere else in the tree is an ordinary mirror-copied asset: [RFC 9309](https://www.rfc-editor.org/rfc/rfc9309.html) §2.3 fetches the file from one place — `/robots.txt` at the origin — so a copy in `blog/` is a file no crawler asks for, and a file unify would never interpret is a file it does not interpret. Nothing here generates, rewrites, or reorders a byte of it: the author's policy ships exactly as written.
 
-Activation follows §21.1: these checks run when `--base-url` supplied the site's public address, for the same reason. A `Sitemap:` value is an absolute URL by [RFC 9309](https://www.rfc-editor.org/rfc/rfc9309.html) §2.2.3, and deciding whether one points inside *this* site is not answerable without knowing the site's address.
+**Under a subpath `--base-url` the file is checked but not served.** `--base-url https://example.com/repo/` puts the output root at `/repo/`, so the emitted file answers to `/repo/robots.txt`, which no crawler fetches. §23 checks it anyway, and deliberately: the file is still what the author wrote, still what they will move or symlink to the origin root, and a `Sitemap:` line that names nothing is wrong wherever it is served from. What unify must not do is *invent* the deployment — it does not warn that the file is at the wrong address, because it cannot know whether the subpath is the whole site or one deploy of it.
+
+**These checks are not gated on `--base-url`.** §21.1 gates its section because a `<loc>` is absolute by protocol, so classifying one genuinely needs the site's address. That premise does not carry here: `Sitemap: /sitemap.xml` is internal by inspection, with no address required. An earlier version of this section borrowed §21.1's conclusion without its premise, and the result was an asymmetry inside a single build — §12 blocked the publish for `<a href="/gone.html">` while the identically-shaped `Sitemap: /gone.xml` beside it stayed silent, in exactly the configuration where a broken sitemap declaration is most likely, since a site with no `--base-url` has no generated `sitemap.xml` for the line to name. `--base-url` governs only the stripping step of §23.3's internal test, exactly as it does in §12.
 
 ### 23.2 Records
 
 The file is read as RFC 9309 records: a line is a comment (`#`), blank, or `field: value`. Field names are case-insensitive. Everything the parser cannot make sense of is carried through untouched — §23.4 says why that is not an error.
 
 ### 23.3 `Sitemap:` is a reference
+
+The `Sitemap` line is defined by the [Sitemaps protocol](https://www.sitemaps.org/protocol.html), not by RFC 9309 — which mentions it only as its example of a record outside the protocol (§2.2.4) — and it is the Sitemaps protocol that asks for a full URL there. unify does not require one: a value naming a location this site emits, in any spelling §12 accepts, is checked the same way.
 
 A `Sitemap:` value naming a location this site emits must resolve to a file the site emits, or it is **P13**, the same broken-reference problem §12 raises for a page and §21.6 for a `<loc>`, located at the source `robots.txt`. "Naming a location this site emits" is §12's own test, reused: strip the `--base-url` prefix, and a value that is left root-relative or relative is internal. A value on another origin is skipped — verifying it needs the network, and network access is an explicit audit operation, never a build dependency.
 
@@ -1235,8 +1241,8 @@ This is the one check because it is the one **reference**. A `Sitemap:` line is 
 ### 23.4 What is deliberately not checked
 
 - **`Disallow` and `Allow` values are patterns, not references.** `Disallow: /admin/` on a site with no `/admin/` is ordinary and defensive — blocking a path that does not exist yet is exactly what an author should do. Checking them would be inventing the policy product-spec §6.3.3 forbids: "unify never decides what an author should block."
-- **A malformed line is not a build problem.** RFC 9309 §2.2.1 states that crawlers **must** ignore lines they cannot parse, so an unparseable line is *defined* to be inert. Failing a publish over one would contradict the standard the check exists to serve.
-- **An unknown field is not an error.** The same section requires crawlers to ignore fields they do not recognise, which is what makes the format extensible.
+- **A malformed line is not a build problem.** RFC 9309 §2.3.1.5 (Parsing Errors) requires crawlers to try to parse every line and to **use the parseable rules** — an unparseable line does not invalidate the file or the lines around it. Failing a publish over one would contradict the standard the check exists to serve.
+- **An unknown field is not an error.** RFC 9309 §2.2.4 (Other Records) *permits* crawlers to interpret records that are not part of the protocol, and names `Sitemap` as its example. The permission is what makes the format extensible, and it runs both ways: unify may read the `Sitemap` line precisely because §2.2.4 allows it, and must not reject a field it does not recognise, because another consumer may be the one reading it.
 - **A missing `Sitemap:` line is not an error, even when unify generated a sitemap.** Declaring one is the author's choice; a tool that required it would be deciding policy in the other direction.
 - **A page's own `noindex` versus what a sitemap lists** is a contradiction between two authored things, not a broken reference. Product-spec §6.3.4 assigns robots conflicts to `unify audit`, and §6.1 keeps subjective findings out of the publish path; §20.6 already records each page's directives as the data that command will read.
 
@@ -1291,10 +1297,13 @@ Every finding is a predicate over the §20 manifest. `record` is the page being 
 | `jsonld-invalid` | broken | a `jsonLd` entry has a non-null `error` |
 | `schema-incomplete` | incomplete | `schemaType` is `Article` or `BlogPosting` and `title` is null, or `datePublished` is null or has a null `iso` |
 | `image-missing-dimensions` | incomplete | `image` is present and either `width` or `height` is null |
-| `canonical-noindex` | broken | the page is not `indexable` and its canonical names somewhere else — §21.2's own self-canonical test, negated |
+| `canonical-noindex` | broken | the page is not `indexable` and its canonical **resolves to** a different page |
 | `sitemap-noindex` | broken | a sitemap emitted by this build lists the page and the page is not `indexable` |
-| `sitemap-canonical-disagree` | broken | a sitemap lists the page and its canonical names somewhere else — the same test, not §21.2's membership predicate |
-| `text-duplicate` | incomplete | another page's `text` is byte-identical and non-empty |
+| `sitemap-canonical-disagree` | broken | a sitemap lists the page and its canonical **resolves to** a different page |
+| `text-duplicate` | incomplete | another page's `text` is identical, after folding Unicode space separators, and non-empty |
+| `metadata-conflict` | broken | the page declares two or more differing values for one field — one finding per field in `conflicts` |
+
+`metadata-conflict` is what §20.4 and §22.5 both promise this command will render. §20.4 keeps the first of two differing declarations and records the loser precisely so that a human can be told; §22.5 assigns "multiple canonicals" here by name, and product-spec §6.3.2 requires them reported. Until it existed the record carried the data and nothing read it, so a page shipping two contradictory canonicals and two contradictory descriptions was silent in `build` *and* in `audit` — the one shape where both commands agreed to say nothing about a page that contradicts itself. It is `broken` because a page declaring two answers to one question has given consumers no answer.
 
 Three of these are narrower than the plain-language name suggests, and each narrowing has a reason rather than a preference:
 
@@ -1306,9 +1315,18 @@ Three more absences are deliberate.
 
 - **A canonical naming its own page is not `canonical-noindex`.** On a `noindex` page that is redundant, not contradictory, and §22.4 declines to complete one there for the same reason. The contradiction product-spec §6.3.2 names is the *cross*-canonical shape.
 
-  Both findings that turn on this ask §21.2's `isSelfCanonical` **directly**. Neither may ask it by negating §21.2's *membership* predicate, which is a broader question a `noindex` page fails for an unrelated reason: doing so reports a self-canonical page for "disagreeing" with a sitemap and quotes its own URL as the evidence. A canonical this build cannot resolve — another origin, a `mailto:`, an empty value — is not self-canonical, because it names something unify cannot confirm is this page.
+  Both findings that turn on this read §21.2's `canonicalTarget` — *which page does this canonical name?* — and fire only on a resolved answer that is a different page. Two other readings of the question have each produced a finding whose evidence quoted the page's own URL back at it, and both are excluded by construction:
+
+  - **Not by negating §21.2's *membership* predicate.** Membership is a broader question that a `noindex` page fails for an unrelated reason, so a self-canonical `noindex` page listed in a sitemap was reported as "disagreeing" with it.
+  - **Not by treating *unresolvable* as "somewhere else".** A canonical on another origin, a `mailto:`, an empty value, or an absolute URL with no `--base-url` to strip names something this build cannot confirm either way. Membership reads that as "not self-canonical", which is the conservative direction *there* — do not list a page unless its canonical demonstrably names it. For a finding the conservative direction is the opposite, and folding the two together meant that on the default golden path, where no `--base-url` is set and every absolute canonical is therefore unresolvable, a page whose canonical named itself was reported as nominating a replacement.
+
+  The consequence is that both findings are narrower without `--base-url`: a root-relative canonical still resolves, an absolute one cannot, and unify says nothing rather than guessing where the site lives.
 - **A canonical naming a location the site does not emit is P13, not a finding.** §12 checks `link href` for every `rel`, so the build already refuses to publish it (§22.5).
-- **A share image naming a location the site does not emit is P13 too.** Product-spec §6.3.4 lists "missing social-image targets" among the findings this command should carry, and the intent is met — but it is met by v0.7.0's §12, which has always checked `content` on every `og:`/`twitter:` meta. Reporting it here as well would answer one question with two mechanisms, which is precisely what §6.1's single-interpretation constraint forbids, and it would answer it *worse*: a finding reports, while P13 blocks the publish. `image-missing-dimensions` remains a finding because a missing dimension is not a broken reference — nothing to resolve, nothing for §12 to check. An image on **another origin** is skipped by §12 and unreachable here, because verifying it needs the network; that is `audit --external`, never a build dependency (§6.1).
+- **A share image naming a location the site does not emit is P13 too.** Product-spec §6.3.4 lists "missing social-image targets" among the findings this command should carry, and the intent is met by §12 — which blocks the publish rather than reporting, the stronger of the two answers, and keeps the question to one mechanism as §6.1 requires.
+
+  This absence was first written on a false premise, and the premise is recorded because it is the more useful half. §12 was described here as having "always checked `content` on every `og:`/`twitter:` meta"; it had not. Its scope was a test on the *value* — root-relative or absolute — so a **relative** `og:image` naming nothing was checked by neither command: `build` never collected it, and `audit` had dropped the finding on the grounds that `build` covered it. A chain of two correct-sounding steps terminated in nobody. The repair was to make §12's premise true rather than to add a second mechanism, because the finding would have been the weaker answer to a question §12 can settle.
+
+  `image-missing-dimensions` remains a finding because a missing dimension is not a broken reference — nothing to resolve, nothing for §12 to check. An image on **another origin** is skipped by §12 and unreachable here, because verifying it needs the network; that is `audit --external`, never a build dependency (§6.1).
 
 ### 24.5 The report
 

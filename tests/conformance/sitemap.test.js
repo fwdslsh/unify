@@ -366,6 +366,12 @@ test("SIT-06: a namespace-prefixed loc is a loc, so a broken one cannot ship sil
   if (!r.stderr.includes("gone.html")) {
     throw new Error(`§21.6: a prefixed <sm:loc> is a loc and must be checked.\nstderr:\n${r.stderr}`);
   }
+  // §14.1: "in:" is the offending SOURCE text, and no byte of an authored
+  // sitemap is rewritten — so the stripped form appears in no file the author
+  // can grep, which is the same defect §23.3 fixes for robots.txt.
+  if (!r.stderr.includes("in: https://example.com/gone.html")) {
+    throw new Error(`§14.1: the diagnostic quotes what the author wrote.\nstderr:\n${r.stderr}`);
+  }
   covers("SIT-06");
 }, TEST_MS);
 

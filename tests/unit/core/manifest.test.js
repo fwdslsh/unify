@@ -199,12 +199,12 @@ describe("§20.3 fields (MAN-03)", () => {
           `<meta property="og:image:height" content="630">`,
       ),
     );
-    expect(r.image).toEqual({ url: "/card.png", width: 1200, height: 630 });
+    expect(r.image).toEqual({ url: "/card.png", fromOg: true, width: 1200, height: 630 });
   });
 
   test("image falls back to twitter:image and null dimensions", () => {
     const r = only(doc(`<meta name="twitter:image" content="/t.png">`));
-    expect(r.image).toEqual({ url: "/t.png", width: null, height: null });
+    expect(r.image).toEqual({ url: "/t.png", fromOg: false, width: null, height: null });
   });
 
   test("og:image wins over twitter:image regardless of document order", () => {
@@ -222,7 +222,7 @@ describe("§20.3 fields (MAN-03)", () => {
           `<meta property="og:image:height" content="six hundred">`,
       ),
     );
-    expect(r.image).toEqual({ url: "/card.png", width: null, height: null });
+    expect(r.image).toEqual({ url: "/card.png", fromOg: true, width: null, height: null });
   });
 
   test("dimensions attach only when og:image supplied the url", () => {
@@ -233,14 +233,14 @@ describe("§20.3 fields (MAN-03)", () => {
           `<meta property="og:image:height" content="630">`,
       ),
     );
-    expect(r.image).toEqual({ url: "/tw.png", width: null, height: null });
+    expect(r.image).toEqual({ url: "/tw.png", fromOg: false, width: null, height: null });
   });
 
   test("an absurd dimension is null, not a float", () => {
     const r = only(
       doc(`<meta property="og:image" content="/c.png">\n<meta property="og:image:width" content="99999999999999999999">`),
     );
-    expect(r.image).toEqual({ url: "/c.png", width: null, height: null });
+    expect(r.image).toEqual({ url: "/c.png", fromOg: true, width: null, height: null });
   });
 
   test("an empty first h1 is null, like an empty title", () => {

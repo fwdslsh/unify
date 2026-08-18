@@ -100,9 +100,33 @@ const xmlUnescape = decodeXmlEntities;
  */
 export function isSelfCanonical(record, base) {
   if (record.canonical === null) return true;
+  return canonicalTarget(record, base) === record.outputPath;
+}
+
+/**
+ * §21.2/§24.4 — **which page** this page's canonical names, or `null` when
+ * this build cannot say: no canonical, another origin, a `mailto:`, an empty
+ * value, or an absolute URL with no `--base-url` to strip.
+ *
+ * The three-way answer is the point. `isSelfCanonical` folds `null` into
+ * `false`, which is the conservative direction for *membership* — do not list
+ * a page in a sitemap unless its canonical demonstrably names it — and the
+ * wrong direction for a *finding*, where the conservative move is not to
+ * accuse. With no `--base-url`, every absolute canonical is unresolvable, so
+ * reading `false` as "names somewhere else" reported a page whose canonical
+ * named itself, quoting the page's own URL as the evidence, on the default
+ * golden path. Each caller now states its own direction instead of inheriting
+ * one from a boolean that cannot carry both.
+ *
+ * @param {import('./manifest.js').PageRecord} record
+ * @param {import('./urls.js').BaseUrlConfig|null} base
+ * @returns {string|null} an emitted output path, or null when unanswerable
+ */
+export function canonicalTarget(record, base) {
+  if (record.canonical === null) return null;
   const stripped = base ? stripBaseUrl(record.canonical, base) : record.canonical;
-  if (isSkippedUrl(stripped)) return false;
-  return resolveReference(stripped, record.outputPath) === record.outputPath;
+  if (isSkippedUrl(stripped)) return null;
+  return resolveReference(stripped, record.outputPath);
 }
 
 /**
@@ -280,12 +304,15 @@ export function generateSitemap({ records, base, emittedFromSource, reporter }) 
  * @param {import('./diagnostics.js').Reporter} args.reporter
  */
 export function checkSitemapLocs({ sitemaps, emittedPaths, base, reporter }) {
-  for (const { file, stripped, resolved } of internalLocs({ sitemaps, base })) {
+  for (const { file, raw, resolved } of internalLocs({ sitemaps, base })) {
     if (resolved !== null && emittedPaths.has(resolved)) continue;
+    // The authored spelling, for §23.3's reason: neither an authored sitemap
+    // nor a generated one is rewritten after it is written, so `raw` is the
+    // text in the file and `stripped` is a string that appears in none.
     reporter.problem({
       file,
-      message: `${stripped} does not resolve to any emitted file`,
-      context: stripped,
+      message: `${raw} does not resolve to any emitted file`,
+      context: raw,
       fixes: [CHECK_SPELLING],
     });
   }

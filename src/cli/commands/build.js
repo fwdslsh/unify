@@ -323,20 +323,6 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
         file: emittedFromSource.get(outPath) ?? outPath,
       });
     }
-      // §23 — the one reference in an authored robots.txt. Gated with §21.6 for
-    // the same reason: a Sitemap: value is an absolute URL, and whether one
-    // points inside THIS site is unanswerable without the site's address.
-    const robotsContent = tempFiles.get(robots.ROBOTS_PATH);
-    if (robotsContent !== undefined) {
-      robots.checkRobots({
-        text: typeof robotsContent === "string" ? robotsContent : robotsContent.toString("utf8"),
-        file: emittedFromSource.get(robots.ROBOTS_PATH) ?? robots.ROBOTS_PATH,
-        emittedPaths: new Set(tempFiles.keys()),
-        base: baseConfig,
-        reporter,
-      });
-    }
-
     sitemap.checkSitemapLocs({
       sitemaps: sitemapFiles, emittedPaths: new Set(tempFiles.keys()), base: baseConfig, reporter,
     });
@@ -345,6 +331,21 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
     // audit.js so the check and the comparison read one answer (§21.6's own
     // note on why a second reader of a <loc> would be a defect).
     sitemapLocs = sitemap.sitemapListings({ sitemaps: sitemapFiles, base: baseConfig });
+  }
+
+  // §23 — the one reference in an authored robots.txt. Ungated, unlike §21.6:
+  // a `<loc>` is absolute by protocol and genuinely needs the site's address to
+  // classify, but `Sitemap: /sitemap.xml` is internal by inspection. `base` may
+  // be null; it governs only the stripping step, exactly as in §12.
+  const robotsContent = tempFiles.get(robots.ROBOTS_PATH);
+  if (robotsContent !== undefined) {
+    robots.checkRobots({
+      text: typeof robotsContent === "string" ? robotsContent : robotsContent.toString("utf8"),
+      file: emittedFromSource.get(robots.ROBOTS_PATH) ?? robots.ROBOTS_PATH,
+      emittedPaths: new Set(tempFiles.keys()),
+      base: baseConfig,
+      reporter,
+    });
   }
 
   references.checkReferences({
@@ -393,7 +394,6 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
     const findings = auditManifest({
       records: manifest.records,
       byOutputPath: manifest.byOutputPath,
-      emittedPaths: new Set(tempFiles.keys()),
       base: baseConfig,
       sitemapLocs,
     });

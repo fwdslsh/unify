@@ -544,3 +544,197 @@ test("AUD-08: a pipeline problem exits 1 with or without --strict, and 2 stays u
   expectExit(await runCli(["audit", "-s", "src", "--no-such-flag"], bad), 2, "an unknown flag");
   covers("AUD-08");
 }, TEST_MS);
+
+// ------------------------------------------------- review round 1 regressions
+
+test("AUD-04: a sitemap listing a page whose canonical names another page", async () => {
+  // The positive case for `sitemap-canonical-disagree`. Without it the whole
+  // predicate could be deleted and the suite stayed green — the only assertion
+  // that named the id was an expectNoFinding, which a deleted block satisfies.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    ...linked(["About"]),
+    "about.html": page("About", '<p>Words about About.</p><a href="/">Home</a>')
+      .replace("<head>", '<head>\n<link rel="canonical" href="https://example.com/">'),
+    "sitemap.xml": `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<url><loc>https://example.com/</loc></url>
+<url><loc>https://example.com/about.html</loc></url>
+</urlset>
+`,
+  });
+  const r = await runCli(["audit", "-s", "src", "-o", "dist", "--base-url", BASE], tmp);
+  expectExit(r, 0, "a listed page consolidated onto another");
+  expectFinding(r, "sitemap-canonical-disagree", "§24.4: the sitemap and the canonical name different pages");
+  expectNoFinding(r, "sitemap-noindex", "§24.4: the page is indexable — only the canonical disagrees");
+  covers("AUD-04");
+}, TEST_MS);
+
+test("AUD-06: an unresolvable canonical is not 'somewhere else' — no finding without an address", async () => {
+  // With no --base-url an absolute canonical cannot be resolved, so unify
+  // cannot tell "names itself" from "names another page". Accusing on that
+  // reported a self-canonical page for nominating a replacement, quoting the
+  // page's own URL as the evidence, on the default golden path.
+  const files = {
+    ...linked(["About"]),
+    "about.html": page("About", '<p>Words about About.</p><a href="/">Home</a>').replace(
+      "<head>",
+      '<head>\n<meta name="robots" content="noindex">\n<link rel="canonical" href="https://example.com/about.html">'),
+  };
+  const off = mkTmp();
+  writeTree(join(off, "src"), files);
+  const a = await runCli(["audit", "-s", "src", "-o", "dist"], off);
+  expectExit(a, 0, "a self-canonical noindex page with no --base-url");
+  expectNoFinding(a, "canonical-noindex", "§24.4: unresolvable is not 'somewhere else'");
+
+  // Supplying the address makes it resolvable, and it still names itself.
+  const on = mkTmp();
+  writeTree(join(on, "src"), files);
+  const b = await runCli(["audit", "-s", "src", "-o", "dist", "--base-url", BASE], on);
+  expectExit(b, 0, "the identical bytes with an address supplied");
+  expectNoFinding(b, "canonical-noindex", "§24.4: the canonical names this very page");
+
+  // A ROOT-RELATIVE canonical resolves without an address, so the finding is
+  // narrower without --base-url but never dead.
+  const rel = mkTmp();
+  writeTree(join(rel, "src"), {
+    ...linked(["About"]),
+    "about.html": page("About", '<p>Words about About.</p><a href="/">Home</a>').replace(
+      "<head>", '<head>\n<meta name="robots" content="noindex">\n<link rel="canonical" href="/">'),
+  });
+  const c = await runCli(["audit", "-s", "src", "-o", "dist"], rel);
+  expectExit(c, 0, "a root-relative cross-canonical with no --base-url");
+  expectFinding(c, "canonical-noindex", "§24.4: this one resolves, address or no address");
+  covers("AUD-06");
+}, TEST_MS);
+
+test("AUD-04: contradictory declarations are reported — §20.4's data, rendered", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    ...linked(["About"]),
+    "about.html": page("About", '<p>Words about About.</p><a href="/">Home</a>')
+      .replace("<head>", '<head>\n<link rel="canonical" href="https://example.com/about.html">'
+        + '\n<link rel="canonical" href="https://example.com/">'
+        + '\n<meta name="description" content="A second, different description.">'),
+  });
+  const r = await runCli(["audit", "-s", "src", "-o", "dist", "--base-url", BASE], tmp);
+  expectExit(r, 0, "a page declaring two canonicals and two descriptions");
+  const lines = r.stdout.split("\n").filter((l) => l.includes("[metadata-conflict]"));
+  if (lines.length !== 2) {
+    throw new Error(`§24.4: one finding per conflicting field.\nstdout:\n${r.stdout}`);
+  }
+  if (!lines.join("\n").includes("canonical") || !lines.join("\n").includes("description")) {
+    throw new Error(`§24.4: the evidence names the field.\n${lines.join("\n")}`);
+  }
+  covers("AUD-04");
+  covers("AUD-09");
+}, TEST_MS);
+
+test("AUD-05: text-duplicate folds Unicode space separators, as §20.3 requires of it", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": page("Home", '<p>Welcome.</p><a href="/a.html">A</a> <a href="/b.html">B</a>'),
+    // §20.3 collapses ASCII whitespace only and keeps &nbsp; verbatim, because
+    // the author chose it. The obligation to fold lands here, at the compare.
+    // Same visible text apart from the one separator — the h1s must match too,
+    // or the pages differ for an ordinary reason and prove nothing.
+    "a.html": page("A", '<p>New York office hours.</p><a href="/">Home</a>').replace("<h1>A</h1>", "<h1>Hours</h1>"),
+    "b.html": page("B", '<p>New&nbsp;York office hours.</p><a href="/">Home</a>').replace("<h1>B</h1>", "<h1>Hours</h1>"),
+  });
+  const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
+  expectExit(r, 0, "two pages differing only by a non-breaking space");
+  expectFinding(r, "text-duplicate", "§20.3: fold U+00A0 and the other Unicode space separators at index time");
+  // BOTH pages, each naming the other. Checking only that the finding appeared
+  // let a fold applied on one side of the comparison survive: the page holding
+  // the &nbsp; still matched the plain one, so exactly half the pair reported.
+  const dupes = r.stdout.split("\n").filter((l) => l.includes("[text-duplicate]"));
+  const files = dupes.map((l) => l.split(":")[0]).sort();
+  if (files.join(",") !== "a.html,b.html") {
+    throw new Error(`§20.3: the fold is a property of the COMPARISON, so it holds both ways.\nreported: ${files.join(", ")}\nstdout:\n${r.stdout}`);
+  }
+  covers("AUD-05");
+}, TEST_MS);
+
+test("AUD-05: page-orphan counts incoming links from OTHER pages", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": page("Home", "<p>Welcome.</p>"),
+    // Its only incoming link is its own permalink. The evidence line has always
+    // said "no OTHER page links to this one"; the predicate now agrees.
+    "solo.html": page("Solo", '<p>Alone.</p><a href="/solo.html">permalink</a>'),
+  });
+  const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
+  expectExit(r, 0, "a page linked only from itself");
+  const orphans = r.stdout.split("\n").filter((l) => l.includes("[page-orphan]"));
+  if (orphans.length !== 1 || !orphans[0].startsWith("solo.html")) {
+    throw new Error(`§24.4: a self-link is not an incoming link.\nstdout:\n${r.stdout}`);
+  }
+  covers("AUD-05");
+}, TEST_MS);
+
+test("AUD-07: no evidence value can break the two-line report", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    // A legally-wrapped robots meta. §20.3 trims but never collapses the value,
+    // so interpolating it raw desynchronized every line below it.
+    "index.html": page("Home", '<p>Welcome.</p><a href="/notes.html#gone">Notes</a>')
+      .replace("<head>", '<head>\n<meta name="robots" content="noindex,\n  nofollow">\n<link rel="canonical" href="/notes.html">'),
+    "notes.html": page("Notes", '<p>Words.</p><a href="/">Home</a>'),
+  });
+  const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
+  expectExit(r, 0, "a multi-line robots value");
+  const lines = r.stdout.trimEnd().split("\n");
+  const finding = /^[^\n]+: (broken|incomplete): .+ \[[a-z0-9-]+\]$/;
+  for (let i = 0; i < lines.length - 1; i += 2) {
+    if (!finding.test(lines[i])) throw new Error(`§24.5: line ${i + 1} is not a finding line: ${lines[i]}`);
+    if (!lines[i + 1].startsWith("  fix: ")) throw new Error(`§24.5: line ${i + 2} is not a fix line: ${lines[i + 1]}`);
+  }
+  covers("AUD-07");
+}, TEST_MS);
+
+test("AUD-02: a saved clean: true is refused too — unify.yaml keys ARE the flags", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), { ...linked(["About"]), "unify.yaml": "clean: true\n" });
+  writeTree(join(tmp, "dist"), { "stale.html": "<p>older</p>\n" });
+  const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
+  expectExit(r, 2, "audit with a saved clean: true");
+  if (!/--clean/.test(r.stderr) || !/unify\.yaml/.test(r.stderr)) {
+    throw new Error(`§24.2: the error names the flag and where it came from.\nstderr:\n${r.stderr}`);
+  }
+  if (!existsSync(join(tmp, "dist", "stale.html"))) {
+    throw new Error("§24.2: a refused --clean must not have emptied anything");
+  }
+  // The same key is live for `build`, which is what makes the refusal necessary.
+  const b = await runCli(["build", "-s", "src", "-o", "dist"], tmp);
+  expectExit(b, 0, "build with the same saved key");
+  if (existsSync(join(tmp, "dist", "stale.html"))) {
+    throw new Error("§18: the saved key really does mean --clean");
+  }
+  covers("AUD-02");
+}, TEST_MS);
+
+test("REF-01: a relative og:image naming no file is P13, like every other spelling", async () => {
+  // The hole that made §24.4 drop `image-missing-target`: §12 tested the VALUE
+  // (root-relative or absolute), so the third spelling was checked by nothing
+  // while audit deferred to a check that was not happening.
+  for (const [label, value] of [["relative", "missing-card.png"], ["root-relative", "/missing-card.png"]]) {
+    const tmp = mkTmp();
+    writeTree(join(tmp, "src"), {
+      "index.html": page("Home").replace("<head>", `<head>\n<meta property="og:image" content="${value}">`),
+    });
+    const r = await runCli(["build", "-s", "src", "-o", "dist"], tmp);
+    expectExit(r, 1, `a ${label} og:image naming no file`);
+    if (!/missing-card\.png/.test(r.stderr)) {
+      throw new Error(`§12: every spelling of a URL is checked.\nstderr:\n${r.stderr}`);
+    }
+  }
+  // And prose is still never checked as a reference.
+  const ok = mkTmp();
+  writeTree(join(ok, "src"), {
+    "index.html": page("Home").replace("<head>",
+      '<head>\n<meta property="og:site_name" content="Meridian Coffee">\n<meta name="twitter:card" content="summary">'),
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist"], ok);
+  expectExit(r, 0, "og:site_name and twitter:card are prose");
+  covers("REF-01");
+}, TEST_MS);
