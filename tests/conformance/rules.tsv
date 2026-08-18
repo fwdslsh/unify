@@ -201,3 +201,12 @@ FIX-11	§8.1	fixture	fixture	Worked example: the whole head-merge table at once,
 FIX-12	§9	fixture	fixture	Worked example: root-attribute merge one-liner
 FIX-13	§10.6	fixture	fixture	Worked example: Markdown end to end, exact
 FIX-14	§7.7 C7	fixture	fixture	Worked example C7: a layout declaring data-layout is a problem P15 (realized as landmine layout-declares-layout)
+MAN-01	§20.1	rule	targeted	Membership: one record per composed page, in output-path order; assets, .fragment.html files, excluded sources, and pages that failed to compose have no record; a page with no metadata still gets a complete record
+MAN-02	§20.2	rule	targeted	Extraction reads the emitted text only (post-includes, post-Markdown, post-composition, post-§11); layout-supplied metadata is read per shipping page; <template> contents are never scanned; deriving the manifest changes no output, diagnostic, or exit code
+MAN-03	§20.3	rule	targeted	Every record carries every field; absent scalars are null and absent lists are []; text content omits script/style/template/noscript subtrees, collapses whitespace runs to one space, and trims
+MAN-04	§20.4	rule	targeted	Single-valued fields keep the first accepted declaration in document order; differing repeats append one conflicts entry {field, kept, discarded} ordered by field name; identical repeats are not conflicts; a conflict is data, never a §14 diagnostic
+MAN-05	§20.5	rule	targeted	path is publish.js's urlForOutputPath (index.html dropped, --base-url path prefix applied); url is origin+path with --base-url and null without it
+MAN-06	§20.6	rule	targeted	robots parsed from <meta name="robots"> only: comma-split lowercased directives, indexable false on noindex/none, followable false on nofollow/none; googlebot meta and robots.txt are never read into a record
+MAN-07	§20.7	rule	targeted	text is the text content of the first <main>, else <body>, else the whole document
+MAN-08	§20.8	rule	targeted	jsonLd is one {raw, data, error} per ld+json script in document order, parsing never throws; schemaType is the first of <meta name="schema"> or a single-object string @type, and arrays/@graph/missing/non-string @type declare nothing
+MAN-09	§20.9	rule	targeted	linksOut holds deduplicated sorted output paths of linked pages that have records, after base-url stripping, with query/fragment discarded and skipped-URL schemes excluded; linksIn is its exact reverse
