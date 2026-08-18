@@ -108,3 +108,31 @@ export function decodeEntities(s) {
     return NAMED.get(body) ?? whole;
   });
 }
+
+/** XML's five predefined entities — the only named ones XML defines itself. */
+const XML_PREDEFINED = new Map([["quot", '"'], ["amp", "&"], ["apos", "'"], ["lt", "<"], ["gt", ">"]]);
+
+/**
+ * The XML reading of the same job: the five predefined entities plus numeric
+ * references, and no HTML named references at all.
+ *
+ * Kept separate from `decodeEntities` deliberately. A `<loc>` containing
+ * `&nbsp;` is not well-formed XML — no XML parser would accept the document —
+ * and a checker that quietly understood it would be reading a file the world
+ * cannot. The manifest reads HTML and gets the HTML table; a sitemap is XML
+ * and gets XML's.
+ * @param {string} s
+ * @returns {string}
+ */
+export function decodeXmlEntities(s) {
+  if (typeof s !== "string" || !s.includes("&")) return s;
+  return s.replace(/&(#[Xx][0-9A-Fa-f]+|#[0-9]+|[A-Za-z][A-Za-z0-9]*);/g, (whole, body) => {
+    if (body[0] === "#") {
+      const n = body[1] === "x" || body[1] === "X"
+        ? Number.parseInt(body.slice(2), 16)
+        : Number.parseInt(body.slice(1), 10);
+      return isValidCodePoint(n) ? String.fromCodePoint(n) : whole;
+    }
+    return XML_PREDEFINED.get(body) ?? whole;
+  });
+}

@@ -67,6 +67,49 @@ const SCHEME_RE = /^[a-z][a-z0-9+.-]*:/i;
  * @param {string} url
  * @returns {boolean}
  */
+/**
+ * §20.5 — percent-encode every segment of an output path, leaving the `/`
+ * separators intact.
+ *
+ * A filesystem name is not a URI: a file called `two words.html` answers to
+ * `/two%20words.html`, and emitting the raw form into a sitemap `<loc>`, an
+ * `href`, or the `--dry-run` report puts an illegal character inside a URL.
+ * `encodeURIComponent` is exactly right per segment, because an output-path
+ * segment is a literal filename and never pre-encoded — so the transform is
+ * total, and a literal `%` becomes `%25` rather than being read as an escape.
+ * @param {string} outputPath
+ * @returns {string}
+ */
+export function encodePathSegments(outputPath) {
+  return outputPath.split("/").map(encodeURIComponent).join("/");
+}
+
+/**
+ * The exact inverse, for matching an authored URL back to an output path.
+ *
+ * Per segment, and never `decodeURI`: that function deliberately leaves
+ * reserved characters escaped, so `/a%26b.html` would keep its `%26` and never
+ * match the emitted `a&b.html`. Decoding per segment also keeps `%2F` from
+ * inventing a path separator — it becomes a literal `/` inside one segment's
+ * name, which matches no real file, which is the correct answer. A malformed
+ * escape keeps its segment verbatim rather than throwing: a URL unify cannot
+ * decode is one it reports on, not one it crashes over.
+ * @param {string} path
+ * @returns {string}
+ */
+export function decodePathSegments(path) {
+  return path
+    .split("/")
+    .map((seg) => {
+      try {
+        return decodeURIComponent(seg);
+      } catch {
+        return seg;
+      }
+    })
+    .join("/");
+}
+
 export function isSkippedUrl(url) {
   return url === "" || url.startsWith("#") || url.startsWith("//") || SCHEME_RE.test(url);
 }
@@ -370,9 +413,15 @@ export function pageWillMove(htmlOutputPath, prettyUrls) {
  * @returns {string} root-relative, always ending in `/` (except `/404.html`)
  */
 export function prettyLinkTarget(htmlOutputPath) {
+  // Percent-encoded, because this URL is one unify CONSTRUCTS rather than one
+  // the author wrote. That is the line §11.2 draws: §11.1 relocates an
+  // authored URL and keeps its spelling, while the directory form here is
+  // unify's own invention from an output path — and a URL unify invents has to
+  // be a legal URI, or it disagrees with the same page's sitemap <loc> and
+  // dry-run row, which §20.5 builds from `urlForOutputPath`.
   if (htmlOutputPath === "404.html") return "/404.html";
   const pretty = prettyOutputPath(htmlOutputPath); // always ends in "index.html" past this point
-  return `/${pretty.slice(0, pretty.length - "index.html".length)}`;
+  return `/${encodePathSegments(pretty.slice(0, pretty.length - "index.html".length))}`;
 }
 
 /**
@@ -401,9 +450,14 @@ export function applyPrettyLinks(html, { pageOutputPath, emittedHtmlPaths }) {
     if (isSkippedUrl(url)) return null;
     const { path, query, fragment } = splitUrl(url);
     if (path === "") return null;
-    const resolved = path.startsWith("/")
-      ? posix.normalize(path).slice(1)
-      : posix.normalize(posix.join(pageDir, path));
+    // Decoded before matching: `emittedHtmlPaths` holds literal output paths,
+    // and §20.5 makes `/two%20words.html` the spelling the site advertises for
+    // `two words.html`. Without this, a link written the way the sitemap
+    // publishes it would silently miss the pretty rewrite.
+    const decoded = decodePathSegments(path);
+    const resolved = decoded.startsWith("/")
+      ? posix.normalize(decoded).slice(1)
+      : posix.normalize(posix.join(pageDir, decoded));
     if (!emittedHtmlPaths.has(resolved)) return null; // URL-09: not a page — preserved untouched
     return prettyLinkTarget(resolved) + query + fragment;
   };

@@ -23,9 +23,9 @@
  *     suppresses it too. The author's file always wins.
  */
 
-import { decodeEntities } from "./entities.js";
+import { decodeXmlEntities } from "./entities.js";
 import { findAll, innerText, parse } from "./html.js";
-import { isSkippedUrl, splitUrl } from "./urls.js";
+import { decodePathSegments, isSkippedUrl, splitUrl } from "./urls.js";
 import { stripBaseUrl, resolveReference } from "./references.js";
 import { CHECK_SPELLING } from "./diagnostics.js";
 
@@ -56,12 +56,15 @@ function xmlEscape(s) {
 
 /**
  * The inverse, for reading `<loc>` values back out of an emitted sitemap.
- * Delegates to the manifest's own reference resolver rather than carrying a
- * second, smaller table — an earlier local version decoded `&#39;` but no
- * other numeric reference, which is the kind of half-surface that makes two
- * parts of one build disagree about what a document says.
+ *
+ * XML's own five predefined entities plus numeric references, and nothing
+ * else — NOT the HTML 4.01 table the manifest reads pages with. `&nbsp;` in a
+ * `<loc>` is not well-formed XML, and quietly resolving it would let this
+ * check understand a document no XML parser would accept. An earlier local
+ * version had the opposite flaw: it decoded `&#39;` and no other numeric
+ * reference.
  */
-const xmlUnescape = decodeEntities;
+const xmlUnescape = decodeXmlEntities;
 
 /**
  * §21.2 — is this record's canonical (if any) its own address?
@@ -149,6 +152,13 @@ export function splitEntries(entries) {
     current.push(entry);
     bytes += cost;
   }
+  // A single entry larger than the whole byte cap is emitted anyway rather
+  // than refused. Not an oversight: a 50 MiB <loc> needs a 50 MiB output path,
+  // and every filesystem unify runs on caps a path component near 255 bytes
+  // and a full path near 4096. A refusal here would be a diagnostic that can
+  // never fire, which is worse than the behaviour it guards. The sitemap index
+  // is uncapped for the same reason — exceeding it needs 2.5 billion pages.
+  //
   // An empty site still has one (empty) part, so callers never special-case
   // "no entries" into "no sitemap" — §21.1 already decided whether to generate.
   if (current.length || parts.length === 0) parts.push(current);
@@ -233,7 +243,7 @@ export function checkSitemapLocs({ sitemaps, emittedPaths, base, reporter }) {
       // A <loc> is percent-encoded (§21.3), and §12 resolves against literal
       // output paths — so the encoding comes off before the path is matched,
       // or `/two%20words.html` would never find `two words.html`.
-      const decoded = decodePath(raw);
+      const decoded = decodePathSegments(raw);
       const stripped = base ? stripBaseUrl(decoded, base) : decoded;
       if (isSkippedUrl(stripped)) continue; // another origin, or nothing to check
       if (splitUrl(stripped).path === "") continue;
@@ -266,39 +276,26 @@ function locValues(text) {
   // `findAll` never descends into comments (they are not elements), so a
   // commented-out entry is excluded by construction rather than by a rule.
   const elements = findAll(root, (n) => n.type === "element" && /(^|:)loc$/i.test(n.tag));
-  return elements.map((el) => unwrapCdata(innerText(text, el)).trim()).filter(Boolean).map(xmlUnescape);
+  const out = [];
+  for (const el of elements) {
+    const inner = innerText(text, el);
+    const cdata = unwrapCdata(inner);
+    // Entity resolution applies to the ordinary branch only. CDATA suspends
+    // markup interpretation — that is the entire reason to write it — so
+    // decoding its payload would read a value the document does not contain.
+    const value = cdata === null ? xmlUnescape(inner).trim() : cdata.trim();
+    if (value) out.push(value);
+  }
+  return out;
 }
 
 /**
- * `<![CDATA[value]]>` carries `value`. CDATA suspends markup interpretation,
- * so the payload is taken verbatim — no entity resolution, which is the whole
- * point of writing it that way.
+ * `<![CDATA[value]]>` carries `value`; anything else returns `null` so the
+ * caller can tell the two branches apart. CDATA suspends markup
+ * interpretation, so its payload is taken verbatim — no entity resolution,
+ * which is the whole point of writing it that way.
  */
 function unwrapCdata(inner) {
   const m = /^\s*<!\[CDATA\[([\s\S]*?)\]\]>\s*$/.exec(inner);
-  return m ? m[1] : inner;
-}
-
-/**
- * Undo §20.5's percent-encoding for path matching, segment by segment — the
- * exact inverse of how it was applied. `decodeURI` is deliberately NOT used:
- * it leaves reserved characters escaped, so `/a%26b.html` would stay `%26` and
- * never match the emitted `a&b.html`. Query and fragment are left untouched
- * because §12 discards them anyway. A malformed escape keeps its segment as
- * written rather than throwing: this is a check, and a URL unify cannot decode
- * is one it reports on rather than crashes over.
- */
-function decodePath(url) {
-  const { path, query, fragment } = splitUrl(url);
-  const decoded = path
-    .split("/")
-    .map((seg) => {
-      try {
-        return decodeURIComponent(seg);
-      } catch {
-        return seg;
-      }
-    })
-    .join("/");
-  return decoded + query + fragment;
+  return m ? m[1] : null;
 }

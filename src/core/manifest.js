@@ -138,19 +138,6 @@ function textContent(el) {
   return readText(out);
 }
 
-/**
- * §20.5 — percent-encode every segment of an output path, leaving the `/`
- * separators intact. `encodeURIComponent` is exactly right per segment: an
- * output-path segment is a literal filename, never a pre-encoded one, so the
- * transform is total and a literal `%` becomes `%25` rather than being read as
- * the start of an escape.
- * @param {string} outputPath
- * @returns {string}
- */
-function encodePathSegments(outputPath) {
-  return outputPath.split("/").map(encodeURIComponent).join("/");
-}
-
 /** Collapse every run of ASCII whitespace to one space and trim (§20.3). */
 function collapse(s) {
   return s.replace(/[ \t\n\r\f]+/g, " ").trim();
@@ -422,13 +409,10 @@ function extract(page, base) {
   ].filter(Boolean).sort((a, b) => (a.field < b.field ? -1 : a.field > b.field ? 1 : 0));
 
   const prefix = base ? base.pathPrefix : "/";
-  // §20.5 — percent-encode each segment that came from an output path. A
-  // filesystem name is not a URI: `two words.html` answers to
-  // `/two%20words.html`, and emitting the raw space into a sitemap <loc> or an
-  // href would be an invalid URL in a standards artifact. The `--base-url`
-  // prefix is deliberately NOT re-encoded — the author wrote it as a URL, and a
-  // legitimate escape inside it would be corrupted by a second pass.
-  const path = urlForOutputPath(encodePathSegments(page.outputPath), prefix);
+  // §20.5's percent-encoding happens inside `urlForOutputPath` — the one
+  // function the dry-run report shares — so this cannot drift from what the
+  // report prints or from what a projection emits.
+  const path = urlForOutputPath(page.outputPath, prefix);
 
   return {
     sourcePath: page.sourcePath,
@@ -497,6 +481,10 @@ export function buildManifest({ pages, base = null }) {
       if (isSkippedUrl(stripped)) continue;
       const { path } = splitUrl(stripped);
       if (path === "") continue; // query/fragment-only: not a navigation
+      // `resolveReference` percent-decodes (REF-08), so a link written in the
+      // spelling §20.5 publishes — `/two%20words.html` — joins the graph like
+      // the raw form. Both name the same page; the graph must not depend on
+      // which one the author typed.
       const resolved = resolveReference(stripped, rec.outputPath);
       if (resolved !== null && byOutputPath.has(resolved)) out.add(resolved);
     }

@@ -31,12 +31,19 @@
  *      bugs. Narrow and stated, or nothing.
  *
  *  H6  No leftover experiment markers in shipped source. `src/**` is scanned
- *      for MUTATION PROBE / DEBUG / XXX-style markers. This rule exists
- *      because the review protocol asks reviewers to MUTATE src/** to prove a
- *      test can fail, and one such probe — P22 detection deleted outright —
- *      was committed and pushed when an unrelated `git add -A` ran while it
- *      was live. The full 790-test suite passed with the check gone, so
- *      nothing else in this repository would have caught it.
+ *      for MUTATION PROBE / DEBUG / XXX-style markers. The review protocol
+ *      asks reviewers to MUTATE src/** to prove a test can fail, which makes
+ *      an abandoned probe a recurring hazard rather than a one-off: one was
+ *      committed and pushed when an unrelated `git add -A` ran while it was
+ *      live, and the full 790-test suite passed with the deleted check gone.
+ *
+ *      Do not over-trust this rule. It catches a probe that LEFT A MARKER; the
+ *      incident above happened to leave one, but a silent deletion leaves
+ *      nothing to grep for and this gate would miss it entirely. The actual
+ *      countermeasures are procedural and live in the review protocol: mutate
+ *      only in a detached worktree, stage by explicit path, and require a
+ *      reviewer to report which tests a mutation KILLED rather than that a
+ *      mutation was run.
  *
  * H1-H5 police tests/conformance and tests/e2e; H6 polices src/**.
  *

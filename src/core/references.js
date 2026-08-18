@@ -47,7 +47,7 @@
  */
 import { posix } from "node:path";
 import { findAll, getAttr, getAttrNode, isElement, lineOf, parse } from "./html.js";
-import { isSkippedUrl, splitUrl } from "./urls.js";
+import { decodePathSegments, isSkippedUrl, splitUrl } from "./urls.js";
 import { CHECK_SPELLING } from "./diagnostics.js";
 
 // ------------------------------------------------------------- CSS url()
@@ -184,8 +184,16 @@ export function stripBaseUrl(url, base) {
  */
 export function resolveReference(url, containingOutputPath) {
   if (isSkippedUrl(url)) return null;
-  const { path } = splitUrl(url); // query/fragment never participate (REF-06 for fragments)
-  if (path === "") return null;
+  const { path: rawPath } = splitUrl(url); // query/fragment never participate (REF-06 for fragments)
+  if (rawPath === "") return null;
+  // Percent-decoded before matching (REF-08). §20.5 makes `/two%20words.html`
+  // the URL the site publishes for `two words.html` — in the sitemap, in the
+  // dry-run report, everywhere — so a link written that way must resolve, or
+  // the build advertises an address it refuses to let the author use. Decoding
+  // is per segment, so `%2F` becomes a literal slash inside one name rather
+  // than a new path separator, and matches nothing. Both spellings name the
+  // same file and both resolve; neither is rewritten.
+  const path = decodePathSegments(rawPath);
   let resolved = path.startsWith("/")
     ? posix.normalize(path).replace(/^\/+/, "")
     : posix.normalize(posix.join(posix.dirname(containingOutputPath), path));

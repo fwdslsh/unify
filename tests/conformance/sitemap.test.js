@@ -247,6 +247,78 @@ test("SIT-03: loc paths are percent-encoded, so a filesystem name becomes a lega
   covers("SIT-03", "MAN-05");
 }, TEST_MS);
 
+test("REF-08/SIT-03: the report, the sitemap, and the reference check name one URL for one file", async () => {
+  // §20.5's "one interpretation" law, made executable. It was broken for one
+  // commit: the report printed /two words.html, the sitemap published
+  // /two%20words.html, and §12 rejected the second — so the build advertised
+  // an address it refused to let the author link to. Three surfaces, one file,
+  // one string, asserted against each other rather than each on its own.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": page("Home", '<a href="/two%20words.html">encoded</a><a href="/two words.html">raw</a>'),
+    "two words.html": page("Spaced"),
+  });
+
+  const dry = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", BASE, "--dry-run"], tmp);
+  expectExit(dry, 0, "dry-run");
+  const row = dry.stdout.split("\n").find((l) => l.includes("dist/two words.html"));
+  const reported = /\(([^)]*)\)/.exec(row ?? "")?.[1];
+  if (reported !== "/two%20words.html") {
+    throw new Error(`§20.5: the report must print the percent-encoded address, got ${JSON.stringify(reported)} from:\n${dry.stdout}`);
+  }
+
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", BASE], tmp);
+  expectExit(r, 0, "build with both link spellings");
+  const xml = read(tmp, "dist", "sitemap.xml");
+  if (!xml.includes(`<loc>https://example.com${reported}</loc>`)) {
+    throw new Error(`§21.3: the sitemap loc must be the same string the report printed (${reported}).\n${xml}`);
+  }
+  // §12 accepted BOTH spellings — the build did not refuse the address it publishes.
+  covers("REF-08", "SIT-03", "MAN-05");
+}, TEST_MS);
+
+test("REF-08: a link written in the published spelling resolves; a broken one still fails", async () => {
+  const good = mkTmp();
+  writeTree(join(good, "src"), {
+    "index.html": page("Home", '<a href="/caf%C3%A9.html">café</a>'),
+    "café.html": page("Cafe"),
+  });
+  const a = await runCli(["build", "-s", "src", "-o", "dist"], good);
+  expectExit(a, 0, "encoded link, no base-url");
+
+  const bad = mkTmp();
+  writeTree(join(bad, "src"), { "index.html": page("Home", '<a href="/caf%C3%A9.html">café</a>') });
+  const b = await runCli(["build", "-s", "src", "-o", "dist"], bad);
+  expectExit(b, 1, "encoded link to a page that does not exist");
+  if (!b.stderr.includes("does not resolve")) {
+    throw new Error(`§12: decoding must widen what resolves, not stop reporting what does not.\nstderr:\n${b.stderr}`);
+  }
+  covers("REF-08");
+}, TEST_MS);
+
+test("REF-08/MAN-05: an encodable name survives --pretty-urls", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": page("Home", '<a href="/two words.html">spaced</a>'),
+    "two words.html": page("Spaced"),
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", BASE, "--pretty-urls"], tmp);
+  expectExit(r, 0, "pretty build with an encodable name");
+  expectBytes(
+    read(tmp, "dist", "sitemap.xml"),
+    '<?xml version="1.0" encoding="UTF-8"?>\n' +
+      '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
+      "<url><loc>https://example.com/</loc></url>\n" +
+      "<url><loc>https://example.com/two%20words/</loc></url>\n" +
+      "</urlset>\n",
+    "§20.5 + §11.2: the index.html suffix rule and the encoder meet here",
+  );
+  if (!read(tmp, "dist", "index.html").includes('href="/two%20words/"')) {
+    throw new Error(`§11.2: the link must be pretty-rewritten to the encoded directory URL:\n${read(tmp, "dist", "index.html")}`);
+  }
+  covers("REF-08", "MAN-05");
+}, TEST_MS);
+
 test("SIT-03: a base-url path that needs XML escaping still gets it", async () => {
   // Percent-encoding covers everything derived from an output path, so the
   // only route left for a raw `&` into a <loc> is the base-url prefix, which
