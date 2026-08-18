@@ -1150,6 +1150,54 @@ test("REF-02: an origin match needs a boundary, and host equivalence is not a by
   covers("REF-02");
 }, TEST_MS);
 
+test("REF-02: a doubled slash is a path on this site, not an authority", async () => {
+  // stripBaseUrl's RESULT is read for its shape — callers ask "is it still an
+  // authority?" to mean "is it another site?" — so returning `//about.html`
+  // for a path with a doubled leading slash made an everyday templating
+  // artifact read as `//another-host`, two ways at once.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    ...linked(["About"]),
+    "about.html": page("About", '<p>Words about About.</p><a href="/">Home</a>')
+      .replace("<head>", '<head>\n<link rel="canonical" href="https://example.com//about.html">'),
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", BASE], tmp);
+  expectExit(r, 0, "a canonical with a doubled slash");
+  if (!readFileSync(join(tmp, "dist", "sitemap.xml"), "utf8").includes("about.html")) {
+    throw new Error("§21.2: the canonical names this page, doubled slash and all");
+  }
+
+  // And the same shape must not let a genuinely broken reference past §12 as
+  // though it were on another host.
+  const broken = mkTmp();
+  writeTree(join(broken, "src"), {
+    "index.html": page("Home", '<p>x</p><link rel="stylesheet" href="https://example.com//gone.css">'),
+  });
+  const b = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", BASE], broken);
+  expectExit(b, 1, "a doubled-slash reference naming nothing");
+  if (!/gone\.css/.test(b.stderr)) {
+    throw new Error(`§12: it is a path on this site, so it is checked.\nstderr:\n${b.stderr}`);
+  }
+  covers("REF-02");
+}, TEST_MS);
+
+test("URL-10: --base-url needs a scheme that has a host", async () => {
+  // `new URL("foo://x/").origin` is the STRING "null", so every URL §20.5
+  // builds reads `null/about.html` — which shipped as <loc>null/</loc> until
+  // §12 started parsing, then became a problem blaming a generated file for a
+  // flag the author typed.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), linked(["About"]));
+  for (const bad of ["foo://example.com/", "file:///srv/site/"]) {
+    const r = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", bad], tmp);
+    expectExit(r, 2, `--base-url ${bad}`);
+    if (!/host/.test(r.stderr)) {
+      throw new Error(`§11.3: the error names what is missing.\nstderr:\n${r.stderr}`);
+    }
+  }
+  covers("URL-10");
+}, TEST_MS);
+
 test("REF-02: a non-ASCII --base-url path strips in either spelling", async () => {
   // `parseBaseUrl` stores pathPrefix as `new URL().pathname` gives it —
   // percent-encoded — while the authored value carries what the author typed.

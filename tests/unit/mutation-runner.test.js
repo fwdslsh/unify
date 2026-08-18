@@ -13,7 +13,7 @@
  */
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { classify, compareBaselines, failingTests, parseMutations, runtimeErrorIn, unescapeCell } from "../conformance/run-mutations.mjs";
+import { classify, compareBaselines, failingTests, parseMutations, runtimeErrorIn, unescapeCell, validateAnchors } from "../conformance/run-mutations.mjs";
 
 /** A suite run that failed with these test names. */
 const red = (...names) => ({
@@ -85,6 +85,61 @@ describe("classify — the logic that inverted", () => {
     const v = classify({ exitCode: null, output: "", timedOut: true });
     expect(v.outcome).toBe("TIMEOUT");
     expect(v.note).toContain("hang");
+  });
+});
+
+describe("validateAnchors — the guard against a gate that lies", () => {
+  // Three rows sat stale across two review rounds because this ran over the
+  // prefix-filtered subset. The fix went in with no test, so reverting it —
+  // or deleting it — left the whole suite green: the guard against an
+  // unpinned rule was itself an unpinned rule, one level in.
+  const read = (files) => (f) => (f in files ? files[f] : null);
+
+  test("a present, unique anchor is clean", () => {
+    const rows = [{ id: "a-01", file: "x.js", old: "const a = 1;", next: "const a = 2;" }];
+    expect(validateAnchors(rows, read({ "x.js": "const a = 1;\nconst b = 2;\n" }))).toEqual([]);
+  });
+
+  test("an absent anchor is BAD-ANCHOR — the case that scored rows on a mutation that never happened", () => {
+    const rows = [{ id: "a-01", file: "x.js", old: "const gone = 1;", next: "const gone = 2;" }];
+    const out = validateAnchors(rows, read({ "x.js": "const a = 1;\n" }));
+    expect(out).toHaveLength(1);
+    expect(out[0]).toContain("BAD-ANCHOR a-01");
+    expect(out[0]).toContain("x.js");
+  });
+
+  test("a repeated anchor is AMBIGUOUS — replace edits the first, which may not be the row's subject", () => {
+    const rows = [{ id: "a-01", file: "x.js", old: "return null;", next: "return 0;" }];
+    const out = validateAnchors(rows, read({ "x.js": "return null;\nif (q) return null;\n" }));
+    expect(out).toHaveLength(1);
+    expect(out[0]).toContain("AMBIGUOUS a-01");
+    expect(out[0]).toContain("2x");
+  });
+
+  test("a replacement equal to the anchor is NO-OP", () => {
+    const rows = [{ id: "a-01", file: "x.js", old: "const a = 1;", next: "const a = 1;" }];
+    const out = validateAnchors(rows, read({ "x.js": "const a = 1;\n" }));
+    expect(out.some((m) => m.startsWith("NO-OP a-01"))).toBe(true);
+  });
+
+  test("a row naming a deleted file reports, rather than taking the runner down", () => {
+    // No existsSync guard, and the loop died of an unhandled ENOENT before it
+    // could print the one message that would have explained the row.
+    const rows = [{ id: "a-01", file: "deleted.js", old: "x", next: "y" }];
+    const out = validateAnchors(rows, read({}));
+    expect(out).toHaveLength(1);
+    expect(out[0]).toContain("BAD-ANCHOR a-01");
+    expect(out[0]).toContain("does not exist");
+  });
+
+  test("EVERY row is checked, not a caller-chosen subset — the scope bug itself", () => {
+    const rows = [
+      { id: "a-01", file: "x.js", old: "const a = 1;", next: "const a = 2;" },
+      { id: "b-01", file: "x.js", old: "const stale = 1;", next: "const stale = 2;" },
+    ];
+    const out = validateAnchors(rows, read({ "x.js": "const a = 1;\n" }));
+    expect(out).toHaveLength(1);
+    expect(out[0]).toContain("b-01");
   });
 });
 

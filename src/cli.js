@@ -142,6 +142,26 @@ export async function run(argv) {
       "a canonical must be absolute — a root-relative one is ignored by the crawlers it exists for",
     ]);
   }
+  // A scheme with no authority — `file:`, `foo:`, `data:` — parses, but its
+  // origin is the *string* "null", and every URL §20.5 builds from it then
+  // reads `null/about.html`. That shipped as `<loc>null/</loc>` in a generated
+  // sitemap until §12 started parsing, at which point it became a problem
+  // blaming a generated file for a flag the author typed. Refused where the
+  // author can act on it, in §11.3's existing family.
+  if (settings.baseUrl !== undefined && /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(String(settings.baseUrl))) {
+    let origin = null;
+    try {
+      origin = new URL(String(settings.baseUrl)).origin;
+    } catch {
+      origin = "null";
+    }
+    if (origin === "null") {
+      throw new UsageError(`--base-url needs a scheme that has a host, got: ${settings.baseUrl}`, [
+        "write it with http or https: --base-url https://your-domain.example/",
+        "og:, twitter: and canonical URLs are fetched over the network, so the address has to name a host",
+      ]);
+    }
+  }
   if (settings.baseUrl !== undefined && !/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(String(settings.baseUrl))) {
     const path = `/${String(settings.baseUrl).replace(/^\/+/, "")}`;
     throw new UsageError(`--base-url needs the site's whole address, got: ${settings.baseUrl}`, [

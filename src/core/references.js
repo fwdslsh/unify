@@ -177,7 +177,14 @@ export function stripBaseUrl(url, base) {
       return url; // not a URL this build can reason about — treat it as written
     }
     if (u.host !== new URL(base.origin).host) return url; // another site
-    const rest = u.pathname + u.search + u.hash;
+    // The leading slash run collapses, because this function's RESULT is read
+    // for its shape: callers ask "is it still an authority?" to mean "is it
+    // another site?". `https://example.com//about.html` is a path on this site
+    // with a doubled slash — an everyday CMS and templating artifact — and
+    // returning `//about.html` made it read as `//another-host`, so the page
+    // was reported as consolidating elsewhere and dropped from its own
+    // sitemap, while a broken `//gone.css` slipped past §12 as external.
+    const rest = (u.pathname + u.search + u.hash).replace(/^\/+/, "/");
     if (rest.startsWith(base.pathPrefix)) return `/${rest.slice(base.pathPrefix.length)}`;
     return rest || "/";
   }

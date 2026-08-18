@@ -218,6 +218,49 @@ export function runtimeErrorIn(output) {
   return m ? m[1].trim() : null;
 }
 
+/**
+ * Every anchor must resolve, and resolve UNIQUELY.
+ *
+ * `String.replace` edits the first occurrence, so an ambiguous anchor mutates
+ * something other than the row it names — a silent mis-measurement rather than
+ * a loud one. An **absent** anchor is worse: `replace` with a needle that is
+ * not there returns the string unchanged, the file is rewritten identical, and
+ * the row is scored KILLED or SURVIVED on a mutation that never happened.
+ *
+ * EVERY row, never the selected ones. This ran over the prefix-filtered subset
+ * once, so a sweep validated only what it ran — and three rows sat stale across
+ * two review rounds while sweep after sweep reported "all killed", one of them
+ * the row certifying the rule the round existed to protect. A stale row
+ * anywhere means the inventory claims a rule is pinned when nothing tests it,
+ * which is the exact class this file exists to detect: the detector had
+ * inherited the blind spot it was written to find.
+ *
+ * Extracted and pure so it can be tested, which is the same lesson one level
+ * in — the guard added for the above was itself unpinned, and reverting it to
+ * the subset left the whole suite green. `read` returns the file's text, or
+ * null when it does not exist: a row naming a deleted module is a BAD-ANCHOR,
+ * not an unhandled ENOENT that takes the runner down before it can say so.
+ *
+ * @param {{id: string, file: string, old: string, next: string}[]} rows
+ * @param {(file: string) => string|null} read
+ * @returns {string[]} one message per problem, empty when every row is usable
+ */
+export function validateAnchors(rows, read) {
+  const problems = [];
+  for (const row of rows) {
+    const text = read(row.file);
+    if (text === null) {
+      problems.push(`BAD-ANCHOR ${row.id} — ${row.file} does not exist; update mutations.tsv`);
+    } else {
+      const hits = text.split(row.old).length - 1;
+      if (hits === 0) problems.push(`BAD-ANCHOR ${row.id} — ${row.file} no longer contains it; update mutations.tsv`);
+      else if (hits > 1) problems.push(`AMBIGUOUS ${row.id} — the anchor appears ${hits}x in ${row.file}; make it unique`);
+    }
+    if (row.old === row.next) problems.push(`NO-OP ${row.id} — the replacement equals the anchor`);
+  }
+  return problems;
+}
+
 // --------------------------------------------------------------------- main
 
 function main() {
@@ -253,7 +296,16 @@ function main() {
   const runSuite = () => {
     const r = spawnSync("bun", ["test"], {
       cwd: work, encoding: "utf8", timeout: SUITE_TIMEOUT_MS,
-      env: { ...process.env, CLAUDECODE: "1" },
+      // `UNIFY_MUTATION_RUN` tells the suite it is looking at a deliberately
+      // altered tree. Exactly one test cares: the inventory check, which
+      // asserts that every committed anchor is present in the tree — true of
+      // the COMMITTED tree and false by construction of a mutated one. Left
+      // running it would have failed on every single mutation and attributed
+      // every one as a kill, which is this file's own "gate that lies" failure
+      // arriving through the fix for it. It is not an exclusion list and not a
+      // flakiness heuristic: the test's subject is the committed tree, and
+      // under a sweep that is not what it is being handed.
+      env: { ...process.env, CLAUDECODE: "1", UNIFY_MUTATION_RUN: "1" },
     });
     return {
       exitCode: r.status,
@@ -288,30 +340,13 @@ function main() {
     extract();
     execFileSync("cp", ["-r", join(ROOT, "node_modules"), join(work, "node_modules")]);
 
-    // Every anchor must resolve, and resolve UNIQUELY: `String.replace` edits
-    // the first occurrence, so an ambiguous anchor mutates something other than
-    // the row it names — a silent mis-measurement rather than a loud one. An
-    // absent anchor is worse: `replace` returns the string unchanged, the file
-    // is rewritten identical, and the row is scored KILLED or SURVIVED on a
-    // mutation that never happened.
-    //
-    // EVERY row, not the selected ones. This loop used to iterate `selected`,
-    // so a prefix-filtered sweep validated only what it ran — and three rows
-    // sat stale across two review rounds while sweep after sweep reported "all
-    // killed", one of them the row certifying the rule the round existed to
-    // protect. A stale row anywhere means the inventory is claiming a rule is
-    // pinned when nothing tests it, which is exactly the class this file was
-    // written to detect; scoping the check to the subset made the detector
-    // inherit the blind spot.
-    let bad = 0;
-    for (const row of rows) {
-      const text = readFileSync(join(work, row.file), "utf8");
-      const hits = text.split(row.old).length - 1;
-      if (hits === 0) { console.error(`BAD-ANCHOR ${row.id} — ${row.file} no longer contains it; update mutations.tsv`); bad++; }
-      else if (hits > 1) { console.error(`AMBIGUOUS ${row.id} — the anchor appears ${hits}x in ${row.file}; make it unique`); bad++; }
-      if (row.old === row.next) { console.error(`NO-OP ${row.id} — the replacement equals the anchor`); bad++; }
-    }
-    if (bad) { console.error(`mutation: ${bad} unusable row(s)`); finalExit = 2; return; }
+    // EVERY row, not the selected ones — see `validateAnchors`.
+    const problems = validateAnchors(rows, (file) => {
+      const abs = join(work, file);
+      return existsSync(abs) ? readFileSync(abs, "utf8") : null;
+    });
+    for (const p of problems) console.error(p);
+    if (problems.length) { console.error(`mutation: ${problems.length} unusable row(s)`); finalExit = 2; return; }
 
     // THE BASELINE GATE. Without it a red tree reports every mutation KILLED.
     // Run TWICE: the second run costs one suite and buys the flake set by
