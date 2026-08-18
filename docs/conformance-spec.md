@@ -1205,3 +1205,35 @@ A page is completed when §21.2's sitemap membership holds — it has a record, 
 A canonical — authored or completed — that names a location this site does not emit is already **P13**. §12 checks `link href` for every `rel`, so no new rule is needed and none is added; the case is pinned two-sided.
 
 Multiple canonicals, a canonical on a `noindex` page, and disagreement between a canonical and the sitemap are content-quality judgements. Product-spec §6.3.4 assigns them to `unify audit`, and §6.1 states that ordinary `build` does not reject subjective findings. §20.4 already records the multiple-canonical case as data on the record, which is what the evaluation command will read. Adding any of them here would put a judgement in the publish path that the product contract puts outside it.
+
+---
+
+## 23. Robots consistency
+
+unify never writes a `robots.txt` and never decides what a site should block. This section validates the one thing in an authored file that is a **reference** — a URL that must fetch — and deliberately validates nothing else.
+
+### 23.1 Scope
+
+The output-root `robots.txt`, when the site emits one from its own source. A `robots.txt` anywhere else in the tree is an ordinary mirror-copied asset: the Robots Exclusion Protocol only gives the root file meaning, and a file unify would never interpret is a file it does not interpret. Nothing here generates, rewrites, or reorders a byte of it — the author's policy ships exactly as written.
+
+Activation follows §21.1: these checks run when `--base-url` supplied the site's public address, for the same reason. A `Sitemap:` value is an absolute URL by [RFC 9309](https://www.rfc-editor.org/rfc/rfc9309.html) §2.2.3, and deciding whether one points inside *this* site is not answerable without knowing the site's address.
+
+### 23.2 Records
+
+The file is read as RFC 9309 records: a line is a comment (`#`), blank, or `field: value`. Field names are case-insensitive. Everything the parser cannot make sense of is carried through untouched — §23.4 says why that is not an error.
+
+### 23.3 `Sitemap:` is a reference
+
+A `Sitemap:` value naming a location this site emits must resolve to a file the site emits, or it is **P13**, the same broken-reference problem §12 raises for a page and §21.6 for a `<loc>`, located at the source `robots.txt`. "Naming a location this site emits" is §12's own test, reused: strip the `--base-url` prefix, and a value that is left root-relative or relative is internal. A value on another origin is skipped — verifying it needs the network, and network access is an explicit audit operation, never a build dependency.
+
+This is the one check because it is the one **reference**. A `Sitemap:` line is a promise that a crawler can fetch that URL; a promise the site itself breaks is a fault unify can see without judging anything.
+
+### 23.4 What is deliberately not checked
+
+- **`Disallow` and `Allow` values are patterns, not references.** `Disallow: /admin/` on a site with no `/admin/` is ordinary and defensive — blocking a path that does not exist yet is exactly what an author should do. Checking them would be inventing the policy product-spec §6.3.3 forbids: "unify never decides what an author should block."
+- **A malformed line is not a build problem.** RFC 9309 §2.2.1 states that crawlers **must** ignore lines they cannot parse, so an unparseable line is *defined* to be inert. Failing a publish over one would contradict the standard the check exists to serve.
+- **An unknown field is not an error.** The same section requires crawlers to ignore fields they do not recognise, which is what makes the format extensible.
+- **A missing `Sitemap:` line is not an error, even when unify generated a sitemap.** Declaring one is the author's choice; a tool that required it would be deciding policy in the other direction.
+- **A page's own `noindex` versus what a sitemap lists** is a contradiction between two authored things, not a broken reference. Product-spec §6.3.4 assigns robots conflicts to `unify audit`, and §6.1 keeps subjective findings out of the publish path; §20.6 already records each page's directives as the data that command will read.
+
+Everything in this list is reportable — by the evaluation command, which is where a judgement belongs. None of it blocks a build.

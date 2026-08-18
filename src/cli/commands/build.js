@@ -60,6 +60,7 @@ import * as urls from "../../core/urls.js";
 import { buildManifest } from "../../core/manifest.js";
 import * as sitemap from "../../core/sitemap.js";
 import { completeCanonical } from "../../core/canonical.js";
+import * as robots from "../../core/robots.js";
 
 /**
  * @param {object} context
@@ -320,6 +321,20 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
         file: emittedFromSource.get(outPath) ?? outPath,
       });
     }
+      // §23 — the one reference in an authored robots.txt. Gated with §21.6 for
+    // the same reason: a Sitemap: value is an absolute URL, and whether one
+    // points inside THIS site is unanswerable without the site's address.
+    const robotsContent = tempFiles.get(robots.ROBOTS_PATH);
+    if (robotsContent !== undefined) {
+      robots.checkRobots({
+        text: typeof robotsContent === "string" ? robotsContent : robotsContent.toString("utf8"),
+        file: emittedFromSource.get(robots.ROBOTS_PATH) ?? robots.ROBOTS_PATH,
+        emittedPaths: new Set(tempFiles.keys()),
+        base: baseConfig,
+        reporter,
+      });
+    }
+
     sitemap.checkSitemapLocs({
       sitemaps: sitemapFiles, emittedPaths: new Set(tempFiles.keys()), base: baseConfig, reporter,
     });
