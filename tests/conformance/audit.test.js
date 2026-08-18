@@ -677,7 +677,10 @@ test("AUD-07: no evidence value can break the two-line report", async () => {
   writeTree(join(tmp, "src"), {
     // A legally-wrapped robots meta. §20.3 trims but never collapses the value,
     // so interpolating it raw desynchronized every line below it.
-    "index.html": page("Home", '<p>Welcome.</p><a href="/notes.html#gone">Notes</a>')
+    // Two evidence values that can carry a newline, on one page: a wrapped
+    // robots meta, and a fragment id spelled with a character reference. The
+    // fix line is as much of the two-line contract as the evidence line is.
+    "index.html": page("Home", '<p>Welcome.</p><a href="/notes.html#gone">Notes</a> <a href="/notes.html#miss&#10;ing">Broken</a>')
       .replace("<head>", '<head>\n<meta name="robots" content="noindex,\n  nofollow">\n<link rel="canonical" href="/notes.html">'),
     "notes.html": page("Notes", '<p>Words.</p><a href="/">Home</a>'),
   });
@@ -685,6 +688,13 @@ test("AUD-07: no evidence value can break the two-line report", async () => {
   expectExit(r, 0, "a multi-line robots value");
   const lines = r.stdout.trimEnd().split("\n");
   const finding = /^[^\n]+: (broken|incomplete): .+ \[[a-z0-9-]+\]$/;
+  // Count first, then walk. Walking alone missed a break in the LAST finding's
+  // fix line, where the extra line falls past the loop's own bound — and the
+  // fix line is as much of the contract as the evidence line is.
+  const found = lines.filter((l) => finding.test(l));
+  if (lines.length !== found.length * 2 + 1) {
+    throw new Error(`§24.5: ${found.length} findings is ${found.length * 2 + 1} lines, got ${lines.length}:\n${r.stdout}`);
+  }
   for (let i = 0; i < lines.length - 1; i += 2) {
     if (!finding.test(lines[i])) throw new Error(`§24.5: line ${i + 1} is not a finding line: ${lines[i]}`);
     if (!lines[i + 1].startsWith("  fix: ")) throw new Error(`§24.5: line ${i + 2} is not a fix line: ${lines[i + 1]}`);
@@ -737,4 +747,140 @@ test("REF-01: a relative og:image naming no file is P13, like every other spelli
   const r = await runCli(["build", "-s", "src", "-o", "dist"], ok);
   expectExit(r, 0, "og:site_name and twitter:card are prose");
   covers("REF-01");
+}, TEST_MS);
+
+// ------------------------------------------------- review round 2 regressions
+
+test("AUD-04: a fragment written with a character reference matches a literal id", async () => {
+  // REF-08 — a reference is the attribute's VALUE — applies to the fragment as
+  // much as to the path. `ids` decodes; reading the href's bytes made the two
+  // halves of one comparison disagree, and `fragment-missing` reported a link
+  // that works in every browser. The percent-escaped spelling already matched,
+  // which is what made the entity one look like the author's mistake.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": page("Home", '<p>x</p><a href="/notes.html#caf&eacute;">Entity</a>'
+      + ' <a href="/notes.html#caf%C3%A9">Escaped</a> <a href="/notes.html#caf\u00e9">Literal</a>'),
+    "notes.html": page("Notes", '<p id="caf\u00e9">y</p><a href="/">Home</a>'),
+  });
+  const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
+  expectExit(r, 0, "three spellings of one fragment");
+  expectNoFinding(r, "fragment-missing", "REF-08: all three name the same id");
+
+  // And a fragment that really names nothing is still reported.
+  const bad = mkTmp();
+  writeTree(join(bad, "src"), {
+    "index.html": page("Home", '<p>x</p><a href="/notes.html#caf&eacute;">Entity</a>'),
+    "notes.html": page("Notes", '<p id="tea">y</p><a href="/">Home</a>'),
+  });
+  const b = await runCli(["audit", "-s", "src", "-o", "dist"], bad);
+  expectExit(b, 0, "an entity fragment naming nothing");
+  expectFinding(b, "fragment-missing", "REF-08: decoding is not excusing");
+  covers("AUD-04");
+}, TEST_MS);
+
+test("AUD-06: with the site's address known, an off-origin canonical IS somewhere else", async () => {
+  // The repair for "unresolvable must not accuse" silently created its
+  // opposite: folding another origin into `unknown` lost the pairing
+  // product-spec §6.3.2 names first — a noindex page consolidating onto a
+  // syndication partner, and a sitemap advertising a URL that points off-site.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    ...linked(["About"]),
+    "synd.html": page("Syndicated", '<p>Words.</p><a href="/">Home</a>').replace(
+      "<head>",
+      '<head>\n<meta name="robots" content="noindex">'
+      + '\n<link rel="canonical" href="https://competitor.example/their-copy">'),
+    "listed.html": page("Listed", '<p>Words.</p><a href="/">Home</a>').replace(
+      "<head>", '<head>\n<link rel="canonical" href="https://competitor.example/their-copy">'),
+    "sitemap.xml": `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<url><loc>https://example.com/listed.html</loc></url>
+</urlset>
+`,
+  });
+  const r = await runCli(["audit", "-s", "src", "-o", "dist", "--base-url", BASE], tmp);
+  expectExit(r, 0, "off-origin canonicals with the address supplied");
+  expectFinding(r, "canonical-noindex", "§24.4: another origin is demonstrably not this page");
+  expectFinding(r, "sitemap-canonical-disagree", "§24.4: the sitemap advertises a URL pointing off-site");
+
+  // Without the address, unify cannot tell another origin from its own.
+  const off = mkTmp();
+  writeTree(join(off, "src"), {
+    ...linked(["About"]),
+    "synd.html": page("Syndicated", '<p>Words.</p><a href="/">Home</a>').replace(
+      "<head>",
+      '<head>\n<meta name="robots" content="noindex">'
+      + '\n<link rel="canonical" href="https://competitor.example/their-copy">'),
+  });
+  const b = await runCli(["audit", "-s", "src", "-o", "dist"], off);
+  expectExit(b, 0, "the same page with no address to compare against");
+  expectNoFinding(b, "canonical-noindex", "§24.4: unknown must not accuse");
+  covers("AUD-06");
+}, TEST_MS);
+
+test("AUD-04: repeated og:image and a second ld+json block are correct markup", async () => {
+  // §20.4's `conflicts` records which value the manifest KEPT — not that the
+  // markup is wrong. The Open Graph protocol spells an array by repeating the
+  // tag, and a second ld+json entity is recommended practice, so rendering the
+  // array whole told authors to delete valid tags.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    ...linked(["About"]),
+    "about.html": page("About", '<p>Words about About.</p><a href="/">Home</a>')
+      .replace("<head>", '<head>'
+        + '\n<meta property="og:image" content="/a.png">'
+        + '\n<meta property="og:image" content="/b.png">'
+        + '\n<meta name="author" content="A. Writer">'
+        + '\n<meta name="author" content="B. Writer">'
+        + '\n<script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"X"}</script>'
+        + '\n<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList"}</script>'),
+    "a.png": "bytes\n",
+    "b.png": "bytes\n",
+  });
+  const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
+  expectExit(r, 0, "conforming multi-valued declarations");
+  expectNoFinding(r, "metadata-conflict", "§20.4: a conflict entry is not a claim the markup is wrong");
+
+  // The single-valued fields still report.
+  const bad = mkTmp();
+  writeTree(join(bad, "src"), {
+    ...linked(["About"]),
+    "about.html": page("About", '<p>Words about About.</p><a href="/">Home</a>')
+      .replace("<head>", '<head>\n<meta name="description" content="A second, different one.">'),
+  });
+  const b = await runCli(["audit", "-s", "src", "-o", "dist"], bad);
+  expectExit(b, 0, "two descriptions");
+  expectFinding(b, "metadata-conflict", "§24.4: a page may declare one description");
+  covers("AUD-04");
+}, TEST_MS);
+
+test("URL-01: a layout's relative og:image is re-rooted, like every other URL it declares", async () => {
+  // §12 now checks relative meta values; §11.1 not re-rooting them meant the
+  // build emitted a URL it could see was wrong and then blocked on it, under a
+  // fix line naming a spelling that was already right.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "_layout.html": `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Site</title>
+<meta name="description" content="The site.">
+<meta property="og:image" content="card.png">
+</head>
+<body><main></main></body>
+</html>
+`,
+    "index.html": "<!doctype html>\n<html><body><h1>Home</h1><p>x</p></body></html>\n",
+    "blog/post.html": "<!doctype html>\n<html><body><h1>Post</h1><p>y</p></body></html>\n",
+    "card.png": "bytes\n",
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist"], tmp);
+  expectExit(r, 0, "a layout's relative og:image, used from two directories");
+  for (const [file, where] of [["index.html", "the root"], ["blog/post.html", "a subdirectory"]]) {
+    const out = readFileSync(join(tmp, "dist", file), "utf8");
+    if (!out.includes('content="/card.png"')) {
+      throw new Error(`§11.1: re-rooted by provenance, so ${where} resolves to the same asset:\n${out}`);
+    }
+  }
+  covers("URL-01");
 }, TEST_MS);

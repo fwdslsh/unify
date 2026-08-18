@@ -31,6 +31,9 @@ import { isSkippedUrl } from "./urls.js";
 /** The one path the Robots Exclusion Protocol gives meaning to (§23.1). */
 export const ROBOTS_PATH = "robots.txt";
 
+/** The output paths §21 generates, when it is asked to (§21.4 splits at the caps). */
+const GENERATED_SITEMAP = /^sitemap(-\d+)?\.xml$/;
+
 /**
  * §23.2 — read RFC 9309 records out of a `robots.txt`.
  *
@@ -86,6 +89,14 @@ export function checkRobots({ text, file, emittedPaths, base, reporter }) {
     if (isSkippedUrl(stripped)) continue; // another origin — not checkable offline
     const resolved = resolveReference(stripped, ROBOTS_PATH);
     if (resolved === null || emittedPaths.has(resolved)) continue;
+    // §21.1 generates a sitemap only when --base-url supplied the site's
+    // address, so without it `Sitemap: /sitemap.xml` names a file this build
+    // was not asked to produce. That is not a broken reference — the author's
+    // line is right for the deployed site, and nothing they wrote changed —
+    // and blocking on it broke `unify build` and `unify dev` for a correct
+    // site, under a fix line pointing at a spelling that was already right.
+    // §21.1's own compatibility principle, applied in the other direction.
+    if (base === null && GENERATED_SITEMAP.test(resolved)) continue;
     reporter.problem({
       file,
       line: record.line,

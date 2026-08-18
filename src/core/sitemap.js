@@ -67,18 +67,6 @@ function xmlEscape(s) {
 const xmlUnescape = decodeXmlEntities;
 
 /**
- * §21.2 — is this record's canonical (if any) its own address?
- *
- * Resolution reuses §12's rule rather than comparing URL strings, so
- * `/about/`, `/about/index.html`, and the `--base-url`-absolutized spelling of
- * either all answer the same question the reference check would answer. A
- * canonical resolving to nothing internal (another origin, or a path the site
- * does not emit) is not this page, so the page is consolidated away.
- * @param {import('./manifest.js').PageRecord} record
- * @param {import('./urls.js').BaseUrlConfig|null} base
- * @returns {boolean}
- */
-/**
  * "Does this page's canonical name this page?" — §21.2's second clause, and
  * §24.4's own test for two findings that are *about* that question rather than
  * about membership.
@@ -99,34 +87,51 @@ const xmlUnescape = decodeXmlEntities;
  * @returns {boolean}
  */
 export function isSelfCanonical(record, base) {
-  if (record.canonical === null) return true;
-  return canonicalTarget(record, base) === record.outputPath;
+  const kind = classifyCanonical(record, base);
+  return kind === "none" || kind === "self";
 }
 
 /**
- * §21.2/§24.4 — **which page** this page's canonical names, or `null` when
- * this build cannot say: no canonical, another origin, a `mailto:`, an empty
- * value, or an absolute URL with no `--base-url` to strip.
+ * §21.2/§24.4 — what does this page's canonical name? Four answers, and the
+ * fourth is why this is not a boolean.
  *
- * The three-way answer is the point. `isSelfCanonical` folds `null` into
- * `false`, which is the conservative direction for *membership* — do not list
- * a page in a sitemap unless its canonical demonstrably names it — and the
- * wrong direction for a *finding*, where the conservative move is not to
- * accuse. With no `--base-url`, every absolute canonical is unresolvable, so
- * reading `false` as "names somewhere else" reported a page whose canonical
- * named itself, quoting the page's own URL as the evidence, on the default
- * golden path. Each caller now states its own direction instead of inheriting
- * one from a boolean that cannot carry both.
+ *   `none`      — the page declares no canonical.
+ *   `self`      — it resolves to this page's own output path.
+ *   `elsewhere` — it names a different page, demonstrably. Either it resolved
+ *                 to another emitted path, or — with `--base-url` supplied —
+ *                 it is an `http(s):`/protocol-relative URL that `stripBaseUrl`
+ *                 did not strip, which places it on another origin.
+ *   `unknown`   — this build cannot say: a `mailto:`, an empty value, or an
+ *                 absolute URL with no `--base-url` to compare it against.
+ *
+ * Each caller needs a different conservative direction, which is exactly what
+ * a boolean could not carry, and both wrong foldings have shipped:
+ *
+ *   - *Membership* treats anything but `self`/`none` as excluded — do not list
+ *     a page in a sitemap unless its canonical demonstrably names it.
+ *   - *Findings* fire only on `elsewhere` — do not accuse. Folding `unknown`
+ *     in reported a page whose canonical named itself, quoting the page's own
+ *     URL as the evidence, on the default golden path where no `--base-url` is
+ *     set and every absolute canonical is therefore unresolvable.
+ *   - But folding `elsewhere` OUT of the `unknown` case lost the case that
+ *     matters most: with the site's address known, a canonical pointing at a
+ *     syndication partner is visibly not this page, and product-spec §6.3.2
+ *     names exactly that pairing — `noindex` plus an off-site canonical, and a
+ *     sitemap advertising a URL whose canonical points away from it.
  *
  * @param {import('./manifest.js').PageRecord} record
  * @param {import('./urls.js').BaseUrlConfig|null} base
- * @returns {string|null} an emitted output path, or null when unanswerable
+ * @returns {'none'|'self'|'elsewhere'|'unknown'}
  */
-export function canonicalTarget(record, base) {
-  if (record.canonical === null) return null;
+export function classifyCanonical(record, base) {
+  if (record.canonical === null) return "none";
   const stripped = base ? stripBaseUrl(record.canonical, base) : record.canonical;
-  if (isSkippedUrl(stripped)) return null;
-  return resolveReference(stripped, record.outputPath);
+  // Survived stripping with an origin intact, and we know ours: another site.
+  if (base && (stripped.startsWith("//") || /^https?:\/\//i.test(stripped))) return "elsewhere";
+  if (isSkippedUrl(stripped)) return "unknown";
+  const target = resolveReference(stripped, record.outputPath);
+  if (target === null) return "unknown";
+  return target === record.outputPath ? "self" : "elsewhere";
 }
 
 /**

@@ -48,7 +48,7 @@
 import { posix } from "node:path";
 import { findAll, getAttr, getAttrNode, isElement, lineOf, parse } from "./html.js";
 import { decodeEntities } from "./entities.js";
-import { decodePathSegments, isSkippedUrl, splitUrl } from "./urls.js";
+import { decodePathSegments, isSkippedUrl, isUrlValuedMeta, splitUrl } from "./urls.js";
 import { CHECK_SPELLING } from "./diagnostics.js";
 
 // ------------------------------------------------------------- CSS url()
@@ -77,30 +77,6 @@ function findCssUrls(text, baseOffset) {
 }
 
 // --------------------------------------------------------- HTML collection
-
-/**
- * The og:/twitter: properties whose value is a **URL**, closed list.
- *
- * The scope cannot simply be "every og:/twitter: meta": `og:site_name` is
- * "Meridian Coffee" and `twitter:card` is "summary", and checking those as
- * relative references would fail every correct site that has them. Nor can it
- * be "values that look like URLs", which is how §12 read for its whole life —
- * `v.startsWith("/") || /^https?:/` — and that shape checked the two spellings
- * an author is least likely to get wrong while never checking the third. A
- * RELATIVE `og:image` was collected by nothing, reported by nothing, and
- * §24.4 then dropped its own `image-missing-target` finding on the grounds
- * that §12 already covered it. It did not.
- *
- * Naming the properties instead makes the value's *kind* the criterion, so
- * every spelling of a URL is checked and no prose ever is.
- */
-const URL_VALUED_META = /^(og:(url|image|audio|video)|twitter:(image|player))(:(url|secure_url|src|stream))?$/i;
-
-/** @param {ElementNode} el @returns {boolean} */
-function isUrlValuedMeta(el) {
-  const key = getAttr(el, "property") ?? getAttr(el, "name") ?? "";
-  return URL_VALUED_META.test(key.trim());
-}
 
 function isOgOrTwitterMeta(el) {
   const property = getAttr(el, "property");

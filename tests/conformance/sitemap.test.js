@@ -372,6 +372,9 @@ test("SIT-06: a namespace-prefixed loc is a loc, so a broken one cannot ship sil
   if (!r.stderr.includes("in: https://example.com/gone.html")) {
     throw new Error(`§14.1: the diagnostic quotes what the author wrote.\nstderr:\n${r.stderr}`);
   }
+  if (!r.stderr.includes("problem: https://example.com/gone.html does not resolve")) {
+    throw new Error(`§14.1: the message line quotes it too — it is a separate interpolation.\nstderr:\n${r.stderr}`);
+  }
   covers("SIT-06");
 }, TEST_MS);
 

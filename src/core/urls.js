@@ -52,7 +52,7 @@
  */
 import { posix } from "node:path";
 import { decodeEntities } from "./entities.js";
-import { applyEdits, findAll, getAttr, getAttrNode, lineOf, parse, tokens } from "./html.js";
+import { applyEdits, findAll, getAttr, getAttrNode, isElement, lineOf, parse, tokens } from "./html.js";
 
 // --------------------------------------------------------------- URL basics
 //
@@ -227,7 +227,14 @@ export function isSkippedUrl(url) {
  * @returns {{path: string, query: string, fragment: string}}
  */
 export function splitUrl(url) {
-  const m = /^([^?#]*)(\?[^#]*)?(#.*)?$/.exec(url);
+  // `[\s\S]`, not `.`: a URL can contain a newline, and `.` cannot match one.
+  // `<a href="/notes.html#miss&#10;ing">` is legal HTML whose VALUE (§12: a
+  // reference is the attribute's value) carries a literal newline, and the old
+  // pattern simply failed to match it — returning null from a function every
+  // caller treats as total, so the build died with "null is not an object" and
+  // no file, no line, and no fix. §14 has no unlocated fatals; a URL nothing
+  // can resolve is a located diagnostic, never a crash.
+  const m = /^([^?#]*)(\?[^#]*)?(#[\s\S]*)?$/.exec(url);
   return { path: m[1], query: m[2] ?? "", fragment: m[3] ?? "" };
 }
 
@@ -409,6 +416,33 @@ function isVerbatimSourceText(text, spans, file) {
 const SINGLE_URL_ATTRS = ["href", "src", "poster"];
 
 /**
+ * The `og:`/`twitter:` properties whose value is a **URL**, closed list —
+ * §11.1 re-roots them and §12 checks them, from this one definition.
+ *
+ * The scope cannot be "every `og:`/`twitter:` meta": `og:site_name` is
+ * "Meridian Coffee" and `twitter:card` is "summary", and treating those as
+ * URLs would rewrite and then fail every correct site that has one. Nor can it
+ * be a test on the *value* — that is what §12 did for its whole life, and it
+ * checked the root-relative and absolute spellings while never checking the
+ * relative one.
+ *
+ * The prefix is the boundary, and it is chosen rather than accidental: Open
+ * Graph's *vertical* namespaces (`article:author`, `music:album`,
+ * `video:actor`, `book:author`, `profile:username`) are URL-valued but are not
+ * `og:`-prefixed, and §12's scope has been "og:/twitter: metas" since v0.7.0.
+ * Widening to them is a separate decision, not an oversight here.
+ */
+export const URL_VALUED_META =
+  /^(og:(url|image|audio|video)|twitter:(image[0-3]?|player))(:(url|secure_url|src|stream))?$/i;
+
+/** @param {import('./html.js').ElementNode} el @returns {boolean} */
+export function isUrlValuedMeta(el) {
+  if (!isElement(el, "meta")) return false;
+  const key = getAttr(el, "property") ?? getAttr(el, "name") ?? "";
+  return URL_VALUED_META.test(key.trim());
+}
+
+/**
  * Rewrite every `href`/`src`/`srcset`/`poster` URL in `composedHtml`
  * (already include-inlined and layout-composed) per §11.1's per-URL
  * branching. `url()` in `<style>`/`style=` is deliberately never reached
@@ -468,6 +502,19 @@ export function rewriteProvenanceUrls(composedHtml, { provenanceOf, pageFile, pa
     if (srcset && srcset.value) {
       const rewritten = rewriteSrcsetValue(srcset.value, (u) => rewriteOne(u, el.start));
       if (rewritten !== srcset.value) edits.push({ start: srcset.valueStart, end: srcset.valueEnd, replacement: rewritten });
+    }
+    // A URL-valued meta's `content` is a URL with provenance like any other.
+    // Leaving it out meant a layout's relative `og:image` emitted a value that
+    // resolves against the PAGE — `/blog/card.png` for an asset at
+    // `/card.png` — which §12 now sees and blocks, under a fix line saying
+    // "check the path spelling" when the spelling was right. §11.3 already
+    // treats these values as URLs; §11.1 not doing so was the asymmetry.
+    if (isUrlValuedMeta(el)) {
+      const content = getAttrNode(el, "content");
+      if (content && content.value) {
+        const next = rewriteOne(content.value, el.start);
+        if (next !== null) edits.push({ start: content.valueStart, end: content.valueEnd, replacement: next });
+      }
     }
   }
   return applyEdits(composedHtml, edits);

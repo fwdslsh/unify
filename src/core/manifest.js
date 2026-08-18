@@ -538,7 +538,14 @@ export function buildManifest({ pages, base = null }) {
     const out = new Set();
     /** @type {Map<string, {target: string, id: string}>} deduplicated by target#id */
     const fragments = new Map();
-    for (const href of rec._hrefs) {
+    for (const raw of rec._hrefs) {
+      // REF-08: a reference is the attribute's VALUE, so character references
+      // resolve before anything reads it. `#caf&eacute;` is the correct HTML
+      // spelling of `#café` and must match an element whose `id` is `café` —
+      // and `ids` above already decodes, via `nonEmpty`. Reading the bytes here
+      // while decoding there made the two halves of one comparison disagree,
+      // and `fragment-missing` reported a link that works in every browser.
+      const href = decodeEntities(raw);
       const stripped = base ? stripBaseUrl(href, base) : href;
       const { path, fragment } = splitUrl(stripped);
       // A fragment-only link names an id on THIS page. It has to be read before

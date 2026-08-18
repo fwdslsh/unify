@@ -103,6 +103,12 @@ test("ROB-02: the diagnostic quotes the author's own line, at the author's own l
   const r = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", BASE], tmp);
   expectExit(r, 1, "a Sitemap: naming nothing emitted");
   const authored = "https://example.com/no-such-sitemap.xml";
+  // BOTH lines. The message is the one CI logs and a reader greps for, and it
+  // is a separate interpolation from the `in:` line — asserting only the
+  // second let the first revert to the un-greppable stripped spelling.
+  if (!r.stderr.includes(`problem: ${authored} does not resolve`)) {
+    throw new Error(`§14.1: the message quotes the SOURCE text too.\nstderr:\n${r.stderr}`);
+  }
   if (!r.stderr.includes(`in: ${authored}`)) {
     throw new Error(`§14.1: "in:" is the offending SOURCE text.\nstderr:\n${r.stderr}`);
   }
@@ -147,6 +153,33 @@ test("ROB-03: a bare-CR file is still records, per RFC 9309's NL", async () => {
   const r = await runCli(["build", "-s", "src", "-o", "dist"], tmp);
   expectExit(r, 1, "a bare-CR robots.txt");
   covers("ROB-03");
+}, TEST_MS);
+
+test("ROB-02: a Sitemap: naming the file --base-url would generate is not broken without it", async () => {
+  // §21.1 generates sitemap.xml only when the site's address is known, so this
+  // author's line is right for the deployed site. Blocking on it refused to
+  // publish — and refused every `unify dev` preview — for a site whose
+  // --base-url build is clean, under a fix line naming a correct spelling.
+  const files = { "index.html": page("Home"), "robots.txt": "User-agent: *\nSitemap: /sitemap.xml\n" };
+  const off = mkTmp();
+  writeTree(join(off, "src"), files);
+  const a = await runCli(["build", "-s", "src", "-o", "dist"], off);
+  expectExit(a, 0, "no --base-url, so no sitemap was asked for");
+
+  const on = mkTmp();
+  writeTree(join(on, "src"), files);
+  const b = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", BASE], on);
+  expectExit(b, 0, "the same file with the address supplied");
+
+  // Not a blanket skip: any OTHER missing target still fails without the flag.
+  const other = mkTmp();
+  writeTree(join(other, "src"), {
+    "index.html": page("Home"),
+    "robots.txt": "User-agent: *\nSitemap: /feeds/all.xml\n",
+  });
+  const c = await runCli(["build", "-s", "src", "-o", "dist"], other);
+  expectExit(c, 1, "a Sitemap: naming something unify never generates");
+  covers("ROB-02");
 }, TEST_MS);
 
 // ------------------------------------------------------------------- §23.3

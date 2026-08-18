@@ -32,7 +32,7 @@
  * publish path; `unify audit --strict` is the opt-in gate.
  */
 
-import { canonicalTarget } from "./sitemap.js";
+import { classifyCanonical } from "./sitemap.js";
 
 /**
  * @typedef {object} Finding
@@ -43,6 +43,33 @@ import { canonicalTarget } from "./sitemap.js";
  * @property {string} evidence - what was observed, quoting the output
  * @property {string} fix - one concrete action
  */
+
+/**
+ * The fields a page may declare **once**, by the standard that defines them.
+ *
+ * §20.4's `conflicts` array is a record of which value the manifest kept, not
+ * a claim that the markup is wrong, and reading it as one made `audit` report
+ * conforming pages as `broken`. Two fields prove it:
+ *
+ *   - **`image`.** The Open Graph protocol defines arrays by repeating the
+ *     tag — "if a tag can have multiple values, just put multiple versions of
+ *     the same meta tag on your page; the first is given preference during
+ *     conflicts" — and ogp.me's own `og:image` example ships two. A page with
+ *     several share images is correct, common, and was being told to delete
+ *     valid tags.
+ *   - **`schemaType`.** §20.8 reads the first block's `@type` deliberately,
+ *     as a bounded read. An `Organization` block beside a `BreadcrumbList` is
+ *     routine and recommended, and every consumer parses every block, so the
+ *     second is not "ignored".
+ *
+ * `author` is excluded too: a co-authored page names two authors, and the HTML
+ * spec does not restrict `<meta name="author">` to one per document. What
+ * remains is the set where a second differing value genuinely leaves consumers
+ * without an answer.
+ */
+const SINGLE_VALUED = new Set([
+  "canonical", "title", "description", "lang", "robots", "datePublished", "dateModified",
+]);
 
 /** Normalize a heading or title for comparison — case and whitespace only. */
 const norm = (s) => s.toLowerCase().replace(/\s+/g, " ").trim();
@@ -185,7 +212,7 @@ export function auditManifest({ records, byOutputPath, base = null, sitemapLocs 
       if (!target || target.ids.includes(link.id)) continue;
       add(record, "fragment-missing", "broken",
         `${JSON.stringify(`#${link.id}`)} in ${link.target === record.outputPath ? "this page" : link.target} names no element`,
-        `add id="${link.id}" to the element it should reach, or correct the link`);
+        `add the id ${JSON.stringify(link.id)} to the element it should reach, or correct the link`);
     }
 
     // ---- contradictory declarations ----------------------------------------
@@ -195,6 +222,7 @@ export function auditManifest({ records, byOutputPath, base = null, sitemapLocs 
     // declaring two different canonicals — the case product-spec §6.3.2 asks
     // to have reported — was silent in `build` AND in `audit`.
     for (const conflict of record.conflicts) {
+      if (!SINGLE_VALUED.has(conflict.field)) continue;
       add(record, "metadata-conflict", "broken",
         `the page declares ${conflict.discarded.length + 1} different values for ${conflict.field}: ` +
         `${JSON.stringify(truncate(conflict.kept))} is used, ` +
@@ -272,8 +300,7 @@ export function auditManifest({ records, byOutputPath, base = null, sitemapLocs 
     // narrower without the site's address — a root-relative canonical still
     // resolves, an absolute one cannot — and saying nothing is the only
     // honest answer when unify does not know where the site lives.
-    const target = canonicalTarget(record, base);
-    const elsewhere = target !== null && target !== record.outputPath;
+    const elsewhere = classifyCanonical(record, base) === "elsewhere";
 
     // The cross-canonical shape, which is the contradiction: a page telling
     // crawlers not to index it while consolidating onto something else. A
