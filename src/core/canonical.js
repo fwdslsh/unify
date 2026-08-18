@@ -22,7 +22,7 @@
  * evaluation command's business (§22.5).
  */
 
-import { getAttr, isElement, findAll, findFirst, parse } from "./html.js";
+import { findAll, findFirst, getAttr, isElement, parse } from "./html.js";
 import { isCompletablePage } from "./sitemap.js";
 
 /**
@@ -105,7 +105,14 @@ export function completeCanonical(html, record, base) {
  */
 export function declaresCanonical(html) {
   const { root } = parse(html);
-  return findAll(root, (n) =>
+  // §22.3 — the question is about the HEAD. A <link rel="canonical"> in the
+  // body is not a declaration, because nothing reads it there; treating one as
+  // a declaration suppressed completion on a page that then shipped with no
+  // effective canonical at all. A page with no head element declares nothing
+  // either, and §22.2 already has nowhere to insert one.
+  const head = findFirst(root, (n) => isElement(n, "head"));
+  if (head === null) return false;
+  return findAll(head, (n) =>
     isElement(n, "link") && (getAttr(n, "rel") ?? "").trim().toLowerCase().split(/\s+/).includes("canonical"),
   ).length > 0;
 }

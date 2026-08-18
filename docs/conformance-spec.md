@@ -1043,6 +1043,19 @@ s samp small span strong sub sup time u var wbr
 
 Collapsing covers **ASCII** whitespace only. A decoded `&nbsp;` is U+00A0, a character the author chose because it forbids a line break, and rewriting it to U+0020 would be an edit to their content — the same verbatim discipline `iso` and `canonical` follow. This pushes a real cost onto consumers that tokenize: a client-side search comparing a typed `New York` against an indexed `New\u00A0York` misses, and duplicate-content detection reads two otherwise identical pages as different. Any projection of this field that is searched or compared must fold U+00A0 and the other Unicode space separators **at index time**, and say so where it is specified. Folding them here instead would put one consumer's normalization into the shared record, where every other consumer inherits it silently.
 
+**Document metadata is read from `<head>`.** `title`, `description`, `author`, `robots`, `datePublished`/`dateModified`, the `og:`/`twitter:` metas behind `image`, and `canonical` are declarations *to a consumer*, and a consumer reads them in the head. A `<title>` or `<meta name="description">` in `<body>` is inert — no browser shows it, no crawler indexes it — and §8 never put it there; the author did.
+
+Reading them document-wide was wrong in the direction that matters, because it made the manifest describe a page nobody receives. A page whose head held only `<meta charset>`, with its title and description written into the body, reported both fields as present: `title-missing` and `description-missing` stayed silent, and §24.4's `title-h1-mismatch` then fired on the inert title and told the author to reconcile it with their heading. The one real fault — that this page has no title at all — was the only thing not reported.
+
+**Five fields are deliberately not head-scoped**, each because the head is not where it lives:
+
+- `lang` is an attribute of `<html>`, which *contains* the head.
+- `headings`, `ids`, `text`, `linksOut`, and `fragmentLinks` describe the body by definition.
+- `jsonLd` is valid **and read** inside `<body>`: the HTML spec permits `<script type="application/ld+json">` there and structured-data consumers do parse it, so head-scoping it would drop entities a crawler acts on — the same defect pointing the other way. `schemaType` follows `jsonLd` wherever it was declared, and its `<meta name="schema">` spelling with the head.
+- `conflicts` follows whatever field it is about.
+
+**A document with no `<head>` element is read whole.** A browser's parser synthesises a head and moves leading metadata into it; unify's parser does not implement HTML tree construction and cannot say where that boundary would fall. Reporting every field missing on a document a browser *does* read them from would be the worse error, so the bounded reading is to accept the whole document — and §24.4's `metadata-in-body` correspondingly says nothing about a page that has no head to be outside of.
+
 ### 20.4 Determinism and conflicts
 
 Several fields are single-valued while the emitted document may declare them more than once. For each such field the manifest keeps **the first accepted declaration in document order** and records nothing further when the repeats agree.
@@ -1196,7 +1209,9 @@ A page whose emitted document has no `<head>`, or whose `<head>` is left unclose
 
 ### 22.3 Authored canonicals always win
 
-A page that declares any `rel="canonical"` is left exactly as written. That holds when it declares several (§20.4 keeps the first and records the conflict), when its canonical names another page, and when its canonical names nothing this site emits. Completion means *filling a gap*, never adjudicating a value the author chose.
+"Declares a canonical" is a question about the **head**, for §20.3's reason: a `<link rel="canonical">` in `<body>` is not a declaration, because nothing reads it there. Treating one as a declaration suppressed completion on a page that then shipped with no effective canonical at all — the flag's whole job, silently not done. A canonical inside a `<template>` was never a declaration either, and still is not (§7: template contents are never touched).
+
+A page that declares any `rel="canonical"` **in its head** is left exactly as written. That holds when it declares several (§20.4 keeps the first and records the conflict), when its canonical names another page, and when its canonical names nothing this site emits. Completion means *filling a gap*, never adjudicating a value the author chose.
 
 ### 22.4 Membership is §21.2's, unchanged
 
@@ -1301,9 +1316,12 @@ Every finding is a predicate over the §20 manifest. `record` is the page being 
 | `sitemap-noindex` | broken | a sitemap emitted by this build lists the page and the page is not `indexable` |
 | `sitemap-canonical-disagree` | broken | a sitemap lists the page and its canonical **resolves to** a different page |
 | `text-duplicate` | incomplete | another page's `text` is identical, after folding Unicode space separators, and non-empty |
+| `metadata-in-body` | broken | the page has a `<head>`, and a document-metadata element is emitted outside it |
 | `metadata-conflict` | broken | the page declares two or more differing values for one field — one finding per field in `conflicts` |
 
 `metadata-conflict` is what §20.4 and §22.5 both promise this command will render. §20.4 keeps the first of two differing declarations and records the loser precisely so that a human can be told; §22.5 assigns "multiple canonicals" here by name, and product-spec §6.3.2 requires them reported. Until it existed the record carried the data and nothing read it, so a page shipping two contradictory canonicals and two contradictory descriptions was silent in `build` *and* in `audit` — the one shape where both commands agreed to say nothing about a page that contradicts itself. It is `broken` because a page declaring two answers to one question has given consumers no answer.
+
+`metadata-in-body` names a closed set of elements — `<title>`, `<base>`, `<meta charset>`, `<link rel="canonical">`, and `<meta>` carrying `name="description"`, `name="robots"`, `property="og:*"`, or `name="twitter:*"` — because those are exactly the elements whose only valid position is the head and whose presence elsewhere therefore says nothing to anyone. It is `broken` rather than `incomplete` for the reason §24.3 gives: the document declares something at a position where the standard defines it to have no effect, which is wrong whatever the author intended. Elements that are legal in the body are never reported: `<link rel="stylesheet">`, `<link rel="preload">`, `<meta itemprop>`, and `<script type="application/ld+json">` all do their job there. Neither is anything inside a `<template>`, which §7 never touches.
 
 Three of these are narrower than the plain-language name suggests, and each narrowing has a reason rather than a preference:
 

@@ -202,6 +202,19 @@ export function auditManifest({ records, byOutputPath, base = null, sitemapLocs 
         `keep one — a page that declares two answers to one question has given consumers no answer`);
     }
 
+    // ---- metadata placement ------------------------------------------------
+    // §20.3 already declined to READ these; this says so out loud, because a
+    // silently-dropped <title> is indistinguishable from one never written.
+    for (const el of record.strayMetadata) {
+      const shown = el.key === null ? `<${el.tag}>`
+        : el.tag === "link" ? `<link rel="${el.key}">`
+        : el.key === "charset" ? "<meta charset>"
+        : `<meta ${el.key.startsWith("og:") ? "property" : "name"}="${el.key}">`;
+      add(record, "metadata-in-body", "broken",
+        `${shown} is emitted outside <head>, where no browser or crawler reads it`,
+        `move it into <head> — in the page's own <head>, or the layout's if every page needs it`);
+    }
+
     // ---- structured data ---------------------------------------------------
     for (const entry of record.jsonLd) {
       if (entry.error === null) continue;

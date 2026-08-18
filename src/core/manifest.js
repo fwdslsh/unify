@@ -34,7 +34,7 @@
  */
 
 import { decodeEntities } from "./entities.js";
-import { getAttr, isElement, findAll, findFirst, innerText, parse } from "./html.js";
+import { findAll, findFirst, getAttr, innerText, isElement, isInside, parse } from "./html.js";
 import { urlForOutputPath } from "./publish.js";
 import { isSkippedUrl, splitUrl } from "./urls.js";
 import { stripBaseUrl, resolveReference } from "./references.js";
@@ -89,6 +89,8 @@ import { stripBaseUrl, resolveReference } from "./references.js";
  * @property {JsonLdEntry[]} jsonLd
  * @property {string[]} linksOut
  * @property {string[]} linksIn
+ * @property {{tag: string, key: string|null}[]} strayMetadata - one entry per
+ *   document-metadata element emitted outside <head> on a page that has one (§20.3)
  * @property {string[]} ids - every id the page declares, document order, repeats kept
  * @property {{target:string, id:string}[]} fragmentLinks - one entry per distinct
  *   internal link carrying a fragment: the output path it names and the id it asks for
@@ -347,11 +349,22 @@ function extract(page, base) {
   /** @type {string[]} */
   const ids = [];
 
+  // §20.3 — document metadata is read from `<head>`, because that is where a
+  // consumer reads it. A page with NO head element is read whole: a browser
+  // synthesises one and moves leading metadata into it, and this parser does
+  // not implement HTML tree construction, so it cannot place that boundary —
+  // reporting every field missing on a document a browser reads fine would be
+  // the worse error of the two.
+  const hasHead = findFirst(root, (n) => isElement(n, "head")) !== null;
+  /** @type {{tag: string, key: string|null}[]} */
+  const strayMetadata = [];
+
   // One document-order pass. `findAll` already refuses to descend into
   // `<template>` (§20.2), which is why every collector below can trust that
   // what it sees is markup the shipped page actually declares.
   for (const node of findAll(root, (n) => n.type === "element")) {
     const tag = node.tag.toLowerCase();
+    const inHead = !hasHead || isInside(node, "head");
     // Every id, in document order, repeats kept — §20.3. Repeats are the point:
     // "this page declares one id twice" is only answerable if they survive.
     const idAttr = nonEmpty(getAttr(node, "id"));
@@ -359,11 +372,26 @@ function extract(page, base) {
     if (tag === "html") {
       lang.add(nonEmpty(getAttr(node, "lang")));
     } else if (tag === "title") {
-      title.add(orNull(readText(innerText(html, node))));
+      if (inHead) title.add(orNull(readText(innerText(html, node))));
+      else strayMetadata.push({ tag: "title", key: null });
+    } else if (tag === "base") {
+      if (!inHead) strayMetadata.push({ tag: "base", key: null });
     } else if (tag === "meta") {
       const name = (getAttr(node, "name") ?? "").trim().toLowerCase();
       const property = (getAttr(node, "property") ?? "").trim().toLowerCase();
       const content = getAttr(node, "content");
+      if (!inHead) {
+        // §24.4's closed set: the metas whose only valid position is the head.
+        // `itemprop` and every other spelling does its job in the body and is
+        // not reported — this is a list of what is *inert* there, not of what
+        // unify happens to read.
+        const key = getAttr(node, "charset") !== null ? "charset"
+          : name === "description" || name === "robots" || name.startsWith("twitter:") ? name
+          : property.startsWith("og:") ? property
+          : null;
+        if (key !== null) strayMetadata.push({ tag: "meta", key });
+        continue;
+      }
       if (name === "description") description.add(nonEmpty(content));
       else if (name === "author") author.add(nonEmpty(content));
       else if (name === "robots") robotsRaw.add(nonEmpty(content));
@@ -378,7 +406,14 @@ function extract(page, base) {
       else if (property === "og:image:height") ogHeight.add(nonEmpty(content));
     } else if (tag === "link") {
       const rel = (getAttr(node, "rel") ?? "").trim().toLowerCase().split(/\s+/);
-      if (rel.includes("canonical")) canonical.add(nonEmpty(getAttr(node, "href")));
+      if (!rel.includes("canonical")) {
+        // Every other rel — stylesheet, preload, icon — is legal in the body
+        // and does its job there. Only canonical is inert outside the head.
+      } else if (inHead) {
+        canonical.add(nonEmpty(getAttr(node, "href")));
+      } else {
+        strayMetadata.push({ tag: "link", key: "canonical" });
+      }
     } else if (tag === "script" && isJsonLdScript(node)) {
       const raw = innerText(html, node);
       let data = null;
@@ -465,6 +500,7 @@ function extract(page, base) {
     schemaType: schemaType.kept,
     jsonLd,
     ids,
+    strayMetadata,
     linksOut: [],
     linksIn: [],
     fragmentLinks: [],
