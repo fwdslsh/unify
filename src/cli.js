@@ -27,7 +27,7 @@ Options:
       --clean              empty the output directory first
       --exclude <glob>     globs never emitted, still usable by the build (repeatable; default: _*)
       --pretty-urls        about.html → about/index.html, and rewrite internal links to match
-      --base-url <url>     the site's whole address (https://site.example/repo/): prefix root-relative links, and make og:/canonical absolute for share crawlers
+      --base-url <url>     the site's whole address (https://site.example/repo/): prefix root-relative links, make og:/canonical absolute for share crawlers, and generate sitemap.xml
       --dry-run            run the full build and every check, print the report, write nothing
       --strict             advisories count as problems for the exit code
   -p, --port <n>           port for \`unify dev\` (default: 3000)

@@ -884,6 +884,7 @@ The bold IDs are the stable identifiers used by `tests/conformance/rules.tsv` an
 18. **P19** — A named `<slot>` inside the layout's default-content sink `<main>`, with no bare `<slot>` (§7.4). Located at the named slot
 19. **P20** — A `<slot>` outside a layout's `<body>` — anywhere in a page, or in a layout's `<head>` (§7.1). Inert in both cases; the message names the spelling that belongs in that file (`slot=` on a real element for a page, the layout's `<body>` for a head slot). Was advisory A04 until 2026-08-13
 20. **P21** — A page or layout with no `<body>` element where a merge requires one (§7). Attributed to the file that lacks it, file-level (there is no line to point at); the fix lines are spelled for that file's kind — for a page, the complete-document shape and the `.fragment.html` rename (§4.4), because a body-less `.html` is either an unfinished page or an intended partial; for a layout, `<body></body>` (the §7.5 head-only pattern)
+21. **P22** — A generated discovery artifact's output path is already occupied by a file the site emits from source (§21.5). Located at the occupying source file. Generation is suppressed rather than overwriting, so the problem never costs the author their own file
 
 ### 14.3 Advisories (the closed catalogue — capped at twelve; at the cap, adding one means removing one)
 
@@ -1059,3 +1060,53 @@ A crawler-specific meta (`<meta name="googlebot">`) is **not** read: unify does 
 `linksOut` holds the output paths of the pages this page links to. A link participates when it is an `<a href>` in the emitted document whose value, after `--base-url` stripping (§12's own rule, reused), resolves to an output path that has a page record. Fragment-only, external, `mailto:`, `tel:`, and `data:` URLs never participate, and a link to a non-page asset never participates; the query and fragment of a participating URL are discarded before matching. A page linking to itself records itself. Values are deduplicated and sorted.
 
 `linksIn` is the exact reverse relation, computed after every record exists: `B` is in `A.linksIn` if and only if `A` is in `B.linksOut`. Deduplicated and sorted. Orphan detection (product-spec §6.3.4) is `linksIn.length === 0`, which is why the relation is built here once rather than by the consumer.
+
+---
+
+## 21. Sitemap generation
+
+The first projection of §20. Everything here reads page records; nothing here re-reads a page.
+
+### 21.1 Activation
+
+A sitemap is generated when, and only when, `--base-url` supplied the site's public address. Without it the manifest's `url` is `null` (§20.5) and unify does not know what to write in a `<loc>` — a sitemap of root-relative paths is invalid per the Sitemaps protocol, and inventing an origin is the class of guess product-spec §6.1 forbids. A build with no `--base-url` therefore emits no sitemap and reports nothing about it; this is the v0.7 golden path, unchanged.
+
+Generation is additive: it writes one new file (or, at protocol scale, a small set), changes no authored content, appears in `--dry-run` like any other write, and participates in §15's transactional publish. `--base-url` is the whole opt-in — there is no separate flag, because a site that has told unify its public address has told it everything the sitemap needs.
+
+### 21.2 Membership
+
+A page record is included when **all** of the following hold. The list is closed; nothing else affects membership.
+
+1. It has a record at all (§20.1) — so assets, `.fragment.html` files, excluded sources, and pages that failed to compose are already out.
+2. `robots.indexable` is `true` (§20.6). A `noindex` or `none` page is excluded: listing a page the author told crawlers to drop is a contradiction the sitemap should not publish.
+3. Its output path is not `404.html`. An error document is not a destination.
+4. It is **self-canonical**: it either declares no canonical, or declares one that resolves to its own output path. A canonical naming another page means the author consolidated this URL into that one, and a sitemap entry would ask crawlers to undo that. Resolution reuses §12's own rule (base-URL stripping, then relative/root-relative resolution, then directory URLs to `index.html`) so "which page does this URL name" has one answer across the build. A canonical that resolves to nothing internal — an external URL, or a path the site does not emit — is likewise not this page, so the page is excluded.
+
+Membership is evaluated per record in manifest order (§20.1), and that order is the order entries appear in the file. No sorting, shuffling, or grouping: two builds of the same tree produce byte-identical sitemaps.
+
+### 21.3 Entry contents
+
+Each included record contributes one `<url>` element:
+
+- `<loc>` is `record.url` — the absolute public URL §20.5 already computed, so a URL in the sitemap and a URL in the `--dry-run` report are the same string by construction. XML-escaped (`&`, `<`, `>`, `"`, `'`).
+- `<lastmod>` is emitted **only** when `record.dateModified.iso` is non-null — an authored, well-formed W3C date. A page with no authored modification date gets no `<lastmod>`. The build clock, the filesystem's mtime, the filename, and Git history are not fallbacks: a fabricated `lastmod` is a claim about the world, and it is the specific fabrication crawler guidance punishes. `datePublished` is not a fallback either; the element is named for the last modification and reads the value authored under that name.
+
+No `<changefreq>` and no `<priority>`. Both are author guesses that unify cannot derive from the page, and current primary crawler guidance ignores them; emitting a constant for every page would be noise with the shape of information.
+
+### 21.4 Serialization and protocol limits
+
+The document is a `urlset` in the `http://www.sitemaps.org/schemas/sitemap/0.9` namespace, UTF-8, one element per line, newline-terminated. Byte-identical across runs of the same input.
+
+The Sitemaps protocol caps one file at **50,000 URLs** and **50 MiB** uncompressed. When the entry set exceeds either cap, unify emits a **sitemap index** at `sitemap.xml` naming parts `sitemap-1.xml`, `sitemap-2.xml`, … Parts are filled in manifest order to the first cap reached, so the split points are a function of the input alone. The index's `<loc>` values are the parts' own absolute public URLs; the index carries no `<lastmod>`, for the same reason entries do not invent one. A site under both caps gets exactly one file, `sitemap.xml`, and no index.
+
+### 21.5 Authored sitemaps and generated-path collisions
+
+If the site already emits `sitemap.xml` from its own source, **generation is suppressed entirely** and the authored file ships byte-for-byte. The author's file is the site's sitemap; unify neither overwrites it nor merges into it. Its internal `<loc>` values are checked exactly as generated ones are (§21.6).
+
+If generation proceeds and a path it would write is already occupied by a file the site emits from source, that is **P22**, located at the occupying source file, and generation is suppressed — the problem blocks publish (§15) without ever costing the author a file. In practice this reaches only the split parts, since an authored `sitemap.xml` suppresses generation before any path is claimed.
+
+### 21.6 `<loc>` verification
+
+Every `<loc>` in an emitted sitemap — generated or authored — whose value names a location inside this site must resolve to a file the site emits. "Inside this site" means the value, after `--base-url` stripping (§12's rule), is root-relative or relative; a URL on another origin is not checkable offline and is skipped, because network access is an explicit audit operation and never a build dependency (product-spec §6.1). A `<loc>` that does not resolve is **P13**, the same broken-internal-reference problem §12 raises for a page, located at the sitemap file.
+
+For generated sitemaps this check can only pass — every `<loc>` came from a record whose output path exists. It runs anyway, and that is the point: it is the executable form of the claim that the sitemap and the published tree agree, so a future change that lets the two drift fails here instead of at a crawler.

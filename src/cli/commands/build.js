@@ -58,6 +58,7 @@ import * as publishModule from "../../core/publish.js";
 import * as references from "../../core/references.js";
 import * as urls from "../../core/urls.js";
 import { buildManifest } from "../../core/manifest.js";
+import * as sitemap from "../../core/sitemap.js";
 
 /**
  * @param {object} context
@@ -223,6 +224,13 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
     manifestPages.push({ sourcePath: p.relPath, outputPath: finalOutputPath, html: rewritten });
   }
 
+  // §4.4/EXC-09 — mirror copy: every emitted asset, byte-for-byte, same
+  // relative identity (only its OUTPUT path may move, under --pretty-urls
+  // collision resolution — content never does).
+  for (const asset of assetFiles) {
+    tempFiles.set(outputPathOf.get(asset.relPath), readFileSync(asset.absPath));
+  }
+
   // ---- §20 — the final-output page manifest. -------------------------------
   // Derived here, between §11 and §12, because this is the first moment every
   // page's emitted bytes exist and the last moment before anything reads them.
@@ -238,12 +246,22 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
   // the suite here, not at the first site that enabled a sitemap.
   const manifest = buildManifest({ pages: manifestPages, base: baseConfig });
 
-  // §4.4/EXC-09 — mirror copy: every emitted asset, byte-for-byte, same
-  // relative identity (only its OUTPUT path may move, under --pretty-urls
-  // collision resolution — content never does).
-  for (const asset of assetFiles) {
-    tempFiles.set(outputPathOf.get(asset.relPath), readFileSync(asset.absPath));
-  }
+  // ---- §21 — sitemap generation, the manifest's first projection. ----------
+  // Runs after the mirror copy above, not before: §21.5 must know which paths
+  // the site already emits from its own source before it claims one, and the
+  // asset copy is what establishes that. Generated files then join `tempFiles`
+  // like any other output — which is what makes them appear in --dry-run,
+  // participate in §15's transactional publish, and fall under §12's checks,
+  // with no special-casing in any of the three.
+  const emittedFromSource = new Map([
+    ...composedPages.map((p) => [outputPathOf.get(p.relPath), p.relPath]),
+    ...assetFiles.map((a) => [outputPathOf.get(a.relPath), a.relPath]),
+  ]);
+  const generated = sitemap.generateSitemap({
+    records: manifest.records, base: baseConfig, emittedFromSource, reporter,
+  });
+  for (const [outPath, text] of generated) tempFiles.set(outPath, text);
+
 
   // ---- §12 — the reference check, against the completed temp tree. --------
   const htmlFiles = new Map();
@@ -253,6 +271,25 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
     if (extname(outPath) === ".html" && text !== null) htmlFiles.set(outPath, text);
     else if (extname(outPath) === ".css") cssFiles.set(outPath, text ?? content.toString("utf8"));
   }
+  // §21.6 — every internal <loc> in an emitted sitemap must name a file the
+  // site emits. Both kinds are scanned: what unify generated (where this can
+  // only pass, and is the executable form of "the sitemap and the tree agree")
+  // and what the author wrote (where it is a real check). Attribution is the
+  // SOURCE path for an authored file — `dist/sitemap.xml` is not a file
+  // anyone can edit.
+  const sitemapFiles = new Map();
+  for (const outPath of [sitemap.SITEMAP_PATH, ...generated.keys()]) {
+    const content = tempFiles.get(outPath);
+    if (typeof content !== "string" && !Buffer.isBuffer(content)) continue;
+    sitemapFiles.set(outPath, {
+      text: typeof content === "string" ? content : content.toString("utf8"),
+      file: emittedFromSource.get(outPath) ?? outPath,
+    });
+  }
+  sitemap.checkSitemapLocs({
+    sitemaps: sitemapFiles, emittedPaths: new Set(tempFiles.keys()), base: baseConfig, reporter,
+  });
+
   references.checkReferences({
     htmlFiles, cssFiles, emittedPaths: new Set(tempFiles.keys()), base: baseConfig, reporter,
     locate: makeReferenceLocator(pageSpansByOutputPath, htmlFiles, cssFiles, resolveLine),
@@ -329,6 +366,15 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
         outputPath: `${displayOutput}/${outputPathOf.get(a.relPath)}`,
         url: publishModule.urlForOutputPath(outputPathOf.get(a.relPath), prefix),
         from: a.relPath,
+      })),
+      // §21.1 — a generated artifact is a write like any other, so it carries
+      // the same address the report gives every other row. `from` names what
+      // produced it rather than a source file, because there is no source file.
+      ...[...generated.keys()].map((outPath) => ({
+        action: "write",
+        outputPath: `${displayOutput}/${outPath}`,
+        url: publishModule.urlForOutputPath(outPath, prefix),
+        from: "generated (--base-url)",
       })),
       ...plan.delete.map((rel) => ({ action: "delete", outputPath: `${displayOutput}/${rel}` })),
     ];

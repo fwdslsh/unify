@@ -14,7 +14,7 @@ Options:
       --clean              empty the output directory first
       --exclude <glob>     globs never emitted, still usable by the build (repeatable; default: _*)
       --pretty-urls        about.html → about/index.html, and rewrite internal links to match
-      --base-url <url>     the site's whole address (https://site.example/repo/): prefix root-relative links, and make og:/canonical absolute for share crawlers
+      --base-url <url>     the site's whole address (https://site.example/repo/): prefix root-relative links, make og:/canonical absolute for share crawlers, and generate sitemap.xml
       --dry-run            run the full build and every check, print the report, write nothing
       --strict             advisories count as problems for the exit code
   -p, --port <n>           port for `unify dev` (default: 3000)
@@ -67,6 +67,8 @@ Moves every page `X.html` to `X/index.html` — except `index.html` files (alrea
 ### `--base-url <url>`
 
 The address the site will be served from, scheme and domain included: `--base-url https://example.com/repo/`. Its path part prefixes every root-relative URL in the built HTML — `href`, `src`, `srcset`, `poster`, and `og:`/`twitter:` meta values; source files stay rooted at `/` so local preview keeps working. Its origin additionally absolutizes root-relative `og:`/`twitter:`/`rel="canonical"` values, which crawlers require to be absolute: `/assets/x.jpg` becomes `https://example.com/repo/assets/x.jpg` — origin **and** subpath, so the URL points where the file is actually served.
+
+Knowing the address is also what lets unify write the site's `sitemap.xml`, so `--base-url` is the whole opt-in — there is no second flag. The generated file lists every page that is indexable, is not `404.html`, and is not consolidated elsewhere by its own `rel="canonical"`; URLs are the same absolute ones the `--dry-run` report shows. A `<lastmod>` appears only where the page authored a real date (`<meta property="article:modified_time">`, or `lastmod:` in Markdown frontmatter) — unify never dates a page from the build clock, the filesystem, the filename, or Git history. If your source tree already contains a `sitemap.xml`, that file is the site's sitemap: unify ships it untouched and generates nothing.
 
 A bare path (`--base-url /repo-name/`) is a usage error naming the full form. It used to be accepted, and prefixed links correctly while leaving `og:`/`canonical` root-relative — valid-looking metadata no share crawler can fetch. Give the whole address; for a local preview of a subpath site, `http://localhost:3000/repo-name/` is one.
 
