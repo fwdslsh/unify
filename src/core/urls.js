@@ -51,6 +51,7 @@
  * head-merge.js (§8) so all three locate a fault the same way.
  */
 import { posix } from "node:path";
+import { decodeEntities } from "./entities.js";
 import { applyEdits, findAll, getAttr, getAttrNode, lineOf, parse, tokens } from "./html.js";
 
 // --------------------------------------------------------------- URL basics
@@ -567,11 +568,16 @@ export function applyPrettyLinks(html, { pageOutputPath, emittedHtmlPaths }) {
     if (isSkippedUrl(url)) return null;
     const { path, query, fragment } = splitUrl(url);
     if (path === "") return null;
+    // Character references resolved first, for §12's reason: an attribute's
+    // value is its bytes decoded, so `/a&amp;b.html` names `a&b.html` and must
+    // reach the same pretty target the raw spelling does. Writes never need the
+    // inverse — `prettyLinkTarget` percent-encodes, so `&` leaves as `%26`.
+    //
     // Decoded before matching: `emittedHtmlPaths` holds literal output paths,
     // and §20.5 makes `/two%20words.html` the spelling the site advertises for
     // `two words.html`. Without this, a link written the way the sitemap
     // publishes it would silently miss the pretty rewrite.
-    const decoded = decodePathSegments(path);
+    const decoded = decodePathSegments(decodeEntities(path));
     const resolved = decoded.startsWith("/")
       ? posix.normalize(decoded).slice(1)
       : posix.normalize(posix.join(pageDir, decoded));

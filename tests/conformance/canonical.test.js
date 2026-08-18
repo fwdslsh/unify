@@ -172,6 +172,72 @@ test("CAN-03: an authored canonical is left exactly as written, in every shape",
   covers("CAN-03");
 }, TEST_MS);
 
+test("CAN-03: an authored canonical with an empty or absent href is still authored", async () => {
+  // `record.canonical` is null for both, so gating completion on the manifest
+  // VALUE rather than on the DOCUMENT stamped a second canonical — creating
+  // the multiple-canonical fault §22.4's own rationale says the tool must never
+  // create, and creating it invisibly: the manifest then reads only the
+  // completed value and records no conflict for `unify audit` to find.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": page("Home"),
+    "empty.html": page("Empty", '    <link rel="canonical" href="">\n'),
+    "nohref.html": page("NoHref", "    <link rel=\"canonical\">\n"),
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", BASE, "--canonical", "auto"], tmp);
+  expectExit(r, 0, "authored canonicals with no usable href");
+  for (const f of ["empty.html", "nohref.html"]) {
+    const n = [...read(tmp, "dist", f).matchAll(/rel="canonical"/g)].length;
+    if (n !== 1) throw new Error(`§22.3: ${f} authored one canonical and must keep exactly one, found ${n}:\n${read(tmp, "dist", f)}`);
+  }
+  covers("CAN-03");
+}, TEST_MS);
+
+test("CAN-02/SIT-02: completion never changes the sitemap — the invariant the design rests on", async () => {
+  // §22 decides membership from a manifest read BEFORE completion; §21 decides
+  // from the manifest read AFTER. They agree only because a completed canonical
+  // resolves back to its own page. One unescaped `&` in the base-url path broke
+  // that and the site's only page vanished from the sitemap, silently — so the
+  // agreement is asserted rather than assumed.
+  for (const base of ["https://example.com/", "https://example.com/&copy;x/", "https://example.com/café/"]) {
+    const tmp = mkTmp();
+    const files = { "index.html": page("Home"), "about.html": page("About") };
+    writeTree(join(tmp, "src"), files);
+    const plain = await runCli(["build", "-s", "src", "-o", "plain", "--base-url", base], tmp);
+    expectExit(plain, 0, `baseline for ${base}`);
+    const done = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", base, "--canonical", "auto"], tmp);
+    expectExit(done, 0, `completed for ${base}`);
+    if (read(tmp, "plain", "sitemap.xml") !== read(tmp, "dist", "sitemap.xml")) {
+      throw new Error(`§21/§22: completion must not change which pages the sitemap lists (${base}).\n--- without ---\n${read(tmp, "plain", "sitemap.xml")}\n--- with ---\n${read(tmp, "dist", "sitemap.xml")}`);
+    }
+  }
+  covers("CAN-02");
+}, TEST_MS);
+
+test("CAN-02: a diagnostic below </head> keeps its file and line when completion runs", async () => {
+  // §14.1 R3. The span table is built before §22 inserts bytes, and nothing
+  // updated it — so a broken link inside an include was attributed to a
+  // different file, at a line holding unrelated content.
+  const files = {
+    "_inc/nav.html": '<nav><a href="/gone.html">x</a></nav>\n',
+    "page.html": page("P", "", '    <include src="/_inc/nav.html"></include>\n    <p>two</p>'),
+    "index.html": page("Home"),
+  };
+  const plain = mkTmp();
+  writeTree(join(plain, "src"), files);
+  const a = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", BASE], plain);
+  expectExit(a, 1, "broken include reference without the flag");
+
+  const done = mkTmp();
+  writeTree(join(done, "src"), files);
+  const b = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", BASE, "--canonical", "auto"], done);
+  expectExit(b, 1, "the same site with completion");
+  if (a.stderr !== b.stderr) {
+    throw new Error(`§14.1: completion must not move a diagnostic.\n--- without ---\n${a.stderr}\n--- with ---\n${b.stderr}`);
+  }
+  covers("CAN-02");
+}, TEST_MS);
+
 // ------------------------------------------------------------------- §22.4
 
 test("CAN-04: a noindex page is never stamped — that would manufacture the conflict", async () => {

@@ -9,15 +9,19 @@ import { UsageError } from "../core/diagnostics.js";
 
 const COMMANDS = ["build", "dev", "watch", "init"];
 
-/** Long name → kind. `list` repeats, `string` takes a value, `flag` does not. */
+/**
+ * Long name → kind. `list` repeats, `string` takes a value, `flag` does not.
+ * `example` supplies a real value for the missing-value fix line, where the
+ * option has one worth naming.
+ */
 const OPTIONS = {
   source: { kind: "string", short: "s" },
   output: { kind: "string", short: "o" },
   clean: { kind: "flag" },
   exclude: { kind: "list" },
   "pretty-urls": { kind: "flag" },
-  "base-url": { kind: "string" },
-  canonical: { kind: "string" },
+  "base-url": { kind: "string", example: "https://your-domain.example/" },
+  canonical: { kind: "string", example: "auto" },
   "dry-run": { kind: "flag" },
   strict: { kind: "flag" },
   port: { kind: "string", short: "p" },
@@ -88,7 +92,12 @@ export function parseArgs(argv) {
 
     const value = inlineValue ?? argv[++i];
     if (value === undefined) {
-      throw new UsageError(`--${name} needs a value`, [`pass one, for example --${name} <value>`]);
+      // Name a real value where the option has one worth naming. `--canonical`
+      // is the likeliest typo of the pair (`auto` is its only value), and a fix
+      // line reading `--canonical <value>` names nothing.
+      throw new UsageError(`--${name} needs a value`, [
+        spec.example ? `write it as: --${name} ${spec.example}` : `pass one, for example --${name} <value>`,
+      ]);
     }
     if (spec.kind === "list") {
       const existing = /** @type {string[]} */ (options[name] ?? []);

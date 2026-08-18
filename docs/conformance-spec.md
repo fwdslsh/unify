@@ -830,6 +830,8 @@ A URL is internal when, after stripping the `--base-url` prefix — the path pre
 
 One absence is **not** reported: a URL that resolves to the output path of a **source page that exists but failed to compose**. That page emitted no file because of a problem of its own — already reported, and already blocking the publish — so a second diagnostic located at the *link* sends the author to a correctly-spelled path in the wrong file, and, diagnostics being path-ordered, usually prints above the one problem that matters. Measured on a twenty-page site with one page failing to compose: twenty-one problems printed, one of them real, the real one last. A reference to a target with no source file at all, and a reference to a source file that exists but is *excluded* (the stranded underscore asset above), are not this case and still fail here, loudly.
 
+**A reference is the attribute's VALUE, not its bytes.** Character references resolve first: `href="/a&amp;b.html"` is the correct HTML spelling for a file named `a&b.html`, and that is the URL a browser fetches. Reading the bytes instead failed a correctly-written page to publish, with a diagnostic quoting a spelling that was right — present since v0.7.0. The obligation runs both ways: a URL unify *writes* into an attribute is escaped for the same reason a URL it *reads* is decoded (§22.2), and the two are one rule rather than two conventions that happen to agree.
+
 **A reference is percent-decoded, per segment, before it is matched.** §20.5 makes `/two%20words.html` the address a file named `two words.html` answers to — that is what the sitemap publishes, what `--dry-run` prints, and what a browser sends — so a link written that way must resolve. Both spellings name the same file and both pass; neither is rewritten into the other, because the author's bytes are theirs.
 
 Decoding follows [RFC 3986](https://www.rfc-editor.org/rfc/rfc3986)'s own division rather than a local rule: a percent-encoded **unreserved** character is equivalent to the character itself, so `%2E` is `.` and `%41` is `A` and both decode; a **reserved delimiter** left encoded is deliberately not a delimiter. `/a%2Fb.html` therefore names one segment whose name contains a slash — something no filesystem holds — so it matches nothing, **always**, including when a file is literally named `a%2Fb.html`: that file's own address is `/a%252Fb.html`, and letting the impossible spelling match it would publish a link that 404s. Decoding it into a separator instead would silently resolve it to `a/b.html`, a different file, and under `--pretty-urls` would rewrite the author's link to an address naming that different file. `%5C` is not treated this way — a backslash is a legal POSIX filename character, so `a\b.html` is a real file whose published address is `/a%5Cb.html`, and refusing to decode it would make the site's own address unresolvable. A malformed escape leaves its segment as written rather than failing the build with a parse error.
@@ -1182,7 +1184,9 @@ For every page record that §22.4 includes, a canonical link is inserted **at th
 
 `href` is `record.url` — the same absolute URL §20.5 computes, the `--dry-run` report prints, and §21.3 writes into `<loc>`. Serialization is fixed, matching §10.2's rule for synthesized elements: double-quoted attributes, `rel` before `href`. The insertion reuses the whitespace immediately preceding `</head>`, so the element lands at that tag's own indentation and the rest of the document is byte-identical (§3's preservation rule).
 
-A page whose emitted document has no `<head>` gets nothing — there is nowhere to put it, and synthesizing a head would be a structural change this section does not make.
+`href` is HTML-escaped. §20.5 deliberately leaves the `--base-url` path prefix un-re-encoded, so `record.url` may legitimately contain `&` — and an unescaped `&copy;` in an attribute is a character reference, which §20.3 says the manifest resolves. Emitted raw, the page came back declaring a canonical of a *different* URL, §21.2's self-canonical test then failed, and the page vanished from the sitemap of the very build whose flag exists to help crawlers find it. §21.3 XML-escapes for exactly this reason; this is the same obligation one document type over, and §12's decode-on-read is its other half.
+
+A page whose emitted document has no `<head>`, or whose `<head>` is left unclosed, gets nothing — there is no insertion point, and synthesizing one would be a structural change this section does not make.
 
 ### 22.3 Authored canonicals always win
 
@@ -1192,10 +1196,9 @@ A page that declares any `rel="canonical"` is left exactly as written. That hold
 
 A page is completed when §21.2's sitemap membership holds — it has a record, is `indexable`, is not `404.html`, and is self-canonical — and it authors no canonical. The predicate is shared, not merely similar, for two reasons beyond tidiness:
 
-- Stamping a canonical onto a `noindex` page **manufactures** the contradiction product-spec §6.3.2 asks unify to report. A tool that creates the fault it warns about is worse than one that does neither.
-- A page consolidated onto another already has the canonical it wants; that is what excluded it from the sitemap in the first place.
-
-`404.html` is excluded because an error document is not a destination, exactly as in §21.2.
+- **`404.html`** is excluded for a stronger reason here than in §21.2. An error document is served *at whatever URL was missing*, so a canonical naming `/404.html` is not merely useless — it is an actively false claim about every address it appears at.
+- **A `noindex` page** is excluded as the conservative default: write less where the author has said less. Note precisely what this is not — a completed canonical always names the page's **own** URL, so on a `noindex` page it would be redundant rather than contradictory. The contradiction product-spec §6.3.2 names is the *cross*-canonical shape, a page marked `noindex` whose canonical points elsewhere, and completion cannot produce that. §22.3 leaves the author's own escape hatch open: write the canonical and it is kept.
+- **A page consolidated onto another** already has the canonical it wants — which is also why it left the sitemap. This clause does no work in the completion direction, because a page with any authored canonical is already excluded by §22.3; it is inherited with the predicate rather than needed by it.
 
 ### 22.5 What this section reports, and what it deliberately does not
 

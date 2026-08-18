@@ -47,6 +47,7 @@
  */
 import { posix } from "node:path";
 import { findAll, getAttr, getAttrNode, isElement, lineOf, parse } from "./html.js";
+import { decodeEntities } from "./entities.js";
 import { decodePathSegments, isSkippedUrl, splitUrl } from "./urls.js";
 import { CHECK_SPELLING } from "./diagnostics.js";
 
@@ -280,7 +281,15 @@ function isCascade(resolved, unbuiltPagePaths) {
 }
 
 function checkOne({ raw, offset }, containingOutputPath, { base, emittedPaths, unbuiltPagePaths, reporter, locate }) {
-  const stripped = base ? stripBaseUrl(raw, base) : raw;
+  // An attribute's VALUE is its bytes with character references resolved —
+  // `href="/a&amp;b.html"` is the correct HTML spelling for a file named
+  // `a&b.html`, and a browser fetches the decoded form. §12 read the bytes, so
+  // a page written correctly failed to publish with a diagnostic quoting a
+  // spelling that was right. Present since v0.7.0 and reproduced there; reached
+  // in a new way by §22, whose synthesized href must be escaped for exactly the
+  // same reason. Decoding on read and escaping on write are one rule.
+  const value = decodeEntities(raw);
+  const stripped = base ? stripBaseUrl(value, base) : value;
   const resolved = resolveReference(stripped, containingOutputPath);
   if (resolved === null) return; // out of scope: external/mailto/tel/data/fragment-only/escaping
   if (emittedPaths.has(resolved)) return; // REF-05: exact, case-sensitive membership

@@ -238,15 +238,20 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
   // result — so §20.2's "every field is read from the emitted text" stays
   // literally true rather than being patched around. The extra pass runs only
   // under --canonical auto.
+  /** Output path -> the byte insertions §22 made, so §14.1's locator can undo them. */
+  const insertionsByOutputPath = new Map();
+  let completedCount = 0;
   if (settings.canonical === "auto") {
     const preliminary = buildManifest({ pages: manifestPages, base: baseConfig });
     for (const page of manifestPages) {
       const record = preliminary.byOutputPath.get(page.outputPath);
       if (!record) continue;
       const completed = completeCanonical(page.html, record, baseConfig);
-      if (completed === page.html) continue;
-      page.html = completed;
-      tempFiles.set(page.outputPath, completed);
+      if (completed.text === page.html) continue;
+      page.html = completed.text;
+      tempFiles.set(page.outputPath, completed.text);
+      insertionsByOutputPath.set(page.outputPath, completed.insertions);
+      completedCount++;
     }
   }
 
@@ -322,7 +327,7 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
 
   references.checkReferences({
     htmlFiles, cssFiles, emittedPaths: new Set(tempFiles.keys()), base: baseConfig, reporter,
-    locate: makeReferenceLocator(pageSpansByOutputPath, htmlFiles, cssFiles, resolveLine),
+    locate: makeReferenceLocator(pageSpansByOutputPath, htmlFiles, cssFiles, resolveLine, insertionsByOutputPath),
     // §12's cascade exemption: the output paths of pages that exist in source
     // and failed to compose. Only this loop knows which absences are that —
     // from inside the check, a page that emitted nothing and a page that never
@@ -421,6 +426,17 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
         ? `serving from ${baseConfig.origin}${baseConfig.pathPrefix}`
         : "serving from / — the domain root (no --base-url)",
     );
+
+    // §6.1 — anything that writes published output appears in --dry-run. The
+    // sitemap gets a write row of its own; completion edits pages that already
+    // have one, so it reports a count instead. Without it the report was
+    // byte-identical with and without the flag, and a reader checking before
+    // publish could not tell it had done anything.
+    if (settings.canonical === "auto") {
+      reporter.summary(
+        `canonical completion: ${completedCount} page${completedCount === 1 ? "" : "s"} would gain a canonical link`,
+      );
+    }
 
     const report = publishModule.formatDryRunReport(rows);
     if (report) reporter.summary(report);
@@ -521,10 +537,22 @@ function makeSourceLineResolver(sourceRoot) {
  * @param {(file: string, fileOffset: number) => number|undefined} resolveLine
  * @returns {import('../../core/references.js').Locate}
  */
-function makeReferenceLocator(pageSpansByOutputPath, htmlFiles, cssFiles, resolveLine) {
+function makeReferenceLocator(pageSpansByOutputPath, htmlFiles, cssFiles, resolveLine, insertionsByOutputPath = new Map()) {
   return (outputFile, offset) => {
     const spans = pageSpansByOutputPath.get(outputFile);
-    const hit = spans ? urls.spansToSourceLocator(spans, outputFile)(offset) : null;
+    // §22's completion INSERTS bytes after the spans were computed, which is
+    // the one thing the invariant below never allowed for: §11's rewrites only
+    // ever replace attribute values in place, so a final-text offset indexed
+    // the span table exactly. An insertion breaks that, and it broke it
+    // silently — a broken link inside an include was attributed to a different
+    // file at a line holding unrelated content, which is worse than no location
+    // at all. Subtracting the insertions that precede the offset maps a
+    // final-text position back to the pre-insertion text the spans describe.
+    const insertions = insertionsByOutputPath.get(outputFile) ?? [];
+    let shift = 0;
+    for (const ins of insertions) if (ins.at <= offset - shift) shift += ins.length;
+    const spanOffset = offset - shift;
+    const hit = spans ? urls.spansToSourceLocator(spans, outputFile)(spanOffset) : null;
     if (!hit || hit.fileOffset === null) {
       const text = htmlFiles.get(outputFile) ?? cssFiles.get(outputFile) ?? "";
       return { file: outputFile, line: html.lineOf(text, offset) };
