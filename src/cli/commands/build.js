@@ -57,6 +57,7 @@ import { contains, isNeverShipped, toRelative } from "../../core/paths.js";
 import * as publishModule from "../../core/publish.js";
 import * as references from "../../core/references.js";
 import * as urls from "../../core/urls.js";
+import { buildManifest } from "../../core/manifest.js";
 
 /**
  * @param {object} context
@@ -201,6 +202,11 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
   // POST-rewrite text maps back through spans computed against the
   // PRE-rewrite composed text.
   const pageSpansByOutputPath = new Map();
+  // §20.1's membership set, accumulated as each page's FINAL text is produced
+  // — the manifest reads the bytes §15 would publish (§20.2), so it is filled
+  // from the rewritten text below rather than from `composedPages`.
+  /** @type {{sourcePath: string, outputPath: string, html: string}[]} */
+  const manifestPages = [];
   for (const p of composedPages) {
     const pageOutputPath = collisions.computeOutputPath({ path: p.relPath, kind: "page" }, { prettyUrls: false });
     const rewritten = urls.rewriteUrls(p.html, {
@@ -214,7 +220,23 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
     const finalOutputPath = outputPathOf.get(p.relPath);
     tempFiles.set(finalOutputPath, rewritten);
     pageSpansByOutputPath.set(finalOutputPath, p.spans);
+    manifestPages.push({ sourcePath: p.relPath, outputPath: finalOutputPath, html: rewritten });
   }
+
+  // ---- §20 — the final-output page manifest. -------------------------------
+  // Derived here, between §11 and §12, because this is the first moment every
+  // page's emitted bytes exist and the last moment before anything reads them.
+  // It observes only: no diagnostic, no write, no effect on the exit code
+  // (§20.2). Every discovery, evaluation, and publication feature downstream
+  // consumes THIS — adding a second extractor is the defect product-spec §6.2
+  // exists to forbid.
+  //
+  // Derived unconditionally, including on builds no consumer below reads it
+  // for: that is what holds §20.2's "changes nothing" invariant to the whole
+  // fixture corpus rather than to the pages a discovery feature happens to
+  // touch. An extractor that threw on some real emitted document would fail
+  // the suite here, not at the first site that enabled a sitemap.
+  const manifest = buildManifest({ pages: manifestPages, base: baseConfig });
 
   // §4.4/EXC-09 — mirror copy: every emitted asset, byte-for-byte, same
   // relative identity (only its OUTPUT path may move, under --pretty-urls
