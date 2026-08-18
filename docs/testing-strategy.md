@@ -170,6 +170,18 @@ Enforced by `tests/conformance/check-suite-hygiene.mjs` (in CI as gate G9), whic
 
 It is deliberately **not** a release gate yet: it costs one suite run per mutation, and a slow gate becomes the thing people re-run until green — the M2 mechanism rebuilt with better intentions. It graduates in the same milestone that empties the phase baseline. Until then it is a review step, and its output belongs in the review report. It never touches the working tree, for a reason this repository has already paid for twice: an in-place mutation was swept into a commit by an unrelated `git add -A`, and a second in-place run silently reverted a real fix when its restore step did not execute after a timeout.
 
+**Never mutate anything you need back.** Three separate incidents in one review cycle had one root cause — a *restore* step that could be skipped:
+
+1. A reviewer's mutation was live in the working tree when an unrelated `git add -A` ran, and shipped to `main` with a real check deleted. The suite passed: nothing executed that branch.
+2. An in-place mutation loop timed out mid-iteration, so its restore never ran, silently reverting a fix made minutes earlier.
+3. A reviewer's extracted *baseline* copy was overwritten with a newer revision's file. Ten minutes of before/after comparisons were invalid, and it was caught only because one result was impossible — the "before" commit exhibiting the "after" behavior.
+
+The durable fix is structural, not procedural: **a comparison must not depend on restoring anything.** `run-mutations.mjs` embodies it for the working tree — it writes only inside a throwaway copy, so a crash mid-run can damage nothing. The same discipline extends to every artifact a comparison rests on:
+
+- **Content-address a baseline before trusting it, not after.** `md5sum` each extracted file against `git show <rev>:<path>` immediately before the comparison. Incident 3 was caught by exactly this check, one step too late.
+- **Make baselines read-only** (`chmod -R a-w`). A silent overwrite becomes a loud failure at the moment it happens rather than a wrong conclusion later.
+- **Extract a fresh baseline per round.** Reuse across rounds is the window incident 3 fell through, and re-extraction costs seconds.
+
 Process rules that cannot be fully mechanized, stated as review law with their partial mechanizations:
 
 - **A bug fix arrives with its fixture.** The fixture must fail on the pre-fix commit and pass after. CI cannot verify the "fails before" half automatically; the PR template requires the fixture path and the reviewer checks it by `git stash`-ing the fix locally. What CI *does* verify: the fix PR touches `tests/fixtures/landmines/**` or `tests/conformance/**` whenever it touches `src/**` composition code (a path-based check; override requires the literal PR label `no-fixture-needed`, which is greppable and auditable).

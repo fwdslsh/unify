@@ -76,6 +76,44 @@ export function encodePathSegments(outputPath) {
 }
 
 /**
+ * §20.5 — canonicalize a URL path that is **already in URL space**.
+ *
+ * `encodePathSegments` and this function take different inputs and are not
+ * interchangeable. That one takes a *filesystem* path whose segments are
+ * literal names and never pre-encoded, so encoding is total. This one takes a
+ * path built from text the **author wrote as a URL**, which may already carry
+ * escapes — so it decodes each segment and re-encodes it, leaving a canonical
+ * URL whichever spelling arrived.
+ *
+ * Applying the wrong one here is a defect in both directions at once, and it
+ * shipped for one commit: encoding an authored `a%20b.png` produced
+ * `a%2520b.png`, so a site whose file really is `a b.png` — a site the author
+ * had spelled correctly — stopped building, while a site whose file is
+ * literally named `a%20b.png` started passing silently, which is the direction
+ * that reaches production.
+ *
+ * Decoding and re-encoding **per segment, without rejoining in between** is
+ * what makes this idempotent for every input: `a%2Fb.png` decodes to a single
+ * segment named `a/b.png` and `encodeURIComponent` puts the `%2F` straight
+ * back, rather than emitting `a%252Fb.png` or splitting one impossible segment
+ * into two real ones.
+ * @param {string} path
+ * @returns {string}
+ */
+export function canonicalizePathSegments(path) {
+  return path
+    .split("/")
+    .map((seg) => {
+      try {
+        return encodeURIComponent(decodeURIComponent(seg));
+      } catch {
+        return seg; // malformed escape — preserved, and unmatchable, as everywhere else
+      }
+    })
+    .join("/");
+}
+
+/**
  * The exact inverse, for matching an authored URL back to an output path.
  *
  * Per segment, and never `decodeURI`: that function deliberately leaves
@@ -362,12 +400,13 @@ export function rewriteProvenanceUrls(composedHtml, { provenanceOf, pageFile, pa
     // raw space while the same asset's dry-run row and sitemap loc were
     // encoded — one file, two addresses, from one build.
     //
-    // Encoding a path already resolved from authored text is safe because
-    // `resolveProvenanceUrl` returns a path built from decoded source segments;
-    // `encodePathSegments` is total, so an authored `%20` becomes `%2520` and
-    // keeps naming the file literally called `a%20b.png`, which is what
-    // RFC 3986 says it named all along.
-    return encodePathSegments(resolvedPath) + query + fragment;
+    // `canonicalizePathSegments`, NOT `encodePathSegments`: this path is built
+    // from text the author wrote as a URL, so it may already carry escapes.
+    // The two functions take different input spaces and the wrong one here is
+    // wrong in both directions — it briefly turned an authored `a%20b.png`
+    // into `a%2520b.png`, failing a correct site and silently passing an
+    // incorrect one.
+    return canonicalizePathSegments(resolvedPath) + query + fragment;
   };
 
   for (const el of findAll(root, (n) => n.type === "element")) {

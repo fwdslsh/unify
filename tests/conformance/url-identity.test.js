@@ -167,6 +167,37 @@ test("URL-06/MAN-05: §11.1 encodes the URL it CONSTRUCTS, and preserves the one
   covers("MAN-05");
 }, TEST_MS);
 
+test("URL-06: §11.1 canonicalizes an authored escape rather than re-encoding it", async () => {
+  // The four cases that distinguish canonicalize (decode-then-encode per
+  // segment) from plain encode. Encoding a path built from authored URL text
+  // is wrong in BOTH directions at once, and the silent direction — case B —
+  // is the one that reaches production.
+  const cases = [
+    { file: "a b.png", href: "a%20b.png", exit: 0, emit: "/assets/a%20b.png",
+      why: "author spelled it correctly per RFC 3986; plain encode would make it %2520 and fail a correct site" },
+    { file: "a%20b.png", href: "a%20b.png", exit: 1, emit: null,
+      why: "that href names 'a b.png', which is absent; plain encode would pass this silently" },
+    { file: "my logo.png", href: "my logo.png", exit: 0, emit: "/assets/my%20logo.png",
+      why: "a raw space is not a legal URI; unify's re-rooted construction must be one" },
+    { file: "a%20b.png", href: "a%2520b.png", exit: 0, emit: "/assets/a%2520b.png",
+      why: "the only correct spelling for a file literally named a%20b.png" },
+  ];
+  for (const c of cases) {
+    const tmp = mkTmp();
+    writeTree(join(tmp, "src"), {
+      "_includes/nav.html": `<nav><img src="../assets/${c.href}" alt="l"></nav>\n`,
+      "index.html": page("Home", '<include src="/_includes/nav.html"></include>'),
+      [`assets/${c.file}`]: "PNG",
+    });
+    const r = await runCli(["build", "-s", "src", "-o", "dist"], tmp);
+    expectExit(r, c.exit, `file=${c.file} href=${c.href} — ${c.why}`);
+    if (c.emit !== null && !read(tmp, "dist", "index.html").includes(`src="${c.emit}"`)) {
+      throw new Error(`§20.5: expected src="${c.emit}" for file=${c.file} href=${c.href} (${c.why}):\n${read(tmp, "dist", "index.html")}`);
+    }
+  }
+  covers("MAN-05");
+}, TEST_MS);
+
 test("REF-08/URL-08: an ENCODED authored link is pretty-rewritten like a raw one", async () => {
   // Pins applyPrettyLinks' own decode. Without it a link written in the exact
   // spelling the site publishes stops being rewritten and then fails §12 as

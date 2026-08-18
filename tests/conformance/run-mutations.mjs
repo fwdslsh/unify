@@ -46,6 +46,14 @@ import { fileURLToPath } from "node:url";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const TSV = join(ROOT, "tests", "conformance", "mutations.tsv");
 
+/**
+ * Tests whose failure never proves a mutation was noticed: they bind ports and
+ * touch timers, so they fail for environmental reasons a source mutation cannot
+ * cause. Excluded from kill attribution so a coincidental flake cannot mask a
+ * real survivor.
+ */
+const FLAKY = /^§16 dev server|^§16 watch|dev-server|reload script/i;
+
 const args = process.argv.slice(2);
 const revIdx = args.indexOf("--rev");
 const rev = revIdx === -1 ? null : args[revIdx + 1]; // null = the working tree
@@ -101,7 +109,17 @@ try {
       killed = true;
       const out = `${err.stdout ?? ""}${err.stderr ?? ""}`;
       const fails = [...out.matchAll(/^\(fail\) (.+?)(?: \[[\d.]+ms\])?$/gm)].map((m) => m[1]);
-      summary = fails.length ? ` — killed by ${fails.length}: ${fails.slice(0, 3).join("; ")}` : "";
+      // A mutation is killed by tests that ACTUALLY DEPEND on it. The dev-server
+      // and watch tests bind ports and occasionally fail for reasons no source
+      // mutation could cause; crediting one as a kill would let a real survivor
+      // hide behind a coincidental flake. They are excluded from attribution,
+      // and a mutation whose only "kills" were flaky counts as SURVIVED.
+      const real = fails.filter((t) => !FLAKY.test(t));
+      killed = real.length > 0;
+      summary = real.length ? ` — killed by ${real.length}: ${real.slice(0, 3).join("; ")}` : "";
+      if (!killed && fails.length) {
+        summary = ` — only environment-flaky failures (${fails.slice(0, 2).join("; ")}), not counted`;
+      }
     } finally {
       writeFileSync(target, pristine);
     }
