@@ -999,7 +999,7 @@ Every record carries every field. A field with nothing to read is `null` (scalar
 | `title` | string\|null | `<title>` text content, whitespace-collapsed and trimmed; empty is `null` |
 | `description` | string\|null | `<meta name="description">` `content`, trimmed; empty is `null` |
 | `lang` | string\|null | the `lang` attribute of `<html>`, trimmed; empty is `null` |
-| `canonical` | string\|null | `<link rel="canonical">` `href`, exactly as emitted |
+| `canonical` | string\|null | `<link rel="canonical">` `href`, with character references resolved and nothing else changed — no normalization, no re-encoding |
 | `robots` | object | §20.6 — `{raw, directives, indexable, followable}` |
 | `h1` | string\|null | text content of the first `<h1>`, whitespace-collapsed and trimmed; empty is `null` |
 | `headings` | array | every `h1`–`h6` in document order: `{level, text, id}`; `id` is `null` when unset |
@@ -1029,6 +1029,8 @@ s samp small span strong sub sup time u var wbr
 
 `<br>` is deliberately *not* inline here: it separates lines, so it separates words.
 
+Collapsing covers **ASCII** whitespace only. A decoded `&nbsp;` is U+00A0, a character the author chose because it forbids a line break, and rewriting it to U+0020 would be an edit to their content — the same verbatim discipline `iso` and `canonical` follow. This pushes a real cost onto consumers that tokenize: a client-side search comparing a typed `New York` against an indexed `New\u00A0York` misses, and duplicate-content detection reads two otherwise identical pages as different. Any projection of this field that is searched or compared must fold U+00A0 and the other Unicode space separators **at index time**, and say so where it is specified. Folding them here instead would put one consumer's normalization into the shared record, where every other consumer inherits it silently.
+
 ### 20.4 Determinism and conflicts
 
 Several fields are single-valued while the emitted document may declare them more than once. For each such field the manifest keeps **the first accepted declaration in document order** and records nothing further when the repeats agree.
@@ -1042,6 +1044,8 @@ When two or more accepted declarations exist and their values **differ**, the ma
 ### 20.5 Public URLs
 
 `path` is the address the output path answers to, computed by the **same function §17's dry-run report already uses** to print it — one interpretation, so a URL a consumer emits and a URL the report shows can never disagree. A trailing `index.html` segment is dropped: `about.html` → `/about.html`, `about/index.html` → `/about/`, `index.html` → `/`. With `--base-url https://example.com/repo/` the path prefix is applied: `/repo/about/`.
+
+Each segment derived from an output path is **percent-encoded**, because a filesystem name is not a URI and the manifest's job is to say what a page answers to: `two words.html` → `/two%20words.html`, `a&b.html` → `/a%26b.html`, `caf%C3%A9.html` for a UTF-8 `café.html`. A literal `%` encodes to `%25`, so the transform is total and never double-encodes. The path prefix supplied by `--base-url` is **not** re-encoded — the author wrote it as a URL already, and re-encoding it would corrupt a prefix that legitimately contains an escape.
 
 `url` is `base.origin + path` when `--base-url` was supplied, and `null` otherwise. unify does not know a site's public address unless it is told, and a feature that needs an absolute URL must therefore say so rather than invent an origin. Because §11.3 makes a bare-path `--base-url` a usage error, `url` is either a complete absolute URL or `null` — never a half-built one.
 
@@ -1069,6 +1073,23 @@ A `<noscript>` link participates even though `<noscript>` text does not reach `t
 
 `linksIn` is the exact reverse relation, computed after every record exists: `B` is in `A.linksIn` if and only if `A` is in `B.linksOut`. Deduplicated and sorted. Orphan detection (product-spec §6.3.4) is `linksIn.length === 0`, which is why the relation is built here once rather than by the consumer.
 
+### 20.10 Dates: `raw` and `iso`
+
+A date field is `{raw, iso}` precisely so the two questions never collapse into one. `raw` is the value exactly as the document declared it, so nothing an author wrote is lost. `iso` is that value **only when it is a well-formed [W3C-DTF](https://www.w3.org/TR/NOTE-datetime) date or date-time**, and `null` otherwise; it is the field every consumer that emits a date must read, and `raw` is never emitted anywhere.
+
+The accepted grammar is W3C-DTF's, no more:
+
+```
+YYYY-MM-DD
+YYYY-MM-DDThh:mmTZD
+YYYY-MM-DDThh:mm:ssTZD
+YYYY-MM-DDThh:mm:ss.sTZD          TZD = Z | +hh:mm | -hh:mm
+```
+
+The literal `T` is required — `2026-01-02 03:04:05` is not W3C-DTF, and a space-separated value emitted verbatim into a sitemap `<lastmod>` or a JSON-LD `dateModified` is invalid where it lands. A time-zone designator is required whenever a time is present, since a local time with no offset names no instant. The date must be a real calendar day (`2026-02-30` and `2025-02-29` are not), the clock must be a real time of day (`24:00` and `23:60` are not), and the offset must be one that exists (`±14:00` is the outer bound). `iso` is the accepted value verbatim, not a normalization: unify does not rewrite `+00:00` to `Z` or pad a fractional second, because reformatting an author's timestamp is an edit to their content.
+
+No date is ever derived. The build clock, the filesystem's mtime, the filename, and Git history are not consulted by this section or by anything reading it — product-spec §6.1's no-invented-claims constraint, in the one place it is most tempting to break.
+
 ---
 
 ## 21. Sitemap generation
@@ -1080,6 +1101,8 @@ The first projection of §20. Everything here reads page records; nothing here r
 A sitemap is generated when, and only when, `--base-url` supplied the site's public address. Without it the manifest's `url` is `null` (§20.5) and unify does not know what to write in a `<loc>` — a sitemap of root-relative paths is invalid per the Sitemaps protocol, and inventing an origin is the class of guess product-spec §6.1 forbids. A build with no `--base-url` therefore emits no sitemap and reports nothing about it; this is the v0.7 golden path, unchanged.
 
 Generation is additive: it writes one new file (or, at protocol scale, a small set), changes no authored content, appears in `--dry-run` like any other write, and participates in §15's transactional publish. `--base-url` is the whole opt-in — there is no separate flag, because a site that has told unify its public address has told it everything the sitemap needs.
+
+**Activation governs this entire section, §21.6's verification included.** Without `--base-url` a site's `sitemap.xml` is an ordinary asset: it mirror-copies byte-for-byte (§4.4) and unify says nothing about its contents, exactly as in v0.7. This is not a gap left for later — it is what "the v0.7 golden path, unchanged" costs to mean. A site that shipped an authored sitemap with a stale entry built clean before this section existed and must keep building clean after it, because nothing the author did changed and no flag opted them in. It is also the only coherent reading: a `<loc>` is an absolute URL by protocol, and deciding whether one points inside *this* site requires knowing the site's address.
 
 ### 21.2 Membership
 
@@ -1096,7 +1119,7 @@ Membership is evaluated per record in manifest order (§20.1), and that order is
 
 Each included record contributes one `<url>` element:
 
-- `<loc>` is `record.url` — the absolute public URL §20.5 already computed, so a URL in the sitemap and a URL in the `--dry-run` report are the same string by construction. XML-escaped (`&`, `<`, `>`, `"`, `'`).
+- `<loc>` is `record.url` — the absolute public URL §20.5 already computed, so a URL in the sitemap and a URL in the `--dry-run` report are the same string by construction. Two escapings apply and neither substitutes for the other: §20.5 has already **percent-encoded** the path so the value is a legal URI (a source file named `two words.html` answers to `/two%20words.html`, never to a URL with a raw space in it), and the value is then **XML-escaped** (`&`, `<`, `>`, `"`, `'`) so the document is well-formed. The Sitemaps protocol requires both.
 - `<lastmod>` is emitted **only** when `record.dateModified.iso` is non-null — an authored, well-formed W3C date. A page with no authored modification date gets no `<lastmod>`. The build clock, the filesystem's mtime, the filename, and Git history are not fallbacks: a fabricated `lastmod` is a claim about the world, and it is the specific fabrication crawler guidance punishes. `datePublished` is not a fallback either; the element is named for the last modification and reads the value authored under that name.
 
 No `<changefreq>` and no `<priority>`. Both are author guesses that unify cannot derive from the page, and current primary crawler guidance ignores them; emitting a constant for every page would be noise with the shape of information.
@@ -1117,21 +1140,12 @@ If generation proceeds and a path it would write is already occupied by a file t
 
 Every `<loc>` in an emitted sitemap — generated or authored — whose value names a location inside this site must resolve to a file the site emits. "Inside this site" means the value, after `--base-url` stripping (§12's rule), is root-relative or relative; a URL on another origin is not checkable offline and is skipped, because network access is an explicit audit operation and never a build dependency (product-spec §6.1). A `<loc>` that does not resolve is **P13**, the same broken-internal-reference problem §12 raises for a page, located at the sitemap file.
 
+**The document is parsed, not scanned for a tag's spelling.** Three consequences, each a real form a sitemap takes and each a wrong answer if the text is pattern-matched instead:
+
+- A `<loc>` inside an **XML comment** declares nothing, exactly as §20.3 says comments contribute no text. Treating a commented-out entry as live turns a valid site into a publish-blocking false problem — the worst failure available to a check whose job is to be trusted.
+- A `<loc>` whose value is wrapped in **CDATA** carries the value, not the wrapper. Real generators emit `<loc><![CDATA[https://…]]></loc>`, and reading the brackets as part of a URL fails a site for being written in legal XML.
+- A **namespace-prefixed** element (`<sm:loc>` under `xmlns:sm=…`) is a `loc`. Missing it is the more dangerous direction: the check passes and the broken URL ships, which is the silent failure this specification exists to prevent.
+
+Scope is the output-root `sitemap.xml` plus any part `sitemap-N.xml` generation produced. A sitemap elsewhere in the tree (`blog/sitemap.xml`) is an ordinary asset — §21.5 scopes the whole feature to the output root, and a file unify would never generate is a file it does not interpret.
+
 For generated sitemaps this check can only pass — every `<loc>` came from a record whose output path exists. It runs anyway, and that is the point: it is the executable form of the claim that the sitemap and the published tree agree, so a future change that lets the two drift fails here instead of at a crawler.
-
-### 20.10 Dates: `raw` and `iso`
-
-A date field is `{raw, iso}` precisely so the two questions never collapse into one. `raw` is the value exactly as the document declared it, so nothing an author wrote is lost. `iso` is that value **only when it is a well-formed [W3C-DTF](https://www.w3.org/TR/NOTE-datetime) date or date-time**, and `null` otherwise; it is the field every consumer that emits a date must read, and `raw` is never emitted anywhere.
-
-The accepted grammar is W3C-DTF's, no more:
-
-```
-YYYY-MM-DD
-YYYY-MM-DDThh:mmTZD
-YYYY-MM-DDThh:mm:ssTZD
-YYYY-MM-DDThh:mm:ss.sTZD          TZD = Z | +hh:mm | -hh:mm
-```
-
-The literal `T` is required — `2026-01-02 03:04:05` is not W3C-DTF, and a space-separated value emitted verbatim into a sitemap `<lastmod>` or a JSON-LD `dateModified` is invalid where it lands. A time-zone designator is required whenever a time is present, since a local time with no offset names no instant. The date must be a real calendar day (`2026-02-30` and `2025-02-29` are not), the clock must be a real time of day (`24:00` and `23:60` are not), and the offset must be one that exists (`±14:00` is the outer bound). `iso` is the accepted value verbatim, not a normalization: unify does not rewrite `+00:00` to `Z` or pad a fractional second, because reformatting an author's timestamp is an edit to their content.
-
-No date is ever derived. The build clock, the filesystem's mtime, the filename, and Git history are not consulted by this section or by anything reading it — product-spec §6.1's no-invented-claims constraint, in the one place it is most tempting to break.

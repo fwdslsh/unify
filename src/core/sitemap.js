@@ -23,6 +23,8 @@
  *     suppresses it too. The author's file always wins.
  */
 
+import { decodeEntities } from "./entities.js";
+import { findAll, innerText, parse } from "./html.js";
 import { isSkippedUrl, splitUrl } from "./urls.js";
 import { stripBaseUrl, resolveReference } from "./references.js";
 import { CHECK_SPELLING } from "./diagnostics.js";
@@ -52,16 +54,14 @@ function xmlEscape(s) {
     .replaceAll("'", "&apos;");
 }
 
-/** The inverse, for reading `<loc>` values back out of an emitted sitemap. */
-function xmlUnescape(s) {
-  return s
-    .replaceAll("&lt;", "<")
-    .replaceAll("&gt;", ">")
-    .replaceAll("&quot;", '"')
-    .replaceAll("&apos;", "'")
-    .replaceAll("&#39;", "'")
-    .replaceAll("&amp;", "&");
-}
+/**
+ * The inverse, for reading `<loc>` values back out of an emitted sitemap.
+ * Delegates to the manifest's own reference resolver rather than carrying a
+ * second, smaller table — an earlier local version decoded `&#39;` but no
+ * other numeric reference, which is the kind of half-surface that makes two
+ * parts of one build disagree about what a document says.
+ */
+const xmlUnescape = decodeEntities;
 
 /**
  * §21.2 — is this record's canonical (if any) its own address?
@@ -229,9 +229,12 @@ export function generateSitemap({ records, base, emittedFromSource, reporter }) 
  */
 export function checkSitemapLocs({ sitemaps, emittedPaths, base, reporter }) {
   for (const [outputPath, { text, file }] of [...sitemaps].sort((a, b) => (a[0] < b[0] ? -1 : 1))) {
-    for (const m of text.matchAll(/<loc>([\s\S]*?)<\/loc>/g)) {
-      const raw = xmlUnescape(m[1].trim());
-      const stripped = base ? stripBaseUrl(raw, base) : raw;
+    for (const raw of locValues(text)) {
+      // A <loc> is percent-encoded (§21.3), and §12 resolves against literal
+      // output paths — so the encoding comes off before the path is matched,
+      // or `/two%20words.html` would never find `two words.html`.
+      const decoded = decodePath(raw);
+      const stripped = base ? stripBaseUrl(decoded, base) : decoded;
       if (isSkippedUrl(stripped)) continue; // another origin, or nothing to check
       if (splitUrl(stripped).path === "") continue;
       const resolved = resolveReference(stripped, outputPath);
@@ -244,4 +247,58 @@ export function checkSitemapLocs({ sitemaps, emittedPaths, base, reporter }) {
       });
     }
   }
+}
+
+/**
+ * §21.6 — the `<loc>` values a sitemap document actually declares.
+ *
+ * Parsed, never pattern-matched. The three forms that make the difference are
+ * all real and all wrong under a regex: a `<loc>` inside a comment is not an
+ * entry (matching it turns a valid site into a blocked publish), a CDATA
+ * wrapper is not part of the URL, and `<sm:loc>` under a namespace prefix IS a
+ * loc — missing it lets a broken URL ship silently, which is the worse of the
+ * two directions.
+ * @param {string} text
+ * @returns {string[]}
+ */
+function locValues(text) {
+  const { root } = parse(text);
+  // `findAll` never descends into comments (they are not elements), so a
+  // commented-out entry is excluded by construction rather than by a rule.
+  const elements = findAll(root, (n) => n.type === "element" && /(^|:)loc$/i.test(n.tag));
+  return elements.map((el) => unwrapCdata(innerText(text, el)).trim()).filter(Boolean).map(xmlUnescape);
+}
+
+/**
+ * `<![CDATA[value]]>` carries `value`. CDATA suspends markup interpretation,
+ * so the payload is taken verbatim — no entity resolution, which is the whole
+ * point of writing it that way.
+ */
+function unwrapCdata(inner) {
+  const m = /^\s*<!\[CDATA\[([\s\S]*?)\]\]>\s*$/.exec(inner);
+  return m ? m[1] : inner;
+}
+
+/**
+ * Undo §20.5's percent-encoding for path matching, segment by segment — the
+ * exact inverse of how it was applied. `decodeURI` is deliberately NOT used:
+ * it leaves reserved characters escaped, so `/a%26b.html` would stay `%26` and
+ * never match the emitted `a&b.html`. Query and fragment are left untouched
+ * because §12 discards them anyway. A malformed escape keeps its segment as
+ * written rather than throwing: this is a check, and a URL unify cannot decode
+ * is one it reports on rather than crashes over.
+ */
+function decodePath(url) {
+  const { path, query, fragment } = splitUrl(url);
+  const decoded = path
+    .split("/")
+    .map((seg) => {
+      try {
+        return decodeURIComponent(seg);
+      } catch {
+        return seg;
+      }
+    })
+    .join("/");
+  return decoded + query + fragment;
 }

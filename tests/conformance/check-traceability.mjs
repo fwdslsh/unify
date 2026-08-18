@@ -94,6 +94,22 @@ const syncChecks = [
 for (const [name, inSpec, inInv] of syncChecks) {
   if (inSpec !== inInv) fail(`spec↔inventory drift: ${name}: spec has ${inSpec}, rules.tsv has ${inInv}`);
 }
+// Every `### N.M` subsection must sit physically under its own `## N` section.
+// Nothing else catches a misplacement: this checker matches rules.tsv's `spec`
+// COLUMN, not the heading's position, so a §20.10 appended after §21.6 leaves
+// both --static and --runtime clean while a reader of §20 never meets it.
+{
+  let current = null;
+  for (const line of specText.split("\n")) {
+    const top = /^## (\d+)\./.exec(line);
+    if (top) { current = top[1]; continue; }
+    const sub = /^### (\d+)\.(\d+)/.exec(line);
+    if (sub && current !== null && sub[1] !== current) {
+      fail(`spec layout: "${line.trim()}" is filed under §${current} — move it under §${sub[1]}`);
+    }
+  }
+}
+
 // every top-level spec section must have at least one inventory row
 const sections = [...specText.matchAll(/^## (\d+)\./gm)].map((m) => m[1]);
 for (const s of sections) {

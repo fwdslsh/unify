@@ -229,18 +229,39 @@ test("SIT-03: no page ever receives a build-time lastmod", async () => {
   covers("SIT-03");
 }, TEST_MS);
 
-test("SIT-03: loc values are XML-escaped", async () => {
+test("SIT-03: loc paths are percent-encoded, so a filesystem name becomes a legal URI", async () => {
   const tmp = mkTmp();
-  writeTree(join(tmp, "src"), { "a&b.html": page("Ampersand") });
+  writeTree(join(tmp, "src"), { "a&b.html": page("Ampersand"), "two words.html": page("Spaced"), "café.html": page("Accented") });
   const r = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", BASE], tmp);
-  expectExit(r, 0, "escaping build");
+  expectExit(r, 0, "encoding build");
   expectBytes(
     read(tmp, "dist", "sitemap.xml"),
     '<?xml version="1.0" encoding="UTF-8"?>\n' +
       '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
-      "<url><loc>https://example.com/a&amp;b.html</loc></url>\n" +
+      "<url><loc>https://example.com/a%26b.html</loc></url>\n" +
+      "<url><loc>https://example.com/caf%C3%A9.html</loc></url>\n" +
+      "<url><loc>https://example.com/two%20words.html</loc></url>\n" +
       "</urlset>\n",
-    "§21.3: & in a URL must be escaped or the document is not well-formed XML",
+    "§20.5/§21.3: a raw space or ampersand in a <loc> is not a URI; the file still ships at its own name",
+  );
+  covers("SIT-03", "MAN-05");
+}, TEST_MS);
+
+test("SIT-03: a base-url path that needs XML escaping still gets it", async () => {
+  // Percent-encoding covers everything derived from an output path, so the
+  // only route left for a raw `&` into a <loc> is the base-url prefix, which
+  // §20.5 deliberately does not re-encode. XML escaping is what catches it.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), { "index.html": page("Home") });
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", "https://example.com/a&b/"], tmp);
+  expectExit(r, 0, "xml-escaping build");
+  expectBytes(
+    read(tmp, "dist", "sitemap.xml"),
+    '<?xml version="1.0" encoding="UTF-8"?>\n' +
+      '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
+      "<url><loc>https://example.com/a&amp;b/</loc></url>\n" +
+      "</urlset>\n",
+    "§21.3: an unescaped & makes the document not well-formed XML",
   );
   covers("SIT-03");
 }, TEST_MS);
@@ -307,6 +328,74 @@ test("P22: an emitted source file occupying a generated split path is a located 
 }, TEST_MS);
 
 // ------------------------------------------------------------------- §21.6
+
+test("SIT-06: a loc inside an XML comment or a CDATA wrapper is not a false problem", async () => {
+  // The two forms a regex scanner gets wrong in the publish-blocking
+  // direction: a commented-out entry read as live, and CDATA brackets read as
+  // part of the URL. Both are legal XML that real generators emit, and both
+  // would turn a valid site into a refused publish.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": page("Home"),
+    "sitemap.xml":
+      '<?xml version="1.0"?>\n<urlset>\n' +
+      "<url><loc><![CDATA[https://example.com/index.html]]></loc></url>\n" +
+      "<!-- <url><loc>https://example.com/retired.html</loc></url> -->\n" +
+      "</urlset>\n",
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", BASE], tmp);
+  expectExit(r, 0, "comment/CDATA build");
+  if (r.stderr.trim() !== "") {
+    throw new Error(`§21.6: a commented-out loc declares nothing and a CDATA wrapper is not part of the URL.\nstderr:\n${r.stderr}`);
+  }
+  covers("SIT-06");
+}, TEST_MS);
+
+test("SIT-06: a namespace-prefixed loc is a loc, so a broken one cannot ship silently", async () => {
+  // The direction that fails silently under a regex scanner: <sm:loc> is legal
+  // per the protocol's own schema, and missing it publishes the broken URL.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": page("Home"),
+    "sitemap.xml":
+      '<?xml version="1.0"?>\n<sm:urlset xmlns:sm="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
+      "<sm:url><sm:loc>https://example.com/gone.html</sm:loc></sm:url>\n</sm:urlset>\n",
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", BASE], tmp);
+  expectExit(r, 1, "namespace-prefixed build");
+  if (!r.stderr.includes("gone.html")) {
+    throw new Error(`§21.6: a prefixed <sm:loc> is a loc and must be checked.\nstderr:\n${r.stderr}`);
+  }
+  covers("SIT-06");
+}, TEST_MS);
+
+test("SIT-01: without --base-url an authored sitemap is an ordinary asset, checked by nothing", async () => {
+  // §21.1's activation governs §21.6 too. A v0.7 site that shipped a sitemap
+  // with a stale entry built clean before this section existed; nothing the
+  // author wrote changed, and no flag opted them in, so it must build clean
+  // still. The adjacent case below shows the same tree DOES fail once the
+  // site's address is supplied — the check is gated, not absent.
+  const files = {
+    "index.html": page("Home"),
+    "sitemap.xml":
+      '<?xml version="1.0"?>\n<urlset>\n<url><loc>/index.html</loc></url>\n' +
+      "<url><loc>/retired.html</loc></url>\n</urlset>\n",
+  };
+  const noBase = mkTmp();
+  writeTree(join(noBase, "src"), files);
+  const a = await runCli(["build", "-s", "src", "-o", "dist"], noBase);
+  expectExit(a, 0, "no-base authored sitemap");
+  expectBytes(read(noBase, "dist", "sitemap.xml"), files["sitemap.xml"], "§4.4: it mirror-copies like any other asset");
+
+  const withBase = mkTmp();
+  writeTree(join(withBase, "src"), files);
+  const b = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", BASE], withBase);
+  expectExit(b, 1, "based authored sitemap");
+  if (!b.stderr.includes("retired.html")) {
+    throw new Error(`§21.6: with an address supplied, the stale loc must be reported.\nstderr:\n${b.stderr}`);
+  }
+  covers("SIT-01", "SIT-06");
+}, TEST_MS);
 
 test("SIT-06: a broken internal loc in an authored sitemap is P13 located at the sitemap; a good one is silent", async () => {
   const broken = mkTmp();

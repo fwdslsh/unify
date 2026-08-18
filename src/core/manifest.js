@@ -135,7 +135,20 @@ function textContent(el) {
     if (separates) out += " ";
   };
   for (const child of el.children ?? []) visit(child);
-  return collapse(decodeEntities(out));
+  return readText(out);
+}
+
+/**
+ * §20.5 — percent-encode every segment of an output path, leaving the `/`
+ * separators intact. `encodeURIComponent` is exactly right per segment: an
+ * output-path segment is a literal filename, never a pre-encoded one, so the
+ * transform is total and a literal `%` becomes `%25` rather than being read as
+ * the start of an escape.
+ * @param {string} outputPath
+ * @returns {string}
+ */
+function encodePathSegments(outputPath) {
+  return outputPath.split("/").map(encodeURIComponent).join("/");
 }
 
 /** Collapse every run of ASCII whitespace to one space and trim (§20.3). */
@@ -144,9 +157,36 @@ function collapse(s) {
 }
 
 /**
+ * §20.3's reading of one raw slice of emitted markup: resolve character
+ * references, then collapse.
+ *
+ * The order is not interchangeable and this helper exists so no call site can
+ * pick the wrong one. Collapsing first leaves whitespace a reference
+ * INTRODUCES uncollapsed — `a&#32;&#32;b` keeps two spaces, `a&#10;b` keeps a
+ * raw newline in a field the spec says is collapsed — so two fields reading
+ * the same characters disagree. Every text-bearing field goes through here or
+ * through `textContent`, which applies the same order, and nothing decodes a
+ * value either of them has already returned.
+ * @param {string} raw
+ * @returns {string}
+ */
+function readText(raw) {
+  return collapse(decodeEntities(raw));
+}
+
+/** Trim-only emptiness, for a value already read by `readText`/`textContent`. */
+function orNull(s) {
+  return typeof s === "string" && s.trim() !== "" ? s.trim() : null;
+}
+
+/**
  * `""` and whitespace-only both mean "declared nothing" (§20.3). Character
  * references resolve here too: an attribute carries them exactly as element
  * text does, so `content="Tea &amp; Coffee"` is `Tea & Coffee` in the record.
+ *
+ * For RAW slices only — an attribute value, straight from the parser. A value
+ * `readText` or `textContent` already returned must use `orNull` instead, or it
+ * decodes twice and reports text no page displays.
  */
 function nonEmpty(s) {
   if (typeof s !== "string") return null;
@@ -311,7 +351,7 @@ function extract(page, base) {
     if (tag === "html") {
       lang.add(nonEmpty(getAttr(node, "lang")));
     } else if (tag === "title") {
-      title.add(nonEmpty(collapse(innerText(html, node))));
+      title.add(orNull(readText(innerText(html, node))));
     } else if (tag === "meta") {
       const name = (getAttr(node, "name") ?? "").trim().toLowerCase();
       const property = (getAttr(node, "property") ?? "").trim().toLowerCase();
@@ -382,7 +422,13 @@ function extract(page, base) {
   ].filter(Boolean).sort((a, b) => (a.field < b.field ? -1 : a.field > b.field ? 1 : 0));
 
   const prefix = base ? base.pathPrefix : "/";
-  const path = urlForOutputPath(page.outputPath, prefix);
+  // §20.5 — percent-encode each segment that came from an output path. A
+  // filesystem name is not a URI: `two words.html` answers to
+  // `/two%20words.html`, and emitting the raw space into a sitemap <loc> or an
+  // href would be an invalid URL in a standards artifact. The `--base-url`
+  // prefix is deliberately NOT re-encoded — the author wrote it as a URL, and a
+  // legitimate escape inside it would be corrupted by a second pass.
+  const path = urlForOutputPath(encodePathSegments(page.outputPath), prefix);
 
   return {
     sourcePath: page.sourcePath,
@@ -394,7 +440,10 @@ function extract(page, base) {
     lang: lang.kept,
     canonical: canonical.kept,
     robots: parseRobots(robotsRaw.kept),
-    h1: nonEmpty(headings.find((h) => h.level === 1)?.text ?? null),
+    // `orNull`, never `nonEmpty`: this text came from `textContent`, which
+    // already resolved references. Decoding it again reports a string the page
+    // does not contain and makes `h1` disagree with `headings[0].text`.
+    h1: orNull(headings.find((h) => h.level === 1)?.text ?? null),
     headings,
     text: textContent(textHost),
     image: imageUrl === null

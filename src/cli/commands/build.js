@@ -247,12 +247,14 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
   const manifest = buildManifest({ pages: manifestPages, base: baseConfig });
 
   // ---- §21 — sitemap generation, the manifest's first projection. ----------
-  // Runs after the mirror copy above, not before: §21.5 must know which paths
-  // the site already emits from its own source before it claims one, and the
-  // asset copy is what establishes that. Generated files then join `tempFiles`
-  // like any other output — which is what makes them appear in --dry-run,
-  // participate in §15's transactional publish, and fall under §12's checks,
-  // with no special-casing in any of the three.
+  // §21.5 must know which paths the site already emits from its own source
+  // before it claims one. That set is `emittedFromSource` below, built from
+  // `composedPages` and `assetFiles` directly rather than from `tempFiles` —
+  // so ordering against the mirror copy is not what makes it correct, and this
+  // block would work above it too. Generated files then join `tempFiles` like
+  // any other output, which is what makes them appear in --dry-run, participate
+  // in §15's transactional publish, and fall under §12's checks with no
+  // special-casing in any of the three.
   const emittedFromSource = new Map([
     ...composedPages.map((p) => [outputPathOf.get(p.relPath), p.relPath]),
     ...assetFiles.map((a) => [outputPathOf.get(a.relPath), a.relPath]),
@@ -262,7 +264,6 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
   });
   for (const [outPath, text] of generated) tempFiles.set(outPath, text);
 
-
   // ---- §12 — the reference check, against the completed temp tree. --------
   const htmlFiles = new Map();
   const cssFiles = new Map();
@@ -271,24 +272,34 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
     if (extname(outPath) === ".html" && text !== null) htmlFiles.set(outPath, text);
     else if (extname(outPath) === ".css") cssFiles.set(outPath, text ?? content.toString("utf8"));
   }
-  // §21.6 — every internal <loc> in an emitted sitemap must name a file the
-  // site emits. Both kinds are scanned: what unify generated (where this can
-  // only pass, and is the executable form of "the sitemap and the tree agree")
-  // and what the author wrote (where it is a real check). Attribution is the
-  // SOURCE path for an authored file — `dist/sitemap.xml` is not a file
+  // §21.6 — every internal <loc> in an emitted output-root sitemap must name a
+  // file the site emits. Both kinds are checked: what unify generated (where
+  // this can only pass, and is the executable form of "the sitemap and the tree
+  // agree") and what the author wrote (where it is a real check). Attribution
+  // is the SOURCE path for an authored file — `dist/sitemap.xml` is not a file
   // anyone can edit.
-  const sitemapFiles = new Map();
-  for (const outPath of [sitemap.SITEMAP_PATH, ...generated.keys()]) {
-    const content = tempFiles.get(outPath);
-    if (typeof content !== "string" && !Buffer.isBuffer(content)) continue;
-    sitemapFiles.set(outPath, {
-      text: typeof content === "string" ? content : content.toString("utf8"),
-      file: emittedFromSource.get(outPath) ?? outPath,
+  //
+  // Gated on `baseConfig` because §21.1's activation governs the whole section.
+  // Without --base-url an authored sitemap is an ordinary mirror-copied asset
+  // and unify says nothing about it, which is what keeps a v0.7 site that
+  // shipped one building exactly as it did before: nothing the author wrote
+  // changed, and no flag opted them in. It is also the only coherent reading —
+  // a <loc> is an absolute URL, and deciding whether one points inside THIS
+  // site is not answerable without the site's address.
+  if (baseConfig) {
+    const sitemapFiles = new Map();
+    for (const outPath of [sitemap.SITEMAP_PATH, ...generated.keys()]) {
+      const content = tempFiles.get(outPath);
+      if (typeof content !== "string" && !Buffer.isBuffer(content)) continue;
+      sitemapFiles.set(outPath, {
+        text: typeof content === "string" ? content : content.toString("utf8"),
+        file: emittedFromSource.get(outPath) ?? outPath,
+      });
+    }
+    sitemap.checkSitemapLocs({
+      sitemaps: sitemapFiles, emittedPaths: new Set(tempFiles.keys()), base: baseConfig, reporter,
     });
   }
-  sitemap.checkSitemapLocs({
-    sitemaps: sitemapFiles, emittedPaths: new Set(tempFiles.keys()), base: baseConfig, reporter,
-  });
 
   references.checkReferences({
     htmlFiles, cssFiles, emittedPaths: new Set(tempFiles.keys()), base: baseConfig, reporter,

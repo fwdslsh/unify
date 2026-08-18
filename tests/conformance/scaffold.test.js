@@ -114,6 +114,35 @@ function readTree(dir, base = dir) {
   return out;
 }
 
+for (const name of TEMPLATES) {
+  test(`scaffold/${name}: SCF-04 — the golden path holds with --base-url, the flag every published site sets`, async () => {
+    // §21 makes --base-url the flag a site sets to get a sitemap, so a
+    // template that only builds clean WITHOUT it does not have a golden path
+    // any more. This caught a real scaffold defect: blog's author link was
+    // https://example.com/sam, and --base-url https://example.com/ — the most
+    // obvious value a reader types — made REF-02 strip the matching origin,
+    // turning an intended external link into a broken internal one. A
+    // placeholder that collides with the reader's own address is a scaffold
+    // bug, not a CLI bug.
+    const tmp = mkTmp();
+    const initR = await runCli(["init", name], tmp);
+    if (initR.exit !== 0) throw new Error(`unify init ${name} exited ${initR.exit}: ${initR.stderr}`);
+
+    const dry = await runCli(["build", "--dry-run", "--strict", "--base-url", "https://example.com/"], tmp);
+    if (dry.exit !== 0) {
+      throw new Error(`unify build --dry-run --strict --base-url https://example.com/ exited ${dry.exit}\nstdout:\n${dry.stdout}\nstderr:\n${dry.stderr}`);
+    }
+    const real = await runCli(["build", "--base-url", "https://example.com/"], tmp);
+    if (real.exit !== 0) {
+      throw new Error(`unify build --base-url exited ${real.exit}\nstderr:\n${real.stderr}`);
+    }
+    if (!existsSync(join(tmp, "dist", "sitemap.xml"))) {
+      throw new Error(`${name} built with --base-url but emitted no sitemap.xml`);
+    }
+    covers("SCF-04", "SIT-01");
+  }, TEST_MS);
+}
+
 test("scaffold/blog: SCF-03 — _scripts/gen.mjs reproduces the checked-in tree byte-for-byte; SCF-05 — the private field never leaves _data/", async () => {
   const tmp = mkTmp();
   const initR = await runCli(["init", "blog"], tmp);

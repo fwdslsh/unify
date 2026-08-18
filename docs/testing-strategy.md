@@ -88,29 +88,33 @@ This is the mechanism that makes "fully implemented" a measurable claim.
 
 `tests/conformance/rules.tsv` — one row per normative claim in `docs/conformance-spec.md`, extracted section by section. It held **202 rows** (199 gated + 3 structural) at v0.7.0 and grows with the spec; the checker prints the current count, which is the number to trust. IDs are stable, never reused, and namespaced by area, reusing the spec's own labels wherever the spec numbers things. Retired IDs stay retired: `LAY-06`–`LAY-08`, `HED-08`, `P06`, and `FIX-08` died with layout chaining; `A05`–`A07` were merged into `A13` (the duplicated-construct advisory); `A03`, `A04`, and `A15` were retired by the ratification rounds (A04 became problem P20); no test may reference them.
 
-| Prefix | Source | Count |
-|---|---|---|
-| `PIP-*` | §2 pipeline order & best-effort | 2 |
-| `S01–S12`, `SHL-01` | §3 splice rules + shell rule | 13 |
-| `EXC-*` | §4 classification/exclusion/never-shipped/copy | 12 |
-| `INC-*` | §5 includes | 12 |
-| `LAY-*` | §6 layout resolution (incl. the no-chaining problem) | 11 |
-| `MRG-*` | §7 composition (incl. the no-nested-slots problem) | 20 |
-| `HED-01–07` | §8 head-merge table rows | 7 |
-| `ATT-*` | §9 root attributes | 3 |
-| `MD-*` | §10 Markdown | 21 |
-| `URL-*` | §11 URL phases | 12 |
-| `REF-*` | §12 reference check | 7 |
-| `COL-*` | §13 collisions | 4 |
-| `DIA-*` | §14 diagnostics contract | 13 |
-| `P01–P21` (P06 retired) | §14.2 closed problem list | 20 |
-| `A01–A14` (A05–A07 merged into A13; A03, A04, A15 retired) | §14.3 closed advisory catalogue | 9 |
-| `PUB-*` | §15 transactional publish | 4 |
-| `WCH-*` | §16 watch/dev | 7 |
-| `DRY-*` | §17 dry-run report | 4 |
-| `CFG-*` | §18 unify.yaml | 3 |
-| `SCF-*` | §19 scaffold contract | 5 |
-| `FIX-01–14` (FIX-08 retired) | the spec's worked examples | 13 |
+| Prefix | Source |
+|---|---|
+| `PIP-*` | §2 pipeline order & best-effort |
+| `S01–S12`, `SHL-01` | §3 splice rules + shell rule |
+| `EXC-*` | §4 classification/exclusion/never-shipped/copy |
+| `INC-*` | §5 includes |
+| `LAY-*` | §6 layout resolution (incl. the no-chaining problem) |
+| `MRG-*` | §7 composition (incl. the no-nested-slots problem) |
+| `HED-01–07` | §8 head-merge table rows |
+| `ATT-*` | §9 root attributes |
+| `MD-*` | §10 Markdown |
+| `URL-*` | §11 URL phases |
+| `REF-*` | §12 reference check |
+| `COL-*` | §13 collisions |
+| `DIA-*` | §14 diagnostics contract |
+| `P01–P21` (P06 retired) | §14.2 closed problem list |
+| `A01–A14` (A05–A07 merged into A13; A03, A04, A15 retired) | §14.3 closed advisory catalogue |
+| `PUB-*` | §15 transactional publish |
+| `WCH-*` | §16 watch/dev |
+| `DRY-*` | §17 dry-run report |
+| `CFG-*` | §18 unify.yaml |
+| `SCF-*` | §19 scaffold contract |
+| `FIX-01–14` (FIX-08 retired) | the spec's worked examples |
+| `MAN-*` | §20 the final-output page manifest |
+| `SIT-*` | §21 sitemap generation |
+
+Counts are deliberately absent: this table drifted twice in three commits while the checker's own printed totals stayed correct by construction. `check-traceability.mjs` prints the current inventory size, the covered count, and the gap list on every run — that output is the number to quote, and it cannot go stale.
 
 A row's `testkind` is `fixture`, `targeted`, `e2e`, or `structural`. The three `structural` rows (MRG-18 the content-loss law, COL-04 no-last-write-wins, WCH-07 the closed dev scope) are invariants asserted *by the shape of the whole suite* (exhaustive diagnostics + full expected trees + closed CLI test) rather than by one test; they are exempt from the per-rule gate and documented as such in the TSV.
 

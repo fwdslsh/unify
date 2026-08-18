@@ -65,6 +65,20 @@ describe("§20.1 membership (MAN-01)", () => {
     expect(r.conflicts).toEqual([]);
   });
 
+  test("a duplicated output path keeps the FIRST record, not the last", () => {
+    // Only reachable on a build P12 already blocks, but "which record" must be
+    // a function of the input rather than of iteration order.
+    const { records: recs, byOutputPath } = buildManifest({
+      pages: [
+        { sourcePath: "a.md", outputPath: "dup.html", html: doc("<title>First</title>") },
+        { sourcePath: "a.html", outputPath: "dup.html", html: doc("<title>Second</title>") },
+      ],
+    });
+    expect(recs).toHaveLength(2);
+    expect(byOutputPath.size).toBe(1);
+    expect(byOutputPath.get("dup.html").title).toBe("First");
+  });
+
   test("byOutputPath indexes every record", () => {
     const { records: recs, byOutputPath } = buildManifest({
       pages: [
@@ -316,6 +330,43 @@ describe("§20.3 character references (MAN-03)", () => {
   test("a reference naming an impossible codepoint is left as written", () => {
     const r = only(doc("<title>&#xD800; &#0; &#1114112;</title>"));
     expect(r.title).toBe("&#xD800; &#0; &#1114112;");
+  });
+
+  test("every text field decodes exactly once — the whole class, not one field", () => {
+    // Two fields reading the same characters must produce the same string. An
+    // already-decoded value routed back through the attribute reader decodes
+    // twice and reports text the page does not contain; asserting field-to-
+    // field agreement catches that wherever it appears, not just where it was
+    // found.
+    const r = only(doc("<title>&amp;amp;</title>", "<h1>&amp;amp;</h1>"));
+    expect(r.headings[0].text).toBe("&amp;");
+    expect(r.h1).toBe(r.headings[0].text);
+    expect(r.title).toBe("&amp;");
+    expect(r.text).toBe("&amp;");
+  });
+
+  test("h1 equals headings[0].text when the heading carries inline markup", () => {
+    const r = only(doc("", "<h1>Write <code>&amp;amp;</code> for an ampersand</h1>"));
+    expect(r.h1).toBe("Write &amp; for an ampersand");
+    expect(r.h1).toBe(r.headings[0].text);
+  });
+
+  test("references resolve BEFORE whitespace collapses, in every field alike", () => {
+    // Collapsing first leaves whitespace a reference introduced uncollapsed,
+    // so title and text disagree about the same characters.
+    const spaces = only(doc("<title>a&#32;&#32;b</title>", "<p>a&#32;&#32;b</p>"));
+    expect(spaces.title).toBe("a b");
+    expect(spaces.text).toBe("a b");
+    const newline = only(doc("<title>a&#10;b</title>", "<p>a&#10;b</p>"));
+    expect(newline.title).toBe("a b");
+    expect(newline.text).toBe("a b");
+    const tab = only(doc("<title>a&#9;b</title>"));
+    expect(tab.title).toBe("a b");
+  });
+
+  test("named references are case-sensitive, as HTML defines them", () => {
+    const r = only(doc("<title>&amp; vs &AMP; vs &LT;</title>"));
+    expect(r.title).toBe("& vs &AMP; vs &LT;");
   });
 
   test("decoding happens once — an encoded ampersand does not decode twice", () => {
