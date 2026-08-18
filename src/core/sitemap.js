@@ -25,7 +25,7 @@
 
 import { decodeXmlEntities } from "./entities.js";
 import { findAll, innerText, parse } from "./html.js";
-import { decodePathSegments, isSkippedUrl, splitUrl } from "./urls.js";
+import { isSkippedUrl, splitUrl } from "./urls.js";
 import { stripBaseUrl, resolveReference } from "./references.js";
 import { CHECK_SPELLING } from "./diagnostics.js";
 
@@ -240,11 +240,27 @@ export function generateSitemap({ records, base, emittedFromSource, reporter }) 
 export function checkSitemapLocs({ sitemaps, emittedPaths, base, reporter }) {
   for (const [outputPath, { text, file }] of [...sitemaps].sort((a, b) => (a[0] < b[0] ? -1 : 1))) {
     for (const raw of locValues(text)) {
-      // A <loc> is percent-encoded (§21.3), and §12 resolves against literal
-      // output paths — so the encoding comes off before the path is matched,
-      // or `/two%20words.html` would never find `two words.html`.
-      const decoded = decodePathSegments(raw);
-      const stripped = base ? stripBaseUrl(decoded, base) : decoded;
+      // EXACTLY §12's order — strip the base from the RAW value, then let
+      // `resolveReference` split query/fragment and decode, once. Decoding the
+      // whole loc first was wrong three ways at once, and every one of them
+      // blocked the publish of a site whose own generated sitemap was correct:
+      //
+      //   - `--base-url https://example.com/café/` makes `parseBaseUrl` store
+      //     the pathPrefix as `new URL().pathname` gives it, `/caf%C3%A9/`. The
+      //     loc is built correctly with that prefix; pre-decoding turned it
+      //     back into `/café/`, so `stripBaseUrl` no longer recognised its own
+      //     prefix and EVERY page in an ordinary two-page site raised a false
+      //     P13. No unusual filename needed — just a deployment under a path
+      //     with a space or a non-ASCII character.
+      //   - An output path containing `#` or `?` decoded to a literal one, and
+      //     `splitUrl` then ate the rest of the name as a fragment or query.
+      //   - A filename containing a literal escape decoded twice: once here and
+      //     once inside `resolveReference`.
+      //
+      // §21.6 says a generated sitemap's check "can only pass". It could not,
+      // and it reported a string present in no file with "check the path
+      // spelling" against a spelling that was right.
+      const stripped = base ? stripBaseUrl(raw, base) : raw;
       if (isSkippedUrl(stripped)) continue; // another origin, or nothing to check
       if (splitUrl(stripped).path === "") continue;
       const resolved = resolveReference(stripped, outputPath);

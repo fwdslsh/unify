@@ -198,6 +198,49 @@ test("URL-06: §11.1 canonicalizes an authored escape rather than re-encoding it
   covers("MAN-05");
 }, TEST_MS);
 
+test("SIT-06/REF-08: a base-url path that needs escaping does not fail its own sitemap", async () => {
+  // The most reachable defect this section has had, and no test covered it:
+  // parseBaseUrl stores the pathPrefix as `new URL().pathname` gives it, so
+  // `https://example.com/café/` becomes `/caf%C3%A9/`. Locs were built with
+  // that prefix correctly, then the checker pre-decoded the whole loc, so
+  // stripBaseUrl no longer recognised its own prefix and EVERY page of an
+  // ordinary two-page site raised a false P13 against a spelling that was
+  // right. No unusual filename required — just a deployment under a path with
+  // a space or a non-ASCII character.
+  for (const base of ["https://example.com/café/", "https://example.com/my repo/", "https://example.com/a&b/"]) {
+    const tmp = mkTmp();
+    writeTree(join(tmp, "src"), { "index.html": page("Home"), "about.html": page("About") });
+    const r = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", base], tmp);
+    expectExit(r, 0, `--base-url ${base} on a two-page site with plain filenames`);
+    const xml = read(tmp, "dist", "sitemap.xml");
+    if (!xml.includes("<loc>") || xml.includes("does not resolve")) {
+      throw new Error(`§21.6: a generated sitemap must pass its own check for ${base}:\n${xml}`);
+    }
+  }
+  covers("SIT-06");
+}, TEST_MS);
+
+test("SIT-06: an output path containing # ? or a literal escape passes its own loc check", async () => {
+  // The other two orderings the pre-decode broke: `/a%23b.html` decoded to a
+  // literal `#` and splitUrl ate the rest as a fragment; a filename holding a
+  // real escape decoded twice, here and again inside resolveReference.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": page("Home"),
+    "a#b.html": page("Hash"),
+    "q?r.html": page("Query"),
+    "a%20b.html": page("Escaped"),
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", BASE], tmp);
+  expectExit(r, 0, "legal but awkward filenames unify otherwise supports fully");
+  const locs = [...read(tmp, "dist", "sitemap.xml").matchAll(/<loc>([^<]*)<\/loc>/g)].map((m) => m[1]).sort();
+  if (!locs.includes("https://example.com/a%23b.html") || !locs.includes("https://example.com/q%3Fr.html")
+      || !locs.includes("https://example.com/a%2520b.html")) {
+    throw new Error(`§21.3: each name must be escaped into a legal URI:\n${locs.join("\n")}`);
+  }
+  covers("SIT-06", "SIT-03");
+}, TEST_MS);
+
 test("REF-08: a file whose NAME contains %2F is addressed by %252F, and the impossible spelling fails", async () => {
   // The narrowest case the one-interpretation law has, and the one where
   // "matches nothing" was almost true: leaving the segment percent-encoded made
