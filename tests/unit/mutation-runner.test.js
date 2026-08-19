@@ -13,8 +13,8 @@
  */
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { anchorProblems, classify, compareBaselines, failingTests, parseMutations, runtimeErrorIn, unescapeCell } from "../conformance/run-mutations.mjs";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { OWNER, alive, anchorProblems, classify, compareBaselines, failingTests, parseMutations, reapOrphans, runtimeErrorIn, unescapeCell } from "../conformance/run-mutations.mjs";
+import { existsSync, mkdtempSync, mkdirSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -304,5 +304,78 @@ describe("compareBaselines — flakiness by observation", () => {
     // The habit this prevents: a fifteen-minute check that aborts on a known
     // flake is one people re-run until it passes, which is M2 by another route.
     expect(compareBaselines(["§16 dev server > WCH-05"], []).hard).toEqual([]);
+  });
+});
+
+describe("reapOrphans — the cleanup that runs when the previous one could not", () => {
+  // A ~1 GB work directory leaks whenever the sweep dies without running its
+  // exit handler: SIGKILL, an OOM kill, an escalating `timeout`, a container
+  // restart. The handler covers every ending this program controls and none of
+  // those, so the cleanup that matters happens at STARTUP, on the evidence the
+  // last failure left behind. Five orphans (~5 GB) on a fixed disk allowance
+  // slowed a live sweep to a crawl before anyone thought to look at `df`.
+  //
+  // Each case below is one of the four shapes a sibling directory can have,
+  // and getting any of them wrong is expensive in one direction or the other:
+  // sparing a dead run wastes the disk this exists to reclaim, and reaping a
+  // live one deletes a colleague's fifteen-minute sweep mid-flight.
+  const fixture = () => {
+    const root = mkdtempSync(join(tmpdir(), "reap-fixture-"));
+    const make = (name, marker) => {
+      const dir = join(root, name);
+      mkdirSync(dir, { recursive: true });
+      if (marker !== undefined) writeFileSync(join(dir, OWNER), `${marker}\n`);
+      return dir;
+    };
+    return { root, make };
+  };
+
+  test("a dead pid's directory is removed, and a live one's is kept", () => {
+    const { root, make } = fixture();
+    // 2^22 is above every default pid_max, so nothing can own it.
+    const dead = make("unify-mutate-dead", 4_194_304);
+    const live = make("unify-mutate-live", process.pid);
+    const self = make("unify-mutate-self", process.pid);
+    reapOrphans(self, root);
+    expect(existsSync(dead)).toBe(false);
+    expect(existsSync(live)).toBe(true);
+    expect(existsSync(self)).toBe(true);
+  });
+
+  test("a directory with no marker is removed once it is too old to be mid-mkdtemp", () => {
+    // The pre-fix leak shape: every directory that existed before the marker
+    // did. It has no pid to ask about, so age is the only evidence — and the
+    // window is narrow on purpose, since the only legitimate marker-less
+    // directory is one whose owner called mkdtempSync milliseconds ago.
+    const { root, make } = fixture();
+    const stale = make("unify-mutate-stale");
+    const young = make("unify-mutate-young");
+    utimesSync(stale, new Date(Date.now() - 3600_000), new Date(Date.now() - 3600_000));
+    reapOrphans(join(root, "unify-mutate-self"), root);
+    expect(existsSync(stale)).toBe(false);
+    expect(existsSync(young)).toBe(true);
+  });
+
+  test("nothing outside the naming convention is touched", () => {
+    // The function deletes recursively in a shared temp directory, so the
+    // prefix filter is the only thing standing between it and somebody else's
+    // files. Asserted rather than assumed.
+    const { root, make } = fixture();
+    const ours = make("unify-mutate-dead", 4_194_304);
+    const theirs = join(root, "important-work");
+    mkdirSync(theirs, { recursive: true });
+    writeFileSync(join(theirs, "data.txt"), "not ours\n");
+    utimesSync(theirs, new Date(0), new Date(0));
+    reapOrphans(join(root, "unify-mutate-self"), root);
+    expect(existsSync(ours)).toBe(false);
+    expect(readFileSync(join(theirs, "data.txt"), "utf8")).toBe("not ours\n");
+  });
+
+  test("alive answers about the operating system, not about an mtime", () => {
+    expect(alive(process.pid)).toBe(true);
+    expect(alive(4_194_304)).toBe(false);
+    // A malformed marker must not read as alive — that would spare an orphan
+    // forever, which is the failure mode with no upper bound on its cost.
+    expect(alive(Number.NaN)).toBe(false);
   });
 });

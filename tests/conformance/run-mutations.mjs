@@ -67,7 +67,7 @@
  * KILLED, which turns "I mutated it" from an anecdote into a record.
  */
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -315,6 +315,88 @@ export function anchorProblems(rootDir) {
   return { checked: rows.length, problems };
 }
 
+// ------------------------------------------------------------------- orphans
+
+/** The PID file each run drops in its own work directory. */
+export const OWNER = ".owner-pid";
+
+/**
+ * Delete the work directories of runs that are no longer alive.
+ *
+ * The `process.on("exit")` handler above is the ordinary cleanup and it is
+ * enough for every ending this program controls — a survivor, a crash, an
+ * explicit `process.exit`. It is not enough for the endings it does not:
+ * SIGKILL, an OOM kill, a `timeout` that escalates, a container restart. Each
+ * of those leaves ~1 GB behind, and this repository has now paid for it twice
+ * — once as the comment above records, and once when five orphans (~5 GB) on
+ * a fixed disk allowance slowed a live sweep to a crawl before anyone looked
+ * at `df`. A cleanup that only runs on the paths that were already fine is not
+ * a cleanup; the one that matters runs at STARTUP, when the evidence of the
+ * previous failure is still on disk.
+ *
+ * Liveness is asked of the operating system rather than guessed from an
+ * mtime: `process.kill(pid, 0)` sends no signal and throws `ESRCH` when
+ * nothing owns that pid. A long-running sweep therefore keeps its directory
+ * however many hours it takes, which an age threshold could not promise.
+ *
+ * Two entries are spared regardless. Our own — `self` — because we are alive
+ * and about to use it. And a directory with no marker that is younger than a
+ * minute, which is the one shape a concurrent run can briefly have: it called
+ * `mkdtempSync` and has not yet written its pid. An older marker-less
+ * directory predates this function and is deleted, which is the case that
+ * motivated writing it.
+ *
+ * Every step is best-effort. A permission error on somebody else's temp
+ * directory must never fail a mutation sweep — the disk is a resource this
+ * function tidies, not a precondition it enforces.
+ *
+ * `dir` exists so a test can point this at a fixture. That is not a
+ * convenience: run against the real temp directory, a test of this function
+ * would be deleting whatever work directories happen to be on the machine,
+ * including a colleague's live fifteen-minute sweep. A destructive function
+ * that cannot be aimed somewhere harmless is a function nobody can test
+ * safely, and an untested reaper is worse than none.
+ *
+ * @param {string} self - this run's own work directory, never removed
+ * @param {string} [dir] - the directory to sweep; the real temp dir in production
+ */
+export function reapOrphans(self, dir = tmpdir()) {
+  let entries = [];
+  try {
+    entries = readdirSync(dir).filter((n) => n.startsWith("unify-mutate-"));
+  } catch { return; }
+  for (const name of entries) {
+    const path = join(dir, name);
+    if (path === self) continue;
+    let pid = null;
+    try {
+      pid = Number.parseInt(readFileSync(join(path, OWNER), "utf8").trim(), 10);
+    } catch { /* no marker: either pre-dates this function, or a run mid-mkdtemp */ }
+    if (pid === null) {
+      let age = 0;
+      try { age = Date.now() - statSync(path).mtimeMs; } catch { continue; }
+      if (age < 60_000) continue; // a concurrent run between mkdtemp and its marker
+    } else if (Number.isFinite(pid) && alive(pid)) {
+      continue;
+    }
+    try {
+      rmSync(path, { recursive: true, force: true });
+      console.log(`mutation: removed an orphaned work directory (${name})`);
+    } catch { /* best effort — a tidy-up must never fail the sweep */ }
+  }
+}
+
+/** Whether a pid names a live process. Signal 0 checks without delivering. */
+export function alive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    // EPERM means the process exists and belongs to another user — alive.
+    return e?.code === "EPERM";
+  }
+}
+
 // --------------------------------------------------------------------- main
 
 function main() {
@@ -347,6 +429,10 @@ function main() {
   // A leaked copy is ~1 GB each, and several accumulated in one session.
   let finalExit = 0;
   process.on("exit", () => { try { rmSync(work, { recursive: true, force: true }); } catch { /* best effort */ } });
+  // The marker, written before the sweep below reads any sibling, so a run
+  // starting concurrently sees an owner rather than an orphan.
+  writeFileSync(join(work, OWNER), `${process.pid}\n`);
+  reapOrphans(work);
   const runSuite = () => {
     // Removed here, immediately before the suite runs, rather than inside the
     // extraction — so no future reordering of `extract` can put it back before

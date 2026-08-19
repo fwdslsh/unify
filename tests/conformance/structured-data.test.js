@@ -1279,6 +1279,11 @@ test("SD-06 — date-unusable quotes the author's own bytes, and the generated b
 }, TEST_MS);
 
 test("SD-07 — the comparisons §26.3 declines to make: dates at two granularities, two share images, two descriptions, name against title", async () => {
+  // A test of DELIBERATE SILENCE needs a positive control on the same run, or
+  // it passes just as happily against a §26 that was never wired up at all.
+  // `flag.html` is that control: one comparison §26.3 DOES make, on a page in
+  // the same tree, audited by the same command. Its finding is what proves the
+  // silence below is a decision rather than an absence.
   const tmp = mkTmp();
   writeTree(tmp, {
     "src/contact.html": doc({
@@ -1286,7 +1291,12 @@ test("SD-07 — the comparisons §26.3 declines to make: dates at two granularit
       head: '<meta name="description" content="Reach the team.">\n'
         + '<link rel="canonical" href="/contact.html">\n'
         + '<meta property="og:image" content="/card.png">\n'
-        + '<meta property="article:published_time" content="2026-01-02">\n'
+        // BOTH date spellings, at two granularities. This is §24.4's own
+        // stated exclusion from metadata-conflict, and without both metas the
+        // silence assertion below would be vacuous: one meta declares no
+        // conflict to decline reporting in the first place.
+        + '<meta property="article:published_time" content="2026-01-02T09:30:00Z">\n'
+        + '<meta name="date" content="2026-01-02">\n'
         + ld({
           "@context": "https://schema.org",
           "@type": "WebPage",
@@ -1297,26 +1307,46 @@ test("SD-07 — the comparisons §26.3 declines to make: dates at two granularit
           url: "/contact.html",
           // a share image for the crawler, beside one for the social scraper.
           image: "/other-card.png",
-          // one instant at two granularities.
+          // one instant at two granularities, a third time.
           datePublished: "2026-01-02T09:30:00Z",
           inLanguage: "en",
         }),
       body: "<h1>Contact</h1>\n<p>Words.</p>\n",
     }),
+    // The control. One fault, of a kind §26.3 does compare.
+    "src/flag.html": doc({
+      lang: "en",
+      title: "Flag",
+      head: '<meta name="description" content="The control page.">\n'
+        + ld({ "@context": "https://schema.org", "@type": "WebPage", inLanguage: "fr" }),
+      body: "<h1>Flag</h1>\n<p>Words.</p>\n",
+    }),
     "src/card.png": "a file the site emits\n",
     "src/other-card.png": "another file the site emits\n",
   });
   const b = await runCli(["build", "-s", "src", "-o", "dist"], tmp);
-  expectExit(b, 0, "a page carrying four deliberately-uncompared pairs");
-  expectEmitted(tmp, "contact.html");
+  expectExit(b, 0, "a page carrying four deliberately-uncompared pairs, beside a control");
+  expectEmitted(tmp, "contact.html", "flag.html");
 
   const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
   expectExit(r, 0, "audit over the uncompared pairs");
-  for (const id of ["jsonld-headline-mismatch", "jsonld-url-mismatch", "jsonld-lang-mismatch",
+
+  // The control fires. Everything below is now a claim about §26.3's choices
+  // rather than about whether §26.3 ran.
+  expectFires(r, "jsonld-lang-mismatch", "src/flag.html", "broken",
+    "the positive control: §26.3 IS comparing blocks in this run, so the silence below is a decision");
+
+  for (const id of ["jsonld-headline-mismatch", "jsonld-url-mismatch",
     "jsonld-entity-conflict", "date-unusable", "metadata-conflict"]) {
     expectSilent(r, id, "src/contact.html",
       "§26.3: each of these pairs needs a judgement — about time zones, about which consumer, about a third string");
   }
+  // Named apart from the loop above, because it is silent for a DIFFERENT
+  // reason and lumping it in would misdescribe the rule: `inLanguage: "en"`
+  // beside `lang="en"` is a comparison §26.3 makes and that the page passes.
+  // The declined list is about comparisons never attempted; this one was.
+  expectSilent(r, "jsonld-lang-mismatch", "src/contact.html",
+    "§26.3: this comparison is made and agrees — not declined, which is a different sentence");
 
   covers("SD-07");
 }, TEST_MS);
