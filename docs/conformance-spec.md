@@ -664,7 +664,7 @@ YAML between `---` fences at the very start of the file.
 
 **A key's name decides its output; the YAML shape used to spell it does not.** A nested block is sugar for prefixed keys — `og:` with `image:` indented under it names the key `og:image`, identical in every respect to writing `og:image:` flat, and both emit `property="og:image"`. The same holds for any other prefix (`twitter:` written either way names `twitter:card`, which is not `og:` and so emits `name=`). Both spellings are valid YAML and both are supported deliberately: `og:image: /card.png` is what most authors and every frontmatter ecosystem write, and a spec that accepted it as a key while silently emitting `name=` would produce a meta tag that looks right, builds clean, and is ignored by every scraper — the failure class §14 exists to prevent.
 
-Synthesized elements merge by §8 exactly as if the page had written them; their serialization is fixed: double-quoted attributes, `name`/`property` first, then `content` (`<meta name="description" content="…">`), and `<title>TEXT</title>`. Two consequences of "as if the page had written them", stated because implementations otherwise diverge: a present-but-empty `title:` counts as absent, so §10.3's `<h1>` fallback applies to it exactly as §8 row 2 treats an empty page `<title>`; and `class` takes a string — any other value is treated as absent rather than coerced. A `.md` file included as a fragment has its frontmatter stripped and **never validated** (§5.1 step 4): the data is provably unused, and a shared fragment must not make an unrelated page's build depend on the shape of metadata nobody reads. There are no other reserved keys: `date`, `tags`, `categories`, `draft`, `permalink`, `slug` have no behavior and become plain metas — `draft: true` publishes the page; a leading underscore is how a page is held back. The honest gap, stated: frontmatter cannot express `rel="canonical"`, `rel="preload"`, or JSON-LD. Preloads and JSON-LD are layout material; a canonical is not — it names one page's own address, a layout-supplied value stamps every page with the same URL (silently wrong on every page but one, and consequential: share crawlers consolidate by canonical), and a Markdown page cannot override it, because §8's replace rule needs an HTML head to carry the page's own tag. A page that needs a canonical is written in HTML, or does without.
+Synthesized elements merge by §8 exactly as if the page had written them; their serialization is fixed: double-quoted attributes, `name`/`property` first, then `content` (`<meta name="description" content="…">`), and `<title>TEXT</title>`. Two consequences of "as if the page had written them", stated because implementations otherwise diverge: a present-but-empty `title:` counts as absent, so §10.3's `<h1>` fallback applies to it exactly as §8 row 2 treats an empty page `<title>`; and `class` takes a string — any other value is treated as absent rather than coerced. A `.md` file included as a fragment has its frontmatter stripped and **never validated** (§5.1 step 4): the data is provably unused, and a shared fragment must not make an unrelated page's build depend on the shape of metadata nobody reads. One further key is reserved, and only for the value it may take: `schema` becomes `<meta name="schema">` exactly as this table says, and §26.4 restricts its value to the three types unify generates. `date`, `tags`, `categories`, `draft`, `permalink`, `slug` have no behavior and become plain metas — `draft: true` publishes the page; a leading underscore is how a page is held back. A `date` a consumer can use is `date`'s own doing rather than this table's: §20.10 reads the emitted meta and accepts it only as W3C-DTF. The honest gap, stated: frontmatter cannot express `rel="canonical"`, `rel="preload"`, or JSON-LD. Preloads and JSON-LD are layout material; a canonical is not — it names one page's own address, a layout-supplied value stamps every page with the same URL (silently wrong on every page but one, and consequential: share crawlers consolidate by canonical), and a Markdown page cannot override it, because §8's replace rule needs an HTML head to carry the page's own tag. A page that needs a canonical is written in HTML, or does without.
 
 **Value serialization.** VALUE is the value's text, by YAML form. A **plain scalar** serializes as its source text, exactly as written — `draft: true` → `content="true"`, `date: 2026-01-01` → `content="2026-01-01"`, `weight: 0.50` → `content="0.50"`: no type coercion ever rewrites a value (booleans don't normalize, dates don't reformat, numbers keep their zeros — the author's bytes, not YAML's data model). A **quoted scalar** serializes as its content with the quotes gone (`note: "Colons: fine"` → `content="Colons: fine"`); a **block scalar** (`|`, `>`) as the string YAML defines; an **empty value** as the empty string. The list rule composes with blocks: a list under `og:image` emits one `property="og:image"` meta per item, in order. What has no text form is a problem, located at the key (**P17**): a mapping nested below a key that already names one, or a list item that is itself a mapping or list. Because the two spellings name the same key, **eligibility is decided by the key's name, not by nesting depth**: a block under `og:image:` is P17 exactly as `og:` → `image:` → `url:` is, since the effective key `og:image` already carries its prefix and there is nothing left to flatten into. Counting recursion levels instead would let the flat spelling through and reject the block one, which would break the equivalence above. Inventing a serialization or dropping the value would each be a silent lie:
 
@@ -960,6 +960,7 @@ The bold IDs are the stable identifiers used by `tests/conformance/rules.tsv` an
 19. **P20** — A `<slot>` outside a layout's `<body>` — anywhere in a page, or in a layout's `<head>` (§7.1). Inert in both cases; the message names the spelling that belongs in that file (`slot=` on a real element for a page, the layout's `<body>` for a head slot). Was advisory A04 until 2026-08-13
 20. **P21** — A page or layout with no `<body>` element where a merge requires one (§7). Attributed to the file that lacks it, file-level (there is no line to point at); the fix lines are spelled for that file's kind — for a page, the complete-document shape and the `.fragment.html` rename (§4.4), because a body-less `.html` is either an unfinished page or an intended partial; for a layout, `<body></body>` (the §7.5 head-only pattern)
 21. **P22** — A generated discovery artifact's output path is already occupied by a file the site emits from source (§21.5). Located at the occupying source file. Generation is suppressed rather than overwriting, so the problem never costs the author their own file
+22. **P23** — A `schema` declaration naming a type unify does not generate (§26.4). Located at the declaration — the frontmatter key for a Markdown page, the `<meta name="schema">` element for an HTML one. Case-sensitive, because `article` is not a schema.org type and a declaration that generated nothing in silence is what §14 exists to forbid; the message names the three accepted spellings and the `<script type="application/ld+json">` that carries any other vocabulary
 
 ### 14.3 Advisories (the closed catalogue — capped at twelve; at the cap, adding one means removing one)
 
@@ -1427,6 +1428,8 @@ It is `incomplete` rather than `broken` because the author's line is not wrong. 
 
 Two neighbouring shapes stay out, for §12's reason rather than a preference. A `Sitemap:` naming anything else the site does not emit — `/feeds/all.xml`, or `/SITEMAP.XML`, which the exemption is deliberately case-sensitive about — is **P13** already: the stronger answer, and §24.6 exits 1 on it whether or not a finding joined it. And an **absolute** `Sitemap:` value with no `--base-url` is skipped here exactly as §23.3 skips it: unify does not know the site's address, so it cannot say the URL names this site's sitemap at all. That is the same narrowing the two canonical findings take without an address, for the same reason — saying nothing is the only honest answer when unify does not know where the site lives.
 
+**Five more findings belong to this catalogue and are specified in §26.3**, because their subject is one artifact and splitting its rules across two sections is how a reader ends up deriving them from the code: `jsonld-headline-mismatch` (incomplete), `jsonld-url-mismatch`, `jsonld-lang-mismatch`, `jsonld-entity-conflict`, and `date-unusable` (all `broken`). They are predicates over the §20 manifest like every row above, they print in §24.5's format, and `build` consults them exactly as much as it consults these — not at all (§24.7).
+
 Three of these are narrower than the plain-language name suggests, and each narrowing has a reason rather than a preference:
 
 - **Duplicate means identical.** Product-spec §6.3.4 says "substantially duplicated page text"; this spec says *identical*, and titles and descriptions fold case and collapse whitespace before comparing because those two differences are never authorial intent. Anything looser needs a similarity threshold, and a threshold is a number nobody can defend to an author whose two pages fell either side of it. §6.1 forbids failing content on arbitrary rules; an arbitrary rule is no better for being a float.
@@ -1550,3 +1553,145 @@ The boundary stays where §12 already draws it, and it is sharp in both directio
 **A host that strips extensions is not a collision.** Two output paths `about.html` and `about/index.html` answer to `/about.html` and `/about/` — two addresses, and unify emits both. A host configured to serve `about.html` at `/about` as well makes `/about` ambiguous, but that is a property of the deployment, invisible in the output tree, and choosing it site-wide is precisely what `--pretty-urls` is — under which the pair is already **P12** (§13, row two). unify does not guess a host's routing table.
 
 **Nothing here reaches the network.** An external URL, an off-origin share image, an off-origin `<loc>`: all skipped, by §12, §21.6, and §24.4 alike. Product-spec §6.5.3's `audit --external` is where that lives, and it is never a build dependency (§6.1).
+
+---
+
+## 26. Structured data: validation and bounded generation
+
+Product-spec §6.3.6, and the two halves are deliberately unequal in size: unify **validates** structured data at length and **generates** almost none of it.
+
+### 26.1 What already owns which half
+
+Nothing in this section re-reads a page. Four rules were in place before it existed, and it adds to them rather than restating them:
+
+| question | owner |
+|---|---|
+| does an authored block parse? | §20.8 records `{raw, data, error}`; §24.4's `jsonld-invalid` reports the failure |
+| do its URLs name files this site emits? | §12's closed property list; **P13**, publish-blocking |
+| are those URLs right at the deploy address? | §24.4's `jsonld-url-unprefixed` |
+| what type does the page declare? | §20.8's `schemaType` |
+
+What this section adds is findings that compare a block against **the page it is on** (§26.3, read as §26.2 bounds it), and one bounded generator (§26.4–§26.8).
+
+### 26.2 Reading a block: the subject object
+
+Every comparison below reads the **subject object** of a JSON-LD entry: its `data`, when `data` is a single object — not an array, not a `{"@graph": […]}` wrapper — and only that object's own **string-valued** properties. This is §20.8's bounded reading, unchanged, applied to one more question, and the reason is the same: an array and a `@graph` are several entities, and deciding which of them is *this page* is a judgement, not a reading.
+
+The cost is stated rather than hidden. `@graph` is how several widely-deployed CMS plugins emit structured data, so on those pages every finding in §26.3 is silent. That is the conservative direction — §24.3's severities are claims about a document, and a claim about the wrong node of a graph is worse than no claim. A later revision that wants those pages must first say **which** node is the page, in this section, with the rule written down; until then it says nothing and this paragraph records why.
+
+### 26.3 Validation findings
+
+These join §24.4's catalogue and obey every rule of it: they are predicates over the §20 manifest, they print in §24.5's format, they never block a publish, and `build` never consults them (§24.7).
+
+| id | severity | fires when |
+|---|---|---|
+| `jsonld-headline-mismatch` | incomplete | a subject object's `@type` is `Article` or `BlogPosting` and it declares a string `headline`, the page emits exactly one `h1`, and neither string contains the other after case folding and whitespace collapse |
+| `jsonld-url-mismatch` | broken | a subject object declares a string `url`, the page declares a `canonical`, both resolve — by §12's own reader — to an output path this manifest holds, and the two paths differ |
+| `jsonld-lang-mismatch` | broken | a subject object declares a string `inLanguage`, the page declares `lang`, and the two **primary language subtags** differ after case folding |
+| `jsonld-entity-conflict` | broken | two subject objects on one page declare the same string `@id` and different string `@type` values; one finding per `@id`, in sorted order |
+| `date-unusable` | broken | `datePublished` or `dateModified` has a non-null `raw` and a null `iso`; one finding per field, `datePublished` first |
+
+`jsonld-headline-mismatch` is product-spec §6.3.6's "compare factual fields with visible content where the relationship is unambiguous", and the `h1` is the visible content — the one string on the page that is *definitionally* the same fact a `headline` states. The comparison is **containment in either direction**, for §24.4's own reason: §8 row 2 prepends a page title to the layout's, so the strings a correct site produces are routinely nested rather than equal, and anything looser is a similarity threshold nobody can defend to the author whose two strings fell either side of it. It requires **exactly one** `h1` for the reason `title-h1-mismatch` does: with none there is nothing visible to compare, and with several there is no answer to *which* one, only a choice. It is `incomplete` rather than `broken` because a headline that restates the heading differently is a decision an author may have made; `title-h1-mismatch` is the same shape and the same severity.
+
+`jsonld-url-mismatch` is the page telling a consumer two different things about its own address: `<link rel="canonical">` names one page and the structured data names another. Both are read through **one** resolver — §12's base stripping, then §12's resolution, then directory URLs to `index.html` — which is the same rule §21.2, §22.4, and `canonical-scheme-mismatch` read, so "which page does this URL name" keeps one answer across the whole build. It fires only when **both** resolve: a `url` naming another origin is that site's business, and one naming a location this site does not emit is already **P13** through §12's closed property list, which is the stronger answer and the one mechanism (§24.4's own precedent for the share image). `broken`, because two addresses for one page in bytes one build emitted is §24.3's definition.
+
+`jsonld-lang-mismatch` compares only the **primary subtag**, case-insensitively, and both halves are load-bearing. [BCP 47](https://www.rfc-editor.org/rfc/bcp47) §2.1.1 makes language tags case-insensitive, so `EN-us` and `en-US` are one tag and a byte comparison would accuse a correct page. And `en` beside `en-GB` is a **refinement** rather than a contradiction — one says English, the other says which English — so comparing whole tags would accuse the commonest correct pairing there is. What is left, `en` against `fr`, is one document answering one question twice with two answers, which is `broken` for `metadata-conflict`'s reason.
+
+`jsonld-entity-conflict` is product-spec §6.3.6's "contradictory entities", at the one shape where the contradiction is unarguable: two blocks naming **one** entity by `@id` and classing it two ways. §24.4 already records that a second `ld+json` block with a *different* `@type` is recommended practice rather than a fault — a `WebPage` beside an `Organization` is two entities — so the `@id` is exactly what separates the two cases, and this finding fires on nothing that lacks one.
+
+`date-unusable` is the one finding here that reads no JSON-LD. §20.10 splits a date into `{raw, iso}` so that "what did the author write" and "what can anything emit" never collapse; a record where `raw` is present and `iso` is null is a page that declared a date **no consumer can use** — not §21.3's `<lastmod>`, not §26.6's `datePublished`, not a crawler. Before this finding existed that value was dropped in silence by every one of them, which is the failure class §14 exists to forbid, moved one register over. It is `broken` because a value that does not conform to the format its field is defined in is wrong regardless of intent (§24.3), and the evidence quotes `raw` — the author's own bytes, the only string they can grep for. Product-spec §6.7 names "inferred or malformed dates" among the cases a diagnostic must cover; this is the malformed half, and the inferred half is §20.10's rule that no date is ever derived.
+
+**One comparison is deliberately not made.** A JSON-LD `datePublished` beside the page's own `<meta property="article:published_time">` is *not* compared, and the reason is §24.4's, verbatim in another costume: the two name one instant at two granularities. `2026-01-02` and `2026-01-02T09:30:00Z` are not a contradiction, and separating the pairs that are from the pairs that are not needs a rule about time zones and about how much of a day a bare date covers — a judgement, in a section whose whole discipline is that it makes none. §24.4 excluded the same pair from `metadata-conflict` for the same reason, and excluding it here keeps one answer rather than two.
+
+Three more comparisons stay out, each for a reason of its own. A JSON-LD `image` beside `og:image` is two share images, and a page may legitimately want different ones — the crawler and the social scraper are different consumers. A JSON-LD `description` beside the meta is the same: a `description` written for a search snippet and one written for a rich result are both the author's. And `name` beside `<title>` is `title-h1-mismatch`'s question with a third string added, which would make one page's title reconcilable against two things at once.
+
+### 26.4 Generation: the declaration
+
+A page asks for a generated block by declaring a type unify generates:
+
+```html
+<meta name="schema" content="Article">
+```
+
+or, from Markdown frontmatter, `schema: Article` — §10.2's ordinary meta synthesis, no new key mechanism. The two spellings are the same declaration and produce identical output, and a layout may carry it for a whole section. There is one extraction path (§20.8's `schemaType`) and one generator.
+
+The accepted values are exactly **`WebPage`**, **`Article`**, **`BlogPosting`**, **case-sensitively**. Anything else is **P23**, located at the declaration — the frontmatter key for a Markdown page, the element for an HTML one, at its line in that file when §14.1 can name one:
+
+```
+src/post.md: problem: schema is "article" — unify generates WebPage, Article, or BlogPosting, spelled exactly
+  fix: write schema: Article, or write the block yourself in a <script type="application/ld+json">
+```
+
+Case-sensitivity is not fussiness: `article` is not a schema.org type, and a declaration that silently generated nothing would be the failure class §14 exists to forbid. Nor is the closed list a claim that other types do not matter — a page needing `Product`, `Recipe`, `LocalBusiness`, or any other vocabulary writes its own `<script type="application/ld+json">`, which is product-spec §6.3.6's own instruction and which also switches generation off (§26.5), so the two never fight.
+
+`name="schema"` is **unify's own key**, introduced by §20.8 in this same 0.8 line and defined by no standard, so constraining its values constrains unify's vocabulary rather than the author's HTML. §20.8's `schemaType` stays as general as it was: it also reads a JSON-LD `@type`, which is unrestricted, so a page declaring `Product` in a block it wrote itself still has `schemaType` `Product`, and `schema-incomplete` still reads it.
+
+### 26.5 Generation: activation
+
+A block is generated for a page when **all three** hold:
+
+1. `record.schemaType` is one of the three accepted values.
+2. `record.jsonLd` is **empty** — the page emits no `<script type="application/ld+json">` anywhere in the document.
+3. The emitted document has a `<head>` with a closing tag.
+
+Condition 2 is **authored JSON-LD always wins**, §22.3's rule one artifact over: generation fills a gap and never adjudicates a value the author chose. It is deliberately not head-scoped, because §20.8 is not and §24.4's `metadata-in-body` says outright that `ld+json` does its job in the body — a page that wrote its block after its content wrote a block. Contents of a `<template>` are not a declaration, here as everywhere (§7, §20.2).
+
+Conditions 1 and 2 together mean the declaration that reaches the generator is always the **meta**: under (2) no JSON-LD survives for §20.8 to read a `@type` from, so the two sources of `schemaType` cannot disagree about which one activated this.
+
+Condition 3 is §22.2's rule: with no closing `</head>` there is no insertion point, and synthesizing one would be a structural change this section does not make.
+
+There is **no flag**. The declaration is the whole opt-in, and a site that writes none is the v0.7 golden path, unchanged.
+
+### 26.6 What is generated
+
+One `<script type="application/ld+json">` inserted **at the end of the emitted `<head>`, immediately before `</head>`**, reusing the whitespace that precedes that tag so the element lands at its indentation and the rest of the document is byte-identical (§3, §22.2). Every line of the element carries that same indentation.
+
+The object's properties, in this order, every one of them omitted when its source is absent:
+
+| property | value | omitted when |
+|---|---|---|
+| `@context` | the string `https://schema.org` | never |
+| `@type` | the declared value | never |
+| `name` (`WebPage`) / `headline` (`Article`, `BlogPosting`) | `record.title` | `title` is null |
+| `description` | `record.description` | `description` is null |
+| `url` | `record.canonical`, else `record.url` | both are null |
+| `image` | `record.image.url` | `image` is null |
+| `author` | `record.author` — **a string** | `author` is null |
+| `datePublished` | `record.datePublished.iso` | the field is null, or its `iso` is |
+| `dateModified` | `record.dateModified.iso` | the field is null, or its `iso` is |
+| `inLanguage` | `record.lang` | `lang` is null |
+
+Product-spec §6.3.6 names the two date sources as the frontmatter keys `date` and `lastmod`, and the chain that connects them to this table runs entirely through rules that already exist: §10.2 emits `<meta name="date">` and `<meta name="lastmod">`, §20.3 reads those into `datePublished` and `dateModified` (alongside `article:published_time`/`article:modified_time`, which an HTML page is likelier to write), and §20.10 decides whether either has an `iso`. This section adds no mapping of its own, which is why an HTML page needs no frontmatter to generate the same block.
+
+Every value is a **record field** (§20), never frontmatter. That is §20.2's equal-citizen rule doing its work: a layout-supplied description is used, an HTML page generates exactly what a Markdown page with the same emitted head generates, and character references are already resolved (§20.3) so the JSON carries the text a reader sees.
+
+Four of these choices are not arbitrary and are argued rather than asserted:
+
+- **`headline` for an article, `name` for a page.** schema.org gives `Article` and `BlogPosting` a `headline`, and it is the property Google's own Article documentation reads; `WebPage` has no `headline`, and `name` is the property it does have. Emitting `name` on an article would be valid and unread; emitting `headline` on a `WebPage` would be a property its type does not define.
+- **`author` is a plain string, not a `Person`.** `<meta name="author">` declares, in the HTML specification's own words, the name of one of the page's authors — a name, and nothing about what kind of thing bears it. Writing `{"@type": "Person", "name": …}` would assert that the author is a person, which is an invented claim and which product-spec §6.1 forbids in exactly these words. A publication whose author is an organization would be misdescribed by a build that never asked. A page that needs a typed author writes its own block (§26.5's condition 2), which is the escape hatch §22.3 has for the same class of decision.
+- **`url` is the final canonical**, which is why §26.7 orders this after §22: a page whose canonical `--canonical auto` supplied must generate *that* URL, not a second opinion about its address. Where the page declares no canonical and no address is known, both sources are null and the property is omitted rather than guessed.
+- **A date is emitted only from `iso`.** `raw` is never emitted anywhere (§20.10), so a page whose `date:` is not W3C-DTF generates no `datePublished` — and says so, through `date-unusable` (§26.3), rather than emitting a value that is invalid where it lands.
+
+**Serialization is fixed**, so two builds of one tree produce identical bytes: two-space indentation, properties in the table's order, and every `<` in the serialized JSON written as `\u003c`. That last is not decoration — a description containing `</script>` would otherwise end the element early and put the rest of the JSON into the document as text. `\u003c` is a JSON string escape, so the block a consumer parses is unchanged.
+
+### 26.7 Ordering, and what checks the result
+
+Generation runs **after §22's canonical completion and before §20's final manifest**, for the reason §22 runs where it does: the manifest reads emitted bytes (§20.2), so anything that writes into a page must have written before the reading that every consumer shares. A build with both features derives the manifest three times — once to decide completion, once to decide generation against the completed text, once as the manifest — and §20.2's "deriving it changes nothing" is exactly what makes that safe rather than a smell.
+
+§12 then checks the generated block like any other, and here that **can only pass**: `url` is the canonical §12 already checks as a `link href`, and `image` is the `og:image` value §12 already checks as a URL-valued meta. It runs anyway, for §21.6's reason — it is the executable form of the claim that a generated block and the published tree agree, so a change that lets them drift fails in the suite rather than at a crawler.
+
+`--dry-run` names the work, beside §22's own line (§17):
+
+```
+structured data: 3 pages would gain a JSON-LD block
+```
+
+The block participates in §15's transactional publish because it is part of a page's bytes: a problem anywhere leaves the previous output untouched, generated block and all.
+
+`unify audit` runs this exactly as `build` does — §26 has no flag to be set, so §24.1's "the whole pipeline" includes it — and then evaluates the result. A generated block is therefore visible to §26.3's own findings, and consistent with them by construction: its `headline` is the record's title, its `url` the record's canonical, its `inLanguage` the record's `lang`.
+
+### 26.8 What is never generated
+
+The list is closed, and each absence is the same rule: unify emits what the page declared and nothing it would have to decide.
+
+No `publisher` — it names an entity the page did not declare. No `mainEntityOfPage` and no `@id` — both are identity, and §12's own property list excludes them for that reason. No `articleBody`, `wordCount`, or `keywords` derived from `record.text` — that is generated prose and a keyword count, two things product-spec §6.1 forbids by name. No `isPartOf`, `breadcrumb`, or `speakable` — each needs a structure of the site that unify has as links, not as claims. No image `width`/`height` inside the block, even when `record.image` carries them: they belong to the `og:image` declaration that supplied the URL, and `image-missing-dimensions` already reports their absence there. And no date from any source but an authored, well-formed one — not the build clock, not the filesystem, not the filename, not Git (§20.10).
