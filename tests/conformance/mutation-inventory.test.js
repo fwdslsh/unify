@@ -37,11 +37,15 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 // are where both shipped defects lived, and pinning them here pins them for
 // the sweep too.
 test("every mutation row anchors uniquely in the current tree", () => {
-  // Sanity: the inventory is non-empty, so a truncated file cannot pass by
-  // having nothing to check.
-  expect(parseMutations(readFileSync(join(ROOT, "tests", "conformance", "mutations.tsv"), "utf8")).length)
-    .toBeGreaterThan(0);
-  const problems = anchorProblems(ROOT);
+  const committed = parseMutations(readFileSync(join(ROOT, "tests", "conformance", "mutations.tsv"), "utf8"));
+  expect(committed.length).toBeGreaterThan(0);
+  const { checked, problems } = anchorProblems(ROOT);
+  // EVERY committed row, counted. Without this a narrowing inside
+  // `anchorProblems` is invisible: all rows are currently clean, so a subset
+  // and the whole set both return an empty problem list, and slicing the parse
+  // passed the suite. The count is the only property that separates them —
+  // which is the same lesson as the caller-narrowing bug, one layer in.
+  expect(checked).toBe(committed.length);
   if (problems.length) {
     throw new Error(
       `${problems.length} mutation row(s) no longer describe the tree — each is scored on a mutation that never happens:\n  ${problems.join("\n  ")}`,

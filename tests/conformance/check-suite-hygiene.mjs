@@ -15,10 +15,25 @@
  *  H3  No internal imports in behavior tests. Importing from src/** couples
  *      tests to internals and lets them pass while the CLI is broken; behavior
  *      tests spawn the CLI. (The harness itself holds the single cli.js path.)
- *  H4  No skipped tests carrying rule declarations. `test.skip`/`it.skip`/
- *      `test.todo` in a file that declares `covers(`/`@covers` fails — skipped
- *      coverage is the runtime ledger's job to expose, and a skip that keeps a
- *      declaration is a lie waiting to be believed.
+ *  H4  No test opts itself out of running. `skip`, `skipIf`, `todo`, and
+ *      `only` on `test`/`it`/`describe` all fail, in any test file, whether or
+ *      not it declares coverage — a skip that keeps a declaration is a lie
+ *      waiting to be believed, and a skip with no declaration is a test that
+ *      silently stopped being one.
+ *
+ *      It used to match `skip|todo` only, and only in files that declared
+ *      coverage, which left two doors open at once. `test.skipIf(cond)` — the
+ *      modern spelling — passed cleanly in a file dense with `covers()` lines,
+ *      and any file without a declaration could skip freely. That matters more
+ *      since the mutation sweep began deleting one file from its work copy:
+ *      the copy's path (`unify-mutate-…`) and that file's absence are both
+ *      sniffable, so a future test could condition itself on either and never
+ *      run under a sweep while its `covers()` line kept claiming the rule was
+ *      pinned. A test that decides for itself when to run is not a gate.
+ *
+ *      The one legitimate exemption in this repository is not a skip: the
+ *      sweep DELETES `mutation-inventory.test.js` from its copy, in the
+ *      harness that owns the copy, where it is visible and cannot spread.
  *  H5  No ad-hoc normalization in tree comparison. All tree comparison goes
  *      through the single harness comparator (tests/conformance/compare.mjs),
  *      whose only normalization is the documented contract (testing-strategy
@@ -107,10 +122,9 @@ for (const dir of BEHAVIOR_DIRS) {
         violations++;
       }
     }
-    const declares = /covers\s*\(|@covers\s/.test(src);
-    const skips = /\b(?:test|it|describe)\.(?:skip|todo)\s*\(/.test(src);
-    if (declares && skips) {
-      console.error(`H-FAIL H4 ${relative(ROOT, p)}: file both skips tests and declares rule coverage`);
+    const skip = /\b(?:test|it|describe)\.(?:skipIf|skip|todo|only)\b/.exec(src);
+    if (skip) {
+      console.error(`H-FAIL H4 ${relative(ROOT, p)}: a test opts itself out of running (${JSON.stringify(skip[0])})`);
       violations++;
     }
   }

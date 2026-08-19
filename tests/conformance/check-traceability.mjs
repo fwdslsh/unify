@@ -245,8 +245,27 @@ if (baseline) {
   if (closed.length) fail(`baseline gap(s) now covered — shrink the baseline file in the same commit: ${closed.join(", ")}`);
   if (!unexpected.length && !closed.length) console.log(`gaps match the committed baseline (${gaps.length}) — migration phase gate green`);
 } else if (gaps.length) {
-  fail(`${gaps.length} rule(s) with no covering test:`);
-  for (const id of gaps) console.error(`  ${id}\t${inventory.get(id).spec}\t${inventory.get(id).summary.slice(0, 80)}`);
+  // Release semantics: without --baseline, any gap fails. That is correct, and
+  // it is also the invocation a person types by hand — so during a migration
+  // phase this printed the same FAIL, listing the same rows, on every single
+  // run. A gate that always says FAIL teaches its readers to skim FAIL lines,
+  // which is the habit that let three stale mutation rows survive two review
+  // rounds. It still fails; it now says whether this is news.
+  const committed = join(HERE, "phase-gaps", "baseline.txt");
+  const known = existsSync(committed)
+    ? new Set(readFileSync(committed, "utf8").split("\n").map((l) => l.trim()).filter((l) => l && !l.startsWith("#")))
+    : new Set();
+  const fresh = gaps.filter((id) => !known.has(id));
+  const expected = gaps.filter((id) => known.has(id));
+  if (fresh.length) {
+    fail(`${fresh.length} rule(s) with no covering test, and NOT in the committed baseline:`);
+    for (const id of fresh) console.error(`  ${id}\t${inventory.get(id).spec}\t${inventory.get(id).summary.slice(0, 80)}`);
+  }
+  if (expected.length) {
+    fail(`${expected.length} rule(s) with no covering test, all in the committed phase baseline — expected here, because this invocation is the RELEASE gate and deliberately ignores it:`);
+    for (const id of expected) console.error(`  ${id}\t${inventory.get(id).spec}\t${inventory.get(id).summary.slice(0, 80)}`);
+    console.error("  (run with --baseline tests/conformance/phase-gaps/baseline.txt for the migration-phase gate)");
+  }
 }
 if (failed) process.exit(1);
 console.log("traceability: OK");

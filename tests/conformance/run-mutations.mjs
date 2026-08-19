@@ -241,15 +241,16 @@ export function runtimeErrorIn(output) {
  * null when it does not exist: a row naming a deleted module is a BAD-ANCHOR,
  * not an unhandled ENOENT that takes the runner down before it can say so.
  *
- * `read` returns the file's text, or null when it does not exist. Prefer
- * `anchorProblems` below — it owns the reading, and the reading is where the
- * defects were.
+ * Module-private on purpose. It was exported so unit tests could reach it,
+ * and that put the `rows` parameter — the one the shipped bug lived in — back
+ * on the public surface for a future caller to narrow. It is reached through
+ * `anchorProblems` instead, which has no such parameter.
  *
  * @param {{id: string, file: string, old: string, next: string}[]} rows
  * @param {(file: string) => string|null} read
  * @returns {string[]} one message per problem, empty when every row is usable
  */
-export function validateAnchors(rows, read) {
+function validateAnchors(rows, read) {
   const problems = [];
   for (const row of rows) {
     const text = read(row.file);
@@ -291,15 +292,27 @@ export function validateAnchors(rows, read) {
  * the entry point reads both from the same root and there is nothing left to
  * pass it incorrectly.
  *
+ * Returns `checked` alongside `problems` so a caller can assert HOW MANY rows
+ * were looked at. Without it a narrowing inside this function is invisible:
+ * every row is currently clean, so a subset and the whole set both return an
+ * empty list, and slicing the parse passed the suite. The count is the only
+ * property that distinguishes them.
+ *
+ * `rootDir` supplies BOTH the tree and the inventory, so the question is
+ * always "does this tree's inventory describe this tree?". The sweep passes
+ * its work copy; passing the repository root there instead would silently
+ * validate the current checkout rather than the revision being swept.
+ *
  * @param {string} rootDir - the tree, and the inventory that claims to describe it
- * @returns {string[]} one message per problem, empty when every row is usable
+ * @returns {{checked: number, problems: string[]}}
  */
 export function anchorProblems(rootDir) {
   const rows = parseMutations(readFileSync(join(rootDir, "tests", "conformance", "mutations.tsv"), "utf8"));
-  return validateAnchors(rows, (file) => {
+  const problems = validateAnchors(rows, (file) => {
     const abs = join(rootDir, file);
     return existsSync(abs) ? readFileSync(abs, "utf8") : null;
   });
+  return { checked: rows.length, problems };
 }
 
 // --------------------------------------------------------------------- main
@@ -335,6 +348,27 @@ function main() {
   let finalExit = 0;
   process.on("exit", () => { try { rmSync(work, { recursive: true, force: true }); } catch { /* best effort */ } });
   const runSuite = () => {
+    // Removed here, immediately before the suite runs, rather than inside the
+    // extraction — so no future reordering of `extract` can put it back before
+    // a suite sees it. That is not hypothetical: the first version deleted it
+    // once after the first extraction, and `extract` re-running per row
+    // restored it, which the sweep reported back as the inventory test
+    // "killing" every row.
+    //
+    // The inventory test asserts that every committed anchor is present in the
+    // tree — true of the COMMITTED tree and false by construction of a mutated
+    // one, since applying a mutation always invalidates the mutated row's own
+    // anchor. Its failure under a sweep is never evidence about the mutant, so
+    // counting it as a killer was this file's own "gate that lies" failure
+    // arriving through the fix for it.
+    //
+    // Deleted from the copy, never switched off through the environment or a
+    // name list: an ambient variable disables an always-on gate for anyone who
+    // has it exported, and a name list is the door H4 now closes. Nothing is
+    // lost — `anchorProblems` checks the pristine copy before any suite runs,
+    // and the test runs on every ordinary run.
+    rmSync(join(work, "tests", "conformance", "mutation-inventory.test.js"), { force: true });
+
     const r = spawnSync("bun", ["test"], {
       cwd: work, encoding: "utf8", timeout: SUITE_TIMEOUT_MS,
       env: { ...process.env, CLAUDECODE: "1" },
@@ -366,36 +400,15 @@ function main() {
     } else {
       execFileSync("sh", ["-c", `git -C ${JSON.stringify(ROOT)} archive ${JSON.stringify(rev)} | tar -x -C ${JSON.stringify(work)}`]);
     }
-    // Inside `extract`, because `extract` runs again before every row. The
-    // inventory test asserts that every committed anchor is present in the
-    // tree — true of the COMMITTED tree and false by construction of a mutated
-    // one, since applying a mutation always invalidates the mutated row's own
-    // anchor. Left in place it failed on every single mutation and was
-    // credited as the killer of every one: this file's own "gate that lies"
-    // failure, arriving through the fix for it.
-    //
-    // Deleted from the copy rather than switched off through the environment.
-    // An ambient variable disables an always-on gate for anyone who has it
-    // exported, and nothing would stop a future test opting into the same
-    // exemption to quiet a real killer — the door the rejected exclusion list
-    // came through, with a different key. Nothing is lost: `anchorProblems`
-    // checks the pristine copy before any suite runs, and the test itself runs
-    // on every ordinary run.
-    //
-    // A one-shot deletion after the first extraction was the first attempt,
-    // and the sweep reported it back — the row it swept was still "killed by"
-    // the inventory test, because the next `extract()` had put the file back.
-    rmSync(join(work, "tests", "conformance", "mutation-inventory.test.js"), { force: true });
   };
 
   try {
     extract();
     execFileSync("cp", ["-r", join(ROOT, "node_modules"), join(work, "node_modules")]);
 
-
     // EVERY row, not the selected ones — see `anchorProblems`, which owns the
     // reading precisely so this call site cannot get either half wrong.
-    const problems = anchorProblems(work);
+    const { problems } = anchorProblems(work);
     for (const p of problems) console.error(p);
     if (problems.length) { console.error(`mutation: ${problems.length} unusable row(s)`); finalExit = 2; return; }
 

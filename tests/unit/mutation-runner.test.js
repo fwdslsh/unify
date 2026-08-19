@@ -13,7 +13,10 @@
  */
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { classify, compareBaselines, failingTests, parseMutations, runtimeErrorIn, unescapeCell, validateAnchors } from "../conformance/run-mutations.mjs";
+import { anchorProblems, classify, compareBaselines, failingTests, parseMutations, runtimeErrorIn, unescapeCell } from "../conformance/run-mutations.mjs";
+import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 
 /** A suite run that failed with these test names. */
 const red = (...names) => ({
@@ -88,58 +91,83 @@ describe("classify — the logic that inverted", () => {
   });
 });
 
-describe("validateAnchors — the guard against a gate that lies", () => {
+describe("anchorProblems — the guard against a gate that lies", () => {
   // Three rows sat stale across two review rounds because this ran over the
-  // prefix-filtered subset. The fix went in with no test, so reverting it —
-  // or deleting it — left the whole suite green: the guard against an
-  // unpinned rule was itself an unpinned rule, one level in.
-  const read = (files) => (f) => (f in files ? files[f] : null);
+  // prefix-filtered subset. The first fix went in with no test at all; the
+  // second tested the extracted function, whose behaviour had never been
+  // wrong — the defects were both in what it was handed. So these go through
+  // the PUBLIC entry point against a real tree on disk: the reading and the
+  // row set are the parts that broke, and reaching past them tests nothing.
+  const tree = (files) => {
+    const root = mkdtempSync(join(tmpdir(), "unify-anchors-"));
+    const rows = [];
+    for (const [name, spec] of Object.entries(files)) {
+      if (spec.text !== undefined) {
+        mkdirSync(dirname(join(root, name)), { recursive: true });
+        writeFileSync(join(root, name), spec.text);
+      }
+      for (const r of spec.rows ?? []) rows.push([name, r.id, r.old, r.next, "why"].join("\t"));
+    }
+    mkdirSync(join(root, "tests", "conformance"), { recursive: true });
+    writeFileSync(join(root, "tests", "conformance", "mutations.tsv"),
+      `file\tid\told\tnew\twhy\n${rows.join("\n")}\n`);
+    return root;
+  };
 
   test("a present, unique anchor is clean", () => {
-    const rows = [{ id: "a-01", file: "x.js", old: "const a = 1;", next: "const a = 2;" }];
-    expect(validateAnchors(rows, read({ "x.js": "const a = 1;\nconst b = 2;\n" }))).toEqual([]);
+    const root = tree({ "x.js": { text: "const a = 1;\nconst b = 2;\n", rows: [{ id: "a-01", old: "const a = 1;", next: "const a = 2;" }] } });
+    expect(anchorProblems(root)).toEqual({ checked: 1, problems: [] });
   });
 
   test("an absent anchor is BAD-ANCHOR — the case that scored rows on a mutation that never happened", () => {
-    const rows = [{ id: "a-01", file: "x.js", old: "const gone = 1;", next: "const gone = 2;" }];
-    const out = validateAnchors(rows, read({ "x.js": "const a = 1;\n" }));
-    expect(out).toHaveLength(1);
-    expect(out[0]).toContain("BAD-ANCHOR a-01");
-    expect(out[0]).toContain("x.js");
+    const root = tree({ "x.js": { text: "const a = 1;\n", rows: [{ id: "a-01", old: "const gone = 1;", next: "const gone = 2;" }] } });
+    const { problems } = anchorProblems(root);
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toContain("BAD-ANCHOR a-01");
+    expect(problems[0]).toContain("x.js");
   });
 
   test("a repeated anchor is AMBIGUOUS — replace edits the first, which may not be the row's subject", () => {
-    const rows = [{ id: "a-01", file: "x.js", old: "return null;", next: "return 0;" }];
-    const out = validateAnchors(rows, read({ "x.js": "return null;\nif (q) return null;\n" }));
-    expect(out).toHaveLength(1);
-    expect(out[0]).toContain("AMBIGUOUS a-01");
-    expect(out[0]).toContain("2x");
+    const root = tree({ "x.js": { text: "return null;\nif (q) return null;\n", rows: [{ id: "a-01", old: "return null;", next: "return 0;" }] } });
+    const { problems } = anchorProblems(root);
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toContain("AMBIGUOUS a-01");
+    expect(problems[0]).toContain("2x");
   });
 
   test("a replacement equal to the anchor is NO-OP", () => {
-    const rows = [{ id: "a-01", file: "x.js", old: "const a = 1;", next: "const a = 1;" }];
-    const out = validateAnchors(rows, read({ "x.js": "const a = 1;\n" }));
-    expect(out.some((m) => m.startsWith("NO-OP a-01"))).toBe(true);
+    const root = tree({ "x.js": { text: "const a = 1;\n", rows: [{ id: "a-01", old: "const a = 1;", next: "const a = 1;" }] } });
+    expect(anchorProblems(root).problems.some((m) => m.startsWith("NO-OP a-01"))).toBe(true);
   });
 
   test("a row naming a deleted file reports, rather than taking the runner down", () => {
-    // No existsSync guard, and the loop died of an unhandled ENOENT before it
-    // could print the one message that would have explained the row.
-    const rows = [{ id: "a-01", file: "deleted.js", old: "x", next: "y" }];
-    const out = validateAnchors(rows, read({}));
-    expect(out).toHaveLength(1);
-    expect(out[0]).toContain("BAD-ANCHOR a-01");
-    expect(out[0]).toContain("does not exist");
+    // The reading is the caller's half, and without an existsSync guard the
+    // loop died of an unhandled ENOENT before it could print the one message
+    // that would have explained the row. Reachable only through the entry
+    // point, which is why this goes through it.
+    const root = tree({ "deleted.js": { rows: [{ id: "a-01", old: "x", next: "y" }] } });
+    const { problems } = anchorProblems(root);
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toContain("BAD-ANCHOR a-01");
+    expect(problems[0]).toContain("does not exist");
   });
 
-  test("EVERY row is checked, not a caller-chosen subset — the scope bug itself", () => {
-    const rows = [
-      { id: "a-01", file: "x.js", old: "const a = 1;", next: "const a = 2;" },
-      { id: "b-01", file: "x.js", old: "const stale = 1;", next: "const stale = 2;" },
-    ];
-    const out = validateAnchors(rows, read({ "x.js": "const a = 1;\n" }));
-    expect(out).toHaveLength(1);
-    expect(out[0]).toContain("b-01");
+  test("EVERY committed row is checked — the scope bug itself, counted", () => {
+    const root = tree({
+      "x.js": {
+        text: "const a = 1;\n",
+        rows: [
+          { id: "a-01", old: "const a = 1;", next: "const a = 2;" },
+          { id: "b-01", old: "const stale = 1;", next: "const stale = 2;" },
+        ],
+      },
+    });
+    const { checked, problems } = anchorProblems(root);
+    // The count is what makes a narrowing visible at all: with every row clean
+    // a subset and the whole set both yield no problems.
+    expect(checked).toBe(2);
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toContain("b-01");
   });
 });
 
