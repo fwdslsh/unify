@@ -150,6 +150,67 @@ export function classifyCanonical(record, base) {
   return target === record.outputPath ? "self" : "elsewhere";
 }
 
+/** The two schemes a page is served under. Nothing else is comparable. */
+const WEB_SCHEMES = new Set(["http:", "https:"]);
+
+/**
+ * §24.4 — does this page's canonical name this page under a scheme the site is
+ * not served under?
+ *
+ * The question `classifyCanonical` deliberately does not answer, kept here so
+ * the two read as one design. Excluding the scheme from that host comparison is
+ * correct — `http:` against `https:` on one host is not a page "nominating a
+ * replacement", and folding it in would drop every such page out of its own
+ * sitemap — but the exclusion left the classic post-migration error observed by
+ * nothing: a site moved to https whose canonicals still read `http://`, asking
+ * crawlers to consolidate onto the address it left. §12 does not catch it
+ * either; `stripBaseUrl` compares hosts, so the value is checked as the path it
+ * resolves to and passes, verified against the real CLI.
+ *
+ * `self` is the entry condition, which is what keeps this from being a second
+ * opinion about "is this URL on this site?" — the answer it reads is §12's,
+ * through `classifyCanonical`, unchanged. What that answer guarantees is §12's
+ * own: the canonical resolves to this page's OUTPUT PATH. Under a subpath
+ * `--base-url` that is weaker than "names this page's address", because
+ * `stripBaseUrl` leaves an on-host path lacking the prefix untouched — §24.4
+ * records the gap, and it is that function's semantics to change, not this
+ * one's. It also keeps canonical-scheme-mismatch from ever co-occurring with
+ * the other two for one canonical: they need `elsewhere`, it needs `self`, and
+ * one canonical has one answer. Not a partition of the three — canonical-noindex
+ * and sitemap-canonical-disagree share the `elsewhere` branch and a page can
+ * collect both.
+ *
+ * @param {import('./manifest.js').PageRecord} record
+ * @param {import('./urls.js').BaseUrlConfig|null} base
+ * @returns {boolean}
+ */
+export function canonicalSchemeMismatch(record, base) {
+  if (!base) return false; // no address, no scheme to compare against (§24.4)
+  if (classifyCanonical(record, base) !== "self") return false;
+  const declared = schemeOf(record.canonical);
+  // Both sides must be the web's two. `--base-url` accepts any scheme that has
+  // a host (cli.js rejects only an origin-less one), so an `ftp:` base reaches
+  // here, and under one unify has no basis for calling either side wrong.
+  return declared !== null && WEB_SCHEMES.has(declared) && WEB_SCHEMES.has(base.scheme) && declared !== base.scheme;
+}
+
+/**
+ * The scheme a URL declares, or null when it declares none.
+ *
+ * Parsed, never matched: RFC 3986 §3.1 makes a scheme case-insensitive, so a
+ * lowercase pattern reads `HTTP://EXAMPLE.COM/x` as declaring nothing. The
+ * throw is the answer for the values that declare no scheme of their own —
+ * relative, root-relative, and protocol-relative `//example.com/x`, which
+ * borrows the page's scheme and is therefore right at either address.
+ */
+function schemeOf(url) {
+  try {
+    return new URL(url).protocol;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * §21.2/§21.3 — the sitemap entries for a manifest, in manifest order.
  * @param {import('./manifest.js').PageRecord[]} records

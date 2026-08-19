@@ -46,9 +46,9 @@
  * only the caller knows which. See `isCascade` for why the second is silent.
  */
 import { posix } from "node:path";
-import { findAll, getAttr, getAttrNode, isElement, lineOf, parse } from "./html.js";
+import { findAll, getAttr, getAttrNode, innerText, isElement, isJsonLdScript, lineOf, parse } from "./html.js";
 import { decodeEntities } from "./entities.js";
-import { decodePathSegments, isSkippedUrl, isUrlValuedMeta, splitUrl } from "./urls.js";
+import { decodePathSegments, isSkippedUrl, isUrlValuedMeta, parseRefreshMeta, splitUrl } from "./urls.js";
 import { CHECK_SPELLING } from "./diagnostics.js";
 
 // ------------------------------------------------------------- CSS url()
@@ -87,6 +87,138 @@ function isOgOrTwitterMeta(el) {
 
 
 /**
+ * §12 — the closed list of JSON-LD properties whose string value is a URL.
+ *
+ * The criterion is the PROPERTY, never the value's shape. This module got that
+ * backwards once, in the same way `isUrlValuedMeta` above it did, and one
+ * bullet after §12 finished documenting why: a shape test decides whether a
+ * string LOOKS LIKE A PATH, and §12's question is whether it is a LOCATOR. In
+ * structured data most root-relative strings are not, so the shape test blocked
+ * the publish of conforming markup and left dist/ at the previous build —
+ * measured on four ordinary shapes, each reported as `does not resolve to any
+ * emitted file` under `fix: check the path spelling and casing`, which was
+ * wrong on both counts:
+ *
+ *   "urlTemplate": "/search?q={search_term_string}"   RFC 6570 template
+ *                                                     (Google's sitelinks
+ *                                                     search box, verbatim)
+ *   "@id": "/#website"                                a node identifier
+ *   "identifier": "/ISBN/9780000000000"               an identifier, not an
+ *                                                     address
+ *   "softwareRequirements": "/usr/bin/node"           another machine's path
+ *
+ * The list is SHORT, CLOSED and biased toward omission: a missing entry costs a
+ * missed check, a wrong entry costs the blocked publish of correct markup, and
+ * those are not the same price. Every entry is a property whose value, as the
+ * vocabulary is used in practice, is the address of a file this site emits —
+ * but the five are NOT every such property and this list has never claimed to
+ * be exhaustive. `mainEntityOfPage`, `significantLink`, `relatedLink` and
+ * `acquireLicensePage` all fit that description and are absent; so is `item`
+ * inside a breadcrumb `ListItem`, which is the commonest site-local URL in real
+ * structured data. Each absence costs a missed check and nothing else — a page
+ * whose every one of them names a deleted file builds and publishes.
+ *
+ * Deliberately absent, and why: `sameAs` names ANOTHER site by definition;
+ * `embedUrl`/`downloadUrl` are URL-valued but rarely site-local; `@id` and
+ * `@type` are JSON-LD keywords rather than terms; `identifier` identifies
+ * rather than locates. Those three are excluded by OMISSION — the same
+ * mechanism that leaves `mainEntityOfPage` unchecked, not a deny set. Only
+ * `@context` is excluded BY NAME, in the walk below, and that is a different
+ * mechanism with a different failure mode: omission skips a property, the name
+ * check skips a subtree. `item` is the closest call and is left off on
+ * this module's own `@id` reasoning: it names an ENTITY rather than a URL, so a
+ * string there is that entity's identifier written where the entity goes, which
+ * is `@id` in another spelling — and a `ListItem` that nests the object instead
+ * already has that object's `url` checked, by the depth rule.
+ *
+ * `@context` is excluded in BOTH directions, and the second cost real markup:
+ * it is not a checkable property, AND its VALUE is not data at all (see the
+ * walk below). What is left is a document that RENAMES a term, since unify
+ * expands no context. That points two ways. A context mapping some other name
+ * onto schema.org's `logo` hides a checkable value: a missed check, the
+ * direction this list is deliberately wrong in. A context repointing the NAME
+ * `logo` at something that is not an address makes the one check unify does
+ * make the wrong one — the blocking direction, and the only route left to it.
+ * It stands because the alternative is term expansion in the publish path, and
+ * because a redefinition of a schema.org term name to a non-URL meaning on a
+ * page that also writes a root-relative value under it is not a shape anyone
+ * has observed; the `@context` value, which IS such a shape and did fail this
+ * way, is skipped whole.
+ */
+const URL_VALUED_JSONLD_PROPERTIES = new Set(["url", "logo", "image", "thumbnailUrl", "contentUrl"]);
+
+/**
+ * §12 — which strings inside a parsed JSON-LD block are references.
+ *
+ * Two conditions, and each answers its own question. The PROPERTY (above)
+ * answers "is this a locator?". ROOT-RELATIVE answers "can this build know
+ * what it points at?": a relative IRI in JSON-LD resolves against `@base` or
+ * the document's own address — the first unread here, the second moved by
+ * --pretty-urls — so checking one would mean guessing the base the author
+ * meant, and an absolute one is a spelling §12 has never checked (widening to
+ * it is its own decision, not a detail of this repair).
+ *
+ * Exported because §24.4's `jsonld-url-unprefixed` asks the same question about
+ * the same blocks; one owner, or the two could disagree about which value is a
+ * URL and report on values §12 never checked.
+ * @param {any} data - a parsed JSON-LD value
+ * @returns {string[]} every reference, in document order, repeats kept
+ */
+export function jsonLdReferences(data) {
+  const out = [];
+  const visit = (node, property) => {
+    if (typeof node === "string") {
+      if (property !== null && URL_VALUED_JSONLD_PROPERTIES.has(property) && isJsonLdReference(node)) out.push(node);
+      return;
+    }
+    if (Array.isArray(node)) {
+      // An array INHERITS the property that names it: `"image": ["/a.png",
+      // "/b.png"]` is two images, and repeating the value inside an array is
+      // how the vocabulary spells every multi-valued property.
+      for (const v of node) visit(v, property);
+      return;
+    }
+    // Each value is visited under its OWN key, at any depth — a URL under
+    // publisher.logo is a reference like any other, and depth is not a hiding
+    // place. A key is never visited as a value: it selects a reference, it is
+    // never one itself.
+    if (node !== null && typeof node === "object") {
+      for (const [k, v] of Object.entries(node)) {
+        // A `@context` value is a TERM DEFINITION, never data. The strings
+        // under it are the IRIs that give this document's keys their meaning —
+        // `"url": "/vocab#url"` says what the key `url` MEANS here, and names
+        // no address on this site. Walking it as data made an ordinary inline
+        // context that happens to define URL-valued term names print
+        //
+        //   src/index.html:3: problem: /vocab#url does not resolve to any emitted file
+        //     fix: check the path spelling and casing
+        //
+        // and leave dist/ at the previous build: the same category error, under
+        // the same wrong fix line (the spelling was right; the path was never
+        // meant to exist), that the property list above was written to end.
+        // The key is skipped WHOLE rather than filtered, because everything
+        // beneath it is definition — a term may also be defined by an object
+        // (`{"image": {"@id": "…", "@type": "@id"}}`), and `@context` nests.
+        if (k === "@context") continue;
+        visit(v, k);
+      }
+    }
+  };
+  visit(data, null); // a string at the top level is named by no property
+  return out;
+}
+
+function isJsonLdReference(s) {
+  if (!s.startsWith("/") || s.startsWith("//")) return false; // root-relative: one leading slash
+  // A URI template is not an address, whichever property carries it. The
+  // property list already excludes `urlTemplate`; this is the second lock,
+  // because a template under a listed property (`"url"` in a vocabulary that
+  // permits one) would otherwise be reported as a missing file whose braces
+  // no author can spell away.
+  return !s.includes("{") && !s.includes("}");
+}
+
+/**
  * Every checkable reference in one emitted HTML file's text: href/src/poster
  * (any element, any `<link>` rel — REF-01), srcset candidates, root-relative
  * og:/twitter: meta content, `<style>` block url(), and `style=` attribute
@@ -121,6 +253,33 @@ function collectHtmlReferences(text) {
       // of scope.
       const v = content?.value ?? "";
       if (v !== "") refs.push({ raw: v, offset: content.valueStart });
+    }
+    // §12 — the URL part of a meta refresh, read through urls.js's single
+    // reading of that grammar so the URL this checks, the URL §11 rewrote, and
+    // the URL §20.11 records cannot be three different strings. A redirect stub
+    // is the one page whose whole content is a URL, and it shipped unchecked:
+    // a redirect naming a deleted page is a guaranteed 404 for everyone who
+    // follows it, from a build that exited 0.
+    const refresh = parseRefreshMeta(el);
+    if (refresh?.url) refs.push({ raw: refresh.url, offset: refresh.start });
+    if (isJsonLdScript(el)) {
+      // Read as JSON, never scanned as text: a key is never a reference, and a
+      // block that does not parse is §24.4's `jsonld-invalid` — hunting for
+      // URLs inside broken JSON would report one fault twice, the second time
+      // under a message about path spelling.
+      let data;
+      try {
+        data = JSON.parse(innerText(text, el));
+      } catch {
+        data = undefined; // JSON.parse never yields undefined, so this is unambiguous
+      }
+      if (data !== undefined) {
+        // Located at the <script> element and deliberately no more precisely: a
+        // byte offset inside the JSON is not a position in the author's file
+        // once the block arrived through an include, and §14.1 omits precision
+        // rather than inventing it.
+        for (const url of jsonLdReferences(data)) refs.push({ raw: url, offset: el.start });
+      }
     }
     if (isElement(el, "style")) {
       for (const child of el.children) {
@@ -186,6 +345,13 @@ export function stripBaseUrl(url, base) {
     // sitemap, while a broken `//gone.css` slipped past §12 as external.
     const rest = (u.pathname + u.search + u.hash).replace(/^\/+/, "/");
     if (rest.startsWith(base.pathPrefix)) return `/${rest.slice(base.pathPrefix.length)}`;
+    // An on-host URL that does not carry the prefix keeps its path, so under
+    // `--base-url https://example.com/repo/` the value `/team.html` is checked
+    // as `team.html` — §12's own semantics since v0.7.0, and unchanged here.
+    // Noted because a SECOND caller now leans on it: §24.4's
+    // canonical-scheme-mismatch accuses on `classifyCanonical`'s `self`, which
+    // this line produces for a canonical naming an address above this site's
+    // root. Changing the fallback changes what that finding fires on.
     return rest || "/";
   }
   if (base.pathPrefix !== "/" && url.startsWith(base.pathPrefix)) {

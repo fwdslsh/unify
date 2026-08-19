@@ -328,8 +328,10 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
     });
     // §24.4 — the same resolution, kept for the evaluator: which pages does a
     // sitemap this build emits actually list? Computed here rather than in
-    // audit.js so the check and the comparison read one answer (§21.6's own
-    // note on why a second reader of a <loc> would be a defect).
+    // audit.js so the check and the comparison read one answer — see
+    // `sitemapListings` for what a second resolver costs: the two would agree
+    // on every ASCII path and diverge on the first escaped one, which is the
+    // one-interpretation law product-spec §6.1 states for URLs.
     sitemapLocs = sitemap.sitemapListings({ sitemaps: sitemapFiles, base: baseConfig });
   }
 
@@ -337,9 +339,18 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
   // a `<loc>` is absolute by protocol and genuinely needs the site's address to
   // classify, but `Sitemap: /sitemap.xml` is internal by inspection. `base` may
   // be null; it governs only the stripping step, exactly as in §12.
+  //
+  // The return value is §23.3's exemption — the `Sitemap:` lines the check
+  // DECLINED to report — carried to the only command that reports them (§24.4's
+  // `robots-sitemap-missing`). Threaded exactly as `sitemapLocs` above is:
+  // computed by the module that owns the question, empty for the builds where
+  // the question never arose, and read only inside the audit branch below. A
+  // `build` receives it and ignores it, which is §24.7.
+  /** @type {{file: string, value: string}[]} */
+  let exemptedSitemaps = [];
   const robotsContent = tempFiles.get(robots.ROBOTS_PATH);
   if (robotsContent !== undefined) {
-    robots.checkRobots({
+    exemptedSitemaps = robots.checkRobots({
       text: typeof robotsContent === "string" ? robotsContent : robotsContent.toString("utf8"),
       file: emittedFromSource.get(robots.ROBOTS_PATH) ?? robots.ROBOTS_PATH,
       emittedPaths: new Set(tempFiles.keys()),
@@ -396,6 +407,7 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
       byOutputPath: manifest.byOutputPath,
       base: baseConfig,
       sitemapLocs,
+      exemptedSitemaps,
     });
     reporter.summary(formatFindings(findings));
     // §24.6 — a pipeline problem exits 1 regardless: evaluating output that

@@ -34,9 +34,9 @@
  */
 
 import { decodeEntities } from "./entities.js";
-import { findAll, findFirst, getAttr, innerText, isElement, isInside, parse } from "./html.js";
+import { findAll, findFirst, getAttr, innerText, isElement, isInside, isJsonLdScript, parse } from "./html.js";
 import { urlForOutputPath } from "./publish.js";
-import { isSkippedUrl, splitUrl } from "./urls.js";
+import { isSkippedUrl, parseRefreshMeta, splitUrl } from "./urls.js";
 import { stripBaseUrl, resolveReference } from "./references.js";
 
 /**
@@ -58,6 +58,14 @@ import { stripBaseUrl, resolveReference } from "./references.js";
  * @property {boolean} indexable
  * @property {boolean} followable
  *
+ * @typedef {object} RefreshValue
+ * @property {string} raw - the `content` value exactly as emitted
+ * @property {number} seconds - the declared delay; 0 is no delay at all (§24.4)
+ * @property {string|null} url - §12's grammar's URL part, null when it reads none
+ * @property {string|null} target - the output path this redirect names, when it
+ *   names a page in this manifest; null for external, unresolvable, and for a
+ *   second part §12's grammar does not read (§20.11 — never folded into "self")
+ *
  * @typedef {object} JsonLdEntry
  * @property {string} raw - the script's text content, verbatim
  * @property {any} data - the parsed value, or null when parsing failed
@@ -78,6 +86,7 @@ import { stripBaseUrl, resolveReference } from "./references.js";
  * @property {string|null} lang
  * @property {string|null} canonical
  * @property {RobotsValue} robots
+ * @property {RefreshValue|null} refresh
  * @property {string|null} h1
  * @property {{level:number, text:string, id:string|null}[]} headings
  * @property {string} text
@@ -302,13 +311,6 @@ function parseRobotsValue(raw) {
   };
 }
 
-/** True for `<script type="application/ld+json">`, case- and parameter-tolerant. */
-function isJsonLdScript(el) {
-  if (!isElement(el, "script")) return false;
-  const type = getAttr(el, "type");
-  return typeof type === "string" && type.trim().toLowerCase().split(";")[0] === "application/ld+json";
-}
-
 /**
  * §20.8 — `schemaType` reads a *single object's string* `@type` and nothing
  * else. An array, a `@graph`, a missing `@type`, or a non-string `@type`
@@ -349,6 +351,9 @@ function extract(page, base) {
   const twitterImage = new Field();
   const ogWidth = new Field();
   const ogHeight = new Field();
+  const refreshRaw = new Field();
+  /** @type {ReturnType<typeof parseRefreshMeta>} the first declaration (§20.4). */
+  let refreshFirst = null;
 
   /** @type {JsonLdEntry[]} */
   const jsonLd = [];
@@ -390,6 +395,15 @@ function extract(page, base) {
       const name = (getAttr(node, "name") ?? "").trim().toLowerCase();
       const property = (getAttr(node, "property") ?? "").trim().toLowerCase();
       const content = getAttr(node, "content");
+      // §20.11 — read document-wide, and this placement is the whole decision:
+      // head-scoped, a redirect written outside the head is invisible to §24,
+      // and a redirect nobody checks is the silent failure §12 and §24 exist to
+      // remove. It therefore has to be read BEFORE the head early-return below.
+      const refresh = parseRefreshMeta(node);
+      if (refresh !== null) {
+        refreshRaw.add(nonEmpty(getAttr(node, "content")));
+        if (refreshFirst === null) refreshFirst = refresh;
+      }
       if (!inHead) {
         // §24.4's closed set: the metas whose only valid position is the head.
         // `itemprop` and every other spelling does its job in the body and is
@@ -472,6 +486,11 @@ function extract(page, base) {
     description.conflict("description"),
     (ogImage.values.length ? ogImage : twitterImage).conflict("image"),
     lang.conflict("lang"),
+    // §20.4 calls itself total, so a new single-valued field is listed here as
+    // DATA. §24.4's metadata-conflict deliberately does not render it: that
+    // subset's criterion is a spec-stated at-most-one rule, and unify asserts
+    // only that the manifest reads the first.
+    refreshRaw.conflict("refresh"),
     schemaType.conflict("schemaType"),
     title.conflict("title"),
   ].filter(Boolean).sort((a, b) => (a.field < b.field ? -1 : a.field > b.field ? 1 : 0));
@@ -517,8 +536,39 @@ function extract(page, base) {
     linksIn: [],
     fragmentLinks: [],
     conflicts,
+    // §20.11's `target` is a lookup in a manifest that does not exist yet, so
+    // the raw reading rides on the draft the way `_hrefs` does and is resolved
+    // in `buildManifest`'s second pass.
+    refresh: null,
+    _refresh: refreshFirst,
     _hrefs: hrefs,
   };
+}
+
+/**
+ * §20.11 — turn one draft's raw refresh reading into the record's field.
+ * @param {PageRecord & {_refresh: any}} rec
+ * @param {import('./urls.js').BaseUrlConfig|null} base
+ * @param {Map<string, PageRecord>} byOutputPath
+ * @returns {RefreshValue|null}
+ */
+function resolveRefresh(rec, base, byOutputPath) {
+  const raw = rec._refresh;
+  if (!raw) return null;
+  let target = null;
+  if (!raw.hasSecondPart) {
+    // `content="5"` names THIS page — the same loop written shorter (§24.4).
+    target = rec.outputPath;
+  } else if (raw.url !== null) {
+    const url = decodeEntities(raw.url);
+    const stripped = base ? stripBaseUrl(url, base) : url;
+    const resolved = resolveReference(stripped, rec.outputPath);
+    if (resolved !== null && byOutputPath.has(resolved)) target = resolved;
+  }
+  // Everything else stays null, including a second part §12 declined to read:
+  // `content="0; /gone.html"` declares a redirect SOMEWHERE, and calling it a
+  // self-redirect would make §24.4 report a loop the page does not contain.
+  return { raw: raw.raw, seconds: raw.seconds, url: raw.url, target };
 }
 
 /**
@@ -584,6 +634,11 @@ export function buildManifest({ pages, base = null }) {
         }
       }
     }
+    // §20.11 — the redirect's target, resolved exactly the way `linksOut`
+    // resolves a link: the same `stripBaseUrl` + `resolveReference` pair, so a
+    // redirect and an <a href> to one page can never name two different records.
+    rec.refresh = resolveRefresh(rec, base, byOutputPath);
+    delete rec._refresh;
     rec.linksOut = [...out].sort();
     rec.fragmentLinks = [...fragments.values()].sort((a, b) =>
       a.target === b.target ? (a.id < b.id ? -1 : a.id > b.id ? 1 : 0) : a.target < b.target ? -1 : 1);

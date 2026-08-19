@@ -1,5 +1,5 @@
 /**
- * §24 `unify audit` — AUD-01..08.
+ * §24 `unify audit` — AUD-01..09, AUD-11 and AUD-12.
  *
  * The command's whole contract is that it decides nothing. Most of what is
  * asserted below is therefore a *restraint*: it writes nothing, it never
@@ -1253,4 +1253,241 @@ test("DIA-01: a value carrying a newline is escaped, not collapsed", async () =>
     throw new Error(`§14.1: a space is a different string from a newline.\nstderr:\n${r.stderr}`);
   }
   covers("DIA-01");
+}, TEST_MS);
+
+// ------------------------------------------------------------------- §24.4
+
+test("AUD-11: the sitemap robots.txt promises and this build never wrote is a finding, not silence", async () => {
+  // §23.3's exemption keeps `Sitemap: /sitemap.xml` out of the PUBLISH PATH
+  // without --base-url, because the author's line is right for the deployed
+  // site. Its stated limit is a site that never passes the flag: it promises a
+  // file it will never have, and both commands used to say nothing about it.
+  const files = { "index.html": page("Home"), "robots.txt": "User-agent: *\nSitemap: /sitemap.xml\n" };
+
+  const built = mkTmp();
+  writeTree(join(built, "src"), files);
+  const b = await runCli(["build", "-s", "src", "-o", "dist"], built);
+  expectExit(b, 0, "the exemption still stands for build");
+  if (b.stderr.trim() !== "") {
+    throw new Error(`§23.3: the finding must not reintroduce the block.\nstderr:\n${b.stderr}`);
+  }
+  if (existsSync(join(built, "dist", "sitemap.xml"))) {
+    throw new Error("§21.1: no --base-url, so there is no sitemap — that is what the finding reports");
+  }
+
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), files);
+  const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
+  expectExit(r, 0, "an audit of the same tree");
+  expectFinding(r, "robots-sitemap-missing", "§24.4: §23.3's residual is reported here");
+  if (!/^robots\.txt: incomplete: /m.test(r.stdout)) {
+    throw new Error(`§24.4: located at the source robots.txt, and incomplete.\nstdout:\n${r.stdout}`);
+  }
+  // The AUTHORED spelling. §23.1 rewrites no byte of this file, so the
+  // resolved `sitemap.xml` is a string the author's robots.txt does not hold.
+  if (!r.stdout.includes('"/sitemap.xml"')) {
+    throw new Error(`§23.1: the evidence quotes the line the author typed.\nstdout:\n${r.stdout}`);
+  }
+  // The count line pins the severity, and pins that nothing else fired.
+  if (!r.stdout.includes("audit: 0 broken, 1 incomplete")) {
+    throw new Error(`§24.3: absent is not wrong — the markup is right.\nstdout:\n${r.stdout}`);
+  }
+
+  const strict = mkTmp();
+  writeTree(join(strict, "src"), files);
+  const s = await runCli(["audit", "-s", "src", "-o", "dist", "--strict"], strict);
+  expectExit(s, 1, "§24.6: --strict gates on any finding of either severity");
+  covers("AUD-11");
+}, TEST_MS);
+
+test("AUD-11: it is the exemption's residual — never a second predicate over the tree", async () => {
+  const files = { "index.html": page("Home"), "robots.txt": "User-agent: *\nSitemap: /sitemap.xml\n" };
+
+  // (a) Supply the address and §21 writes the file: the line resolves, and
+  // there is nothing absent to report. A `broken` a flag repairs is not broken.
+  const addressed = mkTmp();
+  writeTree(join(addressed, "src"), files);
+  const a = await runCli(["audit", "-s", "src", "-o", "dist", "--base-url", BASE], addressed);
+  expectExit(a, 0, "the identical bytes with an address supplied");
+  expectNoFinding(a, "robots-sitemap-missing", "§21.1: the sitemap exists, so the promise is kept");
+  const built = mkTmp();
+  writeTree(join(built, "src"), files);
+  await runCli(["build", "-s", "src", "-o", "dist", "--base-url", BASE], built);
+  if (!existsSync(join(built, "dist", "sitemap.xml"))) {
+    throw new Error("§21.1: --base-url generates the file the robots.txt line names");
+  }
+
+  // (b) The author's own sitemap.xml, mirror-copied, with no --base-url. The
+  // check returns before the exemption is ever consulted, so a finding here
+  // would be a second predicate disagreeing with the branch it claims to follow.
+  const authored = mkTmp();
+  writeTree(join(authored, "src"), {
+    ...files,
+    "sitemap.xml": '<?xml version="1.0" encoding="UTF-8"?>\n'
+      + '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+      + "<url><loc>https://example.com/</loc></url>\n</urlset>\n",
+  });
+  const bBuild = await runCli(["build", "-s", "src", "-o", "dist"], authored);
+  expectExit(bBuild, 0, "a hand-written sitemap.xml the site emits");
+  const b = await runCli(["audit", "-s", "src", "-o", "dist"], authored);
+  expectExit(b, 0, "the same tree audited");
+  expectNoFinding(b, "robots-sitemap-missing", "§23.3: the file is emitted — the line resolves");
+
+  // (c) Anything else the site does not emit stays P13, the stronger answer.
+  const other = mkTmp();
+  writeTree(join(other, "src"), {
+    "index.html": page("Home"),
+    "robots.txt": "User-agent: *\nSitemap: /feeds/all.xml\n",
+  });
+  const c = await runCli(["audit", "-s", "src", "-o", "dist"], other);
+  expectExit(c, 1, "§24.6: a pipeline problem exits 1 whatever the findings say");
+  if (!c.stderr.includes("/feeds/all.xml")) {
+    throw new Error(`§23.3: P13 still names the value.\nstderr:\n${c.stderr}`);
+  }
+  expectNoFinding(c, "robots-sitemap-missing", "§24.4: no second mechanism for what §12 settles");
+  covers("AUD-11");
+}, TEST_MS);
+
+test("AUD-11: one finding per exempted line, and none without the site's address", async () => {
+  // An ABSOLUTE Sitemap: with no --base-url is skipped exactly as §23.3 skips
+  // it: with no address, unify cannot say that URL names this site's sitemap
+  // at all — the same narrowing the two canonical findings take (AUD-06).
+  const absolute = mkTmp();
+  writeTree(join(absolute, "src"), {
+    "index.html": page("Home"),
+    "robots.txt": "User-agent: *\nSitemap: https://example.com/sitemap.xml\n",
+  });
+  const a = await runCli(["audit", "-s", "src", "-o", "dist"], absolute);
+  expectExit(a, 0, "an absolute Sitemap: with no address to compare it against");
+  expectNoFinding(a, "robots-sitemap-missing", "§23.3: another origin, as far as this build can tell");
+
+  // Two promises, two findings, in the file's own line order. Reporting the
+  // file once hides the second behind a fix that clears the first.
+  const two = mkTmp();
+  writeTree(join(two, "src"), {
+    "index.html": page("Home"),
+    "robots.txt": "Sitemap: /sitemap.xml\nSitemap: /sitemap-2.xml\n",
+  });
+  const bBuild = await runCli(["build", "-s", "src", "-o", "dist"], two);
+  expectExit(bBuild, 0, "§21.4's split paths are exempted too");
+  const b = await runCli(["audit", "-s", "src", "-o", "dist"], two);
+  expectExit(b, 0, "the same tree audited");
+  const lines = b.stdout.split("\n").filter((l) => l.includes("[robots-sitemap-missing]"));
+  if (lines.length !== 2) {
+    throw new Error(`§24.4: one finding per exempted line.\nstdout:\n${b.stdout}`);
+  }
+  if (!lines[0].includes('"/sitemap.xml"') || !lines[1].includes('"/sitemap-2.xml"')) {
+    throw new Error(`§24.4: the file's own line order.\n${lines.join("\n")}`);
+  }
+  if (!b.stdout.includes("audit: 0 broken, 2 incomplete")) {
+    throw new Error(`§24.5: both are counted.\nstdout:\n${b.stdout}`);
+  }
+  covers("AUD-11");
+}, TEST_MS);
+
+// ------------------------------------------------------------- §24.4 (scheme)
+
+test("AUD-12: an http canonical on an https site — the finding nothing else raises", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    ...linked(["About"]),
+    "about.html": page("About", '<p>Words about About.</p><a href="/">Home</a>').replace(
+      "<head>", '<head>\n<link rel="canonical" href="http://example.com/about.html">'),
+  });
+  // The gap this closes, pinned two-sided: the BUILD is silent and must stay
+  // silent. §12 strips the base by HOST, so the value is checked as the path
+  // `/about.html`, resolves, and passes; §21.2 calls the page self-canonical
+  // and lists it. Both are correct and neither is changed by this finding.
+  const b = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", BASE], tmp);
+  expectExit(b, 0, "an http canonical under an https base url");
+  const sitemap = readFileSync(join(tmp, "dist", "sitemap.xml"), "utf8");
+  if (!sitemap.includes("<loc>https://example.com/about.html</loc>")) {
+    throw new Error(`§24.4: the page stays self-canonical and stays listed:\n${sitemap}`);
+  }
+
+  const r = await runCli(["audit", "-s", "src", "-o", "dist", "--base-url", BASE], tmp);
+  expectExit(r, 0, "the audit of the same site");
+  expectFinding(r, "canonical-scheme-mismatch", "§24.4");
+  const lines = r.stdout.split("\n");
+  const i = lines.findIndex((l) => l.includes("[canonical-scheme-mismatch]"));
+  if (!/: broken: /.test(lines[i])) {
+    throw new Error(`§24.3: one build publishing two addresses for one page is a contradiction: ${lines[i]}`);
+  }
+  for (const u of ['"http://example.com/about.html"', '"https://example.com/about.html"']) {
+    if (!lines[i].includes(u)) throw new Error(`§24.5: the evidence quotes both addresses: ${lines[i]}`);
+  }
+  if (!lines[i + 1].includes('"https://example.com/about.html"')) {
+    throw new Error(`§24.5: the fix names the page's own URL: ${lines[i + 1]}`);
+  }
+
+  // Symmetric: unify does not decide which scheme a site should use, it observes
+  // that the page and the address the author supplied name different ones.
+  const rev = mkTmp();
+  writeTree(join(rev, "src"), {
+    ...linked(["About"]),
+    "about.html": page("About", '<p>Words about About.</p><a href="/">Home</a>').replace(
+      "<head>", '<head>\n<link rel="canonical" href="https://example.com/about.html">'),
+  });
+  const v = await runCli(["audit", "-s", "src", "-o", "dist", "--base-url", "http://example.com/"], rev);
+  expectExit(v, 0, "an https canonical under an http base url");
+  expectFinding(v, "canonical-scheme-mismatch", "§24.4: the rule is disagreement, not a preference");
+  covers("AUD-12");
+}, TEST_MS);
+
+test("AUD-12: the schemes are parsed — an uppercase scheme and a default port are still http", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    ...linked(["About", "Contact"]),
+    "about.html": page("About", '<p>Words about About.</p><a href="/">Home</a>').replace(
+      "<head>", '<head>\n<link rel="canonical" href="HTTP://EXAMPLE.COM/about.html">'),
+    "contact.html": page("Contact", '<p>Words about Contact.</p><a href="/">Home</a>').replace(
+      "<head>", '<head>\n<link rel="canonical" href="http://example.com:80/contact.html">'),
+  });
+  const r = await runCli(["audit", "-s", "src", "-o", "dist", "--base-url", BASE], tmp);
+  expectExit(r, 0, "an uppercase scheme and a default port");
+  const files = r.stdout.split("\n").filter((l) => l.includes("[canonical-scheme-mismatch]"))
+    .map((l) => l.split(":")[0]).sort();
+  if (files.join(",") !== "about.html,contact.html") {
+    throw new Error(`§24.4: RFC 3986 §3.1 — a scheme is case-insensitive, and :80 is http's default port.\nreported: ${files.join(", ")}\nstdout:\n${r.stdout}`);
+  }
+  covers("AUD-12");
+}, TEST_MS);
+
+test("AUD-12: a canonical with no scheme of its own, or one unify cannot compare, says nothing", async () => {
+  const tmp = mkTmp();
+  const withCanonical = (name, href) =>
+    page(name, `<p>Words about ${name}.</p><a href="/">Home</a>`).replace(
+      "<head>", `<head>\n<link rel="canonical" href="${href}">`);
+  writeTree(join(tmp, "src"), {
+    ...linked(["Protocol", "Ftp", "Root", "Other"]),
+    // Borrows the page's scheme: right at either address.
+    "protocol.html": withCanonical("Protocol", "//example.com/protocol.html"),
+    // A scheme unify has no basis for calling wrong.
+    "ftp.html": withCanonical("Ftp", "ftp://example.com/ftp.html"),
+    // §11.3 absolutizes this with the base's OWN origin — it cannot mismatch.
+    "root.html": withCanonical("Root", "/root.html"),
+    // Another host: `elsewhere`, and another site's scheme is not this site's
+    // business — canonical-noindex and sitemap-canonical-disagree own that shape.
+    "other.html": withCanonical("Other", "http://syndication.example/copy"),
+  });
+  const r = await runCli(["audit", "-s", "src", "-o", "dist", "--base-url", BASE], tmp);
+  expectExit(r, 0, "canonicals with nothing comparable");
+  expectNoFinding(r, "canonical-scheme-mismatch", "§24.4");
+
+  // No address, no scheme to compare against.
+  const n = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
+  expectExit(n, 0, "no --base-url");
+  expectNoFinding(n, "canonical-scheme-mismatch", "§24.4: unify does not know where the site lives");
+
+  // A --base-url that is itself neither http nor https: the flag accepts any
+  // scheme that has a host, and under one neither side can be called wrong.
+  const ftp = mkTmp();
+  writeTree(join(ftp, "src"), {
+    ...linked(["About"]),
+    "about.html": withCanonical("About", "http://example.com/about.html"),
+  });
+  const f = await runCli(["audit", "-s", "src", "-o", "dist", "--base-url", "ftp://example.com/"], ftp);
+  expectExit(f, 0, "a non-web base url");
+  expectNoFinding(f, "canonical-scheme-mismatch", "§24.4: both sides must be the web's two schemes");
+  covers("AUD-12");
 }, TEST_MS);

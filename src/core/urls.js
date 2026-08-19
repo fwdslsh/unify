@@ -443,6 +443,98 @@ export function isUrlValuedMeta(el) {
 }
 
 /**
+ * `<meta http-equiv="refresh">`, ASCII case-insensitive and whitespace-tolerant
+ * — an author writes `HTTP-EQUIV="Refresh"` as readily as the lowercase form,
+ * and a redirect that escaped every check because of its spelling is the fault
+ * this whole path exists to close.
+ * @param {import('./html.js').ElementNode} el
+ * @returns {boolean}
+ */
+export function isRefreshMeta(el) {
+  if (!isElement(el, "meta")) return false;
+  const v = getAttr(el, "http-equiv");
+  return typeof v === "string" && v.trim().toLowerCase() === "refresh";
+}
+
+/** ASCII whitespace, the only whitespace §12's refresh grammar recognises. */
+const REFRESH_WS = /[ \t\n\f\r]/;
+
+/**
+ * §12's refresh grammar, read ONCE for the whole build: §11.1/§11.2/§11.3
+ * rewrite this URL, §12 checks it, and §20.11 records it. Three readers of one
+ * compound attribute value would be three chances for the checked URL, the
+ * rewritten URL, and the reported URL to be different strings — the two-readings
+ * defect product-spec §6.2 forbids, arriving inside a single attribute.
+ *
+ * `start`/`end` are ABSOLUTE document offsets of the URL itself — not of the
+ * attribute — so a rewrite replaces the URL and leaves the `0; url=` the author
+ * wrote alone, and a diagnostic lands inside the text that actually wrote the
+ * URL (§14.1).
+ *
+ * `hasSecondPart` is what keeps §20.11 honest about `content="0; /bare.html"`:
+ * that value declares a redirect this grammar does not read, which is UNKNOWN
+ * and never "this page" — folding it into self would make §24.4 report a loop
+ * the page does not contain.
+ * @param {import('./html.js').ElementNode} el
+ * @returns {{raw:string, seconds:number, url:string|null, start:number|null,
+ *            end:number|null, hasSecondPart:boolean}|null} null when the element
+ *   is not a refresh meta, or its `content` has no leading digits and so
+ *   declares no refresh at all (§12)
+ */
+export function parseRefreshMeta(el) {
+  if (!isRefreshMeta(el)) return null;
+  // One `content` attribute, one reader. An element spelling BOTH readings —
+  // `http-equiv="refresh"` beside `name="twitter:image"` — is markup no consumer
+  // acts on either way, but two readers of one attribute pushed two overlapping
+  // edits into `applyEdits`, which throws: an unlocated fatal out of §11, a
+  // category §14 does not have. The metas' reading is the older one and keeps
+  // the attribute, so nothing that worked before this function existed changes.
+  if (isUrlValuedMeta(el)) return null;
+  const content = getAttrNode(el, "content");
+  if (!content || typeof content.value !== "string") return null;
+  const value = content.value;
+  let i = 0;
+  while (i < value.length && REFRESH_WS.test(value[i])) i++;
+  const digitsAt = i;
+  while (i < value.length && value[i] >= "0" && value[i] <= "9") i++;
+  if (i === digitsAt) return null; // no leading digits: declares no refresh (§12)
+  const seconds = Number(value.slice(digitsAt, i));
+  // A fractional part is SKIPPED rather than read: `0.5` is still no delay a
+  // reader can read a page in, and inventing a float here would put a number in
+  // the record that §24.4's "zero is the absence of a delay" cannot reason about.
+  if (value[i] === ".") { i++; while (i < value.length && value[i] >= "0" && value[i] <= "9") i++; }
+  while (i < value.length && REFRESH_WS.test(value[i])) i++;
+  const noUrl = { raw: value, seconds, url: null, start: null, end: null, hasSecondPart: false };
+  if (i >= value.length) return noUrl; // `content="5"` — no second part: §20.11 reads it as this page
+  if (value[i] !== ";" && value[i] !== ",") return { ...noUrl, hasSecondPart: true };
+  i++;
+  while (i < value.length && REFRESH_WS.test(value[i])) i++;
+  if (!/^url/i.test(value.slice(i))) return { ...noUrl, hasSecondPart: true };
+  i += 3;
+  while (i < value.length && REFRESH_WS.test(value[i])) i++;
+  if (value[i] !== "=") return { ...noUrl, hasSecondPart: true };
+  i++;
+  while (i < value.length && REFRESH_WS.test(value[i])) i++;
+  const rest = value.slice(i);
+  const quote = rest[0] === '"' || rest[0] === "'" ? rest[0] : null;
+  if (quote !== null) i++;
+  const tail = value.slice(i);
+  const stop = quote !== null
+    ? (tail.indexOf(quote) === -1 ? tail.length : tail.indexOf(quote))
+    : (REFRESH_WS.exec(tail)?.index ?? tail.length);
+  const url = tail.slice(0, stop);
+  if (url === "") return { ...noUrl, hasSecondPart: true };
+  return {
+    raw: value,
+    seconds,
+    url,
+    start: content.valueStart + i,
+    end: content.valueStart + i + url.length,
+    hasSecondPart: true,
+  };
+}
+
+/**
  * Rewrite every `href`/`src`/`srcset`/`poster` URL in `composedHtml`
  * (already include-inlined and layout-composed) per §11.1's per-URL
  * branching. `url()` in `<style>`/`style=` is deliberately never reached
@@ -515,6 +607,17 @@ export function rewriteProvenanceUrls(composedHtml, { provenanceOf, pageFile, pa
         const next = rewriteOne(content.value, el.start);
         if (next !== null) edits.push({ start: content.valueStart, end: content.valueEnd, replacement: next });
       }
+    }
+    // A refresh URL is an address in an attribute unify parses, so provenance
+    // governs it exactly as it governs the <a href> beside it. Left alone, a
+    // layout's `content="0; url=target.html"` resolved against each CONSUMING
+    // page — /target.html from the root and /deep/target.html from deep/ — so
+    // one authored redirect sent readers to two different pages, and because
+    // both files existed no check anywhere could see the difference.
+    const refresh = parseRefreshMeta(el);
+    if (refresh?.url) {
+      const next = rewriteOne(refresh.url, el.start);
+      if (next !== null) edits.push({ start: refresh.start, end: refresh.end, replacement: next });
     }
   }
   return applyEdits(composedHtml, edits);
@@ -644,6 +747,15 @@ export function applyPrettyLinks(html, { pageOutputPath, emittedHtmlPaths }) {
       const rewritten = rewriteSrcsetValue(srcset.value, rewriteOne);
       if (rewritten !== srcset.value) edits.push({ start: srcset.valueStart, end: srcset.valueEnd, replacement: rewritten });
     }
+    // §11.2 — a refresh URL is transformed like a link because it is one: a
+    // redirect to /about.html in a build that emits about/index.html names a
+    // file this build never wrote, and §12 would then block the publish over a
+    // spelling that was right.
+    const refresh = parseRefreshMeta(el);
+    if (refresh?.url) {
+      const pretty = rewriteOne(refresh.url);
+      if (pretty !== null) edits.push({ start: refresh.start, end: refresh.end, replacement: pretty });
+    }
   }
   return applyEdits(html, edits);
 }
@@ -654,6 +766,7 @@ export function applyPrettyLinks(html, { pageOutputPath, emittedHtmlPaths }) {
  * @typedef {object} BaseUrlConfig
  * @property {string} pathPrefix - always starts and ends with "/"
  * @property {string} origin - scheme+authority (e.g. "https://example.com")
+ * @property {string} scheme - the scheme with its colon ("https:"), lowercased by the parse
  */
 
 /**
@@ -682,7 +795,11 @@ export function parseBaseUrl(raw) {
   // one prefix that has to hold that true, not the check.
   path = path.replace(/^\/+/, "/");
   if (!path.endsWith("/")) path += "/";
-  return { origin: u.origin, pathPrefix: path };
+  // `scheme` is stored, not re-derived. §24.4's canonical-scheme-mismatch needs
+  // it, and every re-derivation (`origin.split(":")[0]`, a second `new URL`)
+  // would be a second reading of one flag — the shape product-spec §6.1 forbids
+  // for URLs, arriving by the door nobody watches because the two agree today.
+  return { origin: u.origin, pathPrefix: path, scheme: u.protocol };
 }
 
 function isOgOrTwitterMeta(el) {
@@ -768,6 +885,15 @@ export function applyBaseUrl(html, base) {
         const next = prefixRootRelative(content.value, base, true);
         if (next !== content.value) edits.push({ start: content.valueStart, end: content.valueEnd, replacement: next });
       }
+    }
+    // The path prefix and never the origin: a redirect is fetched by the
+    // browser that already has the page, like an href and unlike a canonical.
+    // Without the prefix a root-relative redirect at a subpath deploy address
+    // leaves the site entirely, from a value that resolves in the output tree.
+    const refresh = parseRefreshMeta(el);
+    if (refresh?.url && isRootRelative(refresh.url)) {
+      const next = prefixRootRelative(refresh.url, base, false);
+      if (next !== refresh.url) edits.push({ start: refresh.start, end: refresh.end, replacement: next });
     }
   }
   return applyEdits(html, edits);

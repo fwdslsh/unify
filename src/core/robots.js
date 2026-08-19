@@ -81,8 +81,14 @@ function parseRobots(text) {
  * @param {Set<string>} args.emittedPaths
  * @param {import('./urls.js').BaseUrlConfig|null} args.base
  * @param {import('./diagnostics.js').Reporter} args.reporter
+ * @returns {{file: string, value: string}[]} the `Sitemap:` declarations this
+ *   check DECLINED to report under the exemption below. §24.4's
+ *   `robots-sitemap-missing` fires on exactly these, and is handed them from
+ *   here rather than reading the file a second time (§23.3).
  */
 export function checkRobots({ text, file, emittedPaths, base, reporter }) {
+  /** @type {{file: string, value: string}[]} */
+  const exempted = [];
   for (const record of parseRobots(text)) {
     if (record.field !== "sitemap" || record.value === "") continue;
     const stripped = base ? stripBaseUrl(record.value, base) : record.value;
@@ -96,7 +102,22 @@ export function checkRobots({ text, file, emittedPaths, base, reporter }) {
     // and blocking on it broke `unify build` and `unify dev` for a correct
     // site, under a fix line pointing at a spelling that was already right.
     // §21.1's own compatibility principle, applied in the other direction.
-    if (base === null && GENERATED_SITEMAP.test(resolved)) continue;
+    if (base === null && GENERATED_SITEMAP.test(resolved)) {
+      // The residual §23.3 names is silence in the PUBLISH PATH only: `unify
+      // audit` reports every line taken here, and it is handed the line from
+      // this branch. Skipping and reporting are then one decision, so no second
+      // reader of this file can disagree with this one about which lines those
+      // are. §24.4's own base-prefix-strip exclusion records what a second
+      // interpretation of an already-answered URL question costs — the two
+      // readings agree on every ordinary spelling and part on exactly the
+      // inputs that decide the answer — and a line the check skipped and the
+      // evaluator also skipped is a promise examined by nobody.
+      //
+      // The AUTHORED value, never `resolved` or `stripped`: §23.1 rewrites no
+      // byte of this file, so those are strings the author cannot grep for.
+      exempted.push({ file, value: record.value });
+      continue;
+    }
     reporter.problem({
       file,
       line: record.line,
@@ -105,4 +126,5 @@ export function checkRobots({ text, file, emittedPaths, base, reporter }) {
       fixes: [CHECK_SPELLING],
     });
   }
+  return exempted;
 }

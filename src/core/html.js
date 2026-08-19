@@ -378,6 +378,24 @@ export function innerText(text, el) {
 }
 
 /**
+ * True for `<script type="application/ld+json">`, case- and parameter-tolerant.
+ *
+ * It lives here, in the leaf both readers already import, because §12
+ * (references.js) and §20.8 (manifest.js) must agree about which blocks are
+ * structured data: two copies could disagree about a `; charset=utf-8`
+ * parameter or an uppercase spelling, and the disagreement would be silent in
+ * both — the checker skipping a block the manifest reports on, or the reverse.
+ * `JSON.parse` is deterministic and may be called by either.
+ * @param {Node} el
+ * @returns {boolean}
+ */
+export function isJsonLdScript(el) {
+  if (!isElement(el, "script")) return false;
+  const type = getAttr(el, "type");
+  return typeof type === "string" && type.trim().toLowerCase().split(";")[0] === "application/ld+json";
+}
+
+/**
  * @param {string} text
  * @param {number} index - 0-based offset into text
  * @returns {number} 1-based line number

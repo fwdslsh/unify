@@ -32,7 +32,8 @@
  * publish path; `unify audit --strict` is the opt-in gate.
  */
 
-import { classifyCanonical } from "./sitemap.js";
+import { jsonLdReferences } from "./references.js";
+import { canonicalSchemeMismatch, classifyCanonical } from "./sitemap.js";
 
 /**
  * @typedef {object} Finding
@@ -84,6 +85,47 @@ import { classifyCanonical } from "./sitemap.js";
  */
 const SINGLE_VALUED = new Set(["canonical", "title", "description", "lang"]);
 
+/**
+ * §24.4 — the immediate-refresh chain starting at `record`, when it returns to
+ * `record`; null when it does not.
+ *
+ * A page declares at most one `refresh` (§20.11), so out-degree is one and a
+ * visited-set walk decides the question — an SCC pass would be machinery for a
+ * graph that cannot branch.
+ *
+ * `seconds === 0` is the whole condition, and it is not one of the thresholds
+ * §24.4 forbids: zero is the ABSENCE of a delay, not a small quantity of one. A
+ * chain of immediate refreshes never presents a readable page to anybody, while
+ * a delayed chain is an ordinary pattern — a kiosk rotating three pages, a page
+ * that re-reads itself every thirty seconds — and reporting those would call a
+ * feature a fault.
+ * @param {import('./manifest.js').PageRecord} record
+ * @param {Map<string, import('./manifest.js').PageRecord>} byOutputPath
+ * @returns {import('./manifest.js').PageRecord[]|null} the chain, starting and
+ *   ending at `record`
+ */
+function redirectChain(record, byOutputPath) {
+  const immediate = (r) =>
+    (r.refresh !== null && r.refresh.seconds === 0 && r.refresh.target !== null ? r.refresh.target : null);
+  const chain = [record];
+  const seen = new Set([record.outputPath]);
+  let current = record;
+  for (;;) {
+    const next = immediate(current);
+    if (next === null) return null;
+    const target = byOutputPath.get(next);
+    if (target === undefined) return null; // §20.11 already refuses to resolve this
+    chain.push(target);
+    if (next === record.outputPath) return chain;
+    // A cycle THIS page merely feeds into is not this page's loop: the pages on
+    // it report it themselves, and every one of them prints the chain its own
+    // author will follow.
+    if (seen.has(next)) return null;
+    seen.add(next);
+    current = target;
+  }
+}
+
 /** Normalize a heading or title for comparison — case and whitespace only. */
 const norm = (s) => s.toLowerCase().replace(/\s+/g, " ").trim();
 
@@ -111,9 +153,14 @@ const foldSpaces = (s) => s.replace(/\s+/g, " ").trim();
  * @param {import('./urls.js').BaseUrlConfig|null} args.base
  * @param {Map<string, string>} [args.sitemapLocs] - output path -> the sitemap
  *   file that lists it, for the discovery-artifact comparisons
+ * @param {{file: string, value: string}[]} [args.exemptedSitemaps] - the
+ *   `Sitemap:` declarations §23.3's exemption skipped, handed over by the branch
+ *   that skipped them — never a second read of `robots.txt`
  * @returns {Finding[]} ordered by source path, then by finding id
  */
-export function auditManifest({ records, byOutputPath, base = null, sitemapLocs = new Map() }) {
+export function auditManifest({
+  records, byOutputPath, base = null, sitemapLocs = new Map(), exemptedSitemaps = [],
+}) {
   /** @type {Finding[]} */
   const out = [];
   const add = (record, id, severity, evidence, fix) =>
@@ -277,6 +324,50 @@ export function auditManifest({ records, byOutputPath, base = null, sitemapLocs 
       }
     }
 
+    // ---- redirect chains ---------------------------------------------------
+    const chain = redirectChain(record, byOutputPath);
+    if (chain !== null) {
+      add(record, "redirect-loop", "broken",
+        `the page declares content=${JSON.stringify(record.refresh.raw)} and the chain returns to it: ` +
+        `${chain.map((r) => r.sourcePath).join(" → ")}`,
+        "point one redirect on that chain at a page that stays, or remove it — a reader who follows it never arrives");
+    }
+
+    // ---- structured data at a subpath deploy address -----------------------
+    // §11 never rewrites a URL inside JSON-LD (§11.1), so a root-relative value
+    // resolves in the output tree and passes §12 while naming the ORIGIN's root
+    // at the deploy address. The values are §12's own — `jsonLdReferences` is
+    // the single reader, so a value reported here is one the reference check
+    // accepted as a locator (a URL-valued property's), never a string that
+    // merely looked like a path: telling an author to prefix an `@id` or a URI
+    // template would be advice about a value that is not an address.
+    //
+    // The site's own path prefix is the WHOLE test, and it is one question with
+    // one owner. A second gate asking "did --base-url supply a path?" would be
+    // a different reading of the same fact that could only ever agree with this
+    // one: with no address, and at a root deploy, the prefix unify knows is "/"
+    // — §20.5's own convention — and every root-relative value already begins
+    // with it, so the loop says nothing without being told to.
+    const prefix = base === null ? "/" : base.pathPrefix;
+    const unprefixed = new Set();
+    for (const entry of record.jsonLd) {
+      if (entry.error !== null) continue; // §24.4's jsonld-invalid owns that page
+      for (const v of jsonLdReferences(entry.data)) {
+        // An author who wrote /repo/img/logo.png did by hand what §11.3 does
+        // for an href, and it is right at the address they named.
+        if (!v.startsWith(prefix)) unprefixed.add(v);
+      }
+    }
+    for (const v of [...unprefixed].sort()) {
+      // `base` is non-null here by construction: a value can only fail the test
+      // above under a prefix other than "/", which only --base-url produces.
+      const published = prefix + v.slice(1);
+      add(record, "jsonld-url-unprefixed", "broken",
+        `the structured data names ${JSON.stringify(v)}, which this site publishes at ${JSON.stringify(published)}`,
+        `write the full URL ${base.origin}${published}, or a value relative to the page` +
+        ` — a root-relative one resolves at the origin, above this site's own root`);
+    }
+
     // ---- social image ------------------------------------------------------
     // Only the dimensions. A share image naming no emitted file is already
     // P13 — §12 has checked `content` on every og:/twitter: meta since v0.7.0
@@ -336,6 +427,19 @@ export function auditManifest({ records, byOutputPath, base = null, sitemapLocs 
         `list the canonical URL instead, or remove this page from ${listedBy}`);
     }
 
+    // §24.4 — the scheme `classifyCanonical` excludes from its host comparison.
+    // The `self` inside it is what makes this a different fault from the two
+    // findings above rather than a second complaint about one line: this build
+    // publishes the page at record.url while the page nominates another address
+    // for itself. That contradiction is the whole severity, so it holds where
+    // no sitemap entry does — a noindex page and 404.html fire it and §21.2
+    // lists neither.
+    if (canonicalSchemeMismatch(record, base)) {
+      add(record, "canonical-scheme-mismatch", "broken",
+        `the canonical is ${JSON.stringify(record.canonical)} but this page's URL is ${JSON.stringify(record.url)}`,
+        `write the canonical as ${JSON.stringify(record.url)} — a canonical asks crawlers to consolidate on exactly the URL it names`);
+    }
+
     // ---- duplicated visible text -------------------------------------------
     // IDENTICAL, not "substantially similar". A similarity threshold is a
     // number nobody can justify, so unify does not have one.
@@ -347,6 +451,35 @@ export function auditManifest({ records, byOutputPath, base = null, sitemapLocs 
           "give the pages different content, or keep one and redirect the rest");
       }
     }
+  }
+
+  // ---- a sitemap robots.txt promises and this build never wrote -------------
+  // The one finding whose subject is not a page: it is located at the source
+  // `robots.txt` and carries no url, because there is no record to read. §23.3
+  // exempts `Sitemap: /sitemap.xml` from P13 when no --base-url told §21 where
+  // the site lives — the author's line is right for the deployed site, and
+  // blocking would fail a correct site over a flag they did not pass. This is
+  // that exemption's stated limit, reported where §23.4 assigns every judgement
+  // about intent.
+  //
+  // `incomplete`, not `broken`: the markup is right. Run the same audit with
+  // --base-url and the file exists, the line resolves, and nothing is reported
+  // — so what is absent is this run's output, not the author's line, and a
+  // `broken` that a command-line flag repairs is the accusation this catalogue
+  // has already withdrawn twice (§24.4).
+  //
+  // The values arrive from the branch that skipped them, so the exemption and
+  // the finding cannot disagree about which lines they are, and the quoted
+  // spelling is the author's own — §23.1 rewrites no byte of that file.
+  for (const { file, value } of exemptedSitemaps) {
+    out.push({
+      id: "robots-sitemap-missing",
+      severity: "incomplete",
+      file,
+      url: null,
+      evidence: `the Sitemap: line names ${JSON.stringify(value)}, and no file is emitted there — a sitemap is generated only under --base-url`,
+      fix: "build with --base-url, or add a sitemap.xml of your own at the source root",
+    });
   }
 
   return out.sort((a, b) =>

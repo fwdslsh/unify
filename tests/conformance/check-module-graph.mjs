@@ -18,59 +18,20 @@
  *
  * Exit 0 clean; 1 unreachable modules.
  */
-import { readFileSync, readdirSync, statSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import { reachableFrom, sourceFiles } from "../module-graph.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const SRC = join(ROOT, "src");
 const ENTRY = join(SRC, "cli.js");
 
-/** Every `.js` file under `src/**`, as absolute paths. */
-function allSourceFiles(dir) {
-  const out = [];
-  for (const name of readdirSync(dir)) {
-    const p = join(dir, name);
-    if (statSync(p).isDirectory()) out.push(...allSourceFiles(p));
-    else if (p.endsWith(".js")) out.push(p);
-  }
-  return out;
-}
-
-/**
- * Relative specifiers imported by one file. Covers the static forms the
- * codebase uses — `import … from "…"`, side-effect `import "…"`, and
- * `export … from "…"` — plus `import("…")` so a lazily loaded command still
- * counts as wired.
- */
-function importsOf(file) {
-  const src = readFileSync(file, "utf8");
-  const specs = [];
-  for (const re of [
-    /\bimport\s+[^;'"]*\sfrom\s*['"]([^'"]+)['"]/g,
-    /\bexport\s+[^;'"]*\sfrom\s*['"]([^'"]+)['"]/g,
-    /\bimport\s*['"]([^'"]+)['"]/g,
-    /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
-  ]) {
-    for (const m of src.matchAll(re)) specs.push(m[1]);
-  }
-  return specs.filter((s) => s.startsWith("."));
-}
-
-const reachable = new Set();
-const queue = [ENTRY];
-while (queue.length) {
-  const file = queue.pop();
-  if (reachable.has(file)) continue;
-  reachable.add(file);
-  for (const spec of importsOf(file)) {
-    const target = resolve(dirname(file), spec);
-    if (!target.startsWith(SRC)) continue;
-    queue.push(target);
-  }
-}
-
-const dead = allSourceFiles(SRC).filter((f) => !reachable.has(f));
+// The walk and the file sweep both come from tests/module-graph.mjs, which is
+// also what the test preflight uses. Two gates that answer "what does this file
+// import" from two copies of the same regexes can disagree about a specifier
+// form, and the disagreement is silent in both (testing-strategy §5).
+const reachable = reachableFrom([ENTRY], [SRC]);
+const dead = sourceFiles(SRC).filter((f) => !reachable.has(f));
 console.log(`module graph: ${reachable.size} reachable from src/cli.js`);
 if (dead.length) {
   console.error(`FAIL ${dead.length} unreachable module(s) under src/:`);

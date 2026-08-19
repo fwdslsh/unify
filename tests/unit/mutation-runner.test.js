@@ -262,11 +262,17 @@ describe("parseMutations", () => {
     expect(rows).toEqual([{ file: "src/a.js", id: "x-1", old: "foo", next: "bar", why: "because" }]);
   });
 
-  test("every committed row names a src file, an id, and the rule it defends", () => {
+  test("every committed row names a mutable file, an id, and the rule it defends", () => {
     const rows = parseMutations(readFileSync(new URL("../conformance/mutations.tsv", import.meta.url), "utf8"));
     expect(rows.length).toBeGreaterThan(20);
     for (const r of rows) {
-      expect(r.file).toStartWith("src/");
+      // Product source, or one of the two `bunfig.toml` preload guards, which
+      // decide whether the runner starts at all and are therefore code the
+      // suite has to prove it notices (testing-strategy §5). No other file
+      // under tests/ is admissible: mutating an ordinary test would score the
+      // sweep against its own assertions, where "the suite went red" says
+      // nothing about the product.
+      expect(r.file).toMatch(/^src\/|^tests\/(?:preflight|watchdog)\.mjs$/);
       expect(r.id).toMatch(/^[a-z]+-[a-z0-9-]+$/);
       expect(r.why.length).toBeGreaterThan(20); // a row without a rule is a mutation nobody can act on
       expect(r.old).not.toBe(r.next);

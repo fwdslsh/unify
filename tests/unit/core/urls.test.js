@@ -411,11 +411,11 @@ describe("parseBaseUrl", () => {
     expect(() => parseBaseUrl("coffee")).toThrow();
   });
   test("path is normalized to lead/trail slashes", () => {
-    expect(parseBaseUrl("https://x.example/coffee")).toEqual({ origin: "https://x.example", pathPrefix: "/coffee/" });
+    expect(parseBaseUrl("https://x.example/coffee")).toEqual({ origin: "https://x.example", pathPrefix: "/coffee/", scheme: "https:" });
   });
   test("full URL form: origin split from path", () => {
-    expect(parseBaseUrl("https://meridian.coffee/")).toEqual({ origin: "https://meridian.coffee", pathPrefix: "/" });
-    expect(parseBaseUrl("https://example.com/repo/")).toEqual({ origin: "https://example.com", pathPrefix: "/repo/" });
+    expect(parseBaseUrl("https://meridian.coffee/")).toEqual({ origin: "https://meridian.coffee", pathPrefix: "/", scheme: "https:" });
+    expect(parseBaseUrl("https://example.com/repo/")).toEqual({ origin: "https://example.com", pathPrefix: "/repo/", scheme: "https:" });
   });
 });
 
