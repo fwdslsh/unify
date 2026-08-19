@@ -73,6 +73,18 @@ import * as robots from "../../core/robots.js";
  * @param {boolean} [context.sourceDefaulted] - §4.4 EXC-11: true only when
  *   nothing chose the source root (no --source, no unify.yaml key, no src/)
  * @returns {Promise<number>}
+ *
+ * Two keys on `settings` are set by a command rather than by a flag, and both
+ * only select which of this one pipeline's tails runs: `audit` (§24, set by
+ * `audit.js`) and `onEvaluation` (§27, set by `dev.js`). Neither is parseable
+ * from the command line — `options.js` is the whole flag surface — and
+ * `unify build` and `unify watch` set neither, which is what keeps §24.7
+ * literally true of them: they never call the evaluator at all.
+ *
+ * `onEvaluation` rides on `settings` because `settings` is the one thing
+ * `watch.js` forwards to every rebuild it runs (`{...settings, clean: false}`),
+ * and `unify dev` IS `unify watch` plus a server — there is no other seam
+ * between the two that reaches a rebuild.
  */
 export async function build({ sourceRoot, output, settings, reporter, sourceDefaulted = false }) {
   const files = scanSourceTree(sourceRoot, output, settings.exclude, reporter);
@@ -490,20 +502,31 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
     );
   }
 
-  // ---- §24 — evaluation, for `unify audit` only. ---------------------------
-  // `build` never reaches this branch, which is §24.7 in one line: no finding
-  // can affect a build's output, its diagnostics, or its exit code. The
-  // pipeline above ran identically either way — that is what makes a finding a
-  // fact about the bytes the build would publish rather than about a cheaper
-  // approximation of them (§24.1).
-  if (settings.audit) {
-    const findings = auditManifest({
+  // ---- §24 — evaluation, for `unify audit` and `unify dev`. ----------------
+  // `unify build` and `unify watch` reach neither the call nor the branch
+  // below, which is §24.7 in one line: no finding can affect a build's output,
+  // its diagnostics, or its exit code. The pipeline above ran identically
+  // either way — that is what makes a finding a fact about the bytes the build
+  // would publish rather than about a cheaper approximation of them (§24.1).
+  //
+  // ONE call site, two readers: `unify audit`'s report (§24.5) and `unify
+  // dev`'s local audit view (§27.3). §27.5's "not a second audit" — no finding
+  // exists that only the view can raise, and none it shows is absent from
+  // `unify audit` — is held here by construction rather than by two
+  // implementations agreeing, which is the only way it can be held: a second
+  // predicate set would agree on every simple site and diverge on the first
+  // interesting one, unobserved, inside a development server.
+  const findings = settings.audit || settings.onEvaluation
+    ? auditManifest({
       records: manifest.records,
       byOutputPath: manifest.byOutputPath,
       base: baseConfig,
       sitemapLocs,
       exemptedSitemaps,
-    });
+    })
+    : null;
+
+  if (settings.audit) {
     reporter.summary(formatFindings(findings));
     // §24.6 — a pipeline problem exits 1 regardless: evaluating output that
     // cannot be built is meaningless, and the findings printed beside it
@@ -514,7 +537,12 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
   }
 
   // ---- §15 — transactional publish. ----------------------------------------
-  if (shouldPublish(reporter) && !settings.dryRun) {
+  // Named rather than inlined so the §27 sink at the end of this function can
+  // state whether this build reached the output directory without asking the
+  // question a second way. `publish()` records no diagnostic (its own PUB-01
+  // gate only declines), so the value cannot go stale between here and there.
+  const published = shouldPublish(reporter) && !settings.dryRun;
+  if (published) {
     if (settings.clean) await publishModule.performClean({ output, source: sourceRoot });
     await publishModule.publish({ tempFiles, outputDir: output, reporter });
   }
@@ -573,11 +601,7 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
     // validates against the output tree, which is correct and silent about
     // where that tree will live. This line is the one place the build says
     // out loud what it assumed.
-    reporter.summary(
-      baseConfig
-        ? `serving from ${baseConfig.origin}${baseConfig.pathPrefix}`
-        : "serving from / — the domain root (no --base-url)",
-    );
+    reporter.summary(addressLine(baseConfig));
 
     // §6.1 — anything that writes published output appears in --dry-run. The
     // sitemap gets a write row of its own; completion edits pages that already
@@ -618,7 +642,43 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
     }
   }
 
+  // ---- §27 — the local audit view's one source. ----------------------------
+  // Set only by `unify dev`. Everything the report is allowed to show is
+  // handed over here, at the end of the build that produced it: the §20
+  // manifest this build derived, the §24 findings computed at the single call
+  // site above, §17's own address line, and §14's diagnostics in the printed
+  // order and printed form (`file` already relocated to the working
+  // directory). §27.3's one-source rule is therefore a property of this call
+  // rather than a discipline the report has to keep — there is nothing in the
+  // payload the view could have re-read the site for, and product-spec §6.2's
+  // second interpretation has nowhere to appear.
+  //
+  // Fired last, after publish, so what the view describes is a build that
+  // finished (§27.4: never a half-assembled report). A rebuild that threw never
+  // reaches this line at all, which is exactly the signal `dev.js` reads to say
+  // so rather than leave a stale report looking current.
+  settings.onEvaluation?.({
+    records: manifest.records,
+    findings,
+    address: addressLine(baseConfig),
+    diagnostics: reporter.sorted(),
+    published,
+  });
+
   return reporter.exitCode;
+}
+
+/**
+ * §17's first line: the address the build assumed, stated once. Shared by the
+ * `--dry-run` report and §27's summary line so a reader cannot be shown two
+ * answers to "where does this site think it lives".
+ * @param {{origin: string, pathPrefix: string}|null} baseConfig
+ * @returns {string}
+ */
+function addressLine(baseConfig) {
+  return baseConfig
+    ? `serving from ${baseConfig.origin}${baseConfig.pathPrefix}`
+    : "serving from / — the domain root (no --base-url)";
 }
 
 /**

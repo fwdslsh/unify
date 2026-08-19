@@ -39,7 +39,7 @@ A finding is not a problem or an advisory. It answers a different question — *
 | | means |
 |---|---|
 | `broken` | the output contradicts itself, or the standard it claims to follow: a link to `#section` where no element has that id, an id declared twice, JSON-LD that does not parse, a page in the sitemap that tells crawlers not to index it. Wrong whatever was intended. |
-| `incomplete` | something is absent or inconsistent that you may have chosen: no description, no `lang`, two pages sharing a title, a page nothing links to. |
+| `incomplete` | something is absent or inconsistent that you may have chosen: no description, no `lang`, two pages sharing a title, a page nothing links to, a `tags:` or `categories:` key that built no collection. |
 
 ```
 $ unify audit
@@ -58,9 +58,17 @@ Worth knowing before you wire it up: **every `init` template passes `unify audit
 
 A finding is also never raised for something the build already refuses to publish. A canonical or an `og:image` naming a file the site does not emit is a *problem* — it blocks the publish outright, which is stronger than reporting it.
 
+One finding is about a key rather than a gap. `tags:` and `categories:` are allowed and become ordinary `<meta>` tags, but unify builds nothing from them — no index page, no archive, no feed of any term, no route — so a page declaring one collects `taxonomy-inert`, naming the keys and what did not happen. Nothing about the page is wrong, which is why it is `incomplete` rather than `broken`; write the index yourself with a script that runs before the build, or drop the key. The keys that are *not* allowed do not reach this command at all: `draft`, `permalink`, and `slug` in Markdown frontmatter are build problems (`unify build --dry-run` reports them), because each one, believed, publishes or addresses the wrong page.
+
 ### `unify dev`
 
 Build + watch + a static server on `localhost:<port>` (default 3000) serving the output directory, with live reload on every rebuild. The server is deliberately minimal and permanently so: static files, directory indexes, a 404 page, reload. No proxying, HTTPS, middleware, or config. The reload script is injected only into pages `dev` serves — it never exists in the output directory. While watching, a page that fails to build is served as an error page carrying the located diagnostics, replaced by the next successful rebuild.
+
+**`/_unify/` — the local audit view.** `dev` answers one path that is not a file. `http://localhost:3000/_unify/` is a report of the build that just ran: the counts and address line, then every `unify audit` finding grouped by page, then every page's record — output path, public URL, title, description, language, canonical, heading outline, links in and out, whether it is indexable — and then the build's own problems and advisories. A page with nothing wrong is listed too, because "did my metadata land" is the other half of the question.
+
+It is assembled in memory from the same manifest and the same finding list the command line reads, never a second reading of the site, so it cannot disagree with `unify audit`. **Nothing is written to `dist/`** and no script is added to a published page: a page fetched from `dist/` by a deploy or a `curl` is byte-identical whether or not `dev` ever ran, and `/_unify/` never appears in `--dry-run`. The reload stream that refreshes a page refreshes the report, so it follows every rebuild — including one that failed, whose diagnostics are how it tells you the site on disk is the previous build.
+
+No flag turns it on, off, or moves it; `--port` is the only choice about the server. `/_unify` redirects to `/_unify/`, and every other path beneath it is a 404 — the reservation is a promise about who answers, not an invitation to guess sub-pages. It is HTML for a person, not an API. Only `dev` serves it: `build` writes files, and `watch` has no server. The name has a leading underscore for a reason that is already a rule — a source path with one is excluded, and an emitted `_`-prefixed page or `_`-prefixed directory is a problem — so no site can emit `dist/_unify/anything`. The one output path that guard spares is a root-level non-page file named exactly `_unify` (the same seam that lets `_headers` ship): `dev` answers the reserved path regardless of what is on disk, so that one file is shadowed here and served normally by your host.
 
 ### `unify watch`
 

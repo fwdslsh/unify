@@ -352,6 +352,27 @@ export function auditManifest({
         `move it into <head> — in the page's own <head>, or the layout's if every page needs it`);
     }
 
+    // ---- taxonomy keys that build nothing (§28.2) ---------------------------
+    // The finding is a predicate over `record.taxonomyKeys` and reads no
+    // document: §20.3 already decided which of {tags, categories} the emitted
+    // HEAD declares, and asking the page again here would be the second reading
+    // of the site product-spec §6.2 forbids.
+    //
+    // `incomplete`, not `broken`: nothing about the page is wrong. A site may
+    // legitimately emit these for a consumer unify knows nothing about, so the
+    // evidence says what did NOT happen rather than accusing the markup — the
+    // absent thing is a mechanism the author may have been expecting, which is
+    // §24.3's own line for this severity. One finding per page, naming every
+    // key it declares, because "this page's taxonomy builds nothing" is one
+    // fact however many keys spell it.
+    if (record.taxonomyKeys.length) {
+      const declared = record.taxonomyKeys.map((k) => `<meta name="${k}">`).join(" and ");
+      add(record, "taxonomy-inert", "incomplete",
+        `the page declares ${declared}, and unify built nothing from ${record.taxonomyKeys.length > 1 ? "them" : "it"}: ` +
+        "no index page, no archive, no feed of any term, and no route",
+        "write the index yourself — a script that emits the page before the build — or drop the keys if nothing reads them");
+    }
+
     // ---- structured data ---------------------------------------------------
     for (const entry of record.jsonLd) {
       if (entry.error === null) continue;

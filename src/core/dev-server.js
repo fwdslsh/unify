@@ -13,14 +13,53 @@
  * `createDevServer` throws `UsageError` (exit 2, §14.1's fatal environment
  * fault) when the port is already bound, before anything else about `dev`
  * has started.
+ *
+ * ---
+ *
+ * §27.2 — THE ONE PATH THAT IS NOT A FILE, and why it needs no collision
+ * check. `/_unify/` and everything beneath it belong to this server. The
+ * reservation is enforced by a rule that already exists rather than a new one:
+ * §4.2 excludes a source path with a leading underscore, and an emitted
+ * `_`-prefixed page or `_`-prefixed directory segment is P14, which blocks the
+ * publish. A site therefore *cannot* emit `dist/_unify/anything` — every path
+ * under it carries such a segment — so nothing this report shadows below its
+ * own path is a file the site was able to publish. That is the whole reason
+ * the name has an underscore, and a reserved path that could shadow an
+ * author's file would have been a new rule to learn instead of the underscore
+ * convention read from the URL side.
+ *
+ * ONE output path is not held back, and §27.2 names it rather than repairing
+ * it: §4.2 deliberately spares root-level `_`-prefixed NON-PAGE files (the
+ * Netlify seam that ships `_headers` and `_redirects`), so a site built with
+ * an exclude set that spares them can emit a file named exactly `dist/_unify`.
+ * The redirect below answers `/_unify` regardless of what is on disk, so that
+ * one file is unreachable through this server and served by every static host.
+ *
+ * The defect the missing check prevents is a check that cannot fire: an "is
+ * there a real file at this path?" test here would read as a live safeguard,
+ * would take its other branch only for a file named `_unify`, and would invite
+ * a future reader to make the reservation configurable — while making who
+ * answers depend on the output directory's contents, which is the second rule
+ * the underscore convention exists to avoid. Do not add one. If
+ * `dist/_unify/` ever exists, the fault is upstream in §4.2's guard, and the
+ * repair belongs there.
+ *
+ * Exactly one path serves the report: `/_unify/`. `/_unify` redirects to it as
+ * any directory would, and any other path beneath it is a 404 from this server
+ * itself — the reservation is a promise about who answers, not an invitation
+ * to guess sub-pages.
  */
 import { readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import { UsageError } from "./diagnostics.js";
+import { renderPending } from "./dev-report.js";
 import { contains } from "./paths.js";
 
 /** Namespaced so a real site path can never collide with it. */
 export const RELOAD_PATH = "/__unify_reload__";
+
+/** §27.2 — the local audit view. The trailing slash is part of the path. */
+export const REPORT_PATH = "/_unify/";
 
 const RELOAD_SCRIPT =
   `<script>new EventSource(${JSON.stringify(RELOAD_PATH)}).onmessage=function(){location.reload();};</script>`;
@@ -112,11 +151,37 @@ function sseResponse(clients) {
  * @param {Request} req
  * @param {string} outputDir
  * @param {Set<() => void>} clients
+ * @param {() => string} report - the current §27 report, read at request time
+ *   so a request always gets the latest FINISHED one (§27.4)
  * @returns {Promise<Response>}
  */
-async function handleRequest(req, outputDir, clients) {
+async function handleRequest(req, outputDir, clients, report) {
   const url = new URL(req.url);
   if (url.pathname === RELOAD_PATH) return sseResponse(clients);
+
+  // §27.2, above. Answered before any filesystem lookup because the path is
+  // this server's, not the site's — and `report()` is a value already in
+  // memory, so the answer never waits on a rebuild (§27.4). The report carries
+  // the reload script like every other HTML response this server sends, which
+  // is what makes the same stream that refreshes a page refresh the report.
+  if (url.pathname === REPORT_PATH) {
+    return new Response(injectReloadScript(report()), {
+      headers: { "content-type": "text/html; charset=utf-8" },
+    });
+  }
+  // §27.2's directory redirect — "as any directory would" is the web's
+  // convention, not a symmetry with the static half below, which does not
+  // redirect at all: `resolveStaticFile` answers `/guides` and `/guides/`
+  // alike with `guides/index.html`. §27.2 mandates the redirect here anyway,
+  // because exactly one path serves the report. 302 rather than 301: a
+  // permanent redirect for a development-only path would outlive the process
+  // in the browser's cache.
+  if (url.pathname === REPORT_PATH.slice(0, -1)) {
+    return new Response(null, { status: 302, headers: { location: REPORT_PATH } });
+  }
+  // The same 404 every other missing path gets — this server has one 404
+  // behaviour, and a reserved path is not a reason to invent a second one.
+  if (url.pathname.startsWith(REPORT_PATH)) return notFoundResponse(outputDir);
 
   const filePath = resolveStaticFile(outputDir, decodeURIComponent(url.pathname));
   if (!filePath) return notFoundResponse(outputDir);
@@ -132,12 +197,20 @@ async function handleRequest(req, outputDir, clients) {
  * @param {object} args
  * @param {string} args.outputDir
  * @param {number} args.port
- * @returns {{url: string, port: number, notifyReload(): void, stop(): void}}
+ * @param {string} [args.report] - the §27 report served at `/_unify/`, replaced
+ *   by `setReport` after every rebuild. §27.4 requires a request arriving
+ *   before any build has completed to be *answered*, and requires that no
+ *   half-assembled report is ever served, so this server holds one finished
+ *   document from the moment it binds and swaps it whole. The default IS that
+ *   first answer — kept here rather than at the call site so the guarantee is
+ *   the server's own and cannot be lost by a caller that forgets it.
+ * @returns {{url: string, port: number, notifyReload(): void, setReport(html: string): void, stop(): void}}
  * @throws {UsageError} when the port is already in use (§14.1, exit 2)
  */
-export function createDevServer({ outputDir, port }) {
+export function createDevServer({ outputDir, port, report = renderPending() }) {
   /** @type {Set<() => void>} */
   const clients = new Set();
+  let currentReport = report;
   let server;
   try {
     server = Bun.serve({
@@ -154,7 +227,7 @@ export function createDevServer({ outputDir, port }) {
       // resolves "localhost" to 127.0.0.1 the same way, and `url` below
       // still reads that way.
       hostname: "127.0.0.1",
-      fetch: (req) => handleRequest(req, outputDir, clients),
+      fetch: (req) => handleRequest(req, outputDir, clients, () => currentReport),
     });
   } catch (err) {
     if (err && err.code === "EADDRINUSE") {
@@ -171,6 +244,15 @@ export function createDevServer({ outputDir, port }) {
     /** Tell every open reload connection to refresh. Called after every rebuild, success or failure. */
     notifyReload() {
       for (const send of clients) send();
+    },
+    /**
+     * §27.4 — the rebuild hands over a finished report. One assignment of one
+     * complete string: a request either gets the previous build's report or
+     * this one, never a document assembled halfway between them.
+     * @param {string} html
+     */
+    setReport(html) {
+      currentReport = html;
     },
     stop() {
       server.stop(true);

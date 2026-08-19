@@ -1203,7 +1203,7 @@
    "diagnostics": [],
    "diagnosticsExhaustive": true,
    "expectedTree": "expected",
-   "note": "draft:true publishes; date/permalink/slug/tags are inert plain metas; permalink does NOT move the output (dist/post.html). B6 closed (2026-08-12): §10.2 value serialization pinned exact — plain scalars as source text ('true', '2026-01-01', '0.50' keeps its zero), quoted scalars unquoted ('Colons: kept…'), empty value → content=\"\". The no-text-form firing twin is frontmatter-deep-nest (P17)."
+   "note": "date/featured/tags/note/weight/empty are inert plain metas — the page publishes and nothing is built from any of them (tags is AUD-15's taxonomy-inert in `audit`, never a diagnostic here). draft/permalink/slug LEFT this fixture on 2026-08-19: \u00a728.1 makes each of them P24, so a page carrying one no longer publishes at all; they are covered by tests/conformance/counter-prior.test.js. B6 closed (2026-08-12): §10.2 value serialization pinned exact — plain scalars as source text ('true', '2026-01-01', '0.50' keeps its zero), quoted scalars unquoted ('Colons: kept…'), empty value → content=\"\". The no-text-form firing twin is frontmatter-deep-nest (P17)."
   },
   "frontmatter-deep-nest": {
    "rules": [

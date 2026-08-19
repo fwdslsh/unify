@@ -95,6 +95,9 @@ import { stripBaseUrl, resolveReference } from "./references.js";
  * @property {DateValue|null} datePublished
  * @property {DateValue|null} dateModified
  * @property {string|null} schemaType
+ * @property {string[]} taxonomyKeys - §20.3/§28.2 — the sorted subset of the
+ *   closed set {tags, categories} the emitted head declares as `<meta name>`;
+ *   `[]` for a page declaring neither
  * @property {JsonLdEntry[]} jsonLd
  * @property {string[]} linksOut
  * @property {string[]} linksIn
@@ -347,6 +350,20 @@ function extract(page, base) {
   const published = new Field();
   const modified = new Field();
   const schemaType = new Field();
+  /**
+   * §20.3/§28.2 — the closed set {tags, categories}, as a SET of key names
+   * rather than a `Field` of values: what this records is which of the two the
+   * page declares, never what they say. The set is closed because a growable
+   * list of "names other generators use" is the unbounded reservation
+   * product-spec §6.3.9 refuses.
+   *
+   * A declaration with empty `content` counts, and that is the same rule §28.1
+   * states for its own half of the section: the key is the declaration, and no
+   * value is parsed. `tags:` with nothing after it emits `<meta name="tags"
+   * content="">`, and the author who wrote it believed just as firmly in a
+   * collection as the one who listed three terms.
+   */
+  const taxonomyKeys = new Set();
   const ogImage = new Field();
   const twitterImage = new Field();
   const ogWidth = new Field();
@@ -431,6 +448,12 @@ function extract(page, base) {
       // across two tags is a documented spelling of one policy.
       else if (name === "robots") robotsAll.push(nonEmpty(content));
       else if (name === "schema") schemaType.add(nonEmpty(content));
+      // Head-scoped by sitting below the `!inHead` return above, like every
+      // other document-metadata reading here (§20.3): a `<meta name="tags">` in
+      // the body declares nothing to anybody, so it implies no collection
+      // either. `name` is already trimmed and lowercased, which is how HTML
+      // defines metadata names and how every other row of this chain reads one.
+      else if (name === "tags" || name === "categories") taxonomyKeys.add(name);
       else if (name === "date") published.add(nonEmpty(content));
       else if (name === "lastmod") modified.add(nonEmpty(content));
       else if (name === "twitter:image") twitterImage.add(nonEmpty(content));
@@ -537,6 +560,9 @@ function extract(page, base) {
     datePublished: dateValue(published.kept),
     dateModified: dateValue(modified.kept),
     schemaType: schemaType.kept,
+    // Sorted here, once, so §28.2's "in sorted order" is a property of the
+    // record every consumer reads rather than something each one re-derives.
+    taxonomyKeys: [...taxonomyKeys].sort(),
     jsonLd,
     ids,
     strayMetadata,

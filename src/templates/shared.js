@@ -586,7 +586,10 @@ or a config key, the answer here is a different shape.
 
 Below are the rules that get guessed wrong most often. They are the same rules unify's own README
 and authoring-rules page state — one rule set, three audiences — not a variant for agents. The
-inner loop is \`unify dev\` (build, watch, serve on localhost, reload); \`unify --help\` lists every
+inner loop is \`unify dev\` (build, watch, serve on localhost, reload), which also serves
+\`http://localhost:3000/_unify/\` — every \`unify audit\` finding grouped by page, with that page's
+title, description, language, canonical, headings and links beside it, and the build's own
+diagnostics underneath. Nothing about it is written to \`dist/\`. \`unify --help\` lists every
 command and flag there is.
 
 ## Finish by checking, and read the exit code
@@ -604,10 +607,13 @@ published** and the previous \`dist/\` is untouched — never report success on 
 - A leading underscore keeps a file or a whole directory out of the output — \`_layout.html\`,
   \`_includes/\`, \`_drafts/\`. The build still reads it; \`dist/\` never contains it. Files inside a
   \`_\` directory need no prefix of their own.
-- To hold a page back, prefix its name with \`_\`. \`draft: true\` is **not** honored — it publishes.
-- To change a page's address, rename or move the source file. \`permalink\` and \`slug\` are **not**
-  honored: like every unrecognised frontmatter key — \`tags\` included — they become an ordinary
-  \`<meta>\` and change nothing. There are no collections and no taxonomies.
+- To hold a page back, prefix its name with \`_\`. \`draft:\` in frontmatter is an **error** — unify
+  has no draft mechanism, so a page carrying it would publish; the build says so and stops.
+- To change a page's address, rename or move the source file. \`permalink:\` and \`slug:\` are
+  **errors** for the same reason: a page's address is its source path, and a key that quietly
+  changed nothing would look like it worked.
+- \`tags:\` and \`categories:\` are allowed and become ordinary \`<meta>\` tags, but they build
+  nothing — there are no collections and no taxonomies, and \`unify audit\` says so out loud.
 - Link the real file: \`/about.html\`, never \`/about/\`. A directory link resolves only if you wrote
   \`about/index.html\`. A leading \`/\` means the source root, in any path you write.
 - Derived files — a post index, a feed — come from a script you write and run yourself. From this

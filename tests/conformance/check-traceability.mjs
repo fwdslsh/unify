@@ -60,7 +60,7 @@ const MANIFESTS = [
 const RUNTIME_CASES = join(ROOT, "tests", "fixtures", "landmines", "runtime-cases.mjs");
 const TEST_DIRS = [join(ROOT, "tests", "conformance"), join(ROOT, "tests", "e2e")];
 
-const ID_RE = /^(?:S\d{2}|SHL-\d{2}|PIP-\d{2}|EXC-\d{2}|INC-\d{2}|LAY-\d{2}|MRG-\d{2}|HED-\d{2}|ATT-\d{2}|MD-\d{2}|URL-\d{2}|REF-\d{2}|COL-\d{2}|DIA-\d{2}|P\d{2}|A\d{2}|PUB-\d{2}|WCH-\d{2}|DRY-\d{2}|CFG-\d{2}|SCF-\d{2}|FIX-\d{2}|MAN-\d{2}|SIT-\d{2}|CAN-\d{2}|ROB-\d{2}|AUD-\d{2}|VER-\d{2}|SD-\d{2})$/;
+const ID_RE = /^(?:S\d{2}|SHL-\d{2}|PIP-\d{2}|EXC-\d{2}|INC-\d{2}|LAY-\d{2}|MRG-\d{2}|HED-\d{2}|ATT-\d{2}|MD-\d{2}|URL-\d{2}|REF-\d{2}|COL-\d{2}|DIA-\d{2}|P\d{2}|A\d{2}|PUB-\d{2}|WCH-\d{2}|DRY-\d{2}|CFG-\d{2}|SCF-\d{2}|FIX-\d{2}|MAN-\d{2}|SIT-\d{2}|CAN-\d{2}|ROB-\d{2}|AUD-\d{2}|VER-\d{2}|SD-\d{2}|DEV-\d{2}|CPR-\d{2})$/;
 
 function die(msg) { console.error(`traceability: ${msg}`); process.exit(2); }
 let failed = false;

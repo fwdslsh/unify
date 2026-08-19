@@ -158,10 +158,10 @@ describe("value serialization (§10.2) — no YAML type coercion", () => {
   test("plain scalars ship as source text: booleans, dates, and trailing zeros are not normalized", () => {
     const r = reporter();
     const out = convert(
-      "---\ndraft: true\ndate: 2026-01-01\nweight: 0.50\n---\nx",
+      "---\nfeatured: true\ndate: 2026-01-01\nweight: 0.50\n---\nx",
       { path: "/s/x.md", sourceRoot: "/s", reporter: r },
     );
-    expect(out.headHtml).toContain('<meta name="draft" content="true">');
+    expect(out.headHtml).toContain('<meta name="featured" content="true">');
     expect(out.headHtml).toContain('<meta name="date" content="2026-01-01">');
     expect(out.headHtml).toContain('<meta name="weight" content="0.50">');
   });
@@ -185,14 +185,16 @@ describe("value serialization (§10.2) — no YAML type coercion", () => {
     expect(matches).toEqual(["a", "b", "c"]);
   });
 
-  test("reserved keys (date/tags/categories/draft/permalink/slug) have no behavior beyond being plain metas", () => {
+  test("date, tags and categories have no behavior beyond being plain metas", () => {
     const r = reporter();
-    const out = convert("---\ndraft: true\npermalink: /custom/\n---\nx", { path: "/s/x.md", sourceRoot: "/s", reporter: r });
-    // draft:true does not exclude/hold back the page in any way this module can express —
-    // it is simply another meta (MD-14). permalink does not move anything (this module
-    // has no output-path concept at all).
-    expect(out.headHtml).toContain('<meta name="draft" content="true">');
-    expect(out.headHtml).toContain('<meta name="permalink" content="/custom/">');
+    const out = convert("---\ndate: 2026-01-01\ntags: a\ncategories: notes\n---\nx", { path: "/s/x.md", sourceRoot: "/s", reporter: r });
+    // MD-14: none of the three is reserved, none builds anything, and none draws
+    // a diagnostic — §28.2 assigns what tags/categories fail to imply to `audit`
+    // (taxonomy-inert), which is a reading of the manifest and not of this module.
+    expect(r.diags).toEqual([]);
+    expect(out.headHtml).toContain('<meta name="date" content="2026-01-01">');
+    expect(out.headHtml).toContain('<meta name="tags" content="a">');
+    expect(out.headHtml).toContain('<meta name="categories" content="notes">');
   });
 
   test("attribute/text values are HTML-escaped on the way out", () => {
@@ -300,6 +302,58 @@ describe("P17 — a frontmatter value with no text form (§10.2)", () => {
     expect(diags).toHaveLength(1);
     expect(diags[0]).toMatchObject({ file: "post.md", line: 4, severity: "problem" });
     expect(diags[0].message).toContain("og:image");
+  });
+});
+
+// ------------------------------------------------------------------ P24
+
+describe("P24 — counter-prior frontmatter keys (§28.1)", () => {
+  const at = { path: "/s/post.md", sourceRoot: "/s" };
+
+  test("draft, permalink and slug are each located at their own key line, with their own message", () => {
+    const r = reporter();
+    convert("---\ntitle: T\ndraft: true\npermalink: /custom/\nslug: junky\n---\nx", { ...at, reporter: r });
+    expect(r.diags).toHaveLength(3);
+    expect(r.diags.map((d) => ({ file: d.file, line: d.line, severity: d.severity }))).toEqual([
+      { file: "post.md", line: 3, severity: "problem" },
+      { file: "post.md", line: 4, severity: "problem" },
+      { file: "post.md", line: 5, severity: "problem" },
+    ]);
+    // Each names the key and the mechanism the author was reaching for: the
+    // underscore rename for draft (spelled for this file), the source path for
+    // the two addressing keys.
+    expect(r.diags[0].message).toContain("draft");
+    expect(r.diags[0].fixes.join(" ")).toContain("_post.md");
+    expect(r.diags[1].message).toContain("permalink");
+    expect(r.diags[1].fixes.join(" ")).toContain("--pretty-urls");
+    expect(r.diags[2].message).toContain("slug");
+    expect(new Set(r.diags.map((d) => d.message)).size).toBe(3);
+  });
+
+  test("the key is the problem whatever its value — no value parsing anywhere", () => {
+    for (const value of ["true", "false", '"no"', "0", ""]) {
+      const r = reporter();
+      convert(`---\ndraft: ${value}\n---\nx`, { ...at, reporter: r });
+      expect(r.diags).toHaveLength(1);
+      expect(r.diags[0]).toMatchObject({ file: "post.md", line: 2, severity: "problem" });
+    }
+  });
+
+  test("only the key itself: a prefixed key that merely ends in one of the three names is untouched", () => {
+    const r = reporter();
+    convert("---\nog:\n  draft: x\nsubtitle: y\n---\nx", { ...at, reporter: r });
+    // §10.2: a key's NAME decides what it means, and this one is `og:draft`.
+    expect(r.diags).toEqual([]);
+  });
+
+  test("convertFragment never validates frontmatter — it is not even parsed (§5.1 step 4)", async () => {
+    const r = reporter();
+    const tmp = join(ROOT, "tests", "unit", "core", ".tmp-p24-fragment.md");
+    await writeFile(tmp, "---\ndraft: true\npermalink: /nope/\nslug: nope\n---\n\nA shared note.\n");
+    const html = await convertFragment(tmp, { sourceRoot: dirname(tmp), reporter: r });
+    await rm(tmp, { force: true });
+    expect(r.diags).toEqual([]);
+    expect(html).toBe("<p>A shared note.</p>\n");
   });
 });
 
@@ -506,10 +560,8 @@ describe("exact fixture regressions", () => {
     expect(diags).toEqual([]);
     expect(out.headHtml).toBe(
       '<title>Junk drawer</title>\n' +
-      '<meta name="draft" content="true">\n' +
       '<meta name="date" content="2026-01-01">\n' +
-      '<meta name="permalink" content="/custom/">\n' +
-      '<meta name="slug" content="junky">\n' +
+      '<meta name="featured" content="true">\n' +
       '<meta name="tags" content="a">\n' +
       '<meta name="tags" content="b">\n' +
       '<meta name="note" content="Colons: kept, quotes dropped">\n' +

@@ -664,9 +664,9 @@ YAML between `---` fences at the very start of the file.
 
 **A key's name decides its output; the YAML shape used to spell it does not.** A nested block is sugar for prefixed keys — `og:` with `image:` indented under it names the key `og:image`, identical in every respect to writing `og:image:` flat, and both emit `property="og:image"`. The same holds for any other prefix (`twitter:` written either way names `twitter:card`, which is not `og:` and so emits `name=`). Both spellings are valid YAML and both are supported deliberately: `og:image: /card.png` is what most authors and every frontmatter ecosystem write, and a spec that accepted it as a key while silently emitting `name=` would produce a meta tag that looks right, builds clean, and is ignored by every scraper — the failure class §14 exists to prevent.
 
-Synthesized elements merge by §8 exactly as if the page had written them; their serialization is fixed: double-quoted attributes, `name`/`property` first, then `content` (`<meta name="description" content="…">`), and `<title>TEXT</title>`. Two consequences of "as if the page had written them", stated because implementations otherwise diverge: a present-but-empty `title:` counts as absent, so §10.3's `<h1>` fallback applies to it exactly as §8 row 2 treats an empty page `<title>`; and `class` takes a string — any other value is treated as absent rather than coerced. A `.md` file included as a fragment has its frontmatter stripped and **never validated** (§5.1 step 4): the data is provably unused, and a shared fragment must not make an unrelated page's build depend on the shape of metadata nobody reads. One further key is reserved, and only for the value it may take: `schema` becomes `<meta name="schema">` exactly as this table says, and §26.4 restricts its value to the three types unify generates. `date`, `tags`, `categories`, `draft`, `permalink`, `slug` have no behavior and become plain metas — `draft: true` publishes the page; a leading underscore is how a page is held back. A `date` a consumer can use is `date`'s own doing rather than this table's: §20.10 reads the emitted meta and accepts it only as W3C-DTF. The honest gap, stated: frontmatter cannot express `rel="canonical"`, `rel="preload"`, or JSON-LD. Preloads and JSON-LD are layout material; a canonical is not — it names one page's own address, a layout-supplied value stamps every page with the same URL (silently wrong on every page but one, and consequential: share crawlers consolidate by canonical), and a Markdown page cannot override it, because §8's replace rule needs an HTML head to carry the page's own tag. A page that needs a canonical is written in HTML, or does without.
+Synthesized elements merge by §8 exactly as if the page had written them; their serialization is fixed: double-quoted attributes, `name`/`property` first, then `content` (`<meta name="description" content="…">`), and `<title>TEXT</title>`. Two consequences of "as if the page had written them", stated because implementations otherwise diverge: a present-but-empty `title:` counts as absent, so §10.3's `<h1>` fallback applies to it exactly as §8 row 2 treats an empty page `<title>`; and `class` takes a string — any other value is treated as absent rather than coerced. A `.md` file included as a fragment has its frontmatter stripped and **never validated** (§5.1 step 4): the data is provably unused, and a shared fragment must not make an unrelated page's build depend on the shape of metadata nobody reads. One further key is reserved, and only for the value it may take: `schema` becomes `<meta name="schema">` exactly as this table says, and §26.4 restricts its value to the three types unify generates. `date` and `lastmod` become plain metas that §20.3 then reads (§28.3). `tags` and `categories` become plain metas that create no collection, and `unify audit` says so (§28.2). `draft`, `permalink`, and `slug` are **P24** (§28.1): each is another generator's key, and a `<meta>` that looks like it worked is the failure §14 exists to forbid — a leading underscore is how a page is held back, and a source path is how a page is addressed. A `date` a consumer can use is `date`'s own doing rather than this table's: §20.10 reads the emitted meta and accepts it only as W3C-DTF. The honest gap, stated: frontmatter cannot express `rel="canonical"`, `rel="preload"`, or JSON-LD. Preloads and JSON-LD are layout material; a canonical is not — it names one page's own address, a layout-supplied value stamps every page with the same URL (silently wrong on every page but one, and consequential: share crawlers consolidate by canonical), and a Markdown page cannot override it, because §8's replace rule needs an HTML head to carry the page's own tag. A page that needs a canonical is written in HTML, or does without.
 
-**Value serialization.** VALUE is the value's text, by YAML form. A **plain scalar** serializes as its source text, exactly as written — `draft: true` → `content="true"`, `date: 2026-01-01` → `content="2026-01-01"`, `weight: 0.50` → `content="0.50"`: no type coercion ever rewrites a value (booleans don't normalize, dates don't reformat, numbers keep their zeros — the author's bytes, not YAML's data model). A **quoted scalar** serializes as its content with the quotes gone (`note: "Colons: fine"` → `content="Colons: fine"`); a **block scalar** (`|`, `>`) as the string YAML defines; an **empty value** as the empty string. The list rule composes with blocks: a list under `og:image` emits one `property="og:image"` meta per item, in order. What has no text form is a problem, located at the key (**P17**): a mapping nested below a key that already names one, or a list item that is itself a mapping or list. Because the two spellings name the same key, **eligibility is decided by the key's name, not by nesting depth**: a block under `og:image:` is P17 exactly as `og:` → `image:` → `url:` is, since the effective key `og:image` already carries its prefix and there is nothing left to flatten into. Counting recursion levels instead would let the flat spelling through and reject the block one, which would break the equivalence above. Inventing a serialization or dropping the value would each be a silent lie:
+**Value serialization.** VALUE is the value's text, by YAML form. A **plain scalar** serializes as its source text, exactly as written — `featured: true` → `content="true"`, `date: 2026-01-01` → `content="2026-01-01"`, `weight: 0.50` → `content="0.50"`: no type coercion ever rewrites a value (booleans don't normalize, dates don't reformat, numbers keep their zeros — the author's bytes, not YAML's data model). A **quoted scalar** serializes as its content with the quotes gone (`note: "Colons: fine"` → `content="Colons: fine"`); a **block scalar** (`|`, `>`) as the string YAML defines; an **empty value** as the empty string. The list rule composes with blocks: a list under `og:image` emits one `property="og:image"` meta per item, in order. What has no text form is a problem, located at the key (**P17**): a mapping nested below a key that already names one, or a list item that is itself a mapping or list. Because the two spellings name the same key, **eligibility is decided by the key's name, not by nesting depth**: a block under `og:image:` is P17 exactly as `og:` → `image:` → `url:` is, since the effective key `og:image` already carries its prefix and there is nothing left to flatten into. Counting recursion levels instead would let the flat spelling through and reject the block one, which would break the equivalence above. Inventing a serialization or dropping the value would each be a silent lie:
 
 ```
 src/post.md:4: problem: frontmatter og:image is a nested block — frontmatter flattens one level
@@ -960,6 +960,7 @@ The bold IDs are the stable identifiers used by `tests/conformance/rules.tsv` an
 19. **P20** — A `<slot>` outside a layout's `<body>` — anywhere in a page, or in a layout's `<head>` (§7.1). Inert in both cases; the message names the spelling that belongs in that file (`slot=` on a real element for a page, the layout's `<body>` for a head slot). Was advisory A04 until 2026-08-13
 20. **P21** — A page or layout with no `<body>` element where a merge requires one (§7). Attributed to the file that lacks it, file-level (there is no line to point at); the fix lines are spelled for that file's kind — for a page, the complete-document shape and the `.fragment.html` rename (§4.4), because a body-less `.html` is either an unfinished page or an intended partial; for a layout, `<body></body>` (the §7.5 head-only pattern)
 21. **P22** — A generated discovery artifact's output path is already occupied by a file the site emits from source (§21.5). Located at the occupying source file. Generation is suppressed rather than overwriting, so the problem never costs the author their own file
+23. **P24** — A Markdown page's frontmatter carrying `draft`, `permalink`, or `slug` (§28.1). Located at the key. Each is another generator's key that unify does not honour, and §10.2 would otherwise turn it into a `<meta>` that looks like it worked; the message names the unify mechanism that does the thing the author was reaching for. The key is the problem whatever its value, and the scope is frontmatter only — no generator reads `<meta name="draft">`, so an HTML author writing one is writing an ordinary meta about their own content
 22. **P23** — A `schema` declaration naming a type unify does not generate (§26.4). Located at the declaration — the frontmatter key for a Markdown page, the `<meta name="schema">` element for an HTML one. Case-sensitive, because `article` is not a schema.org type and a declaration that generated nothing in silence is what §14 exists to forbid; the message names the three accepted spellings and the `<script type="application/ld+json">` that carries any other vocabulary
 
 ### 14.3 Advisories (the closed catalogue — capped at twelve; at the cap, adding one means removing one)
@@ -995,7 +996,7 @@ Discipline (asserted by the E2E suite): an advisory that fires on a correct site
 
 `unify watch` and `unify dev` share one contract: saves are coalesced into one rebuild; a save landing mid-rebuild queues exactly one follow-up — no change is ever dropped; every rebuild is a **full** rebuild (no cache, no incremental state; watch output is always identical to a fresh `unify build`); writes are minimal and atomic (unchanged files untouched, temp-then-rename, precise deletions); `--clean` applies only at startup. While watching, a page that fails to build is emitted as a default error page carrying the located diagnostics, replaced by the next successful rebuild; `unify build` never emits error pages, and while watching, problems suspend the transactional gate only this far — error pages are the one thing a broken rebuild may write.
 
-`unify dev` = watch + a static server on `localhost:<port>` (default 3000) serving the output directory with directory indexes and a 404 page, plus a reload event stream; the reload script is injected only into HTML responses **it serves** and never exists in the output directory. No proxying, HTTPS, middleware, or config — permanently.
+`unify dev` = watch + a static server on `localhost:<port>` (default 3000) serving the output directory with directory indexes and a 404 page, plus a reload event stream; the reload script is injected only into HTML responses **it serves** and never exists in the output directory. It answers one path that is not a file: `/_unify/`, the local audit view (§27), assembled in memory from the same manifest and findings the command line reads and written to the output directory never. No proxying, HTTPS, middleware, or config — permanently.
 
 ---
 
@@ -1151,6 +1152,7 @@ Every record carries every field. A field with nothing to read is `null` (scalar
 | `datePublished` | object\|null | §20.10 — `{raw, iso}` from `<meta property="article:published_time">` or `<meta name="date">` |
 | `dateModified` | object\|null | §20.10 — `{raw, iso}` from `<meta property="article:modified_time">` or `<meta name="lastmod">` |
 | `schemaType` | string\|null | §20.8 — the declared structured-data type |
+| `taxonomyKeys` | string[] | §28.2 — the sorted subset of the closed set `{tags, categories}` the emitted **head** declares as `<meta name>`; `[]` for a page declaring neither |
 | `jsonLd` | array | §20.8 — one entry per `<script type="application/ld+json">`, in document order |
 | `ids` | string[] | every `id` attribute in the emitted document, in document order, repeats included |
 | `linksOut` | string[] | §20.9 — output paths of internal pages this page links to, deduplicated, sorted |
@@ -1175,7 +1177,7 @@ s samp small span strong sub sup time u var wbr
 
 Collapsing covers **ASCII** whitespace only. A decoded `&nbsp;` is U+00A0, a character the author chose because it forbids a line break, and rewriting it to U+0020 would be an edit to their content — the same verbatim discipline `iso` and `canonical` follow. This pushes a real cost onto consumers that tokenize: a client-side search comparing a typed `New York` against an indexed `New\u00A0York` misses, and duplicate-content detection reads two otherwise identical pages as different. Any projection of this field that is searched or compared must fold U+00A0 and the other Unicode space separators **at index time**, and say so where it is specified. Folding them here instead would put one consumer's normalization into the shared record, where every other consumer inherits it silently.
 
-**Document metadata is read from `<head>`.** `title`, `description`, `author`, `robots`, `datePublished`/`dateModified`, the `og:`/`twitter:` metas behind `image`, and `canonical` are declarations *to a consumer*, and a consumer reads them in the head. A `<title>` or `<meta name="description">` in `<body>` is inert — no browser shows it, no crawler indexes it — and §8 never put it there; the author did.
+**Document metadata is read from `<head>`.** `title`, `description`, `author`, `robots`, `datePublished`/`dateModified`, the `og:`/`twitter:` metas behind `image`, `taxonomyKeys`, and `canonical` are declarations *to a consumer*, and a consumer reads them in the head. A `<title>` or `<meta name="description">` in `<body>` is inert — no browser shows it, no crawler indexes it — and §8 never put it there; the author did.
 
 Reading them document-wide was wrong in the direction that matters, because it made the manifest describe a page nobody receives. A page whose head held only `<meta charset>`, with its title and description written into the body, reported both fields as present: `title-missing` and `description-missing` stayed silent, and §24.4's `title-h1-mismatch` then fired on the inert title and told the author to reconcile it with their heading. The one real fault — that this page has no title at all — was the only thing not reported.
 
@@ -1571,6 +1573,8 @@ A pipeline problem exits 1 whether or not `--strict` is set, and whether or not 
 
 Nothing. `build` derives the manifest (§20.2 — it must, or the invariant that deriving it changes nothing would only be tested on the pages a discovery feature happens to touch), and never calls the evaluator. No finding in this section can affect a build's output, its diagnostics, or its exit code.
 
+**`build` here is the command, not the pipeline.** §27's local audit view is assembled from findings over the rebuild `unify dev` just ran, and that rebuild runs this same pipeline — the other reading makes §27.3 unimplementable, since a view forbidden to re-read the site can only be handed findings by the run that produced the manifest. What this section forbids is a finding *changing a build*, and that holds of `dev` too: with the view attached, its rebuild writes the same bytes, prints the same diagnostics, and returns the same exit code as without. `unify build` and `unify watch` never evaluate at all, which is the stronger statement and the literal one.
+
 ---
 
 ## 25. Final-output verification: the routing map
@@ -1769,3 +1773,108 @@ The block participates in §15's transactional publish because it is part of a p
 The list is closed, and each absence is the same rule: unify emits what the page declared and nothing it would have to decide.
 
 No `publisher` — it names an entity the page did not declare. No `mainEntityOfPage` and no `@id` — both are identity, and §12's own property list excludes them for that reason. No `articleBody`, `wordCount`, or `keywords` derived from `record.text` — that is generated prose and a keyword count, two things product-spec §6.1 forbids by name. No `isPartOf`, `breadcrumb`, or `speakable` — each needs a structure of the site that unify has as links, not as claims. No image `width`/`height` inside the block, even when `record.image` carries them: they belong to the `og:image` declaration that supplied the URL, and `image-missing-dimensions` already reports their absence there. And no date from any source but an authored, well-formed one — not the build clock, not the filesystem, not the filename, not Git (§20.10).
+
+---
+
+## 27. The local audit view (`/_unify/`)
+
+Product-spec §6.3.8. `unify dev` serves one extra page: a report of what §20 read and what §24 found, for the site currently in the output directory. It exists because `unify audit`'s stdout is a list and a site is a graph — the same findings, arranged by page, with the page's own record beside them, answer "what is wrong with *this* page" in one look.
+
+### 27.1 It is served, never published
+
+The report is assembled in memory and returned by the development server. **Nothing is written to the output directory**, no file is created for it, and `unify build`, `unify watch`, and `unify audit` neither produce nor mention it. It is not in the `--dry-run` list, because `--dry-run` lists what a build would write and this is not that.
+
+Published pages are untouched: §16's reload script is injected into HTML the server *serves* and has never existed in the output directory, and this section adds nothing to that. A page fetched from `dist/` by any other means — a deploy, a `curl`, a second server — is byte-identical whether or not `dev` ever ran.
+
+### 27.2 The path is reserved by a rule that already exists
+
+`/_unify/` and every path beneath it belong to the server. The reservation costs nothing to enforce and nothing to explain, because §4.2 already forbids the collision *there*: a source path with a leading underscore is excluded, and an emitted `_`-prefixed page or `_`-prefixed directory segment is **P14** — and every path under `dist/_unify/` carries one. A site therefore cannot emit `dist/_unify/anything`, so nothing this report shadows below its own path is a file the site was able to publish.
+
+That is the whole reason the name has an underscore. A reserved path that could shadow an author's file would be a new rule; this one is the underscore convention, read from the URL side.
+
+Exactly one path serves the report: `/_unify/`. A request to `/_unify` (no trailing slash) redirects to it, as any directory would, and any other path beneath it is a 404 from the server itself — the reservation is a promise about who answers, not an invitation to guess sub-pages.
+
+**One output path is not held back, and the redirect above answers it anyway.** §4.2's guard deliberately spares root-level `_`-prefixed **non-page** files — that is the Netlify seam, the reason `_headers` and `_redirects` can ship — so a source root holding a file named exactly `_unify`, built with an exclude set that spares it (`--exclude '_*.html' --exclude '_*.md'`), emits `dist/_unify` with no diagnostic, and `unify dev` answers `/_unify` with the redirect above regardless of what is on disk. That one file is therefore unreachable through the development server while every static host serves it. It is stated rather than repaired, and the paragraph above is stated as the narrower claim it can support, because the alternative is worse than the gap: an "is there a real file at this path?" branch in the server would make who answers depend on the output directory's contents — a second rule to learn, in the one place it would almost never take its other branch, and one that could hide the report from the author who needs it. `dev` is not the deploy; a site that needs that byte served locally renames the file, and `unify build` ships it either way.
+
+### 27.3 What it shows
+
+The report is assembled from the **same two sources the command line uses, and no third**: the §20 manifest of the build that just ran, and §24's finding list over it. It re-derives nothing and re-parses nothing, so a page reported here and the same page reported by `unify audit` cannot disagree — that is product-spec §6.2's rule, and a second reading of the site inside a development server would be the least-observed place to break it.
+
+It carries, in this order:
+
+1. **A summary line** — the counts `unify audit` prints, and the address the build assumed (§17's first line), so a report read at a glance says which build it describes.
+2. **The findings, grouped by page**, each with its severity, its evidence, its fix, and its stable id — §24.5's four fields, rearranged rather than reworded. Grouping is by the finding's own location, which is a page for every finding but one: §24.4's `robots-sitemap-missing` is located at the source `robots.txt` and reads no record, so it groups under that file with no record beside it. Walking the records and collecting each one's findings would drop it, and §27.5 forbids exactly that — a finding `unify audit` prints and this view does not is the disagreement that section calls a defect, in its most literal form.
+3. **Every page's record**, including pages with no findings: output path, public URL, title, description, language, canonical, the heading outline, `linksIn`/`linksOut` counts, and whether it is indexable. A page nothing is wrong with is the useful half of the answer to "did my metadata land".
+4. **The build's diagnostics** — §14's problems and advisories for the current build, verbatim. A rebuild that failed leaves the previous `dist/` in place (§15), so without this the report would describe a site the browser is no longer being served.
+
+There is no score, no grade, no percentage, and no character count, for §24.5's reason: that rule is about the *output*, and a page is output.
+
+### 27.4 It follows the rebuild
+
+The report is regenerated by the same rebuild that regenerates the site, and the reload stream that refreshes a page refreshes it too. A report open in a browser while a file is saved shows the new build, or shows why there is no new build.
+
+A request that arrives before any build has completed is answered — with the report of the last build that did, or with a page saying no build has completed yet. The server never blocks on a rebuild and never serves a report assembled from a half-finished one.
+
+### 27.5 What it is not
+
+- **Not a second audit.** No finding exists that only this view can raise, and no finding it shows is absent from `unify audit`. If the two ever disagree, this section is the defect.
+- **Not configurable.** No flag turns it on or off, no flag moves it, and `--port` is the only thing about the server anyone chooses (§16).
+- **Not an API.** The report is HTML for a person. Machine-readable findings are `unify audit --format json` (§6.5.3), which is a different artifact with a `schemaVersion` and stable identifiers; this page promises neither.
+- **Not served by anything else.** `unify watch` has no server. `unify build` writes files. Only `unify dev` answers `/_unify/`.
+
+---
+
+## 28. Counter-prior frontmatter
+
+Product-spec §6.3.9, and its own sentence states the purpose exactly: these diagnostics "exist to prevent confident cross-generator assumptions from publishing or addressing the wrong page, not to reserve ordinary metadata names without cause."
+
+Every key here is one that another static-site generator honours. A page carrying it was written by someone — or by a model — who believed unify would honour it too, and §10.2's rule turns it into a `<meta>` that looks like it worked. That is the exact shape §14 exists to forbid, arriving through the door of a key unify never claimed.
+
+### 28.1 The three that are problems
+
+In a Markdown page's frontmatter, `draft`, `permalink`, and `slug` are **P24**, located at the key. Each message names the unify mechanism that does the thing the author was reaching for:
+
+```
+src/post.md:3: problem: draft has no meaning in unify — the page publishes
+  fix: rename the source to _post.md; a leading underscore keeps a file out of the output
+```
+```
+src/post.md:4: problem: permalink has no meaning in unify — this page's address is its source path
+  fix: rename or move the source file to choose its address, or use --pretty-urls site-wide
+```
+```
+src/post.md:5: problem: slug has no meaning in unify — this page's address is its source path
+  fix: rename the source file to change the last segment of its address
+```
+
+They are **problems rather than advisories** because each one, believed, publishes or addresses the wrong page — the two outcomes §15's transactional gate exists to prevent. `draft: true` is the sharpest: the author's intent is that this page *not* be published, and unify publishes it. That is the content-loss law's mirror image, and worse in one respect, since a dropped page is visible in the output listing and an unintended one is not.
+
+**The key is the problem, whatever its value.** `draft: false` produces no wrong outcome today, and reporting it still earns its place: the belief it expresses is that unify has a draft mechanism, and a diagnostic that waits for the value to become dangerous is a diagnostic that fires after the mistake has shipped. One rule, one message, no value parsing.
+
+**Which key a spelling names is §10.2's question, not this section's.** A key's name decides what it means and the YAML shape used to spell it does not, so a *mapping* under `draft:` names `draft:<child>` and is not this key — exactly as `og:` over an indented `draft:` names `og:draft` and is not this key either. The two directions are one rule read from its two ends, and the rule is §10.2's stated equivalence: `draft:nested: yes` flat and `draft:` over an indented `nested: yes` are "identical in every respect", so a P24 that fired on one spelling and not the other would break the equivalence §10.2 asserts. That is not a value exemption to the paragraph above: a scalar, an empty value, and a list each still name the bare key and each still emits `<meta name="draft">`, so all three are P24, and only the one shape that *renames* the key is not.
+
+**Scope is frontmatter, and only frontmatter.** The prior is a *frontmatter* prior: no generator reads `<meta name="draft">`, and an HTML author who writes one is writing an ordinary meta about their own content. This is the deliberate opposite of §26.4's P23, which checks the emitted `<meta name="schema">` so that HTML and Markdown declare a type the same way. The difference is the subject: `schema` is unify's own key and must mean one thing in both spellings; `draft` is another tool's key, and only one of the two spellings carries the mistaken belief.
+
+A `.md` file included as a fragment has its frontmatter stripped and never validated (§5.1 step 4), here as everywhere: the data is provably unused, and a shared fragment must not make an unrelated page's build depend on metadata nobody reads.
+
+### 28.2 The two that are findings
+
+`tags` and `categories` are not addressed to the build at all — they describe content, and a site may legitimately emit them for a consumer unify knows nothing about. What they must not do is *imply* a collection. `unify audit` reports them:
+
+| id | severity | fires when |
+|---|---|---|
+| `taxonomy-inert` | incomplete | the emitted **head** declares `<meta name="tags">` or `<meta name="categories">`; one finding per page, naming the keys it declares in sorted order |
+
+The evidence names the keys and says what did not happen: no index page, no archive, no feed of that term, no route. `incomplete` rather than `broken` because nothing about the page is wrong — what is absent is a mechanism the author may have been expecting, which is §24.3's own line.
+
+It is a **predicate over the manifest** like every other finding, so §20 gains one field for it (§20.3): `taxonomyKeys`, the sorted subset of the closed set `{tags, categories}` the emitted head declares. Closed because a growable list of "names other generators use" would be exactly the unbounded reservation product-spec §6.3.9 refuses, and read from the emitted document because that is where §20 reads everything — so an HTML page writing `<meta name="tags">` by hand collects the same finding, and the sentence stays true of it.
+
+**The key declares it whatever its value**, as in §28.1 and for §28.1's reason: §10.2 emits `<meta name="tags" content="">` for a bare `tags:`, and the author who wrote that expected a collection as firmly as the one who listed three terms. This is the one place where a `taxonomyKeys` entry parts company with the neighbouring fields in §20.3's table, which read a *value* and record `null` when it is empty — stated because the analogy is the obvious one to draw and it is the wrong one. And the head scope is the field's, not a second rule of this section's: a `<meta name="tags">` in `<body>` declares nothing to any consumer (§20.3), so it implies no collection to report the absence of. One consequence is worth stating outright, because it is this section's only silence: `tags` and `categories` are no part of §24.4's `metadata-in-body` closed set either, so a body-placed taxonomy meta is reported by neither finding. That is not an oversight, and the comparison that makes it look like one is `schema` — unify's own key, admitted to that closed set by §26.4 although no standard defines it, precisely because a body-placed `schema` *changes an outcome*: it switches §26.6's generator off in silence. A body-placed `tags` changes nothing. It builds no collection in the head and none in the body, so there is no mechanism the author could have been expecting and no second position for the same belief to fail in. `taxonomy-inert` reports a declaration a consumer will read that unify built nothing from; a meta no consumer reads is not that declaration.
+
+### 28.3 What stays exactly as it was
+
+Product-spec §6.3.9 closes by requiring four existing diagnostics to remain mandatory, and none of them changes here: a bare layout name is **P04** (§6.1); a path-only `--base-url` is a usage error (§11.3); a hand-written pretty URL is **P13** (§12), and `--pretty-urls` does not switch that check off — a link to `/guides/` that names no emitted page is P13 in both modes; and a non-empty `<include>` is **P03** (§5.1).
+
+That third clause is stated as *the check is not switched off* rather than by the obvious example, because the obvious example is not true of the flag, and the correction is the more useful half. A link to `/about/` on a site whose source holds `about.html` is P13 without `--pretty-urls` and **resolves** with it: §11.2 emits `about/index.html` under the flag and rewrites the author's own `/about.html` links to that same address, so "a site that emits `about.html`" is exactly the antecedent the flag removes. What holds in both modes is §11.2's own rule and the reason §12 checks the output tree: link the real file and let the flag do the rewriting, because a directory URL naming no emitted page is P13 either way, and the one that *does* name a page under the flag is the one the flag would have written for you.
+
+And `date` and `lastmod` stay ordinary metadata keys with no diagnostic of their own. They are the counterexample that keeps this section honest: they *are* read — §20.3 maps them onto `datePublished`/`dateModified` and §26.6 emits them — so they belong to a mechanism unify has rather than one it lacks. A malformed one is `date-unusable` (§26.3), which is a statement about the value, not about the key.

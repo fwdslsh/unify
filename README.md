@@ -143,7 +143,7 @@ Everything here is converted to HTML and dropped into the layout
 exactly like an HTML page's content.
 ```
 
-`title`, `layout`, `class`, `lang`, `dir`, and `schema` are the frontmatter keys with behavior; every other key becomes a `<meta>` tag. Headings get slug `id`s so every heading is a deep link.
+`title`, `layout`, `class`, `lang`, `dir`, and `schema` are the frontmatter keys with behavior; every other key becomes a `<meta>` tag — except `draft`, `permalink`, and `slug`, which are errors that name what unify does instead: a leading underscore holds a page back, and a page's address is its source path. Headings get slug `id`s so every heading is a deep link.
 
 That is the whole product. There is nothing else to learn.
 
@@ -197,7 +197,9 @@ src/index.html:8: problem: include not found: /_includes/navv.html
 
 `unify build --dry-run --strict` is the whole build and every check, writing nothing — the one-line CI lint.
 
-`unify audit` answers a different question: not *is this build sound?* but *is this site complete?* It runs the same whole build, publishes nothing, and reports what it observed — a page with no description, two pages sharing a title, a heading and a `<title>` that disagree, a link to `#section` where nothing has that id, an `id` used twice on one page, a page nothing links to, structured data that contradicts the page carrying it. Each finding prints the evidence and one thing to do. **There is no score, no grade, and nothing counts characters** — a short title is not a finding, an absent one is; "duplicate" means identical, never similar. `unify build` never runs any of it, so no finding can hold up a release; `unify audit --strict` exits non-zero on any finding, and that is the opt-in CI gate. A fresh `unify init` passes it, so the first finding you see is about a page you wrote.
+`unify audit` answers a different question: not *is this build sound?* but *is this site complete?* It runs the same whole build, publishes nothing, and reports what it observed — a page with no description, two pages sharing a title, a heading and a `<title>` that disagree, a link to `#section` where nothing has that id, an `id` used twice on one page, a page nothing links to, structured data that contradicts the page carrying it, a `tags:` or `categories:` key that built no collection. Each finding prints the evidence and one thing to do. **There is no score, no grade, and nothing counts characters** — a short title is not a finding, an absent one is; "duplicate" means identical, never similar. `unify build` never runs any of it, so no finding can hold up a release; `unify audit --strict` exits non-zero on any finding, and that is the opt-in CI gate. A fresh `unify init` passes it, so the first finding you see is about a page you wrote.
+
+While `unify dev` is running, the same findings are a page: **`http://localhost:3000/_unify/`** shows them grouped by page, each page's record beside them — title, description, language, canonical, headings, links in and out — and the build's diagnostics underneath. It is the same manifest and the same finding list the command line reads, never a second opinion; it is assembled in memory and nothing is written to `dist/`, so a published page is byte-identical whether or not `dev` ever ran. Only `dev` serves it: `build` writes files and `watch` has no server.
 
 An optional `unify.yaml` at the source root holds saved flags and nothing more (keys are the long option names; CLI flags win; the file never ships). No behavior exists that only the config file can express.
 
@@ -208,7 +210,7 @@ An optional `unify.yaml` at the source root holds saved flags and nothing more (
 - **Become a component framework.** Slots fill layouts; `<include>` is verbatim and never takes fills.
 - **Need configuration.** Conventions, not config files.
 - **Scope your CSS.** Use `@scope`, `@layer`, nesting, or a class prefix — the platform already answers this.
-- **Be a real web server.** `unify dev` serves static files and reloads. No proxying, HTTPS, middleware, or plugins; pair `unify watch` with a real server instead.
+- **Be a real web server.** `unify dev` serves static files, reloads, and answers one path that is not a file (`/_unify/`, above). No proxying, HTTPS, middleware, or plugins; pair `unify watch` with a real server instead.
 
 The full list, with the reasoning and the accepted costs, is [`docs/product-spec.md`](docs/product-spec.md) §5. Sitemaps, minification, layout chaining, and a browser preview polyfill are post-MVP candidates (§6), not current features.
 
@@ -268,8 +270,8 @@ an error — on a layout too, because layouts don't chain (a section layout is a
 ## Markdown
 Frontmatter is YAML: quote any value containing a colon — `title: "Finish: the last quarter"`. `title`,
 `layout`, `class` (on `<body>`), `lang`, `dir`, and `schema` are the only keys with meaning; every other becomes
-`<meta name=…>` with the value as written, so `tags`/`permalink`/`slug` do nothing and `draft: true`
-publishes (hold pages back with a leading underscore instead). A key named `og:…` emits `property=` instead
+`<meta name=…>` with the value as written — except `draft`, `permalink` and `slug`, which are **errors** naming what unify does instead: a leading underscore holds a page back (`_post.md`), and a page's address is its source path, so rename or move the file. `tags`/`categories` are allowed but build nothing — no index, no archive, no feed, no route — and `unify audit` says so.
+A key named `og:…` emits `property=` instead
 (`og:image: /card.png`; two levels deep is an error). No `title:` → first `# Heading`; headings get slug `id`s. `schema: Article` (or `WebPage`, or `BlogPosting` — those three, spelled exactly; in HTML, `<meta name="schema" content="Article">` in the head, which a layout may carry for a whole section) writes the page's JSON-LD for you, from what the page already declares: its title, description, canonical, `og:image`, `author`, `date`, `lastmod`, and `lang`. Nothing else is added and nothing is guessed — a `date` unify cannot read as `2026-01-02` or `2026-01-02T09:30:00Z` is left out and reported, never filled in from the clock or the file. Write your own `<script type="application/ld+json">` for any other type, or for more detail: yours wins and unify then generates nothing. A canonical still has no frontmatter key — it is one page's own address, which a layout must never set (that stamps every page with the same URL), so write that page in HTML, use `--canonical auto`, or leave it off.
 
 ## Styles, scripts, finishing
