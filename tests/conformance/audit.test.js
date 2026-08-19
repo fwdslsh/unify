@@ -1181,6 +1181,24 @@ test("REF-02: a doubled slash is a path on this site, not an authority", async (
   covers("REF-02");
 }, TEST_MS);
 
+test("URL-10: the base path and a stripped path share one normal form", async () => {
+  // `parseBaseUrl` stored the prefix as `URL.pathname` gives it while
+  // `stripBaseUrl` collapses the leading slash run of what it returns, so a
+  // doubled slash in the base path put the two in different forms and the
+  // prefix never stripped: the build generated a sitemap and then refused to
+  // publish, unable to resolve the <loc> values it had just written. §21.6
+  // says a generated sitemap's check "can only pass"; this is what holds that.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), linked(["About"]));
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", "https://example.com//repo/"], tmp);
+  expectExit(r, 0, "a base path with a doubled slash");
+  const sitemap = readFileSync(join(tmp, "dist", "sitemap.xml"), "utf8");
+  if (!sitemap.includes("<loc>https://example.com/repo/about.html</loc>")) {
+    throw new Error(`§11.3: one normal form for the prefix:\n${sitemap}`);
+  }
+  covers("URL-10");
+}, TEST_MS);
+
 test("URL-10: --base-url needs a scheme that has a host", async () => {
   // `new URL("foo://x/").origin` is the STRING "null", so every URL §20.5
   // builds reads `null/about.html` — which shipped as <loc>null/</loc> until

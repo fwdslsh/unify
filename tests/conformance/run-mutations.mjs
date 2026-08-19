@@ -241,6 +241,10 @@ export function runtimeErrorIn(output) {
  * null when it does not exist: a row naming a deleted module is a BAD-ANCHOR,
  * not an unhandled ENOENT that takes the runner down before it can say so.
  *
+ * `read` returns the file's text, or null when it does not exist. Prefer
+ * `anchorProblems` below — it owns the reading, and the reading is where the
+ * defects were.
+ *
  * @param {{id: string, file: string, old: string, next: string}[]} rows
  * @param {(file: string) => string|null} read
  * @returns {string[]} one message per problem, empty when every row is usable
@@ -259,6 +263,43 @@ export function validateAnchors(rows, read) {
     if (row.old === row.next) problems.push(`NO-OP ${row.id} — the replacement equals the anchor`);
   }
   return problems;
+}
+
+/**
+ * Every committed row, checked against a tree — the whole operation, wiring
+ * included, behind one name.
+ *
+ * The wiring is the point. `validateAnchors` was extracted so it could be
+ * tested, and the two bugs that had shipped were both in the code around it:
+ * the caller passed the prefix-filtered subset instead of every row, and the
+ * caller's file read threw on a deleted module instead of reporting it. Unit
+ * tests of the extracted function pinned neither — the function had always
+ * iterated what it was handed, and had always honoured a `read` returning
+ * null. Reverting either call site left the whole suite green.
+ *
+ * That is the same mistake three rounds running, each time one level
+ * shallower than the defect: the guard for a rule, then the test for the
+ * guard, then the wiring of the test. Collapsing both callers here ends it —
+ * the sweep passes its work copy, the always-on inventory test passes the
+ * repository root, and there is no longer a `rows` parameter for a caller to
+ * narrow or a `read` for a caller to get wrong.
+ *
+ * It takes NO row set. That parameter is where the first of the two bugs
+ * lived — the caller narrowed it to the prefix-filtered subset — and a
+ * parameter a caller can get wrong is a parameter a test of the callee cannot
+ * pin. The question is "does this tree's inventory describe this tree?", so
+ * the entry point reads both from the same root and there is nothing left to
+ * pass it incorrectly.
+ *
+ * @param {string} rootDir - the tree, and the inventory that claims to describe it
+ * @returns {string[]} one message per problem, empty when every row is usable
+ */
+export function anchorProblems(rootDir) {
+  const rows = parseMutations(readFileSync(join(rootDir, "tests", "conformance", "mutations.tsv"), "utf8"));
+  return validateAnchors(rows, (file) => {
+    const abs = join(rootDir, file);
+    return existsSync(abs) ? readFileSync(abs, "utf8") : null;
+  });
 }
 
 // --------------------------------------------------------------------- main
@@ -296,16 +337,7 @@ function main() {
   const runSuite = () => {
     const r = spawnSync("bun", ["test"], {
       cwd: work, encoding: "utf8", timeout: SUITE_TIMEOUT_MS,
-      // `UNIFY_MUTATION_RUN` tells the suite it is looking at a deliberately
-      // altered tree. Exactly one test cares: the inventory check, which
-      // asserts that every committed anchor is present in the tree — true of
-      // the COMMITTED tree and false by construction of a mutated one. Left
-      // running it would have failed on every single mutation and attributed
-      // every one as a kill, which is this file's own "gate that lies" failure
-      // arriving through the fix for it. It is not an exclusion list and not a
-      // flakiness heuristic: the test's subject is the committed tree, and
-      // under a sweep that is not what it is being handed.
-      env: { ...process.env, CLAUDECODE: "1", UNIFY_MUTATION_RUN: "1" },
+      env: { ...process.env, CLAUDECODE: "1" },
     });
     return {
       exitCode: r.status,
@@ -334,17 +366,36 @@ function main() {
     } else {
       execFileSync("sh", ["-c", `git -C ${JSON.stringify(ROOT)} archive ${JSON.stringify(rev)} | tar -x -C ${JSON.stringify(work)}`]);
     }
+    // Inside `extract`, because `extract` runs again before every row. The
+    // inventory test asserts that every committed anchor is present in the
+    // tree — true of the COMMITTED tree and false by construction of a mutated
+    // one, since applying a mutation always invalidates the mutated row's own
+    // anchor. Left in place it failed on every single mutation and was
+    // credited as the killer of every one: this file's own "gate that lies"
+    // failure, arriving through the fix for it.
+    //
+    // Deleted from the copy rather than switched off through the environment.
+    // An ambient variable disables an always-on gate for anyone who has it
+    // exported, and nothing would stop a future test opting into the same
+    // exemption to quiet a real killer — the door the rejected exclusion list
+    // came through, with a different key. Nothing is lost: `anchorProblems`
+    // checks the pristine copy before any suite runs, and the test itself runs
+    // on every ordinary run.
+    //
+    // A one-shot deletion after the first extraction was the first attempt,
+    // and the sweep reported it back — the row it swept was still "killed by"
+    // the inventory test, because the next `extract()` had put the file back.
+    rmSync(join(work, "tests", "conformance", "mutation-inventory.test.js"), { force: true });
   };
 
   try {
     extract();
     execFileSync("cp", ["-r", join(ROOT, "node_modules"), join(work, "node_modules")]);
 
-    // EVERY row, not the selected ones — see `validateAnchors`.
-    const problems = validateAnchors(rows, (file) => {
-      const abs = join(work, file);
-      return existsSync(abs) ? readFileSync(abs, "utf8") : null;
-    });
+
+    // EVERY row, not the selected ones — see `anchorProblems`, which owns the
+    // reading precisely so this call site cannot get either half wrong.
+    const problems = anchorProblems(work);
     for (const p of problems) console.error(p);
     if (problems.length) { console.error(`mutation: ${problems.length} unusable row(s)`); finalExit = 2; return; }
 

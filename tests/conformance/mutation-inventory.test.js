@@ -20,26 +20,28 @@
  * the tree it names.
  */
 import { expect, test } from "bun:test";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseMutations, validateAnchors } from "./run-mutations.mjs";
+import { anchorProblems, parseMutations } from "./run-mutations.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
-// Under a mutation sweep the tree is deliberately not the committed one, so
-// this check has no subject there — and left running it would fail on every
-// mutation and be counted as the killer of every one, which is precisely the
-// "reported a kill while testing nothing" failure the inventory exists to stop.
-const MUTATING = process.env.UNIFY_MUTATION_RUN === "1";
-
-test.skipIf(MUTATING)("every mutation row anchors uniquely in the current tree", () => {
-  const rows = parseMutations(readFileSync(join(ROOT, "tests", "conformance", "mutations.tsv"), "utf8"));
-  expect(rows.length).toBeGreaterThan(0);
-  const problems = validateAnchors(rows, (file) => {
-    const abs = join(ROOT, file);
-    return existsSync(abs) ? readFileSync(abs, "utf8") : null;
-  });
+// A mutation sweep deletes this file from its work copy rather than switching
+// it off through the environment — see `run-mutations.mjs`. The check has no
+// subject against a deliberately altered tree, and an ambient variable would
+// disable it for anyone who happened to have one exported.
+//
+// `anchorProblems` is the sweep's OWN entry point, not a second copy of the
+// same wiring. That is the point of calling it: the reading and the row set
+// are where both shipped defects lived, and pinning them here pins them for
+// the sweep too.
+test("every mutation row anchors uniquely in the current tree", () => {
+  // Sanity: the inventory is non-empty, so a truncated file cannot pass by
+  // having nothing to check.
+  expect(parseMutations(readFileSync(join(ROOT, "tests", "conformance", "mutations.tsv"), "utf8")).length)
+    .toBeGreaterThan(0);
+  const problems = anchorProblems(ROOT);
   if (problems.length) {
     throw new Error(
       `${problems.length} mutation row(s) no longer describe the tree — each is scored on a mutation that never happens:\n  ${problems.join("\n  ")}`,

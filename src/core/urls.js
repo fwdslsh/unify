@@ -673,6 +673,14 @@ export function parseBaseUrl(raw) {
   const u = new URL(raw);
   let path = u.pathname;
   if (!path.startsWith("/")) path = `/${path}`;
+  // One normal form with `stripBaseUrl`, which collapses the leading slash run
+  // of the path it returns. Storing the prefix uncollapsed put the two in
+  // different forms, so `--base-url https://example.com//repo/` never stripped
+  // its own prefix: the build generated a sitemap and then refused to publish
+  // it, unable to resolve the <loc> values it had just written. §21.6 says a
+  // generated sitemap's check "can only pass", and it is the two spellings of
+  // one prefix that has to hold that true, not the check.
+  path = path.replace(/^\/+/, "/");
   if (!path.endsWith("/")) path += "/";
   return { origin: u.origin, pathPrefix: path };
 }
