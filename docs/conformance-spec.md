@@ -965,7 +965,7 @@ The bold IDs are the stable identifiers used by `tests/conformance/rules.tsv` an
 
 ### 14.3 Advisories (the closed catalogue — capped at twelve; at the cap, adding one means removing one)
 
-Ten, two slots free. Three IDs have left this catalogue and none was replaced: **A15** (an `og:` value left root-relative by a path-only `--base-url`) was added and retired the same day, because the form it warned about stopped existing (§11.3); **A04** became problem **P20**, because what it reported was never merely informative — the page it let through was wrong; **A03** (a top-level `<header>`/`<footer>` outside any slot) was deleted, because the markup it fired on had composed exactly as its author drew it (§7.6). All three are the outcome to prefer over a warning that stays: delete the choice, fail the build, or delete the warning. A retired ID is never reused.
+Eleven, one slot free. Three IDs have left this catalogue and none was replaced: **A15** (an `og:` value left root-relative by a path-only `--base-url`) was added and retired the same day, because the form it warned about stopped existing (§11.3); **A04** became problem **P20**, because what it reported was never merely informative — the page it let through was wrong; **A03** (a top-level `<header>`/`<footer>` outside any slot) was deleted, because the markup it fired on had composed exactly as its author drew it (§7.6). All three are the outcome to prefer over a warning that stays: delete the choice, fail the build, or delete the warning. A retired ID is never reused.
 
 Same ID convention as §14.2.
 
@@ -978,7 +978,8 @@ Same ID convention as §14.2.
 9. **A11** — Output paths differing only by case; the group is one case-folded form but the sentence names one representative per NFC form, escaped, and is not printed when that leaves nothing to name — so a pair `toLowerCase` merges only because it collapsed a canonical singleton (U+212A KELVIN SIGN, U+2126 OHM SIGN, U+212B ANGSTROM SIGN) is A16's, not this one's (§13)
 10. **A16** — Output paths a host folding Unicode normalization form *and* letter case together sees as one file; the key is NFC then case-folded for that reason, a group that is A11's entirely (same case fold *and* all NFC forms distinct) is skipped, and the message quotes every distinct spelling, escaped, and says only what is true of the whole group — that such a host merges them — rather than asserting a form relationship between any two (§13)
 11. **A12** — Symlink resolving outside the source root (treated as absent) (§4.4)
-12. **A14** — Known deployment file at the source root held back by the exclude set — names the file and the `--exclude` line that ships it; the recognized names are the implementation's maintained list, which may grow without a spec revision (§4.2)
+12. **A17** — A page declaring `Article`/`BlogPosting` whose `datePublished` names a day rather than an instant, so it is not an entry in the generated feed (§29.3). Atom requires a full date-time with an offset ([RFC 4287](https://www.rfc-editor.org/rfc/rfc4287) §3.3), and the two ways to manufacture one — midnight UTC, or the build clock — are respectively wrong for every reader west of Greenwich and forbidden outright by §20.10. It reports what the build did and names the spelling that would work
+13. **A14** — Known deployment file at the source root held back by the exclude set — names the file and the `--exclude` line that ships it; the recognized names are the implementation's maintained list, which may grow without a spec revision (§4.2)
 
 Two operational tests fell out of A03's retirement. An advisory that a meaningless wrapper element switches off is reporting tree position, not authorial error. And an advisory whose only available repair edits a file the page does not own — a shared layout, a shared fragment — is instructing a restructure by another name, whatever its wording.
 
@@ -1878,3 +1879,201 @@ Product-spec §6.3.9 closes by requiring four existing diagnostics to remain man
 That third clause is stated as *the check is not switched off* rather than by the obvious example, because the obvious example is not true of the flag, and the correction is the more useful half. A link to `/about/` on a site whose source holds `about.html` is P13 without `--pretty-urls` and **resolves** with it: §11.2 emits `about/index.html` under the flag and rewrites the author's own `/about.html` links to that same address, so "a site that emits `about.html`" is exactly the antecedent the flag removes. What holds in both modes is §11.2's own rule and the reason §12 checks the output tree: link the real file and let the flag do the rewriting, because a directory URL naming no emitted page is P13 either way, and the one that *does* name a page under the flag is the one the flag would have written for you.
 
 And `date` and `lastmod` stay ordinary metadata keys with no diagnostic of their own. They are the counterexample that keeps this section honest: they *are* read — §20.3 maps them onto `datePublished`/`dateModified` and §26.6 emits them — so they belong to a mechanism unify has rather than one it lacks. A malformed one is `date-unusable` (§26.3), which is a statement about the value, not about the key.
+
+---
+
+## 29. Feed generation
+
+Product-spec §6.5.1. The manifest's third projection, and the first whose membership an author states in the page rather than in a flag.
+
+### 29.1 Activation, and why there is no collection
+
+A feed is written when **`--base-url` is set** and **at least one page's `schemaType` is `Article` or `BlogPosting`** (§20.8). Those two conditions are the whole opt-in. `--base-url` for §21.1's reason — an entry carries absolute URLs and a stable id, and inventing an origin is the guess product-spec §6.1 forbids — and the type declaration because that is what product-spec §6.5.1 means by *explicitly declaring*: the page says what it is, and the feed is a consequence.
+
+That is deliberately **not a collection**. There is no query, no directory convention, no `posts/` folder, no ordering key, and no way to ask for a feed of some pages and not others. §6.6 rejects a collections DSL by name, and this section is what the rejection costs and what it buys: it costs scoped feeds, and it buys a membership rule an author can check by reading one page. Scoped feeds wait for demonstrated demand (§6.5.1); until then, a site that needs two feeds writes the second one with a generator (§19.6) and unify ships it byte-for-byte.
+
+### 29.2 Atom, and why not RSS
+
+The document is **[Atom](https://www.rfc-editor.org/rfc/rfc4287)**, at output-root `feed.xml`. The choice is forced by §20.10 rather than preferred: RSS 2.0's `pubDate` is an [RFC 822](https://www.rfc-editor.org/rfc/rfc822) date, so emitting one would mean *reformatting* the author's timestamp into another calendar vocabulary — the edit §20.10 refuses in the sentence that declines to rewrite `+00:00` to `Z`. Atom's date construct is [RFC 3339](https://www.rfc-editor.org/rfc/rfc3339), and W3C-DTF is a profile of RFC 3339, so an `iso` value §20.10 accepted with a time is already a conforming Atom date and is emitted verbatim.
+
+### 29.3 An entry needs an instant, and a date is not one
+
+RFC 4287 §4.1.2 makes `atom:updated` **required** on every entry, and §3.3 makes it a full date-time with a time-zone offset. A `date: 2026-01-02` names a day, not an instant, and there is no honest way to turn one into the other:
+
+- Emitting `2026-01-02T00:00:00Z` invents midnight UTC, which a reader west of Greenwich renders as **1 January** — a feed telling the world the wrong publication date, from a value the author wrote correctly.
+- Using the build clock, the filesystem, or Git is the invention product-spec §6.1 forbids by name and §20.10 forbids again.
+
+So a page whose `datePublished` has no time is **not an entry**, and the build says so — advisory **A17**, naming the page, the value it wrote, and the spelling that would work:
+
+```
+src/posts/hello.md: advisory: date is "2026-01-02", which names a day rather than an instant — this page is not in feed.xml
+  fix: write date: 2026-01-02T09:00:00Z — a feed entry's timestamp needs a time and a time zone
+```
+
+An advisory rather than a finding because it reports **what this build did** (§14.3): a page the author declared an `Article` is absent from the feed this build wrote, which is a fact about the emitted tree and belongs beside the other things `build` says. It never blocks a publish. It is the eleventh of twelve.
+
+A page with **no `datePublished` at all** draws nothing here — `schema-incomplete` (§24.4) already reports an `Article` with no date, and one question keeps one owner.
+
+### 29.4 Membership
+
+A page is an entry when all of:
+
+1. It has a record and its `schemaType` is `Article` or `BlogPosting`.
+2. It is `indexable` (§20.6). A page telling crawlers to drop it does not belong in a syndication feed either.
+3. It is **self-canonical**, by §21.2's own `classifyCanonical` — the shared reader, so "which page does this URL name" keeps one answer.
+4. Its `datePublished` has a non-null `iso` **carrying a time** (§29.3).
+
+Entries are ordered by `datePublished` **descending**, ties broken by output path ascending, so two builds of one tree produce byte-identical bytes. That is the one ordering this document invents, and it is the one every feed reader assumes; the tie-break exists so the assumption never costs determinism.
+
+### 29.5 The document
+
+| element | value |
+|---|---|
+| `<feed xmlns>` | `http://www.w3.org/2005/Atom` |
+| `<id>` (feed) | the site's own address — `--base-url`, exactly as given |
+| `<title>` (feed) | the `<title>` of the page at the site root (`index.html`), else the site's host |
+| `<updated>` (feed) | the newest entry's `<updated>` |
+| `<link rel="self">` | the feed's own absolute URL |
+| `<link rel="alternate">` | the site's own address |
+| `<entry><id>` | the entry's **canonical** URL — `record.canonical` if the page declares one, else `record.url` |
+| `<entry><title>` | `record.title` |
+| `<entry><link rel="alternate">` | the same URL as `<id>` |
+| `<entry><updated>` | `dateModified.iso` when it carries a time, else `datePublished.iso` |
+| `<entry><published>` | `datePublished.iso` |
+| `<entry><summary type="text">` | `record.description`, omitted when null |
+| `<entry><author><name>` | `record.author`, omitted when null |
+| `<entry><content type="html">` | only under `--feed-full` (§29.6) |
+
+`<id>` is the canonical because an id must be **stable** (RFC 4287 §4.2.6) and a canonical is the author's own statement of this page's permanent address; deriving one from a path would change the moment a file moved, which is precisely what a canonical exists to prevent. Every URL is percent-encoded by §20.5 and then XML-escaped, both, for §21.3's reason.
+
+`<updated>` prefers `dateModified` because Atom defines it as the last significant modification; a page that has never been modified reports its publication instant, which is the truthful reading of "last modified" for such a page.
+
+### 29.6 `--feed-full`
+
+`--feed-full` puts each entry's rendered body into `<content type="html">`. Product-spec §6.5.1 requires full-content inclusion to be **an explicit option** and this is it; without the flag every entry carries `<summary>` and no content.
+
+The content is the emitted `<main>`'s inner HTML — the same subtree §20.7 reads `text` from, taken as markup rather than as text — with **URLs left exactly as they were emitted**. Under `--base-url` those are already absolute (§11.3), which is what a feed reader needs. Without `--base-url` there is no feed at all (§29.1), so the case where a relative URL would escape into a reader's page cannot arise.
+
+The flag is a usage error without `--base-url`, for the same reason `--canonical auto` is (§22.1): it describes something the build will not do.
+
+### 29.7 References, collisions, and the report
+
+Every URL the feed emits is checked exactly as §21.6 checks a sitemap's: a `<link href>` or `<id>` naming a location inside this site must resolve to a file the site emits, or it is **P13** located at the feed. For a generated feed this can only pass, and the reason is §29.4's third condition rather than an appeal to provenance: an entry's `<id>` is its canonical, and `classifyCanonical` answers `self` — the membership test — only for a canonical that **resolves to this page's own output path**. A canonical naming nothing this site emits classifies as `unknown` or `elsewhere`, so that page is not an entry and its unresolvable value never reaches the feed to be reported a second time. It is already **P13** at the page (§22.5), which is where the author can fix it, and one fault stays one diagnostic. The check runs anyway for §21.6's reason.
+
+Under `--feed-full`, the entry bodies carry the page's own references, and those are §12's already: the same bytes were checked in the page. Nothing is checked twice and nothing is checked in a second way.
+
+An authored `feed.xml` **suppresses generation entirely** (§21.5's rule, unchanged): the author's file is the site's feed, ships byte-for-byte, and has its internal URLs checked exactly as a generated one does. That is not a corner case — the `blog` template's generator writes its own `feed.xml` (§19.6), so the scaffold that teaches feeds is also the fixture that proves the suppression.
+
+`--dry-run` lists the generated file like any other write, and §15 publishes it only when the whole build has zero problems.
+
+---
+
+## 30. The search manifest
+
+Product-spec §6.5.2. One JSON file a client-side search library or an external indexer can read instead of re-parsing the site.
+
+### 30.1 Activation and shape
+
+`--search-index` writes `search-index.json` at the output root. It is a flag rather than a consequence because, unlike a sitemap or a feed, nothing about a site declares that it wants one — there is no page-level statement meaning "I am searchable", and inventing one would be the unify-only content schema product-spec §6.3.7 forbids templates from teaching.
+
+```json
+{
+  "schemaVersion": 1,
+  "pages": [
+    {
+      "url": "https://example.com/about.html",
+      "title": "About — Example",
+      "description": "Who we are.",
+      "headings": [{ "level": 1, "text": "About", "id": "about" }],
+      "text": "About Who we are and what we do."
+    }
+  ]
+}
+```
+
+Top-level keys are `schemaVersion` and `pages`, and a page's keys are `url`, `title`, `description`, `headings`, `text` — the names product-spec §6.5.2 fixes, in that order, with no others. `title` and `description` are `null` when the page declares none; `headings` is `[]`; `text` is `""`. Serialization is two-space-indented JSON with a trailing newline, and `pages` is in manifest order (§20.1), so two builds of one tree are byte-identical.
+
+`schemaVersion` is `1`. It exists so a consumer can refuse a document it does not understand rather than mis-read one, and it changes only when a field's **meaning** changes; adding a field does not.
+
+### 30.2 It is a projection, not an extractor
+
+Every value comes from a §20 record and nothing here reads a page. `url` is `record.url`, and `record.path` when no `--base-url` was given — a root-relative reference is still an address a page on this site can link to, and refusing to emit the file without an address would make the flag useless for the local case it is most used in. `title`, `description` and `headings` are the record's own; `text` is §20.7's.
+
+Membership is **§21.2's predicate**, unchanged and shared: a record, `indexable`, not `404.html`, and self-canonical. `noindex` means *do not show this page in search results*, and a site search is search results; a page consolidated onto another would return the reader to a URL its own author retired.
+
+### 30.3 `text` is folded here, and §20.3 says it must be
+
+§20.3 keeps U+00A0 in `text` because the author chose a character that forbids a line break, and states the obligation this section discharges: *any projection of this field that is searched or compared must fold U+00A0 and the other Unicode space separators at index time, and say so where it is specified*. This is that place. Every Unicode space separator — U+00A0, U+2000–U+200A, U+202F, U+205F, U+3000 — becomes U+0020, runs collapse, and the result is trimmed. A reader typing `New York` with an ordinary space finds a page that wrote it with U+00A0, which they could not do against the unfolded field.
+
+Nothing else is folded. No case folding, no stemming, no stop-word removal, no truncation, and no character count: those are a search engine's decisions, and unify does not ship a search runtime (§6.5.2).
+
+### 30.4 Collisions and checks
+
+An authored `search-index.json` suppresses generation entirely and ships byte-for-byte (§21.5's rule). A generated path already occupied is **P22**. The file is listed in `--dry-run` and published transactionally like every other write. Its `url` values are not re-checked, and the reason is that there is nothing to check: `record.url` and `record.path` are **computed from an output path that exists by construction** (§20.5), not authored, so unlike a sitemap's `<loc>` or a feed's `<id>` there is no author-supplied value here that could name something the site does not emit. §21.6 exists because an authored sitemap can carry one; this file cannot.
+
+---
+
+## 31. Machine-readable and networked evaluation
+
+Product-spec §6.5.3. Two flags on `unify audit`, and the rule that keeps them from becoming a plugin API: neither adds an analysis path. `--format json` re-serializes what §24 already found, and `--external` adds one class of check that cannot run offline.
+
+### 31.1 `unify audit --format json`
+
+`--format json` replaces §24.5's human report on stdout with one JSON document. `--format human` is the default and names the existing behaviour. Any other value is a usage error naming both.
+
+```json
+{
+  "schemaVersion": 1,
+  "baseUrl": "https://example.com/",
+  "summary": { "broken": 1, "incomplete": 3, "problems": 0, "advisories": 2 },
+  "pages": [ ],
+  "findings": [
+    {
+      "id": "title-missing",
+      "severity": "incomplete",
+      "file": "src/about.html",
+      "outputPath": "about.html",
+      "url": "https://example.com/about.html",
+      "evidence": "the emitted <head> declares no <title>",
+      "fix": "add a <title> to the page, or to its layout for a site-wide suffix",
+      "fingerprint": "b21c0f…"
+    }
+  ]
+}
+```
+
+`pages` holds the §20 records in manifest order — the same record every other feature reads, serialized, which is what product-spec §6.5.3 asks for by name rather than a summary of it. `findings` is §24.5's order — source path, then finding id — so the two formats list the same things in the same sequence. `baseUrl` is the address the build assumed, `null` without the flag.
+
+§14's problems and advisories still print to **stderr** as prose (§24.5), and `summary` counts them so a JSON consumer knows they happened. Putting them in the document would make this a second diagnostic channel, and §14.1's contract is that there is one.
+
+Exit codes are §24.6's, unchanged. A format flag that changed an exit code would be a second policy.
+
+### 31.2 The fingerprint
+
+Each finding carries a **stable fingerprint**: a hex digest over the finding's `id`, its source `file`, and the one datum that distinguishes it from its siblings on the same page — the repeated id for `id-duplicate`, the field name for `metadata-conflict`, the unprefixed value for `jsonld-url-unprefixed`, the empty string where a finding can occur only once per page.
+
+It deliberately excludes **line numbers, evidence text, and fix text**. A fingerprint exists so a CI system can say *this is the same finding I saw last week*, and a fault that survives an unrelated edit above it must keep its identity through the line shift. Evidence and fix are prose (§14.1) and may be reworded without the fault changing; hashing them would silently retire every suppression the day a message improved.
+
+Two findings with one fingerprint are the same fault. The digest is over a canonical joining of those three fields with a separator that cannot occur in any of them, so no combination of values can collide by concatenation.
+
+### 31.3 `unify audit --external`
+
+`--external` fetches every off-origin URL the site emits and reports the ones that do not resolve. It is the **only** unify operation that touches the network, and it exists as a flag precisely so that "unify builds are offline and deterministic" stays true without qualification (§6.1).
+
+Scope is the closed set of off-origin references the manifest already holds: `href` and `src` values §12 skipped for being on another origin, the `og:`/`twitter:` image URLs, JSON-LD URL-valued properties (§12's list), and a `<link rel="canonical">` naming another site. `Disallow:` patterns are not URLs (§23.4) and are not fetched.
+
+Requests are `HEAD`, falling back to `GET` on 405; each URL is fetched **once** per run however many pages reference it; redirects are followed to a cap of five; the timeout is ten seconds. Concurrency is bounded, and the order of the report is not the order of the responses — findings sort by §24.5's rule like every other, so two runs over one tree print the same bytes whatever the network did.
+
+| id | severity | fires when |
+|---|---|---|
+| `external-unreachable` | incomplete | the request failed, timed out, or answered 4xx/5xx; one finding per distinct URL, located at the first page referencing it in manifest order |
+
+`incomplete` rather than `broken`, and the reason is the whole shape of this flag: **the answer is about someone else's server at one moment**, not about this site's output. A link that 503s during a deploy is not wrong markup, and a `broken` verdict — the word §24.3 reserves for output that contradicts itself — would be unearned. It is also why this is not, and must never become, a build check: a transient failure on another host must never withhold a publish.
+
+A run that cannot reach the network at all reports that once, as a usage error (exit 2), rather than reporting every URL as unreachable.
+
+### 31.4 SARIF
+
+Product-spec §6.5.3 permits a SARIF serializer **only if it is a mechanical view of the same findings rather than another analysis path**. `--format sarif` is exactly that: the same finding list §31.1 serializes, mapped field for field into SARIF 2.1.0 — `id` to `ruleId`, `file` to the artifact location, `evidence` to the message, `fingerprint` to `partialFingerprints`, and severity to `level` (`broken` to `error`, `incomplete` to `warning`, both of which are SARIF levels and neither of which changes an exit code).
+
+Nothing is computed for SARIF that is not computed for `--format json`. If a future field ever needs a SARIF-only derivation, that is the signal this serializer has become an analysis path and must be removed rather than extended.
