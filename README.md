@@ -52,6 +52,8 @@ unify build         # write the final site to dist/
 
 ```
 my-site/
+├── AGENTS.md             # outside src/, so it cannot publish
+├── DEPLOY.md             # the deployment recipe
 └── src/                  # the source root — everything here ships
     ├── _layout.html      # the site chrome — one complete HTML page
     ├── _includes/
@@ -60,11 +62,15 @@ my-site/
     ├── about.md          # a Markdown page — equal citizen
     ├── contact.html      # a page that overrides a named region
     ├── 404.html          # a page that opts out of the layout
+    ├── robots.txt        # minimal and honest: it blocks nothing
     └── assets/
-        └── style.css
+        ├── style.css
+        └── share-placeholder.png   # the og:image, at its declared size
 ```
 
-Templates: `default`, `basic`, `blog`, `docs`, `portfolio`. Each exercises every primitive exactly once, and `unify init && unify build --dry-run --strict` exits `0`.
+Templates: `default`, `basic`, `blog`, `docs`, `portfolio`. Each exercises every primitive exactly once, and both `unify init && unify build --dry-run --strict` and `unify init && unify audit --strict` exit `0` — a scaffold arrives with a language, a share image whose declared dimensions are the file's real ones, a `robots.txt`, and a title, description and heading on every page.
+
+Two files land beside `src/` rather than in it, so neither can publish: `AGENTS.md`, the repository-local guidance for whoever — or whatever — edits the site next, and `DEPLOY.md`, the recipe ending in the two commands that carry the site's address.
 
 ## How composition works
 
@@ -98,7 +104,7 @@ Templates: `default`, `basic`, `blog`, `docs`, `portfolio`. Each exercises every
   </head>
   <body>
     <main>
-      <h1>Welcome!</h1>
+      <h1>Home</h1>
       <p>This content lands in the layout's &lt;main&gt;.</p>
     </main>
   </body>
@@ -117,7 +123,7 @@ The built page is the layout with its `<main>` content replaced by the page's, a
 </body>
 ```
 
-The footer then contains exactly the element you wrote. No tool vocabulary of any kind survives into the output: built pages contain no `<slot>` elements, no `data-layout` attributes, and no injected script.
+The footer then contains exactly the element you wrote. Built pages contain no `<slot>` elements, no `data-layout` attributes, and no injected script. The one unify token a built page may carry is `<meta name="schema">`, and only on a page that asked for a generated JSON-LD block — nothing else survives into the output.
 
 The precedence rule, in one sentence: **named fills go to named slots, everything else to the bare slot, else into `<main>`.**
 
@@ -137,7 +143,7 @@ Everything here is converted to HTML and dropped into the layout
 exactly like an HTML page's content.
 ```
 
-`title`, `layout`, `class`, `lang`, and `dir` are the frontmatter keys with behavior; every other key becomes a `<meta>` tag. Headings get slug `id`s so every heading is a deep link.
+`title`, `layout`, `class`, `lang`, `dir`, and `schema` are the frontmatter keys with behavior; every other key becomes a `<meta>` tag. Headings get slug `id`s so every heading is a deep link.
 
 That is the whole product. There is nothing else to learn.
 
@@ -158,6 +164,7 @@ thing they get wrong, which no build check can catch.
 
 ```
 unify [build]              build the site (default command)
+unify audit                evaluate the site the build would publish — writes nothing
 unify dev                  build, watch, serve, and reload — the inner loop
 unify watch                build + rebuild on change, no server
 unify init [template]      scaffold a starter site
@@ -168,9 +175,10 @@ Options:
       --clean              empty the output directory first
       --exclude <glob>     globs never emitted, still usable by the build (repeatable; default: _*)
       --pretty-urls        about.html → about/index.html, and rewrite internal links to match
-      --base-url <url>     the site's whole address (https://site.example/repo/): prefix root-relative links, and make og:/canonical absolute for share crawlers
+      --canonical auto     add a canonical link to pages that author none, from the site address
+      --base-url <url>     the site's whole address (https://site.example/repo/): prefix root-relative links, make og:/canonical absolute for share crawlers, and generate sitemap.xml
       --dry-run            run the full build and every check, print the report, write nothing
-      --strict             advisories count as problems for the exit code
+      --strict             advisories count as problems for the exit code (with `audit`, findings too)
   -p, --port <n>           port for `unify dev` (default: 3000)
   -v, --version            print version
   -h, --help               print help
@@ -188,6 +196,8 @@ src/index.html:8: problem: include not found: /_includes/navv.html
 ```
 
 `unify build --dry-run --strict` is the whole build and every check, writing nothing — the one-line CI lint.
+
+`unify audit` answers a different question: not *is this build sound?* but *is this site complete?* It runs the same whole build, publishes nothing, and reports what it observed — a page with no description, two pages sharing a title, a heading and a `<title>` that disagree, a link to `#section` where nothing has that id, an `id` used twice on one page, a page nothing links to, structured data that contradicts the page carrying it. Each finding prints the evidence and one thing to do. **There is no score, no grade, and nothing counts characters** — a short title is not a finding, an absent one is; "duplicate" means identical, never similar. `unify build` never runs any of it, so no finding can hold up a release; `unify audit --strict` exits non-zero on any finding, and that is the opt-in CI gate. A fresh `unify init` passes it, so the first finding you see is about a page you wrote.
 
 An optional `unify.yaml` at the source root holds saved flags and nothing more (keys are the long option names; CLI flags win; the file never ships). No behavior exists that only the config file can express.
 
@@ -207,6 +217,7 @@ The full list, with the reasoning and the accepted costs, is [`docs/product-spec
 Every rule an author needs, in under sixty lines. This section is [`docs/authoring-rules.md`](docs/authoring-rules.md) embedded verbatim: the bytes between the two markers below are byte-identical to that file, which release gate G10 asserts ([`docs/testing-strategy.md`](docs/testing-strategy.md) §6). Edit the file, never this copy.
 
 <!-- BEGIN docs/authoring-rules.md -->
+
 # Authoring a unify site — the complete rules
 
 unify composes plain HTML at build time. No template language, variables, loops, or config: if you reach for
@@ -259,7 +270,7 @@ Frontmatter is YAML: quote any value containing a colon — `title: "Finish: the
 `layout`, `class` (on `<body>`), `lang`, `dir`, and `schema` are the only keys with meaning; every other becomes
 `<meta name=…>` with the value as written, so `tags`/`permalink`/`slug` do nothing and `draft: true`
 publishes (hold pages back with a leading underscore instead). A key named `og:…` emits `property=` instead
-(`og:image: /card.png`; two levels deep is an error). No `title:` → first `# Heading`; headings get slug `id`s. `schema: Article` (or `WebPage`, or `BlogPosting` — those three, spelled exactly) writes the page's JSON-LD for you, from what the page already declares: its title, description, canonical, `og:image`, `author`, `date`, `lastmod`, and `lang`. Nothing else is added and nothing is guessed — a `date` unify cannot read as `2026-01-02` or `2026-01-02T09:30:00Z` is left out and reported, never filled in from the clock or the file. Write your own `<script type="application/ld+json">` for any other type, or for more detail: yours wins and unify then generates nothing. A canonical still has no frontmatter key — it is one page's own address, which a layout must never set (that stamps every page with the same URL), so write that page in HTML, use `--canonical auto`, or leave it off.
+(`og:image: /card.png`; two levels deep is an error). No `title:` → first `# Heading`; headings get slug `id`s. `schema: Article` (or `WebPage`, or `BlogPosting` — those three, spelled exactly; in HTML, `<meta name="schema" content="Article">` in the head, which a layout may carry for a whole section) writes the page's JSON-LD for you, from what the page already declares: its title, description, canonical, `og:image`, `author`, `date`, `lastmod`, and `lang`. Nothing else is added and nothing is guessed — a `date` unify cannot read as `2026-01-02` or `2026-01-02T09:30:00Z` is left out and reported, never filled in from the clock or the file. Write your own `<script type="application/ld+json">` for any other type, or for more detail: yours wins and unify then generates nothing. A canonical still has no frontmatter key — it is one page's own address, which a layout must never set (that stamps every page with the same URL), so write that page in HTML, use `--canonical auto`, or leave it off.
 
 ## Styles, scripts, finishing
 unify never scopes, rewrites, or injects CSS/JS, and rewrites only HTML's own URL attributes (`href`, `src`) — a `url()` in CSS and a `fetch()`/`hx-get` address ship as written, so a root-relative one misses the `--base-url` prefix and 404s:
@@ -267,6 +278,7 @@ keep every `url()` in a stylesheet file and every fetched address relative to th
 `unify build --dry-run --strict` is the whole build and every check, writing nothing: every problem in one pass,
 and a list naming each page with the layout it resolved to. Then `unify build` — exit 0 means `dist/` is the complete
 site; non-zero means nothing was published and `dist/` is untouched, so never report success on a non-zero exit. `--exclude` **replaces** the `_*` default; keep `_*` in your list.
+
 <!-- END docs/authoring-rules.md -->
 
 ## Documentation

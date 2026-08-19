@@ -50,6 +50,8 @@ unify build         # write the final site to dist/
 
 ```
 my-site/
+├── AGENTS.md             # outside src/, so it cannot publish (§6.7)
+├── DEPLOY.md             # the deployment recipe
 └── src/                  # the source root — everything here ships
     ├── _layout.html      # the site chrome — one complete HTML page
     ├── _includes/
@@ -58,8 +60,10 @@ my-site/
     ├── about.md          # a Markdown page — equal citizen
     ├── contact.html      # a page that overrides a named region
     ├── 404.html          # a page that opts out of the layout
+    ├── robots.txt        # minimal and honest: it blocks nothing
     └── assets/
-        └── style.css
+        ├── style.css
+        └── share-placeholder.png   # the og:image, at its declared size
 ```
 
 Scaffolding into `src/` is what makes zero-config safe: the source root holds only what you meant to publish, so nothing outside it — `.git/`, `.env`, notes, screenshots, the output directory — can reach the built site. A flat site with no `src/` still builds with no flags (§4). The scaffold exercises the composition primitives once each: an include, the automatic layout, a named-slot override, a layout opt-out, and the underscore. (The `.fragment.html` opt-out is the one primitive it leaves out — §4 documents it.)
@@ -95,7 +99,7 @@ Scaffolding into `src/` is what makes zero-config safe: the source root holds on
   </head>
   <body>
     <main>
-      <h1>Welcome!</h1>
+      <h1>Home</h1>
       <p>This content lands in the layout's &lt;main&gt;.</p>
     </main>
   </body>
@@ -120,7 +124,7 @@ Built result: the layout, with its `<main>` content replaced by the page's, and 
 </html>
 ```
 
-Built `contact.html` — note that the footer contains exactly the element the author wrote, and no tool vocabulary of any kind survives into the output:
+Built `contact.html` — note that the footer contains exactly the element the author wrote, and that no `<slot>`, no `data-layout` and no injected script survives into the output (the one unify token a built page may carry is `<meta name="schema">`, on a page that asked for a generated JSON-LD block — §6.3.6):
 
 ```html
 <!doctype html>

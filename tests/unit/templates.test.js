@@ -1,9 +1,9 @@
 /**
- * Tier 3 — developer scaffolding, zero authority (testing-strategy §2). A
- * future tests/e2e/ suite is what will assert SCF-01..04 with real
- * conformance authority by spawning the CLI (migration-plan.md Phase 4);
- * these tests exist so a template regression is caught here, at the unit,
- * instead of only three layers up. They deliberately reuse the real
+ * Tier 3 — developer scaffolding, zero authority (testing-strategy §2).
+ * tests/conformance/scaffold.test.js is what asserts SCF-01..SCF-11 with real
+ * conformance authority, by spawning the CLI and reading the tree a real
+ * build emitted; these tests exist so a template regression is caught here,
+ * at the unit, instead of only three layers up. They deliberately reuse the real
  * composition modules (includes.js, markdown.js, compose.js, head-merge.js)
  * rather than a hand-rolled check — H1's "no mocks" discipline is a
  * behavior-test rule (tests/conformance/**, tests/e2e/**), not a unit-test
@@ -16,7 +16,7 @@
  * because includes.js resolves `<include src>` with an actual `readFile`.
  */
 import { afterAll, describe, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import { init } from "../../src/cli/commands/init.js";
@@ -94,26 +94,40 @@ describe.each(TEMPLATE_NAMES)('template "%s" — SCF-01/SCF-02 structure (in-mem
     expect(getAttr(firstElementChild, "charset")).toBe("utf-8");
   });
 
-  test("SCF-02: a plain HTML comment sits directly above the named slot, naming its purpose", () => {
+  test("SCF-02: a plain HTML comment sits directly above EACH slot, naming its purpose", () => {
+    // §19.1 says "each slot", and the layout has two: the bare <slot> inside
+    // <main> and the named "footer" one. This test read only the named slot
+    // until the bare one was found to carry no comment at all in any of the
+    // five templates — the spec's sentence was false of every artifact it
+    // described, and the one case that separated the claim from the artifact
+    // was the exact case nothing looked at. Walking EVERY slot is what makes
+    // the assertion the sentence.
     const { root } = parse(files["_layout.html"]);
-    let commentBeforeSlot = false;
-    // findAll doesn't hand back sibling context, so walk the tree by hand for
-    // this one structural check: is the element immediately before the named
-    // <slot> a comment node?
-    function checkChildren(node) {
+    const unlabelled = [];
+    let seen = 0;
+    // findAll doesn't hand back sibling context, so walk the tree by hand.
+    // `labelled` is whether the element we are *inside* was itself introduced
+    // by a comment: `<!-- main: ... -->` on the line above `<main><slot></slot></main>`
+    // labels that slot exactly as a comment directly above the slot does, and
+    // a one-line <main> is where the scaffold puts it.
+    function walk(node, labelled) {
       if (!node.children) return;
       for (let i = 0; i < node.children.length; i++) {
         const child = node.children[i];
-        if (child.type === "element" && child.tag.toLowerCase() === "slot" && getAttr(child, "name")) {
-          const prevNonBlank = [...node.children.slice(0, i)].reverse()
-            .find((c) => !(c.type === "text" && c.data.trim() === ""));
-          if (prevNonBlank?.type === "comment") commentBeforeSlot = true;
+        if (child.type !== "element") continue;
+        const prev = [...node.children.slice(0, i)].reverse()
+          .find((c) => !(c.type === "text" && c.data.trim() === ""));
+        const introduced = prev?.type === "comment";
+        if (child.tag.toLowerCase() === "slot") {
+          seen += 1;
+          if (!introduced && !labelled) unlabelled.push(getAttr(child, "name") ?? "(bare)");
         }
-        checkChildren(child);
+        walk(child, introduced);
       }
     }
-    checkChildren(root);
-    expect(commentBeforeSlot).toBe(true);
+    walk(root, false);
+    expect(seen).toBeGreaterThanOrEqual(2); // the bare slot and the named one
+    expect(unlabelled).toEqual([]);
   });
 
   test("SCF-02: the starter stylesheet declares slot { display: contents }", () => {
@@ -173,7 +187,7 @@ describe.each(TEMPLATE_NAMES)('template "%s" — full composition (SCF-04: zero 
     const root = mkdtempSync(join(tmpdir(), `unify-templates-test-${name}-`));
     roots.push(root);
     const reporter = silentReporter();
-    const code = await init({ sourceRoot: root, sourceDefaulted: true, template: name, reporter });
+    const code = await init({ projectRoot: root, sourceRoot: root, sourceDefaulted: true, template: name, reporter });
     if (code !== 0) throw new Error(`init(${name}) exited ${code}`);
     target = join(root, "src");
     return target;
@@ -274,5 +288,147 @@ describe.each(TEMPLATE_NAMES)('template "%s" — full composition (SCF-04: zero 
       }
     }
     expect(broken).toEqual([]);
+  });
+});
+
+// ------------------------------------------- §19.2, §19.5, §19.7 at the source
+//
+// Tier 3 still — the authority for SCF-06..SCF-11 is tests/conformance/
+// scaffold.test.js, which reads what a real `unify build` emitted. These
+// checks exist because two of §19's rules are properties of the template
+// MODULE rather than of any page it produces, and a built tree cannot show
+// them: whether a template's own source declares the thing (rather than
+// inheriting it from a layout that might stop supplying it), and whether the
+// module reaches its bytes without touching a filesystem.
+
+describe.each(TEMPLATE_NAMES)('template "%s" — SCF-06/SCF-07 at the source', (name) => {
+  const files = TEMPLATES[name];
+  const paths = Object.keys(files);
+  const pages = paths.filter((p) => isPage(p) && !isUnderscored(p));
+
+  test("§19.2 item 2: every page declares its OWN title and description, never only the layout's", () => {
+    // The built-tree check reads what shipped, which a layout can supply for
+    // the whole site. This reads what each PAGE declares, which is the half
+    // §8's merge cannot invent: a layout-wide description is identical on
+    // every page and is §24.4's description-duplicate, so the per-page
+    // declaration is the only spelling that can ever be right.
+    const missing = [];
+    for (const p of pages) {
+      const source = files[p];
+      if (p.endsWith(".md")) {
+        const frontmatter = source.startsWith("---") ? source.slice(3, source.indexOf("\n---", 3)) : "";
+        if (!/^title:\s*\S/m.test(frontmatter)) missing.push(`${p}: no title: in frontmatter`);
+        if (!/^description:\s*\S/m.test(frontmatter)) missing.push(`${p}: no description: in frontmatter`);
+        continue;
+      }
+      const { root } = parse(source);
+      const head = findAll(root, (n) => n.type === "element" && n.tag.toLowerCase() === "head")[0];
+      const scope = head ?? root;
+      const titles = findAll(scope, (n) => n.type === "element" && n.tag.toLowerCase() === "title");
+      if (titles.length === 0) missing.push(`${p}: no <title> of its own`);
+      const descriptions = findAll(scope, (n) => n.type === "element" && n.tag.toLowerCase() === "meta" && getAttr(n, "name") === "description");
+      if (descriptions.length === 0 || !descriptions[0] || !(getAttr(descriptions[0], "content") ?? "").trim()) {
+        missing.push(`${p}: no <meta name="description"> of its own`);
+      }
+    }
+    expect(missing).toEqual([]);
+  });
+
+  test("§19.7: no value in the template is the spelling a missing argument takes", () => {
+    // `pageHtml({title})` with no `description` interpolates the string
+    // "undefined" into the page, its og:description and its JSON-LD. Every
+    // finding in §24.4 reads that as a present, unique, non-empty value, so
+    // nothing downstream can see it — which is why it is checked here, where
+    // the argument was omitted.
+    //
+    // Scoped to the files whose bytes a reader receives — the pages, the
+    // layout, and the include. `_scripts/gen.mjs` is deliberately out of
+    // scope: it is a program, `Number.isNaN` is the right thing for it to
+    // call, and the pages it writes are `.html` entries in this same map and
+    // are checked here like any other.
+    const offenders = [];
+    for (const p of paths.filter((x) => /\.(html|md)$/i.test(x))) {
+      const content = files[p];
+      if (typeof content !== "string") continue;
+      for (const spelling of ["undefined", "[object Object]", "NaN"]) {
+        if (content.includes(spelling)) offenders.push(`${p}: contains ${JSON.stringify(spelling)}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  test("§19.2 item 7: the template declares no canonical anywhere", () => {
+    // A canonical is one page's own absolute address (§22.1), which a scaffold
+    // cannot know. Checked at the source as well as in dist/ because a
+    // canonical written into a page that failed to compose would never reach
+    // a built tree to be caught there.
+    const withCanonical = paths.filter((p) => typeof files[p] === "string" && /rel\s*=\s*["']canonical["']/i.test(files[p]));
+    expect(withCanonical).toEqual([]);
+  });
+
+  test("§19.2 item 5: robots.txt is at the source root, blocks nothing, and declares no Sitemap:", () => {
+    expect(paths).toContain("robots.txt");
+    const lines = files["robots.txt"].split("\n").filter((l) => l.trim() && !l.trimStart().startsWith("#"));
+    expect(lines.some((l) => /^\s*user-agent\s*:/i.test(l))).toBe(true);
+    // unify never decides what a site should block (§23), and a scaffold
+    // knows even less.
+    expect(lines.filter((l) => /^\s*disallow\s*:\s*\S/i.test(l))).toEqual([]);
+    // §23.2 makes a `#` line a comment, so a commented example teaches the
+    // line; a LIVE record without a sitemap to name is §24.4's
+    // robots-sitemap-missing in a fresh scaffold.
+    expect(lines.filter((l) => /^\s*sitemap\s*:/i.test(l))).toEqual([]);
+  });
+});
+
+describe("§19.5 — a template file may be bytes, and nothing reaches them through a filesystem", () => {
+  test("every value in every template map is a string or raw bytes, the two kinds init.js documents", () => {
+    const wrong = [];
+    for (const [name, files] of Object.entries(TEMPLATES)) {
+      for (const [p, content] of Object.entries(files)) {
+        if (typeof content !== "string" && !(content instanceof Uint8Array)) {
+          wrong.push(`${name}/${p}: ${Object.prototype.toString.call(content)}`);
+        }
+      }
+    }
+    expect(wrong).toEqual([]);
+  });
+
+  test("the byte-valued files are exactly the raster assets, and each one is a real image", () => {
+    for (const [name, files] of Object.entries(TEMPLATES)) {
+      const binary = Object.entries(files).filter(([, content]) => content instanceof Uint8Array);
+      expect(binary.length).toBeGreaterThan(0);
+      for (const [p, bytes] of binary) {
+        expect(`${name}: ${p}`).toMatch(/\.(png|jpg|jpeg|gif|webp|ico)$/);
+        // §19.2 item 4 is why bytes exist at all: an SVG would have kept the
+        // map textual and would not have done the job.
+        expect(Array.from(bytes.slice(0, 8))).toEqual([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+      }
+    }
+  });
+
+  test("no module under src/templates/** imports a filesystem, path, url, or process module", () => {
+    // `bun build --compile` bundles by tracing `import`, and a single-file
+    // executable has no sibling directory to read — so every byte a template
+    // ships must be data reachable by static import.
+    //
+    // The scan uses Bun's own transpiler rather than a grep, and that is
+    // load-bearing rather than fastidious: src/templates/blog.js carries the
+    // text of `_scripts/gen.mjs` in a template literal, and that script
+    // legitimately opens with `import { readFileSync } from "node:fs"`. A grep
+    // reads the scaffold's own generator as a violation by the module that
+    // ships it; scanImports reads the module's actual import graph and ignores
+    // the string. The end-to-end proof — compile the binary, scaffold from an
+    // empty directory, compare bytes — is in tests/conformance/scaffold.test.js.
+    const dir = join(import.meta.dir, "..", "..", "src", "templates");
+    const transpiler = new Bun.Transpiler({ loader: "js" });
+    const forbidden = /^(?:node:)?(?:fs|fs\/promises|path|url|process|child_process|os)$/;
+    const offenders = [];
+    for (const entry of readdirSync(dir)) {
+      if (!entry.endsWith(".js")) continue;
+      for (const record of transpiler.scanImports(readFileSync(join(dir, entry), "utf8"))) {
+        if (forbidden.test(record.path)) offenders.push(`src/templates/${entry} imports ${record.path}`);
+      }
+    }
+    expect(offenders).toEqual([]);
   });
 });

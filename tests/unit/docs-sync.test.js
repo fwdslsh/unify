@@ -67,3 +67,36 @@ test("the authoring rules still fit the one screen they claim", () => {
   const rules = readFileSync(join(ROOT, "docs", "authoring-rules.md"), "utf8").replace(/\n+$/, "");
   expect(rules.split("\n").length).toBeLessThanOrEqual(60);
 });
+
+test("README.md's own summary of the frontmatter keys names the same set as the authoring rules", () => {
+  // The README embeds `docs/authoring-rules.md` verbatim, so a claim it makes
+  // in its OWN prose can contradict the copy it carries 120 lines later, and
+  // the byte-identity test above cannot see it: it compares the embed, not the
+  // document around it. That is exactly what happened. The README said
+  // "`title`, `layout`, `class`, `lang`, and `dir` are the frontmatter keys
+  // with behavior; every other key becomes a `<meta>` tag" while its own
+  // embedded rules said "`title`, `layout`, `class`, `lang`, `dir`, and
+  // `schema` are the only keys with meaning" — and §10.2/§26.4 make the embed
+  // right: `schema: article` is problem P23, not a `<meta name="schema">`.
+  //
+  // Both sentences enumerate a set, so the check is set equality on the
+  // backticked keys before the phrase each uses to end the list.
+  const rules = readFileSync(join(ROOT, "docs", "authoring-rules.md"), "utf8");
+  const readme = readFileSync(join(ROOT, "README.md"), "utf8");
+
+  const keysBefore = (text, marker, label) => {
+    const at = text.indexOf(marker);
+    if (at < 0) throw new Error(`${label} no longer contains "${marker}" — this test's reading is stale, not the document`);
+    // Walk back over the enumeration: backticked spans separated by commas,
+    // "and", and parentheticals, up to the start of the sentence.
+    const before = text.slice(Math.max(0, at - 240), at);
+    const sentence = before.slice(before.lastIndexOf(". ") + 1);
+    const keys = [...sentence.matchAll(/`([a-z]+)`/g)].map((m) => m[1]);
+    if (keys.length === 0) throw new Error(`${label}: found no backticked keys before "${marker}"`);
+    return [...new Set(keys)].sort();
+  };
+
+  const fromRules = keysBefore(rules, "are the only keys with meaning", "docs/authoring-rules.md");
+  const fromReadme = keysBefore(readme, "are the frontmatter keys with behavior", "README.md");
+  expect(fromReadme, "README.md's frontmatter-key list and docs/authoring-rules.md's must name the same keys — one rule set, two audiences (product-spec §6.7)").toEqual(fromRules);
+});

@@ -27,6 +27,8 @@ Upload `dist/` anywhere: GitHub Pages, Netlify, any static host.
 
 ```
 my-site/
+├── AGENTS.md             # notes for whoever edits this site next — outside src/, so it never publishes
+├── DEPLOY.md             # how to publish it, ending in the two commands that carry your address
 └── src/                  # the source root — everything here ships
     ├── _layout.html      # the site chrome — one complete HTML page
     ├── _includes/
@@ -35,8 +37,10 @@ my-site/
     ├── about.md          # a Markdown page
     ├── contact.html      # a page that overrides the footer
     ├── 404.html          # a page with no layout
+    ├── robots.txt        # minimal and honest: it blocks nothing
     └── assets/
-        └── style.css
+        ├── style.css
+        └── share-placeholder.png   # the image social crawlers show — replace it
 ```
 
 Everything in `src/` ships to the site **except** files and folders whose name starts with `_` — those are the build's working material (layouts, fragments, notes, scripts). Files *inside* an underscore folder don't need their own prefix: `_includes/nav.html` is already held back.
@@ -82,7 +86,7 @@ Three things are happening:
   </head>
   <body>
     <main>
-      <h1>Welcome!</h1>
+      <h1>Home</h1>
       <p>This content lands in the layout's &lt;main&gt;.</p>
     </main>
   </body>
@@ -192,7 +196,7 @@ A separate command answers a separate question — not *is this build sound?* bu
 unify audit                      # what the build would publish, evaluated; writes nothing
 ```
 
-It reports the things a build has no business refusing over: a page with no description, two pages sharing a title, a heading and a `<title>` that disagree, a link to `#section` where nothing has that id, a page nothing links to. Each one prints what was seen and one thing to do about it. There is no score and nothing counts characters — a short title is not a problem, an absent one is. `unify audit --strict` exits non-zero on any finding, which is the CI gate; plain `unify build` never runs these checks at all, so none of them can hold up a release. The starter templates do not pass `--strict` yet — they each have a few real gaps of this kind — so treat a fresh scaffold's list as your first to-do, not as a broken install.
+It reports the things a build has no business refusing over: a page with no description, two pages sharing a title, a heading and a `<title>` that disagree, a link to `#section` where nothing has that id, a page nothing links to. Each one prints what was seen and one thing to do about it. There is no score and nothing counts characters — a short title is not a problem, an absent one is. `unify audit --strict` exits non-zero on any finding, which is the CI gate; plain `unify build` never runs these checks at all, so none of them can hold up a release. A fresh scaffold reports nothing: `unify init && unify audit --strict` exits `0` for every starter template, so you can wire the gate up on day one and the first finding you see will be about a page you wrote.
 
 Deploying under a subpath (GitHub Pages project sites)? Give `--base-url` the site's whole address: `unify build --pretty-urls --base-url https://you.github.io/repo-name/`. The path part prefixes every root-relative link; the domain absolutizes `og:` and canonical URLs, which is what Facebook, LinkedIn and Slack fetch when someone shares a page. A bare `/repo-name/` is rejected — it would prefix the links and leave the share metadata unfetchable.
 

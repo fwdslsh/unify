@@ -92,7 +92,7 @@ Path traversal safety in include/layout resolution is internal engineering — a
 - `<main>` is the HTML spec's own page/chrome division — the default slot costs nothing to learn
 - `slot`/`slot=` carry their framework semantics (Astro/Vue/web components) intact: named hole, visible fallback, replace-element
 - Layouts preview their own defaults natively in a browser (slot fallbacks render without any script)
-- The only unify-specific tokens are `<include src>` and `data-layout`; built output contains no tool vocabulary at all
+- The only unify-specific tokens an author writes are `<include src>`, `data-layout`, and (0.8) `schema`; built pages contain no `<slot>`, no `data-layout`, and no injected script. The one unify token that *survives* into output is `<meta name="schema">`, and only on a page that asked for a generated JSON-LD block (§26.4) — it survives because unify never edits an author's markup, and because §20.8 reads it from the emitted document so that a Markdown page and an HTML page declare a type the same way
 
 ## Knowledge Base
 
