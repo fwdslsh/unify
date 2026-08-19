@@ -133,7 +133,9 @@ Everything here is converted to HTML and dropped into the layout
 exactly like an HTML page's content.
 ```
 
-Frontmatter supplies the head: `title` (if you skip it, the first `# Heading` is the title), `layout`, `class`, `lang`, `dir`, and any other key becomes a `<meta>` tag (`description`, `author`; an `og:` block becomes `property=` metas). Headings get anchor `id`s automatically. There is no `draft:`, `date:`, or `tags:` behavior — `draft: true` would just publish a page with a meta tag; hold pages back by renaming them with a leading underscore (`_draft.md`).
+Frontmatter supplies the head: `title` (if you skip it, the first `# Heading` is the title), `layout`, `class`, `lang`, `dir`, and any other key becomes a `<meta>` tag (`description`, `author`; an `og:` block becomes `property=` metas). Headings get anchor `id`s automatically. There is no `draft:` or `tags:` behavior — `draft: true` would just publish a page with a meta tag; hold pages back by renaming them with a leading underscore (`_draft.md`).
+
+One more key does something: `schema: Article` (or `WebPage`, or `BlogPosting`) writes the page's JSON-LD for you, out of what the page already says — title, description, canonical, `og:image`, `author`, `date`, `lastmod`, `lang`. It invents nothing, so a `date:` it cannot read as `2026-01-02` is left out and reported rather than guessed at, and a `<script type="application/ld+json">` you write yourself wins outright. That is the escape hatch for every other type.
 
 Two rules that save you from silent mistakes (unify makes both hard errors): HTML pages never have frontmatter — use `<head>`. Markdown pages never contain a `<head>` element — use frontmatter.
 

@@ -409,8 +409,16 @@ function extract(page, base) {
         // `itemprop` and every other spelling does its job in the body and is
         // not reported — this is a list of what is *inert* there, not of what
         // unify happens to read.
+        //
+        // `schema` is unify's own key (§26.4) and belongs here for the same
+        // reason spelled one register in: it is read with the head (§20.3), so
+        // in the body it reaches neither a consumer nor §26.6's generator. Left
+        // out, the one key whose whole purpose is to switch generation on was
+        // also the only head-only meta whose misplacement nothing reported —
+        // no block, no problem, no finding — which is exactly the silence
+        // §26.4 argues its own closed value list from.
         const key = getAttr(node, "charset") !== null ? "charset"
-          : name === "description" || name === "robots" || name.startsWith("twitter:") ? name
+          : name === "description" || name === "robots" || name === "schema" || name.startsWith("twitter:") ? name
           : property.startsWith("og:") ? property
           : null;
         if (key !== null) strayMetadata.push({ tag: "meta", key });

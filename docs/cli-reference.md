@@ -114,6 +114,34 @@ Pages that are `noindex`, that are `404.html`, or whose own canonical points els
 
 Nothing else about the page changes: the element lands immediately before `</head>` at that tag's indentation, and every other byte is what it was.
 
+## Structured data (`schema:`)
+
+There is no flag for this one: a page asks for JSON-LD by declaring a type, in Markdown frontmatter or in HTML, and a site that declares none behaves exactly as it always has.
+
+```
+---
+title: Shipping in public
+description: Why we write the changelog first.
+schema: BlogPosting
+author: Robin Vale
+date: 2026-01-02
+og:image: /card.png
+---
+```
+
+```html
+<meta name="schema" content="Article">
+```
+
+`WebPage`, `Article`, `BlogPosting` — those three, spelled exactly; `article` is a build error rather than a silent no-op, and so is any other type. unify then writes one `<script type="application/ld+json">` before `</head>`, built only from what the page already declares: the title, the description, the final canonical, the `og:image`, `author`, `date`, `lastmod`, and the document's `lang`. Nothing else, and nothing invented — no publisher, no keywords, no word count, and no date from the build clock, the filesystem, the filename, or Git. A `date` that is not `2026-01-02` or `2026-01-02T09:30:00Z` is left out and reported rather than reformatted or guessed at.
+
+Two things follow from "only what the page declares", and both surprise people once:
+
+- **The headline is the title you see in the browser tab**, layout suffix included — `Shipping in public — Example`. The separator lives in your layout, so unify cannot tell which half is the site's name, and cutting at the first dash would mangle the first headline that contains one.
+- **Anything you write yourself wins.** A page carrying its own `<script type="application/ld+json">`, anywhere in the document, gets nothing generated. That is the escape hatch for every other vocabulary — `Product`, `Recipe`, `LocalBusiness`, a `@graph` — and for more detail than the eight fields above.
+
+`unify audit` then reads structured data as bytes, whoever wrote them: a `headline` that does not match the page's `<h1>`, an `inLanguage` that disagrees with `<html lang>`, a `url` naming a different page than the canonical, one `@id` given two types, and a date nothing can use.
+
 ### `--dry-run`
 
 The entire build — composition, URL rewriting, collision detection, the reference check, every problem and advisory — with no writes. Stdout lists what would be written, copied, and deleted, each page naming what it composed from:
@@ -128,6 +156,13 @@ delete dist/stale.html
 ```
 
 The first line is the address the build assumed — `serving from / — the domain root` when no `--base-url` is set. Each write/copy carries the URL that file answers to, so a site built for the wrong address shows it here rather than after deployment.
+
+Work that edits pages rather than adding files is named above the list, one line each, so it is never invisible:
+
+```
+canonical completion: 5 pages would gain a canonical link
+structured data: 3 pages would gain a JSON-LD block
+```
 
 ### `--strict`
 

@@ -256,10 +256,10 @@ an error — on a layout too, because layouts don't chain (a section layout is a
 
 ## Markdown
 Frontmatter is YAML: quote any value containing a colon — `title: "Finish: the last quarter"`. `title`,
-`layout`, `class` (on `<body>`), `lang`, `dir` are the only keys with meaning; every other becomes
-`<meta name=…>` with the value as written, so `date`/`tags`/`permalink`/`slug` do nothing and `draft: true`
+`layout`, `class` (on `<body>`), `lang`, `dir`, and `schema` are the only keys with meaning; every other becomes
+`<meta name=…>` with the value as written, so `tags`/`permalink`/`slug` do nothing and `draft: true`
 publishes (hold pages back with a leading underscore instead). A key named `og:…` emits `property=` instead
-(`og:image: /card.png`; two levels deep is an error). No `title:` → first `# Heading`; headings get slug `id`s. Canonical and JSON-LD have no frontmatter key: JSON-LD belongs in the layout; a canonical is one page's own address, which a layout must never set — that stamps every page with the same URL — so write that page in HTML, or leave it off.
+(`og:image: /card.png`; two levels deep is an error). No `title:` → first `# Heading`; headings get slug `id`s. `schema: Article` (or `WebPage`, or `BlogPosting` — those three, spelled exactly) writes the page's JSON-LD for you, from what the page already declares: its title, description, canonical, `og:image`, `author`, `date`, `lastmod`, and `lang`. Nothing else is added and nothing is guessed — a `date` unify cannot read as `2026-01-02` or `2026-01-02T09:30:00Z` is left out and reported, never filled in from the clock or the file. Write your own `<script type="application/ld+json">` for any other type, or for more detail: yours wins and unify then generates nothing. A canonical still has no frontmatter key — it is one page's own address, which a layout must never set (that stamps every page with the same URL), so write that page in HTML, use `--canonical auto`, or leave it off.
 
 ## Styles, scripts, finishing
 unify never scopes, rewrites, or injects CSS/JS, and rewrites only HTML's own URL attributes (`href`, `src`) — a `url()` in CSS and a `fetch()`/`hx-get` address ship as written, so a root-relative one misses the `--base-url` prefix and 404s:

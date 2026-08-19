@@ -61,6 +61,7 @@ import { buildManifest } from "../../core/manifest.js";
 import { auditManifest, formatFindings } from "../../core/audit.js";
 import * as sitemap from "../../core/sitemap.js";
 import { completeCanonical } from "../../core/canonical.js";
+import { checkSchemaDeclarations, generateStructuredData } from "../../core/structured-data.js";
 import * as robots from "../../core/robots.js";
 
 /**
@@ -240,8 +241,47 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
   // result — so §20.2's "every field is read from the emitted text" stays
   // literally true rather than being patched around. The extra pass runs only
   // under --canonical auto.
-  /** Output path -> the byte insertions §22 made, so §14.1's locator can undo them. */
+  /**
+   * Output path -> the byte insertions §22 and §26 made, so §14.1's locator can
+   * undo them — in **reverse application order**, most recent first. Each `at`
+   * is a position in the text that insertion was applied to, so the locator
+   * has to peel them off newest-first to keep asking each `at` about an offset
+   * measured in its own text (see `makeReferenceLocator`).
+   */
   const insertionsByOutputPath = new Map();
+  /**
+   * Output path -> the page's emitted text as it stood BEFORE §22 or §26 wrote
+   * into it. The span table `makeReferenceLocator` queries describes exactly
+   * that text, so its own last-resort fallback — numbering an offset against a
+   * whole file when no span covers it — has to number it against this and not
+   * against the taller final text. Numbering the final text added every line an
+   * insertion contributed to the printed number, which on a 16-line page put a
+   * §12 problem at line 22: a number the file cannot hold, which is DIA-06's
+   * "checkable-looking and wrong" reached by arithmetic rather than by a guess.
+   */
+  const preInsertionByOutputPath = new Map();
+  /**
+   * Record one feature's insertions into a page — newest first, since each
+   * `at` is measured in the text ITS feature was applied to — and remember the
+   * page's pre-insertion text the first time anything writes into it. Called
+   * BEFORE `page.html` is replaced, which is what makes that text the right one.
+   *
+   * Each insertion carries the page's OWN source path: §1's provenance is "the
+   * source file whose text contained an element's start tag" and a generated
+   * element has none, so a reference §12 finds inside these bytes is located at
+   * the page the block was generated for (§26.7) rather than at whichever file
+   * happened to contribute the `</head>` it was spliced before — a layout, or
+   * an include's fragment, neither of which contains the reference.
+   */
+  const noteInsertions = (page, insertions) => {
+    if (!preInsertionByOutputPath.has(page.outputPath)) {
+      preInsertionByOutputPath.set(page.outputPath, page.html);
+    }
+    insertionsByOutputPath.set(page.outputPath, [
+      ...insertions.map((ins) => ({ ...ins, file: page.sourcePath })),
+      ...(insertionsByOutputPath.get(page.outputPath) ?? []),
+    ]);
+  };
   let completedCount = 0;
   if (settings.canonical === "auto") {
     const preliminary = buildManifest({ pages: manifestPages, base: baseConfig });
@@ -250,10 +290,64 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
       if (!record) continue;
       const completed = completeCanonical(page.html, record, baseConfig);
       if (completed.text === page.html) continue;
+      noteInsertions(page, completed.insertions);
       page.html = completed.text;
       tempFiles.set(page.outputPath, completed.text);
-      insertionsByOutputPath.set(page.outputPath, completed.insertions);
       completedCount++;
+    }
+  }
+
+  // ---- §26 — structured data: P23, then bounded generation. ----------------
+  // Ordered here for §22's own reason, one section on: the manifest reads
+  // emitted bytes (§20.2), so anything that writes into a page must have
+  // written before the reading every consumer shares. AFTER §22 specifically,
+  // because a page whose canonical `--canonical auto` supplied must generate
+  // THAT url rather than a second opinion about its own address (§26.7).
+  //
+  // The declaration is the whole opt-in — §26 has no flag — so `audit` runs
+  // this exactly as `build` does, and the two emit the same bytes.
+  const schemaLocate = makeReferenceLocator(
+    pageSpansByOutputPath,
+    new Map(manifestPages.map((p) => [p.outputPath, p.html])),
+    new Map(),
+    resolveLine,
+    insertionsByOutputPath,
+    preInsertionByOutputPath,
+  );
+  // P23 first, and unconditionally: a `schema` value naming a type unify does
+  // not generate is a problem whether or not anything else about the page would
+  // have generated (§26.4). It is located at the declaration — the `<meta>` and
+  // its line for an HTML page, the `.md` file with no line for a Markdown one
+  // (§14.1), which is what `schemaLocate` answers.
+  let anyDeclaration = false;
+  for (const page of manifestPages) {
+    const declares = checkSchemaDeclarations({
+      html: page.html, outputPath: page.outputPath, locate: schemaLocate, reporter,
+    });
+    anyDeclaration ||= declares;
+  }
+  // The preliminary manifest §26.5 decides against — derived from the
+  // POST-completion text, exactly as §22's is derived from the pre-completion
+  // one. Skipped when no page declared a generable type: that return value is a
+  // superset of the pages that can generate (§26.5's conditions 1 and 2 leave
+  // the meta as the only surviving source of `schemaType`), so skipping it can
+  // never suppress a block — it only spares a site that opted into nothing the
+  // derivation, which is what "a site that writes none is the v0.7 golden path,
+  // unchanged" costs to mean.
+  let generatedCount = 0;
+  if (anyDeclaration) {
+    const preliminary = buildManifest({ pages: manifestPages, base: baseConfig });
+    for (const page of manifestPages) {
+      const record = preliminary.byOutputPath.get(page.outputPath);
+      if (!record) continue;
+      const block = generateStructuredData(page.html, record);
+      if (block.text === page.html) continue;
+      // Prepended, not appended: §26 wrote into the text §22 had already
+      // lengthened, so it is the one the locator must undo first (`noteInsertions`).
+      noteInsertions(page, block.insertions);
+      page.html = block.text;
+      tempFiles.set(page.outputPath, block.text);
+      generatedCount++;
     }
   }
 
@@ -361,7 +455,8 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
 
   references.checkReferences({
     htmlFiles, cssFiles, emittedPaths: new Set(tempFiles.keys()), base: baseConfig, reporter,
-    locate: makeReferenceLocator(pageSpansByOutputPath, htmlFiles, cssFiles, resolveLine, insertionsByOutputPath),
+    locate: makeReferenceLocator(
+      pageSpansByOutputPath, htmlFiles, cssFiles, resolveLine, insertionsByOutputPath, preInsertionByOutputPath),
     // §12's cascade exemption: the output paths of pages that exist in source
     // and failed to compose. Only this loop knows which absences are that —
     // from inside the check, a page that emitted nothing and a page that never
@@ -494,6 +589,15 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
         `canonical completion: ${completedCount} page${completedCount === 1 ? "" : "s"} would gain a canonical link`,
       );
     }
+    // §26.7 — the same accounting one section over. The gate is the count
+    // rather than a flag because §26 has none: "the declaration is the whole
+    // opt-in" (§26.5), so a site that declared nothing has no work to name and
+    // reads exactly as it did before this section existed.
+    if (generatedCount > 0) {
+      reporter.summary(
+        `structured data: ${generatedCount} page${generatedCount === 1 ? "" : "s"} would gain a JSON-LD block`,
+      );
+    }
 
     const report = publishModule.formatDryRunReport(rows);
     if (report) reporter.summary(report);
@@ -594,7 +698,10 @@ function makeSourceLineResolver(sourceRoot) {
  * @param {(file: string, fileOffset: number) => number|undefined} resolveLine
  * @returns {import('../../core/references.js').Locate}
  */
-function makeReferenceLocator(pageSpansByOutputPath, htmlFiles, cssFiles, resolveLine, insertionsByOutputPath = new Map()) {
+function makeReferenceLocator(
+  pageSpansByOutputPath, htmlFiles, cssFiles, resolveLine,
+  insertionsByOutputPath = new Map(), preInsertionByOutputPath = new Map(),
+) {
   return (outputFile, offset) => {
     const spans = pageSpansByOutputPath.get(outputFile);
     // §22's completion INSERTS bytes after the spans were computed, which is
@@ -605,16 +712,64 @@ function makeReferenceLocator(pageSpansByOutputPath, htmlFiles, cssFiles, resolv
     // file at a line holding unrelated content, which is worse than no location
     // at all. Subtracting the insertions that precede the offset maps a
     // final-text position back to the pre-insertion text the spans describe.
+    // The list is in REVERSE APPLICATION ORDER (see `insertionsByOutputPath`),
+    // and that is what makes this loop total rather than merely lucky. Each
+    // insertion's `at` is a position in the text IT was applied to, so §26's
+    // block sits at an offset in the text §22 had already lengthened. Undoing
+    // the most recent first means `offset - shift` is always expressed in the
+    // space the next `at` was measured in; undoing them in application order
+    // compares a §26-space position against a §22-space offset, which happens
+    // to come out right only because a JSON-LD block is longer than a canonical
+    // link. One insertion cannot show the difference, which is why the order
+    // had to be decided the moment a second feature wrote into the same head.
+    //
+    // An offset that lands INSIDE an insertion has no preimage at all, and the
+    // three cases have to be separated rather than lumped together: §26's
+    // generated block carries references §12 checks (`url`, `image` — §26.7),
+    // so a page whose `og:image` names nothing produces a P13 inside bytes no
+    // source file contains. Subtracting the whole insertion for such an offset
+    // walks BACKWARDS past the insertion point by however much of the block
+    // preceded the reference, which on a page with a long description crossed
+    // into another file entirely: one missing image reported at `_layout.html`
+    // line 2, `<html lang="en">`, holding nothing of the kind. §1's provenance
+    // is "the source file whose text contained the element's start tag" and a
+    // generated element has none, so the position is mapped to the insertion
+    // POINT — a real position in the pre-insertion text — and §14.1's rule
+    // decides the rest: a line is omitted rather than guessed.
+    //
+    // The FILE is decided the same way and had to be, because mapping to the
+    // insertion point answers the line question and then silently answers the
+    // file question wrong: the insertion point is wherever `</head>` came from,
+    // which for a Markdown page under a layout is the LAYOUT, and for a layout
+    // that includes its head chrome is that FRAGMENT — files that contain no
+    // such reference and that the author can grep to no effect. §26.7 fixes
+    // the answer instead: a reference inside a generated block is located at
+    // the page the block was generated for, which every insertion carries.
     const insertions = insertionsByOutputPath.get(outputFile) ?? [];
     let shift = 0;
-    for (const ins of insertions) if (ins.at <= offset - shift) shift += ins.length;
+    /** The page an insertion was generated FOR, when the offset lands inside one. */
+    let generatedFile = null;
+    for (const ins of insertions) {
+      const local = offset - shift;
+      if (local >= ins.at + ins.length) shift += ins.length;
+      else if (local >= ins.at) { shift += local - ins.at; generatedFile = ins.file ?? outputFile; }
+    }
+    const generated = generatedFile !== null;
     const spanOffset = offset - shift;
     const hit = spans ? urls.spansToSourceLocator(spans, outputFile)(spanOffset) : null;
+    // The last resort: no span covers this offset, so the OUTPUT file is its
+    // own provenance. The text numbered has to be the PRE-INSERTION one, and
+    // the offset the un-shifted one — §22 and §26 add whole LINES before
+    // `</head>`, so numbering the final text against the raw offset moved every
+    // later reference down by the height of the block and printed line 22 of a
+    // 16-line file. §14.1 forbids a guessed line for being checkable and wrong;
+    // an impossible one is that fault with the checking already done.
+    const text = preInsertionByOutputPath.get(outputFile)
+      ?? htmlFiles.get(outputFile) ?? cssFiles.get(outputFile) ?? "";
     if (!hit || hit.fileOffset === null) {
-      const text = htmlFiles.get(outputFile) ?? cssFiles.get(outputFile) ?? "";
-      return { file: outputFile, line: html.lineOf(text, offset) };
+      return { file: generatedFile ?? outputFile, line: generated ? undefined : html.lineOf(text, spanOffset) };
     }
-    return { file: hit.file, line: resolveLine(hit.file, hit.fileOffset) };
+    return { file: generatedFile ?? hit.file, line: generated ? undefined : resolveLine(hit.file, hit.fileOffset) };
   };
 }
 

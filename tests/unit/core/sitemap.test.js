@@ -76,6 +76,16 @@ describe("§21.4 protocol limits", () => {
     }
   });
 
+  // The one test in this file with a timeout of its own, and the number is
+  // measured rather than picked. Proving the BYTE cap binds means exceeding
+  // 50 MiB, so the input is ~66 MB of strings by construction and the parts
+  // are re-serialized to check them — ~1.4s on an idle machine, and past
+  // bunfig's 5000ms default under a loaded concurrent run, which is how it
+  // first failed. There is no cheaper input: the caps are module constants, so
+  // the only way to make the byte cap bind is to hand it that many bytes. The
+  // per-part byte assertion below is NOT redundant with "every part serializes
+  // under both caps" above — that test's entries are short, so its split is
+  // count-bound and no byte-bound part is ever checked against the cap there.
   test("the byte cap splits before the URL cap when entries are long enough", () => {
     // ~1.1 KiB per <loc> puts 50 MiB well below 50,000 URLs, so the byte cap
     // has to be the binding one. Deliberately a different failure mode from
@@ -91,7 +101,7 @@ describe("§21.4 protocol limits", () => {
       expect(Buffer.byteLength(serializeUrlset(part), "utf8")).toBeLessThanOrEqual(MAX_BYTES_PER_FILE);
     }
     expect(parts.flat()).toHaveLength(long.length); // nothing dropped at a boundary
-  });
+  }, 30_000);
 
   test("the index names parts in order and carries no lastmod", () => {
     const xml = serializeIndex([

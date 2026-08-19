@@ -32,8 +32,9 @@
  * publish path; `unify audit --strict` is the opt-in gate.
  */
 
-import { jsonLdReferences } from "./references.js";
+import { jsonLdReferences, resolveReference, stripBaseUrl } from "./references.js";
 import { canonicalSchemeMismatch, classifyCanonical } from "./sitemap.js";
+import { stringProperty, subjectObject } from "./structured-data.js";
 
 /**
  * @typedef {object} Finding
@@ -128,6 +129,48 @@ function redirectChain(record, byOutputPath) {
 
 /** Normalize a heading or title for comparison — case and whitespace only. */
 const norm = (s) => s.toLowerCase().replace(/\s+/g, " ").trim();
+
+/**
+ * §26.3 — which page of this manifest does one URL name?
+ *
+ * `jsonld-url-mismatch` compares a block's `url` against the page's canonical,
+ * and both sides are read **here**, through §12's own three steps in §12's own
+ * order: strip the `--base-url` prefix, resolve against the containing output
+ * file, and let a directory URL become the `index.html` within it. That is
+ * literally `classifyCanonical`'s body minus its four-state answer — this
+ * comparison needs the resolved *path* of two different values, which a
+ * self/elsewhere verdict cannot carry — so the two readings are the same
+ * functions applied in the same order and cannot disagree about which page a
+ * URL names. Writing a second resolver here is the defect product-spec §6.1
+ * forbids for URLs; calling §12's is the whole point.
+ *
+ * `null` means "not a page this manifest holds", which is the finding's own
+ * entry condition: a `url` on another origin is that site's business, and one
+ * naming a location this site does not emit is already **P13** through §12's
+ * closed property list — the stronger answer, and the one mechanism.
+ * @param {string} value
+ * @param {import('./manifest.js').PageRecord} record
+ * @param {import('./urls.js').BaseUrlConfig|null} base
+ * @param {Map<string, import('./manifest.js').PageRecord>} byOutputPath
+ * @returns {string|null}
+ */
+function outputPathNamedBy(value, record, base, byOutputPath) {
+  const stripped = base ? stripBaseUrl(value, base) : value;
+  const target = resolveReference(stripped, record.outputPath);
+  return target !== null && byOutputPath.has(target) ? target : null;
+}
+
+/**
+ * §26.3 — a language tag's **primary subtag**, case-folded.
+ *
+ * Both halves are load-bearing. BCP 47 §2.1.1 makes tags case-insensitive, so
+ * `EN-us` and `en-US` are one tag and a byte comparison would accuse a correct
+ * page. And `en` beside `en-GB` is a *refinement* rather than a contradiction
+ * — one says English, the other says which English — so comparing whole tags
+ * would accuse the commonest correct pairing there is. What is left, `en`
+ * against `fr`, is one document answering one question twice.
+ */
+const primarySubtag = (tag) => tag.trim().split("-")[0].toLowerCase();
 
 /**
  * §20.3's requirement on any consumer that compares `text`: fold U+00A0 and
@@ -298,8 +341,14 @@ export function auditManifest({
         : el.tag === "link" ? `<link rel="${el.key}">`
         : el.key === "charset" ? "<meta charset>"
         : `<meta ${el.key.startsWith("og:") ? "property" : "name"}="${el.key}">`;
+      // `schema` is the one member of the set no browser or crawler reads
+      // ANYWHERE: it is unify's own key (§26.4), read with the head (§20.3),
+      // and what a body-placed one loses is unify's own generator. Quoting the
+      // consumer sentence at it would be evidence that is not true.
       add(record, "metadata-in-body", "broken",
-        `${shown} is emitted outside <head>, where no browser or crawler reads it`,
+        el.key === "schema"
+          ? `${shown} is emitted outside <head>, where unify does not read it — the page generates no structured data`
+          : `${shown} is emitted outside <head>, where no browser or crawler reads it`,
         `move it into <head> — in the page's own <head>, or the layout's if every page needs it`);
     }
 
@@ -322,6 +371,101 @@ export function auditManifest({
           `the page declares ${record.schemaType} but supplies ${missing.join(" and ")} — the fields structured data is built from`,
           "supply them, or drop the declared type rather than publish a partial claim");
       }
+    }
+
+    // ---- §26.3 — a block against the page it is on -------------------------
+    // §20.8 asked whether a block parses and what it declares; §12 asked
+    // whether its URLs name files this site emits. These four ask the question
+    // neither does: does the block agree with the page carrying it?
+    //
+    // Every one of them reads the SUBJECT OBJECT (§26.2) — `data` when it is a
+    // single object, never an array and never a `@graph` wrapper, and only its
+    // own string-valued properties. That is §20.8's bounded reading applied to
+    // one more question, and the cost is stated rather than hidden: on the
+    // `@graph` shape several widely-deployed CMS plugins emit, all four are
+    // silent. A claim about the wrong node of a graph is worse than no claim.
+    const subjects = record.jsonLd.map(subjectObject).filter((s) => s !== null);
+    for (const subject of subjects) {
+      const type = stringProperty(subject, "@type");
+
+      // Containment, not similarity — `title-h1-mismatch`'s test, on the one
+      // other string that is DEFINITIONALLY the same fact as the visible
+      // heading. Exactly one h1 for that finding's reason too: with none there
+      // is nothing visible to compare, with several no answer to which.
+      const headline = type === "Article" || type === "BlogPosting" ? stringProperty(subject, "headline") : null;
+      if (headline !== null && h1s.length === 1) {
+        const a = norm(headline);
+        const b = norm(h1s[0].text);
+        if (b !== "" && !a.includes(b) && !b.includes(a)) {
+          add(record, "jsonld-headline-mismatch", "incomplete",
+            `the structured data headline is ${JSON.stringify(headline)} but the <h1> reads ${JSON.stringify(h1s[0].text)}`,
+            "make one of them contain the other, so a rich result and the page agree");
+        }
+      }
+
+      // The page telling a consumer two different things about its own
+      // address. Both values resolve through ONE reader (see
+      // `outputPathNamedBy`), and the finding fires only when BOTH resolve to
+      // a page this manifest holds: anything else is another site's business
+      // or P13's, never a second opinion here.
+      const declared = stringProperty(subject, "url");
+      if (declared !== null && record.canonical !== null) {
+        const named = outputPathNamedBy(declared, record, base, byOutputPath);
+        const canonical = outputPathNamedBy(record.canonical, record, base, byOutputPath);
+        if (named !== null && canonical !== null && named !== canonical) {
+          add(record, "jsonld-url-mismatch", "broken",
+            `the structured data url is ${JSON.stringify(declared)}, which names ${named}, but the canonical names ${canonical}`,
+            "give both the same address — a page that names two of its own URLs has told consumers neither");
+        }
+      }
+
+      const inLanguage = stringProperty(subject, "inLanguage");
+      if (inLanguage !== null && record.lang !== null && primarySubtag(inLanguage) !== primarySubtag(record.lang)) {
+        add(record, "jsonld-lang-mismatch", "broken",
+          `the structured data says inLanguage ${JSON.stringify(inLanguage)} and the document declares lang ${JSON.stringify(record.lang)}`,
+          "name one language in both — a document that answers that question twice has answered it for nobody");
+      }
+    }
+
+    // Two blocks naming ONE entity by `@id` and classing it two ways. The
+    // `@id` is exactly what separates this from the shape §24.4 already
+    // blesses: a second `ld+json` with a different `@type` and no shared id is
+    // two entities — a `WebPage` beside an `Organization` — which is
+    // recommended practice, not a contradiction.
+    const typesById = new Map();
+    for (const subject of subjects) {
+      const id = stringProperty(subject, "@id");
+      const type = stringProperty(subject, "@type");
+      if (id === null || type === null) continue;
+      if (!typesById.has(id)) typesById.set(id, []);
+      const types = typesById.get(id);
+      if (!types.includes(type)) types.push(type);
+    }
+    for (const id of [...typesById.keys()].sort()) {
+      const types = typesById.get(id);
+      if (types.length < 2) continue;
+      add(record, "jsonld-entity-conflict", "broken",
+        `the structured data gives @id ${JSON.stringify(id)} more than one type: ${types.map((t) => JSON.stringify(t)).join(", ")}`,
+        "give one @id one @type, or give the other entity an @id of its own");
+    }
+
+    // ---- a date no consumer can use ---------------------------------------
+    // The one §26.3 finding that reads no JSON-LD. §20.10 splits a date into
+    // {raw, iso} so that "what did the author write" and "what can anything
+    // emit" never collapse; `raw` present with `iso` null is a page that
+    // declared a date NO consumer can use — not §21.3's <lastmod>, not §26.6's
+    // datePublished, not a crawler. Before this finding existed every one of
+    // them dropped that value in silence, which is the failure class §14 exists
+    // to forbid, moved one register over.
+    //
+    // The evidence quotes `raw`: the author's own bytes, and the only string
+    // they can grep for, since §20.10 emits `raw` nowhere else.
+    for (const field of ["datePublished", "dateModified"]) {
+      const value = record[field];
+      if (value === null || value.iso !== null) continue;
+      add(record, "date-unusable", "broken",
+        `${field} is ${JSON.stringify(value.raw)}, which is not a W3C date — nothing this build emits can use it`,
+        `write it as YYYY-MM-DD, or YYYY-MM-DDThh:mm:ssTZD with a time zone — the format ${field} is defined in`);
     }
 
     // ---- redirect chains ---------------------------------------------------
