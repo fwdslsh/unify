@@ -160,7 +160,7 @@ src/index.html:8: problem: include not found: /_includes/navv.html
 src/_layout.html:7: problem: include cycle: _layout.html → _includes/nav.html → _layout.html
 ```
 
-6. An `<include>` without `src` is a problem. An `<include>` with non-whitespace content between its tags is a problem — includes are verbatim and never take fills:
+6. An `<include>` without `src` is a problem. An `<include>` with non-whitespace content between its tags is **not** this section's business: it is a slotted include (§32), resolved by parsing rather than splicing, and its own problems live there. Everything in this section is about the empty form, which is unchanged. The v0.7.0 diagnostic for a non-empty include read:
 
 ```
 src/index.html:9: problem: <include> takes no content — the file's contents replace the element
@@ -961,6 +961,11 @@ The bold IDs are the stable identifiers used by `tests/conformance/rules.tsv` an
 20. **P21** — A page or layout with no `<body>` element where a merge requires one (§7). Attributed to the file that lacks it, file-level (there is no line to point at); the fix lines are spelled for that file's kind — for a page, the complete-document shape and the `.fragment.html` rename (§4.4), because a body-less `.html` is either an unfinished page or an intended partial; for a layout, `<body></body>` (the §7.5 head-only pattern)
 21. **P22** — A generated discovery artifact's output path is already occupied by a file the site emits from source (§21.5). Located at the occupying source file. Generation is suppressed rather than overwriting, so the problem never costs the author their own file
 23. **P24** — A Markdown page's frontmatter carrying `draft`, `permalink`, or `slug` (§28.1). Located at the key. Each is another generator's key that unify does not honour, and §10.2 would otherwise turn it into a `<meta>` that looks like it worked; the message names the unify mechanism that does the thing the author was reaching for. The key is the problem whatever its value, and the scope is frontmatter only — no generator reads `<meta name="draft">`, so an HTML author writing one is writing an ordinary meta about their own content
+23. **P25** — A non-empty `<include>` whose target is not a `.fragment.html` (§32.2). Located at the include element and naming the target
+24. **P26** — A non-empty `<include>` whose target is a `.fragment.html` declaring no `<slot>` (§32.2). Located at the include element and naming the fragment; the content would be dropped, which the content-loss law never permits
+25. **P27** — A `<head>`, `<html>`, or `<body>` element inside a fragment reached by a non-empty `<include>` (§32.3). Located at that element. A fragment contributes no head and no root attributes, so the element would land in the body and do nothing — §10.5's shape, one file type over
+26. **P28** — A fill inside a non-empty `<include>` naming a slot its target does not declare (§32.3). A **problem** rather than §7.3's advisory A02, because a fragment has no flow for unaddressed content to stay in: the include element is replaced entirely, so the content is dropped
+27. **P29** — A `--generate` script that threw (§33.2). Located at the generator's path, carrying the thrown message and, under `DEBUG=1`, the stack. The build stops before the scan, because a partial overlay is a site nobody described
 22. **P23** — A `schema` declaration naming a type unify does not generate (§26.4). Located at the declaration — the frontmatter key for a Markdown page, the `<meta name="schema">` element for an HTML one. Case-sensitive, because `article` is not a schema.org type and a declaration that generated nothing in silence is what §14 exists to forbid; the message names the three accepted spellings and the `<script type="application/ld+json">` that carries any other vocabulary
 
 ### 14.3 Advisories (the closed catalogue — capped at twelve; at the cap, adding one means removing one)
@@ -2077,3 +2082,128 @@ A run that cannot reach the network at all reports that once, as a usage error (
 Product-spec §6.5.3 permits a SARIF serializer **only if it is a mechanical view of the same findings rather than another analysis path**. `--format sarif` is exactly that: the same finding list §31.1 serializes, mapped field for field into SARIF 2.1.0 — `id` to `ruleId`, `file` to the artifact location, `evidence` to the message, `fingerprint` to `partialFingerprints`, and severity to `level` (`broken` to `error`, `incomplete` to `warning`, both of which are SARIF levels and neither of which changes an exit code).
 
 Nothing is computed for SARIF that is not computed for `--format json`. If a future field ever needs a SARIF-only derivation, that is the signal this serializer has become an analysis path and must be removed rather than extended.
+
+---
+
+## 32. Slotted includes
+
+Product-spec §6.4.1, and its own framing is the constraint: recover the useful part of v0.6's customizable fragments **without** reviving area matching or a component DSL. The recovery adds no new vocabulary at all — an include's content fills a fragment's slots by exactly the rules §7 already gives a page filling a layout's.
+
+### 32.1 The two kinds of include
+
+§5's include is unchanged for the case it already served, and the two are told apart by one byte of the author's own markup:
+
+- **An empty `<include src="…"></include>` is verbatim, textual, and pre-parse** — §5.1 in full, unaltered. Whitespace between the tags is still emptiness. This is the include every existing site uses and nothing about it moves.
+- **A non-empty `<include>`** — one carrying any non-whitespace content — is a **composition**: the target is parsed, the include's children are parsed, and the two are merged by §7's slot rules. It was **P03** in v0.7.0; §5.1's sixth rule now defers to this section, and P03 keeps only its other half (an `<include>` without `src`).
+
+That split is why the feature costs one sentence rather than a mode: an author who never writes content between the tags never meets it, and an author who does has already learned the rule from layouts.
+
+### 32.2 The target must be a fragment that declares slots
+
+A non-empty include is valid only when its target is a **`*.fragment.html`** (§4.4) **whose markup contains at least one `<slot>`**. Both halves are required and each has its own problem:
+
+- **P25** — a non-empty include whose target is not a `.fragment.html`. A page or a layout is a complete document; splicing content into one has no meaning, and the two things it might have meant — into its `<main>`, or into its body — are what layouts are for.
+- **P26** — a non-empty include whose target *is* a `.fragment.html` but declares no `<slot>`. The content has nowhere to go, and dropping it is the content-loss law's own case.
+
+Both are located at the **include element**, in the file that wrote it, which is where the author can act (§14.1's provenance rule, unchanged). Both name the fragment as well as the include, because the fix is as likely to be in one file as the other.
+
+### 32.3 The merge is §7's, with two subtractions
+
+The include's children are merged into the parsed fragment exactly as a page's body is merged into a layout's (§7.1–§7.3):
+
+- A child carrying `slot="name"` **replaces** `<slot name="name">`, tag and all; the consumed `slot` attribute is removed; an unfilled slot is replaced by its own children (fallback).
+- Everything else replaces the bare `<slot>`.
+- Slots do not nest (**P16**), slots inside `<template>` are never touched, and a repeated slot name draws **A13** — the same rules, from the same code, reported the same way.
+
+Two things a layout does are **not** done here, and both follow from what a fragment is:
+
+- **No head merge.** A `.fragment.html` is a bare snippet (§4.4); it contributes no `<title>`, no `<meta>`, no `<link>`.
+- **No root attributes.** §9 ranges over `<html>` and `<body>`, and a fragment has neither.
+
+A `<head>`, `<html>`, or `<body>` element inside a fragment reached by a non-empty include is **P27**, located at that element — the same shape as §10.5's "a literal `<head>` in a Markdown body", and for the same reason: it would land in the body and do nothing.
+
+**A fill that addresses nothing is P28**, not an advisory. §7.3's A02 is an advisory precisely because a page's unmatched fill *stays in the page flow* — nothing is lost. A fragment has no flow: it replaces the include element entirely, so an unmatched fill is content the author wrote and the build dropped. That is the one case the content-loss law never permits, whatever the neighbouring rule does.
+
+### 32.4 One fragment, both roles
+
+A `.fragment.html` containing `<slot>` already has a meaning in v0.7.0, and it is not this one. An empty include is a verbatim splice, so the fragment's `<slot>` elements land in the host's text and are consumed by whatever composes *it* — in a layout, they become that layout's slots, filled by the page. `src/core/includes.js` says as much in its own opening comment, and it stays true.
+
+So the same fragment answers to both: **an empty include passes its slots through, a non-empty include consumes them.** That is not an ambiguity; it is §32.1's split read from the fragment's side, and it is what lets one shared fragment be a layout's chrome in one file and a filled component in another without being written twice. What an author must not expect is for a fragment to do both *at once* — a non-empty include consumes every slot in its target, so none is left for the host, and an unfilled one shows its fallback (§32.3) rather than travelling outward.
+
+### 32.5 Fill scope is lexical
+
+Content written inside an `<include>` fills slots **in that include's own target and nowhere else**. If the fragment itself contains an `<include>`, that inner include resolves by its own rules against its own content — the outer include's children are not visible to it, and an unfilled slot in the inner fragment shows its own fallback rather than reaching outward.
+
+The alternative — letting a fill travel down a chain until something matches — is action at a distance: adding a slot to a deeply nested fragment would silently change what an unrelated page renders. Lexical scope means the fill and the slot it fills are always in two files an author can open side by side.
+
+Cycles remain **P02** exactly as in §5.1, counted the same way, printed with the same chain.
+
+### 32.6 Order, and what this changes about §2
+
+§2 step 2 loads and inlines includes before parsing, and that stays true of empty includes. A non-empty include is resolved in the same pass and at the same moment, but by parsing rather than splicing — so the *timing* is unchanged and only the *operation* differs. Everything downstream — layout resolution, composition, URL rewriting, the manifest — sees one text and cannot tell which kind of include produced it.
+
+For a Markdown page, §10.1's ordering is unchanged: conversion first, then includes. A non-empty include written in Markdown must therefore be an HTML block, which §10.1's converter extension already makes it.
+
+### 32.7 What this is not, and the condition on shipping it
+
+No props. No attributes passed to a fragment. No expressions, loops, conditionals, or implicit data. No attribute merging on the include element or anywhere else. No style scoping. A fragment cannot read the page that included it, and a page cannot read the fragment. The complete authoring rule is: **an include may carry content when its target is a fragment with slots, and that content fills them the way a page fills a layout's.**
+
+Product-spec §6.4.1 makes shipping conditional on that rule still fitting comfortably on the authoring-rules page. The mechanical half of the condition is enforced rather than asserted: `docs/authoring-rules.md` stays within its line budget and `tests/unit/docs-sync.test.js` fails if it does not. The empirical half — the authoring trials `docs/ratification-protocol.md` specifies, in which a model authors a site from those rules alone — is **owed, not met**, and `docs/ratification.md` records it as owed. Until a round runs, this feature's claim to be learnable is an argument rather than a measurement, and this paragraph is where that distinction is kept honest.
+
+---
+
+## 33. `--generate <path>`
+
+Product-spec §6.4.2. One author-owned JavaScript file runs before the scan, and everything it writes into one supplied directory joins the build as an overlay. It replaces nothing in the pipeline and adds no API to learn.
+
+### 33.1 What it is, and what it deliberately is not
+
+`--generate _scripts/gen.mjs` names **a file in the source tree**, not a command. It is not `--run "<shell>"`, and the difference is the whole posture of the flag: a path is a thing the author wrote and can read, a shell string is a place arbitrary programs get spelled. There is no shell, no argument list, no environment plumbing, and no way to express "and then run this other thing".
+
+The path is resolved against the source root and must stay inside it (§4.3's containment rule, the same one includes and layouts obey); a path escaping the source root is a usage error. It is saved in `unify.yaml` like any other long option (§18), and it applies to `build`, `watch`, `dev`, and `audit` — the four commands that scan the source tree.
+
+### 33.2 The contract, entire
+
+```
+process.argv[2] = the absolute path of the source root
+process.argv[3] = the absolute path of the generated directory
+```
+
+That is the interface. There is no unify module to import, no object passed in, no return value read, and no callback. The generator writes files into `process.argv[3]` and returns; anything it writes anywhere else is its own business and unify neither collects nor notices it (§33.6).
+
+The working directory is the **source root**, so `./_data/authors.json` in a generator means what an author reading the source tree would expect.
+
+**The runtime is unify's own.** A compiled single-file executable carries it, which is the point product-spec §6.4.2 makes about removing the second runtime: an author with `unify` on their PATH and no Node installation can run a generator. The generator is loaded as an ES module in unify's own process, with `process.argv` set to those values for the duration of the call and restored afterwards.
+
+Three consequences of in-process loading, stated here rather than discovered later:
+
+- **A generator that calls `process.exit()` ends the build**, at whatever code it passes. unify does not sandbox arbitrary JavaScript and does not claim to (§6.7).
+- **A generator that throws is P29**, located at the generator's path, carrying the thrown message and — under `DEBUG=1` — the stack. The build stops before scanning, because a partial overlay is a site nobody described.
+- **Every rebuild re-runs it from source.** Watch mode is full rebuilds only (§16), and a module cache that returned the first build's module would make every rebuild after the first silently skip the generator — the site would go stale while the build reported success. The module is loaded fresh each time, and that is a normative requirement rather than an implementation detail.
+
+### 33.3 The overlay
+
+The generated directory is a **fresh, empty directory outside the source tree**, created per build and removed after it. Two properties follow, and both are why it is not simply a folder under `src/`:
+
+- **`src/` is never mutated.** The supported workflow does not edit the author's tree, so `audit` stays read-only (§24.2) and a failed build leaves nothing behind to clean up.
+- **The watcher cannot see it.** §16 coalesces saves into rebuilds; a generator writing into a watched directory would trigger the rebuild that runs the generator that writes into the watched directory. Putting the directory outside the source tree makes that loop structurally impossible rather than filtered — the distinction §5's own history recommends.
+
+Files in the generated directory are scanned **exactly as source files are**: `.html`/`.md` are pages, everything else mirror-copies, a leading underscore excludes, `.fragment.html` opts out. A generated page resolves layouts, includes, and URLs by the same rules, and §4 through §13 do not know the difference. `--dry-run` marks a generated row's origin (`← generated`), which is the one place the difference is visible — and it must be visible there, because a file in `dist/` with no source file behind it is otherwise unexplainable.
+
+### 33.4 Collisions between the two trees
+
+A relative path present in **both** the source tree and the generated directory is **P12** (§13), naming both — the source file by its source path, the generated one as generated. Neither wins: last-write-wins is what §13 exists to forbid, and picking the source would make a generator's output vanish silently while picking the generated one would overwrite a file the author wrote.
+
+An author who wants a generator to *replace* a page deletes the page. An author who wants a generator to *fill in* a page writes it as a fragment and includes it.
+
+### 33.5 Ordering
+
+The generator runs **before §2 step 1**, the scan. It therefore sees the source tree as it is on disk and nothing else: no manifest, no composed pages, no output. That is deliberate, and it is the boundary that keeps this a seam rather than a plugin API — a generator cannot observe unify's intermediate state, so no future change to that state can break one.
+
+The consequence an author must know, and which the recipes state: a generator that wants to list pages reads the **source** files, exactly as it would if run by hand before `unify build`. That is what the `blog` template's `_scripts/gen.mjs` already does (§19.6), which is why that scaffold is this flag's fixture as well as its documentation.
+
+### 33.6 The boundary, stated because it cannot be enforced
+
+unify runs the file the author named. It does not sandbox it, does not restrict what it may read or write, and does not audit its output for anything the ordinary build would not audit. A generator that writes outside the supplied directory, deletes files, or reaches the network is doing something unify neither prevents nor endorses — product-spec §6.1 keeps *unify's own* build offline and deterministic, and §6.7 says plainly that unify documents this boundary rather than claiming to police it.
+
+Two things unify does guarantee, and they are what make the seam safe to use rather than safe to trust. **Nothing the generator produces bypasses a check**: a generated page is checked, its references are checked, its output path collides like any other, and it publishes only inside §15's transaction. And **a generator's failure is a build failure**: P29 stops the build before the scan, so a site is never published from a half-written overlay.
