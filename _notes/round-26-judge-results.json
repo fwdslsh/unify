@@ -1,0 +1,560 @@
+{
+  "tool": "judge-round.mjs",
+  "version": "1.0.0",
+  "roundDir": "/tmp/ratify/round-26",
+  "config": {
+    "marker": "harrowgate",
+    "privateValues": "0 configured values",
+    "baseUrl": "per-sample, from the chosen command's --base-url",
+    "diagnosticLines": 16,
+    "primitives": {
+      "slotted-include": "/<include[^>]*>[\\s\\S]*?<\\/include>/",
+      "self-closing-include": "/<include[^>]*\\/>/",
+      "fragment-file": "fragment.html",
+      "slot-fill-attr": "/\\bslot=\"/",
+      "slot-element": "/<slot\\b/",
+      "data-layout": "data-layout",
+      "markdown-frontmatter": "/^---$/m",
+      "schema-key": "/^schema:/m"
+    }
+  },
+  "samples": [
+    {
+      "sample": "h1",
+      "candidates": [
+        {
+          "line": 7,
+          "command": "./unify build --base-url https://harrowgate.pages.dev/observatory/ --pretty-urls",
+          "complete": true,
+          "inPublishSection": true,
+          "chosen": true
+        }
+      ],
+      "chosenCommand": "./unify build --base-url https://harrowgate.pages.dev/observatory/ --pretty-urls",
+      "chosenReason": "in the publish-command section, complete",
+      "run": {
+        "executed": "./unify build --base-url https://harrowgate.pages.dev/observatory/ --pretty-urls --dry-run --strict",
+        "exit": 0,
+        "signal": null,
+        "error": null,
+        "problems": 0,
+        "advisories": 0,
+        "diagnostics": [],
+        "stderrLines": 0,
+        "servingFrom": "serving from https://harrowgate.pages.dev/observatory/",
+        "wouldPublish": "would publish 8 files to dist/"
+      },
+      "outputDir": "dist",
+      "markers": {
+        "pattern": "harrowgate",
+        "present": true,
+        "total": 8,
+        "files": 2
+      },
+      "privacy": {
+        "source": "config.privateValues",
+        "valuesChecked": 0,
+        "totalHits": 0,
+        "distinctLeaked": 0,
+        "perValue": {}
+      },
+      "urls": {
+        "base": "https://harrowgate.pages.dev/observatory/",
+        "note": "no fetch()/hx-get targets in the output",
+        "resolutions": [],
+        "dynamicFetches": []
+      },
+      "primitives": {
+        "sourceRoot": "src",
+        "filesSwept": 9,
+        "counts": {
+          "data-layout": {
+            "total": 4,
+            "files": 4
+          },
+          "fragment-file": {
+            "total": 14,
+            "files": 5
+          },
+          "markdown-frontmatter": {
+            "total": 0,
+            "files": 0
+          },
+          "schema-key": {
+            "total": 0,
+            "files": 0
+          },
+          "self-closing-include": {
+            "total": 0,
+            "files": 0
+          },
+          "slot-element": {
+            "total": 4,
+            "files": 2
+          },
+          "slot-fill-attr": {
+            "total": 29,
+            "files": 6
+          },
+          "slotted-include": {
+            "total": 14,
+            "files": 5
+          },
+          "_layout.html files": {
+            "total": 1,
+            "files": 1
+          },
+          "marker": {
+            "total": 1,
+            "files": 1
+          }
+        }
+      }
+    },
+    {
+      "sample": "h2",
+      "candidates": [],
+      "chosenCommand": null,
+      "chosenReason": "no fenced `unify build` command found",
+      "run": {
+        "executed": null,
+        "exit": null,
+        "refused": "no fenced `unify build` command found"
+      },
+      "outputDir": "dist",
+      "markers": {
+        "pattern": "harrowgate",
+        "present": true,
+        "total": 7,
+        "files": 1
+      },
+      "privacy": {
+        "source": "config.privateValues",
+        "valuesChecked": 0,
+        "totalHits": 0,
+        "distinctLeaked": 0,
+        "perValue": {}
+      },
+      "urls": {
+        "base": null,
+        "note": "no base URL (none in config, none in the command) — skipped",
+        "resolutions": [],
+        "dynamicFetches": []
+      },
+      "primitives": {
+        "sourceRoot": "src",
+        "filesSwept": 9,
+        "counts": {
+          "data-layout": {
+            "total": 0,
+            "files": 0
+          },
+          "fragment-file": {
+            "total": 13,
+            "files": 5
+          },
+          "markdown-frontmatter": {
+            "total": 0,
+            "files": 0
+          },
+          "schema-key": {
+            "total": 0,
+            "files": 0
+          },
+          "self-closing-include": {
+            "total": 0,
+            "files": 0
+          },
+          "slot-element": {
+            "total": 4,
+            "files": 2
+          },
+          "slot-fill-attr": {
+            "total": 39,
+            "files": 5
+          },
+          "slotted-include": {
+            "total": 13,
+            "files": 5
+          },
+          "_layout.html files": {
+            "total": 1,
+            "files": 1
+          },
+          "marker": {
+            "total": 0,
+            "files": 0
+          }
+        }
+      }
+    },
+    {
+      "sample": "h3",
+      "candidates": [
+        {
+          "line": 8,
+          "command": "./unify build --base-url https://harrowgate.pages.dev/observatory/",
+          "complete": true,
+          "inPublishSection": false,
+          "chosen": true
+        }
+      ],
+      "chosenCommand": "./unify build --base-url https://harrowgate.pages.dev/observatory/",
+      "chosenReason": "complete",
+      "run": {
+        "executed": "./unify build --base-url https://harrowgate.pages.dev/observatory/ --dry-run --strict",
+        "exit": 0,
+        "signal": null,
+        "error": null,
+        "problems": 0,
+        "advisories": 0,
+        "diagnostics": [],
+        "stderrLines": 0,
+        "servingFrom": "serving from https://harrowgate.pages.dev/observatory/",
+        "wouldPublish": "would publish 8 files to dist/"
+      },
+      "outputDir": "dist",
+      "markers": {
+        "pattern": "harrowgate",
+        "present": true,
+        "total": 8,
+        "files": 2
+      },
+      "privacy": {
+        "source": "config.privateValues",
+        "valuesChecked": 0,
+        "totalHits": 0,
+        "distinctLeaked": 0,
+        "perValue": {}
+      },
+      "urls": {
+        "base": "https://harrowgate.pages.dev/observatory/",
+        "note": "no fetch()/hx-get targets in the output",
+        "resolutions": [],
+        "dynamicFetches": []
+      },
+      "primitives": {
+        "sourceRoot": "src",
+        "filesSwept": 9,
+        "counts": {
+          "data-layout": {
+            "total": 0,
+            "files": 0
+          },
+          "fragment-file": {
+            "total": 14,
+            "files": 6
+          },
+          "markdown-frontmatter": {
+            "total": 0,
+            "files": 0
+          },
+          "schema-key": {
+            "total": 0,
+            "files": 0
+          },
+          "self-closing-include": {
+            "total": 0,
+            "files": 0
+          },
+          "slot-element": {
+            "total": 4,
+            "files": 2
+          },
+          "slot-fill-attr": {
+            "total": 42,
+            "files": 6
+          },
+          "slotted-include": {
+            "total": 14,
+            "files": 6
+          },
+          "_layout.html files": {
+            "total": 1,
+            "files": 1
+          },
+          "marker": {
+            "total": 1,
+            "files": 1
+          }
+        }
+      }
+    },
+    {
+      "sample": "h4",
+      "candidates": [
+        {
+          "line": 8,
+          "command": "./unify build --base-url \"https://harrowgate.pages.dev/observatory/\" --pretty-urls",
+          "complete": true,
+          "inPublishSection": true,
+          "chosen": true
+        }
+      ],
+      "chosenCommand": "./unify build --base-url \"https://harrowgate.pages.dev/observatory/\" --pretty-urls",
+      "chosenReason": "in the publish-command section, complete",
+      "run": {
+        "executed": "./unify build --base-url \"https://harrowgate.pages.dev/observatory/\" --pretty-urls --dry-run --strict",
+        "exit": 0,
+        "signal": null,
+        "error": null,
+        "problems": 0,
+        "advisories": 0,
+        "diagnostics": [],
+        "stderrLines": 0,
+        "servingFrom": "serving from https://harrowgate.pages.dev/observatory/",
+        "wouldPublish": "would publish 9 files to dist/"
+      },
+      "outputDir": "dist",
+      "markers": {
+        "pattern": "harrowgate",
+        "present": true,
+        "total": 7,
+        "files": 1
+      },
+      "privacy": {
+        "source": "config.privateValues",
+        "valuesChecked": 0,
+        "totalHits": 0,
+        "distinctLeaked": 0,
+        "perValue": {}
+      },
+      "urls": {
+        "base": "https://harrowgate.pages.dev/observatory/",
+        "note": "no fetch()/hx-get targets in the output",
+        "resolutions": [],
+        "dynamicFetches": []
+      },
+      "primitives": {
+        "sourceRoot": "src",
+        "filesSwept": 10,
+        "counts": {
+          "data-layout": {
+            "total": 0,
+            "files": 0
+          },
+          "fragment-file": {
+            "total": 9,
+            "files": 5
+          },
+          "markdown-frontmatter": {
+            "total": 0,
+            "files": 0
+          },
+          "schema-key": {
+            "total": 0,
+            "files": 0
+          },
+          "self-closing-include": {
+            "total": 0,
+            "files": 0
+          },
+          "slot-element": {
+            "total": 4,
+            "files": 2
+          },
+          "slot-fill-attr": {
+            "total": 18,
+            "files": 5
+          },
+          "slotted-include": {
+            "total": 9,
+            "files": 5
+          },
+          "_layout.html files": {
+            "total": 1,
+            "files": 1
+          },
+          "marker": {
+            "total": 0,
+            "files": 0
+          }
+        }
+      }
+    },
+    {
+      "sample": "h5",
+      "candidates": [
+        {
+          "line": 6,
+          "command": "./unify build --base-url \"https://harrowgate.pages.dev/observatory/\" --pretty-urls",
+          "complete": true,
+          "inPublishSection": false,
+          "chosen": true
+        }
+      ],
+      "chosenCommand": "./unify build --base-url \"https://harrowgate.pages.dev/observatory/\" --pretty-urls",
+      "chosenReason": "complete",
+      "run": {
+        "executed": "./unify build --base-url \"https://harrowgate.pages.dev/observatory/\" --pretty-urls --dry-run --strict",
+        "exit": 0,
+        "signal": null,
+        "error": null,
+        "problems": 0,
+        "advisories": 0,
+        "diagnostics": [],
+        "stderrLines": 0,
+        "servingFrom": "serving from https://harrowgate.pages.dev/observatory/",
+        "wouldPublish": "would publish 8 files to dist/"
+      },
+      "outputDir": "dist",
+      "markers": {
+        "pattern": "harrowgate",
+        "present": true,
+        "total": 7,
+        "files": 1
+      },
+      "privacy": {
+        "source": "config.privateValues",
+        "valuesChecked": 0,
+        "totalHits": 0,
+        "distinctLeaked": 0,
+        "perValue": {}
+      },
+      "urls": {
+        "base": "https://harrowgate.pages.dev/observatory/",
+        "note": "no fetch()/hx-get targets in the output",
+        "resolutions": [],
+        "dynamicFetches": []
+      },
+      "primitives": {
+        "sourceRoot": "src",
+        "filesSwept": 9,
+        "counts": {
+          "data-layout": {
+            "total": 0,
+            "files": 0
+          },
+          "fragment-file": {
+            "total": 13,
+            "files": 5
+          },
+          "markdown-frontmatter": {
+            "total": 0,
+            "files": 0
+          },
+          "schema-key": {
+            "total": 0,
+            "files": 0
+          },
+          "self-closing-include": {
+            "total": 0,
+            "files": 0
+          },
+          "slot-element": {
+            "total": 4,
+            "files": 2
+          },
+          "slot-fill-attr": {
+            "total": 39,
+            "files": 5
+          },
+          "slotted-include": {
+            "total": 13,
+            "files": 5
+          },
+          "_layout.html files": {
+            "total": 1,
+            "files": 1
+          },
+          "marker": {
+            "total": 0,
+            "files": 0
+          }
+        }
+      }
+    },
+    {
+      "sample": "s1",
+      "candidates": [
+        {
+          "line": 7,
+          "command": "./unify build --pretty-urls --canonical auto --base-url https://harrowgate.pages.dev/observatory/ --clean",
+          "complete": true,
+          "inPublishSection": true,
+          "chosen": true
+        }
+      ],
+      "chosenCommand": "./unify build --pretty-urls --canonical auto --base-url https://harrowgate.pages.dev/observatory/ --clean",
+      "chosenReason": "in the publish-command section, complete",
+      "run": {
+        "executed": "./unify build --pretty-urls --canonical auto --base-url https://harrowgate.pages.dev/observatory/ --clean --dry-run --strict",
+        "exit": 0,
+        "signal": null,
+        "error": null,
+        "problems": 0,
+        "advisories": 0,
+        "diagnostics": [],
+        "stderrLines": 0,
+        "servingFrom": "serving from https://harrowgate.pages.dev/observatory/",
+        "wouldPublish": "would publish 9 files to dist/"
+      },
+      "outputDir": "dist",
+      "markers": {
+        "pattern": "harrowgate",
+        "present": true,
+        "total": 14,
+        "files": 8
+      },
+      "privacy": {
+        "source": "config.privateValues",
+        "valuesChecked": 0,
+        "totalHits": 0,
+        "distinctLeaked": 0,
+        "perValue": {}
+      },
+      "urls": {
+        "base": "https://harrowgate.pages.dev/observatory/",
+        "note": "no fetch()/hx-get targets in the output",
+        "resolutions": [],
+        "dynamicFetches": []
+      },
+      "primitives": {
+        "sourceRoot": "src",
+        "filesSwept": 11,
+        "counts": {
+          "data-layout": {
+            "total": 0,
+            "files": 0
+          },
+          "fragment-file": {
+            "total": 9,
+            "files": 4
+          },
+          "markdown-frontmatter": {
+            "total": 0,
+            "files": 0
+          },
+          "schema-key": {
+            "total": 0,
+            "files": 0
+          },
+          "self-closing-include": {
+            "total": 0,
+            "files": 0
+          },
+          "slot-element": {
+            "total": 4,
+            "files": 2
+          },
+          "slot-fill-attr": {
+            "total": 18,
+            "files": 4
+          },
+          "slotted-include": {
+            "total": 9,
+            "files": 4
+          },
+          "_layout.html files": {
+            "total": 1,
+            "files": 1
+          },
+          "marker": {
+            "total": 0,
+            "files": 0
+          }
+        }
+      }
+    }
+  ]
+}

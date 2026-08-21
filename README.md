@@ -233,7 +233,7 @@ unify composes plain HTML at build time. No template language, variables, loops,
 - Source root is `src/` if it exists, else the current directory. `.html`/`.md` are pages — except a name
   ending `.fragment.html`, a bare snippet shipped as written, for `<include>`, embeds, or `fetch`/`hx-get` — and every other file copies byte-for-byte to the same path. A leading `/` means the source root, in any path you write. Always
   link the real filename — `/about.html`, never `/about/`; a directory link (`/guides/`) resolves only if you
-  wrote a `guides/index.html`. `--pretty-urls` rewrites links; `--base-url https://you.example/handbook/` — the site's whole address, never a bare path — prefixes them and makes `og:`/`canonical` absolute for share crawlers.
+  wrote a `guides/index.html`. This stays true under `--pretty-urls`: you still write `/about.html`, and the build rewrites it to `/about/` in the output; `--base-url https://you.example/handbook/` — the site's whole address, never a bare path — prefixes them and makes `og:`/`canonical` absolute for share crawlers.
 - **Everything in the source root ships.** Anything that is not part of the site — notes, drafts,
   scratch, scripts — goes under a leading underscore (`_draft.html`, `_notes/`, `_scripts/`): the
   build still reads it, the output never contains it. Files inside a `_` directory need no prefix.
@@ -256,7 +256,7 @@ an error — on a layout too, because layouts don't chain (a section layout is a
 ## Merging a page into its layout
 - **Named slots.** The layout writes `<slot name="footer">fallback…</slot>`; the page fills it with `slot=`
   on a real element — `<footer slot="footer">…</footer>`, never a `<slot>` tag, which in a page fills nothing
-  — and that element replaces the slot, tag and all, shipping exactly as written. Omit the fill and the
+  — and that element replaces the slot, tag and all, keeping its own markup; only the `slot=` attribute is dropped. Omit the fill and the
   fallback ships; `slot=` counts on direct children of `<body>` — or of your `<main>`, unwrapped first — and silently does nothing deeper. `grep -o '<slot[^>]*>' src/_layout.html` lists a layout's slots.
 - **Everything else** replaces the layout's bare `<slot></slot>` if it has one — `<main><slot></slot></main>`
   is the usual shape — otherwise the children of its `<main>`. A `<main>` you wrote is dropped and its children used, so write complete semantic
