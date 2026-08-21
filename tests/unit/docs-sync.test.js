@@ -100,3 +100,59 @@ test("README.md's own summary of the frontmatter keys names the same set as the 
   const fromReadme = keysBefore(readme, "are the frontmatter keys with behavior", "README.md");
   expect(fromReadme, "README.md's frontmatter-key list and docs/authoring-rules.md's must name the same keys — one rule set, two audiences (product-spec §6.7)").toEqual(fromRules);
 });
+
+/**
+ * The option surface, checked against the parser rather than against memory.
+ *
+ * `--generate` shipped working and undocumented in three places at once: the
+ * `--help` text, the reference page's synopsis, and CLAUDE.md's. The reference
+ * page opens by claiming it "lists every command, every option, and every exit
+ * code — there are no others", which is the kind of promise that is true when
+ * written and quietly false one commit later.
+ *
+ * So the parser is the source of truth and the prose is compared to it. Adding
+ * an option to `options.js` and nowhere else now fails here, naming the file
+ * that is missing it — which is the only version of this check that survives
+ * the next flag.
+ */
+/**
+ * Every option the parser accepts, as `{name, short}`. The short alias counts
+ * as documentation where a document uses it: CLAUDE.md's synopsis writes
+ * `[-s src]`, which names the option to any reader, and demanding the long
+ * spelling there would be the check dictating prose rather than checking it.
+ */
+function parsedOptions() {
+  const src = readFileSync(join(ROOT, "src", "cli", "options.js"), "utf8");
+  const table = src.slice(src.indexOf("const OPTIONS"), src.indexOf("const CONFIG_KEYS"));
+  return [...table.matchAll(/^\s*"?([a-z][a-z-]*)"?:\s*\{\s*kind:\s*"[a-z]+"(,\s*short:\s*"([a-z])")?/gm)]
+    .map((m) => ({ name: m[1], short: m[3] ?? null }));
+}
+
+/** True when the document names this option, in either spelling. */
+function names(text, option) {
+  if (new RegExp(`--${option.name}\\b`).test(text)) return true;
+  return option.short !== null && new RegExp(`(^|[\\s(\\[\`])-${option.short}\\b`, "m").test(text);
+}
+
+test("every option the parser accepts is named in --help, the reference, and CLAUDE.md", () => {
+  const parsed = parsedOptions();
+  // A positive control on the extractor itself: if this ever comes back empty
+  // or tiny, the regex stopped matching and every assertion below passes
+  // vacuously — the exact way a sync check rots into decoration.
+  expect(parsed.length).toBeGreaterThan(10);
+  expect(parsed.map((o) => o.name)).toContain("generate");
+  expect(parsed.find((o) => o.name === "source").short).toBe("s");
+
+  const undocumented = [];
+  for (const [label, relPath] of [
+    ["src/cli.js --help text", join("src", "cli.js")],
+    ["docs/cli-reference.md", join("docs", "cli-reference.md")],
+    ["CLAUDE.md", "CLAUDE.md"],
+  ]) {
+    const text = readFileSync(join(ROOT, relPath), "utf8");
+    for (const option of parsed) {
+      if (!names(text, option)) undocumented.push(`--${option.name} is missing from ${label}`);
+    }
+  }
+  expect(undocumented).toEqual([]);
+});

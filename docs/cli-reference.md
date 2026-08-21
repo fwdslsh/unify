@@ -19,6 +19,7 @@ Options:
       --base-url <url>     the site's whole address (https://site.example/repo/): prefix root-relative links, make og:/canonical absolute for share crawlers, and generate sitemap.xml
       --feed-full          include each entry's full rendered content in feed.xml (needs --base-url)
       --search-index       write search-index.json for a client-side search library
+      --generate <path>    run one JavaScript file from your source tree before the build
       --dry-run            run the full build and every check, print the report, write nothing
       --strict             advisories count as problems for the exit code (with `audit`, findings too)
       --format <kind>      `audit` report shape: human (default), json, or sarif
@@ -66,7 +67,7 @@ One finding is about a key rather than a gap. `tags:` and `categories:` are allo
 
 **`--format json` / `--format sarif`.** Replace the finding list above with one JSON document instead — `{schemaVersion, baseUrl, summary, pages, findings}`, where `pages` is the same per-page record every other 0.8 feature reads and `findings` is the same list in the same order, machine-readable rather than printed. `--format sarif` is the identical findings, mapped field for field into SARIF 2.1.0 for editors and CI systems that already read it. Neither format changes what is checked or the exit code; `--format human` (the default) is unchanged. `problem`/`advisory` diagnostics still print to stderr as prose either way — a JSON consumer gets their counts in `summary`, never their text, so there is one diagnostic channel rather than two. Each finding carries a `fingerprint`: a stable hash of its id, its file, and the one detail that tells it apart from a sibling finding on the same page (which id repeated, which field conflicted) — deliberately *not* its line number or wording, so a CI suppression survives an unrelated edit above it and a reworded fix line.
 
-**`--external`.** The one unify operation that touches the network, and the only place it can happen — plain `build`/`audit` stay offline always. Fetches every off-origin URL the site's own output declares (a share image, a canonical naming another site, a JSON-LD URL-valued property, an ordinary link) once each, `HEAD` falling back to `GET` on `405`, and reports the ones that fail, time out, or answer `4xx`/`5xx` as `external-unreachable` (`incomplete` — the fault may be the other server's, at this exact moment, and a build must never treat that as a self-contradiction). A run that cannot reach the network at all says so once, as a usage error, rather than printing one `external-unreachable` finding per URL.
+**`--external`.** The one unify operation that touches the network, and the only place it can happen — plain `build`/`audit` stay offline always. Fetches every off-origin URL the site's own output declares (a share image, a canonical naming another site, a JSON-LD URL-valued property, an ordinary link) once each, `HEAD` falling back to `GET` on `405`, and reports the ones that fail, time out, or answer `4xx`/`5xx` as `external-unreachable` (`incomplete` — the fault may be the other server's, at this exact moment, and a build must never treat that as a self-contradiction). unify does not try to tell "the network is down" from "that one host is down": nothing can distinguish them without calling some third party unify would have had to choose, so every URL that does not resolve is reported as itself.
 
 ### `unify dev`
 
@@ -189,6 +190,26 @@ If your source tree already contains a `feed.xml`, that file **is** the site's f
 ```
 
 Membership is the same rule as the sitemap and `--canonical auto`: `noindex`/`none` pages, `404.html`, and pages consolidated elsewhere by their own canonical are left out. `text` is the page's visible main content, with every Unicode space character (`&nbsp;` included) folded to an ordinary space so a search box comparing a typed query against it can actually match — nothing else is touched: no case folding, no stemming, no stop-word removal, no truncation, no character count. An authored `search-index.json` in your source tree ships untouched, the same rule feeds and sitemaps follow.
+
+### `--generate <path>`
+
+Runs one JavaScript file from your source tree before the build scans anything. `build`, `watch`, `dev`, and `audit` all take it, because all four scan the source tree.
+
+It names a **file**, never a command. There is no shell, no argument list, and no way to say "and then run this other thing" — a path is something you wrote and can read. The path resolves against the source root and must stay inside it.
+
+The whole interface is two positional arguments:
+
+```js
+const [, , sourceRoot, generatedDir] = process.argv;
+```
+
+`sourceRoot` is your source tree; `generatedDir` is an empty directory that exists only for this build. Files written into `generatedDir` join the build as an overlay — scanned, composed, checked, published, and colliding with a same-named source file exactly like any other page. Files written anywhere else are your own business. There is no unify module to import, no object passed in, and no return value read.
+
+The working directory is the source root, so `readFileSync("_data/authors.json")` means what you would expect. The runtime is unify's own: `--generate` works on a machine with no Node installed, which is why the flag exists rather than `--run "node gen.mjs"`.
+
+It runs on **every** build, including every rebuild under `watch` and `dev` — a generator that ran once would leave watch output stale while the build reported success. A non-zero exit is a located problem: nothing publishes, and the previous `dist/` is untouched.
+
+unify runs the file you named. It does not sandbox it, restrict what it reads or writes, or check its output for anything an ordinary build would not. What it does guarantee is that nothing the generator produces skips a check, and that a generator's failure is a build failure. `docs/integrations.md` works the common shapes — a data-driven index, image derivatives, a CMS pulled to disk.
 
 ### `--dry-run`
 

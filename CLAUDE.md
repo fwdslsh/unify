@@ -27,16 +27,18 @@ bun run build:windows                      # Windows x64 binary
 # The CLI (complete — there are no other commands or flags)
 bun src/cli.js build  [-s src] [-o dist] [--clean] [--exclude <glob>]... \
                       [--pretty-urls] [--base-url <url>] [--canonical auto] \
-                      [--feed-full] [--search-index] [--dry-run] [--strict]
+                      [--feed-full] [--search-index] [--generate <path>] \
+                      [--dry-run] [--strict]
 bun src/cli.js audit  [-s src] [-o dist] [--exclude <glob>]... [--pretty-urls] \
-                      [--base-url <url>] [--canonical auto] [--strict] \
-                      [--format human|json|sarif] [--external]  # 0.8: evaluate, write nothing
+                      [--base-url <url>] [--canonical auto] [--generate <path>] \
+                      [--strict] [--format human|json|sarif] [--external]  # 0.8: evaluate, write nothing
 bun src/cli.js dev    [-p 3000]            # build + watch + serve + reload
 bun src/cli.js watch                       # build + rebuild on change, no server
 bun src/cli.js init [template]             # default | basic | blog | docs | portfolio
+bun src/cli.js --version | --help          # -v | -h
 ```
 
-There is no `serve` command, no `--minify` (post-MVP), no `--fail-on`, no `--host`, no `--log-level`, and no glob pipeline (`--copy`/`--ignore`/`--render`/…). `DEBUG=1` is the only environment variable (stack traces).
+There is no `serve` command, no `--minify` (post-MVP), no `--fail-on`, no `--host`, no `--log-level`, no `--run "<shell command>"` (§33's `--generate` names a file instead), and no glob pipeline (`--copy`/`--ignore`/`--render`/…). `DEBUG=1` is the only environment variable (stack traces).
 
 **The 0.8 work shipped so far** (conformance-spec §20–§31, all on the v0.7.0 composition core, which is unchanged): the final-output page manifest (§20) — one internal record per emitted page, derived from the emitted bytes, which every discovery and evaluation feature consumes; `sitemap.xml` generation under `--base-url` (§21); `--canonical auto` completion (§22); the `Sitemap:` reference check in an authored `robots.txt` (§23); `unify audit` (§24), which runs the whole pipeline, publishes nothing, and reports `broken`/`incomplete` **findings** — a severity axis of its own, separate from §14's `problem`/`advisory`, which `build` never consults, no score, no character counts, no similarity thresholds (§24.4); structured-data validation and bounded JSON-LD generation from a `schema:` declaration (§26); `feed.xml` generation (§29) — Atom, activated by `--base-url` plus any page declaring `schema: Article`/`BlogPosting`, `--feed-full` for full-content entries, a day-only `date` excluded with advisory **A17** rather than guessed at; the search manifest `search-index.json` under `--search-index` (§30); and `unify audit`'s `--format json`/`--format sarif` (a fingerprinted, machine-readable mirror of the same findings) and `--external` (§31, the one flag in the whole product that touches the network, fetching off-origin references and reporting the ones that don't resolve as `external-unreachable`). An authored `feed.xml`/`search-index.json`/`sitemap.xml` always suppresses generation and ships byte-for-byte, exactly like an authored `robots.txt`.
 

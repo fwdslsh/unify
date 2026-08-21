@@ -32,6 +32,7 @@ Options:
       --base-url <url>     the site's whole address (https://site.example/repo/): prefix root-relative links, make og:/canonical absolute for share crawlers, and generate sitemap.xml
       --feed-full          include each entry's full rendered content in feed.xml (needs --base-url)
       --search-index       write search-index.json for a client-side search library
+      --generate <path>    run one JavaScript file from your source tree before the build
       --dry-run            run the full build and every check, print the report, write nothing
       --strict             advisories count as problems for the exit code (with \`audit\`, findings too)
       --format <kind>      \`audit\` report shape: human (default), json, or sarif
