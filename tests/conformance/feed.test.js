@@ -676,3 +676,56 @@ test("FEED-06 — a site with no root index.html still publishes: a feed's own l
   }
   covers("FEED-06");
 }, TEST_MS);
+
+/**
+ * Round 27's convergent finding, fixed and pinned.
+ *
+ * Two of five authors linked `/feed.xml` from their layout before the feed's
+ * conditions were met, and P13's standing fix line — "check the path spelling
+ * and casing" — was wrong on both counts: the spelling was right, and no
+ * source file was missing. One shipped `../feed.xml`; the other invented a
+ * build-twice model. §12 now adds a second fix line for exactly the three
+ * generated root names, stating the condition this build did not meet.
+ */
+test("REF-04 — a /feed.xml link in a feedless build names the generation condition, and a feedful build still resolves", async () => {
+  const layout = `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Site</title><meta name="description" content="Site."></head>
+<body><header><a href="/feed.xml">feed</a></header><main><slot></slot></main></body>
+</html>
+`;
+  const tree = (date) => ({
+    "_layout.html": layout,
+    "index.html": page("Home", '<h1>Home</h1><a href="/post.html">p</a>'),
+    "post.html": post("Post", { date, description: "A post." }),
+  });
+
+  // Cause 1 — no --base-url at all.
+  const noBase = mkTmp();
+  writeTree(join(noBase, "src"), tree("2026-08-02T21:30:00Z"));
+  const a = await runCli(["build", "-s", "src", "-o", "dist"], noBase);
+  expectExit(a, 1, "the link is genuinely broken in this build");
+  if (!a.stderr.includes("feed.xml is generated, not authored") || !a.stderr.includes("--base-url")) {
+    throw new Error(`§12: the second fix line must name the missing condition:\n${a.stderr}`);
+  }
+
+  // Cause 2 — candidates whose dates carry no time (A17's own case).
+  const dayOnly = mkTmp();
+  writeTree(join(dayOnly, "src"), tree("2026-08-02"));
+  const b = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", BASE], dayOnly);
+  expectExit(b, 1, "no entry, no feed, so the link is broken");
+  if (!b.stderr.includes("no time of day")) {
+    throw new Error(`§12: the second fix line must blame the dates, not the address:\n${b.stderr}`);
+  }
+
+  // The positive control: conditions met, same link, publishes clean — the
+  // second line must never fire on a build that emitted the file.
+  const ok = mkTmp();
+  writeTree(join(ok, "src"), tree("2026-08-02T21:30:00Z"));
+  const c = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", BASE], ok);
+  expectExit(c, 0, "a same-build generated feed satisfies its own link");
+  if (c.stderr.includes("generated, not authored")) {
+    throw new Error(`the second fix line fired on a resolving build:\n${c.stderr}`);
+  }
+  covers("REF-04", "FEED-01");
+}, TEST_MS);

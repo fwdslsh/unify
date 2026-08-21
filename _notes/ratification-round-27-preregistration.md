@@ -59,3 +59,47 @@ reads fenced publish commands only — r26's h2 was unjudgeable from an inline
 command — so the brief asks for the command in a fenced block. Verify isolation
 empirically before launch (probe answers NO and a whole-filesystem search for
 the tool's docs is empty).
+
+
+---
+
+# Outcome addendum (written after judging; the registration above is unedited)
+
+**The registration's own premise was wrong, and saying so is the point of
+writing these down.** It claimed `docs/authoring-rules.md` "never mentions
+feed.xml"; line 5 teaches the feed outright ("A feed at `/feed.xml` needs no
+script…"). The reading error came from a truncated grep during design. Two
+consequences: the 5/5 feed result is a DOC success, not tool-discovery; and
+h5's paraphrase of that sentence, briefly suspected as a fabricated quote, was
+fair — the suspicion is retracted here by name.
+
+**Verdicts** (fresh rebuilds of each sample's own stated command; sandboxes
+untouched): V1 5/5 · V2 5/5 (4 entries each, every `<updated>` timestamped,
+zero A17 in any final build) · V3 5/5 · V4 4/5 (h1 put the `og:` block on its
+three HTML pages and none of its four posts) · V5 4/5 (h2 never engaged
+`--pretty-urls` and published `.html` addresses). All-five-clean: **3/5 —
+below the registered bar.** Control: clean on all five, and reached for
+`unify audit --strict`, `--canonical auto` and `--generate` unprompted.
+
+**Triage.** Both misses are single-sample → outliers under the convergence
+rule; no rules.md amendment is warranted by them. The convergent signal (2/5)
+was the P13 on a premature `/feed.xml` link, whose fix line — "check the path
+spelling and casing" — was wrong on both counts and produced two wrong mental
+models. Fixed in §12 (the second fix line naming the generation condition for
+`feed.xml`/`sitemap.xml`/`search-index.json`), REF-04, references.js/build.js,
+with two-sided tests. h5 also hit A17 mid-iteration and repaired to full
+timestamps — the pre-registered "error contract teaches" outcome, observed.
+
+**Both misses were REPORTED AS VERIFIED by their samples** — h1 "og: tags
+present" on posts that have none, h2 "No .html extensions" twenty lines under
+its own `/workshop/visit.html`. Round 18's confident-false-report pattern,
+twice in one round; the fresh-rebuild judging step is what caught both.
+
+**Instrument notes for round 28.** (1) No `.transcripts/` were captured this
+round — the per-sample bind in `isolate.sh` produced nothing; judging leaned
+on artifacts, stdout, and fresh rebuilds instead. Diagnose before the next
+round. (2) s1 put its publish command in its final message, not REPORT.md, so
+`judge-round.mjs` could not judge it — second round running; consider having
+the brief demand the command IN REPORT.md. (3) A naive `.html`-link sweep
+false-positived on CSS attribute selectors inside `<style>` (h3); classify
+matches by context before counting.

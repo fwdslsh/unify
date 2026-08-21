@@ -574,8 +574,31 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
     });
   }
 
+  // §12's second fix line for the three generated root names. Computed here,
+  // not in references.js, because only this loop knows WHY a file was not
+  // generated this run — and only for names absent from the output, so a
+  // build that emitted (or shipped an authored) file never consults it.
+  const wouldGenerate = new Map();
+  if (!tempFiles.has(feed.FEED_PATH)) {
+    const candidates = manifest.records.some((rec) => feed.isFeedCandidate(rec));
+    wouldGenerate.set(feed.FEED_PATH,
+      baseConfig === null
+        ? "feed.xml is generated, not authored: this build generates it only under --base-url, from pages declaring schema: Article or BlogPosting with a dated time"
+        : candidates
+          ? "feed.xml is generated, not authored: the declared posts' dates carry no time of day, so none is a feed entry (each is reported above)"
+          : "feed.xml is generated, not authored: no page on this build declares schema: Article or BlogPosting");
+  }
+  if (!tempFiles.has(sitemap.SITEMAP_PATH) && baseConfig === null) {
+    wouldGenerate.set(sitemap.SITEMAP_PATH,
+      "sitemap.xml is generated, not authored: this build generates it only under --base-url");
+  }
+  if (!tempFiles.has(searchIndex.SEARCH_INDEX_PATH) && settings.searchIndex !== true) {
+    wouldGenerate.set(searchIndex.SEARCH_INDEX_PATH,
+      "search-index.json is generated, not authored: this build generates it only under --search-index");
+  }
+
   references.checkReferences({
-    htmlFiles, cssFiles, emittedPaths: new Set(tempFiles.keys()), base: baseConfig, reporter,
+    htmlFiles, cssFiles, emittedPaths: new Set(tempFiles.keys()), base: baseConfig, reporter, wouldGenerate,
     locate: makeReferenceLocator(
       pageSpansByOutputPath, htmlFiles, cssFiles, resolveLine, insertionsByOutputPath, preInsertionByOutputPath),
     // §12's cascade exemption: the output paths of pages that exist in source

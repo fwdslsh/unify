@@ -437,3 +437,26 @@ test("SIT-06: a broken internal loc in an authored sitemap is P13 located at the
   }
   covers("SIT-06");
 }, TEST_MS);
+
+test("REF-04 — /sitemap.xml linked without --base-url names the condition; with it, resolves", async () => {
+  // Round 27's §12 second-fix-line rule, the sitemap spelling. One tree, both
+  // builds: the line must name --base-url when the file was not generated and
+  // must not appear at all when it was.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Home</title><meta name="description" content="Home."></head>
+<body><h1>Home</h1><a href="/sitemap.xml">sitemap</a></body>
+</html>
+`,
+  });
+  const bare = await runCli(["build", "-s", "src", "-o", "dist"], tmp);
+  if (bare.exit !== 1) throw new Error(`expected the broken link to block: exit ${bare.exit}\n${bare.stderr}`);
+  if (!bare.stderr.includes("sitemap.xml is generated, not authored") || !bare.stderr.includes("--base-url")) {
+    throw new Error(`§12: the second fix line must name --base-url:\n${bare.stderr}`);
+  }
+  const withBase = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", "https://example.com/"], tmp);
+  if (withBase.exit !== 0) throw new Error(`a generated sitemap satisfies its own link:\n${withBase.stderr}`);
+  covers("REF-04", "SIT-01");
+}, 30_000);

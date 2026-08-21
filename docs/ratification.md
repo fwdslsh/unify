@@ -148,6 +148,18 @@ The round still found two documentation defects, neither of them in the rule bei
 
 Two notes on the instrument, recorded so the next round does not re-learn them. `judge-round.mjs` could not judge one sample because its publish command was written in inline code rather than a fenced block — it was a correct command and the site built clean when run by hand, so a "could not judge" line is not a failure and must not be read as one. And a frontmatter metric configured as `"/^---$/m"` silently counted zero across all six samples that *did* write frontmatter: a supplementary metric reading zero is a claim about the config until checked against the files.
 
+## 7c. Round 27: the 0.8 surface holds, and a diagnostic is the round's one fix
+
+The pre-registered round (`_notes/ratification-round-27-preregistration.md`, outcome addendum included) briefed six isolated samples to publish a site using the whole 0.8 surface: `schema:`, the nested `og:` block, dated Markdown posts by non-HTML-writing volunteers, a subpath deploy with extensionless addresses, and a working feed. Five criteria were fixed before launch.
+
+**The 0.8 rules teach.** Per criterion, Haiku scored: strict build 5/5, feed 5/5 — four entries each, every `<updated>` carrying a time, zero A17 in any final build — JSON-LD 5/5, `og:` on posts 4/5, extensionless addresses 4/5. The registered bar (four of five samples clean on *all* criteria) was missed at 3/5, by two single-sample, single-criterion misses: one sample put its `og:` block on the HTML pages and none of its Markdown posts; one never engaged `--pretty-urls`. Both are outliers under the convergence rule — no rules.md amendment. Both samples also **reported the missed thing as verified** ("og: tags present" over posts with none; "No `.html` extensions" twenty lines below its own `/workshop/visit.html`) — round 18's confident-false-report pattern, twice in one round, caught by judging fresh rebuilds instead of reports.
+
+**The convergent finding pointed at a diagnostic.** Two of five linked `/feed.xml` from their chrome before the feed's conditions were met and got P13's standing fix line — *check the path spelling and casing* — wrong on both counts: the spelling was right, and no source file was missing. One "fixed" it by shipping `../feed.xml`; the other invented a build-twice model in its report. §12 now adds a second fix line when the unresolved target is exactly one of the three generated root names, stating the condition this build did not meet (`--base-url`; `--search-index`; for the feed, whichever of address/declaration/dated-time actually failed). Two-sided tests pin all three names, including that the line never fires on a build that emitted the file.
+
+**The date rule's error contract works.** One sample wrote day-only dates, met A17 mid-iteration, and repaired to full timestamps — the pre-registered success path, observed rather than assumed.
+
+**The control's report earned its keep** even while its site passed everything: it named the one genuinely under-specified sentence on the surface (`og:image:width` versus "two levels deep is an error" — resolved only by experiment), and independently re-derived round 7's layout-side/page-side slot confusion before backing out to a simpler design. Both recorded as watched, not amended: neither caused a failure, and the budget spends only on failures.
+
 ## 8. Running it again, and what is still untested
 
 `docs/ratification-protocol.md` is the procedure — setup, the harness traps, the triage order, the two amendment rules, and the results table for every round. `_notes/ratification-handoff-prompt.md` is the self-contained block to hand a fresh agent, including the five gates that must be green before any commit.

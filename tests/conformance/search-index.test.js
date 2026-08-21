@@ -411,3 +411,24 @@ test('SRCH-03: the fold list is closed — a Unicode codepoint outside it (OGHAM
   }
   covers("SRCH-03");
 }, TEST_MS);
+
+test("REF-04 — /search-index.json linked without --search-index names the flag; with it, resolves", async () => {
+  // Round 27's §12 second-fix-line rule, the search-manifest spelling.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Home</title><meta name="description" content="Home."></head>
+<body><h1>Home</h1><a href="/search-index.json">search</a></body>
+</html>
+`,
+  });
+  const bare = await runCli(["build", "-s", "src", "-o", "dist"], tmp);
+  if (bare.exit !== 1) throw new Error(`expected the broken link to block: exit ${bare.exit}\n${bare.stderr}`);
+  if (!bare.stderr.includes("search-index.json is generated, not authored") || !bare.stderr.includes("--search-index")) {
+    throw new Error(`§12: the second fix line must name --search-index:\n${bare.stderr}`);
+  }
+  const withFlag = await runCli(["build", "-s", "src", "-o", "dist", "--search-index"], tmp);
+  if (withFlag.exit !== 0) throw new Error(`a generated manifest satisfies its own link:\n${withFlag.stderr}`);
+  covers("REF-04", "SRCH-01");
+}, 30_000);

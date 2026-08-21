@@ -444,9 +444,9 @@ export function resolveReference(url, containingOutputPath) {
  * @param {import('./diagnostics.js').Reporter} args.reporter
  * @returns {void} reports P13 problems via `reporter`
  */
-export function checkReferences({ htmlFiles, cssFiles, emittedPaths, unbuiltPagePaths = new Set(), base = null, locate, reporter }) {
+export function checkReferences({ htmlFiles, cssFiles, emittedPaths, unbuiltPagePaths = new Set(), base = null, locate, reporter, wouldGenerate = new Map() }) {
   const resolveLocate = locate ?? defaultLocate(htmlFiles, cssFiles);
-  const ctx = { base, emittedPaths, unbuiltPagePaths, reporter, locate: resolveLocate };
+  const ctx = { base, emittedPaths, unbuiltPagePaths, reporter, locate: resolveLocate, wouldGenerate };
 
   for (const [outputPath, text] of htmlFiles) {
     for (const ref of collectHtmlReferences(text)) checkOne(ref, outputPath, ctx);
@@ -491,7 +491,7 @@ function isCascade(resolved, unbuiltPagePaths) {
   return unbuiltPagePaths.has(resolved);
 }
 
-function checkOne({ raw, offset }, containingOutputPath, { base, emittedPaths, unbuiltPagePaths, reporter, locate }) {
+function checkOne({ raw, offset }, containingOutputPath, { base, emittedPaths, unbuiltPagePaths, reporter, locate, wouldGenerate }) {
   // An attribute's VALUE is its bytes with character references resolved —
   // `href="/a&amp;b.html"` is the correct HTML spelling for a file named
   // `a&b.html`, and a browser fetches the decoded form. §12 read the bytes, so
@@ -519,7 +519,14 @@ function checkOne({ raw, offset }, containingOutputPath, { base, emittedPaths, u
     line,
     message: `${stripped} does not resolve to any emitted file`,
     context: stripped,
-    fixes: [CHECK_SPELLING],
+    // §12 — one target earns a second fix line: a root name this build WOULD
+    // generate under other conditions (feed.xml, sitemap.xml,
+    // search-index.json). The standing line is wrong on both counts there —
+    // the spelling is right and no source file is missing — and round 27
+    // watched two authors, told to check a correct spelling, ship `../feed.xml`
+    // and a build-twice theory respectively. build.js owns the condition text,
+    // because only it knows why the file was not generated this run.
+    fixes: [CHECK_SPELLING, ...(wouldGenerate?.has(resolved) ? [wouldGenerate.get(resolved)] : [])],
     // The reporter deduplicates byte-identical diagnostics (diagnostics.js's
     // own `_record` doc): one broken href in a fragment included into forty
     // pages is one fault located at one line of one file, and printing it
