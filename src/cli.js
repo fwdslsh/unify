@@ -85,6 +85,10 @@ function resolveSettings(flags) {
       // beside `--canonical auto`'s identical shape.
       feedFull: settings["feed-full"] === true,
       searchIndex: settings["search-index"] === true,
+      // §33.1 — a PATH in the source tree, never a command. Read by
+      // build.js before the scan (§33.5), so `watch`, `dev` and `audit`
+      // get it too: all four scan the source tree.
+      generate: settings.generate ?? null,
       dryRun: settings["dry-run"] === true,
       // §24.1 — set by the audit command itself, never by a flag: there is no
       // `--audit`, and `build` has no way to reach the evaluator.
