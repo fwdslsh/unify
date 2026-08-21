@@ -16,7 +16,7 @@ The entire authoring surface is five things, learnable in five minutes:
 
 If a capability cannot be expressed with these five, it does not belong in unify.
 
-> **Status.** v0.7.0 is a clean break from 0.6.x: `data-unify`, `unify-*` area classes, `serve`, `--minify`, and `--fail-on` are gone, and a 0.6 site will not build. The composition model is standard HTML — `<main>`, `<slot>`, `slot=` — plus `<include src>` and `data-layout`. The specification set in [`docs/`](docs/) is authoritative; every normative rule in it is covered by a test that runs against the real CLI.
+> **Status.** v0.8.0 — the v0.7 composition model unchanged, plus the production layer: `unify audit`, sitemap/feed/search-manifest generation under `--base-url`, `--canonical auto`, bounded JSON-LD from `schema:`, slotted includes, and `--generate`. v0.7.0 was a clean break from 0.6.x: `data-unify`, `unify-*` area classes, `serve`, `--minify`, and `--fail-on` are gone, and a 0.6 site will not build. The composition model is standard HTML — `<main>`, `<slot>`, `slot=` — plus `<include src>` and `data-layout`. The specification set in [`docs/`](docs/) is authoritative; every normative rule in it is covered by a test that runs against the real CLI.
 
 ## Install
 

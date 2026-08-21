@@ -1,6 +1,6 @@
 # unify — Conformance Specification
 
-**Status**: v0.7.0, normative
+**Status**: v0.8.0, normative
 **Role**: The implementer-grade reference. `docs/product-spec.md` defines the product; this document defines the exact behavior, rule by rule. Every worked example in this document is a test fixture: an implementation conforms when it reproduces each example's output exactly — exact in element structure, tag names, attributes and their order, and text content — with only whitespace between block-level elements waived (§3; the comparator contract is `docs/testing-strategy.md` §2), and each diagnostic at the stated severity. Where this document and the product spec appear to differ, that is a defect in the document set to be fixed — neither may be silently reinterpreted.
 
 Conventions: "problem" and "advisory" are the only two severities (§14). MUST-level language is implied throughout; nothing here is optional. All paths in examples are relative to the source root unless prefixed `src/` or `dist/` for clarity. All files are UTF-8.
@@ -1041,7 +1041,9 @@ Keeping the list and naming the outcome are both required: suppressing the list 
 
 ## 18. `unify.yaml`
 
-Optional, at the source root; never emitted. Keys are the long option names with the same meanings: `source`, `output`, `clean`, `exclude` (a list, replacing the default like the flag), `pretty-urls`, `base-url`, `strict`, `port`. CLI flags win on conflict. No behavior exists that only the file can express.
+Optional, at the source root; never emitted. Keys are the long option names with the same meanings: `source`, `output`, `clean`, `exclude` (a list, replacing the default like the flag), `pretty-urls`, `base-url`, `canonical`, `feed-full`, `search-index`, `strict`, `port`, `generate`. CLI flags win on conflict. No behavior exists that only the file can express.
+
+The set is the flags that describe the *site*, not one run of the tool: `--dry-run`, `--format`, and `--external` describe what a single invocation should do and are not saveable — a config file that could turn every future `audit` into a network operation, or silently reshape its output, would be behavior only the file expresses in practice, which is what the sentence above exists to prevent.
 
 ---
 

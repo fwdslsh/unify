@@ -182,7 +182,7 @@ DRY-01	§17	rule	fixture	--dry-run report: stdout, one list ordered by output pa
 DRY-02	§17	rule	fixture	Every write line names its inputs: the source page and the layout it resolved to
 DRY-03	§17	rule	fixture	Under --dry-run, diagnostics print to stderr exactly as a real build would
 DRY-04	§17	rule	fixture	--dry-run states the address it is building for (base-url, or the domain root when unset), and each write/copy row carries the URL that file answers to
-CFG-01	§18	rule	targeted	unify.yaml keys are the long option names: source output clean exclude pretty-urls base-url strict port; exclude replaces the default like the flag
+CFG-01	§18	rule	targeted	unify.yaml keys are the long option names: source output clean exclude pretty-urls base-url canonical feed-full search-index strict port generate; exclude is a list replacing the default like the flag; an unknown key is a usage error naming the accepted set. The set is the flags that describe the SITE — dry-run/format/external describe one run and are not saveable
 CFG-02	§18	rule	targeted	CLI flags win over unify.yaml on conflict
 CFG-03	§18	rule	targeted	No behavior exists that only the file can express; the file itself is never emitted
 SCF-01	§19.1	rule	e2e	Every template scaffolds into src/ beside a dist-free root and exercises each primitive exactly once: one include (nav), automatic _layout.html, one named slot with fallback (footer) plus a page filling it, one data-layout=none page (404.html), and _includes/

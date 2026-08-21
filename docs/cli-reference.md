@@ -1,6 +1,6 @@
 # unify CLI reference
 
-**Matches the 0.8 development line** (v0.7.0 plus the shipped 0.8 work: `unify audit`, `--canonical auto`, sitemap generation, feed generation, the search manifest, and `audit`'s `--format`/`--external`). This page lists every command, every option, and every exit code — there are no others. The behavior behind each is specified in [`product-spec.md`](product-spec.md) §4 and, rule by rule, in [`conformance-spec.md`](conformance-spec.md).
+**Matches v0.8.0.** This page lists every command, every option, and every exit code — there are no others. The behavior behind each is specified in [`product-spec.md`](product-spec.md) §4 and, rule by rule, in [`conformance-spec.md`](conformance-spec.md).
 
 ```
 unify [build]              build the site (default command)

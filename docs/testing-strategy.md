@@ -214,7 +214,7 @@ Process rules that cannot be fully mechanized, stated as review law with their p
 
 ---
 
-## 6. Release gates for v0.7.0
+## 6. Release gates
 
 The release ships when a clean CI run on the release commit satisfies **all** of the following. Each is a command with an exit code; no gate is a judgment call:
 

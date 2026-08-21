@@ -16,7 +16,7 @@ bun tests/conformance/check-traceability.mjs --runtime .conformance-ledger.jsonl
 
 Green means the gap set computed from rules a test **actually ran and passed** equals the baseline exactly: a new uncovered rule fails, and a gap that closed fails until the baseline shrinks in the same commit. It is the runtime twin of `traceability-static`, and it is the job that closes the skipped-test hole — a `test.skip` records nothing, so its rules go uncovered and this fails.
 
-This job checked the *release* condition directly (no `--baseline`, so any gap fails) from the end of the v0.7 migration until the v0.8 work opened §20's manifest rows. It is baselined again for the same reason it was during the rewrite: a spec section can be written before any CLI surface exists to observe it, and the honest record of that is a baseline entry rather than a red that people are instructed to ignore — the "warn instead of fail" mechanism `docs/testing-strategy.md` §1 (M2) blames for the suite this one replaced.
+This job checked the *release* condition directly (no `--baseline`, so any gap fails) from the end of the v0.7 migration until the v0.8 work opened §20's manifest rows. It was baselined again during the 0.8 phase for the same reason it was during the rewrite: a spec section can be written before any CLI surface exists to observe it, and the honest record of that is a baseline entry rather than a red that people are instructed to ignore — the "warn instead of fail" mechanism `docs/testing-strategy.md` §1 (M2) blames for the suite this one replaced.
 
 The failure mode to guard against is not this job failing; it is someone making it pass. Do not weaken the harness, the comparator, or the checker to turn it green. Progress is the covered count it prints, and the baseline shrinking.
 
@@ -30,7 +30,7 @@ bun test
 bun tests/conformance/check-traceability.mjs --runtime .conformance-ledger.jsonl
 ```
 
-**This job going green is the release condition.** It carries `continue-on-error: true` for exactly as long as `tests/conformance/phase-gaps/baseline.txt` is non-empty, so the expected-red state is declared mechanically rather than in a comment. `release.yml` runs the identical check **blocking** at tag time, so a phase-baselined tree cannot be released. Emptying the baseline is what turns this back into a blocking push-time gate; it is part of shipping v0.8.0, not part of the phase.
+**This check going green is the release condition**, and it no longer lives in a separate job: an earlier design used a `continue-on-error` twin, which GitHub reports as SUCCESS either way — green in the checks list, its only signal a log nobody opens. The release semantics are now the `release-signal` job's own final step: while the baseline file is non-empty that step *asserts the unbaselined check fails* (a declared phase, mechanically enforced), and the moment the file empties it runs the same check blocking. The baseline was emptied when §31.1 made the last seven §20 rows observable, so this is a blocking push-time gate again — the state shipping v0.8.0 required. `release.yml` runs the identical check blocking at tag time either way.
 
 ### `module-graph` — gate G8
 

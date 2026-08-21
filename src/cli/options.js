@@ -55,7 +55,7 @@ const OPTIONS = {
 };
 
 /** Keys `unify.yaml` may carry — the long option names, minus the ones that make no sense to save. */
-const CONFIG_KEYS = ["source", "output", "clean", "exclude", "pretty-urls", "base-url", "canonical", "strict", "port", "generate"];
+const CONFIG_KEYS = ["source", "output", "clean", "exclude", "pretty-urls", "base-url", "canonical", "feed-full", "search-index", "strict", "port", "generate"];
 
 const SHORT = Object.fromEntries(
   Object.entries(OPTIONS)
