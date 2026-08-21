@@ -577,3 +577,45 @@ test("RPT-04: SARIF's level mirrors severity, message mirrors evidence, partialF
   }
   covers("RPT-04");
 }, TEST_MS);
+
+/**
+ * The other half of the sharp case, which a mutation sweep found undefended.
+ *
+ * The test above pins two DIFFERENT faults on ONE page. This pins ONE fault on
+ * TWO pages, and it is the half a plausible wrong implementation gets wrong:
+ * dropping `file` from the hash reads naturally as "the same fault has the same
+ * fingerprint", and it survived the whole suite.
+ *
+ * It is wrong because a fingerprint is what a CI job suppresses. Two pages each
+ * carrying a duplicate `id="dup"` are two faults needing two fixes; if they
+ * fingerprint identically, suppressing the one you have triaged silently hides
+ * the one you have not.
+ */
+test("RPT-02: the SAME fault on two DIFFERENT pages gets two fingerprints", async () => {
+  const tmp = mkTmp();
+  const dup = { desc: "A page with one duplicated id.", body: '<p id="dup">a</p><p id="dup">b</p>' };
+  writeTree(join(tmp, "src"), {
+    "index.html": page({ title: "Home", desc: "Home page.", h1: "Home", body: '<a href="/one.html">1</a><a href="/two.html">2</a>' }),
+    "one.html": page({ title: "One", h1: "One", ...dup }),
+    "two.html": page({ title: "Two", h1: "Two", ...dup }),
+  });
+  const r = await runCli(["audit", "-s", "src", "-o", "dist", "--format", "json"], tmp);
+  expectExit(r, 0, "two pages each carrying the same duplicate id");
+  const data = parseJson(r.stdout, "§31.2");
+  const dupes = data.findings.filter((f) => f.id === "id-duplicate");
+
+  if (dupes.length !== 2) {
+    throw new Error(`fixture check: expected one finding per page, got ${dupes.length}\nstdout:\n${r.stdout}`);
+  }
+  // The fixture check that makes this the CROSS-page case, mirroring the
+  // same-page test's own guard so neither can drift into the other.
+  if (dupes[0].file === dupes[1].file) {
+    throw new Error(`fixture check: the findings must be on DIFFERENT pages.\nfiles: ${dupes.map((d) => d.file).join(", ")}`);
+  }
+  if (dupes[0].fingerprint === dupes[1].fingerprint) {
+    throw new Error(
+      `§31.2: a fingerprint identifies one finding — the same fault on two pages is two faults, and one CI suppression must not hide the other.\nboth: ${dupes[0].fingerprint}`,
+    );
+  }
+  covers("RPT-02");
+}, TEST_MS);

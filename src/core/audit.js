@@ -294,7 +294,8 @@ export function auditManifest({
   const out = [];
   const add = (record, id, severity, evidence, fix, distinguisher = "") =>
     out.push({
-      id, severity, file: record.sourcePath, outputPath: record.outputPath, url: record.url, distinguisher, evidence, fix,
+      id, severity, file: record.sourcePath, generated: record.generated === true,
+      outputPath: record.outputPath, url: record.url, distinguisher, evidence, fix,
     });
 
   // ---- cross-page groupings, computed once ---------------------------------
@@ -386,7 +387,12 @@ export function auditManifest({
     if (linksInFromElsewhere.length === 0 && record.outputPath !== "index.html" && record.outputPath !== "404.html") {
       add(record, "page-orphan", "incomplete",
         "no other page links to this one",
-        "link to it from a page that is reachable, or exclude it with a leading underscore");
+        // §33.4 — the source-tree advice is wrong for a generated page: there
+        // is no file to rename and no underscore to add. The generator is
+        // where it comes from and where it stops coming from.
+        record.generated === true
+          ? "link to it from a page that is reachable, or stop writing it in your --generate script"
+          : "link to it from a page that is reachable, or exclude it with a leading underscore");
     }
 
     // ---- ids and fragments -------------------------------------------------
@@ -773,7 +779,11 @@ export function formatFindings(findings) {
   if (!findings.length) return "audit: nothing to report";
   const lines = [];
   for (const f of findings) {
-    lines.push(`${f.file}: ${f.severity}: ${f.evidence} [${f.id}]`);
+    // The same `(generated)` marker §33.4 already uses in the collision
+    // report and the --dry-run rows, for the same reason: a reader who
+    // greps their source tree for this path must not come up empty.
+    const where = f.generated === true ? `${f.file} (generated)` : f.file;
+    lines.push(`${where}: ${f.severity}: ${f.evidence} [${f.id}]`);
     lines.push(`  fix: ${f.fix}`);
   }
   const broken = findings.filter((f) => f.severity === "broken").length;

@@ -282,7 +282,11 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
     const finalOutputPath = outputPathOf.get(p.relPath);
     tempFiles.set(finalOutputPath, rewritten);
     pageSpansByOutputPath.set(finalOutputPath, p.spans);
-    manifestPages.push({ sourcePath: p.relPath, outputPath: finalOutputPath, html: rewritten });
+    // §33.4 — a generated page has no file in the author's source tree, so
+    // every surface that NAMES its source has to know. Without this the
+    // audit reported `log.html` at a path the author cannot open, under a
+    // fix line telling them to rename a file they never wrote.
+    manifestPages.push({ sourcePath: p.relPath, outputPath: finalOutputPath, html: rewritten, generated: p.generated === true });
   }
 
   // §4.4/EXC-09 — mirror copy: every emitted asset, byte-for-byte, same

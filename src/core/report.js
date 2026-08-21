@@ -134,6 +134,10 @@ function serializeFinding(f) {
     id: f.id,
     severity: f.severity,
     file: f.file,
+    // §33.4 — a machine consumer rendering its own report needs the same
+    // fact the human report shows, and `file` must stay a plain path for
+    // the consumers that resolve it. So it travels as its own key.
+    generated: f.generated === true,
     outputPath: f.outputPath,
     url: f.url,
     evidence: f.evidence,

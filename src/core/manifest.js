@@ -534,6 +534,9 @@ function extract(page, base) {
 
   return {
     sourcePath: page.sourcePath,
+    // §33.4 — true when this page came from the --generate overlay rather
+    // than the source tree. §20.3: present on every record, boolean always.
+    generated: page.generated === true,
     outputPath: page.outputPath,
     path,
     url: base ? base.origin + path : null,

@@ -101,7 +101,9 @@ describe("buildReport / serializeJson", () => {
     expect(report.findings).toHaveLength(1);
     expect(report.findings[0]).not.toHaveProperty("distinguisher");
     expect(Object.keys(report.findings[0]).sort()).toEqual(
-      ["evidence", "file", "fingerprint", "fix", "id", "outputPath", "severity", "url"].sort(),
+      // `generated` (§31.1/§33.4) is part of the shape: a generated page's
+      // `file` names nothing the author can open, so the document has to say so.
+      ["evidence", "file", "fingerprint", "fix", "generated", "id", "outputPath", "severity", "url"].sort(),
     );
   });
 

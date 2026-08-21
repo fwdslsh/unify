@@ -7,12 +7,18 @@
  * *implementation boundary*. At the iteration that introduces it the
  * manifest has no CLI surface at all — product-spec §6.2 forbids exposing it
  * as an author-facing format — so there is nothing for a CLI-spawning test to
- * observe. That is not a licence to under-test it; it is why MAN-01..09 sit in
+ * observe. That is not a licence to under-test it; it is why the MAN rows sat in
  * `tests/conformance/phase-gaps/baseline.txt` until each consumer (sitemap,
- * canonical completion, robots consistency, audit) makes the corresponding
- * field observable through the real CLI and closes its row. The release gate
- * (`check-traceability.mjs --runtime` with no `--baseline`) still fails while
- * any MAN row is open, so this cannot ship half-covered.
+ * canonical completion, robots consistency, audit) made the corresponding
+ * field observable through the real CLI and closed its row. That is now
+ * finished: §31.1's `unify audit --format json` publishes `pages` as the whole
+ * record, so every MAN rule is covered by a CLI-spawning test in
+ * `tests/conformance/manifest-observable.test.js` and the baseline is empty.
+ *
+ * These Tier-3 tests are kept rather than deleted. They read the extractor
+ * directly on emitted-document strings, which reaches cases the published
+ * projection cannot pose — and §2's authority order is unchanged: where they
+ * and a conformance test disagree, the conformance test wins.
  *
  * Every expectation below is written from §20's text, never from a run.
  * Inputs are emitted-document strings — exactly what §20.2 says the extractor

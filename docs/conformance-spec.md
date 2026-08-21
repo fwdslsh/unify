@@ -2048,6 +2048,7 @@ Product-spec §6.5.3. Two flags on `unify audit`, and the rule that keeps them f
       "id": "title-missing",
       "severity": "incomplete",
       "file": "src/about.html",
+      "generated": false,
       "outputPath": "about.html",
       "url": "https://example.com/about.html",
       "evidence": "the emitted <head> declares no <title>",
@@ -2058,7 +2059,9 @@ Product-spec §6.5.3. Two flags on `unify audit`, and the rule that keeps them f
 }
 ```
 
-`pages` holds the §20 records in manifest order — the same record every other feature reads, serialized, which is what product-spec §6.5.3 asks for by name rather than a summary of it. `findings` is §24.5's order — source path, then finding id — so the two formats list the same things in the same sequence. `baseUrl` is the address the build assumed, `null` without the flag.
+`pages` holds the §20 records in manifest order — the same record every other feature reads, serialized, which is what product-spec §6.5.3 asks for by name rather than a summary of it. `findings` is §24.5's order — source path, then finding id, then evidence — so the two formats list the same things in the same sequence. `baseUrl` is the address the build assumed, `null` without the flag.
+
+`generated` is `true` when the page came from the `--generate` overlay rather than the source tree (§33.4). It travels as its own key because `file` must stay a plain path for the consumers that resolve it, while a consumer rendering its own report needs the same fact the human report shows: a generated page's `file` names no file the author can open, so a report that did not say so would send a reader looking through `src/` for something that was never there.
 
 §14's problems and advisories still print to **stderr** as prose (§24.5), and `summary` counts them so a JSON consumer knows they happened. Putting them in the document would make this a second diagnostic channel, and §14.1's contract is that there is one.
 

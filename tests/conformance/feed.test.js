@@ -547,3 +547,132 @@ test("FEED-06: unify init blog ships its own feed.xml, and building/auditing it 
   }
   covers("FEED-06");
 }, TEST_MS);
+
+/**
+ * The case a mutation sweep found nothing defending.
+ *
+ * §29.5 says an entry's `<id>` and `<link>` are the page's own canonical.
+ * `entryAddress` resolves that canonical against the page's own URL, and
+ * replacing the resolution with the raw canonical string left the whole suite
+ * green — every existing feed test authored an ABSOLUTE canonical, and
+ * `new URL(absolute, base).href` is the absolute string back again. The one
+ * input that separates the rule from its opposite is a RELATIVE authored
+ * canonical, and nothing exercised it.
+ *
+ * It is not a hypothetical spelling. unify accepts a relative canonical and
+ * emits it as written (§11.3 absolutizes og:/twitter: and leaves this one
+ * alone), so `record.canonical` reaches the feed writer relative. Unresolved,
+ * it ships as `<id>post.html</id>` in a feed that lives at the output root —
+ * an id and a link a reader resolves against the wrong directory, which is
+ * the exact harm §29.5 exists to prevent.
+ */
+test("FEED-02 — a RELATIVE authored canonical is resolved against the page, not shipped raw", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": page("Home", '<h1>Home</h1><a href="/post.html">post</a>'),
+    "post.html": post("Post", { date: "2026-08-02T21:30:00Z", canonical: "post.html", description: "A post." }),
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", "https://example.com/blog/"], tmp);
+  expectExit(r, 0, "a relative authored canonical builds");
+
+  const entries = feedEntries(read(tmp, "dist", "feed.xml"));
+  if (entries.length !== 1) throw new Error(`expected one entry, got ${entries.length}`);
+
+  const want = "https://example.com/blog/post.html";
+  const id = tagText(entries[0], "id");
+  const href = linkHref(entries[0], "alternate");
+  // Stated as the absolute value rather than "starts with https", because the
+  // failure being pinned produces a value that is merely SHORTER, not
+  // differently shaped — a laxer assertion would pass against it.
+  if (id !== want) throw new Error(`entry <id> must be the resolved canonical, got ${JSON.stringify(id)}`);
+  if (href !== want) throw new Error(`entry <link href> must be the resolved canonical, got ${JSON.stringify(href)}`);
+  covers("FEED-02");
+}, TEST_MS);
+
+/**
+ * The second thing the sweep found nothing defending.
+ *
+ * §29.6 says `--feed-full` resolves every `href`/`src` in an entry's content
+ * against the ENTRY's own address. Making that function return every URL
+ * untouched left the suite green: the existing `--feed-full` test asserts the
+ * body REACHES `<content type="html">` and never looks at the URLs inside it.
+ *
+ * Both relative forms have to be covered, because they get there by different
+ * routes and an implementation can easily fix one and miss the other. §11.3
+ * prepends only the PATH PREFIX to href/src (the origin goes to og:/twitter:/
+ * canonical), so a root-relative link leaves the build as `/sub/index.html`,
+ * not an absolute URL. And §11.1 leaves a page's OWN relative URL untouched
+ * when the page did not move, so `sibling.html` in a subdirectory stays
+ * `sibling.html` — which a reader resolves against feed.xml at the ROOT,
+ * fetching a file one directory above the real one.
+ *
+ * `src` is asserted beside `href` deliberately: one handler serves both, so a
+ * test naming only `href` would pass against a change that dropped `src`.
+ */
+test("FEED-05 — every href and src inside --feed-full content is absolute, from both relative forms", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": page("Home", '<h1>Home</h1><a href="/blog/post.html">post</a>'),
+    "blog/sibling.html": page("Sibling", "<h1>Sibling</h1>"),
+    "blog/pic.png": "PNG",
+    "blog/post.html": page("Post",
+      "<main><h1>Post</h1>" +
+      '<p>A <a href="sibling.html">page-relative</a> link and a <a href="/index.html">root-relative</a> one.</p>' +
+      '<img src="pic.png" alt="p"></main>',
+      '<meta name="schema" content="BlogPosting">\n<meta name="date" content="2026-08-02T21:30:00Z">\n'),
+  });
+
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", "https://example.com/sub/", "--feed-full"], tmp);
+  expectExit(r, 0, "feed-full build with a subpath base");
+
+  const entry = feedEntries(read(tmp, "dist", "feed.xml"))[0];
+  const content = unwrapXmlText(tagText(entry, "content"));
+
+  for (const want of [
+    // page-relative, resolved against the ENTRY's directory
+    'href="https://example.com/sub/blog/sibling.html"',
+    // root-relative, which the build had already prefixed but not made absolute
+    'href="https://example.com/sub/index.html"',
+    // the same rule for src, through the same handler
+    'src="https://example.com/sub/blog/pic.png"',
+  ]) {
+    if (!content.includes(want)) {
+      throw new Error(`§29.6: --feed-full must absolutize this URL.\nexpected ${want} in:\n${content}`);
+    }
+  }
+  covers("FEED-05");
+}, TEST_MS);
+
+/**
+ * The regression that reached a user, now pinned.
+ *
+ * §29.7 checks the locators INSIDE entries. A feed's own `rel="alternate"`
+ * names the site address — `--base-url` itself — and `rel="self"` names the
+ * feed being written; neither is a claim about a file this build emits.
+ * Reading them anyway resolved the site address to `index.html`, found it
+ * missing, and reported P13 against `src/feed.xml`: a file the author does
+ * not have, under `fix: check the path spelling and casing`, for a spelling
+ * that was right. Adding `--base-url` to such a site stopped it publishing.
+ *
+ * The separating input is narrow and no other feed test has it — every one of
+ * them authors a root `index.html`. A site whose only page is an Article, with
+ * no root index, is the whole case.
+ */
+test("FEED-06 — a site with no root index.html still publishes: a feed's own links are not reference-checked", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "post.html": post("Post", { date: "2026-08-02T21:30:00Z", description: "A post." }),
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", BASE], tmp);
+  expectExit(r, 0, "a site with no root index.html must still publish under --base-url");
+
+  // The positive control: a feed was actually written, so the clean exit is
+  // not the silence of a feature that never ran.
+  const xml = read(tmp, "dist", "feed.xml");
+  if (feedEntries(xml).length !== 1) throw new Error(`expected the one entry:\n${xml}`);
+  // And the feed-level links ARE emitted — they are simply not checked.
+  if (linkHref(feedHeader(xml), "alternate") !== BASE) {
+    throw new Error(`§29.5: the feed still carries its own rel=alternate.\n${feedHeader(xml)}`);
+  }
+  covers("FEED-06");
+}, TEST_MS);
