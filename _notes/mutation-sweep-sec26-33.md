@@ -16,7 +16,7 @@ wrong, because those turned out to be the more useful half.
 
 Five of fourteen rows were case 2. Three times the first reading was "we found a
 gap", and only chasing *why* the mutant lived showed otherwise. That chase is
-not overhead; it is where two of the four real gaps came from — retargeting a
+not overhead; it is where two of the three real gaps came from — retargeting a
 defective row at the line its rule was actually about exposed a rule with no
 test behind it.
 
@@ -42,7 +42,7 @@ both runs and produces different output on some input you can name.
 
 ## The genuine gaps, and their tests (three — see the correction on item 4)
 
-All four are in `feed.js` and `report.js`, and all four are URL-or-identity
+All three are in `feed.js`, and all three are URL-or-identity
 rules from the §29–§31 repair round. That round fixed the code and the
 specification and did not add a test on the input that separates each rule from
 its opposite — which is exactly the gap mutation testing exists to expose.
