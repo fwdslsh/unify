@@ -40,7 +40,7 @@ words without checking that the anchored line can express the rule's opposite.**
 The lesson is cheap to apply — before committing a row, confirm the mutated code
 both runs and produces different output on some input you can name.
 
-## The four genuine gaps, and their tests
+## The genuine gaps, and their tests (three — see the correction on item 4)
 
 All four are in `feed.js` and `report.js`, and all four are URL-or-identity
 rules from the §29–§31 repair round. That round fixed the code and the
@@ -62,11 +62,17 @@ its opposite — which is exactly the gap mutation testing exists to expose.
    site with an Article page and no root `index.html` fail with P13 against
    `src/feed.xml` — a file the author does not have. Every feed test authors a
    root index, so nothing had the shape that fails.
-4. **RPT-02, cross-page fingerprints.** The existing test pins two DIFFERENT
-   faults on ONE page and explicitly checks both findings share a file. Nothing
-   pinned ONE fault on TWO pages — and "the same fault has the same fingerprint"
-   is a natural-sounding wrong implementation that lets one CI suppression hide
-   a second, real fault.
+4. **RPT-02, cross-page fingerprints — RECLASSIFIED: not a gap.** The sweep-1
+   row for this rule (`fingerprint-includes-line`) was a no-op, so nothing ever
+   measured the rule; verified after the fact, the retargeted mutation
+   (`fingerprint-drops-file`) is killed in 0.4 ms by the PRE-EXISTING unit test
+   `fingerprint > differs when id, file, or distinguisher differs`. The added
+   conformance test is redundant depth, kept. The honest count is therefore
+   **three genuine gaps, all in feed.js — the one 0.8 module with no unit test
+   file** — while report.js, which has one, had none. That distribution became
+   testing-strategy §2's Tier-3 placement rule, and `tests/unit/core/feed.test.js`
+   now carries the unit twins of all three (each kills its mutation in ~160 ms
+   of whole-file time against ~3 s per CLI spawn).
 
 ## Method note
 
