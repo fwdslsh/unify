@@ -30,8 +30,12 @@ Options:
       --pretty-urls        about.html → about/index.html, and rewrite internal links to match
       --canonical auto     add a canonical link to pages that author none, from the site address
       --base-url <url>     the site's whole address (https://site.example/repo/): prefix root-relative links, make og:/canonical absolute for share crawlers, and generate sitemap.xml
+      --feed-full          include each entry's full rendered content in feed.xml (needs --base-url)
+      --search-index       write search-index.json for a client-side search library
       --dry-run            run the full build and every check, print the report, write nothing
       --strict             advisories count as problems for the exit code (with \`audit\`, findings too)
+      --format <kind>      \`audit\` report shape: human (default), json, or sarif
+      --external           \`audit\` only: fetch every off-origin URL the site emits and report the ones that don't resolve
   -p, --port <n>           port for \`unify dev\` (default: 3000)
   -v, --version            print version
   -h, --help               print help
@@ -74,11 +78,25 @@ function resolveSettings(flags) {
       prettyUrls: settings["pretty-urls"] === true,
       baseUrl: settings["base-url"],
       canonical: settings.canonical,
+      // §29.6 — full-content feed entries; §30.1 — the search manifest. Both
+      // boolean, both read only by build.js (audit reaches them too, since
+      // `unify audit` runs the same pipeline). `feed-full`'s "requires
+      // --base-url" usage error is cross-cutting validation, checked below
+      // beside `--canonical auto`'s identical shape.
+      feedFull: settings["feed-full"] === true,
+      searchIndex: settings["search-index"] === true,
       dryRun: settings["dry-run"] === true,
       // §24.1 — set by the audit command itself, never by a flag: there is no
       // `--audit`, and `build` has no way to reach the evaluator.
       audit: false,
       strict: settings.strict === true,
+      // §31.1/§31.3 — `unify audit`'s own two flags. `format`'s value is
+      // validated by `cli/commands/audit.js` (the closed set and its usage
+      // error are audit's own concern, same split `--canonical`'s value keeps
+      // between this file and `options.js`); every other command ignores
+      // both, exactly as they ignore `--canonical`.
+      format: settings.format,
+      external: settings.external === true,
       port: settings.port === undefined ? 3000 : Number(settings.port),
     },
     sourceRoot: resolved.root,
@@ -140,6 +158,16 @@ export async function run(argv) {
     throw new UsageError("--canonical auto needs the site's address: --base-url is not set", [
       "add it: --base-url https://your-domain.example/",
       "a canonical must be absolute — a root-relative one is ignored by the crawlers it exists for",
+    ]);
+  }
+  // §29.6 — the same shape as --canonical auto's check immediately above,
+  // and for the same reason: the flag describes something the build will not
+  // do without the site's address (a feed entry's <content> URLs are only
+  // meaningful once they're absolute).
+  if (settings.feedFull === true && settings.baseUrl === undefined) {
+    throw new UsageError("--feed-full needs the site's address: --base-url is not set", [
+      "add it: --base-url https://your-domain.example/",
+      "a feed entry's <content> URLs are only meaningful once they're absolute",
     ]);
   }
   // A scheme with no authority — `file:`, `foo:`, `data:` — parses, but its

@@ -60,6 +60,8 @@ import * as urls from "../../core/urls.js";
 import { buildManifest } from "../../core/manifest.js";
 import { auditManifest, formatFindings } from "../../core/audit.js";
 import * as sitemap from "../../core/sitemap.js";
+import * as feed from "../../core/feed.js";
+import * as searchIndex from "../../core/search-index.js";
 import { completeCanonical } from "../../core/canonical.js";
 import { checkSchemaDeclarations, generateStructuredData } from "../../core/structured-data.js";
 import * as robots from "../../core/robots.js";
@@ -396,6 +398,44 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
   });
   for (const [outPath, text] of generated) tempFiles.set(outPath, text);
 
+  // ---- §29 — feed generation, the manifest's second projection. -----------
+  // Same shape as §21 immediately above, one document type over: reads
+  // `manifest.records` and nothing else about the page (`pageHtml` is the one
+  // exception, and only under --feed-full — see feed.js's own module comment
+  // for why that still isn't a second interpretation of the site). No
+  // ordering dependency against sitemap generation either direction; wired
+  // beside it because both are manifest projections that join `tempFiles`
+  // before §12's reference check and §15's transactional publish. Reuses
+  // `emittedFromSource` — built once, immediately above, for exactly this
+  // sharing (§29.7/§21.5's suppression test).
+  //
+  // `manifestPages[i].html` is each page's FINAL emitted HTML: it was
+  // mutated in place by §22's canonical completion and §26's structured-data
+  // generation above (`page.html = completed.text` / `page.html =
+  // block.text`), and it is the exact text `buildManifest` just read to
+  // produce `manifest` itself — so `pageHtml` never disagrees with what
+  // `record.title`/`record.canonical`/etc. say about the same page.
+  const pageHtml = settings.feedFull
+    ? new Map(manifestPages.map((p) => [p.outputPath, p.html]))
+    : null;
+  const generatedFeed = feed.generateFeed({
+    records: manifest.records, base: baseConfig, feedFull: settings.feedFull,
+    pageHtml, emittedFromSource, reporter,
+  });
+  for (const [outPath, text] of generatedFeed) tempFiles.set(outPath, text);
+
+  // ---- §30 — the search manifest, the manifest's third projection. --------
+  // Unlike sitemap/feed, activation is the flag ALONE (§30.1) — nothing about
+  // a page declares "index me", so there is no record-derived condition to
+  // check the way `generateSitemap`/`generateFeed` check `base`/`schemaType`.
+  // Unconditional on `baseConfig`: `searchIndexEntry` already falls back to
+  // `record.path` with no --base-url (§30.2), so gating this on `base` would
+  // make the flag useless for the local-preview case it exists for.
+  const generatedSearchIndex = settings.searchIndex
+    ? searchIndex.generateSearchIndex({ records: manifest.records, base: baseConfig, emittedFromSource })
+    : new Map();
+  for (const [outPath, text] of generatedSearchIndex) tempFiles.set(outPath, text);
+
   // ---- §12 — the reference check, against the completed temp tree. --------
   const htmlFiles = new Map();
   const cssFiles = new Map();
@@ -439,6 +479,28 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
     // on every ASCII path and diverge on the first escaped one, which is the
     // one-interpretation law product-spec §6.1 states for URLs.
     sitemapLocs = sitemap.sitemapListings({ sitemaps: sitemapFiles, base: baseConfig });
+
+    // §29.7 — every <id>/<link href> in an emitted feed.xml (generated or
+    // authored) must resolve to a file the site emits, exactly as §21.6
+    // checks a sitemap's <loc> — same gate on `baseConfig` as the sitemap
+    // check immediately above, and for the same reason: a feed is generated
+    // only under --base-url (§29.1), and this is where an AUTHORED feed.xml
+    // is checked too (§29.7's suppression is silent about --base-url, so it
+    // is read the way §21.5/§21.6 read an authored sitemap.xml — checked
+    // whenever this build knows the site's address). Must run before
+    // references.checkReferences below, for the same reason the sitemap
+    // check does: both raise P13 against the SAME emittedPaths set, and
+    // ordering relative to each other does not matter, only ordering before
+    // §12's own pass over the rest of the tree.
+    const feedContent = tempFiles.get(feed.FEED_PATH);
+    if (typeof feedContent === "string" || Buffer.isBuffer(feedContent)) {
+      feed.checkFeedLocs({
+        text: typeof feedContent === "string" ? feedContent : feedContent.toString("utf8"),
+        file: emittedFromSource.get(feed.FEED_PATH) ?? feed.FEED_PATH,
+        emittedPaths: new Set(tempFiles.keys()),
+        base: baseConfig, reporter,
+      });
+    }
   }
 
   // §23 — the one reference in an authored robots.txt. Ungated, unlike §21.6:
@@ -523,6 +585,13 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
       base: baseConfig,
       sitemapLocs,
       exemptedSitemaps,
+      // §31.3 — carried through to `lastAuditRun` for `--external`'s own use
+      // (`cli/commands/audit.js`, via `consumeLastAuditRun()`); not read by
+      // any finding predicate. The SAME map §12's reference check just
+      // scanned — reused, not recomputed, so an off-origin URL `--external`
+      // fetches and an internal one §12 already checked came from one pass
+      // over one page's text.
+      htmlFiles,
     })
     : null;
 
@@ -590,6 +659,24 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
         outputPath: `${displayOutput}/${outPath}`,
         url: publishModule.urlForOutputPath(outPath, prefix),
         from: "generated (--base-url)",
+      })),
+      // §29.7 — a generated feed is a write like any other, named the same
+      // way the sitemap's row above is (it too can only exist under
+      // --base-url — §29.1).
+      ...[...generatedFeed.keys()].map((outPath) => ({
+        action: "write",
+        outputPath: `${displayOutput}/${outPath}`,
+        url: publishModule.urlForOutputPath(outPath, prefix),
+        from: "generated (--base-url)",
+      })),
+      // §30.4 — likewise, named for the flag that actually produced it rather
+      // than --base-url: §30.1/§30.2 activate on --search-index alone, with
+      // or without a site address.
+      ...[...generatedSearchIndex.keys()].map((outPath) => ({
+        action: "write",
+        outputPath: `${displayOutput}/${outPath}`,
+        url: publishModule.urlForOutputPath(outPath, prefix),
+        from: "generated (--search-index)",
       })),
       ...plan.delete.map((rel) => ({ action: "delete", outputPath: `${displayOutput}/${rel}` })),
     ];

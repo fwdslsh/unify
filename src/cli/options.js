@@ -22,8 +22,30 @@ const OPTIONS = {
   "pretty-urls": { kind: "flag" },
   "base-url": { kind: "string", example: "https://your-domain.example/" },
   canonical: { kind: "string", example: "auto" },
+  // §29.6 — full-content feed entries. Boolean like every other flag here;
+  // the "requires --base-url" usage error is cross-cutting validation (it
+  // needs settings.baseUrl too), so it lives beside --canonical auto's own
+  // equivalent check in cli.js, not in this registry.
+  "feed-full": { kind: "flag" },
   "dry-run": { kind: "flag" },
   strict: { kind: "flag" },
+  // §30.1 — a flag rather than a consequence: unlike a sitemap or a feed,
+  // nothing about a page declares "index me", so there is no record-derived
+  // condition that could activate this the way `--base-url` activates §21.
+  "search-index": { kind: "flag" },
+  // §31.1 — `unify audit`'s own output shape. This registry stays a
+  // syntactic parser like every entry here: the closed set (human/json/sarif)
+  // and its usage error are audit.js's own concern, the same split
+  // `--canonical`'s value ("auto" only) already keeps between this file and
+  // cli.js. Ignored by every command but `audit`, exactly as `--search-index`
+  // is ignored by `audit` and read only by `build`.
+  format: { kind: "string", example: "json" },
+  // §31.3 — the one network operation in the whole product (product-spec
+  // §6.1: builds are offline and deterministic without qualification), so it
+  // is a flag an author must pass explicitly rather than a consequence of
+  // anything a page declares. Boolean; `cli/commands/audit.js` and
+  // `core/external.js` do the rest.
+  external: { kind: "flag" },
   port: { kind: "string", short: "p" },
   version: { kind: "flag", short: "v" },
   help: { kind: "flag", short: "h" },

@@ -223,10 +223,21 @@ function isJsonLdReference(s) {
  * (any element, any `<link>` rel — REF-01), srcset candidates, root-relative
  * og:/twitter: meta content, `<style>` block url(), and `style=` attribute
  * url() (B5). Byte offsets are relative to `text`.
+ *
+ * Exported for `external.js`'s `--external` (§31.3): that flag's scope is
+ * "the closed set of off-origin references [this build already reads]" —
+ * §12's own href/src/poster/srcset/og:twitter:/refresh/style-url() walk,
+ * this function, complemented (kept off-origin rather than checked
+ * internal) instead of re-derived a second way. The one exception is
+ * JSON-LD: this function's own JSON-LD branch (via `jsonLdReferences`)
+ * accepts ROOT-RELATIVE values only, by §12's own design (an absolute one
+ * "is skipped for the reason the vertical namespaces are"), so it can never
+ * yield an off-origin URL — `external.js` walks JSON-LD's off-origin half
+ * separately, over the same closed 5-property list.
  * @param {string} text
  * @returns {{raw:string, offset:number}[]}
  */
-function collectHtmlReferences(text) {
+export function collectHtmlReferences(text) {
   const { root } = parse(text);
   const refs = [];
   for (const el of findAll(root, (n) => n.type === "element")) {

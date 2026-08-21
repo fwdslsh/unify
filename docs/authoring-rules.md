@@ -2,7 +2,7 @@
 
 unify composes plain HTML at build time. No template language, variables, loops, or config: if you reach for
 `{{ }}`, `{% %}`, props, or a config key, you are solving it wrong. The vocabulary is standard HTML — `<main>`,
-`<slot>`, `slot=` — plus `<include>` and `data-layout`. Derived files (a post index, a feed) come from a script you write and run yourself: `node _scripts/gen.mjs && unify build`.
+`<slot>`, `slot=` — plus `<include>` and `data-layout`. Derived files (a post index) come from a script you write and run yourself: `node _scripts/gen.mjs && unify build`. A feed at `/feed.xml` needs no script: declare `schema: Article` or `BlogPosting` (below) on any page and build with `--base-url`, and unify writes it — Atom, from your title/description/canonical/dates; a `date:` with no time is reported and left out rather than guessed at.
 
 ## Files
 - Source root is `src/` if it exists, else the current directory. `.html`/`.md` are pages — except a name

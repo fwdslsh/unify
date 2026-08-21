@@ -177,8 +177,12 @@ Options:
       --pretty-urls        about.html → about/index.html, and rewrite internal links to match
       --canonical auto     add a canonical link to pages that author none, from the site address
       --base-url <url>     the site's whole address (https://site.example/repo/): prefix root-relative links, make og:/canonical absolute for share crawlers, and generate sitemap.xml
+      --feed-full          include each entry's full rendered content in feed.xml (needs --base-url)
+      --search-index       write search-index.json for a client-side search library
       --dry-run            run the full build and every check, print the report, write nothing
       --strict             advisories count as problems for the exit code (with `audit`, findings too)
+      --format <kind>      `audit` report shape: human (default), json, or sarif
+      --external           `audit` only: fetch every off-origin URL the site emits and report the ones that don't resolve
   -p, --port <n>           port for `unify dev` (default: 3000)
   -v, --version            print version
   -h, --help               print help
@@ -206,7 +210,7 @@ An optional `unify.yaml` at the source root holds saved flags and nothing more (
 ## What unify will never do
 
 - **Ship JavaScript.** Your scripts pass through untouched; unify injects, generates, and rewrites none of its own. `unify dev` injects live reload only into the pages it serves, never into `dist/`.
-- **Grow a templating language.** No variables, loops, conditionals, or expressions — no `{{ }}`, no `{% %}`, no props. Anything derived from a set of files (a post index, a feed) comes from a script you own, run before the build: `node _scripts/gen.mjs && unify build`.
+- **Grow a templating language.** No variables, loops, conditionals, or expressions — no `{{ }}`, no `{% %}`, no props. Anything derived from a set of files (a post index) comes from a script you own, run before the build: `node _scripts/gen.mjs && unify build`. A feed is the one exception — declare `schema: Article`/`BlogPosting` and build with `--base-url`, no script required.
 - **Become a component framework.** Slots fill layouts; `<include>` is verbatim and never takes fills.
 - **Need configuration.** Conventions, not config files.
 - **Scope your CSS.** Use `@scope`, `@layer`, nesting, or a class prefix — the platform already answers this.
@@ -224,7 +228,7 @@ Every rule an author needs, in under sixty lines. This section is [`docs/authori
 
 unify composes plain HTML at build time. No template language, variables, loops, or config: if you reach for
 `{{ }}`, `{% %}`, props, or a config key, you are solving it wrong. The vocabulary is standard HTML — `<main>`,
-`<slot>`, `slot=` — plus `<include>` and `data-layout`. Derived files (a post index, a feed) come from a script you write and run yourself: `node _scripts/gen.mjs && unify build`.
+`<slot>`, `slot=` — plus `<include>` and `data-layout`. Derived files (a post index) come from a script you write and run yourself: `node _scripts/gen.mjs && unify build`. A feed at `/feed.xml` needs no script: declare `schema: Article` or `BlogPosting` (below) on any page and build with `--base-url`, and unify writes it — Atom, from your title/description/canonical/dates; a `date:` with no time is reported and left out rather than guessed at.
 
 ## Files
 - Source root is `src/` if it exists, else the current directory. `.html`/`.md` are pages — except a name

@@ -41,10 +41,73 @@ import { stringProperty, subjectObject } from "./structured-data.js";
  * @property {string} id - stable machine identifier; never renamed
  * @property {'broken'|'incomplete'} severity
  * @property {string} file - the source path a reader should open
+ * @property {string|null} outputPath - §31.1 — the output-root-relative path
+ *   §13 resolved; `null` only for `robots-sitemap-missing`, which is about
+ *   the source `robots.txt` rather than a page
  * @property {string|null} url - the page's public address, when known
+ * @property {string} distinguisher - §31.2 — the ONE datum (besides `id` and
+ *   `file`) that distinguishes this finding from a sibling of the same id on
+ *   the same page; `""` for an id that occurs at most once per page. Read
+ *   only by `report.js`'s `fingerprint()` — never printed by
+ *   `formatFindings` and never a key in the `--format json`/`sarif`
+ *   documents. Named `distinguisher` rather than `subject` so it cannot be
+ *   misread as the unrelated "JSON-LD subject object" this file already
+ *   means by that word (see `subjectObject`, below). See report.js's own
+ *   doc comment above `fingerprint()` for the full id→datum mapping and why
+ *   each choice is stable across an unrelated edit elsewhere on the page.
  * @property {string} evidence - what was observed, quoting the output
  * @property {string} fix - one concrete action
  */
+
+/**
+ * §31.1's only channel into a *structured* audit result.
+ *
+ * `unify audit --format json|sarif` needs `records`, `base`, and `findings`
+ * together: the JSON document's `pages` field is `records` serialized,
+ * `baseUrl` comes from `base`, and `findings` is this function's own return
+ * value (§31 does not touch `src/cli/commands/build.js`; see that file's own
+ * header for why one pipeline has one caller). But `build.js` calls
+ * `auditManifest` exactly once per `settings.audit` run and immediately
+ * flattens the result through `formatFindings` into one prose string before
+ * handing THAT string to `reporter.summary()` — the only value that leaves
+ * build.js's audit branch outward, and a string is not the structured value
+ * §31.1 needs to build a JSON/SARIF document.
+ *
+ * So this module stashes its own last call, and `cli/commands/audit.js`
+ * reads it back with `consumeLastAuditRun()` immediately after its one
+ * `build()` call resolves. Safe because one CLI invocation runs one command
+ * once: `unify audit` never calls `build()` twice in a process, unlike
+ * `watch`/`dev`'s rebuild loop — which never sets `settings.audit` in the
+ * first place and so never reaches the branch that stashes (§24.7: `build`
+ * and `watch` never evaluate at all).
+ * @type {{records: import('./manifest.js').PageRecord[], base: import('./urls.js').BaseUrlConfig|null, findings: Finding[], htmlFiles: Map<string,string>}|null}
+ */
+let lastAuditRun = null;
+
+/**
+ * §31.1 — retrieve and clear the run `auditManifest` most recently stashed;
+ * `null` if `auditManifest` has not run in this process. See `lastAuditRun`.
+ * @returns {{records: import('./manifest.js').PageRecord[], base: import('./urls.js').BaseUrlConfig|null, findings: Finding[], htmlFiles: Map<string,string>}|null}
+ */
+export function consumeLastAuditRun() {
+  const run = lastAuditRun;
+  lastAuditRun = null;
+  return run;
+}
+
+/**
+ * §24.5's order: source path, then finding id. Exported so a caller that
+ * merges in findings from OUTSIDE `auditManifest` — `--external`'s
+ * `external-unreachable`, computed after the pipeline has already returned —
+ * re-sorts with the identical comparator rather than a second one that could
+ * disagree about ties.
+ * @param {Finding[]} findings
+ * @returns {Finding[]} a new, sorted array
+ */
+export function sortFindings(findings) {
+  return [...findings].sort((a, b) =>
+    a.file === b.file ? (a.id < b.id ? -1 : a.id > b.id ? 1 : 0) : a.file < b.file ? -1 : 1);
+}
 
 /**
  * The fields a page may declare **once**, by the standard that defines them.
@@ -199,15 +262,26 @@ const foldSpaces = (s) => s.replace(/\s+/g, " ").trim();
  * @param {{file: string, value: string}[]} [args.exemptedSitemaps] - the
  *   `Sitemap:` declarations §23.3's exemption skipped, handed over by the branch
  *   that skipped them — never a second read of `robots.txt`
+ * @param {Map<string, string>} [args.htmlFiles] - output path -> each page's
+ *   final emitted HTML text. Not read by any predicate below — this function
+ *   evaluates the manifest, not the markup — but carried through into
+ *   `lastAuditRun` unchanged, because §31.3's `--external` needs the SAME
+ *   text `checkReferences` already scanned (`external.js`'s
+ *   `collectExternalReferences`) and `cli/commands/audit.js` has no other
+ *   route to it: `build()`'s only other return is a bare exit code (see this
+ *   module's own `lastAuditRun` doc comment for why that channel exists at
+ *   all).
  * @returns {Finding[]} ordered by source path, then by finding id
  */
 export function auditManifest({
-  records, byOutputPath, base = null, sitemapLocs = new Map(), exemptedSitemaps = [],
+  records, byOutputPath, base = null, sitemapLocs = new Map(), exemptedSitemaps = [], htmlFiles = new Map(),
 }) {
   /** @type {Finding[]} */
   const out = [];
-  const add = (record, id, severity, evidence, fix) =>
-    out.push({ id, severity, file: record.sourcePath, url: record.url, evidence, fix });
+  const add = (record, id, severity, evidence, fix, distinguisher = "") =>
+    out.push({
+      id, severity, file: record.sourcePath, outputPath: record.outputPath, url: record.url, distinguisher, evidence, fix,
+    });
 
   // ---- cross-page groupings, computed once ---------------------------------
   const group = (pick) => {
@@ -308,14 +382,16 @@ export function auditManifest({
     for (const id of [...repeated].sort()) {
       add(record, "id-duplicate", "broken",
         `the id ${JSON.stringify(id)} is declared more than once`,
-        "make each id unique — a duplicate makes every link to it ambiguous");
+        "make each id unique — a duplicate makes every link to it ambiguous",
+        id); // §31.2 names this one: "the repeated id for id-duplicate"
     }
     for (const link of record.fragmentLinks) {
       const target = byOutputPath.get(link.target);
       if (!target || target.ids.includes(link.id)) continue;
       add(record, "fragment-missing", "broken",
         `${JSON.stringify(`#${link.id}`)} in ${link.target === record.outputPath ? "this page" : link.target} names no element`,
-        `add the id ${JSON.stringify(link.id)} to the element it should reach, or correct the link`);
+        `add the id ${JSON.stringify(link.id)} to the element it should reach, or correct the link`,
+        `${link.target}#${link.id}`); // two distinct missing fragments on one page are two distinct faults
     }
 
     // ---- contradictory declarations ----------------------------------------
@@ -330,7 +406,8 @@ export function auditManifest({
         `the page declares ${conflict.discarded.length + 1} different values for ${conflict.field}: ` +
         `${JSON.stringify(truncate(conflict.kept))} is used, ` +
         `${conflict.discarded.map((d) => JSON.stringify(truncate(d))).join(", ")} ignored`,
-        `keep one — a page that declares two answers to one question has given consumers no answer`);
+        `keep one — a page that declares two answers to one question has given consumers no answer`,
+        conflict.field); // §31.2 names this one: "the field name for metadata-conflict"
     }
 
     // ---- metadata placement ------------------------------------------------
@@ -349,7 +426,8 @@ export function auditManifest({
         el.key === "schema"
           ? `${shown} is emitted outside <head>, where unify does not read it — the page generates no structured data`
           : `${shown} is emitted outside <head>, where no browser or crawler reads it`,
-        `move it into <head> — in the page's own <head>, or the layout's if every page needs it`);
+        `move it into <head> — in the page's own <head>, or the layout's if every page needs it`,
+        `${el.tag}:${el.key ?? ""}`); // which stray element, when a page has more than one
     }
 
     // ---- taxonomy keys that build nothing (§28.2) ---------------------------
@@ -378,7 +456,8 @@ export function auditManifest({
       if (entry.error === null) continue;
       add(record, "jsonld-invalid", "broken",
         `a <script type="application/ld+json"> does not parse: ${entry.error}`,
-        "correct the JSON — a block that does not parse is ignored entirely");
+        "correct the JSON — a block that does not parse is ignored entirely",
+        entry.raw); // the block's own bytes — stable across an edit elsewhere; an array index is not
     }
     if (record.schemaType === "Article" || record.schemaType === "BlogPosting") {
       // Objective because product-spec §6.3.6 names exactly the fields bounded
@@ -420,7 +499,8 @@ export function auditManifest({
         if (b !== "" && !a.includes(b) && !b.includes(a)) {
           add(record, "jsonld-headline-mismatch", "incomplete",
             `the structured data headline is ${JSON.stringify(headline)} but the <h1> reads ${JSON.stringify(h1s[0].text)}`,
-            "make one of them contain the other, so a rich result and the page agree");
+            "make one of them contain the other, so a rich result and the page agree",
+            headline); // which block, when a page carries more than one
         }
       }
 
@@ -436,7 +516,8 @@ export function auditManifest({
         if (named !== null && canonical !== null && named !== canonical) {
           add(record, "jsonld-url-mismatch", "broken",
             `the structured data url is ${JSON.stringify(declared)}, which names ${named}, but the canonical names ${canonical}`,
-            "give both the same address — a page that names two of its own URLs has told consumers neither");
+            "give both the same address — a page that names two of its own URLs has told consumers neither",
+            declared); // which block's url, when a page carries more than one
         }
       }
 
@@ -444,7 +525,8 @@ export function auditManifest({
       if (inLanguage !== null && record.lang !== null && primarySubtag(inLanguage) !== primarySubtag(record.lang)) {
         add(record, "jsonld-lang-mismatch", "broken",
           `the structured data says inLanguage ${JSON.stringify(inLanguage)} and the document declares lang ${JSON.stringify(record.lang)}`,
-          "name one language in both — a document that answers that question twice has answered it for nobody");
+          "name one language in both — a document that answers that question twice has answered it for nobody",
+          inLanguage); // which block, when a page carries more than one
       }
     }
 
@@ -467,7 +549,8 @@ export function auditManifest({
       if (types.length < 2) continue;
       add(record, "jsonld-entity-conflict", "broken",
         `the structured data gives @id ${JSON.stringify(id)} more than one type: ${types.map((t) => JSON.stringify(t)).join(", ")}`,
-        "give one @id one @type, or give the other entity an @id of its own");
+        "give one @id one @type, or give the other entity an @id of its own",
+        id); // §31.2's own precedent, "one finding per @id"
     }
 
     // ---- a date no consumer can use ---------------------------------------
@@ -486,7 +569,8 @@ export function auditManifest({
       if (value === null || value.iso !== null) continue;
       add(record, "date-unusable", "broken",
         `${field} is ${JSON.stringify(value.raw)}, which is not a W3C date — nothing this build emits can use it`,
-        `write it as YYYY-MM-DD, or YYYY-MM-DDThh:mm:ssTZD with a time zone — the format ${field} is defined in`);
+        `write it as YYYY-MM-DD, or YYYY-MM-DDThh:mm:ssTZD with a time zone — the format ${field} is defined in`,
+        field); // one finding per field, datePublished first (§26.3)
     }
 
     // ---- redirect chains ---------------------------------------------------
@@ -530,7 +614,8 @@ export function auditManifest({
       add(record, "jsonld-url-unprefixed", "broken",
         `the structured data names ${JSON.stringify(v)}, which this site publishes at ${JSON.stringify(published)}`,
         `write the full URL ${base.origin}${published}, or a value relative to the page` +
-        ` — a root-relative one resolves at the origin, above this site's own root`);
+        ` — a root-relative one resolves at the origin, above this site's own root`,
+        v); // §31.2 names this one: "the unprefixed value for jsonld-url-unprefixed"
     }
 
     // ---- social image ------------------------------------------------------
@@ -641,14 +726,19 @@ export function auditManifest({
       id: "robots-sitemap-missing",
       severity: "incomplete",
       file,
+      outputPath: null, // not a page — there is no record to read (see the comment block above)
       url: null,
+      distinguisher: value, // more than one exempted line in one robots.txt needs its own identity
       evidence: `the Sitemap: line names ${JSON.stringify(value)}, and no file is emitted there — a sitemap is generated only under --base-url`,
       fix: "build with --base-url, or add a sitemap.xml of your own at the source root",
     });
   }
 
-  return out.sort((a, b) =>
-    a.file === b.file ? (a.id < b.id ? -1 : a.id > b.id ? 1 : 0) : a.file < b.file ? -1 : 1);
+  const findings = sortFindings(out);
+  // §31.1's only channel out — see `lastAuditRun`'s own comment for why this
+  // exists and why it is safe.
+  lastAuditRun = { records, base, findings, htmlFiles };
+  return findings;
 }
 
 function listPaths(records) {
@@ -676,4 +766,45 @@ export function formatFindings(findings) {
   const incomplete = findings.length - broken;
   lines.push(`audit: ${broken} broken, ${incomplete} incomplete`);
   return lines.join("\n");
+}
+
+/**
+ * §31.3 — turn `external.js`'s network-probe results into `external-unreachable`
+ * findings. The only finding this catalogue adds outside `auditManifest`
+ * itself, because it is the only one whose evidence depends on the network:
+ * everything else is decidable from the §20 manifest alone, and this one
+ * needs `--external`'s own round trip first (`cli/commands/audit.js` runs
+ * that, then calls this).
+ *
+ * `incomplete`, never `broken` — §31.3's own distinction: "the answer is
+ * about someone else's server at one moment", not about this site's output,
+ * so the `broken` severity §24.3 reserves for a self-contradiction would be
+ * unearned. One finding per distinct URL (`results`' own keys, already
+ * deduplicated by `external.js`'s `probeUrls`), located at the FIRST page
+ * that references it in manifest order (`owners`, from
+ * `collectExternalReferences`) — the same "first in document/manifest order
+ * wins" rule §20.4 and §21.2 already use for locating a shared fault.
+ * @param {Map<string, import('./external.js').ProbeResult>} results
+ * @param {Map<string, import('./manifest.js').PageRecord>} owners - url -> the
+ *   first referencing record, from `external.js`'s `collectExternalReferences`
+ * @returns {Finding[]} §24.5's order
+ */
+export function externalUnreachableFindings(results, owners) {
+  const out = [];
+  for (const [url, result] of results) {
+    if (result.ok) continue;
+    const record = owners.get(url);
+    if (!record) continue; // defensive: every key of `results` came from `owners`' own keys
+    out.push({
+      id: "external-unreachable",
+      severity: "incomplete",
+      file: record.sourcePath,
+      outputPath: record.outputPath,
+      url: record.url,
+      distinguisher: url, // §31.3: "one finding per distinct URL"
+      evidence: `${JSON.stringify(url)} ${result.error}`,
+      fix: "confirm the URL is correct, or remove the reference — the failure may be on the other server rather than this one, not in this site's output",
+    });
+  }
+  return sortFindings(out);
 }

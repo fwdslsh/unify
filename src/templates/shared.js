@@ -616,8 +616,11 @@ published** and the previous \`dist/\` is untouched — never report success on 
   nothing — there are no collections and no taxonomies, and \`unify audit\` says so out loud.
 - Link the real file: \`/about.html\`, never \`/about/\`. A directory link resolves only if you wrote
   \`about/index.html\`. A leading \`/\` means the source root, in any path you write.
-- Derived files — a post index, a feed — come from a script you write and run yourself. From this
+- Derived files — a post index — come from a script you write and run yourself. From this
   directory, with the source tree in \`src/\`, that is \`node src/_scripts/gen.mjs && unify build\`.
+  A feed is the one exception: declare \`schema: Article\`/\`BlogPosting\` (below) and build with
+  \`--base-url\`, and unify writes \`feed.xml\` itself — no script, unless you ship your own
+  (an authored \`feed.xml\` always wins and generates nothing).
 
 ## Composition
 

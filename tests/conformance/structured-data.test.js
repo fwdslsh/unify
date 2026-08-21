@@ -220,6 +220,14 @@ function expectEmitted(tmp, ...names) {
 test("SD-10 — a Markdown page declaring schema: Article gains one block whose properties are the table's, in order", async () => {
   const tmp = mkTmp();
   writeTree(tmp, {
+    // §29.1: a BlogPosting/Article declaration activates feed generation
+    // under --base-url, independent of §26 — and §29.5's feed-level <id>/
+    // rel=alternate is the site's own root address, which §29.7/§21.6's
+    // directory-URL rule resolves to index.html. Present so this page's OWN
+    // pipeline (composing under --base-url with a schema declaration) does
+    // not collide with an unrelated section; irrelevant to every assertion
+    // below, which reads only post.html.
+    "src/index.html": doc({ title: "Home" }),
     // Every source in §26.6's table has a value here except one: the page
     // declares no canonical (frontmatter cannot, §10.2), so `url` comes from
     // record.url, which --base-url supplies.
@@ -434,6 +442,11 @@ test("SD-11 — WebPage emits name and Article/BlogPosting emit headline; author
 test("SD-11 — url is the page's FINAL canonical, never a second opinion about its address", async () => {
   const tmp = mkTmp();
   writeTree(tmp, {
+    // §29.1/§29.7 — see the identical note in SD-10 above: an Article
+    // declaration activates feed generation, whose feed-level address needs
+    // a root page to resolve. Irrelevant to this test's own assertion, which
+    // reads only post.html's url.
+    "src/index.html": doc({ title: "Home" }),
     // An authored canonical naming another page of the site. §22.3 leaves it
     // exactly as written, §11.3 absolutizes it, and §26.6 says the generated
     // `url` is record.canonical *before* record.url — so a build that reached

@@ -1,6 +1,6 @@
 # unify CLI reference
 
-**Matches the 0.8 development line** (v0.7.0 plus the shipped 0.8 work: `unify audit`, `--canonical auto`, and sitemap generation). This page lists every command, every option, and every exit code — there are no others. The behavior behind each is specified in [`product-spec.md`](product-spec.md) §4 and, rule by rule, in [`conformance-spec.md`](conformance-spec.md).
+**Matches the 0.8 development line** (v0.7.0 plus the shipped 0.8 work: `unify audit`, `--canonical auto`, sitemap generation, feed generation, the search manifest, and `audit`'s `--format`/`--external`). This page lists every command, every option, and every exit code — there are no others. The behavior behind each is specified in [`product-spec.md`](product-spec.md) §4 and, rule by rule, in [`conformance-spec.md`](conformance-spec.md).
 
 ```
 unify [build]              build the site (default command)
@@ -17,8 +17,12 @@ Options:
       --pretty-urls        about.html → about/index.html, and rewrite internal links to match
       --canonical auto     add a canonical link to pages that author none, from the site address
       --base-url <url>     the site's whole address (https://site.example/repo/): prefix root-relative links, make og:/canonical absolute for share crawlers, and generate sitemap.xml
+      --feed-full          include each entry's full rendered content in feed.xml (needs --base-url)
+      --search-index       write search-index.json for a client-side search library
       --dry-run            run the full build and every check, print the report, write nothing
       --strict             advisories count as problems for the exit code (with `audit`, findings too)
+      --format <kind>      `audit` report shape: human (default), json, or sarif
+      --external           `audit` only: fetch every off-origin URL the site emits and report the ones that don't resolve
   -p, --port <n>           port for `unify dev` (default: 3000)
   -v, --version            print version
   -h, --help               print help
@@ -59,6 +63,10 @@ Worth knowing before you wire it up: **every `init` template passes `unify audit
 A finding is also never raised for something the build already refuses to publish. A canonical or an `og:image` naming a file the site does not emit is a *problem* — it blocks the publish outright, which is stronger than reporting it.
 
 One finding is about a key rather than a gap. `tags:` and `categories:` are allowed and become ordinary `<meta>` tags, but unify builds nothing from them — no index page, no archive, no feed of any term, no route — so a page declaring one collects `taxonomy-inert`, naming the keys and what did not happen. Nothing about the page is wrong, which is why it is `incomplete` rather than `broken`; write the index yourself with a script that runs before the build, or drop the key. The keys that are *not* allowed do not reach this command at all: `draft`, `permalink`, and `slug` in Markdown frontmatter are build problems (`unify build --dry-run` reports them), because each one, believed, publishes or addresses the wrong page.
+
+**`--format json` / `--format sarif`.** Replace the finding list above with one JSON document instead — `{schemaVersion, baseUrl, summary, pages, findings}`, where `pages` is the same per-page record every other 0.8 feature reads and `findings` is the same list in the same order, machine-readable rather than printed. `--format sarif` is the identical findings, mapped field for field into SARIF 2.1.0 for editors and CI systems that already read it. Neither format changes what is checked or the exit code; `--format human` (the default) is unchanged. `problem`/`advisory` diagnostics still print to stderr as prose either way — a JSON consumer gets their counts in `summary`, never their text, so there is one diagnostic channel rather than two. Each finding carries a `fingerprint`: a stable hash of its id, its file, and the one detail that tells it apart from a sibling finding on the same page (which id repeated, which field conflicted) — deliberately *not* its line number or wording, so a CI suppression survives an unrelated edit above it and a reworded fix line.
+
+**`--external`.** The one unify operation that touches the network, and the only place it can happen — plain `build`/`audit` stay offline always. Fetches every off-origin URL the site's own output declares (a share image, a canonical naming another site, a JSON-LD URL-valued property, an ordinary link) once each, `HEAD` falling back to `GET` on `405`, and reports the ones that fail, time out, or answer `4xx`/`5xx` as `external-unreachable` (`incomplete` — the fault may be the other server's, at this exact moment, and a build must never treat that as a self-contradiction). A run that cannot reach the network at all says so once, as a usage error, rather than printing one `external-unreachable` finding per URL.
 
 ### `unify dev`
 
@@ -149,6 +157,38 @@ Two things follow from "only what the page declares", and both surprise people o
 - **Anything you write yourself wins.** A page carrying its own `<script type="application/ld+json">`, anywhere in the document, gets nothing generated. That is the escape hatch for every other vocabulary — `Product`, `Recipe`, `LocalBusiness`, a `@graph` — and for more detail than the eight fields above.
 
 `unify audit` then reads structured data as bytes, whoever wrote them: a `headline` that does not match the page's `<h1>`, an `inLanguage` that disagrees with `<html lang>`, a `url` naming a different page than the canonical, one `@id` given two types, and a date nothing can use.
+
+## Feeds (`feed.xml`)
+
+No flag either: a page opts itself into the site's feed the same way it opts into structured data — by declaring `schema: Article` or `schema: BlogPosting` — and the feed exists once **both** that declaration and `--base-url` are present. There is no `posts/` convention, no collection query, and no way to scope a feed to some pages: one declaration, one site feed.
+
+The document is [Atom](https://www.rfc-editor.org/rfc/rfc4287) at `feed.xml`, never RSS — RSS's date is a different calendar vocabulary, and Atom's is the one an ISO instant already conforms to without reformatting. An entry needs `datePublished` on the page (`date:` in frontmatter, or `<meta name="date">`/`article:published_time`), it must be `indexable` and self-canonical — the identical membership the sitemap uses — and, crucially, it needs a **time**, not just a day:
+
+```
+src/posts/hello.md: advisory: date is "2026-01-02", which names a day rather than an instant — this page is not in feed.xml
+  fix: write date: 2026-01-02T09:00:00Z — a feed entry's timestamp needs a time and a time zone
+```
+
+`2026-01-02` names a calendar day; inventing a time for it (midnight UTC, the build clock) would tell a reader west of Greenwich the wrong publication date, so unify reports the page as absent from the feed rather than guess. The advisory never blocks a publish — it says what the build did, and how to fix it.
+
+Each entry's `<id>` and `<link>` are the page's own canonical (authored, or completed by `--canonical auto`), never a second address; `<updated>` prefers `dateModified` over `datePublished` when it carries a time. `--feed-full` additionally puts each entry's rendered `<main>` into `<content type="html">` — without it, every entry carries a plain-text `<summary>`. Every internal URL the feed emits is checked exactly as a broken link would be, so a target the site does not emit blocks the publish rather than shipping a feed reader will 404 on.
+
+If your source tree already contains a `feed.xml`, that file **is** the site's feed: unify ships it untouched and generates nothing, exactly as it treats an authored `sitemap.xml`. The `blog` template's own generator writes one for this reason.
+
+## Search manifest (`search-index.json`)
+
+`--search-index` writes `search-index.json` at the output root — a flat, standard document a client-side search library (or an external indexer) can read instead of re-parsing your site. Unlike the sitemap or the feed, this is a plain flag: nothing about a page declares "index me", so it runs with or without `--base-url` (URLs are root-relative without one, absolute with).
+
+```json
+{
+  "schemaVersion": 1,
+  "pages": [
+    { "url": "/about.html", "title": "About — Example", "description": "Who we are.", "headings": [{ "level": 1, "text": "About", "id": "about" }], "text": "About Who we are and what we do." }
+  ]
+}
+```
+
+Membership is the same rule as the sitemap and `--canonical auto`: `noindex`/`none` pages, `404.html`, and pages consolidated elsewhere by their own canonical are left out. `text` is the page's visible main content, with every Unicode space character (`&nbsp;` included) folded to an ordinary space so a search box comparing a typed query against it can actually match — nothing else is touched: no case folding, no stemming, no stop-word removal, no truncation, no character count. An authored `search-index.json` in your source tree ships untouched, the same rule feeds and sitemaps follow.
 
 ### `--dry-run`
 
