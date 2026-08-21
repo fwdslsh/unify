@@ -19,7 +19,7 @@ unify composes plain HTML at build time. No template language, variables, loops,
 ## Include — reuse a fragment
 `<include src="/_includes/nav.html"></include>`, always with the closing tag; `/…` resolves from the source
 root, anything else relative to the including file. Works in any file — layouts, pages, `<head>`, fragments,
-and `.md`. **Never put content between the tags** — includes are verbatim, not components.
+and `.md`. Empty, it splices the file in verbatim. **Content between the tags fills slots** — allowed only when the target is a `*.fragment.html` declaring `<slot>`, and filled exactly as a page fills a layout's (`slot="name"` on a top-level element, everything else to the bare slot, an unfilled slot showing its own fallback). Fills reach that fragment's slots and no deeper. No props, no attributes passed, no expressions: an include is still not a component.
 
 ## Layout — chrome around a page
 Every page is wrapped by the nearest `_layout.html` — its own folder, then each parent; the page says

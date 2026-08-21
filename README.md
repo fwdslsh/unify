@@ -223,7 +223,6 @@ The full list, with the reasoning and the accepted costs, is [`docs/product-spec
 Every rule an author needs, in under sixty lines. This section is [`docs/authoring-rules.md`](docs/authoring-rules.md) embedded verbatim: the bytes between the two markers below are byte-identical to that file, which release gate G10 asserts ([`docs/testing-strategy.md`](docs/testing-strategy.md) §6). Edit the file, never this copy.
 
 <!-- BEGIN docs/authoring-rules.md -->
-
 # Authoring a unify site — the complete rules
 
 unify composes plain HTML at build time. No template language, variables, loops, or config: if you reach for
@@ -245,7 +244,7 @@ unify composes plain HTML at build time. No template language, variables, loops,
 ## Include — reuse a fragment
 `<include src="/_includes/nav.html"></include>`, always with the closing tag; `/…` resolves from the source
 root, anything else relative to the including file. Works in any file — layouts, pages, `<head>`, fragments,
-and `.md`. **Never put content between the tags** — includes are verbatim, not components.
+and `.md`. Empty, it splices the file in verbatim. **Content between the tags fills slots** — allowed only when the target is a `*.fragment.html` declaring `<slot>`, and filled exactly as a page fills a layout's (`slot="name"` on a top-level element, everything else to the bare slot, an unfilled slot showing its own fallback). Fills reach that fragment's slots and no deeper. No props, no attributes passed, no expressions: an include is still not a component.
 
 ## Layout — chrome around a page
 Every page is wrapped by the nearest `_layout.html` — its own folder, then each parent; the page says
@@ -284,7 +283,6 @@ keep every `url()` in a stylesheet file and every fetched address relative to th
 `unify build --dry-run --strict` is the whole build and every check, writing nothing: every problem in one pass,
 and a list naming each page with the layout it resolved to. Then `unify build` — exit 0 means `dist/` is the complete
 site; non-zero means nothing was published and `dist/` is untouched, so never report success on a non-zero exit. `--exclude` **replaces** the `_*` default; keep `_*` in your list.
-
 <!-- END docs/authoring-rules.md -->
 
 ## Documentation

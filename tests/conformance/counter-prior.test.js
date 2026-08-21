@@ -571,10 +571,16 @@ test("CPR-01 — a bare layout name is still P04 and a non-empty <include> is st
     throw new Error(`CPR-01: P04 must name the path form a layout takes:\n${layoutText}`);
   }
 
-  // P03 (§5.1 step 6): includes are verbatim and never take fills.
-  const include = expectDiagnostic(r.stderr, "include", "src/index.html:10", "CPR-01: P03");
-  if (!/content|component/i.test(include.message)) {
-    throw new Error(`CPR-01: P03 must say an <include> takes no content:\n${include.line}`);
+  // §6.3.9 requires a non-empty <include> to keep blocking, and §32 changed
+  // WHICH problem does it: the construct now has a meaning, so a target that
+  // cannot take content is P25 (not a .fragment.html) or P26 (a fragment with
+  // no slot) rather than P03. What the rule actually demands is that this
+  // never become a silent no-op — so this asserts the outcome, and that the
+  // message names the target, which is the half an author acts on.
+  const include = expectDiagnostic(r.stderr, "include", "src/index.html:10", "CPR-01: a non-empty include still blocks");
+  const includeText = [include.message, ...include.fixes].join("\n");
+  if (!/fragment/i.test(includeText)) {
+    throw new Error(`CPR-01: the refusal must name what a non-empty include needs — a fragment with slots:\n${includeText}`);
   }
 
   if (existsSync(join(tmp, "dist"))) throw new Error("§15: a build with two problems published");

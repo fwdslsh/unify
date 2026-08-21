@@ -160,12 +160,13 @@ src/index.html:8: problem: include not found: /_includes/navv.html
 src/_layout.html:7: problem: include cycle: _layout.html → _includes/nav.html → _layout.html
 ```
 
-6. An `<include>` without `src` is a problem. An `<include>` with non-whitespace content between its tags is **not** this section's business: it is a slotted include (§32), resolved by parsing rather than splicing, and its own problems live there. Everything in this section is about the empty form, which is unchanged. The v0.7.0 diagnostic for a non-empty include read:
+6. An `<include>` without `src` is a problem. An `<include>` with non-whitespace content between its tags is **not** this section's business: it is a slotted include (§32), resolved by parsing rather than splicing, and its own problems live there. Everything in this section is about the empty form, which is unchanged. The shape v0.7.0 refused outright is now the one §32 gives a meaning — and it still refuses every target that cannot take content:
 
 ```
-src/index.html:9: problem: <include> takes no content — the file's contents replace the element
+src/index.html:9: problem: <include> with content: _includes/card.html is not a .fragment.html
   in: <include src="/_includes/card.html"><h3>My title</h3></include>
-  fix: includes are not components; put page content in the page, or generate variants with a script (_scripts/)
+  fix: an include may carry content only when its target is a fragment with slots
+  fix: rename it _includes/card.fragment.html, or empty the include
 ```
 
 7. The void form (no closing tag) builds identically and carries advisory A01 (§14.3).
@@ -1879,7 +1880,7 @@ It is a **predicate over the manifest** like every other finding, so §20 gains 
 
 ### 28.3 What stays exactly as it was
 
-Product-spec §6.3.9 closes by requiring four existing diagnostics to remain mandatory, and none of them changes here: a bare layout name is **P04** (§6.1); a path-only `--base-url` is a usage error (§11.3); a hand-written pretty URL is **P13** (§12), and `--pretty-urls` does not switch that check off — a link to `/guides/` that names no emitted page is P13 in both modes; and a non-empty `<include>` is **P03** (§5.1).
+Product-spec §6.3.9 closes by requiring four existing diagnostics to remain mandatory, and none of them changes here: a bare layout name is **P04** (§6.1); a path-only `--base-url` is a usage error (§11.3); a hand-written pretty URL is **P13** (§12), and `--pretty-urls` does not switch that check off — a link to `/guides/` that names no emitted page is P13 in both modes; and a non-empty `<include>` still blocks the build — as **P25**/**P26** since §32 gave it a meaning, rather than P03. What §6.3.9 requires is that it not become a silent no-op, and it has not: §32.2 refuses every target that cannot take content, and names both the include and the fragment.
 
 That third clause is stated as *the check is not switched off* rather than by the obvious example, because the obvious example is not true of the flag, and the correction is the more useful half. A link to `/about/` on a site whose source holds `about.html` is P13 without `--pretty-urls` and **resolves** with it: §11.2 emits `about/index.html` under the flag and rewrites the author's own `/about.html` links to that same address, so "a site that emits `about.html`" is exactly the antecedent the flag removes. What holds in both modes is §11.2's own rule and the reason §12 checks the output tree: link the real file and let the flag do the rewriting, because a directory URL naming no emitted page is P13 either way, and the one that *does* name a page under the flag is the one the flag would have written for you.
 
