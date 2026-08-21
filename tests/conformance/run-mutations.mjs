@@ -197,11 +197,24 @@ export function buildTargetIndex(rootDir) {
 }
 
 const RULE_ID = /\b([A-Z]{1,4}-\d{2}|[PA]\d{2})\b/g;
-const SECTION = /§(\d+(?:\.\d+)?)/g;
+const SECTION = /§(\d+\.\d+)/g; // a SUB-section only — see rankFiles
 
 /**
  * The test files most likely to kill this row, from the rules its `why` cites.
- * Empty is a legitimate answer — the row simply escalates.
+ *
+ * A SUBSET, not a reordering. Ordering the whole list and bailing on the first
+ * failure would be simpler and does not work: `bun test` honours argument order
+ * for a couple of files and abandons it for fifty-six, so a run "ranked" with
+ * feed.test.js first went through seventeen other files and 430 tests before
+ * reaching it — 44.9s to discover what the one file answers in 3.1s.
+ *
+ * An empty result is a legitimate answer; the row escalates to the full suite.
+ *
+ * A file cited by RULE ID is included; a SUB-SECTION (`§20.5`) also counts, but
+ * a bare section does not. `§14` covers the entire diagnostic catalogue, and
+ * reading it literally pulled the two slowest files in the suite into rows that
+ * had nothing to do with them — sixty seconds a row instead of three.
+ *
  * @param {{why: string}} row
  * @param {ReturnType<typeof buildTargetIndex>} index
  * @returns {string[]} repo-relative test file paths
@@ -217,6 +230,25 @@ export function targetsFor(row, index) {
     }
   }
   return [...files].sort();
+}
+
+/**
+ * Every test file in a tree, repo-relative. Derived from the filesystem rather
+ * than listed, so a new test file joins a sweep without anyone remembering.
+ * @param {string} rootDir
+ * @returns {string[]}
+ */
+export function allTestFiles(rootDir) {
+  const out = [];
+  const walk = (dir) => {
+    for (const entry of readdirSync(join(rootDir, dir), { withFileTypes: true })) {
+      const rel = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) walk(rel);
+      else if (entry.name.endsWith(".test.js")) out.push(rel);
+    }
+  };
+  walk("tests");
+  return out.sort();
 }
 
 /**
@@ -519,7 +551,7 @@ function main() {
   // starting concurrently sees an owner rather than an orphan.
   writeFileSync(join(work, OWNER), `${process.pid}\n`);
   reapOrphans(work);
-  const runSuite = (files = [], bail = false) => {
+  const runSuite = (files = []) => {
     // Removed here, immediately before the suite runs, rather than inside the
     // extraction — so no future reordering of `extract` can put it back before
     // a suite sees it. That is not hypothetical: the first version deleted it
@@ -541,11 +573,11 @@ function main() {
     // and the test runs on every ordinary run.
     rmSync(join(work, "tests", "conformance", "mutation-inventory.test.js"), { force: true });
 
-    // `--bail=1` on the full-suite pass only. A kill needs ONE failing test,
-    // not a census, and the full pass exists to answer yes/no. The targeted
-    // pass runs without it, because that set is small and its complete killer
-    // list is what the review protocol reports.
-    const r = spawnSync("bun", ["test", ...files, ...(bail ? ["--bail=1"] : [])], {
+    // ALWAYS `--bail=1`. A kill needs ONE failing test, not a census. Running
+    // the whole ranked list to collect every killer cost sixty seconds a row
+    // and bought a longer report — the single named killer is what a reviewer
+    // acts on, and `--rev`/re-running the row gives the rest when it matters.
+    const r = spawnSync("bun", ["test", ...files, "--bail=1"], {
       cwd: work, encoding: "utf8", timeout: SUITE_TIMEOUT_MS,
       env: { ...process.env, CLAUDECODE: "1" },
     });
@@ -593,75 +625,39 @@ function main() {
     // observation instead of by a hand-maintained name list. It also stops one
     // environmental port flake from discarding a fifteen-minute sweep — which
     // is the habit that trains people to re-run a check until it passes.
-    let needsExtract = true;
+    // THE BASELINE GATE. Without it a red tree reports every mutation KILLED.
+    // Run TWICE: the second run costs one suite and buys the flake set by
+    // observation instead of by a hand-maintained name list. It also stops one
+    // environmental port flake from discarding a sweep — the habit that trains
+    // people to re-run a check until it passes. Twice, once, for the whole
+    // sweep: against 165 rows it is noise, and scoping it to "just the files
+    // this sweep will run" bought nothing once every row runs every file.
+    console.log("mutation: checking the baseline is green (twice, to measure flakiness)...");
+    const first = failingTests(runSuite().output);
+    const second = failingTests(runSuite().output);
+    const { flaky, hard } = compareBaselines(first, second);
+    if (hard.length) {
+      console.error("mutation: the suite is not green unmutated — fix that first, or every mutation reads as killed");
+      for (const t of hard.slice(0, 10)) console.error(`  failing in both runs: ${t}`);
+      finalExit = 2;
+      return;
+    }
+    const baselineFailures = hard;
+    if (flaky.length) {
+      console.log(`mutation: baseline green; ${flaky.length} test(s) observed flaky and excluded from kill attribution:`);
+      for (const t of flaky) console.log(`  flaky: ${t}`);
+    } else {
+      console.log("mutation: baseline green, no flakiness observed");
+    }
 
-    // THE BASELINE IS SCOPED TO WHAT WILL ACTUALLY RUN.
-    //
-    // Its two jobs are to refuse a red tree and to measure flakiness, and both
-    // only concern tests this sweep will execute. Baselining the whole suite to
-    // sweep one targeted row cost 240 seconds of setup for 8 seconds of work —
-    // which is how a check becomes something people stop running.
-    //
-    // So it starts on the union of every selected row's targeted files, and
-    // upgrades to the full suite the first time a row escalates (below). The
-    // upgrade is unconditional at that point: a full-suite verdict must be
-    // attributed against a full-suite baseline, or a pre-existing failure
-    // somewhere unrelated would be credited as the kill.
-    let baselineScope = null; // null = not yet full
-    let baselineFailures = [];
-    let flaky = [];
-
-    const takeBaseline = (files, label) => {
-      console.log(`mutation: checking the baseline is green (twice, to measure flakiness) — ${label}...`);
-      const first = failingTests(runSuite(files).output);
-      const second = failingTests(runSuite(files).output);
-      const cmp = compareBaselines(first, second);
-      if (cmp.hard.length) {
-        console.error("mutation: the suite is not green unmutated — fix that first, or every mutation reads as killed");
-        for (const t of cmp.hard.slice(0, 10)) console.error(`  failing in both runs: ${t}`);
-        return false;
-      }
-      baselineFailures = cmp.hard;
-      // Union rather than replace: a test seen flaky in the targeted baseline
-      // stays excluded from attribution after the scope widens.
-      flaky = [...new Set([...flaky, ...cmp.flaky])];
-      if (cmp.flaky.length) {
-        console.log(`mutation: baseline green; ${cmp.flaky.length} test(s) observed flaky and excluded from kill attribution:`);
-        for (const t of cmp.flaky) console.log(`  flaky: ${t}`);
-      } else {
-        console.log("mutation: baseline green, no flakiness observed");
-      }
-      return true;
-    };
-
-    /** Widen the baseline to the whole suite, once, before the first escalation. */
-    const ensureFullBaseline = () => {
-      if (baselineScope === "full") return true;
-      needsExtract = true; // the baseline runs the landmine tests too
-      extract();
-      needsExtract = false;
-      const ok = takeBaseline([], "whole suite, for a row the index could not target");
-      baselineScope = "full";
-      return ok;
-    };
     // Built from the ROOT tree, not the copy: the ledger is written by ordinary
     // runs there, and a freshly extracted copy may not carry one.
     const index = buildTargetIndex(ROOT);
-    const targeted = selected.filter((r) => targetsFor(r, index).length).length;
+    const targetedRows = selected.filter((r) => targetsFor(r, index).length).length;
     console.log(`mutation: ${selected.length} mutation(s) against ${rev ?? "the working tree"}, in ${work}`);
-    console.log(`mutation: ${targeted}/${selected.length} rows have targeted tests; the rest go straight to the full suite`);
+    console.log(`mutation: ${targetedRows}/${selected.length} rows have targeted tests; the rest run the whole suite`);
     if (!index.byRule.size) {
-      console.log("mutation: no .conformance-ledger.jsonl at the root — every row will run the full suite (slow but correct)");
-    }
-
-    const scopeFiles = [...new Set(selected.flatMap((r) => targetsFor(r, index)))].sort();
-    const startFull = scopeFiles.length === 0 || targeted !== selected.length;
-    if (startFull) {
-      baselineScope = "full";
-      if (!takeBaseline([], "whole suite")) { finalExit = 2; return; }
-    } else if (!takeBaseline(scopeFiles, `${scopeFiles.length} targeted file(s)`)) {
-      finalExit = 2;
-      return;
+      console.log("mutation: no .conformance-ledger.jsonl at the root — every row runs the whole suite (correct, just slower)");
     }
 
     let unkilled = 0;
@@ -670,12 +666,7 @@ function main() {
       // only on a terminal. Piped to a file, \r does not erase, and the line
       // would be interleaved into the record the review protocol quotes.
       if (process.stdout.isTTY) process.stdout.write(`  ... ${row.id}\r`);
-      // The copy only needs re-extracting when the previous row ran the FULL
-      // suite: the landmine cases that exercise `-o . --clean` delete source
-      // files, and a full run is the only thing that reaches them. After a
-      // targeted run, restoring the single mutated file (below) is enough.
-      // `needsExtract` starts true so the first row always gets a clean tree.
-      if (needsExtract) { extract(); needsExtract = false; }
+      extract(); // whatever the previous row's suite did to the copy, undo it (247ms)
       const target = join(work, row.file);
       if (!existsSync(target)) {
         console.error(`  ERROR    ${row.id} — ${row.file} is missing from a freshly extracted copy`);
@@ -685,51 +676,33 @@ function main() {
       const pristine = readFileSync(target, "utf8");
       writeFileSync(target, pristine.replace(row.old, row.next));
       let verdict;
-      let escalated = false;
       try {
         // TIER 1 — the files the ledger says demonstrate this row's rules.
-        // Small, so no bail: the complete killer list from the relevant tests
-        // is what a review report quotes.
         const targets = targetsFor(row, index);
         verdict = targets.length
           ? classify({ ...runSuite(targets), baselineFailures, flakyTests: flaky })
           : { outcome: "SURVIVED", killedBy: [], note: "no targeted tests" };
 
-        // TIER 2 — the full suite. Reached when targeting found nothing, which
-        // is either a row with no mapped tests or a rule genuinely killed
-        // somewhere the index did not predict. EVERY SURVIVOR PASSES THROUGH
-        // HERE: a row is never reported survived on the strength of a subset,
-        // so a wrong index costs time and cannot cost correctness.
-        if (verdict.outcome !== "KILLED") {
-          escalated = true;
-          if (!ensureFullBaseline()) { finalExit = 2; return; }
-          // The widened baseline re-extracted, so re-apply the mutation.
-          writeFileSync(target, pristine.replace(row.old, row.next));
-          verdict = classify({ ...runSuite([], true), baselineFailures, flakyTests: flaky });
-        }
+        // TIER 2 — the whole suite, for a row tier 1 did not kill. EVERY
+        // SURVIVOR PASSES THROUGH HERE, so a targeted set that is wrong, stale
+        // or empty costs time and cannot cost correctness. That is the entire
+        // justification for tier 1 existing.
+        const escalated = verdict.outcome !== "KILLED";
+        if (escalated) verdict = classify({ ...runSuite(), baselineFailures, flakyTests: flaky });
 
-        // A kill resting on ONE test is confirmed by repeating it — on the same
-        // tier that produced it, so the confirmation costs what the kill cost.
-        // A test that is genuinely flaky but happened to pass both baseline
-        // runs would otherwise be credited as the kill, reporting "this rule is
-        // pinned" when nothing pinned it: the inversion this file exists to
-        // prevent, one level down.
+        // A kill resting on ONE test is confirmed by repeating it, on the tier
+        // that produced it. A test that is genuinely flaky but happened to pass
+        // both baseline runs would otherwise be credited as the kill —
+        // reporting "this rule is pinned" when nothing pinned it, the inversion
+        // this file exists to prevent, one level down.
         if (verdict.outcome === "KILLED" && verdict.killedBy.length === 1) {
-          const again = escalated
-            ? classify({ ...runSuite([], true), baselineFailures, flakyTests: flaky })
-            : classify({ ...runSuite(targetsFor(row, index)), baselineFailures, flakyTests: flaky });
+          const again = classify({ ...runSuite(escalated ? [] : targets), baselineFailures, flakyTests: flaky });
           if (!again.killedBy.includes(verdict.killedBy[0])) {
             verdict = { outcome: "SURVIVED", killedBy: [],
               note: `the only failing test (${verdict.killedBy[0]}) did not fail again — flaky, not a kill` };
           }
         }
-        if (verdict.outcome === "KILLED" && escalated && targets.length) {
-          // Worth saying out loud: the row's rules pointed at files that did
-          // not kill it. The sweep is still correct, and the index has a gap.
-          verdict.note = `killed only by the full suite — ${row.id}'s targets (${targets.join(", ")}) missed it`;
-        }
       } finally {
-        if (escalated) needsExtract = true;
         // Best-effort: the next row re-extracts anyway, so a failure here is
         // not fatal the way it was when the copy had to survive the whole run.
         try { writeFileSync(target, pristine); } catch { /* re-extracted next row */ }
