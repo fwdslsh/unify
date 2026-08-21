@@ -134,6 +134,92 @@ export function parseMutations(text) {
 }
 
 /**
+ * COVERAGE-DIRECTED TARGETING — why a sweep no longer costs a suite per row.
+ *
+ * A mutation in `src/core/feed.js` can only be killed by a test that exercises
+ * feed.js. The first design ran all 1,289 tests to discover that, which is the
+ * most expensive possible way to answer a yes/no question: measured on one row,
+ * 117,974ms for the full suite against 3,142ms for the one file that kills it.
+ * Across 165 rows that is the difference between a nine-hour job nobody runs
+ * and a half-hour one that fits in a review.
+ *
+ * The index is built from evidence the suite already produces. Every run writes
+ * `.conformance-ledger.jsonl`, one `{rule, test, status}` per `covers()` call,
+ * so it already knows which test file demonstrated which rule. `rules.tsv` maps
+ * each rule to its spec section, which lets a row citing `§20.5` resolve to the
+ * same files as one citing `MAN-05`.
+ *
+ * TARGETING IS AN OPTIMISATION, NEVER A VERDICT. A row whose targeted files all
+ * pass is NOT reported as survived — it escalates to the full suite, and only a
+ * green full run produces SURVIVED. So an index that is wrong, stale, or empty
+ * costs time and never costs correctness. That property is the whole reason
+ * this is safe to do at all: the failure mode of a bad index is a slow sweep,
+ * not a false "this rule is pinned".
+ *
+ * @param {string} rootDir - the repository root to read the ledger and rules from
+ * @returns {{byRule: Map<string,Set<string>>, bySection: Map<string,Set<string>>}}
+ */
+export function buildTargetIndex(rootDir) {
+  const byRule = new Map();
+  const bySection = new Map();
+  const add = (map, key, value) => {
+    if (!map.has(key)) map.set(key, new Set());
+    map.get(key).add(value);
+  };
+
+  const ledger = join(rootDir, ".conformance-ledger.jsonl");
+  if (existsSync(ledger)) {
+    for (const line of readFileSync(ledger, "utf8").split("\n")) {
+      if (!line.trim()) continue;
+      let row;
+      try { row = JSON.parse(line); } catch { continue; }
+      // The ledger records a test's display name, which carries its file:
+      // "<anonymous> (tests/conformance/feed.test.js:143:5)".
+      const file = /(tests\/[^\s:)]+)/.exec(row.test ?? "")?.[1];
+      if (row.rule && file) add(byRule, row.rule, file);
+    }
+  }
+
+  const rules = join(rootDir, "tests", "conformance", "rules.tsv");
+  if (existsSync(rules)) {
+    for (const line of readFileSync(rules, "utf8").split("\n").slice(1)) {
+      if (!line.trim()) continue;
+      const [id, section] = line.split("\t");
+      if (!id || !section) continue;
+      add(bySection, section, id);
+      // A row citing `§20` should reach every rule under §20.x, not only §20
+      // itself — the section a `why` line quotes is usually the coarse one.
+      const coarse = section.split(".")[0];
+      if (coarse !== section) add(bySection, coarse, id);
+    }
+  }
+  return { byRule, bySection };
+}
+
+const RULE_ID = /\b([A-Z]{1,4}-\d{2}|[PA]\d{2})\b/g;
+const SECTION = /§(\d+(?:\.\d+)?)/g;
+
+/**
+ * The test files most likely to kill this row, from the rules its `why` cites.
+ * Empty is a legitimate answer — the row simply escalates.
+ * @param {{why: string}} row
+ * @param {ReturnType<typeof buildTargetIndex>} index
+ * @returns {string[]} repo-relative test file paths
+ */
+export function targetsFor(row, index) {
+  const files = new Set();
+  for (const [, id] of (row.why ?? "").matchAll(RULE_ID)) {
+    for (const f of index.byRule.get(id) ?? []) files.add(f);
+  }
+  for (const [, num] of (row.why ?? "").matchAll(SECTION)) {
+    for (const id of index.bySection.get(`§${num}`) ?? []) {
+      for (const f of index.byRule.get(id) ?? []) files.add(f);
+    }
+  }
+  return [...files].sort();
+}
+
+/**
  * Which tests failed, by name, in one suite run's output.
  * @param {string} output
  * @returns {string[]}
@@ -433,7 +519,7 @@ function main() {
   // starting concurrently sees an owner rather than an orphan.
   writeFileSync(join(work, OWNER), `${process.pid}\n`);
   reapOrphans(work);
-  const runSuite = () => {
+  const runSuite = (files = [], bail = false) => {
     // Removed here, immediately before the suite runs, rather than inside the
     // extraction — so no future reordering of `extract` can put it back before
     // a suite sees it. That is not hypothetical: the first version deleted it
@@ -455,7 +541,11 @@ function main() {
     // and the test runs on every ordinary run.
     rmSync(join(work, "tests", "conformance", "mutation-inventory.test.js"), { force: true });
 
-    const r = spawnSync("bun", ["test"], {
+    // `--bail=1` on the full-suite pass only. A kill needs ONE failing test,
+    // not a census, and the full pass exists to answer yes/no. The targeted
+    // pass runs without it, because that set is small and its complete killer
+    // list is what the review protocol reports.
+    const r = spawnSync("bun", ["test", ...files, ...(bail ? ["--bail=1"] : [])], {
       cwd: work, encoding: "utf8", timeout: SUITE_TIMEOUT_MS,
       env: { ...process.env, CLAUDECODE: "1" },
     });
@@ -503,24 +593,76 @@ function main() {
     // observation instead of by a hand-maintained name list. It also stops one
     // environmental port flake from discarding a fifteen-minute sweep — which
     // is the habit that trains people to re-run a check until it passes.
-    console.log("mutation: checking the baseline is green (twice, to measure flakiness)...");
-    const first = failingTests(runSuite().output);
-    const second = failingTests(runSuite().output);
-    const { flaky, hard } = compareBaselines(first, second);
-    if (hard.length) {
-      console.error("mutation: the suite is not green unmutated — fix that first, or every mutation reads as killed");
-      for (const t of hard.slice(0, 10)) console.error(`  failing in both runs: ${t}`);
+    let needsExtract = true;
+
+    // THE BASELINE IS SCOPED TO WHAT WILL ACTUALLY RUN.
+    //
+    // Its two jobs are to refuse a red tree and to measure flakiness, and both
+    // only concern tests this sweep will execute. Baselining the whole suite to
+    // sweep one targeted row cost 240 seconds of setup for 8 seconds of work —
+    // which is how a check becomes something people stop running.
+    //
+    // So it starts on the union of every selected row's targeted files, and
+    // upgrades to the full suite the first time a row escalates (below). The
+    // upgrade is unconditional at that point: a full-suite verdict must be
+    // attributed against a full-suite baseline, or a pre-existing failure
+    // somewhere unrelated would be credited as the kill.
+    let baselineScope = null; // null = not yet full
+    let baselineFailures = [];
+    let flaky = [];
+
+    const takeBaseline = (files, label) => {
+      console.log(`mutation: checking the baseline is green (twice, to measure flakiness) — ${label}...`);
+      const first = failingTests(runSuite(files).output);
+      const second = failingTests(runSuite(files).output);
+      const cmp = compareBaselines(first, second);
+      if (cmp.hard.length) {
+        console.error("mutation: the suite is not green unmutated — fix that first, or every mutation reads as killed");
+        for (const t of cmp.hard.slice(0, 10)) console.error(`  failing in both runs: ${t}`);
+        return false;
+      }
+      baselineFailures = cmp.hard;
+      // Union rather than replace: a test seen flaky in the targeted baseline
+      // stays excluded from attribution after the scope widens.
+      flaky = [...new Set([...flaky, ...cmp.flaky])];
+      if (cmp.flaky.length) {
+        console.log(`mutation: baseline green; ${cmp.flaky.length} test(s) observed flaky and excluded from kill attribution:`);
+        for (const t of cmp.flaky) console.log(`  flaky: ${t}`);
+      } else {
+        console.log("mutation: baseline green, no flakiness observed");
+      }
+      return true;
+    };
+
+    /** Widen the baseline to the whole suite, once, before the first escalation. */
+    const ensureFullBaseline = () => {
+      if (baselineScope === "full") return true;
+      needsExtract = true; // the baseline runs the landmine tests too
+      extract();
+      needsExtract = false;
+      const ok = takeBaseline([], "whole suite, for a row the index could not target");
+      baselineScope = "full";
+      return ok;
+    };
+    // Built from the ROOT tree, not the copy: the ledger is written by ordinary
+    // runs there, and a freshly extracted copy may not carry one.
+    const index = buildTargetIndex(ROOT);
+    const targeted = selected.filter((r) => targetsFor(r, index).length).length;
+    console.log(`mutation: ${selected.length} mutation(s) against ${rev ?? "the working tree"}, in ${work}`);
+    console.log(`mutation: ${targeted}/${selected.length} rows have targeted tests; the rest go straight to the full suite`);
+    if (!index.byRule.size) {
+      console.log("mutation: no .conformance-ledger.jsonl at the root — every row will run the full suite (slow but correct)");
+    }
+
+    const scopeFiles = [...new Set(selected.flatMap((r) => targetsFor(r, index)))].sort();
+    const startFull = scopeFiles.length === 0 || targeted !== selected.length;
+    if (startFull) {
+      baselineScope = "full";
+      if (!takeBaseline([], "whole suite")) { finalExit = 2; return; }
+    } else if (!takeBaseline(scopeFiles, `${scopeFiles.length} targeted file(s)`)) {
       finalExit = 2;
       return;
     }
-    const baselineFailures = hard;
-    if (flaky.length) {
-      console.log(`mutation: baseline green; ${flaky.length} test(s) observed flaky and excluded from kill attribution:`);
-      for (const t of flaky) console.log(`  flaky: ${t}`);
-    } else {
-      console.log("mutation: baseline green, no flakiness observed");
-    }
-    console.log(`mutation: ${selected.length} mutation(s) against ${rev ?? "the working tree"}, in ${work}`);
 
     let unkilled = 0;
     for (const row of selected) {
@@ -528,7 +670,12 @@ function main() {
       // only on a terminal. Piped to a file, \r does not erase, and the line
       // would be interleaved into the record the review protocol quotes.
       if (process.stdout.isTTY) process.stdout.write(`  ... ${row.id}\r`);
-      extract(); // whatever the previous row's suite did to the copy, undo it
+      // The copy only needs re-extracting when the previous row ran the FULL
+      // suite: the landmine cases that exercise `-o . --clean` delete source
+      // files, and a full run is the only thing that reaches them. After a
+      // targeted run, restoring the single mutated file (below) is enough.
+      // `needsExtract` starts true so the first row always gets a clean tree.
+      if (needsExtract) { extract(); needsExtract = false; }
       const target = join(work, row.file);
       if (!existsSync(target)) {
         console.error(`  ERROR    ${row.id} — ${row.file} is missing from a freshly extracted copy`);
@@ -538,21 +685,51 @@ function main() {
       const pristine = readFileSync(target, "utf8");
       writeFileSync(target, pristine.replace(row.old, row.next));
       let verdict;
+      let escalated = false;
       try {
-        verdict = classify({ ...runSuite(), baselineFailures, flakyTests: flaky });
-        // A kill resting on ONE test is confirmed by repeating it. A test that
-        // is genuinely flaky but happened to pass both baseline runs would
-        // otherwise be credited as the kill — reporting "this rule is pinned"
-        // when nothing pinned it, which is the inversion this file exists to
+        // TIER 1 — the files the ledger says demonstrate this row's rules.
+        // Small, so no bail: the complete killer list from the relevant tests
+        // is what a review report quotes.
+        const targets = targetsFor(row, index);
+        verdict = targets.length
+          ? classify({ ...runSuite(targets), baselineFailures, flakyTests: flaky })
+          : { outcome: "SURVIVED", killedBy: [], note: "no targeted tests" };
+
+        // TIER 2 — the full suite. Reached when targeting found nothing, which
+        // is either a row with no mapped tests or a rule genuinely killed
+        // somewhere the index did not predict. EVERY SURVIVOR PASSES THROUGH
+        // HERE: a row is never reported survived on the strength of a subset,
+        // so a wrong index costs time and cannot cost correctness.
+        if (verdict.outcome !== "KILLED") {
+          escalated = true;
+          if (!ensureFullBaseline()) { finalExit = 2; return; }
+          // The widened baseline re-extracted, so re-apply the mutation.
+          writeFileSync(target, pristine.replace(row.old, row.next));
+          verdict = classify({ ...runSuite([], true), baselineFailures, flakyTests: flaky });
+        }
+
+        // A kill resting on ONE test is confirmed by repeating it — on the same
+        // tier that produced it, so the confirmation costs what the kill cost.
+        // A test that is genuinely flaky but happened to pass both baseline
+        // runs would otherwise be credited as the kill, reporting "this rule is
+        // pinned" when nothing pinned it: the inversion this file exists to
         // prevent, one level down.
         if (verdict.outcome === "KILLED" && verdict.killedBy.length === 1) {
-          const again = classify({ ...runSuite(), baselineFailures, flakyTests: flaky });
+          const again = escalated
+            ? classify({ ...runSuite([], true), baselineFailures, flakyTests: flaky })
+            : classify({ ...runSuite(targetsFor(row, index)), baselineFailures, flakyTests: flaky });
           if (!again.killedBy.includes(verdict.killedBy[0])) {
             verdict = { outcome: "SURVIVED", killedBy: [],
               note: `the only failing test (${verdict.killedBy[0]}) did not fail again — flaky, not a kill` };
           }
         }
+        if (verdict.outcome === "KILLED" && escalated && targets.length) {
+          // Worth saying out loud: the row's rules pointed at files that did
+          // not kill it. The sweep is still correct, and the index has a gap.
+          verdict.note = `killed only by the full suite — ${row.id}'s targets (${targets.join(", ")}) missed it`;
+        }
       } finally {
+        if (escalated) needsExtract = true;
         // Best-effort: the next row re-extracts anyway, so a failure here is
         // not fatal the way it was when the copy had to survive the whole run.
         try { writeFileSync(target, pristine); } catch { /* re-extracted next row */ }
