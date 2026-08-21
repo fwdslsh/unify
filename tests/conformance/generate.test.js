@@ -115,7 +115,15 @@ test("P29 — a generator that throws stops the build BEFORE the scan, and SAYS 
   expectContains(r.stderr, "problem:", "P29 is reported, not merely exited on");
   expectContains(r.stderr, "boom from the generator", "the thrown message reaches the author");
   expectContains(r.stderr, "_scripts/bad.mjs", "located at the generator's own path");
-  covers("GEN-03");
+  // The runtime wraps a thrown error in a code frame, a caret and stack
+  // frames, and the author's message sits in the MIDDLE of that. Taking the
+  // tail of stderr put `at loadAndEvaluateModule / Bun v1.3.11` here instead,
+  // which is technically the end of the output and useless to the person who
+  // has to fix it.
+  if (/at loadAndEvaluateModule|^Bun v\d/m.test(r.stderr.split("\n").find((l) => l.includes("problem:")) ?? "")) {
+    throw new Error(`P29 must carry the generator's message, not the stack tail:\n${r.stderr}`);
+  }
+  covers("GEN-03", "P29");
 }, TEST_MS);
 
 test("GEN-03 — a generator that calls process.exit() ends the build", async () => {

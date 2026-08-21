@@ -2198,13 +2198,15 @@ That is the interface. There is no unify module to import, no object passed in, 
 
 The working directory is the **source root**, so `./_data/authors.json` in a generator means what an author reading the source tree would expect.
 
-**The runtime is unify's own.** A compiled single-file executable carries it, which is the point product-spec §6.4.2 makes about removing the second runtime: an author with `unify` on their PATH and no Node installation can run a generator. The generator is loaded as an ES module in unify's own process, with `process.argv` set to those values for the duration of the call and restored afterwards.
+**The runtime is unify's own.** A compiled single-file executable carries it, which is the point product-spec §6.4.2 makes about removing the second runtime: an author with `unify` on their PATH and no Node installation can run a generator.
 
-Three consequences of in-process loading, stated here rather than discovered later:
+**The generator runs as a subprocess of that executable**, not inside the build's own process. Its stdout is passed through, so a generator that logs its progress still does; its exit status is the whole of what unify reads back. Three consequences follow, normative rather than incidental:
 
-- **A generator that calls `process.exit()` ends the build**, at whatever code it passes. unify does not sandbox arbitrary JavaScript and does not claim to (§6.7).
-- **A generator that throws is P29**, located at the generator's path, carrying the thrown message and — under `DEBUG=1` — the stack. The build stops before scanning, because a partial overlay is a site nobody described.
-- **Every rebuild re-runs it from source.** Watch mode is full rebuilds only (§16), and a module cache that returned the first build's module would make every rebuild after the first silently skip the generator — the site would go stale while the build reported success. The module is loaded fresh each time, and that is a normative requirement rather than an implementation detail.
+- **A generator that calls `process.exit()` ends its own process**, and a non-zero status is P29. unify does not sandbox arbitrary JavaScript and does not claim to (§6.7); what it does guarantee is that the build does not carry on as though nothing happened.
+- **A generator that throws is P29**, located at the generator's path, carrying the generator's own message — the runtime's presentation of a thrown error surrounds that message with a code frame, a caret and stack frames, and the message is what must reach the author, not the tail of the trace. Under `DEBUG=1` the whole of stderr is passed through as well. The build stops before scanning, because a partial overlay is a site nobody described.
+- **Every rebuild re-runs it.** Watch mode is full rebuilds only (§16), and a module cache that returned the first build's copy would make every rebuild after the first silently skip the generator — the site would go stale while the build reported success. A new process has no module cache to consult, so the requirement holds structurally. It cannot be met by loading the generator in-process behind a cache-busting query string: a runtime is free to ignore the query when caching a file URL, and Bun does, which makes that spelling a no-op that reports success.
+
+The subprocess is therefore part of the contract and not an implementation detail. An implementation that loads the generator in-process satisfies none of the three: it hands `process.exit()` the build's own exit code, it has no separate stderr to locate P29 from, and it must invent a cache defeat that the runtime is entitled to ignore.
 
 ### 33.3 The overlay
 
