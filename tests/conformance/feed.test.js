@@ -179,9 +179,15 @@ test("FEED-02: the document is Atom at output-root feed.xml; an authored offset 
 
 test("A17/FEED-03: a day-only datePublished draws the advisory and is excluded from feed.xml; the same page with a full instant is included — and the feed never manufactures midnight", async () => {
   // The literal fixture from §29.3's own worked example: src/posts/hello.md,
-  // date: 2026-01-02. Activation is schemaType-only (§29.1), so this single
-  // BlogPosting page — even with an unusable date — must still produce a
-  // feed.xml, just with no entry for itself.
+  // date: 2026-01-02. Activation is MEMBERSHIP (§29.1), so this single
+  // BlogPosting page — whose only candidate fails §29.3's date rule — leaves
+  // no entry, and no feed is written at all.
+  //
+  // That is the third answer to a question with only two bad ones. RFC 4287
+  // §4.1.1 requires atom:updated on every feed and §29.5 defines it as the
+  // newest entry's, so a zero-entry feed can only be emitted invalid or
+  // filled with an invented instant — and §6.1 forbids the second. Writing
+  // nothing is honest, and A17 below is what tells the author why.
   const dayOnly = mkTmp();
   writeTree(join(dayOnly, "src"), {
     "index.html": page("Home"),
@@ -189,17 +195,15 @@ test("A17/FEED-03: a day-only datePublished draws the advisory and is excluded f
   });
   const a = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", BASE], dayOnly);
   expectExit(a, 0, "an advisory never blocks a publish");
-  if (!existsSync(join(dayOnly, "dist", "feed.xml"))) {
-    throw new Error("§29.1: activation is schemaType-only — a BlogPosting page with an unusable date must still activate the feed");
-  }
-  const badXml = read(dayOnly, "dist", "feed.xml");
-  if (feedEntries(badXml).length !== 0) {
-    throw new Error(`§29.4: a day-only datePublished fails membership condition 4 — the feed must carry no entry for this page.\n${badXml}`);
-  }
-  // The trap: an implementation that manufactured midnight to still produce
-  // an entry would pass an "entry exists" test and fail this one.
-  if (badXml.includes("T00:00:00")) {
-    throw new Error(`§29.3: midnight UTC must never be manufactured for a page whose date has no time — it is wrong for every reader west of Greenwich.\n${badXml}`);
+  if (existsSync(join(dayOnly, "dist", "feed.xml"))) {
+    // The trap, and the reason this asserts absence rather than emptiness: an
+    // implementation that manufactured midnight would produce a perfectly
+    // well-formed one-entry feed here and pass every "the entry exists" test.
+    const badXml = read(dayOnly, "dist", "feed.xml");
+    throw new Error(
+      `§29.1: no page is an entry, so no feed is written — RFC 4287 requires atom:updated ` +
+      `and there is no newest entry to read it from.\n${badXml}`,
+    );
   }
   // §14.1's stable contract is the FILE:LINE:SEVERITY: prefix and the shape
   // (continuation lines, "fix:"); the prose after it is explicitly marked

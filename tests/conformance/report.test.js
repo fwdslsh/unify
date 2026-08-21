@@ -456,17 +456,57 @@ test("RPT-03: distinct pages referencing the SAME off-origin URL produce ONE fin
   covers("RPT-03");
 }, TEST_MS);
 
-test("RPT-03: no reachable network at all is one usage error (exit 2), not a finding per URL", async () => {
+test("RPT-03: a dead host is a finding at exit 0 — there is no 'no network' verdict", async () => {
+  // The rule that replaced a heuristic, and the input that killed it. §31.3
+  // used to say a run that could not reach the network at all should report
+  // once as a usage error rather than a finding per URL. Nothing available to
+  // a build can tell "this machine has no network" from "the one host this
+  // site links to is down" — the only test that could is a request to some
+  // third party unify chose — and the approximation, *every probe failed to
+  // connect*, made the commonest shape wrong.
+  //
+  // This fixture IS that shape: a site with exactly one off-origin reference,
+  // dead. It used to exit 2 with no report; the identical link beside a live
+  // one exited 0 with a finding. One fault, two answers, decided by an
+  // unrelated page. Both halves are asserted here so neither can drift back.
   const tmp = mkTmp();
   writeTree(join(tmp, "src"), {
-    // A closed local port: connection-refused, not a real per-host outage.
     "index.html": `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Home</title>` +
       `<meta name="description" content="Home."><meta property="og:image" content="http://127.0.0.1:1/x"></head>` +
       `<body><h1>Home</h1><p>x</p></body></html>\n`,
   });
   const r = await runCli(["audit", "--external"], tmp);
-  expectExit(r, 2, "no reachable network");
-  if (r.stdout !== "") throw new Error(`a usage error must print no report at all:\n${r.stdout}`);
+  expectExit(r, 0, "a dead host is a finding, not a usage error");
+  const doc = JSON.parse((await runCli(["audit", "--external", "--format", "json"], tmp)).stdout);
+  const bad = findingsOf(doc, "external-unreachable");
+  if (bad.length !== 1) throw new Error(`the one dead URL must be one finding, got ${bad.length}`);
+  if (bad[0].severity !== "incomplete") throw new Error(`§31.3: incomplete — someone else's server, not this site's output`);
+  covers("RPT-03");
+}, TEST_MS);
+
+test("RPT-03: evidence is unify's own sentence, and a non-http scheme is out of scope", async () => {
+  // Two smaller claims §31.3 makes, both about not accusing a third party of
+  // something unify did not observe. A thrown fetch error's message is a
+  // runtime string — Bun's reads "Unable to connect. Is the computer able to
+  // access the url? (ConnectionRefused)" — and §24.5 makes evidence contract,
+  // so quoting it put one runtime version's wording in every report. And an
+  // `ftp:` URL is rejected by `fetch` LOCALLY, which was reported as the far
+  // end failing to answer.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Home</title>` +
+      `<meta name="description" content="Home."></head><body><h1>Home</h1>` +
+      `<p><a href="http://127.0.0.1:1/dead">d</a> <a href="ftp://example.invalid/f">f</a></p></body></html>\n`,
+  });
+  const r = await runCli(["audit", "--external"], tmp);
+  expectExit(r, 0, "one dead http link, one out-of-scope scheme");
+  const doc = JSON.parse((await runCli(["audit", "--external", "--format", "json"], tmp)).stdout);
+  const bad = findingsOf(doc, "external-unreachable");
+  if (bad.length !== 1) throw new Error(`only the http URL is in scope, got ${bad.length}: ${JSON.stringify(bad)}`);
+  if (bad[0].evidence.includes("ConnectionRefused") || bad[0].evidence.includes("Unable to connect")) {
+    throw new Error(`§31.3: evidence is unify's own sentence, not the runtime's:\n${bad[0].evidence}`);
+  }
+  if (!bad[0].evidence.includes("did not answer")) throw new Error(`expected unify's own wording:\n${bad[0].evidence}`);
   covers("RPT-03");
 }, TEST_MS);
 

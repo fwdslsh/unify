@@ -51,28 +51,27 @@ afterAll(() => server.stop(true));
 
 describe("probeUrls", () => {
   test("200 is ok; 404/500 are not, with the answered-<status> evidence", async () => {
-    const { results, networkUnreachable } = await probeUrls(
+    const results = await probeUrls(
       [`${base}/ok`, `${base}/notfound`, `${base}/servererror`],
       { timeoutMs: 2000 },
     );
-    expect(networkUnreachable).toBe(false);
     expect(results.get(`${base}/ok`)).toMatchObject({ ok: true, status: 200, error: null });
     expect(results.get(`${base}/notfound`)).toMatchObject({ ok: false, status: 404, error: "answered 404" });
     expect(results.get(`${base}/servererror`)).toMatchObject({ ok: false, status: 500, error: "answered 500" });
   });
 
   test("HEAD 405 falls back to GET", async () => {
-    const { results } = await probeUrls([`${base}/method-check`], { timeoutMs: 2000 });
+    const results = await probeUrls([`${base}/method-check`], { timeoutMs: 2000 });
     expect(results.get(`${base}/method-check`).ok).toBe(true);
   });
 
   test("a redirect is followed", async () => {
-    const { results } = await probeUrls([`${base}/redirect-once`], { timeoutMs: 2000 });
+    const results = await probeUrls([`${base}/redirect-once`], { timeoutMs: 2000 });
     expect(results.get(`${base}/redirect-once`).ok).toBe(true);
   });
 
   test("redirects are capped — a loop fails as 'too many redirects', not an infinite fetch", async () => {
-    const { results } = await probeUrls([`${base}/redirect-loop`], { timeoutMs: 2000, maxRedirects: 3 });
+    const results = await probeUrls([`${base}/redirect-loop`], { timeoutMs: 2000, maxRedirects: 3 });
     const r = results.get(`${base}/redirect-loop`);
     expect(r.ok).toBe(false);
     expect(r.error).toMatch(/too many redirects/);
@@ -80,42 +79,54 @@ describe("probeUrls", () => {
 
   test("a request is bounded by its own timeout, not the runtime default", async () => {
     const started = Date.now();
-    const { results } = await probeUrls([`${base}/slow`], { timeoutMs: 300, concurrency: 1 });
+    const results = await probeUrls([`${base}/slow`], { timeoutMs: 300, concurrency: 1 });
     expect(Date.now() - started).toBeLessThan(5000);
     expect(results.get(`${base}/slow`)).toMatchObject({ ok: false, status: null, error: "timed out", reason: "timeout" });
   });
 
   test("each distinct URL is fetched once, however many times it is passed", async () => {
-    const { results } = await probeUrls([`${base}/ok`, `${base}/ok`, `${base}/ok`], { timeoutMs: 2000 });
+    const results = await probeUrls([`${base}/ok`, `${base}/ok`, `${base}/ok`], { timeoutMs: 2000 });
     expect(results.size).toBe(1);
   });
 
-  test("every URL failing at the connection level reads as 'cannot reach the network at all'", async () => {
-    const { results, networkUnreachable } = await probeUrls(
+  test("every failure is a result, INCLUDING all of them — there is no 'no network' verdict", async () => {
+    // §31.3, and the rule that replaced a heuristic. `probeUrls` used to also
+    // return `networkUnreachable`, true when every probe failed to connect,
+    // so the caller could raise one usage error instead of a finding per URL.
+    // It made the commonest shape wrong: a site with a SINGLE off-origin link
+    // is most sites, and for one of those the identical dead host reported as
+    // a finding at exit 0 when some other URL happened to answer, and as a
+    // usage error at exit 2 when it did not — one fault, two answers, decided
+    // by an unrelated page. Nothing here can tell "this machine has no
+    // network" from "the one host this site links to is down"; the only test
+    // that could is a request to some third party unify chose.
+    //
+    // So this asserts the shape the deleted verdict would have collapsed:
+    // two dead hosts, and BOTH are ordinary failed probes.
+    const results = await probeUrls(
       ["http://127.0.0.1:1/closed-a", "http://127.0.0.1:2/closed-b"],
       { timeoutMs: 2000 },
     );
-    for (const r of results.values()) expect(r.reason).toBe("connection");
-    expect(networkUnreachable).toBe(true);
+    expect(results.size).toBe(2);
+    for (const r of results.values()) {
+      expect(r.ok).toBe(false);
+      expect(r.reason).toBe("connection");
+    }
   });
 
-  test("one connection error beside a real response is NOT 'no network' — only ALL-connection-error is", async () => {
-    const { networkUnreachable } = await probeUrls([`${base}/ok`, "http://127.0.0.1:1/closed-a"], { timeoutMs: 2000 });
-    expect(networkUnreachable).toBe(false);
-  });
-
-  test("a timeout does not count toward 'no network' — a real attempt ran the full clock", async () => {
-    const { networkUnreachable } = await probeUrls(
-      [`${base}/slow`, "http://127.0.0.1:1/closed-a"],
-      { timeoutMs: 300, concurrency: 2 },
+  test("a single dead host is one ordinary failure — the shape the old heuristic got wrong", async () => {
+    // The exact input that used to become a usage error: one off-origin link,
+    // dead. It must read identically to the same link beside a live one.
+    const alone = await probeUrls(["http://127.0.0.1:1/closed-a"], { timeoutMs: 2000 });
+    const beside = await probeUrls([`${base}/ok`, "http://127.0.0.1:1/closed-a"], { timeoutMs: 2000 });
+    expect(alone.get("http://127.0.0.1:1/closed-a")).toMatchObject(
+      { ok: beside.get("http://127.0.0.1:1/closed-a").ok, reason: beside.get("http://127.0.0.1:1/closed-a").reason },
     );
-    // One connection error, one timeout — neither alone is unanimous "connection".
-    expect(networkUnreachable).toBe(false);
+    expect(alone.get("http://127.0.0.1:1/closed-a").ok).toBe(false);
   });
 
-  test("an empty URL list is not 'no network' — there is nothing to have failed", async () => {
-    const { networkUnreachable, results } = await probeUrls([], { timeoutMs: 2000 });
-    expect(networkUnreachable).toBe(false);
+  test("an empty URL list probes nothing and returns an empty map", async () => {
+    const results = await probeUrls([], { timeoutMs: 2000 });
     expect(results.size).toBe(0);
   });
 });

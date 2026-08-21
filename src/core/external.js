@@ -173,6 +173,14 @@ export function collectExternalReferences(records, htmlByOutputPath, base) {
   const note = (value, record) => {
     if (!isOffOrigin(value, base)) return;
     const url = withScheme(value, scheme);
+    // Only what this check can actually answer for. `--external` reports
+    // whether a URL RESOLVES, and `fetch` speaks http(s); handed an `ftp:` or
+    // a `data:` it rejects locally, and that rejection was being reported as
+    // a connection failure — accusing a third party of being unreachable on
+    // the strength of a scheme unify never dialled. An off-origin reference
+    // on another scheme is out of this flag's scope, which is a smaller and
+    // truer claim than a finding about it.
+    if (!/^https?:\/\//i.test(url)) return;
     if (!owner.has(url)) owner.set(url, record);
   };
 
@@ -227,9 +235,15 @@ async function probeOne(url, { timeoutMs, maxRedirects, fetchImpl }) {
         if (err?.name === "AbortError" || err?.name === "TimeoutError") {
           return { ok: false, status: null, error: "timed out", reason: "timeout" };
         }
-        const cause = err?.cause?.code ?? err?.code;
-        const detail = cause ? `${err.message} (${cause})` : String(err?.message ?? err);
-        return { ok: false, status: null, error: `failed: ${detail}`, reason: "connection" };
+        // Evidence is unify's own sentence, not the runtime's. A thrown
+        // fetch error's `message` is an implementation string — Bun's reads
+        // "Unable to connect. Is the computer able to access the url?
+        // (ConnectionRefused)" — and §24.5's evidence is contract that a
+        // reader and a diff both depend on. Quoting it verbatim put a Bun
+        // version's wording into every report, and would have changed under
+        // an upgrade that touched no unify code. The machine-readable half is
+        // `reason`, which is this file's own closed vocabulary.
+        return { ok: false, status: null, error: "did not answer", reason: "connection" };
       }
       clearTimeout(timer);
       const location = res.status >= 300 && res.status < 400 ? res.headers.get("location") : null;
@@ -281,16 +295,22 @@ async function mapBounded(items, limit, fn) {
 /**
  * §31.3 — fetch every distinct URL once, bounded concurrency.
  *
- * `networkUnreachable` is the signal behind "a run that cannot reach the
- * network at all reports that once, as a usage error, rather than reporting
- * every URL as unreachable": true only when there was at least one URL to
- * check AND every single one failed at the CONNECTION level (DNS, refused,
- * no route — `reason === "connection"`). A genuine per-host outage still
- * gets a `reason` of `"http"` (a real response, just an error one) or
- * `"timeout"` (a real attempt that ran the full clock) for the hosts that
- * answer at all; only "nothing this run tried could even open a socket"
- * collapses to the usage error, because reporting N broken links when NONE
- * of them were actually tested would be the wrong claim, not a smaller one.
+ * There is deliberately NO "the network is down" verdict here, and the
+ * absence is the rule rather than an omission (§31.3). An earlier version
+ * returned `networkUnreachable` — true when every probe failed to connect —
+ * so the caller could raise one usage error instead of a finding per URL.
+ * It made the commonest shape wrong. A site with a SINGLE off-origin link is
+ * most sites, and for one the identical dead host reported as
+ * `external-unreachable` at exit 0 when some other URL on the page happened
+ * to answer, and as a usage error at exit 2 when it did not: one fault, two
+ * answers, decided by an unrelated page.
+ *
+ * The honest reason it cannot be rescued is that nothing available here can
+ * tell "this machine has no network" from "the one host this site links to
+ * is down". The only test that could is a request to some third party unify
+ * chose, and choosing one is exactly the call this product does not make.
+ * So every failure is a finding, including all of them — which is what
+ * §31.3's own table said before the heuristic was invented on top of it.
  * @param {string[]} urls - distinct URLs (duplicates wastefully re-fetched;
  *   callers pass `[...collectExternalReferences(...).keys()]`)
  * @param {object} [options]
@@ -298,7 +318,7 @@ async function mapBounded(items, limit, fn) {
  * @param {number} [options.maxRedirects]
  * @param {number} [options.concurrency]
  * @param {typeof fetch} [options.fetchImpl]
- * @returns {Promise<{results: Map<string, ProbeResult>, networkUnreachable: boolean}>}
+ * @returns {Promise<Map<string, ProbeResult>>}
  */
 export async function probeUrls(urls, options = {}) {
   const {
@@ -313,8 +333,5 @@ export async function probeUrls(urls, options = {}) {
     results.set(url, await probeOne(url, { timeoutMs, maxRedirects, fetchImpl }));
   });
 
-  const entries = [...results.values()];
-  const networkUnreachable = entries.length > 0 && entries.every((r) => r.reason === "connection");
-
-  return { results, networkUnreachable };
+  return results;
 }

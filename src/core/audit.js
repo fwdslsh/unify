@@ -105,6 +105,20 @@ export function consumeLastAuditRun() {
  * @returns {Finding[]} a new, sorted array
  */
 export function sortFindings(findings) {
+  // Two keys, and STABLE — `Array.prototype.sort` has been stable since ES2019
+  // and this relies on it. A third key was tried and reverted: sorting ties on
+  // `evidence` made the order total, and in doing so it overrode two orderings
+  // the specification states outright. §26.3 requires `date-unusable` to report
+  // `datePublished` before `dateModified`; §24.4 requires
+  // `robots-sitemap-missing` in the FILE'S OWN LINE ORDER. Alphabetical
+  // evidence reverses both ("dateModified" < "datePublished", "/sitemap-2.xml"
+  // < "/sitemap.xml"), and the suite said so immediately.
+  //
+  // So the rule is the one that was already here: this sort groups, and each
+  // PRODUCER owns the order of its own ties. Where a producer had no order of
+  // its own the fix belongs there — `externalUnreachableFindings` now sorts by
+  // URL before building anything, because what it used to inherit was the
+  // order the network answered in.
   return [...findings].sort((a, b) =>
     a.file === b.file ? (a.id < b.id ? -1 : a.id > b.id ? 1 : 0) : a.file < b.file ? -1 : 1);
 }
@@ -791,7 +805,15 @@ export function formatFindings(findings) {
  */
 export function externalUnreachableFindings(results, owners) {
   const out = [];
-  for (const [url, result] of results) {
+  // Sorted by URL before anything is built, so this function's output does not
+  // depend on which probe finished first. `sortFindings` below cannot rescue
+  // that on its own: every finding here shares one `file` and one `id`, so a
+  // stable sort would preserve exactly the network-completion order it was
+  // handed — which made two runs over one unchanged tree emit different bytes,
+  // against §31.3's own "two runs print the same bytes whatever the network
+  // did". Both halves are kept: this sort makes the input deterministic, and
+  // `sortFindings`'s third key makes the output total regardless of input.
+  for (const [url, result] of [...results].sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))) {
     if (result.ok) continue;
     const record = owners.get(url);
     if (!record) continue; // defensive: every key of `results` came from `owners`' own keys

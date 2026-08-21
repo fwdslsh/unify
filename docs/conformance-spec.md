@@ -1556,7 +1556,7 @@ Findings print to stdout, one finding as two lines:
 
 followed by a count line: `audit: N broken, M incomplete`, or `audit: nothing to report` when there are none. Evidence quotes the output — the title that repeats, the id that collides, the sitemap that lists the page — so a reader can act without re-deriving what the command saw. The fix names one action.
 
-Ordering is by source path, then by finding id: deterministic, and stable across runs of an unchanged site, for the same reason §14.1 orders diagnostics.
+Ordering is by source path, then by finding id, and the sort is **stable**: deterministic, and stable across runs of an unchanged site, for the same reason §14.1 orders diagnostics. Two keys are not total — several findings fire more than once on one page (`id-duplicate` per repeated id, `date-unusable` per field, `robots-sitemap-missing` per line, `external-unreachable` per URL) — and that is deliberate, because **each producer owns the order of its own ties**. Those orders carry meaning this sort must not overwrite: §26.3 puts `datePublished` before `dateModified`, and §24.4 keeps `robots-sitemap-missing` in the file's own line order. A third key was tried, on `evidence`, to make the order total. It reversed both of those rules on its first run — alphabetically `dateModified` precedes `datePublished` and `/sitemap-2.xml` precedes `/sitemap.xml` — which is the argument against it, stated here so it is not tried again. Where a producer has no order of its own, the fix belongs in the producer: `external-unreachable` sorts by URL before building a finding, because what it inherited otherwise was the order the network answered in.
 
 The report never contains a score, a grade, a percentage, a ranking, a keyword count, or a character count. This is a rule about the *output*, not only about the checks: a command that computed no score but printed "12 issues — 78% healthy" would be assigning one.
 
@@ -1893,7 +1893,9 @@ Product-spec §6.5.1. The manifest's third projection, and the first whose membe
 
 ### 29.1 Activation, and why there is no collection
 
-A feed is written when **`--base-url` is set** and **at least one page's `schemaType` is `Article` or `BlogPosting`** (§20.8). Those two conditions are the whole opt-in. `--base-url` for §21.1's reason — an entry carries absolute URLs and a stable id, and inventing an origin is the guess product-spec §6.1 forbids — and the type declaration because that is what product-spec §6.5.1 means by *explicitly declaring*: the page says what it is, and the feed is a consequence.
+A feed is written when **`--base-url` is set** and **at least one page is an entry** by §29.4. Those two conditions are the whole opt-in.
+
+The second is deliberately membership rather than declaration, and the difference is not pedantry. An earlier draft activated on any page whose `schemaType` was `Article` or `BlogPosting`, which made a feed with **zero entries** reachable — a lone candidate excluded by §29.3's date rule is exactly that shape, and it is A17's own worked example. Such a document cannot be valid: [RFC 4287](https://www.rfc-editor.org/rfc/rfc4287) §4.1.1 requires `atom:updated` on every feed, §29.5 defines it as the newest entry's, and there is no newest entry. The only two ways out were to emit an invalid feed or to invent an instant, and §6.1 forbids the second. Writing no file is the third, and it is the honest one: a site whose only article is dated wrong gets A17 telling it so, and no feed until a real entry exists. `--base-url` for §21.1's reason — an entry carries absolute URLs and a stable id, and inventing an origin is the guess product-spec §6.1 forbids — and the type declaration because that is what product-spec §6.5.1 means by *explicitly declaring*: the page says what it is, and the feed is a consequence.
 
 That is deliberately **not a collection**. There is no query, no directory convention, no `posts/` folder, no ordering key, and no way to ask for a feed of some pages and not others. §6.6 rejects a collections DSL by name, and this section is what the rejection costs and what it buys: it costs scoped feeds, and it buys a membership rule an author can check by reading one page. Scoped feeds wait for demonstrated demand (§6.5.1); until then, a site that needs two feeds writes the second one with a generator (§19.6) and unify ships it byte-for-byte.
 
@@ -1937,7 +1939,7 @@ Entries are ordered by `datePublished` **descending**, ties broken by output pat
 | `<feed xmlns>` | `http://www.w3.org/2005/Atom` |
 | `<id>` (feed) | the site's own address — `--base-url`, exactly as given |
 | `<title>` (feed) | the `<title>` of the page at the site root (`index.html`), else the site's host |
-| `<updated>` (feed) | the newest entry's `<updated>` |
+| `<updated>` (feed) | the newest entry's `<updated>` — which always exists, because §29.1 writes no feed without one |
 | `<link rel="self">` | the feed's own absolute URL |
 | `<link rel="alternate">` | the site's own address |
 | `<entry><id>` | the entry's **canonical** URL — `record.canonical` if the page declares one, else `record.url` |
@@ -1957,7 +1959,11 @@ Entries are ordered by `datePublished` **descending**, ties broken by output pat
 
 `--feed-full` puts each entry's rendered body into `<content type="html">`. Product-spec §6.5.1 requires full-content inclusion to be **an explicit option** and this is it; without the flag every entry carries `<summary>` and no content.
 
-The content is the emitted `<main>`'s inner HTML — the same subtree §20.7 reads `text` from, taken as markup rather than as text — with **URLs left exactly as they were emitted**. Under `--base-url` those are already absolute (§11.3), which is what a feed reader needs. Without `--base-url` there is no feed at all (§29.1), so the case where a relative URL would escape into a reader's page cannot arise.
+The content is the emitted `<main>`'s inner HTML — the same subtree §20.7 reads `text` from, taken as markup rather than as text — with **every `href` and `src` resolved to an absolute URL against the entry's own address**.
+
+That resolution is not decoration, and the sentence it replaces was wrong. This section used to say URLs could be left exactly as emitted, on the premise that `--base-url` had already made them absolute. It has not: §11.3 prepends the base's **path prefix** to a root-relative `href`/`src` and sends the **origin** only to `og:`/`twitter:` and `canonical`, while §11.1 leaves a page's own *relative* URL untouched when the page did not move. A feed reader resolves what it is given against **the feed's** address, not the page's, so an entry for `blog/post.html` carrying `href="sibling.html"` sent readers to `/sibling.html` — a file one directory up from the real one — and an entry under a subpath deploy carried `/repo/pic.png` rather than `https://example.com/repo/pic.png`. Both are links a reader cannot follow, on the ordinary shape of a blog.
+
+The entry already knows its own absolute address: §29.5 puts it in `<id>`. Resolving against it is §11's rule applied once more with that address as the base, which is why no new interpretation of a URL enters the product here.
 
 The flag is a usage error without `--base-url`, for the same reason `--canonical auto` is (§22.1): it describes something the build will not do.
 
@@ -1967,7 +1973,11 @@ Every URL the feed emits is checked exactly as §21.6 checks a sitemap's: a `<li
 
 Under `--feed-full`, the entry bodies carry the page's own references, and those are §12's already: the same bytes were checked in the page. Nothing is checked twice and nothing is checked in a second way.
 
-An authored `feed.xml` **suppresses generation entirely** (§21.5's rule, unchanged): the author's file is the site's feed, ships byte-for-byte, and has its internal URLs checked exactly as a generated one does. That is not a corner case — the `blog` template's generator writes its own `feed.xml` (§19.6), so the scaffold that teaches feeds is also the fixture that proves the suppression.
+An authored `feed.xml` **suppresses generation entirely** (§21.5's rule, unchanged): the author's file is the site's feed, ships byte-for-byte, and has its internal URLs checked exactly as a generated one does.
+
+**Activation governs this entire section, that verification included** — §21.1's rule, and stated here because a reader cannot otherwise tell design from oversight. Without `--base-url` a site's `feed.xml` is an ordinary asset: it mirror-copies byte-for-byte (§4.4) and unify says nothing about its contents, so a broken root-relative reference inside an authored one publishes clean. That is what "the v0.7 golden path, unchanged" costs to mean: a site that shipped a hand-written feed built clean before this section existed and must keep building clean after it, because nothing the author did changed and no flag opted them in.
+
+**A17 is suppressed with generation, and for a sharper reason.** The advisory's own sentence is *this page is not in `feed.xml`* — a claim about a file unify wrote. Where the author supplies the feed, unify has no idea whether the page is in it; their generator put there whatever it put there. Raising A17 then would be asserting something unify cannot know, which is the invented claim §6.1 forbids, in the one register that looks harmless. That is not a corner case — the `blog` template's generator writes its own `feed.xml` (§19.6), so the scaffold that teaches feeds is also the fixture that proves the suppression.
 
 `--dry-run` lists the generated file like any other write, and §15 publishes it only when the whole build has zero problems.
 
@@ -2065,7 +2075,15 @@ Two findings with one fingerprint are the same fault. The digest is over a canon
 
 `--external` fetches every off-origin URL the site emits and reports the ones that do not resolve. It is the **only** unify operation that touches the network, and it exists as a flag precisely so that "unify builds are offline and deterministic" stays true without qualification (§6.1).
 
-Scope is the closed set of off-origin references the manifest already holds: `href` and `src` values §12 skipped for being on another origin, the `og:`/`twitter:` image URLs, JSON-LD URL-valued properties (§12's list), and a `<link rel="canonical">` naming another site. `Disallow:` patterns are not URLs (§23.4) and are not fetched.
+**Scope is exactly §12's reference set, restricted to the values §12 skipped for being on another origin** — and that is one rule rather than a list, deliberately. §12 already answers "what is a reference in this document": `href` and `src`, `srcset` entries, `poster`, the `og:`/`twitter:` values, a `<meta http-equiv="refresh">` target, JSON-LD's URL-valued properties, and `url()` in a stylesheet, a `<style>` block, or a `style` attribute. `--external` asks the same question of the same reader and keeps the off-origin half.
+
+An earlier draft of this section enumerated four of those and called the list closed. That was a second interpretation of "reference" living inside one product, which is the defect §12's own one-reader discipline exists to prevent — and it was the *worse* of the two, because an off-origin `poster` or a `url()` naming a stylesheet's missing background is exactly the kind of thing a link checker is for. The enumeration is gone; the reader is shared.
+
+`Disallow:` patterns are still not fetched, and that needs no exception: §23.4 says they are patterns rather than URLs, so §12 never collected them and neither does this.
+
+Only `http:` and `https:` are fetched. `fetch` speaks those two, and handed anything else it rejects **locally** — which was being reported as the far end failing to answer, accusing a third party of being unreachable over a scheme unify never dialled. An off-origin reference on another scheme is outside this flag's scope, which is a smaller and truer claim than a finding about it.
+
+Evidence is unify's own sentence rather than the runtime's. A thrown fetch error carries an implementation string, and §24.5 makes evidence contract that a reader and a diff both depend on; quoting it verbatim put one runtime version's wording into every report and would have changed it under an upgrade that touched no unify code.
 
 Requests are `HEAD`, falling back to `GET` on 405; each URL is fetched **once** per run however many pages reference it; redirects are followed to a cap of five; the timeout is ten seconds. Concurrency is bounded, and the order of the report is not the order of the responses — findings sort by §24.5's rule like every other, so two runs over one tree print the same bytes whatever the network did.
 
@@ -2075,13 +2093,19 @@ Requests are `HEAD`, falling back to `GET` on 405; each URL is fetched **once** 
 
 `incomplete` rather than `broken`, and the reason is the whole shape of this flag: **the answer is about someone else's server at one moment**, not about this site's output. A link that 503s during a deploy is not wrong markup, and a `broken` verdict — the word §24.3 reserves for output that contradicts itself — would be unearned. It is also why this is not, and must never become, a build check: a transient failure on another host must never withhold a publish.
 
-A run that cannot reach the network at all reports that once, as a usage error (exit 2), rather than reporting every URL as unreachable.
+**Every failure is a finding, including all of them.** An earlier draft said a run that could not reach the network at all should report that once as a usage error rather than emitting a finding per URL. That rule is deleted, because it cannot be implemented honestly and because implementing it approximately was worse than not having it.
+
+Nothing available to a build distinguishes "this machine has no network" from "the one host this site links to is down": the only test that could is a request to some third party unify chose, which is precisely the kind of call this product does not make. Approximating it as *every probe failed to connect* made the commonest shape wrong — a site with a single off-origin link, which is most sites. The identical dead link then reported as `external-unreachable` and exit 0 when some other URL on the page happened to answer, and as a usage error and exit 2 when it did not. One fault, two answers, decided by an unrelated page.
+
+The table above already says what a failed request is, and it says it without reference to how many others failed. A machine with no network gets one finding per off-origin URL, which is true, ordered, and exits 0 — and §24.6's exit table is left alone, as §31.1 requires.
 
 ### 31.4 SARIF
 
 Product-spec §6.5.3 permits a SARIF serializer **only if it is a mechanical view of the same findings rather than another analysis path**. `--format sarif` is exactly that: the same finding list §31.1 serializes, mapped field for field into SARIF 2.1.0 — `id` to `ruleId`, `file` to the artifact location, `evidence` to the message, `fingerprint` to `partialFingerprints`, and severity to `level` (`broken` to `error`, `incomplete` to `warning`, both of which are SARIF levels and neither of which changes an exit code).
 
 Nothing is computed for SARIF that is not computed for `--format json`. If a future field ever needs a SARIF-only derivation, that is the signal this serializer has become an analysis path and must be removed rather than extended.
+
+The `fix` string is carried in `properties`, **not** in SARIF's own `fixes` array, and the reason is this section's rule enforcing itself. SARIF 2.1.0 makes `artifactChanges` required on every fix object; unify's fix is a sentence rather than a patch, so it has nothing to put there, and a `fixes` array without it made every emitted document invalid against the schema — rejected by validators and by the code-scanning ingests this format exists for. `fix` is also not one of the five mappings above. Both facts point the same way: a field that needs a SARIF-only shape does not belong in the mapping, and `properties` is where the same string survives without the document claiming a structure it cannot honour.
 
 ---
 

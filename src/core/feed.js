@@ -251,10 +251,16 @@ export function reportDateOnlyEntries(records, base, reporter) {
  * @returns {string}
  */
 function dateOnlyFix(record) {
+  // Names the VALUE to change rather than an element to add, because adding
+  // one does not work. §20.3 reads `datePublished` from EITHER
+  // `article:published_time` or `<meta name="date">`, and §20.4 keeps the
+  // FIRST declaration in document order — so a page that declared the second
+  // and was told to write the first gained a tag, kept the old value, and
+  // watched the advisory fire again. The author's own string is the one thing
+  // guaranteed to be present and greppable, whichever spelling carries it and
+  // whether it came from frontmatter or from markup.
   const sample = `${record.datePublished.iso}T09:00:00Z`;
-  return /\.md$/i.test(record.sourcePath)
-    ? `write date: ${sample} — a feed entry's timestamp needs a time and a time zone`
-    : `write <meta property="article:published_time" content="${sample}"> — a feed entry's timestamp needs a time and a time zone`;
+  return `give the date a time and a time zone — "${record.datePublished.raw}" becomes "${sample}"`;
 }
 
 /**
@@ -301,11 +307,108 @@ function mainMarkup(html) {
  * @param {{feedFull: boolean, pageHtml: Map<string,string>|null}} opts
  * @returns {string[]} lines, unindented at the caller's level
  */
+/**
+ * §29.6 — every `href` and `src` in an entry's content, resolved absolute
+ * against that entry's own address.
+ *
+ * The section this implements used to say the markup could be emitted with
+ * URLs exactly as the page carried them, on the premise that `--base-url` had
+ * already made them absolute. It had not, in two different ways, and both
+ * shipped links a reader cannot follow:
+ *
+ *   - §11.3 prepends the base's PATH PREFIX to a root-relative `href`/`src`;
+ *     the ORIGIN goes only to `og:`/`twitter:` and `canonical`. So a subpath
+ *     deploy emitted `/repo/pic.png`, not `https://example.com/repo/pic.png`.
+ *   - §11.1 leaves a page's OWN relative URL untouched when the page did not
+ *     move. So `blog/post.html` carrying `href="sibling.html"` kept it — and
+ *     a reader resolves that against the FEED's address, `/feed.xml` at the
+ *     root, fetching `/sibling.html` one directory above the real file.
+ *
+ * Resolving against `entryAddress` is §11's own rule applied once more with
+ * the entry's address as the base, so no new reading of a URL enters here.
+ * A value that is already absolute is returned unchanged by `new URL`, and
+ * one no parser accepts is left exactly as written rather than dropped —
+ * this function must never be the reason a byte the author wrote disappears.
+ *
+ * Only `href` and `src` are touched. A `srcset` is a comma-separated
+ * descriptor list rather than a URL, a `style` attribute's `url()` is CSS,
+ * and rewriting either would be this file inventing a second URL grammar —
+ * §12 reads them, and reading is not rewriting (§11.1's own distinction).
+ * The cost is stated rather than hidden: an entry whose content carries a
+ * relative `srcset` ships it unresolved.
+ * @param {string} markup
+ * @param {string} entryUrl - the entry's absolute address
+ * @returns {string}
+ */
+function absolutizeMarkupUrls(markup, entryUrl) {
+  return markup.replace(
+    /\s(href|src)\s*=\s*("([^"]*)"|'([^']*)')/gi,
+    (whole, attr, quoted, dq, sq) => {
+      const raw = dq !== undefined ? dq : sq;
+      const decoded = xmlUnescape(raw);
+      if (isSkippedUrl(decoded) || decoded === "") return whole;
+      let abs;
+      try {
+        abs = new URL(decoded, entryUrl).href;
+      } catch {
+        return whole; // unparseable even against an absolute base — leave it
+      }
+      const q = quoted[0];
+      return ` ${attr}=${q}${xmlEscapeAttr(abs, q)}${q}`;
+    },
+  );
+}
+
+/** Re-escape a resolved URL for the quote style it is going back into. */
+function xmlEscapeAttr(value, quote) {
+  const escaped = value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+  return quote === '"' ? escaped.replaceAll('"', "&quot;") : escaped.replaceAll("'", "&apos;");
+}
+
+/**
+ * §29.5 — an entry's own absolute address: the canonical when the page
+ * declares one, else `record.url`, resolved so the result is always absolute.
+ *
+ * The resolution is required rather than tidy. RFC 4287 §4.2.6 makes
+ * `atom:id` a permanent, universally unique IRI, and a RELATIVE canonical is
+ * neither: a reader resolves it against the feed's own location, so
+ * `<link rel="canonical" href="post.html">` on `blog/post.html` — a value
+ * §12 accepts, because it resolves correctly *in the page* — became the id
+ * `post.html`, which names a different file the moment anything but
+ * `feed.xml` reads it. It also made `checkFeedLocs` resolve one string two
+ * ways (against the page for membership, against the feed for the check) and
+ * block the publish of a valid site.
+ *
+ * An already-absolute canonical is passed through UNTOUCHED, which is the
+ * other half of the rule: §20.3 stores the value with character references
+ * resolved and nothing else changed, and re-encoding an author's absolute URL
+ * would edit bytes that are theirs. Only a value that is not yet an absolute
+ * URL is resolved, and it is resolved against the page's own absolute address
+ * — which is §11's rule applied once more, not a new reading of a URL.
+ * @param {import('./manifest.js').PageRecord} record
+ * @returns {string}
+ */
+function entryAddress(record) {
+  // `record.url` is never null here: generateFeed only reaches serializeEntry
+  // once `base` is confirmed non-null (§20.5 makes `url` null ONLY without
+  // --base-url), so there is always an absolute base to resolve against.
+  const canonical = record.canonical;
+  if (canonical === null) return record.url;
+  try {
+    return new URL(canonical, record.url).href;
+  } catch {
+    // Unparseable even against an absolute base — a `mailto:` with no path, a
+    // value no URL parser accepts. §29.5 names the canonical, so the author's
+    // string is emitted as written rather than replaced by a guess.
+    return canonical;
+  }
+}
+
 function serializeEntry(record, { feedFull, pageHtml }) {
   // §29.5 — record.url is never null here: generateFeed only reaches this
   // function once `base` is confirmed non-null (§20.5 makes `url` null ONLY
   // without --base-url), so the fallback always has a real string to use.
-  const id = record.canonical ?? record.url;
+  const id = entryAddress(record);
   const lines = ["  <entry>"];
   lines.push(`    <id>${xmlEscape(id)}</id>`);
   // §29.5's table gives `<summary>`/`<author>` an explicit "omitted when
@@ -327,7 +430,7 @@ function serializeEntry(record, { feedFull, pageHtml }) {
     // so the extracted markup is XML-escaped like any other string here,
     // never wrapped in CDATA (see the module comment's percent/XML-escaping
     // discussion for why this file escapes rather than shields throughout).
-    const markup = mainMarkup(pageHtml?.get(record.outputPath) ?? "");
+    const markup = absolutizeMarkupUrls(mainMarkup(pageHtml?.get(record.outputPath) ?? ""), id);
     lines.push(`    <content type="html">${xmlEscape(markup)}</content>`);
   }
   lines.push("  </entry>");
@@ -369,16 +472,10 @@ function serializeFeed({ records, base, entries, feedFull, pageHtml }) {
   // implementation one.
   lines.push(`  <id>${xmlEscape(address)}</id>`);
   lines.push(`  <title>${xmlEscape(title)}</title>`);
-  // §29.5 names this "the newest entry's <updated>", which presupposes one
-  // exists. Activation (§29.1) does NOT require a non-empty entry set — it
-  // fires the moment any page merely DECLARES Article/BlogPosting, whether
-  // or not that page clears §29.4's other conditions — so a feed with zero
-  // entries is reachable (a lone dated-wrong candidate is exactly A17's own
-  // example). Nothing may invent an instant to fill the gap (product-spec
-  // §6.1/§20.10), so this omits the element rather than fabricate one; a
-  // strictly RFC-4287-valid feed always has one. Flagged in the
-  // implementation report as worth the spec owner's confirmation.
-  if (entries.length > 0) lines.push(`  <updated>${xmlEscape(entryUpdated(entries[0]))}</updated>`);
+  // Unconditional, and safely so: §29.1 writes no feed at all when there are
+  // no entries, precisely so this element always has a newest one to read
+  // (RFC 4287 §4.1.1 requires it, and nothing here may invent an instant).
+  lines.push(`  <updated>${xmlEscape(entryUpdated(entries[0]))}</updated>`);
   lines.push(`  <link rel="self" href="${xmlEscape(selfUrl)}"/>`);
   lines.push(`  <link rel="alternate" href="${xmlEscape(address)}"/>`);
   for (const record of entries) lines.push(...serializeEntry(record, { feedFull, pageHtml }));
@@ -423,6 +520,14 @@ export function generateFeed({ records, base, feedFull = false, pageHtml = null,
   // nothing is generated.
   reportDateOnlyEntries(records, base, reporter);
   const entries = entriesFor(records, base);
+  // §29.1 — activation is MEMBERSHIP, not declaration. A page can declare
+  // Article and still not be an entry (§29.4), and the commonest way is
+  // §29.3's date rule, which is A17's own worked example. A feed with zero
+  // entries cannot be valid — RFC 4287 §4.1.1 requires atom:updated and
+  // §29.5 defines it as the newest entry's — so the only alternatives were an
+  // invalid document or an invented instant, and §6.1 forbids the second.
+  // Writing no file is the third: A17 already told the author why.
+  if (entries.length === 0) return generated;
   generated.set(FEED_PATH, serializeFeed({ records, base, entries, feedFull, pageHtml }));
   return generated;
 }
@@ -504,19 +609,27 @@ function internalFeedUrls(text, base) {
     out.push({ raw, resolved: resolveReference(stripped, FEED_PATH) });
   };
 
+  // §29.7 checks LOCATORS, and RFC 4287 gives the two element shapes different
+  // jobs: `atom:id` is an IRI that IDENTIFIES (§4.2.6, "permanent, universally
+  // unique") and need never dereference, while `atom:link/@href` names a
+  // resource. So `<id>` is not read here at all.
+  //
+  // Nor are the FEED-level links. A feed's `<link rel="alternate">` names the
+  // site's own address — `--base-url` itself — and `rel="self"` names the feed
+  // being written; neither is a claim about a file this build emits. Reading
+  // them cost a real regression: a site with an Article page and no root
+  // `index.html` had its site address resolved to `index.html`, found missing,
+  // and reported as P13 against `src/feed.xml` — a file the author does not
+  // have, under `fix: check the path spelling and casing`, for a spelling that
+  // was right. Adding `--base-url` to such a site stopped it publishing.
+  //
+  // What is left is exactly the set that does name emitted pages: the `href`
+  // of a `<link>` inside an `<entry>`.
   const { root } = parse(text);
-  const elements = findAll(
-    root,
-    (n) => n.type === "element" && (/(^|:)id$/i.test(n.tag) || /(^|:)link$/i.test(n.tag)),
-  );
+  const entries = findAll(root, (n) => n.type === "element" && /(^|:)entry$/i.test(n.tag));
+  const elements = entries.flatMap((entry) =>
+    findAll(entry, (n) => n.type === "element" && /(^|:)link$/i.test(n.tag)));
   for (const el of elements) {
-    if (/(^|:)id$/i.test(el.tag)) {
-      const inner = innerText(text, el);
-      const cdata = unwrapCdata(inner);
-      const raw = (cdata === null ? xmlUnescape(inner) : cdata).trim();
-      if (raw) consider(raw);
-      continue;
-    }
     // <link href="...">. Atom's link is empty (no CDATA question — CDATA is
     // only legal in element content, never in an attribute value), so the
     // one decoding step is XML entity resolution, exactly as an HTML

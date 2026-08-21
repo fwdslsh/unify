@@ -117,17 +117,10 @@ export async function audit(context) {
   if (context.settings.external) {
     const owners = collectExternalReferences(records, htmlFiles, base);
     if (owners.size > 0) {
-      const { results, networkUnreachable } = await probeUrls([...owners.keys()]);
-      if (networkUnreachable) {
-        // §31.3: "a run that cannot reach the network at all reports that
-        // once, as a usage error, rather than reporting every URL as
-        // unreachable." Thrown before anything prints — same discipline as
-        // every other usage error, which cli.js validates before a command
-        // produces any output at all.
-        throw new UsageError("unify audit --external could not reach the network", [
-          "check connectivity, or drop --external to audit offline",
-        ]);
-      }
+      // Every failure is a finding, including all of them (§31.3). There is
+      // no "the network is down" branch here on purpose: see probeUrls for
+      // why the heuristic that used to live here could not be made honest.
+      const results = await probeUrls([...owners.keys()]);
       findings = sortFindings([...findings, ...externalUnreachableFindings(results, owners)]);
     }
   }

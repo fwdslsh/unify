@@ -215,7 +215,7 @@ const SARIF_LEVEL = { broken: "error", incomplete: "warning" };
 export function serializeSarif(report) {
   const ruleIds = [...new Set(report.findings.map((f) => f.id))].sort();
   const doc = {
-    $schema: "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+    $schema: "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json",
     version: "2.1.0",
     runs: [
       {
@@ -236,8 +236,16 @@ export function serializeSarif(report) {
           message: { text: f.evidence },
           locations: [{ physicalLocation: { artifactLocation: { uri: f.file } } }],
           partialFingerprints: { "unify/v1": f.fingerprint },
-          fixes: [{ description: { text: f.fix } }],
-          properties: { outputPath: f.outputPath, url: f.url },
+          // NOT a SARIF `fixes` array. SARIF 2.1.0 makes `artifactChanges`
+          // REQUIRED on every fix object, and unify has no artifact change to
+          // put there — its fix is a sentence, not a patch — so every emitted
+          // document was rejected by every validator, including the code
+          // scanning ingests this format exists for. §31.4 names five
+          // mappings and `fix` is not among them; carrying it in
+          // `properties` keeps the string without claiming a shape the
+          // document cannot honour, which is what "a mechanical view of the
+          // same findings" is supposed to mean.
+          properties: { outputPath: f.outputPath, url: f.url, fix: f.fix },
         })),
       },
     ],

@@ -80,8 +80,8 @@ const SITE_NAME = "My Blog";
  * to say the value in the page's own visible disclaimer — which only works
  * while the disclaimer and the frontmatter cannot drift apart.
  */
-const HELLO_DATE = "2026-01-15";
-const SECOND_DATE = "2026-02-03";
+const HELLO_DATE = "2026-01-15T09:30:00Z";
+const SECOND_DATE = "2026-02-03T14:05:00Z";
 
 /**
  * The line `gen.mjs` writes above the listing. `blog.html` was the one content
@@ -189,7 +189,13 @@ const posts = readdirSync(POSTS)
 
 const items = posts
   .map((p) => {
-    const when = p.date ? ' <time datetime="' + escAttr(p.date) + '">' + esc(p.date) + "</time>" : "";
+    // <time> splits the machine's value from the reader's: the attribute keeps
+    // the full instant a feed needs, the text shows the day. The slice is the
+    // whole formatting rule on purpose — no locale, no month names, nothing
+    // invented from a value the author did not write.
+    const when = p.date
+      ? ' <time datetime="' + escAttr(p.date) + '">' + esc(p.date.slice(0, 10)) + "</time>"
+      : "";
     const by = p.author.name
       ? ' by <a href="' + escAttr(p.author.url) + '" rel="author">' + esc(p.author.name) + "</a>"
       : "";
@@ -363,8 +369,8 @@ The feed leaves the author out entirely. RSS's \`<author>\` element wants an ema
       <h1>Blog</h1>
       <p class="placeholder">${LISTING_PLACEHOLDER_NOTE}</p>
       <ul>
-        <li><a href="/posts/second-post.html">A second post</a> <time datetime="2026-02-03">2026-02-03</time> by <a href="https://author.example/" rel="author">Your Name Here</a></li>
-        <li><a href="/posts/hello-world.html">Hello, world</a> <time datetime="2026-01-15">2026-01-15</time> by <a href="https://author.example/" rel="author">Your Name Here</a></li>
+        <li><a href="/posts/second-post.html">A second post</a> <time datetime="2026-02-03T14:05:00Z">2026-02-03</time> by <a href="https://author.example/" rel="author">Your Name Here</a></li>
+        <li><a href="/posts/hello-world.html">Hello, world</a> <time datetime="2026-01-15T09:30:00Z">2026-01-15</time> by <a href="https://author.example/" rel="author">Your Name Here</a></li>
       </ul>
       <p>Every post above, in one file: the <a href="/feed.xml">RSS feed</a>.</p>
     </main>
@@ -383,13 +389,13 @@ The feed leaves the author out entirely. RSS's \`<author>\` element wants an ema
       <title>A second post</title>
       <link>https://you.example/posts/second-post.html</link>
       <description>The second sample post — it exists so the generated listing and feed have more than one item to show.</description>
-      <pubDate>Tue, 03 Feb 2026 00:00:00 GMT</pubDate>
+      <pubDate>Tue, 03 Feb 2026 14:05:00 GMT</pubDate>
     </item>
     <item>
       <title>Hello, world</title>
       <link>https://you.example/posts/hello-world.html</link>
       <description>A sample post — what a post file contains, and what to run after you add one.</description>
-      <pubDate>Thu, 15 Jan 2026 00:00:00 GMT</pubDate>
+      <pubDate>Thu, 15 Jan 2026 09:30:00 GMT</pubDate>
     </item>
   </channel>
 </rss>
