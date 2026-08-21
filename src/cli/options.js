@@ -33,6 +33,9 @@ const OPTIONS = {
   // nothing about a page declares "index me", so there is no record-derived
   // condition that could activate this the way `--base-url` activates §21.
   "search-index": { kind: "flag" },
+  // §33.1 — a PATH in the source tree, never a command. Saved in unify.yaml
+  // like any other long option.
+  generate: { kind: "value" },
   // §31.1 — `unify audit`'s own output shape. This registry stays a
   // syntactic parser like every entry here: the closed set (human/json/sarif)
   // and its usage error are audit.js's own concern, the same split
@@ -52,7 +55,7 @@ const OPTIONS = {
 };
 
 /** Keys `unify.yaml` may carry — the long option names, minus the ones that make no sense to save. */
-const CONFIG_KEYS = ["source", "output", "clean", "exclude", "pretty-urls", "base-url", "canonical", "strict", "port"];
+const CONFIG_KEYS = ["source", "output", "clean", "exclude", "pretty-urls", "base-url", "canonical", "strict", "port", "generate"];
 
 const SHORT = Object.fromEntries(
   Object.entries(OPTIONS)

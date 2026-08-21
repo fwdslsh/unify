@@ -65,6 +65,7 @@ import * as searchIndex from "../../core/search-index.js";
 import { completeCanonical } from "../../core/canonical.js";
 import { checkSchemaDeclarations, generateStructuredData } from "../../core/structured-data.js";
 import * as robots from "../../core/robots.js";
+import * as generate from "../../core/generate.js";
 
 /**
  * @param {object} context
@@ -89,7 +90,36 @@ import * as robots from "../../core/robots.js";
  * between the two that reaches a rebuild.
  */
 export async function build({ sourceRoot, output, settings, reporter, sourceDefaulted = false }) {
-  const files = scanSourceTree(sourceRoot, output, settings.exclude, reporter);
+  // ---- §33 — the generator seam, BEFORE §2 step 1 --------------------------
+  // It runs before the scan on purpose (§33.5): it sees the source tree as it
+  // is on disk and nothing else — no manifest, no composed pages, no output —
+  // which is the boundary that keeps this a seam rather than a plugin API. A
+  // generator cannot observe unify's intermediate state, so no future change
+  // to that state can break one.
+  let overlayDir = null;
+  if (settings.generate) {
+    const generatorAbs = generate.resolveGeneratorPath(settings.generate, sourceRoot);
+    overlayDir = generate.makeOverlayDir();
+    const ok = await generate.runGenerator({ generatorAbs, sourceRoot, overlayDir, reporter });
+    if (!ok) {
+      // P29 stops the build BEFORE the scan: a partial overlay is a site
+      // nobody described, and §15's transaction leaves the previous dist/
+      // untouched exactly as any other problem would.
+      generate.removeOverlayDir(overlayDir);
+      return 1;
+    }
+  }
+
+  try {
+    return await runBuild({ sourceRoot, output, settings, reporter, sourceDefaulted, overlayDir });
+  } finally {
+    if (overlayDir !== null) generate.removeOverlayDir(overlayDir);
+  }
+}
+
+/** The build proper, with §33's overlay already produced (or absent). */
+async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulted, overlayDir }) {
+  const files = scanSourceTree(sourceRoot, output, settings.exclude, reporter, overlayDir);
 
   // §6.3/P08 — every .html/.md source file, excluded or not (§1: a "page" by
   // extension; only the never-shipped list, already applied in the scan,
@@ -1127,13 +1157,25 @@ function relocateDiagnosticsToCwd(reporter, sourceRoot) {
  * @param {import('../../core/diagnostics.js').Reporter} reporter
  * @returns {{absPath: string, relPath: string, isPage: boolean, excluded: boolean}[]} sorted by relPath (determinism, DIA-05)
  */
-function scanSourceTree(sourceRoot, output, excludePatterns, reporter) {
-  const root = resolve(sourceRoot);
+function scanSourceTree(sourceRoot, output, excludePatterns, reporter, overlayDir = null) {
+  let root = resolve(sourceRoot);
   const outputAbs = resolve(output);
-  /** @type {{absPath: string, relPath: string, isPage: boolean, excluded: boolean}[]} */
+  /** @type {{absPath: string, relPath: string, isPage: boolean, excluded: boolean, generated: boolean}[]} */
   const files = [];
+  // §33.3 — files in the generated directory are scanned EXACTLY as source
+  // files are: pages by extension, mirror copy for everything else, the
+  // underscore exclusion, `.fragment.html`. Only the origin differs, and it
+  // differs for one visible reason: §17 marks a generated row `← generated`,
+  // because a file in dist/ with no source file behind it is otherwise
+  // unexplainable to a reader of the report.
+  let generated = false;
 
   walk(root);
+  if (overlayDir !== null) {
+    root = resolve(overlayDir);
+    generated = true;
+    walk(root);
+  }
   files.sort((a, b) => (a.relPath < b.relPath ? -1 : a.relPath > b.relPath ? 1 : 0));
   return files;
 
@@ -1144,7 +1186,7 @@ function scanSourceTree(sourceRoot, output, excludePatterns, reporter) {
     // embed, or fetch. Everything downstream keys off this one classification.
     const ext = extname(rel);
     const isPage = (ext === ".html" || ext === ".md") && !rel.endsWith(".fragment.html");
-    files.push({ absPath: abs, relPath: rel, isPage, excluded: isExcluded(rel, excludePatterns) });
+    files.push({ absPath: abs, relPath: rel, isPage, excluded: isExcluded(rel, excludePatterns), generated });
   }
 
   function walk(dir) {
