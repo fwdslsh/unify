@@ -17,6 +17,7 @@ import { OWNER, alive, anchorProblems, classify, compareBaselines, failingTests,
 import { existsSync, mkdtempSync, mkdirSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { registerTmp } from "../tmp-reaper.mjs";
 
 /** A suite run that failed with these test names. */
 const red = (...names) => ({
@@ -99,7 +100,7 @@ describe("anchorProblems — the guard against a gate that lies", () => {
   // the PUBLIC entry point against a real tree on disk: the reading and the
   // row set are the parts that broke, and reaching past them tests nothing.
   const tree = (files) => {
-    const root = mkdtempSync(join(tmpdir(), "unify-anchors-"));
+    const root = registerTmp(mkdtempSync(join(tmpdir(), "unify-anchors-")));
     const rows = [];
     for (const [name, spec] of Object.entries(files)) {
       if (spec.text !== undefined) {
@@ -320,7 +321,7 @@ describe("reapOrphans — the cleanup that runs when the previous one could not"
   // sparing a dead run wastes the disk this exists to reclaim, and reaping a
   // live one deletes a colleague's fifteen-minute sweep mid-flight.
   const fixture = () => {
-    const root = mkdtempSync(join(tmpdir(), "reap-fixture-"));
+    const root = registerTmp(mkdtempSync(join(tmpdir(), "reap-fixture-")));
     const make = (name, marker) => {
       const dir = join(root, name);
       mkdirSync(dir, { recursive: true });

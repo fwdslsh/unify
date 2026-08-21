@@ -10,6 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { UsageError } from "../../src/core/diagnostics.js";
 import { loadConfig, mergeConfig, parseArgs } from "../../src/cli/options.js";
+import { registerTmp } from "../tmp-reaper.mjs";
 
 describe("parseArgs", () => {
   test("build is the default command", () => {
@@ -74,7 +75,7 @@ describe("parseArgs", () => {
 describe("loadConfig comments", () => {
   /** Write a unify.yaml into a fresh temp root and load it. */
   function load(yaml) {
-    const dir = mkdtempSync(join(tmpdir(), "unify-cfg-"));
+    const dir = registerTmp(mkdtempSync(join(tmpdir(), "unify-cfg-")));
     writeFileSync(join(dir, "unify.yaml"), yaml);
     return loadConfig(dir);
   }

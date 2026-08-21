@@ -74,3 +74,26 @@ Every replacement row and every new test was verified OUTSIDE the repository
 before being applied: the tree was copied to `/tmp`, the mutation applied there,
 and the test run to confirm it fails for the stated reason and passes without
 it. That is what turned "this test should catch it" into evidence.
+
+## The confirming re-sweep
+
+Every corrected row and every new test was swept a second time against the
+repaired tree. **All 11 killed**, each by the test written for it:
+
+| row | killed by |
+|---|---|
+| `feed-entry-address-canonical-raw` | FEED-02 (new) |
+| `feed-entry-ignores-noindex` | FEED-03 (existing — which is why it is a valid row) |
+| `feed-full-leaves-relative` | FEED-05 (new) |
+| `feed-reads-feed-level-links` | FEED-06 (new) |
+| `fingerprint-drops-file` | RPT-02 cross-page (new) + a unit test |
+| `fingerprint-ignores-distinguisher` | RPT-02 ×4 (existing) |
+| `structured-data-ignores-authored` | SD-09, SD-13 (existing) |
+| `generate-argv-order-swapped` | GEN-03/04/05 and two recipe tests (6 in all) |
+| `generate-failure-is-advisory` | P29 |
+| `generate-detail-takes-stack-tail` | P29 and the compiled-binary test |
+| `generate-escapes-source-root` | GEN-01 |
+
+The runner's own caveat applies and is worth repeating: this defends the rules
+these rows name and no others. A survivor-free sweep of eleven rows is not a
+statement about the rest of the inventory.

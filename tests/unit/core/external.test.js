@@ -37,7 +37,10 @@ function startServer() {
         // without leaving a minutes-long timer alive server-side once the
         // client has already given up — that timer previously outlived
         // server.stop(true) and hung this file's own afterAll hook.
-        await new Promise((r) => setTimeout(r, 3_000));
+        await new Promise((r) => {
+          if (req.signal.aborted) return r();
+          req.signal.addEventListener("abort", () => r(), { once: true });
+        });
         return new Response("late", { status: 200 });
       }
       return new Response("unhandled", { status: 404 });
