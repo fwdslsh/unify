@@ -118,7 +118,7 @@ export function resolveOutputPaths({ entries, prettyUrls = false, reporter }) {
     const sorted = pathOrdered(group);
     reporter.problem({
       file: sorted[0].source.path,
-      message: `${sorted.map((g) => g.source.path).join(" and ")} both produce ${sorted[0].outputPath}`,
+      message: `${sorted.map((g) => g.source.label ?? g.source.path).join(" and ")} both produce ${sorted[0].outputPath}`,
       // Not "remove one": a round-8 repair sample deleted the losing source
       // outright, taking the page's address and phone number with it. Naming
       // the two non-destructive edits first is the whole fix.

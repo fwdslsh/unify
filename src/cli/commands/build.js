@@ -105,6 +105,14 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
       // P29 stops the build BEFORE the scan: a partial overlay is a site
       // nobody described, and §15's transaction leaves the previous dist/
       // untouched exactly as any other problem would.
+      //
+      // The two lines before the return are not optional. Returning straight
+      // out skipped them and the build exited 1 having printed NOTHING —
+      // a silent failure, which is worse than the fault it was reporting and
+      // exactly what §14 exists to forbid. Every other exit from this
+      // function passes through the same pair; this one had to as well.
+      relocateDiagnosticsToCwd(reporter, sourceRoot);
+      reporter.flush();
       generate.removeOverlayDir(overlayDir);
       return 1;
     }
@@ -176,7 +184,7 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
       // the include's own already-reported problem.
       const hadNewProblem = reporter.problemsReported > problemsBefore;
       if (composed !== null && !hadNewProblem) {
-        composedPages.push({ relPath: page.relPath, html: composed.text, spans: composed.spans, layoutFile: composed.layoutFile });
+        composedPages.push({ relPath: page.relPath, html: composed.text, spans: composed.spans, layoutFile: composed.layoutFile, generated: page.generated === true });
       }
     } catch (err) {
       // Best-effort composition (PIP-02): one page's failure must not stop
@@ -214,9 +222,14 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
   }
 
   // ---- §13 — collision-aware output paths, for pages AND assets. ----------
+  // §33.4 — a relative path present in BOTH trees is P12, and the message has
+  // to name which is which: "index.html and index.html both produce
+  // index.html" tells an author nothing. `label` is display-only, so §13's
+  // keying and every downstream consumer are untouched.
+  const label = (rel, generated) => (generated ? `${rel} (generated)` : rel);
   const entries = [
-    ...composedPages.map((p) => ({ path: p.relPath, kind: "page" })),
-    ...assetFiles.map((a) => ({ path: a.relPath, kind: "asset" })),
+    ...composedPages.map((p) => ({ path: p.relPath, kind: "page", label: label(p.relPath, p.generated) })),
+    ...assetFiles.map((a) => ({ path: a.relPath, kind: "asset", label: label(a.relPath, a.generated) })),
   ];
   const resolved = collisions.resolveOutputPaths({ entries, prettyUrls: settings.prettyUrls, reporter });
   const outputPathOf = new Map(resolved.map((r) => [r.source.path, r.outputPath]));
@@ -673,7 +686,12 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
         action: "write",
         outputPath: `${displayOutput}/${outputPathOf.get(p.relPath)}`,
         url: publishModule.urlForOutputPath(outputPathOf.get(p.relPath), prefix),
-        from: p.layoutFile ? `${p.relPath} + ${p.layoutFile}` : `${p.relPath} (no layout)`,
+        // §33.3 — a generated row says so. It must: a file in dist/ with no
+        // source file behind it is otherwise unexplainable to a reader of
+        // this report, which is the one place §33's overlay is visible.
+        from: p.generated
+          ? (p.layoutFile ? `generated + ${p.layoutFile}` : "generated")
+          : (p.layoutFile ? `${p.relPath} + ${p.layoutFile}` : `${p.relPath} (no layout)`),
       })),
       ...assetFiles.map((a) => ({
         action: "copy",
