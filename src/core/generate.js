@@ -22,22 +22,30 @@
  *
  * THE RUNTIME IS UNIFY'S OWN, which is the point product-spec §6.4.2 makes
  * about removing the second runtime: an author with `unify` on their PATH and
- * no Node installation can run a generator. That forces in-process loading,
- * and three consequences follow — normative rather than incidental, so they
- * are stated here rather than left to be discovered:
+ * no Node installation can run a generator. It is run as a SUBPROCESS of
+ * unify's own executable — `BUN_BE_BUN=1` makes a compiled single-file
+ * binary execute a script path, which is what keeps that promise without a
+ * Node installation anywhere.
  *
- *   1. A generator that calls `process.exit()` ENDS THE BUILD, at whatever
- *      code it passes. unify does not sandbox arbitrary JavaScript and does
- *      not claim to (§6.7).
- *   2. A generator that throws is P29, located at the generator's path, and
- *      the build stops BEFORE the scan — a partial overlay is a site nobody
- *      described.
- *   3. EVERY REBUILD RE-LOADS IT FRESH. Watch mode is full rebuilds only
- *      (§16), and an ES module cache returning the first build's module would
- *      make every rebuild after the first silently skip the generator while
- *      reporting success — the failure §14 exists to forbid, wearing a
- *      performance optimisation's clothes. The cache-busting query below is
- *      what prevents it, and it is a requirement rather than a detail.
+ * THE SUBPROCESS IS NOT AN IMPLEMENTATION DETAIL; it is what makes §33.2's
+ * three consequences true rather than aspirational, and the first design
+ * loaded the module in-process and got the third one WRONG:
+ *
+ *   1. A generator that calls `process.exit()` ends its own process, and a
+ *      non-zero exit is P29. In-process it ended the BUILD at whatever code
+ *      it passed, which unify could neither report nor recover from.
+ *   2. A generator that throws exits non-zero with its message on stderr, and
+ *      that is P29 — located at the generator's path, stopping the build
+ *      BEFORE the scan, because a partial overlay is a site nobody described.
+ *   3. EVERY REBUILD RE-RUNS IT, structurally: a new process has no module
+ *      cache to consult. In-process this was a cache-busting query string,
+ *      and it did not work — Bun ignores the query when caching a file URL,
+ *      so `?v=1` and `?v=2` are one module. The generator then ran on the
+ *      FIRST build of a watch session and never again: every later rebuild
+ *      scanned an empty overlay, dropped every generated page, and reported
+ *      the site's own links as broken. Watch mode is full rebuilds only
+ *      (§16), and a cache that survives one is the failure §14 exists to
+ *      forbid wearing a performance optimisation's clothes.
  *
  * THE OVERLAY LIVES OUTSIDE THE SOURCE TREE (§33.3), and both reasons are
  * structural rather than tidy. `src/` is never mutated, so `audit` stays
@@ -59,16 +67,8 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
 import { contains, toRelative } from "./paths.js";
 import { UsageError } from "./diagnostics.js";
-
-/**
- * Distinguishes one build's module load from the next. §33.2's third
- * consequence: without it, ESM's own cache returns the first build's module
- * and every later rebuild silently skips the generator.
- */
-let loadCounter = 0;
 
 /**
  * §33.1 — resolve the flag's value to an absolute path inside the source root.
@@ -108,6 +108,43 @@ export function removeOverlayDir(dir) {
 }
 
 /**
+ * The generator's own words, pulled out of a runtime's stderr.
+ *
+ * A thrown error reaches stderr wrapped in the runtime's presentation — a
+ * code frame, a caret, stack frames, a version footer — and the author's
+ * message is in the MIDDLE of it, not at either end. Taking the last lines
+ * put `at loadAndEvaluateModule (2:1) / Bun v1.3.11 (Linux x64)` in a P29
+ * where `boom from the generator` belonged: technically the tail of stderr,
+ * useless to the person who has to fix it.
+ *
+ * So the frames are dropped by shape and what remains is the message. A
+ * generator that just writes to stderr and exits non-zero has no frames at
+ * all, and its line survives untouched — which is the same rule, not a
+ * second one.
+ *
+ * @param {string} stderr
+ * @returns {string} at most a few lines, joined; "" when there is nothing to say
+ */
+function failureDetail(stderr) {
+  const noise = [
+    /^\s*\d+\s*\|/, //        code frame:  `1 | throw new Error(...)`
+    /^\s*[\^~]+\s*$/, //       the caret under it
+    /^\s*at\s/, //             stack frame
+    /^Bun v\d/, //              the runtime's version footer
+    /^Node\.js v\d/,
+  ];
+  const lines = stderr
+    .split("\n")
+    .map((line) => line.trimEnd())
+    .filter((line) => line.trim() !== "" && !noise.some((re) => re.test(line)));
+  const detail = lines.slice(0, 3).join(" / ");
+  // Bounded, because a generator's stderr is arbitrary and a §14 report is
+  // read by a person. The cap is generous enough that every ordinary message
+  // arrives whole.
+  return detail.length > 300 ? `${detail.slice(0, 299)}…` : detail;
+}
+
+/**
  * §33.2 — run one author-owned generator.
  *
  * @param {object} args
@@ -121,36 +158,42 @@ export async function runGenerator({ generatorAbs, sourceRoot, overlayDir, repor
   const root = resolve(sourceRoot);
   const rel = toRelative(root, generatorAbs);
 
-  const savedArgv = process.argv;
-  const savedCwd = process.cwd();
-  try {
-    // §33.2's contract, entire. argv[0]/[1] keep their conventional meaning
-    // (runtime, script) so a generator reading argv.slice(2) — the ordinary
-    // idiom — gets exactly the two values the contract names.
-    process.argv = [savedArgv[0], generatorAbs, root, overlayDir];
-    process.chdir(root);
-    // The query string is §33.2's third consequence made mechanical: a fresh
-    // specifier per build, so ESM's cache cannot hand back the previous one.
-    await import(`${pathToFileURL(generatorAbs).href}?unify-build=${++loadCounter}`);
-    return true;
-  } catch (err) {
-    // P29. Located at the generator's path with no line: the throw may come
-    // from anywhere in its own call graph — or from a module it imported —
-    // and §14.1 omits a line rather than guessing one the file cannot hold.
-    reporter.problem({
-      file: rel,
-      message: `--generate ${rel} threw: ${err && err.message ? err.message : String(err)}`,
-      fixes: [
-        "fix the generator, or drop --generate to build without it",
-        "re-run with DEBUG=1 for the stack trace",
-      ],
-    });
-    if (process.env.DEBUG && err && err.stack) process.stderr.write(`${err.stack}\n`);
-    return false;
-  } finally {
-    process.argv = savedArgv;
-    try {
-      process.chdir(savedCwd);
-    } catch { /* the original cwd is gone; nothing useful to do about it */ }
-  }
+  // `BUN_BE_BUN=1` is what lets a COMPILED single-file executable run a script
+  // path instead of re-entering its own CLI: without it, `unify gen.mjs` is an
+  // unknown-argument usage error. It is harmless when `process.execPath` is an
+  // ordinary `bun`, so one spawn covers both the checkout and the binary.
+  const proc = Bun.spawn({
+    cmd: [process.execPath, generatorAbs, root, overlayDir],
+    cwd: root, // §33.2 — `./_data/x.json` means what an author expects
+    env: { ...process.env, BUN_BE_BUN: "1" },
+    stdin: "ignore",
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  const [out, err, code] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ]);
+  // A generator's own stdout is its business and is passed through, so a
+  // script that logs its progress still does (§33.6: unify runs the file the
+  // author named and does not police it).
+  if (out) process.stdout.write(out);
+
+  if (code === 0) return true;
+
+  // P29. Located at the generator's path with no line: the failure may come
+  // from anywhere in its own call graph — or from a module it imported — and
+  // §14.1 omits a line rather than guessing one the file cannot hold.
+  const detail = failureDetail(err);
+  reporter.problem({
+    file: rel,
+    message: `--generate ${rel} failed (exit ${code})${detail ? `: ${detail}` : ""}`,
+    fixes: [
+      "fix the generator, or drop --generate to build without it",
+      "run it directly to see its full output: bun " + rel,
+    ],
+  });
+  if (process.env.DEBUG && err) process.stderr.write(err);
+  return false;
 }

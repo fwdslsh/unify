@@ -99,6 +99,52 @@ const SITE = {
 };
 
 describe("§16 watch contract", () => {
+  test("GEN-03 — every rebuild re-loads the generator, so watch output never goes stale", async () => {
+    // §33.2's third consequence, and the ONLY one a subprocess test cannot
+    // reach: each `runCli` is a fresh process, so ESM's module cache is empty
+    // every time and a cached-module bug is invisible. It only bites inside
+    // ONE long-lived process — which is exactly watch mode — and it bites
+    // SILENTLY: the generator is skipped, the site goes stale, and the build
+    // reports success. That is the failure §14 exists to forbid wearing a
+    // performance optimisation's clothes.
+    const tmp = mkTmp();
+    writeTree(tmp, {
+      "src/index.html": '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><title>Home</title><meta name="description" content="Home."></head><body><h1>Home</h1><a href="/from-data.html">d</a></body></html>\n',
+      "src/_data/value.txt": "first\n",
+      "src/_scripts/gen.mjs": `import { writeFileSync, mkdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+const [, , sourceRoot, outDir] = process.argv;
+const value = readFileSync(join(sourceRoot, "_data/value.txt"), "utf8").trim();
+mkdirSync(outDir, { recursive: true });
+writeFileSync(join(outDir, "from-data.html"),
+  \`<!doctype html>\\n<html lang="en"><head><meta charset="utf-8"><title>Data</title><meta name="description" content="From the data file."></head><body><h1>Data</h1><p id="v">\${value}</p></body></html>\\n\`);
+`,
+    });
+    const w = start(["watch", "--generate", "_scripts/gen.mjs"], tmp);
+    await w.ready;
+    const first = readFileSync(join(tmp, "dist/from-data.html"), "utf8");
+    if (!first.includes('<p id="v">first</p>')) {
+      throw new Error(`the first build must run the generator:\n${first}\n${w.stderr}`);
+    }
+
+    // Edit only the DATA the generator reads. Nothing about the generator
+    // module itself changes, which is precisely the case a module cache gets
+    // wrong: re-running the build without re-running the generator leaves
+    // `first` on disk and reports success.
+    writeFileSync(join(tmp, "src/_data/value.txt"), "second\n");
+    await sleep(SETTLE_MS);
+    const second = readFileSync(join(tmp, "dist/from-data.html"), "utf8");
+    w.proc.kill("SIGTERM");
+    await sleep(200);
+
+    if (!second.includes('<p id="v">second</p>')) {
+      throw new Error(
+        `§33.2: every rebuild re-loads the generator FRESH. The output is stale, which means the module was cached and the generator silently skipped:\n${second}`,
+      );
+    }
+    covers("GEN-03");
+  }, 30_000);
+
   test("WCH-02 — watch output after an edit sequence is identical to a fresh build", async () => {
     const tmp = mkTmp();
     writeTree(tmp, SITE);
