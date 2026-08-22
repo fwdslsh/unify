@@ -2,7 +2,7 @@
 
 unify is a Bun-native static site generator for **HTML-native composition**: includes, layouts, and slots written in plain HTML, with no expression language and no client runtime. The output is the HTML and CSS the author wrote; unify adds no JavaScript of its own.
 
-**The v0.7.0 specification set in `docs/` is authoritative, and `src/` implements it.** When code and a document disagree, the document wins and the disagreement is a defect to report.
+**The specification set in `docs/` is authoritative, and `src/` implements it.** When code and a document disagree, the document wins and the disagreement is a defect to report.
 
 ## Read before suggesting anything
 
@@ -13,7 +13,7 @@ unify is a Bun-native static site generator for **HTML-native composition**: inc
 | `docs/cli-reference.md` | Every command, option, and exit code. **There are no others.** |
 | `docs/authoring-rules.md` | The complete authoring surface in under sixty lines. |
 | `docs/testing-strategy.md` | What "implemented" means as a machine-checkable claim, and the release gates. |
-| `docs/migration-plan.md` | The phased path from the v0.6 codebase and suite to v0.7.0. |
+| `docs/migration-plan.md` | The phased path from the previous codebase and suite to this one. |
 | `CONTRIBUTING.md` | The contribution workflow and the gates. |
 
 If two documents disagree, that is a defect to report — never a license to reinterpret either one.
@@ -49,7 +49,7 @@ Exit codes: `0` published, `1` problems found and nothing published, `2` invalid
 
 Also gone as concepts: `.components/` and `.layouts/` directories, dependency and asset trackers (every non-page file mirror-copies byte-for-byte), automatic sitemap generation, and Apache/Nginx container images (the repo ships exactly one Dockerfile, a CLI image).
 
-Suggesting any of these is a regression, not a feature. `data-unify` and `unify-*` appearing in a source file are diagnosed as located build problems naming the v0.7.0 spelling.
+Suggesting any of these is a regression, not a feature. `data-unify` and `unify-*` appearing in a source file are diagnosed as located build problems naming the supported spelling.
 
 ## Non-goals — do not "helpfully" add these
 
@@ -74,7 +74,7 @@ There is no `bun run build`, `serve`, `build:advanced`, `lint`, `format`, `docs:
 
 ## Testing rules that constrain suggestions
 
-Read `docs/testing-strategy.md` §1 for why these exist: v0.6 shipped 93% coverage on a product whose `init` command exited 1 and whose builds silently deleted page content.
+Read `docs/testing-strategy.md` §1 for why these exist: the previous suite reached 93% coverage on a product whose `init` command exited 1 and whose builds silently deleted page content.
 
 - **Behavior tests spawn the real CLI** on a real filesystem in a temp directory. No mocks, no `src/**` imports, no `console.warn`-instead-of-fail, no commented-out expectations, no ad-hoc HTML normalization. These are mechanically enforced.
 - **Unit tests carry zero conformance authority.** When a unit test disagrees with a conformance fixture, the unit test is wrong by definition.
@@ -88,4 +88,4 @@ Read `docs/testing-strategy.md` §1 for why these exist: v0.6 shipped 93% covera
 
 Plain JavaScript with JSDoc — no TypeScript. ES modules with `.js` extensions in imports. Async/await. Prefer Bun-native APIs (`Bun.file`, `Bun.write`, `Bun.spawn`, `Bun.serve`, `fs.watch`) over dependencies; a new dependency needs justification against a Bun-native alternative.
 
-Errors name the file, the reference, and the line where known, with a short fix list. **Silent failure is a bug by definition** — this is the failure class that defined v0.6, and it outranks every other concern.
+Errors name the file, the reference, and the line where known, with a short fix list. **Silent failure is a bug by definition** — this is the failure class that defined the previous implementation, and it outranks every other concern.

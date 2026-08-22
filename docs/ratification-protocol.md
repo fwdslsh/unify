@@ -200,7 +200,7 @@ over fixture count: one rule, two page kinds, and only the untested kind was bro
 ## The two amendment rules
 
 1. **Only amend for failures the documentation caused.** See triage step 0.
-2. **Every addition must displace something.** The doc is capped at 60 lines, and CI enforces byte-identity with the copy embedded in the README. If a fix needs five lines, the underlying **rule** is too complicated and the repair probably belongs in the spec.
+2. **Every addition must displace something.** The doc is capped at 60 lines, and CI enforces the cap. If a fix needs five lines, the underlying **rule** is too complicated and the repair probably belongs in the spec.
 
 That cap is a feature, not an inconvenience. It forces an explicit judgment about which rule earns its line. In round 5 it made me trade a Markdown include-placement clause that no sample in forty had ever exercised for a fix to silent wrong output on a feature a brief actually requested. Without the cap I would have kept both and learned nothing.
 

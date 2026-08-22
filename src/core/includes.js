@@ -6,9 +6,10 @@
  * why a fragment may carry `slot=` fills or contribute `<slot>` elements without
  * either being a special rule.
  *
- * Path resolution is harvested from the v0.6 SSI processor, which the audit found
- * was the only correct implementation of §5.1 in the old codebase: `file=` against
- * the including file's directory, `virtual=` against the source root.
+ * Path resolution is harvested from the earlier SSI processor, which the audit
+ * found was the only correct implementation of §5.1 in the old codebase:
+ * `file=` against the including file's directory, `virtual=` against the
+ * source root.
  *
  * PROVENANCE (§1, §11.1, §14.1 R3): `inlineIncludes` returns `{text, spans}`,
  * not a bare string. `spans` is a sorted, contiguous, non-overlapping
@@ -298,7 +299,8 @@ function lineOf(text, index) {
 /**
  * Splice by index so replacement text is never rescanned — a fragment
  * containing `$&` or `$'` would otherwise be mangled by String.replace's
- * substitution patterns, which is a real v0.6 defect the landmines pin.
+ * substitution patterns, which is a real defect of the previous
+ * implementation that the landmines pin.
  *
  * Also builds the provenance spans array (module doc comment): every byte of
  * `text` not covered by an edit is a verbatim gap authored by `relFile` at

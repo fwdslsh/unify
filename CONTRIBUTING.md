@@ -1,6 +1,6 @@
 # Contributing to unify
 
-unify is a static site generator for HTML-native composition. The v0.7.0 specification set in [`docs/`](docs/) is authoritative and `src/` implements it — **learn the product from those documents first.** When a document and the code disagree, that is a defect to report, never a license to reinterpret either. ([`docs/migration-plan.md`](docs/migration-plan.md) records how the v0.6 tree became this one.)
+unify is a static site generator for HTML-native composition. The specification set in [`docs/`](docs/) is authoritative and `src/` implements it — **learn the product from those documents first.** When a document and the code disagree, that is a defect to report, never a license to reinterpret either. ([`docs/migration-plan.md`](docs/migration-plan.md) records how the current tree came to be.)
 
 ## Setup
 
@@ -28,16 +28,16 @@ bun src/cli.js build --source src --output dist
 | [`docs/cli-reference.md`](docs/cli-reference.md) | Every command, option, and exit code. **There are no others.** |
 | [`docs/authoring-rules.md`](docs/authoring-rules.md) | The complete authoring surface in under sixty lines. |
 | [`docs/testing-strategy.md`](docs/testing-strategy.md) | What "implemented" means as a machine-checkable claim, and the release gates. |
-| [`docs/migration-plan.md`](docs/migration-plan.md) | The phased path from the v0.6 codebase and suite to v0.7.0. |
+| [`docs/migration-plan.md`](docs/migration-plan.md) | The phased path from the previous codebase and suite to this one. |
 
 Two rules follow from that set:
 
 - **A document contradiction is a defect to report, never a license to reinterpret either document.** The specs are written to agree.
-- **`docs/authoring-rules.md` is embedded byte-identically in `README.md`** (release gate G10). Edit the file; never the copy in the README.
+- **`docs/authoring-rules.md` is the complete authoring surface, capped at sixty lines** (release gate G10). The README links it rather than duplicating it; edit the file, and keep any README summary of it consistent.
 
 ## How tests are organized
 
-Read [`docs/testing-strategy.md`](docs/testing-strategy.md) §1 before writing a test. It is the root-cause analysis of why v0.6 shipped 93% coverage on a product whose `init` command exited 1 and whose builds silently deleted page content. Every rule below is a countermeasure to a specific mechanism named there.
+Read [`docs/testing-strategy.md`](docs/testing-strategy.md) §1 before writing a test. It is the root-cause analysis of why the previous suite reached 93% coverage on a product whose `init` command exited 1 and whose builds silently deleted page content. Every rule below is a countermeasure to a specific mechanism named there.
 
 Tiers are numbered by authority. **When two tiers disagree, the lower number wins and the higher tier is what gets fixed.**
 
@@ -75,7 +75,7 @@ bun tests/conformance/check-suite-hygiene.mjs
 2. If the spec agrees with the fixture, **the implementation changes.**
 3. If the spec is ambiguous or wrong, **the spec is amended first** — with its inventory row updated in the same commit — and the fixture follows the amendment.
 
-An expected-tree edit in the same PR as an engine change is the highest-scrutiny diff in this repository. It is exactly how the v0.6 failure started.
+An expected-tree edit in the same PR as an engine change is the highest-scrutiny diff in this repository. It is exactly how that earlier failure started.
 
 **Expected trees are written by humans reasoning from the spec, never captured from a run.** A captured expectation ratifies whatever the code currently does, which is the bug this suite exists to prevent.
 
@@ -83,7 +83,7 @@ An expected-tree edit in the same PR as an engine change is the highest-scrutiny
 
 **Tests that assert retired behavior are deleted with their modules, not fixed.** They are not failures to repair. The retired surface: `data-unify`, `unify-*` area classes, component mode, `<template data-slot>`, landmark and ordered-fill matching, `<style data-unify-docs>` blocks, U001–U008 rule codes, `--fail-on`, the security scanner, the glob pipeline, incremental builds and the build cache, `--minify`, `--host`, `--log-level`, short-name layout resolution, layout chaining, and the `serve` command. `docs/migration-plan.md` §2 carries the per-file disposition.
 
-**Do not add features.** If a capability cannot be expressed with the four primitives — `<include src>`, layouts, slots, underscore exclusion — it does not belong in unify. The non-goals in `docs/product-spec.md` §5 are decisions with stated reasoning and accepted costs, not gaps. §6 is the post-MVP candidate list; it is the roadmap.
+**Do not add features.** If a capability cannot be expressed with the four primitives — `<include src>`, layouts, slots, underscore exclusion — it does not belong in unify. The non-goals in `docs/product-spec.md` §5 are decisions with stated reasoning and accepted costs, not gaps. §6 is the deferred-candidate list; it is the roadmap.
 
 ## About coverage
 
@@ -101,7 +101,7 @@ The release metric is the conformance ledger: every gated rule recorded green, b
 4. Run `bun test`, both gate scripts above, and confirm the CLI surface is still exactly what `docs/cli-reference.md` lists — a surviving retired flag is a finding, not a feature.
 5. Describe what changed and which rule IDs it affects.
 
-Release gates G1–G11 in `docs/testing-strategy.md` §6 define when v0.7.0 ships. Each is a command with an exit code; none is a judgment call. **CI is green and must stay green** — every gate is a command with an exit code, and a red run is a regression, never progress.
+Release gates G1–G11 in `docs/testing-strategy.md` §6 define when a release ships. Each is a command with an exit code; none is a judgment call. **CI is green and must stay green** — every gate is a command with an exit code, and a red run is a regression, never progress.
 
 ## Reporting issues
 
@@ -109,4 +109,4 @@ Include the unify version (`unify --version`), the Bun version (`bun --version`)
 
 ## License
 
-Contributions are made under [CC-BY-4.0](LICENSE).
+Contributions are made under the [Mozilla Public License 2.0](LICENSE).

@@ -640,7 +640,7 @@ export function auditManifest({
 
     // ---- social image ------------------------------------------------------
     // Only the dimensions. A share image naming no emitted file is already
-    // P13 — §12 has checked `content` on every og:/twitter: meta since v0.7.0
+    // P13 — §12 has always checked `content` on every og:/twitter: meta
     // — so a finding here would answer one question with two mechanisms, and
     // answer it worse: P13 blocks the publish, a finding only reports. §24.4
     // records the reasoning; this is where it would otherwise have been added.

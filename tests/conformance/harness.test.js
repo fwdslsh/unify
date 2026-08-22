@@ -15,7 +15,7 @@
  *      cases built by their build() function),
  *   2. spawns the real CLI (`bun src/cli.js build ...`) as a subprocess —
  *      never an import of engine internals — under a hard 30 s kill timer
- *      (the v0.6 engine hung forever on a missing include; a hang is a
+ *      (the previous engine hung forever on a missing include; a hang is a
  *      failure, never a wait),
  *   3. asserts exit code, diagnostics (stable `FILE:LINE: SEVERITY: ` prefix,
  *      exhaustive where declared, severity tokens closed to problem/advisory,
@@ -33,10 +33,10 @@
  * ledger reflects exactly that run (a skipped test records nothing and its
  * rules go uncovered — the skip hole is closed mechanically).
  *
- * Phase 0 note (migration plan §3): against the v0.6 engine every case here
- * is EXPECTED to fail — that is the acceptance condition, recorded in
+ * Phase 0 note (migration plan §3): against the previous engine every case
+ * here is EXPECTED to fail — that is the acceptance condition, recorded in
  * tests/conformance/phase-gaps/p0-expected-fail.txt. Do not weaken this file
- * to make it green; only the v0.7 engine may do that.
+ * to make it green; only the current engine may do that.
  */
 import { test } from "bun:test";
 import {
@@ -90,7 +90,7 @@ export const covers = (...ruleIds) => {
 // --------------------------------------------------------------- CLI spawn
 
 /**
- * Read a stream with a hard byte cap. The v0.6 missing-include loop does not
+ * Read a stream with a hard byte cap. The earlier missing-include loop does not
  * merely hang — it writes output forever; buffering it whole (Response.text)
  * ran the harness process out of memory before the kill timer fired, which
  * failed every later case for a reason that was never observed product
@@ -231,7 +231,8 @@ function checkDiagnostics(stderrText, spec, issues) {
 
 // Seeded into the output dir of every publish-blocked case BEFORE the run;
 // afterwards the whole tree must be byte-identical (PUB-01: a failed build
-// leaves the previous output untouched — the exact thing v0.6 violated).
+// leaves the previous output untouched — the exact thing the earlier
+// implementation violated).
 const SENTINEL_FILES = {
   "index.html":
     "<!doctype html>\n<html><head><title>SENTINEL previous publish</title></head>" +

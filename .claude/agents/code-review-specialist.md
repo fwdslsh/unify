@@ -53,7 +53,7 @@ When reviewing significant changes or patterns, record findings at `./_notes/CR-
 
 ## Project-Specific Considerations
 
-**The v0.7.0 specification set in `docs/` is authoritative, and the composition core is being rewritten against it.** Finding v0.6 machinery in the tree is the expected state, not a discovery — its disposition is already decided in `docs/migration-plan.md`. Review against the spec; do not re-litigate what was cut, and do not flag a deletion as a regression.
+**The specification set in `docs/` is authoritative, and `src/` implements it.** Review against the spec; do not re-litigate what was cut, and do not flag a deletion as a regression.
 
 The composition model is four primitives and nothing else: `<include src>` (verbatim, never takes fills), layouts (`_layout.html` / `data-layout`, which **do not chain**), slots (`<slot name>` in layouts, `slot=` on page elements, `<main>` as the default), and underscore exclusion. Check that:
 

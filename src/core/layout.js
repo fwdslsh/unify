@@ -149,7 +149,7 @@ export function resolveMarkdownLayout({ layoutValue, mdSource, pageAbsPath, sour
 /**
  * §6.2/P15 — a layout that itself declares `data-layout` (any value,
  * including `"none"`) is a problem, never a silent no-op; layout chaining is
- * not part of v0.7.0. Also flags §6.3/P07 misplacement within the layout's
+ * not supported. Also flags §6.3/P07 misplacement within the layout's
  * own document, same as a page. Call once per loaded layout file (the
  * caller is expected to cache by absolute path — §14.1's diagnostics must
  * not repeat once per page that merely references the same broken layout).
@@ -176,7 +176,7 @@ export function checkLayoutDocument({ root, text, spans, resolveLine, file, repo
     // messages keep `layoutFile` for the same reason — "which layout is this"
     // stays the useful fact even when a fragment contributed the markup).
     ...at(attr.start),
-    message: "this layout declares data-layout — layout chaining is not supported in v0.7.0",
+    message: "this layout declares data-layout — layout chaining is not supported",
     fixes: [`make ${file} a complete standalone layout, or delete it so pages use a parent ${LAYOUT_FILENAME}`],
   });
   return { broken: true };
@@ -204,7 +204,7 @@ export function checkRetiredVocabulary({ text, file, reporter }) {
       reporter.problem({
         file,
         line: lineOf(text, el.start),
-        message: "data-unify is the v0.6 spelling",
+        message: "data-unify is a retired spelling",
         fixes: ['write data-layout="/path.html" (or data-layout="none") on <html> or <body>'],
       });
     }
@@ -216,7 +216,7 @@ export function checkRetiredVocabulary({ text, file, reporter }) {
         reporter.problem({
           file,
           line: lineOf(text, el.start),
-          message: `class "${token}" is the v0.6 area vocabulary`,
+          message: `class "${token}" is retired area vocabulary`,
           fixes: [`mark the region with <slot name="${name}">…</slot> in the layout and slot="${name}" on the page element`],
         });
       }

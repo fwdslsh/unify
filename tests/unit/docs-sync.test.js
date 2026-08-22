@@ -1,25 +1,22 @@
 /**
- * The README embeds `docs/authoring-rules.md` verbatim between two HTML
- * comment markers, and product-spec §6.7 requires that: "The README and CLI
- * help must carry the same rules for humans and agents that do not discover
- * `AGENTS.md`; no behavior may be documented only in the agent guide, and
- * there is one rule set rather than tool-specific variants."
+ * Documentation lockstep (product-spec §6.7, §7 item 5): one rule set, in
+ * `docs/authoring-rules.md`, that every audience is led to rather than given
+ * a private copy of. The README used to embed the file verbatim between two
+ * marker comments, with a byte-identity check here; the embed was removed
+ * deliberately — a duplicate the size of the document it duplicates is the
+ * thing that drifts, and it did (the README went on saying "JSON-LD ha[s] no
+ * frontmatter key" after §26 gave `schema:` a meaning) — and the README now
+ * links the file instead. What remains checkable, this file checks:
  *
- * Nothing checked it, and the copies drifted the first time the rules changed
- * after §26 gave `schema:` a meaning: `docs/authoring-rules.md` gained the key
- * and the README went on saying "JSON-LD ha[s] no frontmatter key" — the one
- * failure mode a duplicated document has, arriving on the very edit that
- * created the duplication's first real divergence. A marker pair is a promise
- * that something copies one into the other; until this file existed the
- * promise was kept by whoever remembered.
+ *  - the README still points readers at the rules file at all;
+ *  - the rules file keeps its one-screen budget (≤ 60 lines);
+ *  - where the README summarises a rule in its own prose (the frontmatter
+ *    key set), the summary and the file agree;
+ *  - every option the parser accepts is named in the synopses that claim
+ *    completeness.
  *
- * The check is a byte comparison rather than a fuzzy one on purpose. The
- * embed is a copy, so "nearly the same" is the state this exists to catch:
- * two sentences that differ by one clause are exactly how a reader ends up
- * with the wrong rule and no way to tell which copy is current.
- *
- * No `src/**` import and no mock (hygiene H1): this reads two files on disk
- * and compares them.
+ * No `src/**` import and no mock (hygiene H1): these read files on disk
+ * and compare them.
  */
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
@@ -27,34 +24,14 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
-const BEGIN = "<!-- BEGIN docs/authoring-rules.md -->";
-const END = "<!-- END docs/authoring-rules.md -->";
 
-test("the README's embedded copy of docs/authoring-rules.md is byte-identical to the file", () => {
-  const rules = readFileSync(join(ROOT, "docs", "authoring-rules.md"), "utf8").replace(/\n+$/, "");
+test("the README points readers at docs/authoring-rules.md", () => {
+  // The linking requirement that replaced the embed (product-spec §6.7): a
+  // README reader must be one step from the complete rules, never handed a
+  // copy that can drift. Presence of the path anywhere is enough — pinning a
+  // section or a phrase is how a doc check becomes a tripwire.
   const readme = readFileSync(join(ROOT, "README.md"), "utf8");
-
-  const i = readme.indexOf(BEGIN);
-  const j = readme.indexOf(END);
-  expect(i, `README.md must carry ${BEGIN}`).toBeGreaterThanOrEqual(0);
-  expect(j, `README.md must carry ${END}`).toBeGreaterThan(i);
-
-  const embedded = readme.slice(i + BEGIN.length, j).replace(/^\n+/, "").replace(/\n+$/, "");
-  if (embedded !== rules) {
-    // Name the first differing line: the whole document in a failure message
-    // is unreadable, and the line number is what an author needs.
-    const a = embedded.split("\n");
-    const b = rules.split("\n");
-    const n = a.findIndex((line, k) => line !== b[k]);
-    const at = n === -1 ? Math.min(a.length, b.length) : n;
-    throw new Error(
-      "README.md and docs/authoring-rules.md have drifted — one rule set, two copies.\n" +
-      `  first difference at line ${at + 1} of the embed:\n` +
-      `    docs/authoring-rules.md: ${JSON.stringify(b[at] ?? "(end of file)")}\n` +
-      `    README.md:               ${JSON.stringify(a[at] ?? "(end of file)")}\n` +
-      "  the file is the source; copy it between the markers.",
-    );
-  }
+  expect(readme, "README.md must link docs/authoring-rules.md — product-spec §6.7 leads every audience to one rule set").toContain("docs/authoring-rules.md");
 });
 
 test("the authoring rules still fit the one screen they claim", () => {
@@ -68,21 +45,30 @@ test("the authoring rules still fit the one screen they claim", () => {
   expect(rules.split("\n").length).toBeLessThanOrEqual(60);
 });
 
-test("README.md's own summary of the frontmatter keys names the same set as the authoring rules", () => {
-  // The README embeds `docs/authoring-rules.md` verbatim, so a claim it makes
-  // in its OWN prose can contradict the copy it carries 120 lines later, and
-  // the byte-identity test above cannot see it: it compares the embed, not the
-  // document around it. That is exactly what happened. The README said
+test("README.md's own summary of the frontmatter keys, when it carries one, names the same set as the authoring rules", () => {
+  // A summary in the README's own prose can contradict the rules file it
+  // summarises, and that is exactly what happened while the README still
+  // carried an embedded copy of the file. The prose said
   // "`title`, `layout`, `class`, `lang`, and `dir` are the frontmatter keys
-  // with behavior; every other key becomes a `<meta>` tag" while its own
-  // embedded rules said "`title`, `layout`, `class`, `lang`, `dir`, and
-  // `schema` are the only keys with meaning" — and §10.2/§26.4 make the embed
+  // with behavior; every other key becomes a `<meta>` tag" while the rules
+  // file said "`title`, `layout`, `class`, `lang`, `dir`, and
+  // `schema` are the only keys with meaning" — and §10.2/§26.4 make the file
   // right: `schema: article` is problem P23, not a `<meta name="schema">`.
   //
   // Both sentences enumerate a set, so the check is set equality on the
-  // backticked keys before the phrase each uses to end the list.
-  const rules = readFileSync(join(ROOT, "docs", "authoring-rules.md"), "utf8");
+  // backticked keys before the phrase each uses to end the list — conditional
+  // on the README making a claim of its own at all. The README links the
+  // rules file (the test above), so prose that stops duplicating
+  // the enumeration has nothing left to drift: its absence is a legitimate
+  // edit, never a failure (a check that pins a sentence into existence is a
+  // tripwire, not a sync). The accepted cost, stated: a paraphrase that
+  // rewords the marker phrase escapes this check. What the README may not do
+  // is keep the phrase and change the set.
   const readme = readFileSync(join(ROOT, "README.md"), "utf8");
+  const README_MARKER = "are the frontmatter keys with behavior";
+  if (!readme.includes(README_MARKER)) return;
+
+  const rules = readFileSync(join(ROOT, "docs", "authoring-rules.md"), "utf8");
 
   const keysBefore = (text, marker, label) => {
     const at = text.indexOf(marker);
@@ -97,7 +83,7 @@ test("README.md's own summary of the frontmatter keys names the same set as the 
   };
 
   const fromRules = keysBefore(rules, "are the only keys with meaning", "docs/authoring-rules.md");
-  const fromReadme = keysBefore(readme, "are the frontmatter keys with behavior", "README.md");
+  const fromReadme = keysBefore(readme, README_MARKER, "README.md");
   expect(fromReadme, "README.md's frontmatter-key list and docs/authoring-rules.md's must name the same keys — one rule set, two audiences (product-spec §6.7)").toEqual(fromRules);
 });
 
@@ -148,8 +134,8 @@ test("every option the parser accepts is named in --help, the reference, and CLA
     ["src/cli.js --help text", join("src", "cli.js")],
     ["docs/cli-reference.md", join("docs", "cli-reference.md")],
     // product-spec §4 claims to list the ENTIRE CLI, and it was the one
-    // synopsis this test did not read — which is exactly where seven 0.8
-    // flags sat undocumented until the v0.8.0 release review.
+    // synopsis this test did not read — which is exactly where seven flags
+    // sat undocumented until the release review.
     ["docs/product-spec.md", join("docs", "product-spec.md")],
     ["CLAUDE.md", "CLAUDE.md"],
   ]) {

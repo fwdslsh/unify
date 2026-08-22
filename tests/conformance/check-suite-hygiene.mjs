@@ -2,7 +2,7 @@
 /**
  * check-suite-hygiene.mjs — anti-rot gate for the test suite itself.
  *
- * The v0.6 suite reached 93% coverage on a product that did not work. Each
+ * The previous suite reached 93% coverage on a product that did not work. Each
  * ban below removes one mechanism that made that possible (evidence in
  * docs/testing-strategy.md §1):
  *
@@ -11,7 +11,7 @@
  *      `spyOn(`, `jest.fn` banned there; unit tests under tests/unit may mock.)
  *  H2  No warn-instead-of-fail. `console.warn` and commented-out expectations
  *      (`// expect(`) are banned in behavior tests — the exact pattern that
- *      neutered fixtures-integration.test.js line 375 in v0.6.
+ *      neutered fixtures-integration.test.js line 375 in the previous suite.
  *  H3  No internal imports in behavior tests. Importing from src/** couples
  *      tests to internals and lets them pass while the CLI is broken; behavior
  *      tests spawn the CLI. (The harness itself holds the single cli.js path.)
@@ -41,9 +41,9 @@
  *      dropped; everything else — structure, attributes and their order,
  *      comments, and text content — is compared exactly, and non-HTML files
  *      byte-for-byte. `normalizeHtml`, `replace(/\s+/g` and friends anywhere
- *      else in a behavior test are banned: v0.6 collapsed ALL whitespace,
- *      which blinded the one real comparison to text- and attribute-level
- *      bugs. Narrow and stated, or nothing.
+ *      else in a behavior test are banned: the previous suite collapsed ALL
+ *      whitespace, which blinded the one real comparison to text- and
+ *      attribute-level bugs. Narrow and stated, or nothing.
  *
  *  H6  No leftover experiment markers in shipped source. `src/**` is scanned
  *      for MUTATION PROBE / DEBUG / XXX-style markers. The review protocol

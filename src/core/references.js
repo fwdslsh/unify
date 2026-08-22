@@ -358,7 +358,7 @@ export function stripBaseUrl(url, base) {
     if (rest.startsWith(base.pathPrefix)) return `/${rest.slice(base.pathPrefix.length)}`;
     // An on-host URL that does not carry the prefix keeps its path, so under
     // `--base-url https://example.com/repo/` the value `/team.html` is checked
-    // as `team.html` — §12's own semantics since v0.7.0, and unchanged here.
+    // as `team.html` — §12's own semantics from the start, and unchanged here.
     // Noted because a SECOND caller now leans on it: §24.4's
     // canonical-scheme-mismatch accuses on `classifyCanonical`'s `self`, which
     // this line produces for a canonical naming an address above this site's
@@ -496,7 +496,7 @@ function checkOne({ raw, offset }, containingOutputPath, { base, emittedPaths, u
   // `href="/a&amp;b.html"` is the correct HTML spelling for a file named
   // `a&b.html`, and a browser fetches the decoded form. §12 read the bytes, so
   // a page written correctly failed to publish with a diagnostic quoting a
-  // spelling that was right. Present since v0.7.0 and reproduced there; reached
+  // spelling that was right. Present from the start and reproduced there; reached
   // in a new way by §22, whose synthesized href must be escaped for exactly the
   // same reason. Decoding on read and escaping on write are one rule.
   const value = decodeEntities(raw);

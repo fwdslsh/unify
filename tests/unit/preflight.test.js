@@ -135,6 +135,40 @@ test("a fixture module a test actually imports is checked — the closure follow
   expect(r.stderr).toContain("tests/fixtures/cases.mjs:2:6");
 }, 30_000);
 
+test("declared-but-uninstalled dependencies stop the runner before it half-runs on auto-install", async () => {
+  // The state this closes: no `bun install`, so bun's auto-install serves
+  // in-process imports from a cache while `bun build --compile` and bare-env
+  // spawns fail resolution — a suite that is mostly green and still lying.
+  // The dependency is never imported, so nothing here touches the network.
+  const dir = project({
+    "package.json": '{ "name": "scratch", "dependencies": { "some-missing-dep": "1.0.0" } }\n',
+    "src/core/urls.js": "export const ok = 1;\n",
+    "tests/a.test.js": importer("../src/core/urls.js"),
+  });
+  const r = await runSuite(dir);
+  expect(r.killed).toBe(false);
+  expect(r.exit).toBe(2);
+  expect(r.stderr).toContain("some-missing-dep");
+  expect(r.stderr).toContain("bun install");
+  // Nothing ran: the refusal happens before the runner reaches a test.
+  expect(r.stdout).not.toContain("1 pass");
+}, 30_000);
+
+test("a tree that declares no dependencies is not the dependency guard's business", async () => {
+  // The false positive that would get the guard switched off: every scratch
+  // project in this file, and any consumer testing without a package.json,
+  // must run exactly as before.
+  const dir = project({
+    "package.json": '{ "name": "scratch" }\n',
+    "src/core/urls.js": "export const ok = 1;\n",
+    "tests/a.test.js": importer("../src/core/urls.js"),
+  });
+  const r = await runSuite(dir);
+  expect(r.killed).toBe(false);
+  expect(r.exit).toBe(0);
+  expect(r.stderr).not.toContain("bun install");
+}, 30_000);
+
 test("the watchdog kills a run that hangs between per-test timeouts, and says so", async () => {
   // A never-settling test whose own timeout is longer than the budget: bun
   // would wait, and the budget is what refuses to.
@@ -194,4 +228,10 @@ test("this very run is guarded: both preloads executed, and the parse gate saw t
   // Site content under tests/fixtures is shipped byte-for-byte and may be
   // malformed on purpose; only a fixture some test imports is a module.
   expect(checked).not.toContain("tests/fixtures/kitchen-sink/src/assets/unify-polyfill.js");
+  // The dependency gate saw the real package.json: named packages, not a
+  // count, so a renamed field or an emptied read fails here instead of
+  // leaving the guard running over nothing.
+  const deps = globalThis.__unifyTestPreflight?.depsChecked ?? [];
+  expect(deps).toContain("js-yaml");
+  expect(deps).toContain("markdown-it");
 });

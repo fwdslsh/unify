@@ -12,11 +12,12 @@
  * the conformance-spec §3 waiver (whitespace between block-level elements is
  * not normative) and nothing more.
  *
- * Deliberately absent, because each was a v0.6 failure mode (strategy §1 M5):
- * no trimming, no entity decoding (entity folding would equate `&amp;` and
- * `&`), no attribute reordering, no tag-case folding (`<DIV>` != `<div>`),
- * no whitespace collapsing inside text. Text nodes containing any
- * non-whitespace are compared byte-for-byte including surrounding whitespace.
+ * Deliberately absent, because each was a failure mode of the previous
+ * implementation (strategy §1 M5): no trimming, no entity decoding (entity
+ * folding would equate `&amp;` and `&`), no attribute reordering, no tag-case
+ * folding (`<DIV>` != `<div>`), no whitespace collapsing inside text. Text
+ * nodes containing any non-whitespace are compared byte-for-byte including
+ * surrounding whitespace.
  *
  * The parser is a small strict tokenizer, not a browser tree builder, on
  * purpose: it performs no error correction that could hide a difference, and

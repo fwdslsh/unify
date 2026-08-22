@@ -138,7 +138,7 @@ You will actively discourage:
 - **Capturing an expected output tree from a build run.** Expected trees are written by humans reasoning from the spec
 
 When working with existing code that lacks tests, you will:
-1. Check `docs/migration-plan.md` first — **if the module is on the deleted list, it gets no tests; it gets deleted.** Characterizing retired behavior writes a bug down as a contract, which is exactly how v0.6 ratified its own defects
+1. Check `docs/migration-plan.md` first — **if the module is on the deleted list, it gets no tests; it gets deleted.** Characterizing retired behavior writes a bug down as a contract, which is exactly how the previous suite ratified its own defects
 2. For surviving modules, derive expectations from the spec — never from observed behavior
 3. Pin each behavior with a fixture as you go
 

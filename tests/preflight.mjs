@@ -23,6 +23,18 @@
  *
  * The bound on everything else lives in watchdog.mjs, which imports nothing
  * and therefore survives a parse error in this file or in module-graph.mjs.
+ *
+ * The second unfit state is a tree whose declared dependencies were never
+ * installed. It does not fail honestly: bun auto-installs in-process imports
+ * from a cache, so most of the suite passes, while everything that resolves
+ * from disk — `bun build --compile`, a spawned CLI with a bare environment —
+ * fails with resolution errors that read as product bugs (observed: 11
+ * scattered failures from one missing `bun install`). A suite that is
+ * half-valid is worse than one that refuses, so the refusal is up front and
+ * names the one command. Scoped to `package.json`'s `dependencies`: those are
+ * what the shipped artifact needs on disk; a tree that declares none (the
+ * scratch projects in tests/unit/preflight.test.js) is not this guard's
+ * business.
  */
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
@@ -59,6 +71,34 @@ function loadableFiles() {
   return [...reachableFrom(swept, [SRC, TESTS])].sort();
 }
 
+/**
+ * Refuse to start: one message, one exit. Exit 2 and not 1 on purpose — an
+ * unfit tree is an environment fault, distinguishable from the ordinary red
+ * suite (docs/testing-strategy.md §5) — and both guards funnel through here
+ * so that distinction is made in exactly one place.
+ * @param {string} message
+ * @returns {never}
+ */
+function refuse(message) {
+  process.stderr.write(message);
+  process.exit(2);
+}
+
+const pkgPath = join(ROOT, "package.json");
+const depsChecked = existsSync(pkgPath)
+  ? Object.keys(JSON.parse(readFileSync(pkgPath, "utf8")).dependencies ?? {})
+  : [];
+const missingDeps = depsChecked.filter((name) => !existsSync(join(ROOT, "node_modules", name)));
+if (missingDeps.length) {
+  refuse(
+    "preflight: the tree cannot be tested — package.json declares dependencies that are not installed.\n" +
+    `  missing from node_modules: ${missingDeps.join(", ")}\n` +
+    "Run `bun install` and re-run. Without it, bun auto-installs in-process imports from a cache\n" +
+    "while everything that resolves from disk — `bun build --compile`, a spawned CLI with a bare\n" +
+    "environment — fails resolution, so the suite reports failures the tree does not have.\n",
+  );
+}
+
 const transpiler = new Bun.Transpiler({ loader: "js" });
 const unparseable = [];
 const checked = [];
@@ -82,23 +122,24 @@ for (const file of loadableFiles()) {
 }
 
 if (unparseable.length) {
-  process.stderr.write("preflight: the tree cannot be tested — a module the suite loads does not parse.\n");
+  const lines = ["preflight: the tree cannot be tested — a module the suite loads does not parse.\n"];
   for (const { file, errors } of unparseable) {
     for (const e of errors) {
       const at = e?.position ? `${e.position.line}:${e.position.column}` : "?";
-      process.stderr.write(`  ${file}:${at}: ${e?.message ?? String(e)}\n`);
+      lines.push(`  ${file}:${at}: ${e?.message ?? String(e)}\n`);
     }
   }
-  process.stderr.write(
+  lines.push(
     "Fix the syntax error and re-run. This is checked before the runner starts because\n" +
     "`bun test` hangs, rather than fails, once two test files fail to load from one parse\n" +
     "error (docs/testing-strategy.md §8).\n",
   );
-  process.exit(2);
+  refuse(lines.join(""));
 }
 
-// What was actually parsed, for the same reason watchdog.mjs publishes its
-// budget: a guard that ran over an empty file set passes silently, and so does
-// a suite whose bunfig no longer preloads it. tests/unit/preflight.test.js
-// reads this and names files that must appear.
-globalThis.__unifyTestPreflight = { checked };
+// What was actually parsed and which dependencies were verified, for the same
+// reason watchdog.mjs publishes its budget: a guard that ran over an empty
+// file set passes silently, and so does a suite whose bunfig no longer
+// preloads it. tests/unit/preflight.test.js reads this and names files and
+// dependencies that must appear.
+globalThis.__unifyTestPreflight = { checked, depsChecked };

@@ -7,9 +7,9 @@ name: Release
 # red tree could ship. Both are fixed here by being here.
 #
 # Two ways in, and a prerelease is decided by the version, never by the route:
-#   - push a tag `v*` (`v0.7.0`, or `v0.7.1-rc.1` from a release branch)
+#   - push a tag `v*` (`v1.2.3`, or `v1.2.3-rc.1` from a release branch)
 #   - run it manually from any branch; the tag defaults to package.json's version
-# A version with a hyphen (`0.7.1-rc.1`) is a semver prerelease, so the GitHub
+# A version with a hyphen (`1.2.3-rc.1`) is a semver prerelease, so the GitHub
 # release is marked pre-release, npm publishes under the `next` dist-tag, and
 # `docker …:latest` is left pointing at the last stable build.
 
@@ -20,7 +20,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Version to release — leave blank to use package.json. "0.7.0" and "v0.7.0" both work.'
+        description: 'Version to release — leave blank to use package.json. "1.2.3" and "v1.2.3" both work.'
         required: false
         type: string
 
@@ -57,7 +57,7 @@ jobs:
           else
             asked="${{ inputs.tag }}"
           fi
-          # Compare versions, not spellings: `v0.7.0-beta.1` and `0.7.0-beta.1`
+          # Compare versions, not spellings: `v1.2.3-beta.1` and `1.2.3-beta.1`
           # are the same request, and an empty input means package.json's.
           asked="${asked#v}"
           [ -n "$asked" ] || asked="$version"
@@ -67,7 +67,7 @@ jobs:
           fi
           tag="v${version}"
           case "$version" in
-            *-*) prerelease=true ;;   # semver prerelease: 0.7.1-rc.1
+            *-*) prerelease=true ;;   # semver prerelease: 1.2.3-rc.1
             *)   prerelease=false ;;
           esac
           {
@@ -83,7 +83,7 @@ jobs:
       #
       # Traceability runs with RELEASE semantics here — no --baseline, so any
       # uncovered rule fails — even while test.yml's push-time job is baselined
-      # for the v0.8 phase. That asymmetry is the point: a spec section may be
+      # for a phase. That asymmetry is the point: a spec section may be
       # written before a CLI surface exists to observe it, but it may not be
       # released that way. Emptying tests/conformance/phase-gaps/baseline.txt is
       # part of shipping, not part of the phase.

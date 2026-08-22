@@ -13,7 +13,7 @@
  * Dependency choice — CommonMark engine: markdown-it, in its `commonmark`
  * preset (`html: true`). Justification, stated deliberately per the brief:
  *   - The preset exists specifically to match the CommonMark spec (it drops
- *     tables/strikethrough/linkify/typographer, none of which v0.7.0 wants —
+ *     tables/strikethrough/linkify/typographer, none of which unify wants —
  *     "CommonMark, no extensions"). Hand-rolling a full CommonMark parser
  *     (unlike the frontmatter grammar below) would mean re-deriving a large,
  *     intricate spec — link reference definitions, lazy continuation, list

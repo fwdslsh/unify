@@ -2,8 +2,8 @@
 /**
  * run-mutations.mjs — "does this rule have a test that can fail?"
  *
- * Every defect found across five rounds of independent review on the v0.8
- * manifest work had the same shape: a rule written correctly in
+ * Every defect found across five rounds of independent review on the manifest
+ * work had the same shape: a rule written correctly in
  * `docs/conformance-spec.md`, implemented differently, and a suite that stayed
  * green either way. Coverage cannot see that class — the line executed, it just
  * did the wrong thing and nothing asserted otherwise. Mutation is the only

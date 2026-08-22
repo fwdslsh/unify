@@ -1,8 +1,8 @@
 {
  "fixture": "landmines",
- "description": "The adversarial set: every edge case, ambiguity, and interaction the v0.7.0 spec had to settle, each with its EXACT declared outcome — which problem/advisory fires at what severity and location, or that the case builds clean. Cases that cannot live in git (case-only twins, symlinks, nested .git, --clean containment) are generated at runtime by runtime-cases.mjs and share this expectation schema.",
+ "description": "The adversarial set: every edge case, ambiguity, and interaction the spec had to settle, each with its EXACT declared outcome — which problem/advisory fires at what severity and location, or that the case builds clean. Cases that cannot live in git (case-only twins, symlinks, nested .git, --clean containment) are generated at runtime by runtime-cases.mjs and share this expectation schema.",
  "harnessContract": {
-  "run": "per case: unify build -s <case>/src -o <tmp>/dist <flags>, wrapped in a hard 30s timeout — the v0.6 engine hung forever on a missing <include>; a hang is a failure, never a wait.",
+  "run": "per case: unify build -s <case>/src -o <tmp>/dist <flags>, wrapped in a hard 30s timeout — the previous engine hung forever on a missing <include>; a hang is a failure, never a wait.",
   "diagnostics": "stderr parsed via the stable `FILE:LINE: SEVERITY: ` prefix (line optional). Declared lists are exhaustive when diagnosticsExhaustive=true: one undeclared diagnostic of either severity fails the case. This is the mechanical enforcement of the closed problem/advisory catalogue (conformance spec §14.2/§14.3) and of the content-loss law's flip side — nothing may fire that the spec does not name.",
   "trees": "when expectedTree is set, comparison is byte-exact and bidirectional. expectFiles/expectAbsent assert presence/absence relative to the output dir. expectContains maps output files to required substrings; expectNotContains to forbidden ones.",
   "publish": "published=false cases pre-seed the output dir with a sentinel tree and assert it byte-untouched after the run (PUB-01), and assert exit matches.",
@@ -102,7 +102,7 @@
     }
    ],
    "diagnosticsExhaustive": true,
-   "note": "The v0.6 engine looped forever on this input. The 30s harness timeout makes a hang a hard failure. The 'casing' assertion pins the mandatory fix line for path-shaped problems (DIA-07)."
+   "note": "The previous engine looped forever on this input. The 30s harness timeout makes a hang a hard failure. The 'casing' assertion pins the mandatory fix line for path-shaped problems (DIA-07)."
   },
   "include-cycle": {
    "rules": [
@@ -346,7 +346,7 @@
     }
    ],
    "diagnosticsExhaustive": true,
-   "note": "C7 / FIX-14: a layout that declares data-layout is P15 — layout chaining is not supported in v0.7.0 and is never a silent no-op. The declared target (_base.html) exists, so the only diagnostic is P15 itself."
+   "note": "C7 / FIX-14: a layout that declares data-layout is P15 — layout chaining is not supported and is never a silent no-op. The declared target (_base.html) exists, so the only diagnostic is P15 itself."
   },
   "layout-missing": {
    "rules": [
@@ -456,7 +456,7 @@
     }
    ],
    "diagnosticsExhaustive": true,
-   "note": "The exact failure v0.6 shipped silently (content deleted, exit 0, success banner). Here it must block publish, name the layout, and leave the sentinel output untouched."
+   "note": "The exact failure the previous implementation shipped silently (content deleted, exit 0, success banner). Here it must block publish, name the layout, and leave the sentinel output untouched."
   },
   "misaddressed-fill": {
    "rules": [
@@ -1084,7 +1084,7 @@
     }
    ],
    "diagnosticsExhaustive": true,
-   "note": "B5's firing side: a url() in a style ATTRIBUTE pointing at nothing is a broken reference like any other — rewriting stays exempt (§11.1), checking does not (§12). The v0.6-shaped alternative was shipping the 404 silently."
+   "note": "B5's firing side: a url() in a style ATTRIBUTE pointing at nothing is a broken reference like any other — rewriting stays exempt (§11.1), checking does not (§12). The alternative that shipped before was the silent 404."
   },
   "dollar-patterns": {
    "rules": [

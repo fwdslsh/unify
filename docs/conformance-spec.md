@@ -1,6 +1,6 @@
 # unify — Conformance Specification
 
-**Status**: v0.8.0, normative
+**Status**: normative
 **Role**: The implementer-grade reference. `docs/product-spec.md` defines the product; this document defines the exact behavior, rule by rule. Every worked example in this document is a test fixture: an implementation conforms when it reproduces each example's output exactly — exact in element structure, tag names, attributes and their order, and text content — with only whitespace between block-level elements waived (§3; the comparator contract is `docs/testing-strategy.md` §2), and each diagnostic at the stated severity. Where this document and the product spec appear to differ, that is a defect in the document set to be fixed — neither may be silently reinterpreted.
 
 Conventions: "problem" and "advisory" are the only two severities (§14). MUST-level language is implied throughout; nothing here is optional. All paths in examples are relative to the source root unless prefixed `src/` or `dist/` for clarity. All files are UTF-8.
@@ -160,7 +160,7 @@ src/index.html:8: problem: include not found: /_includes/navv.html
 src/_layout.html:7: problem: include cycle: _layout.html → _includes/nav.html → _layout.html
 ```
 
-6. An `<include>` without `src` is a problem. An `<include>` with non-whitespace content between its tags is **not** this section's business: it is a slotted include (§32), resolved by parsing rather than splicing, and its own problems live there. Everything in this section is about the empty form, which is unchanged. The shape v0.7.0 refused outright is now the one §32 gives a meaning — and it still refuses every target that cannot take content:
+6. An `<include>` without `src` is a problem. An `<include>` with non-whitespace content between its tags is **not** this section's business: it is a slotted include (§32), resolved by parsing rather than splicing, and its own problems live there. Everything in this section is about the empty form, which is unchanged. The shape this section once refused outright is now the one §32 gives a meaning — and it still refuses every target that cannot take content:
 
 ```
 src/index.html:9: problem: <include> with content: _includes/card.html is not a .fragment.html
@@ -238,10 +238,10 @@ Layout-less emission, both routes (step 1's opt-out and step 5's nothing-found):
 
 ### 6.2 No chaining
 
-Layout chaining is not part of v0.7.0. **A layout that itself declares `data-layout` — any value, including `"none"` — is a problem (P15)**, located, naming the layout file and stating plainly that chaining is not supported; it is never a silent no-op:
+Layout chaining is not part of the composition model. **A layout that itself declares `data-layout` — any value, including `"none"` — is a problem (P15)**, located, naming the layout file and stating plainly that chaining is not supported; it is never a silent no-op:
 
 ```
-src/blog/_layout.html:6: problem: this layout declares data-layout — layout chaining is not supported in v0.7.0
+src/blog/_layout.html:6: problem: this layout declares data-layout — layout chaining is not supported
   fix: make blog/_layout.html a complete standalone layout, or delete it so pages use /_layout.html
 ```
 
@@ -250,12 +250,12 @@ A section that wants its own chrome writes a complete `_layout.html` in its dire
 ### 6.3 Misplacement and migration (problems)
 
 - `data-layout` on any element other than `<html>`/`<body>`: problem naming `<include src="…">` as the replacement — `data-layout` is never a component import.
-- Any `data-unify` attribute, and any class token beginning `unify-`, anywhere in any source file — **excluded files included**: excluded files are build material (§1) and are scanned like everything else; only the never-shipped list (§4.3) escapes scanning. A retired spelling in an excluded fragment or draft would otherwise sit silently meaning something else until the day the file is included or published. Problem naming the v0.7.0 spelling —
+- Any `data-unify` attribute, and any class token beginning `unify-`, anywhere in any source file — **excluded files included**: excluded files are build material (§1) and are scanned like everything else; only the never-shipped list (§4.3) escapes scanning. A retired spelling in an excluded fragment or draft would otherwise sit silently meaning something else until the day the file is included or published. `data-unify` is a retired spelling and `unify-*` is the retired area-class vocabulary; each is a problem naming the supported replacement — `data-layout`, and `<slot name>`/`slot=` —
 
 ```
-src/index.html:2: problem: data-unify is the v0.6 spelling
+src/index.html:2: problem: data-unify is a retired spelling
   fix: write data-layout="/path.html" (or data-layout="none") on <html> or <body>
-src/_layout.html:14: problem: class "unify-footer" is the v0.6 area vocabulary
+src/_layout.html:14: problem: class "unify-footer" is retired area vocabulary
   fix: mark the region with <slot name="footer">…</slot> in the layout and slot="footer" on the page element
 ```
 
@@ -523,7 +523,7 @@ When a layout has a default slot, `<main>`'s other children are never touched �
 With any page under `blog/` (and the C1 site `src/_layout.html` present), the build reports P15, publishes nothing, and exits 1:
 
 ```
-src/blog/_layout.html:4: problem: this layout declares data-layout — layout chaining is not supported in v0.7.0
+src/blog/_layout.html:4: problem: this layout declares data-layout — layout chaining is not supported
   fix: make blog/_layout.html a complete standalone layout, or delete it so pages use /_layout.html
 ```
 
@@ -643,7 +643,7 @@ Fixture: layout `<body class="site">` + page `<body class="home" data-theme="dar
 
 ### 10.1 Conversion
 
-CommonMark, no extensions in v0.7.0 beyond §10.4 heading ids and the include-block rule below. Output filename swaps `.md` for `.html`. Layout rules then apply exactly as for an HTML page whose body is the converted output and whose head is synthesized from frontmatter.
+CommonMark, no extensions beyond §10.4 heading ids and the include-block rule below. Output filename swaps `.md` for `.html`. Layout rules then apply exactly as for an HTML page whose body is the converted output and whose head is synthesized from frontmatter.
 
 **Include timing — conversion first.** In a `.md` page, includes resolve **after** conversion: include tags and SSI comments pass through the converter as raw HTML, then resolve normally (§5) on the converted output. The order is the point, twice over. First, the fragment's contents are spliced verbatim in every host — never run through the Markdown converter — so an HTML fragment is never mangled by blank-line or indentation rules, and a `.md` include target converts exactly once, on its own (§5.1 step 4). Second, include syntax inside a code fence or code span is escaped to text by conversion, so it is content, never a directive — a Markdown page can document `<include>` itself. Pre-conversion textual inlining (§2's order for HTML) would break both.
 
@@ -834,7 +834,7 @@ After the temporary tree is complete, every internal URL the output contains is 
 
   The scope is a closed list of *properties* rather than a test on the *value* for a reason this document got wrong for its whole life. It cannot be every `og:`/`twitter:` meta, because `og:site_name` is "Meridian Coffee" and `twitter:card` is "summary", and checking those as relative references would fail every correct site that has one. It was therefore written as a test on the value — root-relative or `http(s):` — which checked the two spellings an author is least likely to get wrong and never checked the third. A **relative** `og:image` naming no file was collected by nothing and reported by nothing, and §24.4 went on to drop its own `image-missing-target` finding on the stated grounds that this rule already covered it. Naming the properties makes the *kind* of the value the criterion, so every spelling of a URL is checked and no prose ever is.
 
-  The `og:`/`twitter:` prefix is the boundary, and it is chosen. Open Graph's **vertical** namespaces — `article:author`, `music:album`, `video:actor`, `book:author`, `profile:username` — are URL-valued and are not checked, because §12's scope has read "og:/twitter: metas" since v0.7.0 and widening to a second family is its own decision rather than a detail of this one.
+  The `og:`/`twitter:` prefix is the boundary, and it is chosen. Open Graph's **vertical** namespaces — `article:author`, `music:album`, `video:actor`, `book:author`, `profile:username` — are URL-valued and are not checked, because §12's scope has always read "og:/twitter: metas" and widening to a second family is its own decision rather than a detail of this one.
 - In every emitted HTML file: **the URL part of a `<meta http-equiv="refresh">` `content`**. The accepted grammar is bounded, and it is stated here rather than in §20.11 because both sections read it and a second reading would let the checker and the manifest disagree about one page's redirect: optional whitespace; one or more ASCII digits (the delay — a fractional part is skipped rather than read); optional whitespace; then, when anything follows, a `;` or `,`; optional whitespace; the keyword `url` in any ASCII case; optional whitespace; `=`; optional whitespace; and the URL. The URL may be wrapped in matching `"` or `'`, which are not part of it; unquoted, it ends at the first whitespace. A value with **no leading digits** declares no refresh and is not read at all. A value whose second part does **not** begin with `url` declares a refresh whose target this specification does not read: nothing is checked, and §20.11 records no target. That is deliberate — browsers accept spellings beyond this grammar, and a publish-blocking problem raised on a URL unify guessed at is worse than a redirect it declined to check. The delay never enters the test: `content="600; url=/gone.html"` names a file that must exist exactly as `content="0; …"` does. The reference is located at the **URL's own offset inside the attribute value**, like every other attribute reference, so §14.1's provenance mapping lands inside the text that actually wrote the URL. One `content` attribute has one reader: an element that also declares a URL-valued `og:`/`twitter:` key spells two readings of one value, and the metas' reading — which predates this one — keeps it, so no phase can rewrite one attribute twice.
 
 - In every emitted HTML file: inside every `<script type="application/ld+json">` block that parses, **the string value of a URL-valued property, at any depth**, when that value is **root-relative** — one leading slash. The properties are a closed list: **`url`, `logo`, `image`, `thumbnailUrl`, `contentUrl`**. A property carries through arrays and applies at any depth, because that is how the vocabulary spells multiple values and nested entities: `"image": ["/a.png", "/b.png"]` is two references, and `"publisher": {"logo": "/img/logo.png"}` is one.
@@ -858,7 +858,7 @@ After the temporary tree is complete, every internal URL the output contains is 
 
   **Root-relative**, the second condition, is about resolvability rather than about shape carrying the whole claim. A **relative** IRI in JSON-LD resolves against `@base` or the document's own address — the first unread here, the second moved by `--pretty-urls` — so checking one would mean guessing the base the author meant. An **absolute** one is skipped for the reason the vertical namespaces are: a spelling this section has never checked is its own decision, not a detail of this repair. §24.4's `jsonld-url-unprefixed` reads exactly these values from the same reader, so the two cannot disagree about what a reference is.
 
-  It stays **publish-blocking** (P13), and the property list is what makes that defensible again. Under the shape rule, "is this string a locator?" was a judgement the build made about the author's data — and product-spec §6.1 keeps a judgement about intent out of the publish path, the same rule §22.5 and §23.4 cite. Under a property list it is a fact about a named term: `logo` holds a URL because the vocabulary says so, so a `logo` naming no emitted file is a broken internal reference in precisely the sense §12 exists for, and is the same fault as the `og:image` naming nothing that has been P13 since v0.7.0. Demoting it to a §24 finding would answer one question with two mechanisms of different strength, and would let one missing file block the publish or not depending on which tag described it.
+  It stays **publish-blocking** (P13), and the property list is what makes that defensible again. Under the shape rule, "is this string a locator?" was a judgement the build made about the author's data — and product-spec §6.1 keeps a judgement about intent out of the publish path, the same rule §22.5 and §23.4 cite. Under a property list it is a fact about a named term: `logo` holds a URL because the vocabulary says so, so a `logo` naming no emitted file is a broken internal reference in precisely the sense §12 exists for, and is the same fault as the `og:image` naming nothing, which P13 has always covered. Demoting it to a §24 finding would answer one question with two mechanisms of different strength, and would let one missing file block the publish or not depending on which tag described it.
 
   The block is read as **JSON, not scanned as text**: a key selects a value and is never itself a reference, **the value of a `@context` key is skipped whole at any depth** — it is a term definition, so every string beneath it is an IRI that gives a key its meaning rather than an address on this site, and a term may be defined by an object as readily as by a string — and a block that does not parse is skipped entirely — §24.4's `jsonld-invalid` is what reports that, and hunting for URLs inside broken JSON would report one fault twice, the second time under a message about path spelling. A block inside a `<template>` is not read at all (§20.2). **The diagnostic is located at the `<script>` element**, and deliberately no more precisely: a position inside the JSON is not a position in the author's source once the block arrived through an include, and §14.1 omits precision rather than inventing it. Because §11 never rewrites these values (§11.1), a root-relative `"url": "/about.html"` in a JSON-LD block fails here in a `--pretty-urls` build — correctly: the emitted structured data names an address the site does not serve.
 
@@ -874,7 +874,7 @@ One unresolved target earns a second fix line: a reference to exactly `feed.xml`
 
 One absence is **not** reported: a URL that resolves to the output path of a **source page that exists but failed to compose**. That page emitted no file because of a problem of its own — already reported, and already blocking the publish — so a second diagnostic located at the *link* sends the author to a correctly-spelled path in the wrong file, and, diagnostics being path-ordered, usually prints above the one problem that matters. Measured on a twenty-page site with one page failing to compose: twenty-one problems printed, one of them real, the real one last. A reference to a target with no source file at all, and a reference to a source file that exists but is *excluded* (the stranded underscore asset above), are not this case and still fail here, loudly.
 
-**A reference is the attribute's VALUE, not its bytes.** Character references resolve first: `href="/a&amp;b.html"` is the correct HTML spelling for a file named `a&b.html`, and that is the URL a browser fetches. Reading the bytes instead failed a correctly-written page to publish, with a diagnostic quoting a spelling that was right — present since v0.7.0. The obligation runs both ways: a URL unify *writes* into an attribute is escaped for the same reason a URL it *reads* is decoded (§22.2), and the two are one rule rather than two conventions that happen to agree.
+**A reference is the attribute's VALUE, not its bytes.** Character references resolve first: `href="/a&amp;b.html"` is the correct HTML spelling for a file named `a&b.html`, and that is the URL a browser fetches. Reading the bytes instead failed a correctly-written page to publish, with a diagnostic quoting a spelling that was right — a defect the earlier codebase carried from the beginning. The obligation runs both ways: a URL unify *writes* into an attribute is escaped for the same reason a URL it *reads* is decoded (§22.2), and the two are one rule rather than two conventions that happen to agree.
 
 **A reference is percent-decoded, per segment, before it is matched.** §20.5 makes `/two%20words.html` the address a file named `two words.html` answers to — that is what the sitemap publishes, what `--dry-run` prints, and what a browser sends — so a link written that way must resolve. Both spellings name the same file and both pass; neither is rewritten into the other, because the author's bytes are theirs.
 
@@ -938,7 +938,7 @@ That last clause has a consequence worth stating outright, because implementatio
 
 Diagnostics are **deduplicated** before they are counted or printed: two diagnostics with the same file, line, severity, message, `in:` and `fix:` lines are one diagnostic, however many times the build encountered it. This follows from the attribution rule above rather than adding to it — a problem located at a shared include or layout is one problem at one line of one file, whatever number of pages consume it — and it is what keeps the printed count and the printed lines in agreement. Two faults that would print identically but are genuinely distinct — the same relative `url()` in shared chrome, which §11.1 does not rewrite, resolving against different consuming pages (§12) — are distinguished by their resolved targets and both printed.
 
-### 14.2 Problems (closed list for v0.7.0)
+### 14.2 Problems (the closed list)
 
 The bold IDs are the stable identifiers used by `tests/conformance/rules.tsv` and by tests; list position is not meaningful.
 
@@ -947,7 +947,7 @@ The bold IDs are the stable identifiers used by `tests/conformance/rules.tsv` an
 3. **P03** — `<include>` without `src`; `<include>` with non-whitespace content (§5.1)
 4. **P04** — Layout reference not a `.html` path (bare name) (§6.1)
 5. **P05** — Layout target missing or escaping the source root (§6.1)
-6. **P15** — A layout declares `data-layout` — layout chaining is not supported in v0.7.0 (§6.2)
+6. **P15** — A layout declares `data-layout` — layout chaining is not supported (§6.2)
 7. **P07** — `data-layout` on a non-root element (§6.3)
 8. **P08** — `data-unify` attribute; `unify-` class token (§6.3)
 9. **P09** — Unaddressed page content with no sink in a slotted layout (§7.4)
@@ -1076,7 +1076,7 @@ unify init && unify build --dry-run --strict     exits 0
 unify init && unify audit --strict               exits 0
 ```
 
-The first has held since v0.7.0: an advisory that fires on a correct site is a bug in the advisory (§14.3). The second is new in 0.8 and is the stronger of the two, because `audit --strict` gates on **any** finding of either severity (§24.6) — so a scaffold passes only when it has a title, a description, a heading, a language, a share image with dimensions, no orphan page, no duplicate id, and no contradiction anywhere in it.
+The first has always held: an advisory that fires on a correct site is a bug in the advisory (§14.3). The second is the stronger of the two, because `audit --strict` gates on **any** finding of either severity (§24.6) — so a scaffold passes only when it has a title, a description, a heading, a language, a share image with dimensions, no orphan page, no duplicate id, and no contradiction anywhere in it.
 
 Until this section required it, every template shipped between seven and thirteen `incomplete` findings — all of them `lang-missing` and `description-missing`, and all of them real. The command that exists to tell authors their site is incomplete could not be run on the site unify itself writes, which is the same shape as a linter whose own configuration fails it: not a false finding, and not a reason to soften the gate, but a gap in the reference material that made the gate impossible to adopt on day one.
 
@@ -1086,7 +1086,7 @@ Both guarantees are asserted per template by the suite, for the whole set, witho
 
 Two files are scaffolded at the **project root**, deliberately outside the source root so that neither can publish (§4.2's underscore rule is for files inside it; these are simply not in it):
 
-- **`AGENTS.md`** — product-spec §6.7 requires it of every 0.8 template, and requires it to be repository-local guidance rather than optional marketing. It repeats only the high-conflict rules: layouts are paths; source links name real `.html` files; `--base-url` is a complete public URL; a leading underscore excludes source; `draft`, `permalink`, and `slug` are not silently honored; an empty `<include>` performs verbatim inclusion; structured data uses visible explicit facts; and `unify audit` plus `--dry-run` are the pre-publish checks. It states no behavior the README and `docs/authoring-rules.md` do not state: **one rule set, three audiences**, never a tool-specific variant.
+- **`AGENTS.md`** — product-spec §6.7 requires it of every template, and requires it to be repository-local guidance rather than optional marketing. It repeats only the high-conflict rules: layouts are paths; source links name real `.html` files; `--base-url` is a complete public URL; a leading underscore excludes source; `draft`, `permalink`, and `slug` are not silently honored; an empty `<include>` performs verbatim inclusion; structured data uses visible explicit facts; and `unify audit` plus `--dry-run` are the pre-publish checks. It states no behavior the author-facing documents — the README, `docs/authoring-rules.md`, `docs/getting-started.md`, `docs/cli-reference.md` — do not state (product-spec §6.7: no behavior may be documented *only* in the agent guide): **one rule set, three audiences**, never a tool-specific variant.
 - **`DEPLOY.md`** — the deployment recipe, ending in the two commands that carry the site's address, since §19.2's items 4 and 7 both defer to it.
 
 **Where "project root" is** has one answer and it is not a guess: these files are written to the **working directory the command ran in**. In the fresh-project case that directory *is* the project root and `init` creates `src/` beneath it (product-spec §2's `my-site/`), so the two land side by side. Where `--source` names a directory explicitly, unify does not infer a project root from it — walking to a parent would write outside the tree the author named, which is the one thing a scaffolding command must never do. They land where the author was standing, which is a place they chose.
@@ -1125,7 +1125,7 @@ The blog template additionally ships the generator seam worked end-to-end, becau
 
 Between §11's URL phases and §12's reference check, unify derives exactly one **page record** for every page that composed. The manifest is the build's single semantic reading of the site it is about to publish: sitemap generation, canonical completion, robots consistency, structured-data checks, feeds, search output, and every audit finding read it, and none of them re-parses a page or re-decides a value. Adding a second extractor, or letting one consumer pick a different winner than another, is a defect in this section rather than in the consumer.
 
-The manifest is an **implementation boundary**. No command writes it, no authoring rule mentions it, and product-spec §6.2 states plainly that it is not a new file format authors must learn. Nothing in this section changes what a v0.7 build emits, reports, or exits with: deriving the manifest is pure observation.
+The manifest is an **implementation boundary**. No command writes it, no authoring rule mentions it, and product-spec §6.2 states plainly that it is not a new file format authors must learn. Nothing in this section changes what a build emits, reports, or exits with: deriving the manifest is pure observation.
 
 ### 20.1 Membership
 
@@ -1291,11 +1291,11 @@ The first projection of §20. Everything here reads page records; nothing here r
 
 ### 21.1 Activation
 
-A sitemap is generated when, and only when, `--base-url` supplied the site's public address. Without it the manifest's `url` is `null` (§20.5) and unify does not know what to write in a `<loc>` — a sitemap of root-relative paths is invalid per the Sitemaps protocol, and inventing an origin is the class of guess product-spec §6.1 forbids. A build with no `--base-url` therefore emits no sitemap and reports nothing about it; this is the v0.7 golden path, unchanged.
+A sitemap is generated when, and only when, `--base-url` supplied the site's public address. Without it the manifest's `url` is `null` (§20.5) and unify does not know what to write in a `<loc>` — a sitemap of root-relative paths is invalid per the Sitemaps protocol, and inventing an origin is the class of guess product-spec §6.1 forbids. A build with no `--base-url` therefore emits no sitemap and reports nothing about it; this is the golden path, unchanged.
 
 Generation is additive: it writes one new file (or, at protocol scale, a small set), changes no authored content, appears in `--dry-run` like any other write, and participates in §15's transactional publish. `--base-url` is the whole opt-in — there is no separate flag, because a site that has told unify its public address has told it everything the sitemap needs.
 
-**Activation governs this entire section, §21.6's verification included.** Without `--base-url` a site's `sitemap.xml` is an ordinary asset: it mirror-copies byte-for-byte (§4.4) and unify says nothing about its contents, exactly as in v0.7. This is not a gap left for later — it is what "the v0.7 golden path, unchanged" costs to mean. A site that shipped an authored sitemap with a stale entry built clean before this section existed and must keep building clean after it, because nothing the author did changed and no flag opted them in. It is also the only coherent reading: a `<loc>` is an absolute URL by protocol, and deciding whether one points inside *this* site requires knowing the site's address.
+**Activation governs this entire section, §21.6's verification included.** Without `--base-url` a site's `sitemap.xml` is an ordinary asset: it mirror-copies byte-for-byte (§4.4) and unify says nothing about its contents, exactly as it always has. This is not a gap left for later — it is what "the golden path, unchanged" costs to mean. A site that shipped an authored sitemap with a stale entry built clean before this section existed and must keep building clean after it, because nothing the author did changed and no flag opted them in. It is also the only coherent reading: a `<loc>` is an absolute URL by protocol, and deciding whether one points inside *this* site requires knowing the site's address.
 
 ### 21.2 Membership
 
@@ -1351,7 +1351,7 @@ The second projection of §20, and the first that writes into a page rather than
 
 ### 22.1 Activation
 
-`--canonical auto`, or the identical `canonical: auto` in `unify.yaml`. `auto` is the only accepted value; anything else is a usage error naming it, so a future mode cannot be silently misspelled into today's behaviour. Without the option nothing in this section runs, no page changes, and nothing is reported — the v0.7 golden path.
+`--canonical auto`, or the identical `canonical: auto` in `unify.yaml`. `auto` is the only accepted value; anything else is a usage error naming it, so a future mode cannot be silently misspelled into today's behaviour. Without the option nothing in this section runs, no page changes, and nothing is reported — the golden path.
 
 **`--canonical auto` requires `--base-url`**, and the combination is checked as a usage error (exit 2) rather than degrading. A canonical must be an absolute URL: that is why §11.3 absolutizes authored ones, and why a path-only base URL is itself a usage error. Without a public address §20.5 makes `url` null, so there is nothing truthful to write — and writing a root-relative canonical, or writing nothing while the flag says otherwise, are both worse than saying so.
 
@@ -1540,7 +1540,7 @@ It fires only where unify can name both schemes and both are the web's:
 - **The canonical must resolve to *this page's own output path*** — `classifyCanonical` must answer `self`. That is the guarantee stated as the predicate computes it: §12's base stripping, then §12's resolution, against the page's output path. So this finding never re-derives "is this URL on this site?": the answer it reads is §12's, through §21.2, unchanged. It also means this finding never co-occurs with the other two for one canonical: they require `elsewhere` and it requires `self`, and one canonical has one answer. That is the whole of the guarantee, and deliberately not a partition — `canonical-noindex` and `sitemap-canonical-disagree` share the `elsewhere` branch, so a `noindex` page listed in a sitemap whose canonical names another page of the site collects both, and `sitemap-noindex` beside them. That is three true sentences about three different contradictions, which is the right outcome; what would be wrong is one page being told its canonical both names this page and does not. A canonical on another host is another site's business, and one naming a different page of this site has already been reported by the other two, where the scheme is the smaller of the two faults.
 - **Both schemes must be `http` or `https`, and they must differ.** A canonical with no scheme of its own declares nothing to compare: a relative one carries none, a root-relative one is absolutized by §11.3 with the base's *own* origin and therefore cannot mismatch, and a protocol-relative `//example.com/about.html` **borrows the page's scheme** and is right at either address. A scheme unify cannot compare says nothing either — an `ftp:` or `mailto:` canonical, a value no URL parser accepts, or a `--base-url` that is itself neither `http` nor `https` (the flag requires a scheme with a host, not one of these two) leaves no basis for calling either side wrong.
 
-Under a **subpath** `--base-url` the `self` entry condition above is a shade weaker than "names this page's address", and the gap is recorded here because this is the first rule to turn a `self` answer into an accusation — §21.2 reads the same answer only to decide whether to list a page. `stripBaseUrl` returns an on-host absolute URL's path unchanged when it does not carry the base's path prefix, so on a site deployed at `https://example.com/repo/` the canonical `http://example.com/team.html` — an address above this site's own root — strips to `/team.html`, resolves to the page's output path, and classifies `self`. The finding then reports the scheme, which is one of that value's two faults. That is `stripBaseUrl`'s resolution semantics, which §12 has had since v0.7.0 and which this section does not change; anyone changing it changes what this finding fires on.
+Under a **subpath** `--base-url` the `self` entry condition above is a shade weaker than "names this page's address", and the gap is recorded here because this is the first rule to turn a `self` answer into an accusation — §21.2 reads the same answer only to decide whether to list a page. `stripBaseUrl` returns an on-host absolute URL's path unchanged when it does not carry the base's path prefix, so on a site deployed at `https://example.com/repo/` the canonical `http://example.com/team.html` — an address above this site's own root — strips to `/team.html`, resolves to the page's output path, and classifies `self`. The finding then reports the scheme, which is one of that value's two faults. That is `stripBaseUrl`'s resolution semantics, which §12 has always had and which this section does not change; anyone changing it changes what this finding fires on.
 
 The two schemes are **parsed, never matched as text**, for §12's own reason one document over: [RFC 3986](https://www.rfc-editor.org/rfc/rfc3986) §3.1 makes a scheme case-insensitive, so `HTTP://EXAMPLE.COM/about.html` is an `http:` URL, and so is `http://example.com:80/about.html`.
 
@@ -1611,7 +1611,7 @@ This section decides almost nothing of its own. It is a **map**: one row per §6
 
 §6.3.5's own wording is "extend the existing reference check", and taking it literally is the reading this document rejects. The reason is in what the two mechanisms mean.
 
-**A broken fragment is not a 404.** The page loads, the reader arrives, and the only thing that failed is the scroll position the link promised. §12 exists to stop the build publishing an address that fetches nothing; a fragment that names no id fetches the page perfectly well. Making it publish-blocking would mean a v0.7 site that has always built clean stops publishing over a link that still works — the exact shape of failure §14.1's severity split exists to prevent, and the reason `--strict` moves the exit code without withholding the site. §12 has said so in one clause since v0.7.0: "`#fragment` targets are not validated against ids — that is a reader's judgment, not a build gate" (REF-06).
+**A broken fragment is not a 404.** The page loads, the reader arrives, and the only thing that failed is the scroll position the link promised. §12 exists to stop the build publishing an address that fetches nothing; a fragment that names no id fetches the page perfectly well. Making it publish-blocking would mean a site that has always built clean stops publishing over a link that still works — the exact shape of failure §14.1's severity split exists to prevent, and the reason `--strict` moves the exit code without withholding the site. §12 has said so in one clause all along: "`#fragment` targets are not validated against ids — that is a reader's judgment, not a build gate" (REF-06).
 
 But it is a *checkable* judgment, and §20.9 says so in the same breath: the manifest carries `fragmentLinks` beside `ids` precisely so the question is answerable from the record rather than by re-parsing. That is what a finding is for — §24.3's `broken` means "the output contradicts itself, wrong regardless of what the author intended", which is exactly right for a link naming an id that is not there, and it blocks nothing.
 
@@ -1703,9 +1703,9 @@ src/post.md: problem: schema is "article" — unify generates WebPage, Article, 
 
 Case-sensitivity is not fussiness: `article` is not a schema.org type, and a declaration that silently generated nothing would be the failure class §14 exists to forbid. Nor is the closed list a claim that other types do not matter — a page needing `Product`, `Recipe`, `LocalBusiness`, or any other vocabulary writes its own `<script type="application/ld+json">`, which is product-spec §6.3.6's own instruction and which also switches generation off (§26.5), so the two never fight.
 
-`name="schema"` is **unify's own key**, introduced by §20.8 in this same 0.8 line and defined by no standard, so constraining its values constrains unify's vocabulary rather than the author's HTML.
+`name="schema"` is **unify's own key**, introduced by §20.8 and defined by no standard, so constraining its values constrains unify's vocabulary rather than the author's HTML.
 
-**It also ships**, and that is worth stating outright because three documents claimed it could not. "Built output contains no tool vocabulary at all" was true of v0.7.0 — `<slot>`, `slot=`, `data-layout` and `<include>` are all consumed by composition — and this key is the first exception. It is not an oversight and it is not removable: unify does not edit an author's markup, so an HTML page's `<meta name="schema">` is theirs and stays; and §20.8 reads the declaration *from the emitted document*, which is the whole reason a Markdown page and an HTML page declare a type the same way. Consuming the frontmatter key the way §10.2 consumes `title` or `lang` would give Markdown its own extraction path and break that equality — one more spelling for one more reader to learn, which §20.2's equal-citizen rule exists to prevent. So the honest statement, and the one those documents now carry, is that built pages contain no `<slot>`, no `data-layout` and no injected script, and that the one token which survives is this meta, on a page that asked for a block. §20.8's `schemaType` stays as general as it was: it also reads a JSON-LD `@type`, which is unrestricted, so a page declaring `Product` in a block it wrote itself still has `schemaType` `Product`, and `schema-incomplete` still reads it.
+**It also ships**, and that is worth stating outright because three documents claimed it could not. "Built output contains no tool vocabulary at all" was true of the composition core alone — `<slot>`, `slot=`, `data-layout` and `<include>` are all consumed by composition — and this key is the first exception. It is not an oversight and it is not removable: unify does not edit an author's markup, so an HTML page's `<meta name="schema">` is theirs and stays; and §20.8 reads the declaration *from the emitted document*, which is the whole reason a Markdown page and an HTML page declare a type the same way. Consuming the frontmatter key the way §10.2 consumes `title` or `lang` would give Markdown its own extraction path and break that equality — one more spelling for one more reader to learn, which §20.2's equal-citizen rule exists to prevent. So the honest statement, and the one those documents now carry, is that built pages contain no `<slot>`, no `data-layout` and no injected script, and that the one token which survives is this meta, on a page that asked for a block. §20.8's `schemaType` stays as general as it was: it also reads a JSON-LD `@type`, which is unrestricted, so a page declaring `Product` in a block it wrote itself still has `schemaType` `Product`, and `schema-incomplete` still reads it.
 
 **The declaration is read with the head**, exactly as §20.3 reads it, and P23's scope is that scope — a `<meta name="schema">` emitted in `<body>` declares no type, generates nothing, and is not P23, because diagnosing a declaration §20.8 never accepted would be a problem raised against markup that changes nothing. What it *is* instead is §24.4's `metadata-in-body`, whose closed set names `schema` for this reason: unify's own key, read with the head, so outside it the declaration reaches neither a consumer nor this section's generator. Without that row the one key whose whole purpose is to switch generation on would be the only head-only meta whose misplacement nothing reports — no block, no problem, no finding — which is the silence the case-sensitivity argument above refuses one line earlier.
 
@@ -1723,7 +1723,7 @@ Conditions 1 and 2 together mean the declaration that reaches the generator is a
 
 Condition 3 is §22.2's rule: with no closing `</head>` there is no insertion point, and synthesizing one would be a structural change this section does not make.
 
-There is **no flag**. The declaration is the whole opt-in, and a site that writes none is the v0.7 golden path, unchanged.
+There is **no flag**. The declaration is the whole opt-in, and a site that writes none is the golden path, unchanged.
 
 ### 26.6 What is generated
 
@@ -1980,7 +1980,7 @@ Under `--feed-full`, the entry bodies carry the page's own references, and those
 
 An authored `feed.xml` **suppresses generation entirely** (§21.5's rule, unchanged): the author's file is the site's feed, ships byte-for-byte, and has its internal URLs checked exactly as a generated one does.
 
-**Activation governs this entire section, that verification included** — §21.1's rule, and stated here because a reader cannot otherwise tell design from oversight. Without `--base-url` a site's `feed.xml` is an ordinary asset: it mirror-copies byte-for-byte (§4.4) and unify says nothing about its contents, so a broken root-relative reference inside an authored one publishes clean. That is what "the v0.7 golden path, unchanged" costs to mean: a site that shipped a hand-written feed built clean before this section existed and must keep building clean after it, because nothing the author did changed and no flag opted them in.
+**Activation governs this entire section, that verification included** — §21.1's rule, and stated here because a reader cannot otherwise tell design from oversight. Without `--base-url` a site's `feed.xml` is an ordinary asset: it mirror-copies byte-for-byte (§4.4) and unify says nothing about its contents, so a broken root-relative reference inside an authored one publishes clean. That is what "the golden path, unchanged" costs to mean: a site that shipped a hand-written feed built clean before this section existed and must keep building clean after it, because nothing the author did changed and no flag opted them in.
 
 **A17 is suppressed with generation, and for a sharper reason.** The advisory's own sentence is *this page is not in `feed.xml`* — a claim about a file unify wrote. Where the author supplies the feed, unify has no idea whether the page is in it; their generator put there whatever it put there. Raising A17 then would be asserting something unify cannot know, which is the invented claim §6.1 forbids, in the one register that looks harmless. That is not a corner case — the `blog` template's generator writes its own `feed.xml` (§19.6), so the scaffold that teaches feeds is also the fixture that proves the suppression.
 
@@ -2119,14 +2119,14 @@ The `fix` string is carried in `properties`, **not** in SARIF's own `fixes` arra
 
 ## 32. Slotted includes
 
-Product-spec §6.4.1, and its own framing is the constraint: recover the useful part of v0.6's customizable fragments **without** reviving area matching or a component DSL. The recovery adds no new vocabulary at all — an include's content fills a fragment's slots by exactly the rules §7 already gives a page filling a layout's.
+Product-spec §6.4.1, and its own framing is the constraint: recover the useful part of the previous implementation's customizable fragments **without** reviving area matching or a component DSL. The recovery adds no new vocabulary at all — an include's content fills a fragment's slots by exactly the rules §7 already gives a page filling a layout's.
 
 ### 32.1 The two kinds of include
 
 §5's include is unchanged for the case it already served, and the two are told apart by one byte of the author's own markup:
 
 - **An empty `<include src="…"></include>` is verbatim, textual, and pre-parse** — §5.1 in full, unaltered. Whitespace between the tags is still emptiness. This is the include every existing site uses and nothing about it moves.
-- **A non-empty `<include>`** — one carrying any non-whitespace content — is a **composition**: the target is parsed, the include's children are parsed, and the two are merged by §7's slot rules. It was **P03** in v0.7.0; §5.1's sixth rule now defers to this section, and P03 keeps only its other half (an `<include>` without `src`).
+- **A non-empty `<include>`** — one carrying any non-whitespace content — is a **composition**: the target is parsed, the include's children are parsed, and the two are merged by §7's slot rules. It was **P03** before this section existed; §5.1's sixth rule now defers to this section, and P03 keeps only its other half (an `<include>` without `src`).
 
 That split is why the feature costs one sentence rather than a mode: an author who never writes content between the tags never meets it, and an author who does has already learned the rule from layouts.
 
@@ -2158,7 +2158,7 @@ A `<head>`, `<html>`, or `<body>` element inside a fragment reached by a non-emp
 
 ### 32.4 One fragment, both roles
 
-A `.fragment.html` containing `<slot>` already has a meaning in v0.7.0, and it is not this one. An empty include is a verbatim splice, so the fragment's `<slot>` elements land in the host's text and are consumed by whatever composes *it* — in a layout, they become that layout's slots, filled by the page. `src/core/includes.js` says as much in its own opening comment, and it stays true.
+A `.fragment.html` containing `<slot>` already has a meaning under §5, and it is not this one. An empty include is a verbatim splice, so the fragment's `<slot>` elements land in the host's text and are consumed by whatever composes *it* — in a layout, they become that layout's slots, filled by the page. `src/core/includes.js` says as much in its own opening comment, and it stays true.
 
 So the same fragment answers to both: **an empty include passes its slots through, a non-empty include consumes them.** That is not an ambiguity; it is §32.1's split read from the fragment's side, and it is what lets one shared fragment be a layout's chrome in one file and a filled component in another without being written twice. What an author must not expect is for a fragment to do both *at once* — a non-empty include consumes every slot in its target, so none is left for the host, and an unfilled one shows its fallback (§32.3) rather than travelling outward.
 

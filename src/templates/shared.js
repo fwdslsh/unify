@@ -566,11 +566,11 @@ export function commonFiles(siteName, navLinks) {
 
 /**
  * `AGENTS.md` — product-spec §6.7's repository-local guidance, required of
- * every 0.8 template and written to the PROJECT ROOT, outside the source
+ * every template and written to the PROJECT ROOT, outside the source
  * root, so it cannot publish (§19.4).
  *
  * It repeats only the high-conflict rules §19.4 enumerates, and it states
- * no behavior `docs/authoring-rules.md` and the README do not: **one rule
+ * no behavior the author-facing documents do not: **one rule
  * set, three audiences**, never a tool-specific variant. Every claim below
  * is a restatement of an authoring rule — when that file changes and this
  * one disagrees, this one is wrong.
@@ -584,8 +584,8 @@ This site is built by [unify](https://github.com/fwdslsh/unify): plain HTML comp
 No template language, no variables, no loops, no config — if you reach for \`{{ }}\`, \`{% %}\`, props,
 or a config key, the answer here is a different shape.
 
-Below are the rules that get guessed wrong most often. They are the same rules unify's own README
-and authoring-rules page state — one rule set, three audiences — not a variant for agents. The
+Below are the rules that get guessed wrong most often. They are the same rules unify's own
+documentation states — one rule set, three audiences — not a variant for agents. The
 inner loop is \`unify dev\` (build, watch, serve on localhost, reload), which also serves
 \`http://localhost:3000/_unify/\` — every \`unify audit\` finding grouped by page, with that page's
 title, description, language, canonical, headings and links beside it, and the build's own

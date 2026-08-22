@@ -170,7 +170,7 @@ describe.each(TEMPLATE_NAMES)('template "%s" — SCF-01/SCF-02 structure (in-mem
     }
   });
 
-  test("no page or layout uses the retired v0.6 vocabulary (data-unify, unify- classes)", () => {
+  test("no page or layout uses the retired vocabulary (data-unify, unify- classes)", () => {
     expect(wholeSource).not.toMatch(/data-unify\b/);
     expect(wholeSource).not.toMatch(/class="[^"]*\bunify-/);
   });

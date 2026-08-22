@@ -429,7 +429,7 @@ const SINGLE_URL_ATTRS = ["href", "src", "poster"];
  * The prefix is the boundary, and it is chosen rather than accidental: Open
  * Graph's *vertical* namespaces (`article:author`, `music:album`,
  * `video:actor`, `book:author`, `profile:username`) are URL-valued but are not
- * `og:`-prefixed, and §12's scope has been "og:/twitter: metas" since v0.7.0.
+ * `og:`-prefixed, and §12's scope has always been "og:/twitter: metas".
  * Widening to them is a separate decision, not an oversight here.
  */
 export const URL_VALUED_META =

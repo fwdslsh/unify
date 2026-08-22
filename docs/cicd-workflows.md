@@ -16,7 +16,7 @@ bun tests/conformance/check-traceability.mjs --runtime .conformance-ledger.jsonl
 
 Green means the gap set computed from rules a test **actually ran and passed** equals the baseline exactly: a new uncovered rule fails, and a gap that closed fails until the baseline shrinks in the same commit. It is the runtime twin of `traceability-static`, and it is the job that closes the skipped-test hole — a `test.skip` records nothing, so its rules go uncovered and this fails.
 
-This job checked the *release* condition directly (no `--baseline`, so any gap fails) from the end of the v0.7 migration until the v0.8 work opened §20's manifest rows. It was baselined again during the 0.8 phase for the same reason it was during the rewrite: a spec section can be written before any CLI surface exists to observe it, and the honest record of that is a baseline entry rather than a red that people are instructed to ignore — the "warn instead of fail" mechanism `docs/testing-strategy.md` §1 (M2) blames for the suite this one replaced.
+This job checked the *release* condition directly (no `--baseline`, so any gap fails) from the end of the rewrite until the manifest work opened §20's rows. It was baselined again during that phase for the same reason it was during the rewrite: a spec section can be written before any CLI surface exists to observe it, and the honest record of that is a baseline entry rather than a red that people are instructed to ignore — the "warn instead of fail" mechanism `docs/testing-strategy.md` §1 (M2) blames for the suite this one replaced.
 
 The failure mode to guard against is not this job failing; it is someone making it pass. Do not weaken the harness, the comparator, or the checker to turn it green. Progress is the covered count it prints, and the baseline shrinking.
 
@@ -30,7 +30,7 @@ bun test
 bun tests/conformance/check-traceability.mjs --runtime .conformance-ledger.jsonl
 ```
 
-**This check going green is the release condition**, and it no longer lives in a separate job: an earlier design used a `continue-on-error` twin, which GitHub reports as SUCCESS either way — green in the checks list, its only signal a log nobody opens. The release semantics are now the `release-signal` job's own final step: while the baseline file is non-empty that step *asserts the unbaselined check fails* (a declared phase, mechanically enforced), and the moment the file empties it runs the same check blocking. The baseline was emptied when §31.1 made the last seven §20 rows observable, so this is a blocking push-time gate again — the state shipping v0.8.0 required. `release.yml` runs the identical check blocking at tag time either way.
+**This check going green is the release condition**, and it no longer lives in a separate job: an earlier design used a `continue-on-error` twin, which GitHub reports as SUCCESS either way — green in the checks list, its only signal a log nobody opens. The release semantics are now the `release-signal` job's own final step: while the baseline file is non-empty that step *asserts the unbaselined check fails* (a declared phase, mechanically enforced), and the moment the file empties it runs the same check blocking. The baseline was emptied when §31.1 made the last seven §20 rows observable, so this is a blocking push-time gate again — the state a release requires. `release.yml` runs the identical check blocking at tag time either way.
 
 ### `module-graph` — gate G8
 
@@ -54,7 +54,7 @@ Enforces the anti-rot rules H1–H5 from `docs/testing-strategy.md` §5 — no f
 bun tests/conformance/check-traceability.mjs --static --baseline tests/conformance/phase-gaps/baseline.txt
 ```
 
-Compares the computed gap set against the committed baseline and fails on **any** difference. A new gap fails; so does a gap that closed, until the baseline shrinks in the same commit. `baseline.txt` currently holds the v0.8 manifest rows that no CLI surface can yet observe (`docs/conformance-spec.md` §20); each is closed by the consumer that makes its field observable, and the file is empty again before v0.8.0 ships.
+Compares the computed gap set against the committed baseline and fails on **any** difference. A new gap fails; so does a gap that closed, until the baseline shrinks in the same commit. While non-empty, `baseline.txt` holds the manifest rows that no CLI surface can yet observe (`docs/conformance-spec.md` §20); each is closed by the consumer that makes its field observable, and the file is empty again before a release ships.
 
 The static check also enforces spec↔inventory sync: if `docs/conformance-spec.md` gains or loses an enumerable rule (a splice rule, a problem, an advisory, a head-merge row) without `rules.tsv` being updated in the same commit, it exits 1.
 
@@ -64,16 +64,16 @@ There is no coverage threshold anywhere in CI, deliberately. This project shippe
 
 ## The legacy suite is gone
 
-`tests/legacy-v0.6/` was quarantined out of CI for the whole rewrite and has now been deleted, along with the nine v0.6 fixture trees (`component-scoping`, `area-merging-complex`, `landmark-fallback`, and the rest) that no other test read. It tested a product that no longer exists — component mode, area classes, rule codes — and its green was load-bearing for nothing. Tests asserting cut behavior are deleted with their modules rather than fixed; `docs/migration-plan.md` §2 has the rule for telling those apart from tests worth porting. Nothing in the repo is excluded from `bun test` any more, so a red suite on any branch means something is actually broken.
+The legacy test tree was quarantined out of CI for the whole rewrite and has now been deleted, along with the nine legacy fixture trees (`component-scoping`, `area-merging-complex`, `landmark-fallback`, and the rest) that no other test read. It tested a product that no longer exists — component mode, area classes, rule codes — and its green was load-bearing for nothing. Tests asserting cut behavior are deleted with their modules rather than fixed; `docs/migration-plan.md` §2 has the rule for telling those apart from tests worth porting. Nothing in the repo is excluded from `bun test` any more, so a red suite on any branch means something is actually broken.
 
 ## `release.yml`
 
 Two ways in, and two jobs, all defined in this repo:
 
-- **push a `v*` tag** — `v0.7.0`, or `v0.7.1-rc.1` from a release branch;
+- **push a `v*` tag** — `v1.2.3`, or `v1.2.3-rc.1` from a release branch;
 - **run it manually** from any branch (Actions → Release → Run workflow). The tag defaults to `v` + the version in `package.json`, and `gh release create --target` creates it at that commit — which is how a release branch cuts a prerelease without tagging first.
 
-**Prereleases are decided by the version, never by the route.** A version with a hyphen (`0.7.1-rc.1`) is a semver prerelease, so: the GitHub release is marked pre-release, npm publishes under the `next` dist-tag, and `fwdslsh/unify:latest` is left pointing at the last stable image. `npm install -g @fwdslsh/unify` and `install.sh` keep resolving to stable; `@fwdslsh/unify@next` opts in. Cutting an rc is therefore: bump `package.json` to `0.7.1-rc.1` on the release branch, dispatch, done.
+**Prereleases are decided by the version, never by the route.** A version with a hyphen (`1.2.3-rc.1`) is a semver prerelease, so: the GitHub release is marked pre-release, npm publishes under the `next` dist-tag, and `fwdslsh/unify:latest` is left pointing at the last stable image. `npm install -g @fwdslsh/unify` and `install.sh` keep resolving to stable; `@fwdslsh/unify@next` opts in. Cutting an rc is therefore: bump `package.json` to the `-rc.1` version on the release branch, dispatch, done.
 
 **`release`** does everything up to and including npm, in order, on one runner:
 

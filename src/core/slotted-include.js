@@ -11,10 +11,10 @@
  *
  * Read from the fragment's side the same split says something more useful:
  * an empty include PASSES its `<slot>` elements through to the host, where a
- * layout's composition consumes them (v0.7.0's behaviour, unchanged), and a
- * non-empty include CONSUMES them itself. So one shared fragment can be a
- * layout's chrome in one file and a filled component in another without being
- * written twice (§32.4).
+ * layout's composition consumes them (the established behaviour, unchanged),
+ * and a non-empty include CONSUMES them itself. So one shared fragment can be
+ * a layout's chrome in one file and a filled component in another without
+ * being written twice (§32.4).
  *
  * WHAT THIS IS NOT (§32.7). No props. No attributes passed to a fragment. No
  * expressions, loops, conditionals, or implicit data. No attribute merging.

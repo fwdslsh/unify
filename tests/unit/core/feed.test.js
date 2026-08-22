@@ -3,8 +3,8 @@
  * are cheap.
  *
  * This file exists because of a measured asymmetry. The first mutation sweep
- * of the 0.8 modules found three genuine coverage gaps, and all three were in
- * feed.js — the one 0.8 module with NO unit test file. report.js, which has
+ * of the discovery-and-evaluation modules found three genuine coverage gaps,
+ * and all three were in feed.js — the one of them with NO unit test file. report.js, which has
  * one, had no real gap: the same sweep's fingerprint mutation dies against its
  * unit test in 0.4ms. The gaps were not caused by too little machinery; they
  * were caused by skipping the cheap tier in one module.

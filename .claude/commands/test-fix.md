@@ -1,6 +1,6 @@
 # Test Fix
 
-Resolve failing tests in the unify suite without re-creating the failure mode that produced the v0.6 suite (`docs/testing-strategy.md` §1: a green suite over a broken product).
+Resolve failing tests in the unify suite without re-creating the failure mode that produced the previous suite (`docs/testing-strategy.md` §1: a green suite over a broken product).
 
 ## Authority order
 
@@ -16,7 +16,7 @@ When something disagrees, this is the order — lower wins, and the higher thing
 
 ## Before fixing anything: is this test still legitimate?
 
-The implementation predates the v0.7.0 spec and is being rewritten against it. A test that asserts **retired v0.6 behavior is not a failure to fix — it is deleted with the module it covers**: `data-unify`, `unify-*` area classes, component mode, `<template data-slot>`, landmark/ordered-fill matching, `<style data-unify-docs>` blocks, U001–U008 rule codes, `--fail-on`, the security scanner, the glob pipeline (`--copy`/`--ignore`/`--render`/`--default-layout`), incremental builds and the build cache, `--minify`, `--host`, `--log-level`, short-name layout resolution, layout chaining, and the `serve` command. See `CLAUDE.md` ("Implementation Map") and `docs/migration-plan.md` for the disposition of each module.
+A test that asserts **retired behavior is not a failure to fix — it is deleted with the module it covers**: `data-unify`, `unify-*` area classes, component mode, `<template data-slot>`, landmark/ordered-fill matching, `<style data-unify-docs>` blocks, U001–U008 rule codes, `--fail-on`, the security scanner, the glob pipeline (`--copy`/`--ignore`/`--render`/`--default-layout`), incremental builds and the build cache, `--minify`, `--host`, `--log-level`, short-name layout resolution, layout chaining, and the `serve` command. See `CLAUDE.md` ("Implementation Map") and `docs/migration-plan.md` for the disposition of each module.
 
 Classify every failure first:
 
