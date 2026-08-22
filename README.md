@@ -103,26 +103,6 @@ unify init [template]    scaffold a starter site
 
 `unify --help` lists every option — among them `--pretty-urls`, `--base-url` (which also generates `sitemap.xml`, and `feed.xml` once a page declares `schema: Article`/`BlogPosting`), `--canonical auto`, `--search-index`, `--dry-run`, and `--strict`. The **[CLI Reference](docs/cli-reference.md)** documents every command, option, and exit code — there are no others. An optional `unify.yaml` at the source root holds saved flags and nothing more.
 
-## Guarantees
-
-- **Content you wrote is never silently dropped.** Anything that would lose authored content is a `problem`, and problems block publishing. The milder severity, `advisory`, never blocks (under `--strict` it counts). Diagnostics are plain language, located, and name a fix — no rule codes.
-- **Publishing is transactional.** Composition and every check — including a reference check of every internal URL — run into a temporary tree, and `dist/` is replaced only on zero problems. Exit `0` means `dist/` is the complete site; `1` means problems were found and the previous output is byte-for-byte untouched; `2` means invalid usage.
-- **`unify build --dry-run --strict`** runs the whole build and every check while writing nothing — the one-line CI lint.
-
-## Auditing
-
-`unify audit` answers a different question — not *is this build sound?* but *is this site complete?* It runs the same pipeline, publishes nothing, and reports findings: a page with no description, two pages sharing a title, a `#fragment` link that names nothing, duplicate ids, a page nothing links to, structured data that contradicts its page. No score, no grade, no character counts — and `build` never runs any of it, so no finding can hold up a release. `unify audit --strict` is the opt-in CI gate, `--format json|sarif` is the machine-readable mirror, and `--external` checks off-origin links — the one flag in the product that touches the network. While `unify dev` is running, the same findings are a live page at `http://localhost:3000/_unify/`, grouped by page with each page's record beside them.
-
-## What unify will never do
-
-- **Ship JavaScript.** Your scripts pass through untouched; unify injects none of its own (dev's live reload never reaches `dist/`).
-- **Grow a templating language.** No variables, loops, conditionals, or props. Derived pages come from a script you own, run before the build — a feed is the one exception (`schema:` plus `--base-url`).
-- **Become a component framework.** Slots fill layouts; `<include>` splices files verbatim.
-- **Need configuration.** Conventions, not config files.
-- **Scope your CSS, or be a real web server.** `@scope`/`@layer` and a real server already answer those.
-
-The full list, with the reasoning and the accepted costs, is [Product Specification §5](docs/product-spec.md).
-
 ## Examples
 
 [`examples/`](examples/) holds five complete sites, each building clean under `unify build --dry-run --strict`. Four were authored by agents given nothing but the sixty-line authoring rules and a client brief, and kept because they passed review — so they show what the rules actually lead someone to build. Between them: pages generated from a data file, client-side filtering, a section with its own chrome, a page with no chrome for embedding, deploying under a subdirectory, htmx swapping `.fragment.html` panels, and a Svelte component compiled to an ordinary asset. [`examples/README.md`](examples/README.md) names the pattern in each.
@@ -161,6 +141,26 @@ Authoring or editing a **site built with unify**? Review **[docs/authoring-rules
 
 Contributing to **unify itself**? Start with [CLAUDE.md](CLAUDE.md) and [CONTRIBUTING.md](CONTRIBUTING.md); the [Conformance Specification](docs/conformance-spec.md) is normative.
 
+## Guarantees
+
+- **Content you wrote is never silently dropped.** Anything that would lose authored content is a `problem`, and problems block publishing. The milder severity, `advisory`, never blocks (under `--strict` it counts). Diagnostics are plain language, located, and name a fix — no rule codes.
+- **Publishing is transactional.** Composition and every check — including a reference check of every internal URL — run into a temporary tree, and `dist/` is replaced only on zero problems. Exit `0` means `dist/` is the complete site; `1` means problems were found and the previous output is byte-for-byte untouched; `2` means invalid usage.
+- **`unify build --dry-run --strict`** runs the whole build and every check while writing nothing — the one-line CI lint.
+
+And the guarantees that run the other way — what unify will never do:
+
+- **Ship JavaScript.** Your scripts pass through untouched; unify injects none of its own (dev's live reload never reaches `dist/`).
+- **Grow a templating language.** No variables, loops, conditionals, or props. Derived pages come from a script you own, run before the build — a feed is the one exception (`schema:` plus `--base-url`).
+- **Become a component framework.** Slots fill layouts; `<include>` splices files verbatim.
+- **Need configuration.** Conventions, not config files.
+- **Scope your CSS, or be a real web server.** `@scope`/`@layer` and a real server already answer those.
+
+The full list, with the reasoning and the accepted costs, is [Product Specification §5](docs/product-spec.md).
+
+## Auditing
+
+`unify audit` answers a different question — not *is this build sound?* but *is this site complete?* It runs the same pipeline, publishes nothing, and reports findings: a page with no description, two pages sharing a title, a `#fragment` link that names nothing, duplicate ids, a page nothing links to, structured data that contradicts its page. No score, no grade, no character counts — and `build` never runs any of it, so no finding can hold up a release. `unify audit --strict` is the opt-in CI gate, `--format json|sarif` is the machine-readable mirror, and `--external` checks off-origin links — the one flag in the product that touches the network. While `unify dev` is running, the same findings are a live page at `http://localhost:3000/_unify/`, grouped by page with each page's record beside them.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Development setup:
@@ -174,4 +174,4 @@ bun test
 
 ## License
 
-CC-BY-4.0. See [LICENSE](LICENSE).
+Mozilla Public License 2.0. See [LICENSE](LICENSE).

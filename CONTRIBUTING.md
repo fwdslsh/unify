@@ -109,4 +109,4 @@ Include the unify version (`unify --version`), the Bun version (`bun --version`)
 
 ## License
 
-Contributions are made under [CC-BY-4.0](LICENSE).
+Contributions are made under the [Mozilla Public License 2.0](LICENSE).
