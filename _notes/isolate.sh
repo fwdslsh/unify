@@ -28,8 +28,16 @@ unshare -m bash -c '
   # writable transcript dir (round-21 lesson; round 23 showed a read-only
   # mask silently discards the transcripts triage depends on).
   S=/root/.claude/projects/-sandbox
-  mkdir -p "$S" "$DIR/.transcripts"
-  mount --bind "$DIR/.transcripts" "$S"
+  # THROUGH /sandbox, NEVER $DIR: by this line /tmp is already masked, so for a
+  # sample directory under /tmp/ratify/ the path "$DIR/.transcripts" names a
+  # directory inside the MASK — round 27 wrote every transcript there and the
+  # mask took them all, silently, while each sample reported success. /sandbox
+  # is the bind of $DIR taken before the mask, so writing through it reaches
+  # the real directory wherever $DIR lives. (No apostrophes in this comment:
+  # it sits inside a single-quoted bash -c string, and one apostrophe truncated
+  # the whole script into garbage arguments the first time this was written.)
+  mkdir -p "$S" /sandbox/.transcripts
+  mount --bind /sandbox/.transcripts "$S"
   cd /sandbox || exit 1
   printf "%s" "$(cat "/sandbox/$PROMPT")" | timeout "$TMO" claude -p \
       --model "$MODEL" --permission-mode acceptEdits --allowedTools "$@" \

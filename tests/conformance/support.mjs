@@ -15,6 +15,7 @@ import { appendFileSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { registerTmp } from "../tmp-reaper.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const ROOT = join(HERE, "..", "..");
@@ -71,9 +72,15 @@ export async function runCli(args, cwd, envOverrides = {}) {
   return { exit, stdout, stderr };
 }
 
-/** A fresh empty temp directory, same convention as harness.test.js. */
+/**
+ * A fresh empty temp directory, same convention as harness.test.js.
+ *
+ * Registered for removal at the end of the run — see `tests/tmp-reaper.mjs` for
+ * why that is a preload hook rather than an exit handler, and what it cost to
+ * leave undone.
+ */
 export function mkTmp() {
-  return mkdtempSync(join(tmpdir(), "unify-targeted-"));
+  return registerTmp(mkdtempSync(join(tmpdir(), "unify-targeted-")));
 }
 
 /**

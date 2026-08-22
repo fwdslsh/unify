@@ -115,7 +115,7 @@ const HEAD_JOIN = "\n    ";
  * @param {number} to
  * @returns {{start:number,end:number,file:string,fileOffset:number}[]}
  */
-function sliceSpans(spans, from, to) {
+export function sliceSpans(spans, from, to) {
   const out = [];
   for (const sp of spans) {
     const s = Math.max(sp.start, from);
@@ -131,7 +131,7 @@ function sliceSpans(spans, from, to) {
  * @param {{start:number,end:number,file:string,fileOffset:number}[]} spans
  * @param {number} delta
  */
-function shiftSpans(spans, delta) {
+export function shiftSpans(spans, delta) {
   if (!delta) return spans;
   return spans.map((s) => ({ ...s, start: s.start + delta, end: s.end + delta }));
 }
@@ -171,7 +171,7 @@ function fillGaps(spans, len, fallbackFile) {
  * @param {string} fallbackFile
  * @returns {{text:string, spans:{start:number,end:number,file:string,fileOffset:number}[]}}
  */
-function spliceTrackingSpans(text, spans, edits, fallbackFile) {
+export function spliceTrackingSpans(text, spans, edits, fallbackFile) {
   if (edits.length === 0) return { text, spans };
   const sorted = [...edits].sort((a, b) => a.start - b.start);
   let out = "";
@@ -229,7 +229,7 @@ function spliceTrackingSpans(text, spans, edits, fallbackFile) {
  * before/after excision, so a fill's `replacementSpans` line up byte for
  * byte with `spanWithAttrRemoved`'s text.
  */
-function spansWithAttrRemoved(spans, el, name) {
+export function spansWithAttrRemoved(spans, el, name) {
   const a = getAttrNode(el, name);
   if (!a) return sliceSpans(spans, el.start, el.end);
   const before = sliceSpans(spans, el.start, a.start);
@@ -246,7 +246,7 @@ function spansWithAttrRemoved(spans, el, name) {
  * @param {{text:string, spans:{start:number,end:number,file:string,fileOffset:number}[]}[]} pieces
  * @param {string} glue
  */
-function joinWithGlue(pieces, glue) {
+export function joinWithGlue(pieces, glue) {
   let text = "";
   const spans = [];
   for (let i = 0; i < pieces.length; i++) {
@@ -744,7 +744,7 @@ function detectSinks(lBody, excluded, at, layoutFile, reporter) {
  * (`at`, from `spansToDiagnosticLocator`) — and returns the set of both slots in the pair
  * so callers can exclude them from further processing.
  */
-function checkNestedSlots(scopeRoot, at, reporter) {
+export function checkNestedSlots(scopeRoot, at, reporter) {
   const excluded = new Set();
   const allSlots = findAll(scopeRoot, (n) => isElement(n, "slot"));
   for (const outer of allSlots) {

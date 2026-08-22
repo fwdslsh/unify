@@ -8,15 +8,37 @@ on:
   workflow_dispatch:
 
 jobs:
-  # The release signal (docs/migration-plan.md §1). Green here means every
-  # gated rule in tests/conformance/rules.tsv was recorded by a test that
-  # actually ran and passed against the real CLI in this run. It was red by
-  # design for the whole rewrite; the migration is complete and it is green
-  # now, so a red run is a regression. Do not "fix" this job by weakening the
-  # harness or the checker — a skipped test records nothing and fails the gate
-  # rather than hiding in it.
+  # The runtime signal (docs/migration-plan.md §1). Two assertions, both
+  # blocking, because a job that cannot fail is not a signal.
+  #
+  #  1. The gap set computed from rules a test actually RAN and PASSED equals
+  #     the committed phase baseline exactly — a new uncovered rule fails, and
+  #     a gap that closed fails until the baseline shrinks in the same commit.
+  #     This is what closes the skipped-test hole: a test.skip records nothing.
+  #
+  #  2. The DECLARED PHASE matches reality. The release condition is the same
+  #     check with no --baseline, so it must fail while the baseline is
+  #     non-empty and pass once it is empty. Asserting the correspondence keeps
+  #     this job red exactly when the two diverge, and turns it into the release
+  #     gate automatically the moment the baseline empties — no second job, no
+  #     continue-on-error, nothing anyone is trained to ignore.
+  #
+  # An earlier attempt used a separate continue-on-error job for the release
+  # semantics. It was worse than useless: GitHub reports such a job's
+  # conclusion as SUCCESS, so it read green in the checks list and its only
+  # output was log text nobody opens.
+  #
+  # This job checked the release condition directly until the v0.8 work opened
+  # §20's manifest rows. A spec section can be written before any CLI surface
+  # exists to observe it, and the honest record of that is a baseline entry —
+  # not a red people are told to ignore, which is the "warn instead of fail"
+  # mechanism docs/testing-strategy.md §1 (M2) blames for the suite this one
+  # replaced. release.yml runs the unbaselined check BLOCKING at tag time, so a
+  # phase-baselined tree can never be released.
+  #
+  # Do not "fix" this job by weakening the harness or the checker.
   release-signal:
-    name: Release signal (conformance ledger complete)
+    name: Runtime traceability (coverage + declared phase)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -30,7 +52,35 @@ jobs:
         run: |
           rm -f .conformance-ledger.jsonl
           bun test
-          bun tests/conformance/check-traceability.mjs --runtime .conformance-ledger.jsonl
+          bun tests/conformance/check-traceability.mjs --runtime .conformance-ledger.jsonl --baseline tests/conformance/phase-gaps/baseline.txt
+      - name: Declared phase matches reality
+        run: |
+          set -u
+          baseline=tests/conformance/phase-gaps/baseline.txt
+          if [ -s "$baseline" ]; then
+            echo "Phase baseline is non-empty; the release gate must still be red:"
+            sed 's/^/  /' "$baseline"
+            if bun tests/conformance/check-traceability.mjs --runtime .conformance-ledger.jsonl; then
+              echo "::error::Release gate PASSES but the phase baseline is non-empty — empty $baseline in this commit."
+              exit 1
+            fi
+            echo "OK: release gate red, as the declared phase says it should be."
+          else
+            echo "Phase baseline is empty; the release gate must now be green."
+            bun tests/conformance/check-traceability.mjs --runtime .conformance-ledger.jsonl
+          fi
+
+  # Always-on gate G8: every src/** file reachable from src/cli.js. A module
+  # nothing imports is either a cut feature left behind or a written-and-never-
+  # wired one, and a green suite sees neither — a unit test importing a module
+  # directly makes it covered without making it reachable.
+  module-graph:
+    name: No dead modules (G8)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun tests/conformance/check-module-graph.mjs
 
   # Always-on gate G9: the anti-rot rules for the suite itself (H1-H5).
   suite-hygiene:

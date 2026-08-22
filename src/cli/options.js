@@ -7,25 +7,55 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { UsageError } from "../core/diagnostics.js";
 
-const COMMANDS = ["build", "dev", "watch", "init"];
+const COMMANDS = ["build", "audit", "dev", "watch", "init"];
 
-/** Long name → kind. `list` repeats, `string` takes a value, `flag` does not. */
+/**
+ * Long name → kind. `list` repeats, `string` takes a value, `flag` does not.
+ * `example` supplies a real value for the missing-value fix line, where the
+ * option has one worth naming.
+ */
 const OPTIONS = {
   source: { kind: "string", short: "s" },
   output: { kind: "string", short: "o" },
   clean: { kind: "flag" },
   exclude: { kind: "list" },
   "pretty-urls": { kind: "flag" },
-  "base-url": { kind: "string" },
+  "base-url": { kind: "string", example: "https://your-domain.example/" },
+  canonical: { kind: "string", example: "auto" },
+  // §29.6 — full-content feed entries. Boolean like every other flag here;
+  // the "requires --base-url" usage error is cross-cutting validation (it
+  // needs settings.baseUrl too), so it lives beside --canonical auto's own
+  // equivalent check in cli.js, not in this registry.
+  "feed-full": { kind: "flag" },
   "dry-run": { kind: "flag" },
   strict: { kind: "flag" },
+  // §30.1 — a flag rather than a consequence: unlike a sitemap or a feed,
+  // nothing about a page declares "index me", so there is no record-derived
+  // condition that could activate this the way `--base-url` activates §21.
+  "search-index": { kind: "flag" },
+  // §33.1 — a PATH in the source tree, never a command. Saved in unify.yaml
+  // like any other long option.
+  generate: { kind: "value" },
+  // §31.1 — `unify audit`'s own output shape. This registry stays a
+  // syntactic parser like every entry here: the closed set (human/json/sarif)
+  // and its usage error are audit.js's own concern, the same split
+  // `--canonical`'s value ("auto" only) already keeps between this file and
+  // cli.js. Ignored by every command but `audit`, exactly as `--search-index`
+  // is ignored by `audit` and read only by `build`.
+  format: { kind: "string", example: "json" },
+  // §31.3 — the one network operation in the whole product (product-spec
+  // §6.1: builds are offline and deterministic without qualification), so it
+  // is a flag an author must pass explicitly rather than a consequence of
+  // anything a page declares. Boolean; `cli/commands/audit.js` and
+  // `core/external.js` do the rest.
+  external: { kind: "flag" },
   port: { kind: "string", short: "p" },
   version: { kind: "flag", short: "v" },
   help: { kind: "flag", short: "h" },
 };
 
 /** Keys `unify.yaml` may carry — the long option names, minus the ones that make no sense to save. */
-const CONFIG_KEYS = ["source", "output", "clean", "exclude", "pretty-urls", "base-url", "strict", "port"];
+const CONFIG_KEYS = ["source", "output", "clean", "exclude", "pretty-urls", "base-url", "canonical", "feed-full", "search-index", "strict", "port", "generate"];
 
 const SHORT = Object.fromEntries(
   Object.entries(OPTIONS)
@@ -87,7 +117,12 @@ export function parseArgs(argv) {
 
     const value = inlineValue ?? argv[++i];
     if (value === undefined) {
-      throw new UsageError(`--${name} needs a value`, [`pass one, for example --${name} <value>`]);
+      // Name a real value where the option has one worth naming. `--canonical`
+      // is the likeliest typo of the pair (`auto` is its only value), and a fix
+      // line reading `--canonical <value>` names nothing.
+      throw new UsageError(`--${name} needs a value`, [
+        spec.example ? `write it as: --${name} ${spec.example}` : `pass one, for example --${name} <value>`,
+      ]);
     }
     if (spec.kind === "list") {
       const existing = /** @type {string[]} */ (options[name] ?? []);

@@ -25,6 +25,7 @@ import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promise
 import { dirname, join, resolve } from "node:path";
 import { UsageError } from "./diagnostics.js";
 import { cleanRefusalReason } from "./paths.js";
+import { encodePathSegments } from "./urls.js";
 
 // ------------------------------------------------------------------ types
 
@@ -223,7 +224,16 @@ export async function performClean({ output, source, cwd = process.cwd() }) {
  */
 export function urlForOutputPath(outputPath, pathPrefix = "/") {
   const rel = outputPath.replace(/(^|\/)index\.html$/, "$1");
-  return pathPrefix + rel;
+  // §20.5's percent-encoding lives HERE, not in any caller, because this is
+  // the single function §17's report, §20's manifest, and every projection of
+  // it already share. It was briefly applied in the manifest alone, and the
+  // result was three components holding three positions on one page's address:
+  // the report printed `/two words.html`, the sitemap published
+  // `/two%20words.html`, and §12 rejected the second spelling — so the build
+  // advertised a URL it refused to let the author link to. One function, one
+  // answer. The `--base-url` prefix is deliberately not re-encoded: the author
+  // wrote it as a URL, and a legitimate escape in it would be corrupted.
+  return pathPrefix + encodePathSegments(rel);
 }
 
 /**

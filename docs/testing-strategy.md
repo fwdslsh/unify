@@ -76,6 +76,8 @@ Targeted behavior tests, still through the CLI, still mock-free, for the contrac
 
 Unit tests on pure internals (the slugger, the glob matcher, splice-span arithmetic) are welcome for development speed and may use whatever test doubles they like — but they carry **no conformance authority**: they cannot declare rule coverage (`covers()` is rejected outside `tests/conformance` + `tests/e2e` by the hygiene gate), they don't gate release, and when a unit test disagrees with a fixture, the unit test is wrong by definition. This inverts v0.6, where unit tests were the majority authority (M1) and ratified bugs (M3).
 
+**Where a new rule's coverage should land first (measured, 2026-08).** The first mutation sweep of the 0.8 modules found three genuine gaps, and their distribution was the lesson: all three sat in `feed.js`, the one 0.8 module with **no unit test file**, while `report.js` — which has one — had no real gap at all (its existing unit test kills the fingerprint mutation in 0.4 ms). The same defect costs ~3 s to detect through a CLI spawn and ~1 ms through the module's exports; the unit twins of all three gaps (`tests/unit/core/feed.test.js`) kill their mutations in ~160 ms of whole-file time. So the division of labour is: **one conformance test per rule proves the wiring — the flag reaches the module, the module's output reaches the tree — and the edge-case matrix belongs here at Tier 3**, where the next input costs a millisecond instead of a spawn. Authority is unchanged: when the tiers disagree, Tier 3 is wrong by definition — the tier that *finds* a bug first is simply allowed to be the cheap one. And the wiring test is not optional, for a reason the same session supplied: `--generate` shipped parsed but never mapped through `cli.js` — a complete no-op — and every unit test of the generator function would have stayed green while the feature did not exist.
+
 **Comparator discipline (all tiers)**: tree comparison is bidirectional (an extra emitted file fails, a missing file fails) and goes through exactly one comparator, implemented once in the harness (`tests/conformance/compare.mjs`). Its contract, in full: **non-HTML files are compared byte-for-byte. HTML files are parsed and compared exactly on the file set, the doctype, element structure, tag names, attributes (names, values, and order), comments, and text content — with precisely one normalization: a text node consisting entirely of whitespace, whose parent is not `<pre>`, `<textarea>`, `<script>`, or `<style>`, is dropped from both sides before comparison.** That is the conformance spec §3 waiver ("whitespace between block-level elements is not normative") and nothing more. A text node containing any non-whitespace is compared byte-for-byte, including its internal and surrounding whitespace — whitespace inside text-bearing content *is* significant. One blind spot, named rather than hidden: the comparator cannot tell a block gap from an inline gap without a tag taxonomy, so a whitespace-only text node between inline siblings (`<a>x</a> <a>y</a>`) is also normalized; where an inline gap is itself the thing under test, the fixture must make it text content (give the siblings a text-bearing parent with surrounding text). Trimming, entity folding, attribute reordering, tag-case folding, and any other normalization are forbidden; ad-hoc normalization anywhere else in a behavior test fails hygiene rule H5 (the M5 countermeasure, narrowed and stated rather than absolute). Diagnostics are parsed on the stable `FILE:LINE: SEVERITY: ` prefix; message prose beyond declared substrings is not asserted (the spec says prose is not contract — tests must not fossilize it). stdout/stderr comparisons (DIA-05, G6) remain byte-exact: determinism of one implementation is a byte-level claim even though cross-checking output trees against fixtures is not.
 
 ---
@@ -86,31 +88,35 @@ This is the mechanism that makes "fully implemented" a measurable claim.
 
 ### 3.1 The rule inventory
 
-`tests/conformance/rules.tsv` — **202 rows** (199 gated + 3 structural), one per normative claim in `docs/conformance-spec.md`, extracted section by section. IDs are stable, never reused, and namespaced by area, reusing the spec's own labels wherever the spec numbers things. Retired IDs stay retired: `LAY-06`–`LAY-08`, `HED-08`, `P06`, and `FIX-08` died with layout chaining; `A05`–`A07` were merged into `A13` (the duplicated-construct advisory); `A03`, `A04`, and `A15` were retired by the ratification rounds (A04 became problem P20); no test may reference them.
+`tests/conformance/rules.tsv` — one row per normative claim in `docs/conformance-spec.md`, extracted section by section. It held **202 rows** (199 gated + 3 structural) at v0.7.0 and grows with the spec; the checker prints the current count, which is the number to trust. IDs are stable, never reused, and namespaced by area, reusing the spec's own labels wherever the spec numbers things. Retired IDs stay retired: `LAY-06`–`LAY-08`, `HED-08`, `P06`, and `FIX-08` died with layout chaining; `A05`–`A07` were merged into `A13` (the duplicated-construct advisory); `A03`, `A04`, and `A15` were retired by the ratification rounds (A04 became problem P20); no test may reference them.
 
-| Prefix | Source | Count |
-|---|---|---|
-| `PIP-*` | §2 pipeline order & best-effort | 2 |
-| `S01–S12`, `SHL-01` | §3 splice rules + shell rule | 13 |
-| `EXC-*` | §4 classification/exclusion/never-shipped/copy | 12 |
-| `INC-*` | §5 includes | 12 |
-| `LAY-*` | §6 layout resolution (incl. the no-chaining problem) | 11 |
-| `MRG-*` | §7 composition (incl. the no-nested-slots problem) | 20 |
-| `HED-01–07` | §8 head-merge table rows | 7 |
-| `ATT-*` | §9 root attributes | 3 |
-| `MD-*` | §10 Markdown | 21 |
-| `URL-*` | §11 URL phases | 12 |
-| `REF-*` | §12 reference check | 7 |
-| `COL-*` | §13 collisions | 4 |
-| `DIA-*` | §14 diagnostics contract | 13 |
-| `P01–P21` (P06 retired) | §14.2 closed problem list | 20 |
-| `A01–A14` (A05–A07 merged into A13; A03, A04, A15 retired) | §14.3 closed advisory catalogue | 9 |
-| `PUB-*` | §15 transactional publish | 4 |
-| `WCH-*` | §16 watch/dev | 7 |
-| `DRY-*` | §17 dry-run report | 4 |
-| `CFG-*` | §18 unify.yaml | 3 |
-| `SCF-*` | §19 scaffold contract | 5 |
-| `FIX-01–14` (FIX-08 retired) | the spec's worked examples | 13 |
+| Prefix | Source |
+|---|---|
+| `PIP-*` | §2 pipeline order & best-effort |
+| `S01–S12`, `SHL-01` | §3 splice rules + shell rule |
+| `EXC-*` | §4 classification/exclusion/never-shipped/copy |
+| `INC-*` | §5 includes |
+| `LAY-*` | §6 layout resolution (incl. the no-chaining problem) |
+| `MRG-*` | §7 composition (incl. the no-nested-slots problem) |
+| `HED-01–07` | §8 head-merge table rows |
+| `ATT-*` | §9 root attributes |
+| `MD-*` | §10 Markdown |
+| `URL-*` | §11 URL phases |
+| `REF-*` | §12 reference check |
+| `COL-*` | §13 collisions |
+| `DIA-*` | §14 diagnostics contract |
+| `P01–P21` (P06 retired) | §14.2 closed problem list |
+| `A01–A14` (A05–A07 merged into A13; A03, A04, A15 retired) | §14.3 closed advisory catalogue |
+| `PUB-*` | §15 transactional publish |
+| `WCH-*` | §16 watch/dev |
+| `DRY-*` | §17 dry-run report |
+| `CFG-*` | §18 unify.yaml |
+| `SCF-*` | §19 scaffold contract |
+| `FIX-01–14` (FIX-08 retired) | the spec's worked examples |
+| `MAN-*` | §20 the final-output page manifest |
+| `SIT-*` | §21 sitemap generation |
+
+Counts are deliberately absent: this table drifted twice in three commits while the checker's own printed totals stayed correct by construction. `check-traceability.mjs` prints the current inventory size, the covered count, and the gap list on every run — that output is the number to quote, and it cannot go stale.
 
 A row's `testkind` is `fixture`, `targeted`, `e2e`, or `structural`. The three `structural` rows (MRG-18 the content-loss law, COL-04 no-last-write-wins, WCH-07 the closed dev scope) are invariants asserted *by the shape of the whole suite* (exhaustive diagnostics + full expected trees + closed CLI test) rather than by one test; they are exempt from the per-rule gate and documented as such in the TSV.
 
@@ -130,7 +136,11 @@ Two declaration channels, both machine-read:
 
 - **Spec→inventory sync** (both modes): the checker parses the conformance spec's countable structures — the `**S<n> —**` bullets (12), the §14.2 numbered problems (20), the §14.3 numbered advisories (9), the §8 table body rows (7) — and fails on any drift from the inventory, so an edit that adds an S13 or a fifteenth problem breaks CI until `rules.tsv` (and therefore a test) catches up. Prose rules can't be machine-extracted; for them the sync check enforces the weaker invariant that every spec section has inventory rows, and the human review rule is: **a PR touching `docs/conformance-spec.md` must touch `rules.tsv` in the same commit or say why in the PR description**. That last clause is the one non-automated step in this section, named honestly.
 
-**Current status (2026-08-13, `--static`)**: 202 rules (199 gated, 3 structural); **every gated rule covered** — `tests/conformance/phase-gaps/baseline.txt` is empty, so the phase gate and the release semantics are the same check. All thirteen FIX rows are realized, and the §7 spec-bug set (B1–B7) plus the four pinned readings are closed — every gate-blocking flag on the inventory is gone. The checker's output is the authoritative gap list at any moment; the gate is blocking in CI (see `docs/cicd-workflows.md`).
+**Status at v0.7.0 (2026-08-13, `--static`)**: 202 rules (199 gated, 3 structural); **every gated rule covered** — `baseline.txt` empty, so the phase gate and the release semantics were the same check. All thirteen FIX rows realized, the §7 spec-bug set (B1–B7) and the four pinned readings closed.
+
+**During v0.8.x**, `baseline.txt` was non-empty again, and is now empty: `unify audit --format json` (§31.1) publishes `pages` as the whole record, so the last seven rows — MAN-02/03/04/07/08/09/10 — became observable through the real CLI at once and are covered by `tests/conformance/manifest-observable.test.js`. What follows is the reasoning that put them there, kept because the pattern recurs. Conformance-spec §20 (the final-output page manifest) is an *implementation boundary*: product-spec §6.2 forbids exposing it as an author-facing format, so a rule about it can be specified before any CLI surface exists for a behavior test to observe. Those rows are baselined rather than claimed, and each is closed by the consumer that makes its field observable — the sitemap closed MAN-01/05/06 in the commit that landed it. Baselining is the honest record of "specified, not yet observable"; claiming coverage from a Tier-3 unit test would not be, since §3.2's declaration channels deliberately read only `tests/conformance` and `tests/e2e`.
+
+The release semantics are unchanged and still blocking: `release.yml` runs `--runtime` with **no** baseline at tag time, so v0.8.0 cannot ship until the file is empty again — which it now is, so the phase gate and the release semantics are once more the same check. The checker's output is the authoritative gap list at any moment (see `docs/cicd-workflows.md` for which job means what).
 
 ### 3.4 Why declaration ≠ vacuous claiming
 
@@ -150,13 +160,51 @@ A declared rule could still be *weakly* tested (the ID is on a case that only br
 
 ## 5. Anti-regression rules for the suite itself
 
-Enforced by `tests/conformance/check-suite-hygiene.mjs` (in CI as gate G9), which greps behavior-test sources (`tests/conformance/**`, `tests/e2e/**`); each rule is the countermeasure to a v0.6 mechanism from §1:
+**The defect is rarely in the function; it is in what the function was handed.** Six rounds of independent review on the v0.8 work produced the same shape every time, and it is worth stating before it has to be rediscovered. `isSelfCanonical` was correct and its caller's boolean fold was not. `validateAnchors` was correct and the row set its caller passed was not. `stripBaseUrl`'s comparison was correct and the normal form its result shared with `parseBaseUrl` was not. In each case the first repair added a test for the callee, the suite went green, and the defect stayed.
+
+The fixes that held all did the same thing: **they deleted the parameter rather than testing around it.** `anchorProblems` takes no row set, because a caller that can narrow one is a caller a test of the callee cannot pin. The mutation sweep has no environment variable, because an ambient switch is a parameter every shell can set. `parseBaseUrl` and `stripBaseUrl` share one normal form, because two spellings of one prefix is a parameter with no owner. Where a wrong value cannot be supplied, no test is needed to catch it being supplied.
+
+The corollary for this section: a guard is pinned at the level its defects live, not at the level it was convenient to extract. When adding one, revert each defect it was written for and confirm the suite goes red — if it stays green, the guard is one layer too shallow.
+
+
+Enforced by `tests/conformance/check-suite-hygiene.mjs` (in CI as gate G9), which greps behavior-test sources (`tests/conformance/**`, `tests/e2e/**`) for H1–H5 and shipped source (`src/**`) for H6; H1–H5 are each the countermeasure to a v0.6 mechanism from §1, H6 to an incident of this repository's own review protocol:
 
 - **H1 — No mocks in behavior tests.** `mock(`/`spyOn(`/`jest.fn` fail the gate there. Behavior tests exercise the real CLI on a real filesystem in a temp dir. (Counters M1. Unit tests under `tests/unit/` may mock freely — they have no authority to protect.)
 - **H2 — No warn-instead-of-fail.** `console.warn` and commented-out expectations (`// expect(`) fail the gate — the literal pattern of fixtures-integration line 375. A behavior test has exactly two outcomes. (Counters M2.)
 - **H3 — No `src/**` imports in behavior tests.** Behavior tests spawn the CLI; the harness holds the one entrypoint path. Internal imports are how function-level green detaches from product truth. (Counters M1/M3.)
-- **H4 — No skipped tests holding rule declarations.** A file that both `test.skip`s and `covers()` fails the gate; the runtime ledger already un-credits skipped tests, this makes the intent unmissable at review time. (Counters M2's "temporarily disabled" gateway.)
+- **H4 — No test opts itself out of running.** `skip`, `skipIf`, `todo`, and `only` on `test`/`it`/`describe` fail the gate, in any test file, whether or not it declares coverage. A skip that keeps a `covers()` declaration is a lie waiting to be believed; a skip without one is a test that quietly stopped being a test. The rule used to match `skip|todo` only, and only in declaring files, which left `test.skipIf(cond)` — the modern spelling — passing cleanly in a file dense with declarations. That gap grew teeth once the mutation sweep began removing one file from its work copy: the copy's path and that file's absence are both sniffable, so a test could condition itself on either and never run under a sweep while still claiming its rule was pinned. The one legitimate exemption in this repository is not a skip — the sweep *deletes* `mutation-inventory.test.js` from its own copy, in the harness that owns it, where it is visible and cannot spread.
 - **H5 — No ad-hoc normalization.** All tree comparison goes through the single harness comparator (`tests/conformance/compare.mjs`), whose only normalization is the §2 contract — whitespace-only text nodes outside `<pre>`/`<textarea>`/`<script>`/`<style>`. `normalizeHtml`/`replace(/\s+/g` anywhere else in a behavior test fails the gate: v0.6 collapsed *all* whitespace, per test, wherever convenient. Narrow and stated, or nothing. (Counters M5.)
+- **H6 — No leftover experiment markers in shipped source.** `src/**` is scanned for `MUTATION PROBE` / `DEBUG PROBE` / `XXX` / `FIXME` / `HACK`. The review protocol asks reviewers to mutate `src/**` to prove a test can fail, which makes an abandoned probe a recurring hazard rather than a one-off: one was committed when an unrelated `git add -A` ran while it was live, and the full suite passed with the deleted check gone. Do not over-trust it — it catches a probe that *left a marker*; a silent deletion leaves nothing to grep for, and the real countermeasures are procedural (mutate only in a detached worktree, stage by explicit path, report which tests a mutation KILLED).
+
+**The suite refuses to start on a tree it cannot parse, and bounds its own runtime.** Both are `bunfig.toml [test] preload` entries, because they must run before the runner loads a test file — no test can ask either question from inside the run, which is the §8 hang stated as a design constraint. `tests/preflight.mjs` hands every JavaScript file the suite can load to `Bun.Transpiler.scan()` — parse, never import: importing to find out would run module side effects on a tree already known to be untrustworthy — and exits **2** with a located message about 40 ms in. The set it checks is a sweep of `src/**` and `tests/**` plus that sweep's import closure: a sweep cannot miss a file the way a graph walk can, and the closure only ever *adds*, so a specifier form the walker does not recognise can never remove a file from the check. `fixtures/` is swept out and re-entered only through a real import, so `tests/fixtures/landmines/runtime-cases.mjs` is covered while a deliberately malformed fixture *asset* is not — unify ships broken scripts byte-for-byte, and a guard that refuses to start on a test case is a guard that gets switched off. `tests/watchdog.mjs` is loaded first and has **no imports at all**, so it still bounds the run when the parse gate or its walker is itself the unparseable file; it arms one unref'd timer for `UNIFY_TEST_BUDGET_MS` (default 600 000 ms, ~7× the full suite; a malformed or empty value falls back to the default rather than firing at once) and exits **3**. Raise the budget for a genuinely slower machine, never to silence it — it is the one ambient switch this suite allows, and only because no value of it means "never". Neither guard touches `bun src/cli.js`: `preload` under `[test]` applies to the test runner only. Both are also the only files outside `src/**` that `mutations.tsv` may name — they are code the suite has to prove it notices, whereas mutating an ordinary test would score the sweep against its own assertions. And both publish what they did on `globalThis` (the budget they armed; the file list they parsed), because every other test of them runs in a scratch project carrying copies: without that marker a deleted `preload` line leaves the guards demonstrably working and the real suite unguarded.
+
+`tests/module-graph.mjs` is the single owner of which files this tree's JavaScript consists of and what each one pulls in — `check-module-graph.mjs` (G8) and the preflight both ask it. They had a copy of the walk each, which is §5's own shape one level up: a specifier form one copy missed was invisible in the other.
+
+**A duplicated document needs a gate, exactly as duplicated code does.** `README.md` embeds `docs/authoring-rules.md` verbatim between two marker comments, because product-spec §6.7 requires one rule set rather than tool-specific variants. Nothing checked the copies, and they drifted on the first edit that mattered: §26 gave `schema:` a meaning, the rules file gained it, and the README went on telling readers that JSON-LD has no frontmatter key. A marker pair is a promise that something copies one into the other, and until `tests/unit/docs-sync.test.js` existed that something was whoever remembered. The comparison is byte-exact on purpose — "nearly the same" is the state it exists to catch, since two sentences differing by one clause is precisely how a reader ends up with the wrong rule and no way to tell which copy is current. The same file pins the 60-line budget the document's own name claims, so a feature that needs a paragraph has to argue for it rather than append one.
+
+**A reviewer reports which tests a mutation KILLED, not that a mutation was run.** Four rounds of independent review on the v0.8 manifest work found six defects, and every one had the same shape: a rule written correctly in the conformance spec, implemented differently, and a suite that stayed green either way. Coverage cannot see that class — the line executed, it just did the wrong thing and nothing asserted otherwise. `tests/conformance/mutations.tsv` names one anchor→replacement pair per rule with the rule it defends, and `bun tests/conformance/run-mutations.mjs` applies each in a throwaway copy of the tree, runs the suite, and fails on any mutation the suite does not notice. A survivor is not a bug in the code — it is a rule the tests cannot distinguish from its opposite, which is the state that let all six through.
+
+**A green sweep is not a statement about the inventory.** The file defends the rules its rows name — a fraction of the inventory — and nothing else. "Every mutation killed" means those anchors are pinned; reading it as "the spec is pinned" would be a new way to reach the same false confidence this check exists to remove.
+
+Flakiness is **measured, not listed**. The baseline runs twice and the two failure sets are compared: a test that differs between two runs of identical source is flaky by observation; one failing in both is genuinely red and aborts the sweep. An earlier version matched test names against a regex, which excluded every test in `watch-dev.test.js` — including the deterministic filesystem assertions — so a dev-server mutation was credited to a Tier-3 unit test while the authoritative behaviour test that also caught it was filtered out. That inverts §2's authority order, and the only available "fix" for the next such row would have been to weaken the regex further. Measuring also means one environmental flake no longer discards a fifteen-minute sweep, which is the habit that trains people to re-run a check until it passes.
+
+The runner refuses to start unless the suite is green unmutated, because its first version did not: it treated any non-zero exit as a kill, so on a red tree every mutation reported KILLED and the sweep exited 0 — the answer inverting exactly when it mattered most. A reviewer found that within a day of the file landing, and the decision logic is now exported and unit-tested against that exact scenario. A kill must name a test that was passing before; a non-zero exit with no failing test is `CRASHED`, so a malformed replacement cannot pass as evidence; and a hang is `TIMEOUT`, never a kill.
+
+It is deliberately **not** a release gate, and — recorded here because this sentence used to promise the opposite — it does not graduate to one now that the phase baseline is empty. The full-inventory sweep that milestone imagined was run once, and its economics settled the question: **all 152 pre-existing rows re-passed, at a cost of hours, while every finding came from the handful of rows written against code that was days old.** The value concentrates entirely in fresh and just-repaired modules, so the standing policy is: **sweep the prefixes you touched, at review time** (`bun tests/conformance/run-mutations.mjs feed-`), never the whole inventory. The runner targets each row at the test files the coverage ledger maps to its rules and escalates any survivor to the full suite, so a targeted module sweep is minutes and a wrong or stale ledger costs time, never correctness. When a sweep does find a survivor, land the killing test at Tier 3 where the rule is logic and at the conformance tier only where it is wiring (§2). The sweep's output belongs in the review report. It never touches the working tree, for a reason this repository has already paid for twice: an in-place mutation was swept into a commit by an unrelated `git add -A`, and a second in-place run silently reverted a real fix when its restore step did not execute after a timeout.
+
+**Never mutate anything you need back.** Three separate incidents in one review cycle had one root cause — a *restore* step that could be skipped:
+
+1. A reviewer's mutation was live in the working tree when an unrelated `git add -A` ran, and shipped to `main` with a real check deleted. The suite passed: nothing executed that branch.
+2. An in-place mutation loop timed out mid-iteration, so its restore never ran, silently reverting a fix made minutes earlier.
+3. A reviewer's extracted *baseline* copy was overwritten with a newer revision's file. Ten minutes of before/after comparisons were invalid, and it was caught only because one result was impossible — the "before" commit exhibiting the "after" behavior.
+
+The durable fix is structural, not procedural: **a comparison must not depend on restoring anything.** `run-mutations.mjs` embodies it for the working tree — it writes only inside a throwaway copy, so a crash mid-run can damage nothing. The same discipline extends to every artifact a comparison rests on:
+
+There is a fourth incident with the same root cause one level down, and it is worth stating because the fix people reach for first does not work. The throwaway copy is ~1 GB, and the sweep deletes it in a `process.on("exit")` handler — which covers every ending the program controls and none of the endings that actually happen: SIGKILL, an OOM kill, a `timeout` that escalates, a container restart. Five orphaned copies (~5 GB) accumulated on a fixed disk allowance and slowed a live sweep to a crawl, and the symptom looked like a slow machine rather than a full disk until somebody ran `df`. **A cleanup that only runs on the paths that were already fine is not a cleanup.** The one that works runs at *startup*, on the evidence the previous failure left behind: each run drops its pid in its own work directory, and a new run removes any sibling whose pid the operating system says is gone. Liveness is asked of the OS (`process.kill(pid, 0)`) rather than inferred from an mtime, so a genuinely long sweep keeps its directory for as many hours as it needs — a promise an age threshold cannot make.
+
+- **Content-address a baseline before trusting it, not after.** `md5sum` each extracted file against `git show <rev>:<path>` immediately before the comparison. Incident 3 was caught by exactly this check, one step too late.
+- **Make baselines read-only** (`chmod -R a-w`). A silent overwrite becomes a loud failure at the moment it happens rather than a wrong conclusion later.
+- **Extract a fresh baseline per round.** Reuse across rounds is the window incident 3 fell through, and re-extraction costs seconds.
 
 Process rules that cannot be fully mechanized, stated as review law with their partial mechanizations:
 
@@ -166,20 +214,20 @@ Process rules that cannot be fully mechanized, stated as review law with their p
 
 ---
 
-## 6. Release gates for v0.7.0
+## 6. Release gates
 
 The release ships when a clean CI run on the release commit satisfies **all** of the following. Each is a command with an exit code; no gate is a judgment call:
 
 | # | Gate | Check |
 |---|---|---|
-| G1 | Suite green | `bun test` exits 0 (includes Tiers 0–3; every behavior test under its hard timeout) |
+| G1 | Suite green | `bun test` exits 0 (includes Tiers 0–3; every behavior test under its hard timeout, and the whole run under the §5 watchdog budget) |
 | G2 | Traceability | `check-traceability.mjs --runtime .conformance-ledger.jsonl` exits 0: every gated rule recorded by passing tests; zero unknown IDs; spec↔inventory sync clean |
 | G3 | Kitchen sink | all four kitchen-sink profiles tree-exact (§2 comparator) / publish-state-exact |
 | G4 | Landmines | every declared diagnostic fires with declared severity/location; zero undeclared diagnostics suite-wide; both publish-block sentinels byte-untouched |
 | G5 | Golden path | all five `init` templates: scaffold → `build --dry-run --strict` exit 0 → `build` → reference-clean output; dev smoke passes |
 | G6 | Determinism | two consecutive builds of kitchen-sink: identical output trees, identical stdout bytes, identical stderr bytes |
 | G7 | Watch equivalence | scripted edit sequence under `watch` yields a tree byte-identical to a fresh `build`; a no-op save rewrites nothing (mtime check) |
-| G8 | No dead modules | every `src/**` file reachable from `src/cli.js` in the import graph |
+| G8 | No dead modules | `check-module-graph.mjs` exits 0: every `src/**` file reachable from `src/cli.js` in the static import graph |
 | G9 | Suite hygiene | `check-suite-hygiene.mjs` exits 0 |
 | G10 | Docs lockstep | `docs/authoring-rules.md` ≤ 60 lines and byte-embedded in README (product-spec §7, item 5) |
 | G11 | Binary parity | the compiled Linux x86_64 binary passes the Tier-0 golden path; Linux ARM64 and macOS x86_64/ARM64 release binaries build successfully (parity runs where runners exist) |
@@ -206,5 +254,7 @@ Writing exact expectations is the strongest spec review that exists. Filed here 
 ## 8. What this strategy does not cover, said plainly
 
 Performance (no perf gates until real sites are slow — a product non-goal), fuzzing (a future property harness — "random tree in, law holds" — would strengthen MRG-18 beyond fixtures; not required for v0.7.0), Windows/macOS binary behavioral parity beyond the smoke run (G11 runs the full golden path on Linux only until CI runners exist for the rest), and browser-preview parity for the post-MVP polyfill (its "build and polyfill must agree" check belongs to the polyfill's own milestone).
+
+**The one known hole, closed 2026-08-19: `bun test` used to hang instead of failing when a module the suite loads cannot be parsed.** Tier 0 says a hang is a failure, and this was the one place it was not. The cause is not in any unify code: on bun 1.3.11, when **two or more** test files fail to load because a module they import cannot be parsed, the runner prints "Unhandled error between tests" and then spins at 100% CPU with no child processes and no exit — measured past 900 s, against ~85 s for the healthy suite. One such file exits 1 in under a second; two never exit. The spin happens *between* test files, so no per-test timeout is in reach, and the runner prints nothing for a passing file, so the stall does not even look like one. A single syntax error in `src/core/urls.js` clears that threshold on its own, because much of `tests/unit/**` imports it transitively; so does one in `tests/conformance/support.mjs`. The reproduction recorded here previously blamed `tests/conformance/watch-dev.test.js` and its un-timed `fetch` calls. That was wrong, and re-measurement is what showed it: with a broken `urls.js` that file fails 5/5 and exits in 19 s, `tests/conformance` as a whole finishes in 61 s, and during the hang there are no child processes at all — a diagnosis nobody had re-run, which is its own lesson about a hole recorded once and left. The closure is `tests/preflight.mjs` and `tests/watchdog.mjs`, described in §5; both broken trees above now exit 2 in under a second. What remains open is bun's own bug: if a later version stops spinning, the preflight becomes belt-and-braces rather than load-bearing — it still turns a suite-wide load failure into one located line — and this paragraph should be re-measured at the next bun bump.
 
 It also does not test whether the **documentation** is any good. Every tier here checks that the engine implements the spec; none of them checks that a person handed `docs/authoring-rules.md` can build a site from it. That is a different experiment with a different failure mode — a rule can be correctly implemented, correctly specified, and still worded so that nobody follows it — and it has its own procedure in **`docs/ratification-protocol.md`**: agents author from the rules alone in isolation, and each failure is triaged into documentation, specification, implementation, or outlier. Two spec defects in this document's own catalogue were found that way, both because several independent samples made the identical "mistake" and the spec turned out to be the thing that was wrong.

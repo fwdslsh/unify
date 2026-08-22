@@ -7,9 +7,11 @@
  *
  *  SPEC → INVENTORY (sync check, always on)
  *    The countable structures of the conformance spec — the S1..S12 splice
- *    rules, the closed problem list (16), the closed advisory catalogue (11),
- *    and the head-merge table rows (7) — are parsed out of the spec text and
- *    compared against tests/conformance/rules.tsv. If the spec grows or loses
+ *    rules, the closed problem list, the closed advisory catalogue, and the
+ *    head-merge table rows — are counted out of the spec text rather than
+ *    hard-coded here (both parenthetical counts written here once had gone
+ *    stale by five and by two) and compared against
+ *    tests/conformance/rules.tsv. If the spec grows or loses
  *    an enumerable rule and the inventory was not updated in the same commit,
  *    this exits 1. Prose rules cannot be machine-extracted; for those the
  *    check enforces a weaker invariant: every top-level spec section that
@@ -58,7 +60,7 @@ const MANIFESTS = [
 const RUNTIME_CASES = join(ROOT, "tests", "fixtures", "landmines", "runtime-cases.mjs");
 const TEST_DIRS = [join(ROOT, "tests", "conformance"), join(ROOT, "tests", "e2e")];
 
-const ID_RE = /^(?:S\d{2}|SHL-\d{2}|PIP-\d{2}|EXC-\d{2}|INC-\d{2}|LAY-\d{2}|MRG-\d{2}|HED-\d{2}|ATT-\d{2}|MD-\d{2}|URL-\d{2}|REF-\d{2}|COL-\d{2}|DIA-\d{2}|P\d{2}|A\d{2}|PUB-\d{2}|WCH-\d{2}|DRY-\d{2}|CFG-\d{2}|SCF-\d{2}|FIX-\d{2})$/;
+const ID_RE = /^(?:S\d{2}|SHL-\d{2}|PIP-\d{2}|EXC-\d{2}|INC-\d{2}|LAY-\d{2}|MRG-\d{2}|HED-\d{2}|ATT-\d{2}|MD-\d{2}|URL-\d{2}|REF-\d{2}|COL-\d{2}|DIA-\d{2}|P\d{2}|A\d{2}|PUB-\d{2}|WCH-\d{2}|DRY-\d{2}|CFG-\d{2}|SCF-\d{2}|FIX-\d{2}|MAN-\d{2}|SIT-\d{2}|CAN-\d{2}|ROB-\d{2}|AUD-\d{2}|VER-\d{2}|SD-\d{2}|DEV-\d{2}|CPR-\d{2}|FEED-\d{2}|SRCH-\d{2}|RPT-\d{2}|SLOT-\d{2}|GEN-\d{2})$/;
 
 function die(msg) { console.error(`traceability: ${msg}`); process.exit(2); }
 let failed = false;
@@ -94,6 +96,22 @@ const syncChecks = [
 for (const [name, inSpec, inInv] of syncChecks) {
   if (inSpec !== inInv) fail(`spec↔inventory drift: ${name}: spec has ${inSpec}, rules.tsv has ${inInv}`);
 }
+// Every `### N.M` subsection must sit physically under its own `## N` section.
+// Nothing else catches a misplacement: this checker matches rules.tsv's `spec`
+// COLUMN, not the heading's position, so a §20.10 appended after §21.6 leaves
+// both --static and --runtime clean while a reader of §20 never meets it.
+{
+  let current = null;
+  for (const line of specText.split("\n")) {
+    const top = /^## (\d+)\./.exec(line);
+    if (top) { current = top[1]; continue; }
+    const sub = /^### (\d+)\.(\d+)/.exec(line);
+    if (sub && current !== null && sub[1] !== current) {
+      fail(`spec layout: "${line.trim()}" is filed under §${current} — move it under §${sub[1]}`);
+    }
+  }
+}
+
 // every top-level spec section must have at least one inventory row
 const sections = [...specText.matchAll(/^## (\d+)\./gm)].map((m) => m[1]);
 for (const s of sections) {
@@ -229,8 +247,27 @@ if (baseline) {
   if (closed.length) fail(`baseline gap(s) now covered — shrink the baseline file in the same commit: ${closed.join(", ")}`);
   if (!unexpected.length && !closed.length) console.log(`gaps match the committed baseline (${gaps.length}) — migration phase gate green`);
 } else if (gaps.length) {
-  fail(`${gaps.length} rule(s) with no covering test:`);
-  for (const id of gaps) console.error(`  ${id}\t${inventory.get(id).spec}\t${inventory.get(id).summary.slice(0, 80)}`);
+  // Release semantics: without --baseline, any gap fails. That is correct, and
+  // it is also the invocation a person types by hand — so during a migration
+  // phase this printed the same FAIL, listing the same rows, on every single
+  // run. A gate that always says FAIL teaches its readers to skim FAIL lines,
+  // which is the habit that let three stale mutation rows survive two review
+  // rounds. It still fails; it now says whether this is news.
+  const committed = join(HERE, "phase-gaps", "baseline.txt");
+  const known = existsSync(committed)
+    ? new Set(readFileSync(committed, "utf8").split("\n").map((l) => l.trim()).filter((l) => l && !l.startsWith("#")))
+    : new Set();
+  const fresh = gaps.filter((id) => !known.has(id));
+  const expected = gaps.filter((id) => known.has(id));
+  if (fresh.length) {
+    fail(`${fresh.length} rule(s) with no covering test, and NOT in the committed baseline:`);
+    for (const id of fresh) console.error(`  ${id}\t${inventory.get(id).spec}\t${inventory.get(id).summary.slice(0, 80)}`);
+  }
+  if (expected.length) {
+    fail(`${expected.length} rule(s) with no covering test, all in the committed phase baseline — expected here, because this invocation is the RELEASE gate and deliberately ignores it:`);
+    for (const id of expected) console.error(`  ${id}\t${inventory.get(id).spec}\t${inventory.get(id).summary.slice(0, 80)}`);
+    console.error("  (run with --baseline tests/conformance/phase-gaps/baseline.txt for the migration-phase gate)");
+  }
 }
 if (failed) process.exit(1);
 console.log("traceability: OK");

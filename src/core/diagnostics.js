@@ -205,9 +205,23 @@ export class Reporter {
    */
   static format(d) {
     const where = d.line === undefined ? d.file : `${d.file}:${d.line}`;
-    const lines = [`${where}: ${d.severity}: ${d.message}`];
-    if (d.context) lines.push(`  in: ${d.context}`);
-    for (const fix of d.fixes ?? []) lines.push(`  fix: ${fix}`);
+    // §14.1 is a line-oriented contract — one diagnostic renders as its
+    // `FILE:LINE: SEVERITY:` line plus indented continuations — and a value
+    // carrying a newline breaks it from the inside. `<a href="/x&#10;.css">`
+    // is legal HTML whose VALUE (§12) contains a literal newline, and it
+    // rendered a single P13 across four lines, two of them looking like
+    // diagnostics with no location.
+    //
+    // ESCAPED, not folded. Collapsing the newline to a space gives the same
+    // one-line guarantee while showing the reader `/x .css` — a string the
+    // file does not contain, under a fix line telling them to check the
+    // spelling. That is the exact property §23.3 had to remove from this
+    // reporter once already. §24.5 escapes for the same reason, so both
+    // reporters now render one value one way.
+    const fold = (t) => String(t).replace(/[\n\r]/g, (c) => (c === "\n" ? "\\n" : "\\r"));
+    const lines = [`${where}: ${d.severity}: ${fold(d.message)}`];
+    if (d.context) lines.push(`  in: ${fold(d.context)}`);
+    for (const fix of d.fixes ?? []) lines.push(`  fix: ${fold(fix)}`);
     return lines.join("\n");
   }
 

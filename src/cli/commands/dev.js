@@ -12,8 +12,28 @@
  * (`createDevServer` throws `UsageError` — §14.1's fatal environment fault,
  * exit 2) with no build attempted at all — consistent with every other exit-2
  * case in this CLI (checked up front, before real work starts).
+ *
+ * §27 — THE LOCAL AUDIT VIEW is wired here and only here, because `unify dev`
+ * is the only command that answers a URL (§27.5: `watch` has no server,
+ * `build` writes files). Three facts about the wiring:
+ *
+ *   - **The report follows the rebuild, not the request** (§27.4). Every
+ *     rebuild hands `build()` an `onEvaluation` sink; the sink renders one
+ *     complete document and swaps it into the server, and the reload stream
+ *     that refreshes a page refreshes it too. Nothing is rendered on the
+ *     request path, so a browser never waits on a rebuild.
+ *   - **The server starts holding a real document** — §27.4's "a request that
+ *     arrives before any build has completed is answered". `createDevServer`
+ *     owns that first answer, so it exists from the moment the port binds and
+ *     no ordering here can lose it.
+ *   - **The sink rides on `settings`** because `settings` is the one value
+ *     `watch()` forwards to every rebuild it runs. `dev` adds nothing to the
+ *     build/rebuild contract and must not: the report describes the same build
+ *     `unify build` would have run, which is what makes §27.5's "not a second
+ *     audit" checkable by diffing this view against `unify audit`.
  */
 import { createDevServer } from "../../core/dev-server.js";
+import { renderInterrupted, renderReport } from "../../core/dev-report.js";
 import { watch } from "./watch.js";
 
 /**
@@ -27,14 +47,38 @@ export async function dev(context, opts = {}) {
 
   reporter.summary(`serving ${devServer.url} (output: ${output})`);
 
+  // A rebuild that reached the end of `build()` reported; one that threw did
+  // not (watcher.js catches it). Counting reports is the exact test, because
+  // the sink below is the last thing `build()` does.
+  let reports = 0;
   try {
     // Reuse the exact watch loop `unify watch` uses — dev adds nothing to
     // the build/rebuild contract, only a server layered on top of it. Every
     // rebuild (success or failure — WCH-04's error page is exactly the thing
     // a developer needs the reload to show) notifies connected reload clients.
-    await watch(context, {
+    await watch({
+      ...context,
+      // §27.3 — the report's ONE source: the §20 manifest of the build that
+      // just ran and §24's findings over it, handed over by `build()` itself.
+      // Rendering is a pure function of that payload (`dev-report.js` opens no
+      // file and parses no markup), so the view cannot re-read the site and
+      // cannot disagree with `unify audit` (product-spec §6.2).
+      settings: {
+        ...settings,
+        onEvaluation(evaluation) {
+          reports++;
+          devServer.setReport(renderReport(evaluation));
+        },
+      },
+    }, {
       ...opts,
       onRebuild(result) {
+        // §27.4 — the report follows the rebuild, including the rebuild that
+        // produced no report at all. Keeping the previous one would leave a
+        // stale document looking current, which is the mistake §27.3 (4) is
+        // written against.
+        if (reports === 0) devServer.setReport(renderInterrupted());
+        reports = 0;
         devServer.notifyReload();
         opts.onRebuild?.(result);
       },

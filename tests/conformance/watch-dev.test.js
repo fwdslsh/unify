@@ -11,6 +11,13 @@
  *
  * No mocks, no `src/**` imports, no fake timers: a watcher that only works
  * against a simulated clock is not evidence about a watcher.
+ *
+ * Every wait in this file is a CONDITION with an upper bound, never a
+ * constant. A fixed sleep is wrong in both directions at once: too long on the
+ * machine that rebuilds in 40 ms, and too short on the loaded CI box that
+ * needs a second — which is the flake this shape removes. `SETTLE_TIMEOUT_MS`
+ * is a bound reached only when the thing under test genuinely never happened,
+ * and it is deliberately far more generous than the sleep it replaced.
  */
 import { afterEach, describe, expect, test } from "bun:test";
 import { spawn } from "node:child_process";
@@ -18,7 +25,17 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSy
 import { join } from "node:path";
 import { CLI, covers, mkTmp, writeTree } from "./support.mjs";
 
-const SETTLE_MS = 700; // generous: a slow rebuild must not read as a lost event
+/** The bound on any single wait. Reached only on a real failure, never on a pass. */
+const SETTLE_TIMEOUT_MS = 15_000;
+/** How often a condition is re-checked. Small: the cost of a poll is a stat. */
+const POLL_MS = 20;
+/**
+ * How long the output tree must hold still before it counts as settled.
+ * `publish()` renames file by file (src/core/publish.js), so a tree read
+ * mid-publish can be a mixture of two builds — this is what makes the
+ * whole-tree comparisons below read one build and not two.
+ */
+const QUIET_MS = 100;
 
 /** @type {{proc: import('node:child_process').ChildProcess}[]} */
 const running = [];
@@ -29,7 +46,9 @@ afterEach(() => {
 
 /**
  * Start a long-running CLI command and resolve once it has produced its first
- * output (the startup summary), so tests never race the initial build.
+ * output (the startup summary), so tests never race the initial build. The
+ * resolution is the output itself — there is no padding after it, because
+ * every caller follows this with a wait for the specific artefact it needs.
  * @param {string[]} args
  * @param {string} cwd
  */
@@ -46,12 +65,82 @@ function start(args, cwd) {
     get stderr() { return err; },
     ready: new Promise((res) => {
       const t = setTimeout(res, 3000);
-      proc.stdout.once("data", () => { clearTimeout(t); setTimeout(res, 400); });
+      proc.stdout.once("data", () => { clearTimeout(t); res(); });
     }),
   };
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Poll `check` until it returns something truthy, and return that. A throw
+ * from `check` (a file that does not exist yet, a connection refused) counts
+ * as "not yet", never as a failure — the bound is what reports a failure, and
+ * it names what was being waited for.
+ * @template T
+ * @param {() => T | Promise<T>} check
+ * @param {string} what - named in the timeout message
+ * @param {number} [timeoutMs]
+ * @returns {Promise<T>}
+ */
+async function waitUntil(check, what, timeoutMs = SETTLE_TIMEOUT_MS) {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    try {
+      const value = await check();
+      if (value) return value;
+    } catch { /* not yet */ }
+    if (Date.now() >= deadline) throw new Error(`timed out after ${timeoutMs} ms waiting for ${what}`);
+    await sleep(POLL_MS);
+  }
+}
+
+/**
+ * Read `file` until its contents satisfy `predicate`; a missing file is "not
+ * yet". Returns the contents that satisfied it.
+ * @param {string} file
+ * @param {(text: string) => boolean} predicate
+ * @param {string} what
+ */
+function waitForContent(file, predicate, what, timeoutMs = SETTLE_TIMEOUT_MS) {
+  return waitUntil(() => {
+    if (!existsSync(file)) return null;
+    const text = readFileSync(file, "utf8");
+    return predicate(text) ? text : null;
+  }, what, timeoutMs);
+}
+
+/**
+ * Wait for a killed child to actually be gone, escalating to SIGKILL at the
+ * bound. Replaces "sleep long enough that it has probably exited": what the
+ * caller needs is that nothing is writing to `dist/` any more, and process
+ * exit is that fact rather than a proxy for it.
+ * @param {import('node:child_process').ChildProcess} proc
+ */
+function waitForExit(proc, timeoutMs = 5000) {
+  if (proc.exitCode !== null || proc.signalCode !== null) return Promise.resolve();
+  return new Promise((res) => {
+    const t = setTimeout(() => { try { proc.kill("SIGKILL"); } catch { /* gone */ } res(); }, timeoutMs);
+    proc.once("close", () => { clearTimeout(t); res(); });
+  });
+}
+
+/**
+ * Fetch `url` until the response satisfies `predicate`, which sees the status
+ * and the body together — a dev server answers as soon as it is listening,
+ * which is before its first build lands, so a status alone is not proof the
+ * page under test is the one being served.
+ * @param {string} url
+ * @param {(r: {status: number, body: string}) => boolean} predicate
+ * @param {string} what
+ */
+function waitForResponse(url, predicate, what, timeoutMs = SETTLE_TIMEOUT_MS) {
+  return waitUntil(async () => {
+    const res = await fetch(url, { redirect: "manual" });
+    const answer = { status: res.status, body: await res.text() };
+    return predicate(answer) ? answer : null;
+  }, what, timeoutMs);
+}
 
 /**
  * A port the OS says is free right now.
@@ -91,6 +180,27 @@ function snapshot(dir) {
   return out;
 }
 
+/**
+ * `snapshot(dir)` once two readings `QUIET_MS` apart agree and the tree is not
+ * empty — i.e. no publish is in flight. This is the one wait that is not a
+ * single observable event, because "no further rebuild is coming" is not an
+ * event a watcher emits; a quiet period is the honest approximation, and it is
+ * applied once at the end rather than after every edit.
+ * @param {string} dir
+ */
+async function settledSnapshot(dir, timeoutMs = SETTLE_TIMEOUT_MS) {
+  let prev = null;
+  return waitUntil(async () => {
+    const next = snapshot(dir);
+    const key = JSON.stringify(next);
+    const agreed = key === prev && Object.keys(next).length > 0;
+    prev = key;
+    if (agreed) return next;
+    await sleep(QUIET_MS);
+    return null;
+  }, `the output tree under ${dir} to stop changing`, timeoutMs);
+}
+
 const SITE = {
   "src/_layout.html":
     '<!doctype html>\n<html>\n<head>\n  <meta charset="utf-8">\n  <title>— Site</title>\n</head>\n<body>\n  <main><slot></slot></main>\n</body>\n</html>\n',
@@ -99,27 +209,82 @@ const SITE = {
 };
 
 describe("§16 watch contract", () => {
+  test("GEN-03 — every rebuild re-loads the generator, so watch output never goes stale", async () => {
+    // §33.2's third consequence, and the ONLY one a subprocess test cannot
+    // reach: each `runCli` is a fresh process, so ESM's module cache is empty
+    // every time and a cached-module bug is invisible. It only bites inside
+    // ONE long-lived process — which is exactly watch mode — and it bites
+    // SILENTLY: the generator is skipped, the site goes stale, and the build
+    // reports success. That is the failure §14 exists to forbid wearing a
+    // performance optimisation's clothes.
+    const tmp = mkTmp();
+    writeTree(tmp, {
+      "src/index.html": '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><title>Home</title><meta name="description" content="Home."></head><body><h1>Home</h1><a href="/from-data.html">d</a></body></html>\n',
+      "src/_data/value.txt": "first\n",
+      "src/_scripts/gen.mjs": `import { writeFileSync, mkdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+const [, , sourceRoot, outDir] = process.argv;
+const value = readFileSync(join(sourceRoot, "_data/value.txt"), "utf8").trim();
+mkdirSync(outDir, { recursive: true });
+writeFileSync(join(outDir, "from-data.html"),
+  \`<!doctype html>\\n<html lang="en"><head><meta charset="utf-8"><title>Data</title><meta name="description" content="From the data file."></head><body><h1>Data</h1><p id="v">\${value}</p></body></html>\\n\`);
+`,
+    });
+    const w = start(["watch", "--generate", "_scripts/gen.mjs"], tmp);
+    await w.ready;
+    const generated = join(tmp, "dist/from-data.html");
+    try {
+      await waitForContent(generated, (t) => t.includes('<p id="v">first</p>'), "the generator's first output");
+    } catch {
+      const seen = existsSync(generated) ? readFileSync(generated, "utf8") : "<the generator wrote nothing>";
+      throw new Error(`the first build must run the generator:\n${seen}\n${w.stderr}`);
+    }
+
+    // Edit only the DATA the generator reads. Nothing about the generator
+    // module itself changes, which is precisely the case a module cache gets
+    // wrong: re-running the build without re-running the generator leaves
+    // `first` on disk and reports success.
+    writeFileSync(join(tmp, "src/_data/value.txt"), "second\n");
+    try {
+      await waitForContent(generated, (t) => t.includes('<p id="v">second</p>'), "the rebuild to re-run the generator");
+    } catch {
+      throw new Error(
+        `§33.2: every rebuild re-loads the generator FRESH. The output is stale, which means the module was cached and the generator silently skipped:\n${readFileSync(generated, "utf8")}`,
+      );
+    }
+    w.proc.kill("SIGTERM");
+    await waitForExit(w.proc);
+    covers("GEN-03");
+  }, 30_000);
+
   test("WCH-02 — watch output after an edit sequence is identical to a fresh build", async () => {
     const tmp = mkTmp();
     writeTree(tmp, SITE);
+    const dist = join(tmp, "dist");
     const w = start(["watch"], tmp);
     await w.ready;
 
     // An edit sequence a person would actually perform: change a page, add a
-    // page, change the shared layout, delete a page.
+    // page, change the shared layout, delete a page. Each step waits for its
+    // OWN effect to reach the output, so the next edit lands against a
+    // finished rebuild exactly as the fixed sleep intended — but observed
+    // rather than assumed.
     writeFileSync(join(tmp, "src/index.html"), SITE["src/index.html"].replace("one", "two"));
-    await sleep(SETTLE_MS);
+    await waitForContent(join(dist, "index.html"), (t) => t.includes("two"), "the edit to reach dist/index.html");
+
     writeFileSync(join(tmp, "src/extra.html"), "<!doctype html>\n<html>\n<head><title>Extra</title></head>\n<body>\n  <p>extra</p>\n</body>\n</html>\n");
-    await sleep(SETTLE_MS);
+    await waitForContent(join(dist, "extra.html"), (t) => t.includes("extra"), "the added page to reach dist/extra.html");
+
     writeFileSync(join(tmp, "src/_layout.html"), SITE["src/_layout.html"].replace("— Site", "— Renamed"));
-    await sleep(SETTLE_MS);
+    await waitForContent(join(dist, "index.html"), (t) => t.includes("Renamed"), "the layout change to reach every page");
+
     const { unlinkSync } = await import("node:fs");
     unlinkSync(join(tmp, "src/about.html"));
-    await sleep(SETTLE_MS);
+    await waitUntil(() => !existsSync(join(dist, "about.html")), "the deleted page to leave the output");
 
-    const watched = snapshot(join(tmp, "dist"));
+    const watched = await settledSnapshot(dist);
     w.proc.kill("SIGTERM");
-    await sleep(200);
+    await waitForExit(w.proc);
 
     // A completely independent build of the same final source.
     const fresh = mkTmp();
@@ -139,17 +304,23 @@ describe("§16 watch contract", () => {
   test("WCH-03 — an unchanged file is not rewritten across rebuilds", async () => {
     const tmp = mkTmp();
     writeTree(tmp, SITE);
+    const dist = join(tmp, "dist");
     const w = start(["watch"], tmp);
     await w.ready;
 
-    const untouched = join(tmp, "dist", "about.html");
+    const untouched = join(dist, "about.html");
+    // The baseline must be taken from a FINISHED initial build: an inode read
+    // while the first publish is still renaming files in is a baseline the
+    // startup build itself would go on to change, and the rebuild would be
+    // blamed for it.
+    await settledSnapshot(dist);
     const before = statSync(untouched);
 
     // Edit a different page; about.html's content is unaffected.
     writeFileSync(join(tmp, "src/index.html"), SITE["src/index.html"].replace("one", "changed"));
-    await sleep(SETTLE_MS);
+    await waitForContent(join(dist, "index.html"), (t) => t.includes("changed"), "the edit to reach dist/index.html");
 
-    expect(readFileSync(join(tmp, "dist", "index.html"), "utf8")).toContain("changed");
+    expect(readFileSync(join(dist, "index.html"), "utf8")).toContain("changed");
     const after = statSync(untouched);
     // Same inode and mtime: not rewritten, not recreated.
     expect(after.ino).toBe(before.ino);
@@ -160,22 +331,23 @@ describe("§16 watch contract", () => {
   test("WCH-04 — a failing rebuild emits an error page, and the next good one replaces it", async () => {
     const tmp = mkTmp();
     writeTree(tmp, SITE);
+    const dist = join(tmp, "dist");
     const w = start(["watch"], tmp);
     await w.ready;
-    expect(readFileSync(join(tmp, "dist", "index.html"), "utf8")).toContain("one");
+    await waitForContent(join(dist, "index.html"), (t) => t.includes("one"), "the startup build to publish index.html");
 
     // Break it: a reference that resolves to nothing is a problem (§12).
     writeFileSync(join(tmp, "src/index.html"),
       '<!doctype html>\n<html>\n<head><title>Home</title></head>\n<body>\n  <a href="/missing.html">x</a>\n</body>\n</html>\n');
-    await sleep(SETTLE_MS);
-    const broken = readFileSync(join(tmp, "dist", "index.html"), "utf8");
+    const broken = await waitForContent(
+      join(dist, "index.html"), (t) => t.includes("unify-watch-error-page"), "the failing rebuild's error page");
     expect(broken).toContain("unify-watch-error-page");
     expect(broken).toContain("missing.html");
 
     // Fix it: the error page is gone and real output is back.
     writeFileSync(join(tmp, "src/index.html"), SITE["src/index.html"].replace("one", "fixed"));
-    await sleep(SETTLE_MS);
-    const healed = readFileSync(join(tmp, "dist", "index.html"), "utf8");
+    const healed = await waitForContent(
+      join(dist, "index.html"), (t) => t.includes("fixed"), "the good rebuild to replace the error page");
     expect(healed).not.toContain("unify-watch-error-page");
     expect(healed).toContain("fixed");
     covers("WCH-04");
@@ -189,13 +361,18 @@ describe("§16 dev server", () => {
     const port = await freePort();
     const d = start(["dev", "-p", String(port)], tmp);
     await d.ready;
-    await sleep(400);
 
-    const res = await fetch(`http://localhost:${port}/index.html`);
+    // Status AND body together: the server is listening before its first build
+    // has landed, so a bare 200 is not evidence the built page is being served.
+    const res = await waitForResponse(
+      `http://localhost:${port}/index.html`,
+      (r) => r.status === 200 && r.body.includes("one"),
+      "the dev server to serve the built index.html");
     expect(res.status).toBe(200);
-    expect(await res.text()).toContain("one");
+    expect(res.body).toContain("one");
 
     const missing = await fetch(`http://localhost:${port}/nope.html`);
+    await missing.text();
     expect(missing.status).toBe(404);
 
     // A second dev on the same port must exit 2, not silently bind elsewhere.
@@ -214,13 +391,15 @@ describe("§16 dev server", () => {
     const port = await freePort();
     const d = start(["dev", "-p", String(port)], tmp);
     await d.ready;
-    await sleep(400);
 
-    const served = await (await fetch(`http://localhost:${port}/index.html`)).text();
-    expect(served).toContain("EventSource");
+    const served = await waitForResponse(
+      `http://localhost:${port}/index.html`,
+      (r) => r.status === 200 && r.body.includes("one"),
+      "the dev server to serve the built index.html");
+    expect(served.body).toContain("EventSource");
 
     d.proc.kill("SIGTERM");
-    await sleep(300);
+    await waitForExit(d.proc);
 
     // §5's "unify ships no JavaScript, ever" — check the whole tree, not one file.
     for (const [rel, body] of Object.entries(snapshot(join(tmp, "dist")))) {

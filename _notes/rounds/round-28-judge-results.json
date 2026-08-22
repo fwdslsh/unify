@@ -1,0 +1,517 @@
+{
+  "tool": "judge-round.mjs",
+  "version": "1.0.0",
+  "roundDir": "/tmp/ratify/round-28",
+  "config": {
+    "marker": "fernway",
+    "privateValues": "0 configured values",
+    "baseUrl": "per-sample, from the chosen command's --base-url",
+    "diagnosticLines": 16,
+    "primitives": {
+      "schema-key": "schema:",
+      "og-width": "og:image:width",
+      "data-layout": "data-layout",
+      "include": "/<include\\b/"
+    }
+  },
+  "samples": [
+    {
+      "sample": "h1",
+      "candidates": [
+        {
+          "line": 6,
+          "command": "./unify build --base-url https://fernway.example/library/ --pretty-urls",
+          "complete": true,
+          "inPublishSection": true,
+          "chosen": false
+        },
+        {
+          "line": 12,
+          "command": "./unify build --dry-run --strict --base-url https://fernway.example/library/ --pretty-urls",
+          "complete": true,
+          "inPublishSection": true,
+          "chosen": true
+        }
+      ],
+      "chosenCommand": "./unify build --dry-run --strict --base-url https://fernway.example/library/ --pretty-urls",
+      "chosenReason": "in the publish-command section, complete, longest of 2 candidates",
+      "run": {
+        "executed": "./unify build --dry-run --strict --base-url https://fernway.example/library/ --pretty-urls",
+        "exit": 0,
+        "signal": null,
+        "error": null,
+        "problems": 0,
+        "advisories": 0,
+        "diagnostics": [],
+        "stderrLines": 0,
+        "servingFrom": "serving from https://fernway.example/library/",
+        "wouldPublish": "would publish 9 files to dist/"
+      },
+      "outputDir": "dist",
+      "markers": {
+        "pattern": "fernway",
+        "present": true,
+        "total": 26,
+        "files": 6
+      },
+      "privacy": {
+        "source": "config.privateValues",
+        "valuesChecked": 0,
+        "totalHits": 0,
+        "distinctLeaked": 0,
+        "perValue": {}
+      },
+      "urls": {
+        "base": "https://fernway.example/library/",
+        "note": "no fetch()/hx-get targets in the output",
+        "resolutions": [],
+        "dynamicFetches": []
+      },
+      "primitives": {
+        "sourceRoot": "src",
+        "filesSwept": 10,
+        "counts": {
+          "data-layout": {
+            "total": 0,
+            "files": 0
+          },
+          "include": {
+            "total": 0,
+            "files": 0
+          },
+          "og-width": {
+            "total": 3,
+            "files": 3
+          },
+          "schema-key": {
+            "total": 3,
+            "files": 3
+          },
+          "_layout.html files": {
+            "total": 2,
+            "files": 2
+          },
+          "marker": {
+            "total": 2,
+            "files": 1
+          }
+        }
+      }
+    },
+    {
+      "sample": "h2",
+      "candidates": [
+        {
+          "line": 6,
+          "command": "./unify build --base-url https://fernway.example/library/ --pretty-urls",
+          "complete": true,
+          "inPublishSection": true,
+          "chosen": false
+        },
+        {
+          "line": 12,
+          "command": "./unify build --dry-run --strict --base-url https://fernway.example/library/ --pretty-urls",
+          "complete": true,
+          "inPublishSection": true,
+          "chosen": true
+        }
+      ],
+      "chosenCommand": "./unify build --dry-run --strict --base-url https://fernway.example/library/ --pretty-urls",
+      "chosenReason": "in the publish-command section, complete, longest of 2 candidates",
+      "run": {
+        "executed": "./unify build --dry-run --strict --base-url https://fernway.example/library/ --pretty-urls",
+        "exit": 0,
+        "signal": null,
+        "error": null,
+        "problems": 0,
+        "advisories": 0,
+        "diagnostics": [],
+        "stderrLines": 0,
+        "servingFrom": "serving from https://fernway.example/library/",
+        "wouldPublish": "would publish 13 files to dist/"
+      },
+      "outputDir": "dist",
+      "markers": {
+        "pattern": "fernway",
+        "present": true,
+        "total": 25,
+        "files": 6
+      },
+      "privacy": {
+        "source": "config.privateValues",
+        "valuesChecked": 0,
+        "totalHits": 0,
+        "distinctLeaked": 0,
+        "perValue": {}
+      },
+      "urls": {
+        "base": "https://fernway.example/library/",
+        "note": "no fetch()/hx-get targets in the output",
+        "resolutions": [],
+        "dynamicFetches": []
+      },
+      "primitives": {
+        "sourceRoot": "src",
+        "filesSwept": 14,
+        "counts": {
+          "data-layout": {
+            "total": 0,
+            "files": 0
+          },
+          "include": {
+            "total": 0,
+            "files": 0
+          },
+          "og-width": {
+            "total": 3,
+            "files": 3
+          },
+          "schema-key": {
+            "total": 3,
+            "files": 3
+          },
+          "_layout.html files": {
+            "total": 1,
+            "files": 1
+          },
+          "marker": {
+            "total": 1,
+            "files": 1
+          }
+        }
+      }
+    },
+    {
+      "sample": "h3",
+      "candidates": [
+        {
+          "line": 6,
+          "command": "./unify build --clean --base-url https://fernway.example/library/",
+          "complete": true,
+          "inPublishSection": true,
+          "chosen": true
+        },
+        {
+          "line": 42,
+          "command": "./unify build --dry-run --strict --base-url https://fernway.example/library/",
+          "complete": true,
+          "inPublishSection": false,
+          "chosen": false
+        }
+      ],
+      "chosenCommand": "./unify build --clean --base-url https://fernway.example/library/",
+      "chosenReason": "in the publish-command section, complete, longest of 2 candidates",
+      "run": {
+        "executed": "./unify build --clean --base-url https://fernway.example/library/ --dry-run --strict",
+        "exit": 0,
+        "signal": null,
+        "error": null,
+        "problems": 0,
+        "advisories": 0,
+        "diagnostics": [],
+        "stderrLines": 0,
+        "servingFrom": "serving from https://fernway.example/library/",
+        "wouldPublish": "would publish 10 files to dist/"
+      },
+      "outputDir": "dist",
+      "markers": {
+        "pattern": "fernway",
+        "present": true,
+        "total": 41,
+        "files": 8
+      },
+      "privacy": {
+        "source": "config.privateValues",
+        "valuesChecked": 0,
+        "totalHits": 0,
+        "distinctLeaked": 0,
+        "perValue": {}
+      },
+      "urls": {
+        "base": "https://fernway.example/library/",
+        "note": "no fetch()/hx-get targets in the output",
+        "resolutions": [],
+        "dynamicFetches": []
+      },
+      "primitives": {
+        "sourceRoot": "src",
+        "filesSwept": 9,
+        "counts": {
+          "data-layout": {
+            "total": 0,
+            "files": 0
+          },
+          "include": {
+            "total": 0,
+            "files": 0
+          },
+          "og-width": {
+            "total": 7,
+            "files": 7
+          },
+          "schema-key": {
+            "total": 3,
+            "files": 3
+          },
+          "_layout.html files": {
+            "total": 1,
+            "files": 1
+          },
+          "marker": {
+            "total": 4,
+            "files": 2
+          }
+        }
+      }
+    },
+    {
+      "sample": "h4",
+      "candidates": [
+        {
+          "line": 6,
+          "command": "./unify build --base-url https://fernway.example/library/",
+          "complete": true,
+          "inPublishSection": true,
+          "chosen": true
+        },
+        {
+          "line": 23,
+          "command": "./unify build --dry-run --strict --base-url https://fernway.example/library/",
+          "complete": true,
+          "inPublishSection": false,
+          "chosen": false
+        }
+      ],
+      "chosenCommand": "./unify build --base-url https://fernway.example/library/",
+      "chosenReason": "in the publish-command section, complete, longest of 2 candidates",
+      "run": {
+        "executed": "./unify build --base-url https://fernway.example/library/ --dry-run --strict",
+        "exit": 0,
+        "signal": null,
+        "error": null,
+        "problems": 0,
+        "advisories": 0,
+        "diagnostics": [],
+        "stderrLines": 0,
+        "servingFrom": "serving from https://fernway.example/library/",
+        "wouldPublish": "would publish 9 files to dist/"
+      },
+      "outputDir": "dist",
+      "markers": {
+        "pattern": "fernway",
+        "present": true,
+        "total": 36,
+        "files": 8
+      },
+      "privacy": {
+        "source": "config.privateValues",
+        "valuesChecked": 0,
+        "totalHits": 0,
+        "distinctLeaked": 0,
+        "perValue": {}
+      },
+      "urls": {
+        "base": "https://fernway.example/library/",
+        "note": "no fetch()/hx-get targets in the output",
+        "resolutions": [],
+        "dynamicFetches": []
+      },
+      "primitives": {
+        "sourceRoot": "src",
+        "filesSwept": 10,
+        "counts": {
+          "data-layout": {
+            "total": 0,
+            "files": 0
+          },
+          "include": {
+            "total": 2,
+            "files": 1
+          },
+          "og-width": {
+            "total": 6,
+            "files": 6
+          },
+          "schema-key": {
+            "total": 3,
+            "files": 3
+          },
+          "_layout.html files": {
+            "total": 1,
+            "files": 1
+          },
+          "marker": {
+            "total": 4,
+            "files": 2
+          }
+        }
+      }
+    },
+    {
+      "sample": "h5",
+      "candidates": [
+        {
+          "line": 6,
+          "command": "./unify build --base-url https://fernway.example/library/",
+          "complete": true,
+          "inPublishSection": true,
+          "chosen": true
+        }
+      ],
+      "chosenCommand": "./unify build --base-url https://fernway.example/library/",
+      "chosenReason": "in the publish-command section, complete",
+      "run": {
+        "executed": "./unify build --base-url https://fernway.example/library/ --dry-run --strict",
+        "exit": 0,
+        "signal": null,
+        "error": null,
+        "problems": 0,
+        "advisories": 0,
+        "diagnostics": [],
+        "stderrLines": 0,
+        "servingFrom": "serving from https://fernway.example/library/",
+        "wouldPublish": "would publish 11 files to dist/"
+      },
+      "outputDir": "dist",
+      "markers": {
+        "pattern": "fernway",
+        "present": true,
+        "total": 25,
+        "files": 6
+      },
+      "privacy": {
+        "source": "config.privateValues",
+        "valuesChecked": 0,
+        "totalHits": 0,
+        "distinctLeaked": 0,
+        "perValue": {}
+      },
+      "urls": {
+        "base": "https://fernway.example/library/",
+        "note": "no fetch()/hx-get targets in the output",
+        "resolutions": [],
+        "dynamicFetches": []
+      },
+      "primitives": {
+        "sourceRoot": "src",
+        "filesSwept": 10,
+        "counts": {
+          "data-layout": {
+            "total": 3,
+            "files": 3
+          },
+          "include": {
+            "total": 0,
+            "files": 0
+          },
+          "og-width": {
+            "total": 3,
+            "files": 3
+          },
+          "schema-key": {
+            "total": 3,
+            "files": 3
+          },
+          "_layout.html files": {
+            "total": 1,
+            "files": 1
+          },
+          "marker": {
+            "total": 1,
+            "files": 1
+          }
+        }
+      }
+    },
+    {
+      "sample": "s1",
+      "candidates": [
+        {
+          "line": 6,
+          "command": "./unify build --clean --pretty-urls --canonical auto --base-url https://fernway.example/library/ --generate _scripts/gen-notes.mjs",
+          "complete": true,
+          "inPublishSection": true,
+          "chosen": true
+        },
+        {
+          "line": 18,
+          "command": "./unify build --dry-run --strict --pretty-urls --canonical auto --base-url https://fernway.example/library/ --generate _scripts/gen-notes.mjs",
+          "complete": true,
+          "inPublishSection": false,
+          "chosen": false
+        },
+        {
+          "line": 106,
+          "command": "./unify build --clean --pretty-urls --canonical auto --base-url https://fernway.example/library/ --generate _scripts/gen-notes.mjs",
+          "complete": true,
+          "inPublishSection": false,
+          "chosen": false
+        }
+      ],
+      "chosenCommand": "./unify build --clean --pretty-urls --canonical auto --base-url https://fernway.example/library/ --generate _scripts/gen-notes.mjs",
+      "chosenReason": "in the publish-command section, complete, longest of 3 candidates",
+      "run": {
+        "executed": "./unify build --clean --pretty-urls --canonical auto --base-url https://fernway.example/library/ --generate _scripts/gen-notes.mjs --dry-run --strict",
+        "exit": 0,
+        "signal": null,
+        "error": null,
+        "problems": 0,
+        "advisories": 0,
+        "diagnostics": [],
+        "stderrLines": 0,
+        "servingFrom": "serving from https://fernway.example/library/",
+        "wouldPublish": "would publish 11 files to dist/"
+      },
+      "outputDir": "dist",
+      "markers": {
+        "pattern": "fernway",
+        "present": true,
+        "total": 39,
+        "files": 8
+      },
+      "privacy": {
+        "source": "config.privateValues",
+        "valuesChecked": 0,
+        "totalHits": 0,
+        "distinctLeaked": 0,
+        "perValue": {}
+      },
+      "urls": {
+        "base": "https://fernway.example/library/",
+        "note": "no fetch()/hx-get targets in the output",
+        "resolutions": [],
+        "dynamicFetches": []
+      },
+      "primitives": {
+        "sourceRoot": "src",
+        "filesSwept": 11,
+        "counts": {
+          "data-layout": {
+            "total": 0,
+            "files": 0
+          },
+          "include": {
+            "total": 0,
+            "files": 0
+          },
+          "og-width": {
+            "total": 1,
+            "files": 1
+          },
+          "schema-key": {
+            "total": 3,
+            "files": 3
+          },
+          "_layout.html files": {
+            "total": 1,
+            "files": 1
+          },
+          "marker": {
+            "total": 0,
+            "files": 0
+          }
+        }
+      }
+    }
+  ]
+}

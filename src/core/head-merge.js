@@ -34,6 +34,7 @@
  * behavior, which is exact for a direct caller passing a page's unspliced
  * source (every unit test).
  */
+import { decodePathSegments } from "./urls.js";
 import {
   contentSpan, elementChildren, getAttr, hasAttr, innerText, isElement,
   lineOf, rawSpan, tokens,
@@ -60,8 +61,15 @@ function resolveForCompare(url, provenanceFile) {
   if (!url) return null;
   if (/^[a-z][a-z0-9+.-]*:/i.test(url) || url.startsWith("//")) return null;
   if (url.startsWith("#") || url === "") return null;
-  const [pathPart] = url.split(/[?#]/); // query/fragment don't participate in "is this the same file"
-  if (pathPart === "") return null;
+  const [raw] = url.split(/[?#]/); // query/fragment don't participate in "is this the same file"
+  if (raw === "") return null;
+  // Percent-decoded before comparison, exactly as §12 matches (REF-08). This
+  // question — "do these two URLs name one file?" — must have ONE answer across
+  // the build: without decoding, a layout's `/assets/a b.css` and a page's
+  // `/assets/a%20b.css` are the same file and ship as two <link> elements,
+  // against §8 row 6's "dedup compares URLs after resolution". Newly reachable
+  // now that §20.5 makes the encoded spelling the one unify itself publishes.
+  const pathPart = decodePathSegments(raw);
   if (pathPart.startsWith("/")) return posix.normalize(pathPart);
   const dir = posix.dirname("/" + provenanceFile);
   return posix.normalize(posix.join(dir, pathPart));

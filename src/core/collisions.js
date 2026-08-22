@@ -1,5 +1,6 @@
 /**
- * collisions.js — conformance-spec §13 (output paths and collisions), plus
+ * collisions.js — conformance-spec §13 (output paths and collisions,
+ * including A11's case-only advisory and A16's normalization-form one), plus
  * three more "does this file belong in the output tree at all" checks that
  * naturally share §13's shape (iterate the corpus of files about to be
  * emitted or held back, look at each one's PATH, report by pattern — no
@@ -117,7 +118,7 @@ export function resolveOutputPaths({ entries, prettyUrls = false, reporter }) {
     const sorted = pathOrdered(group);
     reporter.problem({
       file: sorted[0].source.path,
-      message: `${sorted.map((g) => g.source.path).join(" and ")} both produce ${sorted[0].outputPath}`,
+      message: `${sorted.map((g) => g.source.label ?? g.source.path).join(" and ")} both produce ${sorted[0].outputPath}`,
       // Not "remove one": a round-8 repair sample deleted the losing source
       // outright, taking the page's address and phone number with it. Naming
       // the two non-destructive edits first is the whole fix.
@@ -137,14 +138,192 @@ export function resolveOutputPaths({ entries, prettyUrls = false, reporter }) {
     if (paths.length < 2) continue;
     const allEntries = pathOrdered(paths.flatMap((p) => byExactPath.get(p)));
     const [first, ...rest] = allEntries;
-    const others = [...new Set(rest.map((r) => r.outputPath))].join(", ");
+    // Keyed on the NFC FORM, not on the literal path.
+    //
+    // "Equal after lowercasing" is not "differs only by case". `toLowerCase`
+    // also collapses the canonical singletons — U+212A KELVIN SIGN → `k`,
+    // U+2126 OHM SIGN → `ω`, U+212B ANGSTROM SIGN → `å` — so `Kilo.html`
+    // spelled with U+212A and `Kilo.html` spelled with ASCII `K` landed in one
+    // A11 group. They are canonically equivalent: one name to a normalizing
+    // host, which is row 4 of §13's table and A16's to report. A11 said
+    // instead, of two strings that render identically and are both capital K,
+    // "Kilo.html and Kilo.html differ only by letter case" — a sentence naming
+    // no edit the author could make, which is the defect `escapeNonAscii`
+    // exists to prevent, arriving in the other advisory.
+    //
+    // Collapsing by NFC leaves nothing to name for such a group, and an
+    // advisory with an empty right-hand side is not printed — which is how the
+    // Kelvin pair reaches A16 and only A16.
+    //
+    // What this buys is NOT a partition of the groups: A16's key is the
+    // coarser, so its group contains this one whenever a name appears in both
+    // a second case and a second form, and §13 no longer claims otherwise. It
+    // buys the weaker property that is actually true and actually load-bearing
+    // — no pair ever draws the WRONG advisory. Every pair this sentence names
+    // has equal lowercase and distinct NFC, which is a difference of case and
+    // nothing else.
+    const others = otherRepresentatives(first, rest, (p) => p.normalize("NFC")).map(escapeNonAscii);
+    if (others.length > 0) {
+      reporter.advisory({
+        file: first.source.path,
+        message: `${escapeNonAscii(first.outputPath)} and ${others.join(", ")} differ only by letter case — they collide on case-insensitive hosts`,
+      });
+    }
+  }
+
+  // A16 — distinct exact-path groups that are one name on a host that
+  // normalizes. §13's closure argument leaves exactly two host-side foldings
+  // once §20.5's address function is known to be injective: letter case,
+  // which is A11's above, and Unicode normalization form, which is this.
+  //
+  // The key folds BOTH, deliberately. macOS — by far the most common
+  // normalizing host — folds case and form at once, so `CAFÉ.html` in NFC
+  // beside `café.html` in NFD is one file there. Keyed on NFC alone that pair
+  // matches neither advisory's key and is reported by nothing: a silent hole
+  // on the commonest normalizing host, which is the shape of gap this
+  // catalogue exists not to have.
+  //
+  // This key is COARSER than A11's, so A11's group sits inside this one
+  // whenever a name appears in both a second case and a second form — and the
+  // guarantee §13 makes is correspondingly weaker than "the two advisories
+  // partition the pairs", which was claimed for two rounds and was false. What
+  // holds is that no pair draws the WRONG advisory, and the skip below is the
+  // whole mechanism: a group that is A11's ENTIRELY is dropped here, and every
+  // group that survives holds at least one genuine difference of form.
+  //
+  // A surviving group is then named IN FULL, not filtered down to the
+  // spellings A11 did not mention — see the `others` line below for why no
+  // filter can do both jobs at once.
+  /** @type {Map<string, string[]>} */
+  const byNormalizedPath = new Map();
+  for (const outputPath of byExactPath.keys()) {
+    const key = outputPath.normalize("NFC").toLowerCase();
+    if (!byNormalizedPath.has(key)) byNormalizedPath.set(key, []);
+    byNormalizedPath.get(key).push(outputPath);
+  }
+  for (const paths of byNormalizedPath.values()) {
+    if (paths.length < 2) continue;
+    // Skip only a group that is A11's ENTIRELY: every member the same after
+    // case folding (so A11 groups them all) AND every member a distinct NFC
+    // form (so none of them differ by form). Both halves are load-bearing.
+    //
+    // Asking only "are the lowercase forms identical" claimed the canonical
+    // singletons for A11: U+212A KELVIN SIGN lowercases to `k`, so `Kilo.html`
+    // spelled with it and with ASCII `K` answered "pure case" — while their
+    // NFC forms are equal, which makes them one name in two forms, row 4 of
+    // §13's table and this advisory's to report.
+    //
+    // Asking only "are the NFC forms distinct" skipped the pair this group's
+    // combined key exists to catch: `CAFÉ.html` in NFC beside `café.html` in
+    // NFD differs in BOTH case and form, so its NFC forms are distinct and its
+    // lowercase forms are not identical. macOS folds both at once and sees one
+    // file. Skipping it left the commonest normalizing host silently unserved.
+    const sameFolded = new Set(paths.map((p) => p.toLowerCase())).size === 1;
+    const distinctForms = new Set(paths.map((p) => p.normalize("NFC"))).size === paths.length;
+    if (sameFolded && distinctForms) continue; // A11's group, not this one's
+    const allEntries = pathOrdered(paths.flatMap((p) => byExactPath.get(p)));
+    const [first, ...rest] = allEntries;
+    // Keyed on the RAW path: every distinct spelling in the group is named.
+    //
+    // Folding the key by case collapsed the pair that differs ONLY by form
+    // when the two spellings also share a case fold — the Kelvin pair above —
+    // and left this sentence with an empty right-hand side. There is no key
+    // that both names those two and hides the case pair inside a
+    // three-spelling group, because the two demands are opposite: one needs
+    // the raw bytes kept, the other needs them folded away.
+    //
+    // So the group is named in full, and §13 claims what is actually true:
+    // each advisory explains ONE host behaviour, no pair ever draws the WRONG
+    // one, and a spelling that collides in both ways appears in both sentences
+    // because both are true of it.
+    const others = otherRepresentatives(first, rest, (p) => p).map(escapeNonAscii).join(", ");
     reporter.advisory({
       file: first.source.path,
-      message: `${first.outputPath} and ${others} differ only by letter case — they collide on case-insensitive hosts`,
+      // The sentence is about the GROUP, not about each pair in it. Saying
+      // "are one name in two normalization forms" was false as soon as the
+      // group held a pure-ASCII case pair beside a canonical singleton:
+      // `Kilo.html`, `kilo.html` and `Kilo.html` spelled with U+212A are one
+      // file on a host that folds case and form together, but the first two
+      // have no normalization relationship with anything, and the sentence
+      // asserted one about them. What is true of every member is the folding
+      // that merges them, so that is what it now says.
+      message: `${escapeNonAscii(first.outputPath)} and ${others} are one name on a host that normalizes Unicode — macOS folds form and case together, so these are one file there`,
     });
   }
 
   return results;
+}
+
+/**
+ * The paths a collision advisory names BESIDES the one it is located at: the
+ * group's remaining entries in path order, reduced to one representative per
+ * `key`, with the key `first` itself answers for already spoken for.
+ *
+ * Both exclusions repair a sentence that quoted something the author could
+ * not act on.
+ *
+ * Seeding the seen set with `first`'s own key is what stops an output path
+ * appearing on both sides of "X and Y". A P12 pair — two sources, one output
+ * path — puts two entries in the group carrying that one path, and when the
+ * path-ordered first source is one of the pair, deduplicating only the REST
+ * left it quoting itself: `About.html and About.html, about.html`, which
+ * reads as a rename of a file to its own name.
+ *
+ * Reducing by `key` rather than by the literal path is A11's other need. Its
+ * group is one case-folded form BY CONSTRUCTION, so a literal-path key names
+ * every sibling — including one that differs from `first` by normalization
+ * form alone, which is not a difference of case and is A16's to report.
+ * `Kilo.html` spelled with U+212A KELVIN SIGN and with ASCII `K` lowercase
+ * onto the same string, and under a literal key A11 announced "Kilo.html and
+ * \u{212a}ilo.html differ only by letter case" — a claim about a pair that
+ * differs by no case at all. Under A11's NFC key that sibling collapses onto
+ * `first` and the advisory is not printed, which is exactly the outcome
+ * wanted: A16 has it.
+ *
+ * A16 passes the identity key deliberately — it names every distinct spelling
+ * (§13). The two advisories' GROUPS nest; only their claims stay apart.
+ *
+ * @param {OutputEntry} first - the group's path-ordered first entry
+ * @param {OutputEntry[]} rest - the remainder, already in path order
+ * @param {(outputPath: string) => string} key - the folding this advisory
+ *   asks its question under
+ * @returns {string[]} representative output paths, path-ordered, unescaped
+ */
+function otherRepresentatives(first, rest, key) {
+  const seen = new Set([key(first.outputPath)]);
+  const others = [];
+  for (const entry of rest) {
+    const folded = key(entry.outputPath);
+    if (seen.has(folded)) continue;
+    seen.add(folded);
+    others.push(entry.outputPath);
+  }
+  return others;
+}
+
+/**
+ * Render an output path with every non-ASCII code point as a `\u{XXXX}`
+ * escape.
+ *
+ * A16's two paths print IDENTICALLY in a terminal — that is the entire hazard
+ * — so an unescaped message reads `café.html and café.html`, names no edit the
+ * author can make, and leaves a reader unable to tell which of the two files
+ * to rename. BOTH advisories use it, not just A16: A11's own pair is normally
+ * `About.html`/`about.html` and distinguishable on sight, but A11 ranges over
+ * arbitrary paths, and a case pair carrying an unrelated non-ASCII segment
+ * (`caf\u{00e9}/About.html` beside `caf\u{00e9}/about.html`) has the same
+ * hazard in the part of the name the author is NOT being asked to change.
+ * The braced form is used rather than the padded
+ * four-digit one because it is the only spelling that stays correct above
+ * U+FFFF, where iterating by code point would otherwise print a surrogate
+ * half as an escape that means something else.
+ * @param {string} path
+ * @returns {string}
+ */
+function escapeNonAscii(path) {
+  return [...path]
+    .map((c) => (c >= " " && c <= "~" ? c : `\\u{${c.codePointAt(0).toString(16).padStart(4, "0")}}`))
+    .join("");
 }
 
 /** Sort output entries by their SOURCE path (§14.1 R3: collision attribution is the path-ordered first source). */

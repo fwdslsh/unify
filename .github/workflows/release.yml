@@ -78,14 +78,21 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           echo "Releasing $tag from ${GITHUB_REF} (prerelease=$prerelease)"
 
-      # The release gates, the same commands CI runs on every push. A tag can
-      # be pushed at any commit, so this is the only thing standing between a
-      # red tree and a published release.
+      # The release gates. A tag can be pushed at any commit, so this is the
+      # only thing standing between a red tree and a published release.
+      #
+      # Traceability runs with RELEASE semantics here — no --baseline, so any
+      # uncovered rule fails — even while test.yml's push-time job is baselined
+      # for the v0.8 phase. That asymmetry is the point: a spec section may be
+      # written before a CLI surface exists to observe it, but it may not be
+      # released that way. Emptying tests/conformance/phase-gaps/baseline.txt is
+      # part of shipping, not part of the phase.
       - name: Release gates
         run: |
           rm -f .conformance-ledger.jsonl
           bun test
           bun tests/conformance/check-suite-hygiene.mjs
+          bun tests/conformance/check-module-graph.mjs
           bun tests/conformance/check-traceability.mjs --runtime .conformance-ledger.jsonl
 
       # One runner cross-compiles every target, so there is no build matrix.

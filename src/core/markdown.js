@@ -238,6 +238,106 @@ function convertBody(bodyText, bodyStartLine, { file, reporter }) {
 /** The five keys with dedicated behavior (§10.2's table) — never become metas. */
 const RESERVED_KEYS = new Set(["title", "layout", "class", "lang", "dir"]);
 
+/**
+ * §28.1/P24 — the three frontmatter keys another generator honours and unify
+ * does not. Each `fix` names the unify mechanism the author was reaching for,
+ * because "unsupported" alone leaves them nowhere to go (product-spec §6.3.9);
+ * `draft`'s is a function of the page's own file name, so it names the file the
+ * author will actually rename.
+ *
+ * **THE KEY IS THE PROBLEM, WHATEVER ITS VALUE — do not add a value check.**
+ * The instinct on reading this is that `draft: false` is harmless and should
+ * pass; it is harmless *today*, and that is exactly why it must not pass. What
+ * the key expresses is the belief that unify has a draft mechanism, and the
+ * page carrying it publishes either way; a diagnostic that waits for the value
+ * to turn dangerous is a diagnostic that fires the day after the page it was
+ * supposed to withhold has shipped. One rule, one message, no value parsing —
+ * §28.1 argues it in those words.
+ *
+ * Scope is **frontmatter, and only frontmatter** (§28.1). An HTML page's
+ * `<meta name="draft">` is an ordinary meta about the author's own content — no
+ * generator reads that spelling, so it carries none of this belief. That is the
+ * deliberate opposite of P23's scope (§26.4), which checks the *emitted* meta:
+ * `schema` is unify's own key and must mean one thing in both spellings, while
+ * these three are another tool's keys, and only the frontmatter spelling
+ * carries the mistake. A `.md` file included as a fragment is never checked
+ * either, because `convertFragment` never parses its frontmatter at all (§5.1
+ * step 4) — that is where the fragment exemption lives, not here.
+ *
+ * Matched exactly, not case-folded: YAML keys are case-sensitive and these are
+ * the spellings the other generators define (`Draft:` is a different key, and
+ * §10.2's table already says what unify does with a key it does not know).
+ */
+const COUNTER_PRIOR_KEYS = new Map([
+  ["draft", (file) => ({
+    message: "draft has no meaning in unify — the page publishes",
+    fixes: [`${renameForUnderscore(file)}; a leading underscore keeps a file out of the output`],
+  })],
+  ["permalink", () => ({
+    message: "permalink has no meaning in unify — this page's address is its source path",
+    fixes: ["rename or move the source file to choose its address, or use --pretty-urls site-wide"],
+  })],
+  ["slug", () => ({
+    message: "slug has no meaning in unify — this page's address is its source path",
+    fixes: ["rename the source file to change the last segment of its address"],
+  })],
+]);
+
+/**
+ * The `draft` fix, spelled for this file: `src/post.md` → "rename the source to
+ * _post.md". A source name that already begins with `_` gets the rule instead
+ * of a name — it is only reachable when `--exclude` was replaced with a set
+ * that no longer holds underscores back (§4.2), where the page is P14 as well
+ * and `__post.md` would be nonsense advice.
+ */
+function renameForUnderscore(file) {
+  const base = file.split("/").pop() ?? file;
+  return base.startsWith("_")
+    ? "hold the page back with a leading underscore on the source file name"
+    : `rename the source to _${base}`;
+}
+
+/**
+ * §28.1/P24 — report every counter-prior key this page's frontmatter declares,
+ * located at the key, at its line in the `.md` file.
+ *
+ * **Which key a spelling names is §10.2's question, not this one's**, in both
+ * directions. `og:` over an indented `draft:` names `og:draft`, which is not
+ * this key any more than `og:image` is `image` — that is why only top-level
+ * keys are read. And a *mapping* under `draft:` names `draft:<child>` (the
+ * same one level of flattening, from the other side), so it is not this key
+ * either and is skipped here: `collectMetas` below emits `draft:nested` for
+ * it, never `draft`. Both halves are one rule, and the rule is §10.2's stated
+ * equivalence — `draft:nested: yes` flat and `draft:` over an indented
+ * `nested: yes` are "identical in every respect", so a P24 that fired on one
+ * spelling and not the other would break it. What stays P24 is every value
+ * that still names the bare key: a scalar, an empty value, and a list all emit
+ * `<meta name="draft">`, and none of them renames anything (§28.1).
+ *
+ * The line comes from the same index P17 uses. It is a real file line — this is
+ * frontmatter, which §10.1 never converts — so §14.1's "omit rather than guess"
+ * clause does not apply the way it does to an offset into converted HTML.
+ */
+function checkCounterPriorKeys(data, { file, reporter, yamlText }) {
+  const lineIndex = indexFrontmatterLines(yamlText, 2);
+  for (const key of Object.keys(data)) {
+    const spell = COUNTER_PRIOR_KEYS.get(key);
+    if (spell === undefined) continue;
+    if (isMapping(data[key])) continue; // §10.2 renamed it to `key:<child>`
+    const { message, fixes } = spell(file);
+    reporter.problem({ file, line: lineForPath([key], lineIndex), message, fixes });
+  }
+}
+
+/**
+ * A YAML block (or flow) mapping, the one value shape §10.2 turns into a
+ * different key. Arrays and `null` are values of *this* key and are not it.
+ * @param {unknown} value
+ */
+function isMapping(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 const FRONTMATTER_RE = /^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/;
 
 /**
@@ -286,12 +386,29 @@ export function checkHtmlFrontmatter(source, { path, sourceRoot, reporter }) {
  * on this line",
  * skipping anything that isn't a `key:` line (list items, comments, scalar
  * continuation lines) — sufficient because it is consulted only to locate a
- * P17 diagnostic, never to derive a value. The key pattern matches greedily
- * up to the *last* colon that is followed by whitespace-or-end-of-line,
+ * P17 or P24 diagnostic, never to derive a value. The key pattern matches
+ * greedily up to the *last* colon that is followed by whitespace-or-end-of-line,
  * mirroring YAML's own key/value split (a colon not followed by whitespace,
  * as in `og:image:`, is part of the key, not a separator) — otherwise a
  * flat-spelled compound key would be invisible to this index even though
  * §10.2 makes it byte-identical in meaning to the block-nested spelling.
+ *
+ * **Three spellings of the same key must all be found, because §14.1 says a
+ * line is omitted only where a position cannot be mapped back to a line of the
+ * named file.** Frontmatter is never converted (§10.1), so every key here has
+ * a real file line and every diagnostic located at a key is entitled to it.
+ * The pattern therefore also accepts a `"quoted"` or `'quoted'` key and
+ * whitespace between the key and its colon, and indexes the **unquoted** name
+ * — the name js-yaml hands back, and the name a caller looks up. Until
+ * 2026-08-19 it accepted neither, so `"draft": true` and `draft : true` — the
+ * same declaration YAML reads identically — printed `src/post.md: problem: …`
+ * with no line while `draft: true` printed `src/post.md:3: …`.
+ *
+ * A double-quoted key carrying a backslash escape is deliberately not decoded:
+ * unescaping is a YAML parser's job, this index would have to reproduce it
+ * exactly to match, and the cost of not trying is the line falling back to
+ * §14.1's `FILE: SEVERITY:` form — the honest answer for a position this index
+ * genuinely cannot map, rather than a plausible-looking wrong number.
  */
 /**
  * Joins nested frontmatter key paths into a single map key. A NUL can never
@@ -303,7 +420,7 @@ export function checkHtmlFrontmatter(source, { path, sourceRoot, reporter }) {
 const KEY_SEP = "\u0000";
 
 function indexFrontmatterLines(yamlText, startLine) {
-  const KEY_LINE_RE = /^(\s*)((?:[^\s:]|:(?!\s|$))+):(?:\s|$)/;
+  const KEY_LINE_RE = /^(\s*)(?:"([^"\\]*)"|'((?:[^']|'')*)'|((?:[^\s:]|:(?!\s|$))+))[ \t]*:(?:\s|$)/;
   const index = new Map();
   const stack = [];
   const lines = yamlText.split("\n");
@@ -311,7 +428,10 @@ function indexFrontmatterLines(yamlText, startLine) {
     const m = KEY_LINE_RE.exec(lines[i]);
     if (!m) continue;
     const indent = m[1].length;
-    const key = m[2];
+    // The name YAML read, not the bytes that spelled it: a double-quoted key
+    // loses its quotes, a single-quoted one loses its quotes and un-doubles
+    // the one escape that form has (`''` is a literal `'`).
+    const key = m[2] ?? (m[3] === undefined ? m[4] : m[3].replaceAll("''", "'"));
     while (stack.length && stack[stack.length - 1].indent >= indent) stack.pop();
     const parentPath = stack.length ? stack[stack.length - 1].path : [];
     const path = [...parentPath, key];
@@ -507,6 +627,11 @@ export function convert(source, { path, sourceRoot, reporter }) {
   const file = toRelative(sourceRoot, path);
   const { yamlText, body, bodyStartLine } = splitFrontmatter(source);
   const data = parseFrontmatterYaml(yamlText, { file, reporter });
+  // §28.1 — page mode only. `convertFragment` never reaches this line, which is
+  // how "a fragment's frontmatter is never validated" (§5.1 step 4) holds here
+  // without a flag: it is not that the check is skipped, it is that a fragment's
+  // frontmatter is never parsed at all.
+  if (yamlText !== null) checkCounterPriorKeys(data, { file, reporter, yamlText });
   const metas = yamlText === null ? [] : collectMetas(data, { file, reporter, yamlText });
   const { html, firstH1 } = convertBody(body, bodyStartLine, { file, reporter });
 

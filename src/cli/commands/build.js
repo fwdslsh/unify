@@ -57,6 +57,15 @@ import { contains, isNeverShipped, toRelative } from "../../core/paths.js";
 import * as publishModule from "../../core/publish.js";
 import * as references from "../../core/references.js";
 import * as urls from "../../core/urls.js";
+import { buildManifest } from "../../core/manifest.js";
+import { auditManifest, formatFindings } from "../../core/audit.js";
+import * as sitemap from "../../core/sitemap.js";
+import * as feed from "../../core/feed.js";
+import * as searchIndex from "../../core/search-index.js";
+import { completeCanonical } from "../../core/canonical.js";
+import { checkSchemaDeclarations, generateStructuredData } from "../../core/structured-data.js";
+import * as robots from "../../core/robots.js";
+import * as generate from "../../core/generate.js";
 
 /**
  * @param {object} context
@@ -67,9 +76,58 @@ import * as urls from "../../core/urls.js";
  * @param {boolean} [context.sourceDefaulted] - §4.4 EXC-11: true only when
  *   nothing chose the source root (no --source, no unify.yaml key, no src/)
  * @returns {Promise<number>}
+ *
+ * Two keys on `settings` are set by a command rather than by a flag, and both
+ * only select which of this one pipeline's tails runs: `audit` (§24, set by
+ * `audit.js`) and `onEvaluation` (§27, set by `dev.js`). Neither is parseable
+ * from the command line — `options.js` is the whole flag surface — and
+ * `unify build` and `unify watch` set neither, which is what keeps §24.7
+ * literally true of them: they never call the evaluator at all.
+ *
+ * `onEvaluation` rides on `settings` because `settings` is the one thing
+ * `watch.js` forwards to every rebuild it runs (`{...settings, clean: false}`),
+ * and `unify dev` IS `unify watch` plus a server — there is no other seam
+ * between the two that reaches a rebuild.
  */
 export async function build({ sourceRoot, output, settings, reporter, sourceDefaulted = false }) {
-  const files = scanSourceTree(sourceRoot, output, settings.exclude, reporter);
+  // ---- §33 — the generator seam, BEFORE §2 step 1 --------------------------
+  // It runs before the scan on purpose (§33.5): it sees the source tree as it
+  // is on disk and nothing else — no manifest, no composed pages, no output —
+  // which is the boundary that keeps this a seam rather than a plugin API. A
+  // generator cannot observe unify's intermediate state, so no future change
+  // to that state can break one.
+  let overlayDir = null;
+  if (settings.generate) {
+    const generatorAbs = generate.resolveGeneratorPath(settings.generate, sourceRoot);
+    overlayDir = generate.makeOverlayDir();
+    const ok = await generate.runGenerator({ generatorAbs, sourceRoot, overlayDir, reporter });
+    if (!ok) {
+      // P29 stops the build BEFORE the scan: a partial overlay is a site
+      // nobody described, and §15's transaction leaves the previous dist/
+      // untouched exactly as any other problem would.
+      //
+      // The two lines before the return are not optional. Returning straight
+      // out skipped them and the build exited 1 having printed NOTHING —
+      // a silent failure, which is worse than the fault it was reporting and
+      // exactly what §14 exists to forbid. Every other exit from this
+      // function passes through the same pair; this one had to as well.
+      relocateDiagnosticsToCwd(reporter, sourceRoot);
+      reporter.flush();
+      generate.removeOverlayDir(overlayDir);
+      return 1;
+    }
+  }
+
+  try {
+    return await runBuild({ sourceRoot, output, settings, reporter, sourceDefaulted, overlayDir });
+  } finally {
+    if (overlayDir !== null) generate.removeOverlayDir(overlayDir);
+  }
+}
+
+/** The build proper, with §33's overlay already produced (or absent). */
+async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulted, overlayDir }) {
+  const files = scanSourceTree(sourceRoot, output, settings.exclude, reporter, overlayDir);
 
   // §6.3/P08 — every .html/.md source file, excluded or not (§1: a "page" by
   // extension; only the never-shipped list, already applied in the scan,
@@ -126,7 +184,7 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
       // the include's own already-reported problem.
       const hadNewProblem = reporter.problemsReported > problemsBefore;
       if (composed !== null && !hadNewProblem) {
-        composedPages.push({ relPath: page.relPath, html: composed.text, spans: composed.spans, layoutFile: composed.layoutFile });
+        composedPages.push({ relPath: page.relPath, html: composed.text, spans: composed.spans, layoutFile: composed.layoutFile, generated: page.generated === true });
       }
     } catch (err) {
       // Best-effort composition (PIP-02): one page's failure must not stop
@@ -164,9 +222,14 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
   }
 
   // ---- §13 — collision-aware output paths, for pages AND assets. ----------
+  // §33.4 — a relative path present in BOTH trees is P12, and the message has
+  // to name which is which: "index.html and index.html both produce
+  // index.html" tells an author nothing. `label` is display-only, so §13's
+  // keying and every downstream consumer are untouched.
+  const label = (rel, generated) => (generated ? `${rel} (generated)` : rel);
   const entries = [
-    ...composedPages.map((p) => ({ path: p.relPath, kind: "page" })),
-    ...assetFiles.map((a) => ({ path: a.relPath, kind: "asset" })),
+    ...composedPages.map((p) => ({ path: p.relPath, kind: "page", label: label(p.relPath, p.generated) })),
+    ...assetFiles.map((a) => ({ path: a.relPath, kind: "asset", label: label(a.relPath, a.generated) })),
   ];
   const resolved = collisions.resolveOutputPaths({ entries, prettyUrls: settings.prettyUrls, reporter });
   const outputPathOf = new Map(resolved.map((r) => [r.source.path, r.outputPath]));
@@ -201,6 +264,11 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
   // POST-rewrite text maps back through spans computed against the
   // PRE-rewrite composed text.
   const pageSpansByOutputPath = new Map();
+  // §20.1's membership set, accumulated as each page's FINAL text is produced
+  // — the manifest reads the bytes §15 would publish (§20.2), so it is filled
+  // from the rewritten text below rather than from `composedPages`.
+  /** @type {{sourcePath: string, outputPath: string, html: string}[]} */
+  const manifestPages = [];
   for (const p of composedPages) {
     const pageOutputPath = collisions.computeOutputPath({ path: p.relPath, kind: "page" }, { prettyUrls: false });
     const rewritten = urls.rewriteUrls(p.html, {
@@ -214,6 +282,11 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
     const finalOutputPath = outputPathOf.get(p.relPath);
     tempFiles.set(finalOutputPath, rewritten);
     pageSpansByOutputPath.set(finalOutputPath, p.spans);
+    // §33.4 — a generated page has no file in the author's source tree, so
+    // every surface that NAMES its source has to know. Without this the
+    // audit reported `log.html` at a path the author cannot open, under a
+    // fix line telling them to rename a file they never wrote.
+    manifestPages.push({ sourcePath: p.relPath, outputPath: finalOutputPath, html: rewritten, generated: p.generated === true });
   }
 
   // §4.4/EXC-09 — mirror copy: every emitted asset, byte-for-byte, same
@@ -223,6 +296,193 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
     tempFiles.set(outputPathOf.get(asset.relPath), readFileSync(asset.absPath));
   }
 
+  // ---- §22 — canonical completion, before the manifest is derived. ---------
+  // A preliminary manifest decides which pages qualify, the completion is
+  // applied to the emitted text, and §20's manifest is then derived from the
+  // result — so §20.2's "every field is read from the emitted text" stays
+  // literally true rather than being patched around. The extra pass runs only
+  // under --canonical auto.
+  /**
+   * Output path -> the byte insertions §22 and §26 made, so §14.1's locator can
+   * undo them — in **reverse application order**, most recent first. Each `at`
+   * is a position in the text that insertion was applied to, so the locator
+   * has to peel them off newest-first to keep asking each `at` about an offset
+   * measured in its own text (see `makeReferenceLocator`).
+   */
+  const insertionsByOutputPath = new Map();
+  /**
+   * Output path -> the page's emitted text as it stood BEFORE §22 or §26 wrote
+   * into it. The span table `makeReferenceLocator` queries describes exactly
+   * that text, so its own last-resort fallback — numbering an offset against a
+   * whole file when no span covers it — has to number it against this and not
+   * against the taller final text. Numbering the final text added every line an
+   * insertion contributed to the printed number, which on a 16-line page put a
+   * §12 problem at line 22: a number the file cannot hold, which is DIA-06's
+   * "checkable-looking and wrong" reached by arithmetic rather than by a guess.
+   */
+  const preInsertionByOutputPath = new Map();
+  /**
+   * Record one feature's insertions into a page — newest first, since each
+   * `at` is measured in the text ITS feature was applied to — and remember the
+   * page's pre-insertion text the first time anything writes into it. Called
+   * BEFORE `page.html` is replaced, which is what makes that text the right one.
+   *
+   * Each insertion carries the page's OWN source path: §1's provenance is "the
+   * source file whose text contained an element's start tag" and a generated
+   * element has none, so a reference §12 finds inside these bytes is located at
+   * the page the block was generated for (§26.7) rather than at whichever file
+   * happened to contribute the `</head>` it was spliced before — a layout, or
+   * an include's fragment, neither of which contains the reference.
+   */
+  const noteInsertions = (page, insertions) => {
+    if (!preInsertionByOutputPath.has(page.outputPath)) {
+      preInsertionByOutputPath.set(page.outputPath, page.html);
+    }
+    insertionsByOutputPath.set(page.outputPath, [
+      ...insertions.map((ins) => ({ ...ins, file: page.sourcePath })),
+      ...(insertionsByOutputPath.get(page.outputPath) ?? []),
+    ]);
+  };
+  let completedCount = 0;
+  if (settings.canonical === "auto") {
+    const preliminary = buildManifest({ pages: manifestPages, base: baseConfig });
+    for (const page of manifestPages) {
+      const record = preliminary.byOutputPath.get(page.outputPath);
+      if (!record) continue;
+      const completed = completeCanonical(page.html, record, baseConfig);
+      if (completed.text === page.html) continue;
+      noteInsertions(page, completed.insertions);
+      page.html = completed.text;
+      tempFiles.set(page.outputPath, completed.text);
+      completedCount++;
+    }
+  }
+
+  // ---- §26 — structured data: P23, then bounded generation. ----------------
+  // Ordered here for §22's own reason, one section on: the manifest reads
+  // emitted bytes (§20.2), so anything that writes into a page must have
+  // written before the reading every consumer shares. AFTER §22 specifically,
+  // because a page whose canonical `--canonical auto` supplied must generate
+  // THAT url rather than a second opinion about its own address (§26.7).
+  //
+  // The declaration is the whole opt-in — §26 has no flag — so `audit` runs
+  // this exactly as `build` does, and the two emit the same bytes.
+  const schemaLocate = makeReferenceLocator(
+    pageSpansByOutputPath,
+    new Map(manifestPages.map((p) => [p.outputPath, p.html])),
+    new Map(),
+    resolveLine,
+    insertionsByOutputPath,
+    preInsertionByOutputPath,
+  );
+  // P23 first, and unconditionally: a `schema` value naming a type unify does
+  // not generate is a problem whether or not anything else about the page would
+  // have generated (§26.4). It is located at the declaration — the `<meta>` and
+  // its line for an HTML page, the `.md` file with no line for a Markdown one
+  // (§14.1), which is what `schemaLocate` answers.
+  let anyDeclaration = false;
+  for (const page of manifestPages) {
+    const declares = checkSchemaDeclarations({
+      html: page.html, outputPath: page.outputPath, locate: schemaLocate, reporter,
+    });
+    anyDeclaration ||= declares;
+  }
+  // The preliminary manifest §26.5 decides against — derived from the
+  // POST-completion text, exactly as §22's is derived from the pre-completion
+  // one. Skipped when no page declared a generable type: that return value is a
+  // superset of the pages that can generate (§26.5's conditions 1 and 2 leave
+  // the meta as the only surviving source of `schemaType`), so skipping it can
+  // never suppress a block — it only spares a site that opted into nothing the
+  // derivation, which is what "a site that writes none is the v0.7 golden path,
+  // unchanged" costs to mean.
+  let generatedCount = 0;
+  if (anyDeclaration) {
+    const preliminary = buildManifest({ pages: manifestPages, base: baseConfig });
+    for (const page of manifestPages) {
+      const record = preliminary.byOutputPath.get(page.outputPath);
+      if (!record) continue;
+      const block = generateStructuredData(page.html, record);
+      if (block.text === page.html) continue;
+      // Prepended, not appended: §26 wrote into the text §22 had already
+      // lengthened, so it is the one the locator must undo first (`noteInsertions`).
+      noteInsertions(page, block.insertions);
+      page.html = block.text;
+      tempFiles.set(page.outputPath, block.text);
+      generatedCount++;
+    }
+  }
+
+  // ---- §20 — the final-output page manifest. -------------------------------
+  // Derived here, between §11 and §12, because this is the first moment every
+  // page's emitted bytes exist and the last moment before anything reads them.
+  // It observes only: no diagnostic, no write, no effect on the exit code
+  // (§20.2). Every discovery, evaluation, and publication feature downstream
+  // consumes THIS — adding a second extractor is the defect product-spec §6.2
+  // exists to forbid.
+  //
+  // Derived unconditionally, including on builds no consumer below reads it
+  // for: that is what holds §20.2's "changes nothing" invariant to the whole
+  // fixture corpus rather than to the pages a discovery feature happens to
+  // touch. An extractor that threw on some real emitted document would fail
+  // the suite here, not at the first site that enabled a sitemap.
+  const manifest = buildManifest({ pages: manifestPages, base: baseConfig });
+
+  // ---- §21 — sitemap generation, the manifest's first projection. ----------
+  // §21.5 must know which paths the site already emits from its own source
+  // before it claims one. That set is `emittedFromSource` below, built from
+  // `composedPages` and `assetFiles` directly rather than from `tempFiles` —
+  // so ordering against the mirror copy is not what makes it correct, and this
+  // block would work above it too. Generated files then join `tempFiles` like
+  // any other output, which is what makes them appear in --dry-run, participate
+  // in §15's transactional publish, and fall under §12's checks with no
+  // special-casing in any of the three.
+  const emittedFromSource = new Map([
+    ...composedPages.map((p) => [outputPathOf.get(p.relPath), p.relPath]),
+    ...assetFiles.map((a) => [outputPathOf.get(a.relPath), a.relPath]),
+  ]);
+  const generated = sitemap.generateSitemap({
+    records: manifest.records, base: baseConfig, emittedFromSource, reporter,
+  });
+  for (const [outPath, text] of generated) tempFiles.set(outPath, text);
+
+  // ---- §29 — feed generation, the manifest's second projection. -----------
+  // Same shape as §21 immediately above, one document type over: reads
+  // `manifest.records` and nothing else about the page (`pageHtml` is the one
+  // exception, and only under --feed-full — see feed.js's own module comment
+  // for why that still isn't a second interpretation of the site). No
+  // ordering dependency against sitemap generation either direction; wired
+  // beside it because both are manifest projections that join `tempFiles`
+  // before §12's reference check and §15's transactional publish. Reuses
+  // `emittedFromSource` — built once, immediately above, for exactly this
+  // sharing (§29.7/§21.5's suppression test).
+  //
+  // `manifestPages[i].html` is each page's FINAL emitted HTML: it was
+  // mutated in place by §22's canonical completion and §26's structured-data
+  // generation above (`page.html = completed.text` / `page.html =
+  // block.text`), and it is the exact text `buildManifest` just read to
+  // produce `manifest` itself — so `pageHtml` never disagrees with what
+  // `record.title`/`record.canonical`/etc. say about the same page.
+  const pageHtml = settings.feedFull
+    ? new Map(manifestPages.map((p) => [p.outputPath, p.html]))
+    : null;
+  const generatedFeed = feed.generateFeed({
+    records: manifest.records, base: baseConfig, feedFull: settings.feedFull,
+    pageHtml, emittedFromSource, reporter,
+  });
+  for (const [outPath, text] of generatedFeed) tempFiles.set(outPath, text);
+
+  // ---- §30 — the search manifest, the manifest's third projection. --------
+  // Unlike sitemap/feed, activation is the flag ALONE (§30.1) — nothing about
+  // a page declares "index me", so there is no record-derived condition to
+  // check the way `generateSitemap`/`generateFeed` check `base`/`schemaType`.
+  // Unconditional on `baseConfig`: `searchIndexEntry` already falls back to
+  // `record.path` with no --base-url (§30.2), so gating this on `base` would
+  // make the flag useless for the local-preview case it exists for.
+  const generatedSearchIndex = settings.searchIndex
+    ? searchIndex.generateSearchIndex({ records: manifest.records, base: baseConfig, emittedFromSource })
+    : new Map();
+  for (const [outPath, text] of generatedSearchIndex) tempFiles.set(outPath, text);
+
   // ---- §12 — the reference check, against the completed temp tree. --------
   const htmlFiles = new Map();
   const cssFiles = new Map();
@@ -231,9 +491,116 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
     if (extname(outPath) === ".html" && text !== null) htmlFiles.set(outPath, text);
     else if (extname(outPath) === ".css") cssFiles.set(outPath, text ?? content.toString("utf8"));
   }
+  // §21.6 — every internal <loc> in an emitted output-root sitemap must name a
+  // file the site emits. Both kinds are checked: what unify generated (where
+  // this can only pass, and is the executable form of "the sitemap and the tree
+  // agree") and what the author wrote (where it is a real check). Attribution
+  // is the SOURCE path for an authored file — `dist/sitemap.xml` is not a file
+  // anyone can edit.
+  //
+  // Gated on `baseConfig` because §21.1's activation governs the whole section.
+  // Without --base-url an authored sitemap is an ordinary mirror-copied asset
+  // and unify says nothing about it, which is what keeps a v0.7 site that
+  // shipped one building exactly as it did before: nothing the author wrote
+  // changed, and no flag opted them in. It is also the only coherent reading —
+  // a <loc> is an absolute URL, and deciding whether one points inside THIS
+  // site is not answerable without the site's address.
+  let sitemapLocs = new Map();
+  if (baseConfig) {
+    const sitemapFiles = new Map();
+    for (const outPath of [sitemap.SITEMAP_PATH, ...generated.keys()]) {
+      const content = tempFiles.get(outPath);
+      if (typeof content !== "string" && !Buffer.isBuffer(content)) continue;
+      sitemapFiles.set(outPath, {
+        text: typeof content === "string" ? content : content.toString("utf8"),
+        file: emittedFromSource.get(outPath) ?? outPath,
+      });
+    }
+    sitemap.checkSitemapLocs({
+      sitemaps: sitemapFiles, emittedPaths: new Set(tempFiles.keys()), base: baseConfig, reporter,
+    });
+    // §24.4 — the same resolution, kept for the evaluator: which pages does a
+    // sitemap this build emits actually list? Computed here rather than in
+    // audit.js so the check and the comparison read one answer — see
+    // `sitemapListings` for what a second resolver costs: the two would agree
+    // on every ASCII path and diverge on the first escaped one, which is the
+    // one-interpretation law product-spec §6.1 states for URLs.
+    sitemapLocs = sitemap.sitemapListings({ sitemaps: sitemapFiles, base: baseConfig });
+
+    // §29.7 — every <id>/<link href> in an emitted feed.xml (generated or
+    // authored) must resolve to a file the site emits, exactly as §21.6
+    // checks a sitemap's <loc> — same gate on `baseConfig` as the sitemap
+    // check immediately above, and for the same reason: a feed is generated
+    // only under --base-url (§29.1), and this is where an AUTHORED feed.xml
+    // is checked too (§29.7's suppression is silent about --base-url, so it
+    // is read the way §21.5/§21.6 read an authored sitemap.xml — checked
+    // whenever this build knows the site's address). Must run before
+    // references.checkReferences below, for the same reason the sitemap
+    // check does: both raise P13 against the SAME emittedPaths set, and
+    // ordering relative to each other does not matter, only ordering before
+    // §12's own pass over the rest of the tree.
+    const feedContent = tempFiles.get(feed.FEED_PATH);
+    if (typeof feedContent === "string" || Buffer.isBuffer(feedContent)) {
+      feed.checkFeedLocs({
+        text: typeof feedContent === "string" ? feedContent : feedContent.toString("utf8"),
+        file: emittedFromSource.get(feed.FEED_PATH) ?? feed.FEED_PATH,
+        emittedPaths: new Set(tempFiles.keys()),
+        base: baseConfig, reporter,
+      });
+    }
+  }
+
+  // §23 — the one reference in an authored robots.txt. Ungated, unlike §21.6:
+  // a `<loc>` is absolute by protocol and genuinely needs the site's address to
+  // classify, but `Sitemap: /sitemap.xml` is internal by inspection. `base` may
+  // be null; it governs only the stripping step, exactly as in §12.
+  //
+  // The return value is §23.3's exemption — the `Sitemap:` lines the check
+  // DECLINED to report — carried to the only command that reports them (§24.4's
+  // `robots-sitemap-missing`). Threaded exactly as `sitemapLocs` above is:
+  // computed by the module that owns the question, empty for the builds where
+  // the question never arose, and read only inside the audit branch below. A
+  // `build` receives it and ignores it, which is §24.7.
+  /** @type {{file: string, value: string}[]} */
+  let exemptedSitemaps = [];
+  const robotsContent = tempFiles.get(robots.ROBOTS_PATH);
+  if (robotsContent !== undefined) {
+    exemptedSitemaps = robots.checkRobots({
+      text: typeof robotsContent === "string" ? robotsContent : robotsContent.toString("utf8"),
+      file: emittedFromSource.get(robots.ROBOTS_PATH) ?? robots.ROBOTS_PATH,
+      emittedPaths: new Set(tempFiles.keys()),
+      base: baseConfig,
+      reporter,
+    });
+  }
+
+  // §12's second fix line for the three generated root names. Computed here,
+  // not in references.js, because only this loop knows WHY a file was not
+  // generated this run — and only for names absent from the output, so a
+  // build that emitted (or shipped an authored) file never consults it.
+  const wouldGenerate = new Map();
+  if (!tempFiles.has(feed.FEED_PATH)) {
+    const candidates = manifest.records.some((rec) => feed.isFeedCandidate(rec));
+    wouldGenerate.set(feed.FEED_PATH,
+      baseConfig === null
+        ? "feed.xml is generated, not authored: this build generates it only under --base-url, from pages declaring schema: Article or BlogPosting with a dated time"
+        : candidates
+          ? "feed.xml is generated, not authored: the declared posts' dates carry no time of day, so none is a feed entry (each is reported above)"
+          : "feed.xml is generated, not authored: no page on this build declares schema: Article or BlogPosting");
+  }
+  if (!tempFiles.has(sitemap.SITEMAP_PATH) && baseConfig === null) {
+    wouldGenerate.set(sitemap.SITEMAP_PATH,
+      "sitemap.xml is generated, not authored: this build generates it only under --base-url");
+  }
+  if (!tempFiles.has(searchIndex.SEARCH_INDEX_PATH) && settings.searchIndex !== true) {
+    wouldGenerate.set(searchIndex.SEARCH_INDEX_PATH,
+      "search-index.json is generated, not authored: this build generates it only under --search-index");
+  }
+
   references.checkReferences({
-    htmlFiles, cssFiles, emittedPaths: new Set(tempFiles.keys()), base: baseConfig, reporter,
-    locate: makeReferenceLocator(pageSpansByOutputPath, htmlFiles, cssFiles, resolveLine),
+    htmlFiles, cssFiles, emittedPaths: new Set(tempFiles.keys()), base: baseConfig, reporter, wouldGenerate,
+    locate: makeReferenceLocator(
+      pageSpansByOutputPath, htmlFiles, cssFiles, resolveLine, insertionsByOutputPath, preInsertionByOutputPath),
     // §12's cascade exemption: the output paths of pages that exist in source
     // and failed to compose. Only this loop knows which absences are that —
     // from inside the check, a page that emitted nothing and a page that never
@@ -267,8 +634,54 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
     );
   }
 
+  // ---- §24 — evaluation, for `unify audit` and `unify dev`. ----------------
+  // `unify build` and `unify watch` reach neither the call nor the branch
+  // below, which is §24.7 in one line: no finding can affect a build's output,
+  // its diagnostics, or its exit code. The pipeline above ran identically
+  // either way — that is what makes a finding a fact about the bytes the build
+  // would publish rather than about a cheaper approximation of them (§24.1).
+  //
+  // ONE call site, two readers: `unify audit`'s report (§24.5) and `unify
+  // dev`'s local audit view (§27.3). §27.5's "not a second audit" — no finding
+  // exists that only the view can raise, and none it shows is absent from
+  // `unify audit` — is held here by construction rather than by two
+  // implementations agreeing, which is the only way it can be held: a second
+  // predicate set would agree on every simple site and diverge on the first
+  // interesting one, unobserved, inside a development server.
+  const findings = settings.audit || settings.onEvaluation
+    ? auditManifest({
+      records: manifest.records,
+      byOutputPath: manifest.byOutputPath,
+      base: baseConfig,
+      sitemapLocs,
+      exemptedSitemaps,
+      // §31.3 — carried through to `lastAuditRun` for `--external`'s own use
+      // (`cli/commands/audit.js`, via `consumeLastAuditRun()`); not read by
+      // any finding predicate. The SAME map §12's reference check just
+      // scanned — reused, not recomputed, so an off-origin URL `--external`
+      // fetches and an internal one §12 already checked came from one pass
+      // over one page's text.
+      htmlFiles,
+    })
+    : null;
+
+  if (settings.audit) {
+    reporter.summary(formatFindings(findings));
+    // §24.6 — a pipeline problem exits 1 regardless: evaluating output that
+    // cannot be built is meaningless, and the findings printed beside it
+    // describe a site that would never ship. Otherwise --strict is the gate,
+    // on any finding of either severity.
+    if (reporter.exitCode !== 0) return reporter.exitCode;
+    return settings.strict && findings.length > 0 ? 1 : 0;
+  }
+
   // ---- §15 — transactional publish. ----------------------------------------
-  if (shouldPublish(reporter) && !settings.dryRun) {
+  // Named rather than inlined so the §27 sink at the end of this function can
+  // state whether this build reached the output directory without asking the
+  // question a second way. `publish()` records no diagnostic (its own PUB-01
+  // gate only declines), so the value cannot go stale between here and there.
+  const published = shouldPublish(reporter) && !settings.dryRun;
+  if (published) {
     if (settings.clean) await publishModule.performClean({ output, source: sourceRoot });
     await publishModule.publish({ tempFiles, outputDir: output, reporter });
   }
@@ -300,13 +713,45 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
         action: "write",
         outputPath: `${displayOutput}/${outputPathOf.get(p.relPath)}`,
         url: publishModule.urlForOutputPath(outputPathOf.get(p.relPath), prefix),
-        from: p.layoutFile ? `${p.relPath} + ${p.layoutFile}` : `${p.relPath} (no layout)`,
+        // §33.3 — a generated row says so. It must: a file in dist/ with no
+        // source file behind it is otherwise unexplainable to a reader of
+        // this report, which is the one place §33's overlay is visible.
+        from: p.generated
+          ? (p.layoutFile ? `generated + ${p.layoutFile}` : "generated")
+          : (p.layoutFile ? `${p.relPath} + ${p.layoutFile}` : `${p.relPath} (no layout)`),
       })),
       ...assetFiles.map((a) => ({
         action: "copy",
         outputPath: `${displayOutput}/${outputPathOf.get(a.relPath)}`,
         url: publishModule.urlForOutputPath(outputPathOf.get(a.relPath), prefix),
         from: a.relPath,
+      })),
+      // §21.1 — a generated artifact is a write like any other, so it carries
+      // the same address the report gives every other row. `from` names what
+      // produced it rather than a source file, because there is no source file.
+      ...[...generated.keys()].map((outPath) => ({
+        action: "write",
+        outputPath: `${displayOutput}/${outPath}`,
+        url: publishModule.urlForOutputPath(outPath, prefix),
+        from: "generated (--base-url)",
+      })),
+      // §29.7 — a generated feed is a write like any other, named the same
+      // way the sitemap's row above is (it too can only exist under
+      // --base-url — §29.1).
+      ...[...generatedFeed.keys()].map((outPath) => ({
+        action: "write",
+        outputPath: `${displayOutput}/${outPath}`,
+        url: publishModule.urlForOutputPath(outPath, prefix),
+        from: "generated (--base-url)",
+      })),
+      // §30.4 — likewise, named for the flag that actually produced it rather
+      // than --base-url: §30.1/§30.2 activate on --search-index alone, with
+      // or without a site address.
+      ...[...generatedSearchIndex.keys()].map((outPath) => ({
+        action: "write",
+        outputPath: `${displayOutput}/${outPath}`,
+        url: publishModule.urlForOutputPath(outPath, prefix),
+        from: "generated (--search-index)",
       })),
       ...plan.delete.map((rel) => ({ action: "delete", outputPath: `${displayOutput}/${rel}` })),
     ];
@@ -318,11 +763,27 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
     // validates against the output tree, which is correct and silent about
     // where that tree will live. This line is the one place the build says
     // out loud what it assumed.
-    reporter.summary(
-      baseConfig
-        ? `serving from ${baseConfig.origin}${baseConfig.pathPrefix}`
-        : "serving from / — the domain root (no --base-url)",
-    );
+    reporter.summary(addressLine(baseConfig));
+
+    // §6.1 — anything that writes published output appears in --dry-run. The
+    // sitemap gets a write row of its own; completion edits pages that already
+    // have one, so it reports a count instead. Without it the report was
+    // byte-identical with and without the flag, and a reader checking before
+    // publish could not tell it had done anything.
+    if (settings.canonical === "auto") {
+      reporter.summary(
+        `canonical completion: ${completedCount} page${completedCount === 1 ? "" : "s"} would gain a canonical link`,
+      );
+    }
+    // §26.7 — the same accounting one section over. The gate is the count
+    // rather than a flag because §26 has none: "the declaration is the whole
+    // opt-in" (§26.5), so a site that declared nothing has no work to name and
+    // reads exactly as it did before this section existed.
+    if (generatedCount > 0) {
+      reporter.summary(
+        `structured data: ${generatedCount} page${generatedCount === 1 ? "" : "s"} would gain a JSON-LD block`,
+      );
+    }
 
     const report = publishModule.formatDryRunReport(rows);
     if (report) reporter.summary(report);
@@ -343,7 +804,43 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
     }
   }
 
+  // ---- §27 — the local audit view's one source. ----------------------------
+  // Set only by `unify dev`. Everything the report is allowed to show is
+  // handed over here, at the end of the build that produced it: the §20
+  // manifest this build derived, the §24 findings computed at the single call
+  // site above, §17's own address line, and §14's diagnostics in the printed
+  // order and printed form (`file` already relocated to the working
+  // directory). §27.3's one-source rule is therefore a property of this call
+  // rather than a discipline the report has to keep — there is nothing in the
+  // payload the view could have re-read the site for, and product-spec §6.2's
+  // second interpretation has nowhere to appear.
+  //
+  // Fired last, after publish, so what the view describes is a build that
+  // finished (§27.4: never a half-assembled report). A rebuild that threw never
+  // reaches this line at all, which is exactly the signal `dev.js` reads to say
+  // so rather than leave a stale report looking current.
+  settings.onEvaluation?.({
+    records: manifest.records,
+    findings,
+    address: addressLine(baseConfig),
+    diagnostics: reporter.sorted(),
+    published,
+  });
+
   return reporter.exitCode;
+}
+
+/**
+ * §17's first line: the address the build assumed, stated once. Shared by the
+ * `--dry-run` report and §27's summary line so a reader cannot be shown two
+ * answers to "where does this site think it lives".
+ * @param {{origin: string, pathPrefix: string}|null} baseConfig
+ * @returns {string}
+ */
+function addressLine(baseConfig) {
+  return baseConfig
+    ? `serving from ${baseConfig.origin}${baseConfig.pathPrefix}`
+    : "serving from / — the domain root (no --base-url)";
 }
 
 /**
@@ -423,15 +920,78 @@ function makeSourceLineResolver(sourceRoot) {
  * @param {(file: string, fileOffset: number) => number|undefined} resolveLine
  * @returns {import('../../core/references.js').Locate}
  */
-function makeReferenceLocator(pageSpansByOutputPath, htmlFiles, cssFiles, resolveLine) {
+function makeReferenceLocator(
+  pageSpansByOutputPath, htmlFiles, cssFiles, resolveLine,
+  insertionsByOutputPath = new Map(), preInsertionByOutputPath = new Map(),
+) {
   return (outputFile, offset) => {
     const spans = pageSpansByOutputPath.get(outputFile);
-    const hit = spans ? urls.spansToSourceLocator(spans, outputFile)(offset) : null;
-    if (!hit || hit.fileOffset === null) {
-      const text = htmlFiles.get(outputFile) ?? cssFiles.get(outputFile) ?? "";
-      return { file: outputFile, line: html.lineOf(text, offset) };
+    // §22's completion INSERTS bytes after the spans were computed, which is
+    // the one thing the invariant below never allowed for: §11's rewrites only
+    // ever replace attribute values in place, so a final-text offset indexed
+    // the span table exactly. An insertion breaks that, and it broke it
+    // silently — a broken link inside an include was attributed to a different
+    // file at a line holding unrelated content, which is worse than no location
+    // at all. Subtracting the insertions that precede the offset maps a
+    // final-text position back to the pre-insertion text the spans describe.
+    // The list is in REVERSE APPLICATION ORDER (see `insertionsByOutputPath`),
+    // and that is what makes this loop total rather than merely lucky. Each
+    // insertion's `at` is a position in the text IT was applied to, so §26's
+    // block sits at an offset in the text §22 had already lengthened. Undoing
+    // the most recent first means `offset - shift` is always expressed in the
+    // space the next `at` was measured in; undoing them in application order
+    // compares a §26-space position against a §22-space offset, which happens
+    // to come out right only because a JSON-LD block is longer than a canonical
+    // link. One insertion cannot show the difference, which is why the order
+    // had to be decided the moment a second feature wrote into the same head.
+    //
+    // An offset that lands INSIDE an insertion has no preimage at all, and the
+    // three cases have to be separated rather than lumped together: §26's
+    // generated block carries references §12 checks (`url`, `image` — §26.7),
+    // so a page whose `og:image` names nothing produces a P13 inside bytes no
+    // source file contains. Subtracting the whole insertion for such an offset
+    // walks BACKWARDS past the insertion point by however much of the block
+    // preceded the reference, which on a page with a long description crossed
+    // into another file entirely: one missing image reported at `_layout.html`
+    // line 2, `<html lang="en">`, holding nothing of the kind. §1's provenance
+    // is "the source file whose text contained the element's start tag" and a
+    // generated element has none, so the position is mapped to the insertion
+    // POINT — a real position in the pre-insertion text — and §14.1's rule
+    // decides the rest: a line is omitted rather than guessed.
+    //
+    // The FILE is decided the same way and had to be, because mapping to the
+    // insertion point answers the line question and then silently answers the
+    // file question wrong: the insertion point is wherever `</head>` came from,
+    // which for a Markdown page under a layout is the LAYOUT, and for a layout
+    // that includes its head chrome is that FRAGMENT — files that contain no
+    // such reference and that the author can grep to no effect. §26.7 fixes
+    // the answer instead: a reference inside a generated block is located at
+    // the page the block was generated for, which every insertion carries.
+    const insertions = insertionsByOutputPath.get(outputFile) ?? [];
+    let shift = 0;
+    /** The page an insertion was generated FOR, when the offset lands inside one. */
+    let generatedFile = null;
+    for (const ins of insertions) {
+      const local = offset - shift;
+      if (local >= ins.at + ins.length) shift += ins.length;
+      else if (local >= ins.at) { shift += local - ins.at; generatedFile = ins.file ?? outputFile; }
     }
-    return { file: hit.file, line: resolveLine(hit.file, hit.fileOffset) };
+    const generated = generatedFile !== null;
+    const spanOffset = offset - shift;
+    const hit = spans ? urls.spansToSourceLocator(spans, outputFile)(spanOffset) : null;
+    // The last resort: no span covers this offset, so the OUTPUT file is its
+    // own provenance. The text numbered has to be the PRE-INSERTION one, and
+    // the offset the un-shifted one — §22 and §26 add whole LINES before
+    // `</head>`, so numbering the final text against the raw offset moved every
+    // later reference down by the height of the block and printed line 22 of a
+    // 16-line file. §14.1 forbids a guessed line for being checkable and wrong;
+    // an impossible one is that fault with the checking already done.
+    const text = preInsertionByOutputPath.get(outputFile)
+      ?? htmlFiles.get(outputFile) ?? cssFiles.get(outputFile) ?? "";
+    if (!hit || hit.fileOffset === null) {
+      return { file: generatedFile ?? outputFile, line: generated ? undefined : html.lineOf(text, spanOffset) };
+    }
+    return { file: generatedFile ?? hit.file, line: generated ? undefined : resolveLine(hit.file, hit.fileOffset) };
   };
 }
 
@@ -642,13 +1202,25 @@ function relocateDiagnosticsToCwd(reporter, sourceRoot) {
  * @param {import('../../core/diagnostics.js').Reporter} reporter
  * @returns {{absPath: string, relPath: string, isPage: boolean, excluded: boolean}[]} sorted by relPath (determinism, DIA-05)
  */
-function scanSourceTree(sourceRoot, output, excludePatterns, reporter) {
-  const root = resolve(sourceRoot);
+function scanSourceTree(sourceRoot, output, excludePatterns, reporter, overlayDir = null) {
+  let root = resolve(sourceRoot);
   const outputAbs = resolve(output);
-  /** @type {{absPath: string, relPath: string, isPage: boolean, excluded: boolean}[]} */
+  /** @type {{absPath: string, relPath: string, isPage: boolean, excluded: boolean, generated: boolean}[]} */
   const files = [];
+  // §33.3 — files in the generated directory are scanned EXACTLY as source
+  // files are: pages by extension, mirror copy for everything else, the
+  // underscore exclusion, `.fragment.html`. Only the origin differs, and it
+  // differs for one visible reason: §17 marks a generated row `← generated`,
+  // because a file in dist/ with no source file behind it is otherwise
+  // unexplainable to a reader of the report.
+  let generated = false;
 
   walk(root);
+  if (overlayDir !== null) {
+    root = resolve(overlayDir);
+    generated = true;
+    walk(root);
+  }
   files.sort((a, b) => (a.relPath < b.relPath ? -1 : a.relPath > b.relPath ? 1 : 0));
   return files;
 
@@ -659,7 +1231,7 @@ function scanSourceTree(sourceRoot, output, excludePatterns, reporter) {
     // embed, or fetch. Everything downstream keys off this one classification.
     const ext = extname(rel);
     const isPage = (ext === ".html" || ext === ".md") && !rel.endsWith(".fragment.html");
-    files.push({ absPath: abs, relPath: rel, isPage, excluded: isExcluded(rel, excludePatterns) });
+    files.push({ absPath: abs, relPath: rel, isPage, excluded: isExcluded(rel, excludePatterns), generated });
   }
 
   function walk(dir) {

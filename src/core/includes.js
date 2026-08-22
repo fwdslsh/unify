@@ -32,6 +32,17 @@ import { readFile } from "node:fs/promises";
 import { dirname, extname, resolve } from "node:path";
 import { CHECK_SPELLING, formatChain } from "./diagnostics.js";
 import { contains, toRelative } from "./paths.js";
+import { declaresSlot, mergeSlottedInclude } from "./slotted-include.js";
+
+/**
+ * §4.4 — a name ending `.fragment.html` opts out of page-ness, and §32.2 makes
+ * it the one shape a non-empty include may target. Case-insensitive, matching
+ * how build.js classifies the same suffix.
+ * @param {string} absPath
+ */
+function isFragment(absPath) {
+  return absPath.toLowerCase().endsWith(".fragment.html");
+}
 
 /** Inclusive: ten include files may be on the stack; the eleventh is the problem. */
 const MAX_DEPTH = 10;
@@ -131,17 +142,11 @@ export async function inlineIncludes({
       reporter.problem({ ...at, message: "<include> without src", context: match.trim() });
       continue;
     }
-    if (content !== undefined && content.trim() !== "") {
-      reporter.problem({
-        ...at,
-        message: "<include> takes no content — the file's contents replace the element",
-        context: match.trim().slice(0, 120),
-        fixes: [
-          "includes are not components; put page content in the page, or generate variants with a script (_scripts/)",
-        ],
-      });
-      continue;
-    }
+    // §32.1 — the CONTENT decides which of two operations this is. An empty
+    // include is everything below: verbatim, textual, pre-parse. A non-empty
+    // one is a composition, and was P03 until §32; §5.1's sixth rule now
+    // defers there and P03 keeps only its other half (an include with no src).
+    const slotted = content !== undefined && content.trim() !== "";
     if (form === "src" && content === undefined) {
       reporter.advisory({
         ...at,
@@ -202,7 +207,56 @@ export async function inlineIncludes({
       // converted above, so the child frame is walking converted HTML too.
       linesAreSource: extname(target.path).toLowerCase() !== ".md",
     });
-    edits.push({ index, length: match.length, text: child.text, spans: child.spans });
+    if (!slotted) {
+      edits.push({ index, length: match.length, text: child.text, spans: child.spans });
+      continue;
+    }
+
+    // §32.2 — a non-empty include is valid only when its target is a
+    // *.fragment.html declaring at least one <slot>. Both halves are required
+    // and each has its own problem, located at the INCLUDE element in the file
+    // that wrote it — where the author can act — and naming the fragment too,
+    // because the fix is as likely to be in one file as the other.
+    const fragmentRel = toRelative(sourceRoot, target.path);
+    if (!isFragment(target.path)) {
+      reporter.problem({
+        ...at,
+        message: `<include> with content: ${fragmentRel} is not a .fragment.html`,
+        context: match.trim().slice(0, 120),
+        fixes: [
+          "an include may carry content only when its target is a fragment with slots",
+          `rename it ${fragmentRel.replace(/\.html$/i, ".fragment.html")}, or empty the include`,
+        ],
+      });
+      continue;
+    }
+    if (!declaresSlot(child.text)) {
+      reporter.problem({
+        ...at,
+        message: `<include> with content: ${fragmentRel} declares no <slot>, so the content has nowhere to go`,
+        context: match.trim().slice(0, 120),
+        fixes: [`add <slot></slot> to ${fragmentRel}`, "or empty the include — an empty one splices the file verbatim"],
+      });
+      continue;
+    }
+
+    // The content's own offsets are offsets in THIS file's text: `text` is
+    // `file`'s raw source (or its converted Markdown), and `edits` are
+    // computed against it, so a fill's provenance is this file at its own
+    // offset. That is what keeps §14.1's line attribution exact across the
+    // interleaving the merge produces.
+    const contentStart = index + match.indexOf(">") + 1;
+    const merged = mergeSlottedInclude({
+      fragmentText: child.text,
+      fragmentSpans: child.spans,
+      fragmentFile: fragmentRel,
+      contentText: content,
+      contentSpans: [{ start: 0, end: content.length, file: relFile, fileOffset: contentStart }],
+      contentFile: relFile,
+      at,
+      reporter,
+    });
+    edits.push({ index, length: match.length, text: merged.text, spans: merged.spans });
   }
 
   return spliceWithProvenance(text, edits, relFile);

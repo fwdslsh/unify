@@ -1,40 +1,35 @@
+## What v0.8.0 adds
+
+The v0.7 composition model — `<include>`, layouts, slots, the underscore, `.fragment.html` — is unchanged. v0.8.0 adds the production layer on top of it: once unify knows your site's address, it verifies and generates the standard artifacts around your pages.
+
+- **`unify audit`** — evaluates the site the build would publish and writes nothing: missing descriptions, duplicate titles, broken fragment links, orphan pages, invalid JSON-LD, share images without dimensions. Findings never block `build`; `audit --strict` is the CI gate. `--format json` / `--format sarif` emit the same findings machine-readably, each with a stable fingerprint CI can suppress; `--external` (the only network operation in the product, opt-in) checks off-origin URLs.
+- **Discovery files from `--base-url`** — `sitemap.xml` and an Atom `feed.xml` (pages declaring `schema: Article`/`BlogPosting` with a full timestamp become entries; `--feed-full` includes rendered content). `--search-index` writes `search-index.json` for client-side search. An authored file always wins: ship your own `feed.xml`/`sitemap.xml`/`search-index.json`/`robots.txt` and unify generates nothing.
+- **`--canonical auto`** — completes a canonical link, from the final public URL, only on pages that author none.
+- **`schema:` frontmatter** (`WebPage` | `Article` | `BlogPosting`) — writes bounded JSON-LD from what the page already declares. Nothing is guessed: no date ever comes from the build clock, the filesystem, or Git. Authored `<script type="application/ld+json">` always wins.
+- **Slotted includes** — content inside `<include>` fills `<slot>` elements in a `*.fragment.html` target, the same `slot="name"`/fallback model layouts already use. No props, no expressions.
+- **`--generate <path>`** — one author-owned JavaScript file runs before the scan; whatever it writes into the supplied directory joins the build as an overlay, checked and published like any source file. The standalone binary supplies the runtime — no Node required. There is no `--run "<shell>"`.
+- **`/_unify/`** — `unify dev` serves the audit findings and each page's record as a local page. Never written to `dist/`.
+
+Every option is saveable in `unify.yaml` except the per-run ones (`--dry-run`, `--format`, `--external`); CLI wins on conflict.
+
+## Upgrading from 0.7.x
+
+One breaking change, deliberate: **`draft:`, `permalink:`, and `slug:` frontmatter are now build errors** naming the unify mechanism — these keys silently imply other generators' behavior unify does not have. Hold a page back by renaming it with a leading underscore; change its address by moving the file. `tags:`/`categories:` still build, and `audit` notes that nothing is built from them.
+
+Everything else is additive: a 0.7 site builds unchanged, and with no `--base-url` no new file is generated.
+
 ## Upgrading from 0.6.x
 
-v0.7.0 is a clean break from the 0.6 composition model. A 0.6 site must be updated before it will build: replace `data-unify` and `unify-*` area classes with `data-layout`, `<main>`, `<slot name>`, and `slot=`; replace the retired `serve` command with `dev`; and remove the retired `--minify` and `--fail-on` options. The build reports every retired composition spelling at its source location and names the v0.7 replacement—it never silently interprets 0.6 markup as something else.
+v0.7.0 was a clean break: `data-unify` and `unify-*` area classes became `data-layout`, `<main>`, `<slot name>`, and `slot=`; `serve` became `dev`; `--minify` and `--fail-on` were retired. The build reports every retired spelling at its source location and names the replacement.
 
 ## Usage
 
 ```bash
-# Scaffold a starter site into src/
-unify init
-
-# Build, watch, serve, and reload — the inner loop
-unify dev
-
-# Build the site
-unify build --source src --output dist
-
-# Build with pretty URLs
-unify build --source src --output dist --pretty-urls
-
-# The one-line CI lint: the whole build and every check, writing nothing
-unify build --dry-run --strict
-
-# Rebuild on change, no server (pair with your own)
-unify watch --source src --output dist
+unify init                     # scaffold a starter site into src/
+unify dev                      # build, watch, serve, reload — the inner loop
+unify build --base-url https://your-site.example/   # + sitemap.xml, feed.xml
+unify build --dry-run --strict # the one-line structural CI check
+unify audit --strict           # the content/discovery CI gate; writes nothing
 ```
 
-## Features
-
-- **HTML-native composition**: no expression language, no client runtime — the output is the HTML and CSS you wrote
-- **Includes**: `<include src="/_includes/nav.html"></include>`, plus the Apache SSI comment form for migrating SSI sites
-- **Layouts**: the nearest `_layout.html` wraps every page automatically; `data-layout` to pick one or opt out
-- **Slots**: `<slot name>` in layouts, `slot=` on page elements, `<main>` as the zero-vocabulary default
-- **Fragments**: name a file `*.fragment.html` and it ships byte-for-byte — a bare snippet for `<include>`, embeds, or client-side fetch, never composed
-- **Markdown**: equal citizen, with YAML frontmatter supplying the head and slug `id`s on every heading
-- **Underscore exclusion**: `_draft.html` and `_includes/` are build material that never ships
-- **Safe publishing**: builds are all-or-nothing — problems mean nothing is written and the previous output is untouched
-
-## Documentation
-
-For full documentation, visit the [project repository](https://github.com/fwdslsh/unify).
+Binaries below are single-file executables — no runtime to install. Also on npm: `npm i -g @fwdslsh/unify`.

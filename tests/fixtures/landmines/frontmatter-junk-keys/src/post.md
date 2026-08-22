@@ -1,9 +1,7 @@
 ---
 title: Junk drawer
-draft: true
 date: 2026-01-01
-permalink: /custom/
-slug: junky
+featured: true
 tags:
   - a
   - b

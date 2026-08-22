@@ -180,3 +180,67 @@ test("CFG-03: no behavior exists that only the file can express — flags-only a
   }
   covers("CFG-03");
 }, TEST_MS);
+
+test("CFG-01: canonical, feed-full, search-index, and generate are saved flags with real effect", async () => {
+  // The v0.8.0 release review found §18's key list contradicting itself: §22.1
+  // and §33.1 each said their flag is saved in unify.yaml while §18's list
+  // omitted both, and the two site-level 0.8 booleans were saveable nowhere.
+  // One tree, one flagless build, all four keys observed by their effects —
+  // each assertion names the section whose promise it keeps.
+  const tmp = mkTmp();
+  writeTree(tmp, {
+    // §18: the file lives AT THE SOURCE ROOT — with src/ present that is
+    // src/unify.yaml, not the project root. (This test's first draft put it
+    // one level up and concluded `generate:` was broken; it was unread.)
+    "src/unify.yaml": [
+      "base-url: https://example.com/site/",
+      "canonical: auto",
+      "feed-full: true",
+      "search-index: true",
+      "generate: _scripts/gen.mjs",
+    ].join("\n") + "\n",
+    "src/index.html": `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Home</title><meta name="description" content="Home page."></head>
+<body><h1>Home</h1><a href="/post.html">post</a><a href="/made.html">made</a></body>
+</html>
+`,
+    "src/post.html": `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Post</title><meta name="description" content="A post.">
+<meta name="schema" content="BlogPosting"><meta name="date" content="2026-08-02T21:30:00Z"></head>
+<body><main><h1>Post</h1><p>Body text.</p></main></body>
+</html>
+`,
+    "src/_scripts/gen.mjs": `import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+const [, , , outDir] = process.argv;
+mkdirSync(outDir, { recursive: true });
+writeFileSync(join(outDir, "made.html"),
+  '<!doctype html>\\n<html lang="en"><head><meta charset="utf-8"><title>Made</title><meta name="description" content="Generated."></head><body><h1>Made</h1></body></html>\\n');
+`,
+  });
+
+  const r = await runCli(["build"], tmp);
+  if (r.exit !== 0) throw new Error(`a build configured entirely by unify.yaml must succeed:\n${r.stdout}\n${r.stderr}`);
+
+  // §22.1 — `canonical: auto` in the file is `--canonical auto`.
+  const post = readFileSync(join(tmp, "dist", "post.html"), "utf8");
+  if (!post.includes('rel="canonical" href="https://example.com/site/post.html"')) {
+    throw new Error(`canonical: auto in unify.yaml must complete a canonical:\n${post}`);
+  }
+  // §29.6 — `feed-full: true` puts the rendered body in <content>.
+  const feed = readFileSync(join(tmp, "dist", "feed.xml"), "utf8");
+  if (!/<content type="html">/.test(feed)) {
+    throw new Error(`feed-full: true in unify.yaml must produce <content type="html">:\n${feed}`);
+  }
+  // §30.1 — `search-index: true` writes the manifest.
+  if (!existsSync(join(tmp, "dist", "search-index.json"))) {
+    throw new Error("search-index: true in unify.yaml must write search-index.json");
+  }
+  // §33.1 — `generate:` runs the generator before the scan.
+  if (!existsSync(join(tmp, "dist", "made.html"))) {
+    throw new Error("generate: in unify.yaml must run the generator");
+  }
+  covers("CFG-01");
+}, 30_000);

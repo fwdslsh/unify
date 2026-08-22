@@ -51,12 +51,159 @@
  * head-merge.js (§8) so all three locate a fault the same way.
  */
 import { posix } from "node:path";
-import { applyEdits, findAll, getAttr, getAttrNode, lineOf, parse, tokens } from "./html.js";
+import { decodeEntities } from "./entities.js";
+import { applyEdits, findAll, getAttr, getAttrNode, isElement, lineOf, parse, tokens } from "./html.js";
 
 // --------------------------------------------------------------- URL basics
+//
+// Three questions about a URL, three owners, one answer each. Every defect this
+// module has had was two components answering the same one differently, so the
+// division is stated here rather than left to be inferred:
+//
+//   "what URL does this OUTPUT PATH answer to?"   -> publish.js urlForOutputPath
+//                                                    (encodePathSegments inside)
+//   "what FILE do these authored bytes name?"     -> decodePathSegments
+//                                                    (references.js §12, urls.js
+//                                                     §11.2, head-merge.js identity,
+//                                                     sitemap.js <loc> checking)
+//   "what is the canonical form of this AUTHORED  -> canonicalizePathSegments
+//    URL unify is about to re-root?"                 (urls.js §11.1)
+//
+// The three are not interchangeable and take different input spaces: an output
+// path is a filesystem path whose segments are never pre-encoded, while an
+// authored URL may already carry escapes. Using the wrong one is wrong in both
+// directions at once — it has shipped twice, failing a correct site and silently
+// passing an incorrect one.
 
 /** A URL with a scheme (`http:`, `mailto:`, `tel:`, `data:`, `javascript:`, …). */
 const SCHEME_RE = /^[a-z][a-z0-9+.-]*:/i;
+
+/**
+ * Stands in for a path segment that cannot name a file. NUL is the one byte no
+ * filename may contain on any filesystem unify runs on, so a path carrying it
+ * is absent from `emittedPaths` by construction rather than by luck.
+ */
+const UNMATCHABLE = "\u0000";
+
+/**
+ * §20.5 — percent-encode every segment of an output path, leaving the `/`
+ * separators intact.
+ *
+ * A filesystem name is not a URI: a file called `two words.html` answers to
+ * `/two%20words.html`, and emitting the raw form into a sitemap `<loc>`, an
+ * `href`, or the `--dry-run` report puts an illegal character inside a URL.
+ * `encodeURIComponent` is exactly right per segment, because an output-path
+ * segment is a literal filename and never pre-encoded — so the transform is
+ * total, and a literal `%` becomes `%25` rather than being read as an escape.
+ * @param {string} outputPath
+ * @returns {string}
+ */
+export function encodePathSegments(outputPath) {
+  return outputPath.split("/").map(encodeURIComponent).join("/");
+}
+
+/**
+ * §20.5 — canonicalize a URL path that is **already in URL space**.
+ *
+ * `encodePathSegments` and this function take different inputs and are not
+ * interchangeable. That one takes a *filesystem* path whose segments are
+ * literal names and never pre-encoded, so encoding is total. This one takes a
+ * path built from text the **author wrote as a URL**, which may already carry
+ * escapes — so it decodes each segment and re-encodes it, leaving a canonical
+ * URL whichever spelling arrived.
+ *
+ * Applying the wrong one here is a defect in both directions at once, and it
+ * shipped for one commit: encoding an authored `a%20b.png` produced
+ * `a%2520b.png`, so a site whose file really is `a b.png` — a site the author
+ * had spelled correctly — stopped building, while a site whose file is
+ * literally named `a%20b.png` started passing silently, which is the direction
+ * that reaches production.
+ *
+ * Decoding and re-encoding **per segment, without rejoining in between** is
+ * what makes this idempotent for every input: `a%2Fb.png` decodes to a single
+ * segment named `a/b.png` and `encodeURIComponent` puts the `%2F` straight
+ * back, rather than emitting `a%252Fb.png` or splitting one impossible segment
+ * into two real ones.
+ * @param {string} path
+ * @returns {string}
+ */
+export function canonicalizePathSegments(path) {
+  const decoded = path.split("/").map((seg) => {
+    try {
+      return decodeURIComponent(seg);
+    } catch {
+      return null; // malformed escape — preserved verbatim below
+    }
+  });
+  // RFC 3986 §5.2.4 on the DECODED segments, because `%2E%2E` is `..` and
+  // `resolveProvenanceUrl` normalized before this function decoded it — so
+  // without this a canonicalized URL could still carry a dot segment, which is
+  // not canonical. Operating on the array rather than a joined string is what
+  // keeps a decoded `/` from becoming a separator on the way through.
+  const out = [];
+  for (const [i, seg] of decoded.entries()) {
+    if (seg === ".") continue;
+    if (seg === ".." && out.length > 1) { out.pop(); continue; }
+    out.push(seg === null ? path.split("/")[i] : encodeURIComponent(seg));
+  }
+  return out.join("/");
+}
+
+/**
+ * The exact inverse, for matching an authored URL back to an output path.
+ *
+ * Per segment, and never `decodeURI`: that function deliberately leaves
+ * reserved characters escaped, so `/a%26b.html` would keep its `%26` and never
+ * match the emitted `a&b.html`.
+ *
+ * A segment whose decoded form contains `/` names an **impossible file** — one
+ * segment whose name holds a slash, which no filesystem can store — so it is
+ * replaced by a sentinel no output path can equal, and the reference matches
+ * nothing. Decoding it and rejoining would instead turn `/a%2Fb.html` into
+ * `/a/b.html`: a one-segment URL reinterpreted as a two-segment path, resolving
+ * to a different file, and under `--pretty-urls` rewriting the author's bytes
+ * to an address naming a different resource.
+ *
+ * The sentinel is a NUL, which is the one byte no filename may contain on any
+ * filesystem unify runs on. Leaving the segment percent-encoded instead was
+ * *almost* right and shipped for one commit: it matched nothing in every case
+ * but one — a file literally named `a%2Fb.html`, whose real published address
+ * is `/a%252Fb.html`, would string-match the impossible spelling and emit a
+ * link that 404s. "Matches nothing" is only true if it is true always.
+ *
+ * `%5C` is deliberately NOT treated the same way, though an earlier version of
+ * this function did. A backslash is a perfectly legal character in a POSIX
+ * filename, so `a\b.html` is a real file that §20.5 publishes as
+ * `/a%5Cb.html`; refusing to decode that segment would make the site's own
+ * advertised address unresolvable — the same self-contradiction, one character
+ * over. It cannot help on Windows either, where a filename may not contain a
+ * backslash at all, so the case never arises.
+ *
+ * This is RFC 3986's own line, not a local invention: percent-encoded
+ * *unreserved* characters are equivalent to their decoded form (so `%2E` is
+ * `.`, `%41` is `A`), while a *reserved* delimiter left encoded is deliberately
+ * not a delimiter. Decoding `%2F` into a separator would be the one
+ * transformation the encoding exists to prevent.
+ *
+ * A malformed escape keeps its segment verbatim rather than throwing: a URL
+ * unify cannot decode is one it reports on, not one it crashes over.
+ * @param {string} path
+ * @returns {string}
+ */
+export function decodePathSegments(path) {
+  return path
+    .split("/")
+    .map((seg) => {
+      let decoded;
+      try {
+        decoded = decodeURIComponent(seg);
+      } catch {
+        return seg; // malformed escape — unmatchable, and reported as such
+      }
+      return decoded.includes("/") ? UNMATCHABLE : decoded;
+    })
+    .join("/");
+}
 
 /**
  * True for every URL §11.1/§11.2 skip entirely: a scheme, a `//`-prefixed
@@ -80,7 +227,14 @@ export function isSkippedUrl(url) {
  * @returns {{path: string, query: string, fragment: string}}
  */
 export function splitUrl(url) {
-  const m = /^([^?#]*)(\?[^#]*)?(#.*)?$/.exec(url);
+  // `[\s\S]`, not `.`: a URL can contain a newline, and `.` cannot match one.
+  // `<a href="/notes.html#miss&#10;ing">` is legal HTML whose VALUE (§12: a
+  // reference is the attribute's value) carries a literal newline, and the old
+  // pattern simply failed to match it — returning null from a function every
+  // caller treats as total, so the build died with "null is not an object" and
+  // no file, no line, and no fix. §14 has no unlocated fatals; a URL nothing
+  // can resolve is a located diagnostic, never a crash.
+  const m = /^([^?#]*)(\?[^#]*)?(#[\s\S]*)?$/.exec(url);
   return { path: m[1], query: m[2] ?? "", fragment: m[3] ?? "" };
 }
 
@@ -262,6 +416,125 @@ function isVerbatimSourceText(text, spans, file) {
 const SINGLE_URL_ATTRS = ["href", "src", "poster"];
 
 /**
+ * The `og:`/`twitter:` properties whose value is a **URL**, closed list —
+ * §11.1 re-roots them and §12 checks them, from this one definition.
+ *
+ * The scope cannot be "every `og:`/`twitter:` meta": `og:site_name` is
+ * "Meridian Coffee" and `twitter:card` is "summary", and treating those as
+ * URLs would rewrite and then fail every correct site that has one. Nor can it
+ * be a test on the *value* — that is what §12 did for its whole life, and it
+ * checked the root-relative and absolute spellings while never checking the
+ * relative one.
+ *
+ * The prefix is the boundary, and it is chosen rather than accidental: Open
+ * Graph's *vertical* namespaces (`article:author`, `music:album`,
+ * `video:actor`, `book:author`, `profile:username`) are URL-valued but are not
+ * `og:`-prefixed, and §12's scope has been "og:/twitter: metas" since v0.7.0.
+ * Widening to them is a separate decision, not an oversight here.
+ */
+export const URL_VALUED_META =
+  /^(og:(url|image|audio|video)|twitter:(image[0-3]?|player))(:(url|secure_url|src|stream))?$/i;
+
+/** @param {import('./html.js').ElementNode} el @returns {boolean} */
+export function isUrlValuedMeta(el) {
+  if (!isElement(el, "meta")) return false;
+  const key = getAttr(el, "property") ?? getAttr(el, "name") ?? "";
+  return URL_VALUED_META.test(key.trim());
+}
+
+/**
+ * `<meta http-equiv="refresh">`, ASCII case-insensitive and whitespace-tolerant
+ * — an author writes `HTTP-EQUIV="Refresh"` as readily as the lowercase form,
+ * and a redirect that escaped every check because of its spelling is the fault
+ * this whole path exists to close.
+ * @param {import('./html.js').ElementNode} el
+ * @returns {boolean}
+ */
+export function isRefreshMeta(el) {
+  if (!isElement(el, "meta")) return false;
+  const v = getAttr(el, "http-equiv");
+  return typeof v === "string" && v.trim().toLowerCase() === "refresh";
+}
+
+/** ASCII whitespace, the only whitespace §12's refresh grammar recognises. */
+const REFRESH_WS = /[ \t\n\f\r]/;
+
+/**
+ * §12's refresh grammar, read ONCE for the whole build: §11.1/§11.2/§11.3
+ * rewrite this URL, §12 checks it, and §20.11 records it. Three readers of one
+ * compound attribute value would be three chances for the checked URL, the
+ * rewritten URL, and the reported URL to be different strings — the two-readings
+ * defect product-spec §6.2 forbids, arriving inside a single attribute.
+ *
+ * `start`/`end` are ABSOLUTE document offsets of the URL itself — not of the
+ * attribute — so a rewrite replaces the URL and leaves the `0; url=` the author
+ * wrote alone, and a diagnostic lands inside the text that actually wrote the
+ * URL (§14.1).
+ *
+ * `hasSecondPart` is what keeps §20.11 honest about `content="0; /bare.html"`:
+ * that value declares a redirect this grammar does not read, which is UNKNOWN
+ * and never "this page" — folding it into self would make §24.4 report a loop
+ * the page does not contain.
+ * @param {import('./html.js').ElementNode} el
+ * @returns {{raw:string, seconds:number, url:string|null, start:number|null,
+ *            end:number|null, hasSecondPart:boolean}|null} null when the element
+ *   is not a refresh meta, or its `content` has no leading digits and so
+ *   declares no refresh at all (§12)
+ */
+export function parseRefreshMeta(el) {
+  if (!isRefreshMeta(el)) return null;
+  // One `content` attribute, one reader. An element spelling BOTH readings —
+  // `http-equiv="refresh"` beside `name="twitter:image"` — is markup no consumer
+  // acts on either way, but two readers of one attribute pushed two overlapping
+  // edits into `applyEdits`, which throws: an unlocated fatal out of §11, a
+  // category §14 does not have. The metas' reading is the older one and keeps
+  // the attribute, so nothing that worked before this function existed changes.
+  if (isUrlValuedMeta(el)) return null;
+  const content = getAttrNode(el, "content");
+  if (!content || typeof content.value !== "string") return null;
+  const value = content.value;
+  let i = 0;
+  while (i < value.length && REFRESH_WS.test(value[i])) i++;
+  const digitsAt = i;
+  while (i < value.length && value[i] >= "0" && value[i] <= "9") i++;
+  if (i === digitsAt) return null; // no leading digits: declares no refresh (§12)
+  const seconds = Number(value.slice(digitsAt, i));
+  // A fractional part is SKIPPED rather than read: `0.5` is still no delay a
+  // reader can read a page in, and inventing a float here would put a number in
+  // the record that §24.4's "zero is the absence of a delay" cannot reason about.
+  if (value[i] === ".") { i++; while (i < value.length && value[i] >= "0" && value[i] <= "9") i++; }
+  while (i < value.length && REFRESH_WS.test(value[i])) i++;
+  const noUrl = { raw: value, seconds, url: null, start: null, end: null, hasSecondPart: false };
+  if (i >= value.length) return noUrl; // `content="5"` — no second part: §20.11 reads it as this page
+  if (value[i] !== ";" && value[i] !== ",") return { ...noUrl, hasSecondPart: true };
+  i++;
+  while (i < value.length && REFRESH_WS.test(value[i])) i++;
+  if (!/^url/i.test(value.slice(i))) return { ...noUrl, hasSecondPart: true };
+  i += 3;
+  while (i < value.length && REFRESH_WS.test(value[i])) i++;
+  if (value[i] !== "=") return { ...noUrl, hasSecondPart: true };
+  i++;
+  while (i < value.length && REFRESH_WS.test(value[i])) i++;
+  const rest = value.slice(i);
+  const quote = rest[0] === '"' || rest[0] === "'" ? rest[0] : null;
+  if (quote !== null) i++;
+  const tail = value.slice(i);
+  const stop = quote !== null
+    ? (tail.indexOf(quote) === -1 ? tail.length : tail.indexOf(quote))
+    : (REFRESH_WS.exec(tail)?.index ?? tail.length);
+  const url = tail.slice(0, stop);
+  if (url === "") return { ...noUrl, hasSecondPart: true };
+  return {
+    raw: value,
+    seconds,
+    url,
+    start: content.valueStart + i,
+    end: content.valueStart + i + url.length,
+    hasSecondPart: true,
+  };
+}
+
+/**
  * Rewrite every `href`/`src`/`srcset`/`poster` URL in `composedHtml`
  * (already include-inlined and layout-composed) per §11.1's per-URL
  * branching. `url()` in `<style>`/`style=` is deliberately never reached
@@ -293,7 +566,21 @@ export function rewriteProvenanceUrls(composedHtml, { provenanceOf, pageFile, pa
     const resolvedPath = resolveProvenanceUrl(url, file);
     if (resolvedPath === null) return null; // out of scope after all (defensive; isSkippedUrl already caught this)
     const { query, fragment } = splitUrl(url);
-    return resolvedPath + query + fragment;
+    // §20.5's line: this branch CONSTRUCTS a root-relative URL — a string that
+    // appears in no source file — so it is percent-encoded, exactly as
+    // `urlForOutputPath` and `prettyLinkTarget` encode theirs. The branch above
+    // preserves what the author wrote and is the other side of that line.
+    // Without this an included `<img src="../assets/my logo.png">` emitted a
+    // raw space while the same asset's dry-run row and sitemap loc were
+    // encoded — one file, two addresses, from one build.
+    //
+    // `canonicalizePathSegments`, NOT `encodePathSegments`: this path is built
+    // from text the author wrote as a URL, so it may already carry escapes.
+    // The two functions take different input spaces and the wrong one here is
+    // wrong in both directions — it briefly turned an authored `a%20b.png`
+    // into `a%2520b.png`, failing a correct site and silently passing an
+    // incorrect one.
+    return canonicalizePathSegments(resolvedPath) + query + fragment;
   };
 
   for (const el of findAll(root, (n) => n.type === "element")) {
@@ -307,6 +594,30 @@ export function rewriteProvenanceUrls(composedHtml, { provenanceOf, pageFile, pa
     if (srcset && srcset.value) {
       const rewritten = rewriteSrcsetValue(srcset.value, (u) => rewriteOne(u, el.start));
       if (rewritten !== srcset.value) edits.push({ start: srcset.valueStart, end: srcset.valueEnd, replacement: rewritten });
+    }
+    // A URL-valued meta's `content` is a URL with provenance like any other.
+    // Leaving it out meant a layout's relative `og:image` emitted a value that
+    // resolves against the PAGE — `/blog/card.png` for an asset at
+    // `/card.png` — which §12 now sees and blocks, under a fix line saying
+    // "check the path spelling" when the spelling was right. §11.3 already
+    // treats these values as URLs; §11.1 not doing so was the asymmetry.
+    if (isUrlValuedMeta(el)) {
+      const content = getAttrNode(el, "content");
+      if (content && content.value) {
+        const next = rewriteOne(content.value, el.start);
+        if (next !== null) edits.push({ start: content.valueStart, end: content.valueEnd, replacement: next });
+      }
+    }
+    // A refresh URL is an address in an attribute unify parses, so provenance
+    // governs it exactly as it governs the <a href> beside it. Left alone, a
+    // layout's `content="0; url=target.html"` resolved against each CONSUMING
+    // page — /target.html from the root and /deep/target.html from deep/ — so
+    // one authored redirect sent readers to two different pages, and because
+    // both files existed no check anywhere could see the difference.
+    const refresh = parseRefreshMeta(el);
+    if (refresh?.url) {
+      const next = rewriteOne(refresh.url, el.start);
+      if (next !== null) edits.push({ start: refresh.start, end: refresh.end, replacement: next });
     }
   }
   return applyEdits(composedHtml, edits);
@@ -370,9 +681,15 @@ export function pageWillMove(htmlOutputPath, prettyUrls) {
  * @returns {string} root-relative, always ending in `/` (except `/404.html`)
  */
 export function prettyLinkTarget(htmlOutputPath) {
+  // Percent-encoded, because this URL is one unify CONSTRUCTS rather than one
+  // the author wrote. That is the line §11.2 draws: §11.1 relocates an
+  // authored URL and keeps its spelling, while the directory form here is
+  // unify's own invention from an output path — and a URL unify invents has to
+  // be a legal URI, or it disagrees with the same page's sitemap <loc> and
+  // dry-run row, which §20.5 builds from `urlForOutputPath`.
   if (htmlOutputPath === "404.html") return "/404.html";
   const pretty = prettyOutputPath(htmlOutputPath); // always ends in "index.html" past this point
-  return `/${pretty.slice(0, pretty.length - "index.html".length)}`;
+  return `/${encodePathSegments(pretty.slice(0, pretty.length - "index.html".length))}`;
 }
 
 /**
@@ -401,9 +718,19 @@ export function applyPrettyLinks(html, { pageOutputPath, emittedHtmlPaths }) {
     if (isSkippedUrl(url)) return null;
     const { path, query, fragment } = splitUrl(url);
     if (path === "") return null;
-    const resolved = path.startsWith("/")
-      ? posix.normalize(path).slice(1)
-      : posix.normalize(posix.join(pageDir, path));
+    // Character references resolved first, for §12's reason: an attribute's
+    // value is its bytes decoded, so `/a&amp;b.html` names `a&b.html` and must
+    // reach the same pretty target the raw spelling does. Writes never need the
+    // inverse — `prettyLinkTarget` percent-encodes, so `&` leaves as `%26`.
+    //
+    // Decoded before matching: `emittedHtmlPaths` holds literal output paths,
+    // and §20.5 makes `/two%20words.html` the spelling the site advertises for
+    // `two words.html`. Without this, a link written the way the sitemap
+    // publishes it would silently miss the pretty rewrite.
+    const decoded = decodePathSegments(decodeEntities(path));
+    const resolved = decoded.startsWith("/")
+      ? posix.normalize(decoded).slice(1)
+      : posix.normalize(posix.join(pageDir, decoded));
     if (!emittedHtmlPaths.has(resolved)) return null; // URL-09: not a page — preserved untouched
     return prettyLinkTarget(resolved) + query + fragment;
   };
@@ -420,6 +747,15 @@ export function applyPrettyLinks(html, { pageOutputPath, emittedHtmlPaths }) {
       const rewritten = rewriteSrcsetValue(srcset.value, rewriteOne);
       if (rewritten !== srcset.value) edits.push({ start: srcset.valueStart, end: srcset.valueEnd, replacement: rewritten });
     }
+    // §11.2 — a refresh URL is transformed like a link because it is one: a
+    // redirect to /about.html in a build that emits about/index.html names a
+    // file this build never wrote, and §12 would then block the publish over a
+    // spelling that was right.
+    const refresh = parseRefreshMeta(el);
+    if (refresh?.url) {
+      const pretty = rewriteOne(refresh.url);
+      if (pretty !== null) edits.push({ start: refresh.start, end: refresh.end, replacement: pretty });
+    }
   }
   return applyEdits(html, edits);
 }
@@ -430,6 +766,7 @@ export function applyPrettyLinks(html, { pageOutputPath, emittedHtmlPaths }) {
  * @typedef {object} BaseUrlConfig
  * @property {string} pathPrefix - always starts and ends with "/"
  * @property {string} origin - scheme+authority (e.g. "https://example.com")
+ * @property {string} scheme - the scheme with its colon ("https:"), lowercased by the parse
  */
 
 /**
@@ -449,8 +786,20 @@ export function parseBaseUrl(raw) {
   const u = new URL(raw);
   let path = u.pathname;
   if (!path.startsWith("/")) path = `/${path}`;
+  // One normal form with `stripBaseUrl`, which collapses the leading slash run
+  // of the path it returns. Storing the prefix uncollapsed put the two in
+  // different forms, so `--base-url https://example.com//repo/` never stripped
+  // its own prefix: the build generated a sitemap and then refused to publish
+  // it, unable to resolve the <loc> values it had just written. §21.6 says a
+  // generated sitemap's check "can only pass", and it is the two spellings of
+  // one prefix that has to hold that true, not the check.
+  path = path.replace(/^\/+/, "/");
   if (!path.endsWith("/")) path += "/";
-  return { origin: u.origin, pathPrefix: path };
+  // `scheme` is stored, not re-derived. §24.4's canonical-scheme-mismatch needs
+  // it, and every re-derivation (`origin.split(":")[0]`, a second `new URL`)
+  // would be a second reading of one flag — the shape product-spec §6.1 forbids
+  // for URLs, arriving by the door nobody watches because the two agree today.
+  return { origin: u.origin, pathPrefix: path, scheme: u.protocol };
 }
 
 function isOgOrTwitterMeta(el) {
@@ -464,6 +813,25 @@ function isCanonicalLink(el) {
   return tokens(getAttr(el, "rel"))
     .map((t) => t.toLowerCase())
     .includes("canonical");
+}
+
+/**
+ * Root-relative means one leading slash. `//host/path` is **protocol-relative**
+ * — an absolute URL that borrows the page's scheme — and §11.1 has always said
+ * so, skipping it with the other absolute forms.
+ *
+ * §11.3's own test was `startsWith("/")`, which is true of both, so it treated
+ * `//cdn.example.com/card.png` as a path on this site and emitted
+ * `https://example.com//cdn.example.com/card.png`: the author's URL rewritten
+ * into a different one, pointing at a path on the wrong host, shipped without a
+ * word. A CDN-hosted `og:image` and an authored `<link rel="canonical"
+ * href="//example.com/">` are both ordinary, and both were corrupted while the
+ * `<img src>` beside them was correctly left alone.
+ * @param {string} value
+ * @returns {boolean}
+ */
+function isRootRelative(value) {
+  return value.startsWith("/") && !value.startsWith("//");
 }
 
 /**
@@ -502,21 +870,30 @@ export function applyBaseUrl(html, base) {
     const originEligible = isCanonicalLink(el);
     for (const attrName of SINGLE_URL_ATTRS) {
       const attr = getAttrNode(el, attrName);
-      if (!attr || !attr.value || !attr.value.startsWith("/")) continue;
+      if (!attr || !attr.value || !isRootRelative(attr.value)) continue;
       const next = prefixRootRelative(attr.value, base, originEligible);
       if (next !== attr.value) edits.push({ start: attr.valueStart, end: attr.valueEnd, replacement: next });
     }
     const srcset = getAttrNode(el, "srcset");
     if (srcset && srcset.value) {
-      const rewritten = rewriteSrcsetValue(srcset.value, (u) => (u.startsWith("/") ? prefixRootRelative(u, base, false) : null));
+      const rewritten = rewriteSrcsetValue(srcset.value, (u) => (isRootRelative(u) ? prefixRootRelative(u, base, false) : null));
       if (rewritten !== srcset.value) edits.push({ start: srcset.valueStart, end: srcset.valueEnd, replacement: rewritten });
     }
     if (isOgOrTwitterMeta(el)) {
       const content = getAttrNode(el, "content");
-      if (content && content.value && content.value.startsWith("/")) {
+      if (content && content.value && isRootRelative(content.value)) {
         const next = prefixRootRelative(content.value, base, true);
         if (next !== content.value) edits.push({ start: content.valueStart, end: content.valueEnd, replacement: next });
       }
+    }
+    // The path prefix and never the origin: a redirect is fetched by the
+    // browser that already has the page, like an href and unlike a canonical.
+    // Without the prefix a root-relative redirect at a subpath deploy address
+    // leaves the site entirely, from a value that resolves in the output tree.
+    const refresh = parseRefreshMeta(el);
+    if (refresh?.url && isRootRelative(refresh.url)) {
+      const next = prefixRootRelative(refresh.url, base, false);
+      if (next !== refresh.url) edits.push({ start: refresh.start, end: refresh.end, replacement: next });
     }
   }
   return applyEdits(html, edits);

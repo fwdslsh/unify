@@ -17,6 +17,7 @@ import { loadConfig, mergeConfig, parseArgs } from "./cli/options.js";
 const HELP = `unify — HTML-native composition: no expression language, no client runtime.
 
   unify [build]              build the site (default command)
+  unify audit                evaluate the site the build would publish — writes nothing
   unify dev                  build, watch, serve, and reload — the inner loop
   unify watch                build + rebuild on change, no server
   unify init [template]      scaffold a starter site
@@ -27,9 +28,15 @@ Options:
       --clean              empty the output directory first
       --exclude <glob>     globs never emitted, still usable by the build (repeatable; default: _*)
       --pretty-urls        about.html → about/index.html, and rewrite internal links to match
-      --base-url <url>     the site's whole address (https://site.example/repo/): prefix root-relative links, and make og:/canonical absolute for share crawlers
+      --canonical auto     add a canonical link to pages that author none, from the site address
+      --base-url <url>     the site's whole address (https://site.example/repo/): prefix root-relative links, make og:/canonical absolute for share crawlers, and generate sitemap.xml
+      --feed-full          include each entry's full rendered content in feed.xml (needs --base-url)
+      --search-index       write search-index.json for a client-side search library
+      --generate <path>    run one JavaScript file from your source tree before the build
       --dry-run            run the full build and every check, print the report, write nothing
-      --strict             advisories count as problems for the exit code
+      --strict             advisories count as problems for the exit code (with \`audit\`, findings too)
+      --format <kind>      \`audit\` report shape: human (default), json, or sarif
+      --external           \`audit\` only: fetch every off-origin URL the site emits and report the ones that don't resolve
   -p, --port <n>           port for \`unify dev\` (default: 3000)
   -v, --version            print version
   -h, --help               print help
@@ -71,8 +78,30 @@ function resolveSettings(flags) {
       exclude: settings.exclude ?? ["_*"],
       prettyUrls: settings["pretty-urls"] === true,
       baseUrl: settings["base-url"],
+      canonical: settings.canonical,
+      // §29.6 — full-content feed entries; §30.1 — the search manifest. Both
+      // boolean, both read only by build.js (audit reaches them too, since
+      // `unify audit` runs the same pipeline). `feed-full`'s "requires
+      // --base-url" usage error is cross-cutting validation, checked below
+      // beside `--canonical auto`'s identical shape.
+      feedFull: settings["feed-full"] === true,
+      searchIndex: settings["search-index"] === true,
+      // §33.1 — a PATH in the source tree, never a command. Read by
+      // build.js before the scan (§33.5), so `watch`, `dev` and `audit`
+      // get it too: all four scan the source tree.
+      generate: settings.generate ?? null,
       dryRun: settings["dry-run"] === true,
+      // §24.1 — set by the audit command itself, never by a flag: there is no
+      // `--audit`, and `build` has no way to reach the evaluator.
+      audit: false,
       strict: settings.strict === true,
+      // §31.1/§31.3 — `unify audit`'s own two flags. `format`'s value is
+      // validated by `cli/commands/audit.js` (the closed set and its usage
+      // error are audit's own concern, same split `--canonical`'s value keeps
+      // between this file and `options.js`); every other command ignores
+      // both, exactly as they ignore `--canonical`.
+      format: settings.format,
+      external: settings.external === true,
       port: settings.port === undefined ? 3000 : Number(settings.port),
     },
     sourceRoot: resolved.root,
@@ -118,12 +147,79 @@ export async function run(argv) {
   // ratification samples chose it, and five of five then published dead
   // preview images with a green build. There is no repair for that inside a
   // diagnostic — the fix is that the weaker form no longer exists.
+  // §22.1 — `auto` is the only accepted value, so a future mode cannot be
+  // silently misspelled into today's behaviour.
+  if (settings.canonical !== undefined && String(settings.canonical) !== "auto") {
+    throw new UsageError(`--canonical accepts only "auto", got: ${settings.canonical}`, [
+      "write it as: --canonical auto",
+      "unify completes a canonical only where a page authors none; an authored one always wins",
+    ]);
+  }
+  // §22.1 — a canonical must be an absolute URL, and §20.5 has no public
+  // address to build one from without --base-url. Saying so beats writing a
+  // root-relative canonical or silently doing nothing while the flag says
+  // otherwise.
+  if (settings.canonical !== undefined && settings.baseUrl === undefined) {
+    throw new UsageError("--canonical auto needs the site's address: --base-url is not set", [
+      "add it: --base-url https://your-domain.example/",
+      "a canonical must be absolute — a root-relative one is ignored by the crawlers it exists for",
+    ]);
+  }
+  // §29.6 — the same shape as --canonical auto's check immediately above,
+  // and for the same reason: the flag describes something the build will not
+  // do without the site's address (a feed entry's <content> URLs are only
+  // meaningful once they're absolute).
+  if (settings.feedFull === true && settings.baseUrl === undefined) {
+    throw new UsageError("--feed-full needs the site's address: --base-url is not set", [
+      "add it: --base-url https://your-domain.example/",
+      "a feed entry's <content> URLs are only meaningful once they're absolute",
+    ]);
+  }
+  // A scheme with no authority — `file:`, `foo:`, `data:` — parses, but its
+  // origin is the *string* "null", and every URL §20.5 builds from it then
+  // reads `null/about.html`. That shipped as `<loc>null/</loc>` in a generated
+  // sitemap until §12 started parsing, at which point it became a problem
+  // blaming a generated file for a flag the author typed. Refused where the
+  // author can act on it, in §11.3's existing family.
+  if (settings.baseUrl !== undefined && /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(String(settings.baseUrl))) {
+    let origin = null;
+    try {
+      origin = new URL(String(settings.baseUrl)).origin;
+    } catch {
+      origin = "null";
+    }
+    if (origin === "null") {
+      throw new UsageError(`--base-url needs a scheme that has a host, got: ${settings.baseUrl}`, [
+        "write it with http or https: --base-url https://your-domain.example/",
+        "og:, twitter: and canonical URLs are fetched over the network, so the address has to name a host",
+      ]);
+    }
+  }
   if (settings.baseUrl !== undefined && !/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(String(settings.baseUrl))) {
     const path = `/${String(settings.baseUrl).replace(/^\/+/, "")}`;
     throw new UsageError(`--base-url needs the site's whole address, got: ${settings.baseUrl}`, [
       `write it with the scheme and domain: --base-url https://your-domain.example${path.endsWith("/") ? path : `${path}/`}`,
       "only the full address can make og:/twitter:/canonical absolute, which is what share crawlers fetch",
     ]);
+  }
+
+  // §24.2 — `audit` writes nothing, so the two flags that describe writing are
+  // refused rather than accepted inertly. `--clean` especially: a reader could
+  // reasonably believe the output directory had been emptied, and a flag that
+  // silently does nothing is the failure §14 exists to forbid.
+  // The check reads the EFFECTIVE settings, not the parsed flags. §18 defines
+  // `unify.yaml` as saved CLI flags — its keys are the long option names — so a
+  // saved `clean: true` is `--clean`, and reading `options` let it through
+  // inertly on the one path a reader is least likely to check. The fix line
+  // names both spellings because the error cannot tell which one you used.
+  if (command === "audit") {
+    for (const [flag, value] of [["clean", settings.clean], ["dry-run", settings.dryRun]]) {
+      if (value !== true) continue;
+      throw new UsageError(`unify audit does not take --${flag}: audit never writes`, [
+        `drop --${flag}, or remove \`${flag}\` from unify.yaml`,
+        "audit runs the whole pipeline and reports on the site build would publish; run `unify build` to publish it",
+      ]);
+    }
   }
 
   const output = resolve(process.cwd(), settings.output);
@@ -143,6 +239,8 @@ export async function run(argv) {
   switch (command) {
     case "build":
       return (await import("./cli/commands/build.js")).build(context);
+    case "audit":
+      return (await import("./cli/commands/audit.js")).audit(context);
     case "dev":
       return (await import("./cli/commands/dev.js")).dev(context);
     case "watch":
