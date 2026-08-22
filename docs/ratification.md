@@ -172,6 +172,14 @@ Rounds 26–27 were re-read end to end — samples' claims against their artifac
 
 **The harness — one addition.** Round 27's evidence lived on `/tmp` and was destroyed by a machine reset hours after judging; the protocol now archives a round — judge output, reports, sample trees — into the repository *before* triage. Its transcript-capture failure stays an open instrument item for round 28, partially compensated by the archive step.
 
+### 7e. Round 28: the evaluator needs no clause, and a sharper question replaces it
+
+The round §7d promised: a brief that compels evaluation — every check the tool offers, including the ones that do not block a build, must report nothing — without ever naming the mechanism, with discovery thresholds registered before launch. **Discovery was 6/6.** Every sample found `unify audit` from `--help` alone and ran it two to five times, fixing what it reported (titles, descriptions, share-image dimensions) and re-running to clean. The registered question closes with no amendment: the 60 lines stay silent about the evaluator because the tool advertises it adequately at the moment it matters.
+
+The rest of the registered card: strict builds 6/6, audit-clean on fresh rebuilds 6/6, and — re-measuring round 27's one miss — `og:image` with real dimensions, absolute, on every post, 6/6. The line-53 clause written after round 27 held universally on first exposure.
+
+What the round surfaced instead, recorded as unregistered and exploratory: three of five shipped `.html`-visible addresses against the brief, and the transcripts turn this from a doc question into a sharper one. One sample quoted the pretty-urls sentence verbatim, explained it correctly in its own reflection — *"an output transformation, not a source-level concern"* — and then left the flag out of its final command. The sentence teaches; the flag does not survive into the command line; and nothing in the tool can push back, because extensionless addresses are a per-site deployment requirement no generic check can own. Round 29's registered question, with one design note carried forward: none of the four samples that missed it, across both rounds, wrote a `unify.yaml` — the mechanism that exists precisely to make a site's flag decisions durable.
+
 ## 8. Running it again, and what is still untested
 
 `docs/ratification-protocol.md` is the procedure — setup, the harness traps, the triage order, the two amendment rules, and the results table for every round. `_notes/ratification-handoff-prompt.md` is the self-contained block to hand a fresh agent, including the five gates that must be green before any commit.
