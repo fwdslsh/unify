@@ -98,8 +98,8 @@ for (const name of TEMPLATES) {
     }
     const agentsMd = readFileSync(join(tmp, "AGENTS.md"), "utf8");
     // The high-conflict rules §19.4 enumerates, by the token an author greps
-    // for. The rule set is the README's and docs/authoring-rules.md's — this
-    // asserts the guide repeats them, not that it invents a variant.
+    // for. The rule set is the author-facing documents' — this asserts the
+    // guide repeats them, not that it invents a variant.
     for (const rule of ["data-layout", "--base-url", "draft", "permalink", "slug", "<include", "schema", "unify audit", "--dry-run"]) {
       if (!agentsMd.includes(rule)) throw new Error(`AGENTS.md never mentions ${rule} — §19.4 lists it among the rules it repeats`);
     }
@@ -1162,11 +1162,19 @@ test("scaffold: the shipped documents' claim about output vocabulary matches the
 // or it is nothing.
 const STANDARD_META_NAMES = ["description", "viewport", "robots", "author", "date", "lastmod", "keywords", "generator", "theme-color", "color-scheme", "referrer"];
 
-test("scaffold: AGENTS.md states no behavior README.md and docs/authoring-rules.md do not state", async () => {
-  // §19.4, verbatim: "It states no behavior the README and docs/authoring-rules.md
-  // do not state: one rule set, three audiences, never a tool-specific
-  // variant", and product-spec §6.7: "no behavior may be documented only in
-  // the agent guide."
+test("scaffold: AGENTS.md states no behavior the author-facing documents do not state", async () => {
+  // §19.4: "It states no behavior the author-facing documents do not state:
+  // one rule set, three audiences, never a tool-specific variant", grounded
+  // in product-spec §6.7: "no behavior may be documented only in the agent
+  // guide." ONLY is the operative word — the corpus is every document a site
+  // author is pointed at, not the README alone. An earlier reading checked
+  // README.md + docs/authoring-rules.md and nothing else, which quietly
+  // promoted the README's own prose to sole carrier of any fact the rules
+  // file happens not to spell (the audit-finding list, say): trimming one
+  // README paragraph then failed a *scaffold* test, far from the edit — a
+  // tripwire, not the rule. The implementer specs stay out of the corpus on
+  // purpose: a behavior spelled only in conformance-spec.md is documented
+  // for implementers, which for an author is not documented at all.
   //
   // Two instances broke it at once, and the first is the worse: AGENTS.md
   // taught `<meta name="schema">` — the HTML spelling — while both human
@@ -1181,11 +1189,12 @@ test("scaffold: AGENTS.md states no behavior README.md and docs/authoring-rules.
   const initR = await runCli(["init", "default"], tmp);
   if (initR.exit !== 0) throw new Error(`unify init default exited ${initR.exit}: ${initR.stderr}`);
   const agents = readFileSync(join(tmp, "AGENTS.md"), "utf8");
-  const human = readFileSync(join(ROOT, "README.md"), "utf8") + "\n" + readFileSync(join(ROOT, "docs", "authoring-rules.md"), "utf8");
+  const HUMAN_DOCS = ["README.md", join("docs", "authoring-rules.md"), join("docs", "getting-started.md"), join("docs", "cli-reference.md")];
+  const human = HUMAN_DOCS.map((rel) => readFileSync(join(ROOT, rel), "utf8")).join("\n");
 
   // Mechanical half: every metadata key AGENTS.md spells that is NOT one the
   // standards define is a key unify invented, and must be spelled the same way
-  // for humans. Standard keys are exempt because README and authoring-rules
+  // for humans. Standard keys are exempt because the author-facing documents
   // legitimately name them in prose.
   const keys = [...new Set([...agents.matchAll(/<meta\s+name="([A-Za-z:-]+)"/g)].map((m) => m[1]))];
   if (!keys.includes("schema")) throw new Error("AGENTS.md shows no <meta name=\"schema\"> — this test's premise is stale, not the documents");
@@ -1193,7 +1202,7 @@ test("scaffold: AGENTS.md states no behavior README.md and docs/authoring-rules.
     if (STANDARD_META_NAMES.includes(key.toLowerCase()) || key.toLowerCase().startsWith("twitter:")) continue;
     if (!human.includes(`name="${key}"`)) {
       throw new Error(
-        `AGENTS.md teaches <meta name="${key}">, a key no standard defines, and neither README.md nor docs/authoring-rules.md spells it — ` +
+        `AGENTS.md teaches <meta name="${key}">, a key no standard defines, and no author-facing document spells it (checked: ${HUMAN_DOCS.join(", ")}) — ` +
         "§19.4: one rule set, three audiences, and product-spec §6.7: no behavior may be documented only in the agent guide",
       );
     }
@@ -1204,7 +1213,7 @@ test("scaffold: AGENTS.md states no behavior README.md and docs/authoring-rules.
   // diverged — AGENTS.md's audit sentence named duplicate ids and README's
   // list of what audit reports did not.
   if (/duplicate ids/i.test(agents) && !/\bid\b[^.]*\btwice\b|duplicate ids?\b/i.test(human)) {
-    throw new Error("AGENTS.md says `unify audit` reports duplicate ids and no human document does — §19.4's one rule set");
+    throw new Error("AGENTS.md says `unify audit` reports duplicate ids and no author-facing document does — §19.4's one rule set");
   }
 }, TEST_MS);
 

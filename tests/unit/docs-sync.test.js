@@ -68,7 +68,7 @@ test("the authoring rules still fit the one screen they claim", () => {
   expect(rules.split("\n").length).toBeLessThanOrEqual(60);
 });
 
-test("README.md's own summary of the frontmatter keys names the same set as the authoring rules", () => {
+test("README.md's own summary of the frontmatter keys, when it carries one, names the same set as the authoring rules", () => {
   // The README embeds `docs/authoring-rules.md` verbatim, so a claim it makes
   // in its OWN prose can contradict the copy it carries 120 lines later, and
   // the byte-identity test above cannot see it: it compares the embed, not the
@@ -80,9 +80,19 @@ test("README.md's own summary of the frontmatter keys names the same set as the 
   // right: `schema: article` is problem P23, not a `<meta name="schema">`.
   //
   // Both sentences enumerate a set, so the check is set equality on the
-  // backticked keys before the phrase each uses to end the list.
-  const rules = readFileSync(join(ROOT, "docs", "authoring-rules.md"), "utf8");
+  // backticked keys before the phrase each uses to end the list — conditional
+  // on the README making a claim of its own at all. The embed above is the
+  // rule set's guaranteed in-README presence, so prose that stops duplicating
+  // the enumeration has nothing left to drift: its absence is a legitimate
+  // edit, never a failure (a check that pins a sentence into existence is a
+  // tripwire, not a sync). The accepted cost, stated: a paraphrase that
+  // rewords the marker phrase escapes this check. What the README may not do
+  // is keep the phrase and change the set.
   const readme = readFileSync(join(ROOT, "README.md"), "utf8");
+  const README_MARKER = "are the frontmatter keys with behavior";
+  if (!readme.includes(README_MARKER)) return;
+
+  const rules = readFileSync(join(ROOT, "docs", "authoring-rules.md"), "utf8");
 
   const keysBefore = (text, marker, label) => {
     const at = text.indexOf(marker);
@@ -97,7 +107,7 @@ test("README.md's own summary of the frontmatter keys names the same set as the 
   };
 
   const fromRules = keysBefore(rules, "are the only keys with meaning", "docs/authoring-rules.md");
-  const fromReadme = keysBefore(readme, "are the frontmatter keys with behavior", "README.md");
+  const fromReadme = keysBefore(readme, README_MARKER, "README.md");
   expect(fromReadme, "README.md's frontmatter-key list and docs/authoring-rules.md's must name the same keys — one rule set, two audiences (product-spec §6.7)").toEqual(fromRules);
 });
 

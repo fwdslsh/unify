@@ -570,7 +570,7 @@ export function commonFiles(siteName, navLinks) {
  * root, so it cannot publish (§19.4).
  *
  * It repeats only the high-conflict rules §19.4 enumerates, and it states
- * no behavior `docs/authoring-rules.md` and the README do not: **one rule
+ * no behavior the author-facing documents do not: **one rule
  * set, three audiences**, never a tool-specific variant. Every claim below
  * is a restatement of an authoring rule — when that file changes and this
  * one disagrees, this one is wrong.
