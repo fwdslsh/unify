@@ -584,8 +584,8 @@ This site is built by [unify](https://github.com/fwdslsh/unify): plain HTML comp
 No template language, no variables, no loops, no config — if you reach for \`{{ }}\`, \`{% %}\`, props,
 or a config key, the answer here is a different shape.
 
-Below are the rules that get guessed wrong most often. They are the same rules unify's own README
-and authoring-rules page state — one rule set, three audiences — not a variant for agents. The
+Below are the rules that get guessed wrong most often. They are the same rules unify's own
+documentation states — one rule set, three audiences — not a variant for agents. The
 inner loop is \`unify dev\` (build, watch, serve on localhost, reload), which also serves
 \`http://localhost:3000/_unify/\` — every \`unify audit\` finding grouped by page, with that page's
 title, description, language, canonical, headings and links beside it, and the build's own

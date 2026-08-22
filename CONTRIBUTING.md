@@ -33,7 +33,7 @@ bun src/cli.js build --source src --output dist
 Two rules follow from that set:
 
 - **A document contradiction is a defect to report, never a license to reinterpret either document.** The specs are written to agree.
-- **`docs/authoring-rules.md` is embedded byte-identically in `README.md`** (release gate G10). Edit the file; never the copy in the README.
+- **`docs/authoring-rules.md` is the complete authoring surface, capped at sixty lines** (release gate G10). The README links it rather than duplicating it; edit the file, and keep any README summary of it consistent.
 
 ## How tests are organized
 
