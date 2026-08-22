@@ -2,81 +2,58 @@
 
 **HTML-native composition — no expression language, no client runtime.**
 
-unify is a static site generator for front-end designers and hobbyists: people fluent in HTML and CSS who have no interest in JavaScript frameworks, templating languages, or build tooling. Define a header, footer, nav, or page layout once, in plain HTML files, and have it rendered into every page of the site. The output is the HTML and CSS you wrote — unify adds no JavaScript of its own. It replaces copy-paste chrome, hand-edited HTML, and Apache SSI; it does not compete with Hugo, Eleventy, or Astro.
+unify is a static site generator for people fluent in HTML and CSS who want nothing to do with JavaScript frameworks, templating languages, or build tooling. Write a header, nav, footer, or page layout once, in plain HTML, and unify renders it into every page. The output is exactly the HTML and CSS you wrote — unify adds no JavaScript of its own. It replaces copy-paste chrome and Apache SSI; it does not compete with Hugo, Eleventy, or Astro.
 
 The entire authoring surface is five things, learnable in five minutes:
 
 | You want to… | You write… |
 |---|---|
 | Reuse a fragment (nav, footer, badge) | `<include src="/_includes/nav.html"></include>` |
-| Wrap pages in a layout | nothing (the nearest `_layout.html` applies) — `data-layout="/path.html"` to pick one, `data-layout="none"` to opt out |
-| Mark where page content lands, or let pages replace a named region | `<main>` for the default; `<slot name="footer">…</slot>` in the layout, `slot="footer"` on a page element |
-| Keep a page or folder out of the built site | name it with a leading underscore: `_draft.html`, `_includes/` |
+| Wrap pages in a layout | nothing — the nearest `_layout.html` applies; `data-layout="/path.html"` picks one, `"none"` opts out |
+| Mark where page content lands, or let pages replace a named region | `<main>` for the default; `<slot name="footer">` in the layout, `slot="footer"` on a page element |
+| Keep a file or folder out of the built site | a leading underscore: `_draft.html`, `_includes/` |
 | Ship a bare snippet exactly as written (for `<include>`, embeds, fetch) | name it `*.fragment.html` |
 
-If a capability cannot be expressed with these five, it does not belong in unify.
+If it cannot be expressed with these five, it does not belong in unify.
 
-> **Status.** v0.8.0 — the v0.7 composition model unchanged, plus the production layer: `unify audit`, sitemap/feed/search-manifest generation under `--base-url`, `--canonical auto`, bounded JSON-LD from `schema:`, slotted includes, and `--generate`. v0.7.0 was a clean break from 0.6.x: `data-unify`, `unify-*` area classes, `serve`, `--minify`, and `--fail-on` are gone, and a 0.6 site will not build. The composition model is standard HTML — `<main>`, `<slot>`, `slot=` — plus `<include src>` and `data-layout`. The specification set in [`docs/`](docs/) is authoritative; every normative rule in it is covered by a test that runs against the real CLI.
+> **Status:** v0.8.0 — the v0.7 composition model unchanged, plus a production layer: `unify audit`, sitemap/feed/search-index generation, `--canonical auto`, and JSON-LD from `schema:`. v0.7 was a clean break from 0.6.x — a 0.6 site will not build, and every retired spelling (`data-unify`, `unify-*` classes) is an error naming its v0.7 replacement. The specification set in [`docs/`](docs/) is authoritative, and every normative rule in it is covered by a test that runs against the real CLI.
 
 ## Install
 
-### Standalone binary — the headline install
+**Standalone binary** (Linux and macOS, x86_64 and arm64 — nothing else to install):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/fwdslsh/unify/main/install.sh | bash
 ```
 
-Installs to `~/.local/bin` by default. The script accepts `--global` (system-wide, needs write access to `/usr/local/bin`), `--dir PATH`, `--version vX.Y.Z`, `--force`, and `--dry-run`. Prebuilt binaries for Linux and macOS (x86_64 and arm64) are attached to releases from v0.7.0 onward ([GitHub releases](https://github.com/fwdslsh/unify/releases)) — nothing else to install. No Windows binary yet — use the Bun or npm install below.
+Installs to `~/.local/bin`; the script accepts `--global`, `--dir PATH`, `--version vX.Y.Z`, `--force`, and `--dry-run`. Binaries are attached to [GitHub releases](https://github.com/fwdslsh/unify/releases). No Windows binary yet — use the install below.
 
-### Bun or npm — the developer path
-
-```bash
-bun add -g @fwdslsh/unify
-# or
-npm install -g @fwdslsh/unify
-```
-
-Bun (>= 1.2.0) is the only supported runtime: the installed `unify` script runs under `bun`, and there are no Node or Deno builds. If you have never heard of Bun, use the binary above.
-
-## The five-minute site
+**Bun or npm:**
 
 ```bash
-unify init          # scaffold a starter site into src/
-unify dev           # build, watch, serve, reload — one command, one terminal
-# …edit, save, browser reloads…
-unify build         # write the final site to dist/
-# upload dist/ anywhere: GitHub Pages, Netlify, a $3 shared host
+bun add -g @fwdslsh/unify    # or: npm install -g @fwdslsh/unify
 ```
 
-`unify init` produces:
+Bun >= 1.2.0 is the only supported runtime — the installed `unify` script runs under `bun`, and there are no Node or Deno builds. Never heard of Bun? Use the binary above.
 
-```
-my-site/
-├── AGENTS.md             # outside src/, so it cannot publish
-├── DEPLOY.md             # the deployment recipe
-└── src/                  # the source root — everything here ships
-    ├── _layout.html      # the site chrome — one complete HTML page
-    ├── _includes/
-    │   └── nav.html      # a fragment
-    ├── index.html        # a page
-    ├── about.md          # a Markdown page — equal citizen
-    ├── contact.html      # a page that overrides a named region
-    ├── 404.html          # a page that opts out of the layout
-    ├── robots.txt        # minimal and honest: it blocks nothing
-    └── assets/
-        ├── style.css
-        └── share-placeholder.png   # the og:image, at its declared size
+## Quick start
+
+```bash
+unify init      # scaffold a starter site into src/
+unify dev       # build, watch, serve, reload — http://localhost:3000
+unify build     # write the final site to dist/ — upload it anywhere
 ```
 
-Templates: `default`, `basic`, `blog`, `docs`, `portfolio`. Each exercises every primitive exactly once, and both `unify init && unify build --dry-run --strict` and `unify init && unify audit --strict` exit `0` — a scaffold arrives with a language, a share image whose declared dimensions are the file's real ones, a `robots.txt`, and a title, description and heading on every page.
+`unify init` scaffolds a complete site into `src/` — a layout, a nav include, HTML and Markdown pages, CSS, and a `robots.txt` — plus two files at the project root, outside `src/` so they can never publish: **`AGENTS.md`**, guidance for whoever (or whatever) edits the site next, and **`DEPLOY.md`**, the deployment recipe. Five templates: `default`, `basic`, `blog`, `docs`, `portfolio`. Every scaffold passes `unify build --dry-run --strict` and `unify audit --strict` out of the box.
 
-Two files land beside `src/` rather than in it, so neither can publish: `AGENTS.md`, the repository-local guidance for whoever — or whatever — edits the site next, and `DEPLOY.md`, the recipe ending in the two commands that carry the site's address.
+New here? The tutorial is **[Getting Started](docs/getting-started.md)**.
 
-## How composition works
+## How it works
 
-**`_layout.html`** — a complete page you can open in a browser right now. Its slot fallbacks are its own preview:
+A layout is a complete HTML page — open it in a browser and its slot fallbacks are its own preview:
 
 ```html
+<!-- src/_layout.html -->
 <!doctype html>
 <html>
   <head>
@@ -87,140 +64,72 @@ Two files land beside `src/` rather than in it, so neither can publish: `AGENTS.
   <body>
     <include src="/_includes/nav.html"></include>
     <main><slot></slot></main>
-    <footer class="site-footer">
-      <slot name="footer"><p>© My Site</p></slot>
-    </footer>
+    <footer><slot name="footer"><p>© My Site</p></slot></footer>
   </body>
 </html>
 ```
 
-**`index.html`** — also a complete page, an ordinary semantic document. It doesn't mention the layout; the nearest `_layout.html` applies automatically:
+A page is also a complete, ordinary HTML document. It never mentions the layout — the nearest `_layout.html` applies automatically:
 
 ```html
+<!-- src/index.html -->
 <!doctype html>
 <html>
-  <head>
-    <title>Home</title>
-  </head>
+  <head><title>Home</title></head>
   <body>
     <main>
       <h1>Home</h1>
-      <p>This content lands in the layout's &lt;main&gt;.</p>
+      <p>This lands in the layout's &lt;main&gt;.</p>
     </main>
   </body>
 </html>
 ```
 
-The built page is the layout with its `<main>` content replaced by the page's, and the page's title prepended to the layout's: `<title>Home — My Site</title>`. The separator lives in the layout, so pages write only their own name.
+The built page is the layout with its `<main>` filled by the page's content, and the page's title joined in front of the layout's: `<title>Home — My Site</title>`. To replace a named region, a page puts one standard attribute on an ordinary element — `<p slot="footer">© My Site — <a href="mailto:hi@example.com">email us</a></p>` — and that element replaces the layout's `<slot name="footer">`, tag and all. The precedence rule in one sentence: **named fills go to named slots, everything else to the bare slot, else into `<main>`.**
 
-**`contact.html`** — overriding a named region. The layout marked its footer contents with `<slot name="footer">`, so any page may replace them with one standard attribute:
+Markdown pages compose identically, with frontmatter supplying the head. `title`, `layout`, `class`, `lang`, `dir`, and `schema` are the frontmatter keys with behavior; every other key becomes a `<meta>` tag, and `draft`, `permalink`, and `slug` are errors that name what unify does instead. Built pages contain no `<slot>` elements, no `data-layout` attributes, and no injected script — the one unify token that can survive into output is `<meta name="schema">`, on a page that asked for a generated JSON-LD block.
 
-```html
-<body>
-  <h1>Contact</h1>
-  <p>Ordinary content as usual.</p>
-  <p slot="footer">© My Site — <a href="mailto:hi@example.com">email us</a></p>
-</body>
-```
+The full model is specified in the [Product Specification](docs/product-spec.md); the exact algorithms — slots, head merge, root attributes, URL rewriting — are in the [Conformance Specification](docs/conformance-spec.md).
 
-The footer then contains exactly the element you wrote. Built pages contain no `<slot>` elements, no `data-layout` attributes, and no injected script. The one unify token a built page may carry is `<meta name="schema">`, and only on a page that asked for a generated JSON-LD block — nothing else survives into the output.
-
-The precedence rule, in one sentence: **named fills go to named slots, everything else to the bare slot, else into `<main>`.**
-
-**`about.md`** — Markdown pages work identically; frontmatter supplies the head:
-
-```markdown
----
-title: About
-description: Who we are
-og:
-  image: /assets/team.jpg
----
-
-# About
-
-Everything here is converted to HTML and dropped into the layout
-exactly like an HTML page's content.
-```
-
-`title`, `layout`, `class`, `lang`, `dir`, and `schema` are the frontmatter keys with behavior; every other key becomes a `<meta>` tag — except `draft`, `permalink`, and `slug`, which are errors that name what unify does instead: a leading underscore holds a page back, and a page's address is its source path. Headings get slug `id`s so every heading is a deep link.
-
-That is the whole product. There is nothing else to learn.
-
-## Worked examples
-
-[`examples/`](examples/) holds five complete sites, each building clean under
-`unify build --dry-run --strict`. Four were authored by an agent given nothing but the
-sixty lines of authoring rules and a client brief, and kept because they passed review —
-so they show what the rules actually lead someone to build, not what a maintainer wishes
-they would. Between them they cover pages generated from a data file, client-side
-filtering with and without fetch, a section with its own look sharing the site's chrome,
-a page with no chrome for embedding elsewhere, deploying under a subdirectory, htmx
-swapping `.fragment.html` panels, and a Svelte component compiled to an ordinary asset.
-[`examples/README.md`](examples/README.md) names the pattern in each — including the one
-thing they get wrong, which no build check can catch.
-
-## CLI
+## Commands
 
 ```
-unify [build]              build the site (default command)
-unify audit                evaluate the site the build would publish — writes nothing
-unify dev                  build, watch, serve, and reload — the inner loop
-unify watch                build + rebuild on change, no server
-unify init [template]      scaffold a starter site
-
-Options:
-  -s, --source <dir>       source directory (default: src/ if it exists, else .)
-  -o, --output <dir>       output directory (default: dist)
-      --clean              empty the output directory first
-      --exclude <glob>     globs never emitted, still usable by the build (repeatable; default: _*)
-      --pretty-urls        about.html → about/index.html, and rewrite internal links to match
-      --canonical auto     add a canonical link to pages that author none, from the site address
-      --base-url <url>     the site's whole address (https://site.example/repo/): prefix root-relative links, make og:/canonical absolute for share crawlers, and generate sitemap.xml
-      --feed-full          include each entry's full rendered content in feed.xml (needs --base-url)
-      --search-index       write search-index.json for a client-side search library
-      --dry-run            run the full build and every check, print the report, write nothing
-      --strict             advisories count as problems for the exit code (with `audit`, findings too)
-      --format <kind>      `audit` report shape: human (default), json, or sarif
-      --external           `audit` only: fetch every off-origin URL the site emits and report the ones that don't resolve
-  -p, --port <n>           port for `unify dev` (default: 3000)
-  -v, --version            print version
-  -h, --help               print help
+unify [build]            build the site (default command)
+unify audit              evaluate the site the build would publish — writes nothing
+unify dev                build, watch, serve, and reload — the inner loop
+unify watch              build + rebuild on change, no server
+unify init [template]    scaffold a starter site
 ```
 
-That is the entire CLI — there are no other commands or flags. See [`docs/cli-reference.md`](docs/cli-reference.md) for what each one does.
+`unify --help` lists every option — among them `--pretty-urls`, `--base-url` (which also generates `sitemap.xml`, and `feed.xml` once a page declares `schema: Article`/`BlogPosting`), `--canonical auto`, `--search-index`, `--dry-run`, and `--strict`. The **[CLI Reference](docs/cli-reference.md)** documents every command, option, and exit code — there are no others. An optional `unify.yaml` at the source root holds saved flags and nothing more.
 
-`unify build` publishes all-or-nothing: composition and every check — including a reference check of every internal URL in the output — run into a temporary tree, and `dist/` is updated only if there were **zero problems**. Exit `0` means `dist/` is the complete site; `1` means problems were found and the previous output is byte-for-byte untouched; `2` means invalid usage or a fatal environment error. Diagnostics come in two severities, `problem` and `advisory`, in plain language with no rule codes:
+## Guarantees
 
-```
-src/index.html:8: problem: include not found: /_includes/navv.html
-  in: <include src="/_includes/navv.html">
-  fix: create src/_includes/navv.html, or point src at an existing file
-  fix: check the path spelling and casing
-```
+- **Content you wrote is never silently dropped.** Anything that would lose authored content is a `problem`, and problems block publishing. The milder severity, `advisory`, never blocks (under `--strict` it counts). Diagnostics are plain language, located, and name a fix — no rule codes.
+- **Publishing is transactional.** Composition and every check — including a reference check of every internal URL — run into a temporary tree, and `dist/` is replaced only on zero problems. Exit `0` means `dist/` is the complete site; `1` means problems were found and the previous output is byte-for-byte untouched; `2` means invalid usage.
+- **`unify build --dry-run --strict`** runs the whole build and every check while writing nothing — the one-line CI lint.
 
-`unify build --dry-run --strict` is the whole build and every check, writing nothing — the one-line CI lint.
+## Auditing
 
-`unify audit` answers a different question: not *is this build sound?* but *is this site complete?* It runs the same whole build, publishes nothing, and reports what it observed — a page with no description, two pages sharing a title, a heading and a `<title>` that disagree, a link to `#section` where nothing has that id, an `id` used twice on one page, a page nothing links to, structured data that contradicts the page carrying it, a `tags:` or `categories:` key that built no collection. Each finding prints the evidence and one thing to do. **There is no score, no grade, and nothing counts characters** — a short title is not a finding, an absent one is; "duplicate" means identical, never similar. `unify build` never runs any of it, so no finding can hold up a release; `unify audit --strict` exits non-zero on any finding, and that is the opt-in CI gate. A fresh `unify init` passes it, so the first finding you see is about a page you wrote.
-
-While `unify dev` is running, the same findings are a page: **`http://localhost:3000/_unify/`** shows them grouped by page, each page's record beside them — title, description, language, canonical, headings, links in and out — and the build's diagnostics underneath. It is the same manifest and the same finding list the command line reads, never a second opinion; it is assembled in memory and nothing is written to `dist/`, so a published page is byte-identical whether or not `dev` ever ran. Only `dev` serves it: `build` writes files and `watch` has no server.
-
-An optional `unify.yaml` at the source root holds saved flags and nothing more (keys are the long option names; CLI flags win; the file never ships). No behavior exists that only the config file can express.
+`unify audit` answers a different question — not *is this build sound?* but *is this site complete?* It runs the same pipeline, publishes nothing, and reports findings: a page with no description, two pages sharing a title, a `#fragment` link that names nothing, duplicate ids, a page nothing links to, structured data that contradicts its page. No score, no grade, no character counts — and `build` never runs any of it, so no finding can hold up a release. `unify audit --strict` is the opt-in CI gate, `--format json|sarif` is the machine-readable mirror, and `--external` checks off-origin links — the one flag in the product that touches the network. While `unify dev` is running, the same findings are a live page at `http://localhost:3000/_unify/`, grouped by page with each page's record beside them.
 
 ## What unify will never do
 
-- **Ship JavaScript.** Your scripts pass through untouched; unify injects, generates, and rewrites none of its own. `unify dev` injects live reload only into the pages it serves, never into `dist/`.
-- **Grow a templating language.** No variables, loops, conditionals, or expressions — no `{{ }}`, no `{% %}`, no props. Anything derived from a set of files (a post index) comes from a script you own, run before the build: `node _scripts/gen.mjs && unify build`. A feed is the one exception — declare `schema: Article`/`BlogPosting` and build with `--base-url`, no script required.
-- **Become a component framework.** Slots fill layouts; `<include>` is verbatim and never takes fills.
+- **Ship JavaScript.** Your scripts pass through untouched; unify injects none of its own (dev's live reload never reaches `dist/`).
+- **Grow a templating language.** No variables, loops, conditionals, or props. Derived pages come from a script you own, run before the build — a feed is the one exception (`schema:` plus `--base-url`).
+- **Become a component framework.** Slots fill layouts; `<include>` splices files verbatim.
 - **Need configuration.** Conventions, not config files.
-- **Scope your CSS.** Use `@scope`, `@layer`, nesting, or a class prefix — the platform already answers this.
-- **Be a real web server.** `unify dev` serves static files, reloads, and answers one path that is not a file (`/_unify/`, above). No proxying, HTTPS, middleware, or plugins; pair `unify watch` with a real server instead.
+- **Scope your CSS, or be a real web server.** `@scope`/`@layer` and a real server already answer those.
 
-The full list, with the reasoning and the accepted costs, is [`docs/product-spec.md`](docs/product-spec.md) §5. Sitemaps, minification, layout chaining, and a browser preview polyfill are post-MVP candidates (§6), not current features.
+The full list, with the reasoning and the accepted costs, is [Product Specification §5](docs/product-spec.md).
+
+## Examples
+
+[`examples/`](examples/) holds five complete sites, each building clean under `unify build --dry-run --strict`. Four were authored by agents given nothing but the sixty-line authoring rules and a client brief, and kept because they passed review — so they show what the rules actually lead someone to build. Between them: pages generated from a data file, client-side filtering, a section with its own chrome, a page with no chrome for embedding, deploying under a subdirectory, htmx swapping `.fragment.html` panels, and a Svelte component compiled to an ordinary asset. [`examples/README.md`](examples/README.md) names the pattern in each.
 
 ## The complete authoring rules
 
-Every rule an author needs, in under sixty lines. This section is [`docs/authoring-rules.md`](docs/authoring-rules.md) embedded verbatim: the bytes between the two markers below are byte-identical to that file, which release gate G10 asserts ([`docs/testing-strategy.md`](docs/testing-strategy.md) §6). Edit the file, never this copy.
+Every rule an author needs, in under sixty lines. This section is [`docs/authoring-rules.md`](docs/authoring-rules.md) embedded verbatim: the bytes between the two markers below are byte-identical to that file, which release gate G10 asserts ([Testing Strategy §6](docs/testing-strategy.md)). Edit the file, never this copy.
 
 <!-- BEGIN docs/authoring-rules.md -->
 # Authoring a unify site — the complete rules
@@ -292,22 +201,32 @@ site; non-zero means nothing was published and `dist/` is untouched, so never re
 - **[Getting Started](docs/getting-started.md)** — the tutorial.
 - **[Authoring Rules](docs/authoring-rules.md)** — the complete authoring surface (embedded above).
 - **[CLI Reference](docs/cli-reference.md)** — every command, option, and exit code.
-- **[Integrations](docs/integrations.md)** — the compile-to-asset pattern: Svelte, TypeScript, or anything else with a compiler, without adopting a framework for the site.
+- **[Integrations](docs/integrations.md)** — the compile-to-asset pattern: Svelte, TypeScript, or anything with a compiler, without adopting a framework.
 - **[Docker Usage](docs/docker-usage.md)** — running the CLI in a container.
 - **[Examples](examples/README.md)** — five complete sites and the patterns they demonstrate.
 
 **How unify is defined**
 
 - **[Product Specification](docs/product-spec.md)** — what unify is, the composition model, the non-goals.
-- **[Conformance Specification](docs/conformance-spec.md)** — the normative implementer reference: exact algorithms, the head-merge table, the closed problem and advisory catalogues.
+- **[Conformance Specification](docs/conformance-spec.md)** — the normative implementer reference: exact algorithms, the head-merge table, the closed problem/advisory catalogues.
 - **[Testing Strategy](docs/testing-strategy.md)** — the testing contract and the release gates.
 - **[CI/CD Workflows](docs/cicd-workflows.md)** — what each job runs and what it is allowed to mean.
 
 **How the documentation was validated**
 
-- **[Ratification](docs/ratification.md)** — the evidence: agents authoring from the sixty lines in isolation, what each round found, and what it changed in the docs, the spec, and the engine.
+- **[Ratification](docs/ratification.md)** — the evidence: agents authoring from the sixty lines in isolation, what each round found, and what it changed.
 - **[Ratification Protocol](docs/ratification-protocol.md)** — the procedure, for running another round.
 - **[Migration Plan](docs/migration-plan.md)** — how the v0.6 tree became this one. History, not current work.
+
+## For Agents
+
+Authoring or editing a **site built with unify**? Review **[docs/authoring-rules.md](docs/authoring-rules.md)** — the complete authoring surface in under sixty lines, embedded verbatim in the section above — before writing anything, and do not substitute conventions from other generators: unify has no props, no expressions, no `draft:`/`permalink:`/`slug:` keys, and layouts do not chain.
+
+- `unify init` drops an **`AGENTS.md`** at the project root (outside `src/`, so it cannot publish) restating the most commonly guessed-wrong rules. If the project has one, read it — it is the same rule set as this README, never a variant.
+- Finish by checking: `unify build --dry-run --strict`, then `unify audit --strict`. Exit `0` from `unify build` means `dist/` is the complete site; non-zero means **nothing was published** and the previous output is untouched — never report success on a non-zero exit.
+- `unify --help` lists the complete CLI. There are no other commands or flags; the authoring rules live in the docs, this README, and the scaffolded `AGENTS.md`, not in a CLI command.
+
+Contributing to **unify itself**? Start with [CLAUDE.md](CLAUDE.md) and [CONTRIBUTING.md](CONTRIBUTING.md); the [Conformance Specification](docs/conformance-spec.md) is normative.
 
 ## Contributing
 
