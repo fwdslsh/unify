@@ -66,7 +66,7 @@ Two more that cost hours rather than rounds:
 
 1. Regenerate the rules file from the current doc.
 2. Seed N sandboxes (5 Haiku + 1 control is a good default).
-3. Launch, wait, collect.
+3. Launch, wait, collect — then **archive the round immediately, before judging**: commit `judge-results.json`, every sample's `REPORT.md`, and a tarball of the sample source trees into `_notes/rounds/`. The machine these rounds run on resets without warning, `/tmp` does not survive it, and round 27's sandboxes — reports, transcripts, sites — were lost hours after judging; its evidence survived only as the one JSON file that had been committed and whatever the judge's write-up had quoted. Evidence that exists only on `/tmp` has not been collected.
 4. **Run `unify build --dry-run --strict` over every sample yourself.** Exit code plus the
    diagnostic list is the verdict.
 5. Read the output anyway — a green exit says the site composes, not that the author reached

@@ -1,0 +1,485 @@
+{
+  "tool": "judge-round.mjs",
+  "version": "1.0.0",
+  "roundDir": "/tmp/ratify/round-27",
+  "config": {
+    "marker": "bellwick",
+    "privateValues": "0 configured values",
+    "baseUrl": "per-sample, from the chosen command's --base-url",
+    "diagnosticLines": 16,
+    "primitives": {
+      "schema-key": "schema:",
+      "og-key": "og:",
+      "data-layout": "data-layout",
+      "slot-element": "/<slot\\b/",
+      "include": "/<include\\b/"
+    }
+  },
+  "samples": [
+    {
+      "sample": "h1",
+      "candidates": [
+        {
+          "line": 6,
+          "command": "./unify build --pretty-urls --base-url https://bellwick.example/workshop/",
+          "complete": true,
+          "inPublishSection": false,
+          "chosen": true
+        }
+      ],
+      "chosenCommand": "./unify build --pretty-urls --base-url https://bellwick.example/workshop/",
+      "chosenReason": "complete",
+      "run": {
+        "executed": "./unify build --pretty-urls --base-url https://bellwick.example/workshop/ --dry-run --strict",
+        "exit": 0,
+        "signal": null,
+        "error": null,
+        "problems": 0,
+        "advisories": 0,
+        "diagnostics": [],
+        "stderrLines": 0,
+        "servingFrom": "serving from https://bellwick.example/workshop/",
+        "wouldPublish": "would publish 10 files to dist/"
+      },
+      "outputDir": "dist",
+      "markers": {
+        "pattern": "bellwick",
+        "present": true,
+        "total": 27,
+        "files": 9
+      },
+      "privacy": {
+        "source": "config.privateValues",
+        "valuesChecked": 0,
+        "totalHits": 0,
+        "distinctLeaked": 0,
+        "perValue": {}
+      },
+      "urls": {
+        "base": "https://bellwick.example/workshop/",
+        "note": "no fetch()/hx-get targets in the output",
+        "resolutions": [],
+        "dynamicFetches": []
+      },
+      "primitives": {
+        "sourceRoot": "src",
+        "filesSwept": 9,
+        "counts": {
+          "data-layout": {
+            "total": 0,
+            "files": 0
+          },
+          "include": {
+            "total": 0,
+            "files": 0
+          },
+          "og-key": {
+            "total": 10,
+            "files": 3
+          },
+          "schema-key": {
+            "total": 4,
+            "files": 4
+          },
+          "slot-element": {
+            "total": 1,
+            "files": 1
+          },
+          "_layout.html files": {
+            "total": 1,
+            "files": 1
+          },
+          "marker": {
+            "total": 2,
+            "files": 1
+          }
+        }
+      }
+    },
+    {
+      "sample": "h2",
+      "candidates": [
+        {
+          "line": 8,
+          "command": "./unify build --base-url https://bellwick.example/workshop/",
+          "complete": true,
+          "inPublishSection": true,
+          "chosen": true
+        }
+      ],
+      "chosenCommand": "./unify build --base-url https://bellwick.example/workshop/",
+      "chosenReason": "in the publish-command section, complete",
+      "run": {
+        "executed": "./unify build --base-url https://bellwick.example/workshop/ --dry-run --strict",
+        "exit": 0,
+        "signal": null,
+        "error": null,
+        "problems": 0,
+        "advisories": 0,
+        "diagnostics": [],
+        "stderrLines": 0,
+        "servingFrom": "serving from https://bellwick.example/workshop/",
+        "wouldPublish": "would publish 10 files to dist/"
+      },
+      "outputDir": "dist",
+      "markers": {
+        "pattern": "bellwick",
+        "present": true,
+        "total": 38,
+        "files": 9
+      },
+      "privacy": {
+        "source": "config.privateValues",
+        "valuesChecked": 0,
+        "totalHits": 0,
+        "distinctLeaked": 0,
+        "perValue": {}
+      },
+      "urls": {
+        "base": "https://bellwick.example/workshop/",
+        "note": "no fetch()/hx-get targets in the output",
+        "resolutions": [],
+        "dynamicFetches": []
+      },
+      "primitives": {
+        "sourceRoot": "src",
+        "filesSwept": 9,
+        "counts": {
+          "data-layout": {
+            "total": 0,
+            "files": 0
+          },
+          "include": {
+            "total": 0,
+            "files": 0
+          },
+          "og-key": {
+            "total": 11,
+            "files": 7
+          },
+          "schema-key": {
+            "total": 4,
+            "files": 4
+          },
+          "slot-element": {
+            "total": 1,
+            "files": 1
+          },
+          "_layout.html files": {
+            "total": 1,
+            "files": 1
+          },
+          "marker": {
+            "total": 5,
+            "files": 3
+          }
+        }
+      }
+    },
+    {
+      "sample": "h3",
+      "candidates": [
+        {
+          "line": 6,
+          "command": "./unify build --base-url \"https://bellwick.example/workshop/\" --pretty-urls",
+          "complete": true,
+          "inPublishSection": false,
+          "chosen": true
+        }
+      ],
+      "chosenCommand": "./unify build --base-url \"https://bellwick.example/workshop/\" --pretty-urls",
+      "chosenReason": "complete",
+      "run": {
+        "executed": "./unify build --base-url \"https://bellwick.example/workshop/\" --pretty-urls --dry-run --strict",
+        "exit": 0,
+        "signal": null,
+        "error": null,
+        "problems": 0,
+        "advisories": 0,
+        "diagnostics": [],
+        "stderrLines": 0,
+        "servingFrom": "serving from https://bellwick.example/workshop/",
+        "wouldPublish": "would publish 11 files to dist/"
+      },
+      "outputDir": "dist",
+      "markers": {
+        "pattern": "bellwick",
+        "present": true,
+        "total": 37,
+        "files": 7
+      },
+      "privacy": {
+        "source": "config.privateValues",
+        "valuesChecked": 0,
+        "totalHits": 0,
+        "distinctLeaked": 0,
+        "perValue": {}
+      },
+      "urls": {
+        "base": "https://bellwick.example/workshop/",
+        "note": "no fetch()/hx-get targets in the output",
+        "resolutions": [],
+        "dynamicFetches": []
+      },
+      "primitives": {
+        "sourceRoot": "src",
+        "filesSwept": 11,
+        "counts": {
+          "data-layout": {
+            "total": 0,
+            "files": 0
+          },
+          "include": {
+            "total": 0,
+            "files": 0
+          },
+          "og-key": {
+            "total": 9,
+            "files": 9
+          },
+          "schema-key": {
+            "total": 4,
+            "files": 4
+          },
+          "slot-element": {
+            "total": 2,
+            "files": 2
+          },
+          "_layout.html files": {
+            "total": 2,
+            "files": 2
+          },
+          "marker": {
+            "total": 5,
+            "files": 4
+          }
+        }
+      }
+    },
+    {
+      "sample": "h4",
+      "candidates": [
+        {
+          "line": 6,
+          "command": "./unify build --base-url https://bellwick.example/workshop/ --pretty-urls",
+          "complete": true,
+          "inPublishSection": false,
+          "chosen": true
+        }
+      ],
+      "chosenCommand": "./unify build --base-url https://bellwick.example/workshop/ --pretty-urls",
+      "chosenReason": "complete",
+      "run": {
+        "executed": "./unify build --base-url https://bellwick.example/workshop/ --pretty-urls --dry-run --strict",
+        "exit": 0,
+        "signal": null,
+        "error": null,
+        "problems": 0,
+        "advisories": 0,
+        "diagnostics": [],
+        "stderrLines": 0,
+        "servingFrom": "serving from https://bellwick.example/workshop/",
+        "wouldPublish": "would publish 14 files to dist/"
+      },
+      "outputDir": "dist",
+      "markers": {
+        "pattern": "bellwick",
+        "present": true,
+        "total": 31,
+        "files": 7
+      },
+      "privacy": {
+        "source": "config.privateValues",
+        "valuesChecked": 0,
+        "totalHits": 0,
+        "distinctLeaked": 0,
+        "perValue": {}
+      },
+      "urls": {
+        "base": "https://bellwick.example/workshop/",
+        "note": "no fetch()/hx-get targets in the output",
+        "resolutions": [],
+        "dynamicFetches": []
+      },
+      "primitives": {
+        "sourceRoot": "src",
+        "filesSwept": 15,
+        "counts": {
+          "data-layout": {
+            "total": 0,
+            "files": 0
+          },
+          "include": {
+            "total": 0,
+            "files": 0
+          },
+          "og-key": {
+            "total": 14,
+            "files": 8
+          },
+          "schema-key": {
+            "total": 4,
+            "files": 4
+          },
+          "slot-element": {
+            "total": 3,
+            "files": 2
+          },
+          "_layout.html files": {
+            "total": 2,
+            "files": 2
+          },
+          "marker": {
+            "total": 0,
+            "files": 0
+          }
+        }
+      }
+    },
+    {
+      "sample": "h5",
+      "candidates": [
+        {
+          "line": 6,
+          "command": "./unify build --base-url https://bellwick.example/workshop/ --pretty-urls",
+          "complete": true,
+          "inPublishSection": false,
+          "chosen": true
+        }
+      ],
+      "chosenCommand": "./unify build --base-url https://bellwick.example/workshop/ --pretty-urls",
+      "chosenReason": "complete",
+      "run": {
+        "executed": "./unify build --base-url https://bellwick.example/workshop/ --pretty-urls --dry-run --strict",
+        "exit": 0,
+        "signal": null,
+        "error": null,
+        "problems": 0,
+        "advisories": 0,
+        "diagnostics": [],
+        "stderrLines": 0,
+        "servingFrom": "serving from https://bellwick.example/workshop/",
+        "wouldPublish": "would publish 10 files to dist/"
+      },
+      "outputDir": "dist",
+      "markers": {
+        "pattern": "bellwick",
+        "present": true,
+        "total": 35,
+        "files": 9
+      },
+      "privacy": {
+        "source": "config.privateValues",
+        "valuesChecked": 0,
+        "totalHits": 0,
+        "distinctLeaked": 0,
+        "perValue": {}
+      },
+      "urls": {
+        "base": "https://bellwick.example/workshop/",
+        "note": "no fetch()/hx-get targets in the output",
+        "resolutions": [],
+        "dynamicFetches": []
+      },
+      "primitives": {
+        "sourceRoot": "src",
+        "filesSwept": 9,
+        "counts": {
+          "data-layout": {
+            "total": 0,
+            "files": 0
+          },
+          "include": {
+            "total": 0,
+            "files": 0
+          },
+          "og-key": {
+            "total": 8,
+            "files": 7
+          },
+          "schema-key": {
+            "total": 4,
+            "files": 4
+          },
+          "slot-element": {
+            "total": 1,
+            "files": 1
+          },
+          "_layout.html files": {
+            "total": 1,
+            "files": 1
+          },
+          "marker": {
+            "total": 2,
+            "files": 1
+          }
+        }
+      }
+    },
+    {
+      "sample": "s1",
+      "candidates": [],
+      "chosenCommand": null,
+      "chosenReason": "no fenced `unify build` command found",
+      "run": {
+        "executed": null,
+        "exit": null,
+        "refused": "no fenced `unify build` command found"
+      },
+      "outputDir": "dist",
+      "markers": {
+        "pattern": "bellwick",
+        "present": true,
+        "total": 40,
+        "files": 9
+      },
+      "privacy": {
+        "source": "config.privateValues",
+        "valuesChecked": 0,
+        "totalHits": 0,
+        "distinctLeaked": 0,
+        "perValue": {}
+      },
+      "urls": {
+        "base": null,
+        "note": "no base URL (none in config, none in the command) — skipped",
+        "resolutions": [],
+        "dynamicFetches": []
+      },
+      "primitives": {
+        "sourceRoot": "src",
+        "filesSwept": 17,
+        "counts": {
+          "data-layout": {
+            "total": 0,
+            "files": 0
+          },
+          "include": {
+            "total": 2,
+            "files": 1
+          },
+          "og-key": {
+            "total": 24,
+            "files": 4
+          },
+          "schema-key": {
+            "total": 4,
+            "files": 4
+          },
+          "slot-element": {
+            "total": 1,
+            "files": 1
+          },
+          "_layout.html files": {
+            "total": 1,
+            "files": 1
+          },
+          "marker": {
+            "total": 0,
+            "files": 0
+          }
+        }
+      }
+    }
+  ]
+}
