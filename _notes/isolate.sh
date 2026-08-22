@@ -30,10 +30,12 @@ unshare -m bash -c '
   S=/root/.claude/projects/-sandbox
   # THROUGH /sandbox, NEVER $DIR: by this line /tmp is already masked, so for a
   # sample directory under /tmp/ratify/ the path "$DIR/.transcripts" names a
-  # directory inside the MASK — round 27's transcripts went there and were
-  # destroyed with it, silently, while every sample reported success. /sandbox
+  # directory inside the MASK — round 27 wrote every transcript there and the
+  # mask took them all, silently, while each sample reported success. /sandbox
   # is the bind of $DIR taken before the mask, so writing through it reaches
-  # the real directory whatever $DIR is under.
+  # the real directory wherever $DIR lives. (No apostrophes in this comment:
+  # it sits inside a single-quoted bash -c string, and one apostrophe truncated
+  # the whole script into garbage arguments the first time this was written.)
   mkdir -p "$S" /sandbox/.transcripts
   mount --bind /sandbox/.transcripts "$S"
   cd /sandbox || exit 1
