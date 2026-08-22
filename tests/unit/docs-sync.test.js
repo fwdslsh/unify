@@ -135,7 +135,7 @@ test("every option the parser accepts is named in --help, the reference, and CLA
     ["docs/cli-reference.md", join("docs", "cli-reference.md")],
     // product-spec §4 claims to list the ENTIRE CLI, and it was the one
     // synopsis this test did not read — which is exactly where seven 0.8
-    // flags sat undocumented until the v0.8.0 release review.
+    // flags sat undocumented until the release review.
     ["docs/product-spec.md", join("docs", "product-spec.md")],
     ["CLAUDE.md", "CLAUDE.md"],
   ]) {

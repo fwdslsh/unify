@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * unify — the v0.7.0 CLI.
+ * unify — the CLI.
  *
  * Exit taxonomy (§14.1): 0 published (with --dry-run, would have been);
  * 1 problems found, nothing published, previous output untouched;

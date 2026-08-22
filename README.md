@@ -155,7 +155,7 @@ The full list, with the reasoning and the accepted costs, is [Product Specificat
 
 Authoring or editing a **site built with unify**? Review **[docs/authoring-rules.md](docs/authoring-rules.md)** — the complete authoring surface in under sixty lines — before writing anything, and do not substitute conventions from other generators: unify has no props, no expressions, no `draft:`/`permalink:`/`slug:` keys, and layouts do not chain.
 
-- `unify init` drops an **`AGENTS.md`** at the project root (outside `src/`, so it cannot publish) restating the most commonly guessed-wrong rules. If the project has one, read it — it is the same rule set as this README, never a variant.
+- `unify init` drops an **`AGENTS.md`** at the project root (outside `src/`, so it cannot publish) restating the most commonly guessed-wrong rules. If the project has one, read it — it restates the rules linked above, never a variant of them.
 - Finish by checking: `unify build --dry-run --strict`, then `unify audit --strict`. Exit `0` from `unify build` means `dist/` is the complete site; non-zero means **nothing was published** and the previous output is untouched — never report success on a non-zero exit.
 - `unify --help` lists the complete CLI. There are no other commands or flags; the authoring rules live in [docs/authoring-rules.md](docs/authoring-rules.md) and the scaffolded `AGENTS.md`, not in a CLI command.
 

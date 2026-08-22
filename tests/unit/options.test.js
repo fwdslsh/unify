@@ -46,7 +46,7 @@ describe("parseArgs", () => {
     expect(() => parseArgs(["-z"])).toThrow(UsageError);
   });
 
-  test("retired v0.6 options are unknown like any other", () => {
+  test("retired options are unknown like any other", () => {
     for (const retired of ["--minify", "--fail-on", "--host", "--copy", "--ignore", "--default-layout"]) {
       expect(() => parseArgs([retired, "x"])).toThrow(UsageError);
     }

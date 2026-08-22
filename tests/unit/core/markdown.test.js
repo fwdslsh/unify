@@ -1,7 +1,7 @@
 /**
  * Tier 3 — developer scaffolding, zero authority (testing-strategy §2). These
  * pin src/core/markdown.js's behavior at the unit level while the real Tier 1
- * conformance harness is blocked on the rest of the v0.7.0 pipeline (cli.js's
+ * conformance harness is blocked on the rest of the pipeline (cli.js's
  * `build` command is still a stub as of this writing — see
  * docs/migration-plan.md). Several cases here mirror conformance fixtures
  * exactly (tests/conformance/spec-fixtures/FIX-13, tests/fixtures/landmines/

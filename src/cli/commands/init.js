@@ -1,10 +1,10 @@
 /**
  * `unify init [template]` — offline scaffolding (conformance-spec §19).
  *
- * The v0.6 command fetched templates from a GitHub repository that did not
- * exist, so step one of the golden path failed with a network error before
- * anything else about the product could matter. The replacement makes that
- * class of failure structurally impossible: every template
+ * The previous implementation fetched templates from a GitHub repository
+ * that did not exist, so step one of the golden path failed with a network
+ * error before anything else about the product could matter. The replacement
+ * makes that class of failure structurally impossible: every template
  * (src/templates/*.js) is a plain object of `{relativePath: content}` data,
  * reached from this file by an ordinary static `import` chain rooted at
  * src/cli.js. `bun build --compile` bundles a single-file executable by

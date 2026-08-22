@@ -1,5 +1,5 @@
 /**
- * The v0.7.0 argument surface. This is the whole CLI — an option that is not
+ * The argument surface. This is the whole CLI — an option that is not
  * here does not exist, and an unknown one exits 2 rather than being ignored.
  */
 

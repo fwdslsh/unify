@@ -7,7 +7,7 @@
  * feature that was cut and left behind or a feature that was written and never
  * wired — both are bugs, and both are invisible to a green test suite, because
  * a unit test importing a module directly makes it *covered* without making it
- * *reachable*. That combination is exactly how the v0.6 suite reached 93%
+ * *reachable*. That combination is exactly how the previous suite reached 93%
  * coverage on a product that did not work (testing-strategy §1).
  *
  * Static analysis only, deliberately: `import` specifiers are read out of the

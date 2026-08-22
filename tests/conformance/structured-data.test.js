@@ -1668,13 +1668,13 @@ test("SD-09 — a site declaring no schema emits no ld+json, and --dry-run --str
     }),
   });
   const dry = await runCli(["build", "-s", "src", "-o", "dist", "--dry-run", "--strict"], tmp);
-  expectExit(dry, 0, "the v0.7 golden path under --dry-run --strict");
+  expectExit(dry, 0, "the golden path under --dry-run --strict");
   if (dry.stdout.includes("structured data:")) {
     throw new Error(`§26.7: a site that declares nothing gains nothing, and the report says nothing.\nstdout:\n${dry.stdout}`);
   }
 
   const r = await runCli(["build", "-s", "src", "-o", "dist", "--strict"], tmp);
-  expectExit(r, 0, "the v0.7 golden path");
+  expectExit(r, 0, "the golden path");
   expectEmitted(tmp, "index.html", "about.html");
   for (const file of ["index.html", "about.html"]) {
     expectNoBlock(read(tmp, "dist", file), "§26.5: the declaration is the whole opt-in");

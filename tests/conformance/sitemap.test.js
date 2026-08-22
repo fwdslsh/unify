@@ -379,7 +379,7 @@ test("SIT-06: a namespace-prefixed loc is a loc, so a broken one cannot ship sil
 }, TEST_MS);
 
 test("SIT-01: without --base-url an authored sitemap is an ordinary asset, checked by nothing", async () => {
-  // §21.1's activation governs §21.6 too. A v0.7 site that shipped a sitemap
+  // §21.1's activation governs §21.6 too. A working site that shipped a sitemap
   // with a stale entry built clean before this section existed; nothing the
   // author wrote changed, and no flag opted them in, so it must build clean
   // still. The adjacent case below shows the same tree DOES fail once the

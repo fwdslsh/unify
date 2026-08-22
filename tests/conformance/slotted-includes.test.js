@@ -66,7 +66,7 @@ test("SLOT-01 — the content decides: an empty include splices verbatim, a non-
   writeTree(join(tmp, "src"), {
     "_includes/box.fragment.html": '<div class="box"><slot>fallback</slot></div>\n',
     // Empty: verbatim. The fragment's <slot> lands in the LAYOUT, where §7's
-    // own composition consumes it — v0.7.0 behaviour, unchanged by §32.
+    // own composition consumes it — the established behaviour, unchanged by §32.
     "_layout.html": `<!doctype html>
 <html lang="en">
 <head><meta charset="utf-8"><title>— S</title></head>
@@ -92,7 +92,7 @@ test("SLOT-01 — the content decides: an empty include splices verbatim, a non-
   const other = read(tmp, "dist", "other.html");
   expectContains(other, '<div class="box"><em>include content</em></div>', "the NON-EMPTY include consumed its own slot");
 
-  // Neither path may leave a <slot> in the output — the v0.7.0 guarantee that
+  // Neither path may leave a <slot> in the output — the standing guarantee that
   // built pages contain no tool vocabulary, which §32 must not weaken.
   for (const [name, text] of [["index.html", home], ["other.html", other]]) {
     expectAbsent(text, "<slot", `${name}: a built page contains no <slot>`);
@@ -110,7 +110,7 @@ test("SLOT-01 — whitespace between the tags is still emptiness", async () => {
     "index.html": page('<h1>Home</h1>\n<include src="/_includes/plain.fragment.html">\n\n  \n</include>'),
   });
   const r = await runCli(["build", "-s", "src", "-o", "dist"], tmp);
-  // A verbatim splice of a slotless fragment is v0.7.0's ordinary include. If
+  // A verbatim splice of a slotless fragment is the ordinary include. If
   // whitespace counted as content this would be P26 instead.
   expectExit(r, 0, "whitespace-only content is an empty include");
   expectContains(read(tmp, "dist", "index.html"), "<p>spliced verbatim</p>", "the fragment spliced verbatim");

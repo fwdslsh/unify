@@ -393,7 +393,7 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
   // superset of the pages that can generate (§26.5's conditions 1 and 2 leave
   // the meta as the only surviving source of `schemaType`), so skipping it can
   // never suppress a block — it only spares a site that opted into nothing the
-  // derivation, which is what "a site that writes none is the v0.7 golden path,
+  // derivation, which is what "a site that writes none is the golden path,
   // unchanged" costs to mean.
   let generatedCount = 0;
   if (anyDeclaration) {
@@ -500,7 +500,7 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
   //
   // Gated on `baseConfig` because §21.1's activation governs the whole section.
   // Without --base-url an authored sitemap is an ordinary mirror-copied asset
-  // and unify says nothing about it, which is what keeps a v0.7 site that
+  // and unify says nothing about it, which is what keeps a working site that
   // shipped one building exactly as it did before: nothing the author wrote
   // changed, and no flag opted them in. It is also the only coherent reading —
   // a <loc> is an absolute URL, and deciding whether one points inside THIS

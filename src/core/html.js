@@ -19,8 +19,9 @@
  * could produce byte-correct-by-its-own-model output that the harness then
  * mis-slices and fails, or worse, silently mis-splices content. No entity
  * decoding, no tag-case folding, no attribute reordering, no whitespace
- * trimming happens anywhere in this file — those are exactly the v0.6
- * failure modes (testing-strategy §1 M5) the splice model exists to avoid.
+ * trimming happens anywhere in this file — those are exactly the previous
+ * implementation's failure modes (testing-strategy §1 M5) the splice model
+ * exists to avoid.
  */
 
 export const VOID_ELEMENTS = new Set([

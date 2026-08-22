@@ -1046,9 +1046,9 @@ test("scaffold: SCF-10 — a single-file executable scaffolds the identical tree
   // and no `src/templates/` to read. A template that reached its share image
   // with `readFileSync(new URL("./assets/x.png", import.meta.url))` passes
   // every other test in this file — it works perfectly under `bun run` — and
-  // produces an executable that cannot scaffold at all. That is the v0.6
-  // failure (an `init` that needed something outside itself) in another
-  // costume, and compiling is the only thing that tells the two apart.
+  // produces an executable that cannot scaffold at all. That is the previous
+  // implementation's failure (an `init` that needed something outside itself)
+  // in another costume, and compiling is the only thing that tells the two apart.
   const workshop = mkTmp();
   const binary = join(workshop, "unify-compiled");
   const compile = Bun.spawn({
