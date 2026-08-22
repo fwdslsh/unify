@@ -2,7 +2,7 @@
 
 unify turns a folder of plain HTML (and Markdown) into a finished site with shared navs, headers, and footers — no templating language, no JavaScript framework, no configuration. If you can write HTML and CSS, you already know almost everything unify does.
 
-This guide takes you from nothing to a deployed-ready site. It matches the 0.8 development line — v0.7.0's authoring surface unchanged, plus the commands and flags 0.8 has added so far; the complete rule set fits on one screen in [`authoring-rules.md`](authoring-rules.md).
+This guide takes you from nothing to a deploy-ready site. The complete rule set fits on one screen in [`authoring-rules.md`](authoring-rules.md).
 
 ## Install
 

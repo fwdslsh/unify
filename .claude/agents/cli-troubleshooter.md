@@ -61,11 +61,11 @@ When investigating issues:
 
 ## Project context (unify)
 
-The v0.7.0 specification set in `docs/` is authoritative, and the implementation is being rewritten against it. When troubleshooting here:
+The specification set in `docs/` is authoritative, and the implementation follows it. When troubleshooting here:
 
 - **`docs/cli-reference.md` is the complete CLI surface — a closed set.** Every command and flag in it exists; nothing outside it exists. A surviving retired flag (`--minify`, `--fail-on`, `--host`, `--log-level`, the `serve` command) is a finding, not a feature, and "the flag doesn't work" is usually "the flag was removed."
 - **Decide who is wrong from the spec, never from observed output.** `docs/conformance-spec.md` is the normative mechanism reference. If the implementation and a fixture disagree and the spec agrees with the fixture, the implementation is the bug.
-- **Silent failure is a bug by definition**, and it is the highest-priority class in this project — v0.6 printed a success message while deleting page content. An unreported wrong answer outranks a loud crash.
+- **Silent failure is a bug by definition**, and it is the highest-priority class in this project — the previous implementation printed a success message while deleting page content. An unreported wrong answer outranks a loud crash.
 - **A bug fix arrives with its fixture** (`CONTRIBUTING.md`), and a hang is a failure, not a slow test — the missing-include infinite hang is one of the defects this rewrite exists to close.
 - Diagnostics carry two severities, `problem` and `advisory`, on a stable `FILE:LINE: SEVERITY: ` prefix. `DEBUG=1` is the only environment variable unify reads.
 

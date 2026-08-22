@@ -48,7 +48,7 @@ For each testing scenario, structure your response as:
 
 ## The tier model (unify) — read `docs/testing-strategy.md` before writing a test
 
-Tiers are numbered by authority. **When two tiers disagree, the lower number wins and the higher tier is what gets fixed.** §1 of that document is the root-cause analysis of why v0.6 shipped 93% coverage on a product whose `init` command exited 1; every rule here is a countermeasure to a mechanism named there.
+Tiers are numbered by authority. **When two tiers disagree, the lower number wins and the higher tier is what gets fixed.** §1 of that document is the root-cause analysis of why the previous suite reached 93% coverage on a product whose `init` command exited 1; every rule here is a countermeasure to a mechanism named there.
 
 - **Tier 0 — golden path E2E**: drives the installed entrypoint as a user would, with subprocess spawns, real temp directories, and a hard timeout on every invocation (a hang is a failure).
 - **Tier 1 — conformance fixtures**: the heart of the suite. A case is a source tree, flags, and a declared outcome — expected output tree, exhaustive expected diagnostics, expected exit code, expected publish state. A generic harness iterates the manifests, so **there is no per-case test code to weaken.** Adding a case is a directory plus a manifest entry, not a new test file.

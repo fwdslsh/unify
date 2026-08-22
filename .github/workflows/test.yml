@@ -28,8 +28,8 @@ jobs:
   # conclusion as SUCCESS, so it read green in the checks list and its only
   # output was log text nobody opens.
   #
-  # This job checked the release condition directly until the v0.8 work opened
-  # §20's manifest rows. A spec section can be written before any CLI surface
+  # This job checked the release condition directly until the manifest work
+  # opened §20's rows. A spec section can be written before any CLI surface
   # exists to observe it, and the honest record of that is a baseline entry —
   # not a red people are told to ignore, which is the "warn instead of fail"
   # mechanism docs/testing-strategy.md §1 (M2) blames for the suite this one
@@ -46,7 +46,7 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
       - name: Full suite + runtime traceability
-        # Migration Phase 1 deleted tests/legacy-v0.6, so this is a bare
+        # The legacy test tree is gone, so this is a bare
         # `bun test` again — there is no longer a quarantined tree to filter
         # out, and every test in the repo votes.
         run: |

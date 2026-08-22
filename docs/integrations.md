@@ -1,6 +1,5 @@
 # Integrating compiled components: the compile-to-asset pattern
 
-**Status**: v0.7.0
 **Role**: The recipe for using a component framework — Svelte here, but the shape is the
 same for anything with a compiler — on a unify site, without adopting a framework for the
 site. unify needs to know nothing about the framework, and that is the design: you compile

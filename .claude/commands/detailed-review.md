@@ -1,16 +1,16 @@
 # Detailed Implementation Review
 
-Produce an evidence-based status report of the unify implementation against the v0.7.0 specification set, in `_notes/detailed-review.md`.
+Produce an evidence-based status report of the unify implementation against the specification set, in `_notes/detailed-review.md`.
 
 ## The authorities
 
-- `docs/product-spec.md` — the product contract: what unify is (§1), the composition model (§3), the complete CLI (§4), the non-goals (§5), and what v0.7.0 requires (§7).
+- `docs/product-spec.md` — the product contract: what unify is (§1), the composition model (§3), the complete CLI (§4), the non-goals (§5), and what the contract requires (§7).
 - `docs/conformance-spec.md` — the normative implementer reference: exact algorithms, the splice model, the head-merge table, the collision matrix, the closed problem/advisory catalogues, and the worked examples that are the fixtures.
 - `docs/cli-reference.md` — every command, option, and exit code. There are no others.
 - `docs/testing-strategy.md` — what "implemented" means as a machine-checkable claim (§3 traceability, §6 the release gates).
 - `docs/authoring-rules.md` — the complete authoring surface in under sixty lines.
 
-`CLAUDE.md` carries the framing: **the implementation in `src/` and the suite in `tests/` predate the spec and are being rewritten against it.** Finding v0.6 machinery is the expected result, not a discovery — its disposition is already decided in CLAUDE.md ("Implementation Map") and `docs/migration-plan.md`. Report status against the spec; do not re-litigate what was cut.
+`CLAUDE.md` carries the framing: **the spec set in `docs/` is authoritative and `src/` implements it.** Report status against the spec; do not re-litigate what was cut.
 
 ## Method
 
@@ -75,7 +75,7 @@ Two things that are **not** evidence: a coverage percentage (it measures executi
 - Findings: <gap, with the spec sentence it violates>
 
 ## Retired vocabulary still present
-<file:line for each surviving v0.6 construct>
+<file:line for each surviving retired construct>
 
 ## Spec defects found
 <contradictions between documents, or rules that cannot be implemented as written — these are defects to raise, never a license to reinterpret>

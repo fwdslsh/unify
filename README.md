@@ -16,7 +16,7 @@ The entire authoring surface is five things, learnable in five minutes:
 
 If it cannot be expressed with these five, it does not belong in unify.
 
-> **Status:** v0.8.0. The specification set in [`docs/`](docs/) is authoritative, and every normative rule in it is covered by a test that runs against the real CLI.
+> The specification set in [`docs/`](docs/) is authoritative, and every normative rule in it is covered by a test that runs against the real CLI.
 
 ## Install
 
@@ -149,7 +149,7 @@ The full list, with the reasoning and the accepted costs, is [Product Specificat
 
 - **[Ratification](docs/ratification.md)** — the evidence: agents authoring from the sixty lines in isolation, what each round found, and what it changed.
 - **[Ratification Protocol](docs/ratification-protocol.md)** — the procedure, for running another round.
-- **[Migration Plan](docs/migration-plan.md)** — how the v0.6 tree became this one. History, not current work.
+- **[Migration Plan](docs/migration-plan.md)** — how the current tree came to be. History, not current work.
 
 ## For Agents
 
