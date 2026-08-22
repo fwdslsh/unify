@@ -566,7 +566,7 @@ export function commonFiles(siteName, navLinks) {
 
 /**
  * `AGENTS.md` — product-spec §6.7's repository-local guidance, required of
- * every 0.8 template and written to the PROJECT ROOT, outside the source
+ * every template and written to the PROJECT ROOT, outside the source
  * root, so it cannot publish (§19.4).
  *
  * It repeats only the high-conflict rules §19.4 enumerates, and it states

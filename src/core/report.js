@@ -183,7 +183,7 @@ export function buildReport({ records, findings, base, problemCount, advisoryCou
 
 /**
  * §31.1 — `--format json`. Two-space indentation with a trailing newline,
- * the same fixed convention every other 0.8 generated document uses
+ * the same fixed convention every other generated document uses
  * (sitemap.xml, search-index.json), so two builds of one tree are
  * byte-identical and so is one build run twice.
  * @param {object} report - `buildReport`'s return value

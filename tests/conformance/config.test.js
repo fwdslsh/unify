@@ -184,7 +184,7 @@ test("CFG-03: no behavior exists that only the file can express — flags-only a
 test("CFG-01: canonical, feed-full, search-index, and generate are saved flags with real effect", async () => {
   // The release review found §18's key list contradicting itself: §22.1
   // and §33.1 each said their flag is saved in unify.yaml while §18's list
-  // omitted both, and the two site-level 0.8 booleans were saveable nowhere.
+  // omitted both, and the two site-level booleans were saveable nowhere.
   // One tree, one flagless build, all four keys observed by their effects —
   // each assertion names the section whose promise it keeps.
   const tmp = mkTmp();
