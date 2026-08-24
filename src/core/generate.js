@@ -199,7 +199,10 @@ function failureDetail(stderr) {
  */
 function collect(proc) {
   const read = (stream) =>
-    new Promise((done) => {
+    // A stream is null only when the spawn itself failed, which the `error`
+    // event below reports properly — reading it must not pre-empt that with a
+    // TypeError about the null.
+    stream === null ? Promise.resolve("") : new Promise((done) => {
       const chunks = [];
       stream.on("data", (chunk) => chunks.push(chunk));
       stream.on("error", () => done(Buffer.concat(chunks).toString()));
