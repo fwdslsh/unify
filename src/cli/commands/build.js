@@ -684,7 +684,7 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
     : null;
 
   if (settings.audit) {
-    reporter.summary(formatFindings(findings));
+    reporter.summary(formatFindings(findings, reporter.problemCount));
     // §24.6 — a pipeline problem exits 1 regardless: evaluating output that
     // cannot be built is meaningless, and the findings printed beside it
     // describe a site that would never ship. Otherwise --strict is the gate,

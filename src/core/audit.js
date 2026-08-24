@@ -785,11 +785,25 @@ function truncate(s, n = 60) {
 
 /**
  * §24.3 — the human report. Evidence and a fix, never a score.
+ *
+ * `problemCount` is the §14 tally the same run reported, and it is here for
+ * one reason: §24.6 exits 1 on a pipeline problem regardless of findings, so a
+ * run that hit one and found nothing printed the problem, then said "audit:
+ * nothing to report", then exited 1 — three lines that read as a tool bug. The
+ * severity axes stay separate, as §24.4 requires; the summary just stops
+ * pretending the other one was not there.
+ *
  * @param {Finding[]} findings
+ * @param {number} [problemCount] - §14 problems reported by the same run
  * @returns {string}
  */
-export function formatFindings(findings) {
-  if (!findings.length) return "audit: nothing to report";
+export function formatFindings(findings, problemCount = 0) {
+  const problems = problemCount > 0
+    ? `${problemCount} ${problemCount === 1 ? "problem" : "problems"} (reported above; the build could not publish)`
+    : "";
+  if (!findings.length) {
+    return problems ? `audit: no findings, and ${problems}` : "audit: nothing to report";
+  }
   const lines = [];
   for (const f of findings) {
     // The same `(generated)` marker §33.4 already uses in the collision
@@ -801,7 +815,11 @@ export function formatFindings(findings) {
   }
   const broken = findings.filter((f) => f.severity === "broken").length;
   const incomplete = findings.length - broken;
-  lines.push(`audit: ${broken} broken, ${incomplete} incomplete`);
+  lines.push(
+    problems
+      ? `audit: ${broken} broken, ${incomplete} incomplete, and ${problems}`
+      : `audit: ${broken} broken, ${incomplete} incomplete`,
+  );
   return lines.join("\n");
 }
 

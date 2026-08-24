@@ -56,6 +56,15 @@ import { CHECK_SPELLING } from "./diagnostics.js";
 /** `url(...)`, matching bare/`"..."`/`'...'` forms, capturing whichever fired. */
 const CSS_URL_RE = /url\(\s*(?:"([^"]*)"|'([^']*)'|([^"')\s][^)]*?))\s*\)/gi;
 
+// REF-11 — `@import` in its BARE string form. `@import url("x")` is already a
+// `url()` and was always checked; `@import "x"` is the commoner spelling in
+// hand-written CSS and was not, so a stylesheet importing a stylesheet that
+// does not exist published green while the identical mistake one line down, in
+// a `url()`, blocked the build. Matching only the quoted form after `@import`
+// keeps the two disjoint: `url(` is not a quote, so the url() rule still owns
+// that spelling and nothing is reported twice.
+const CSS_IMPORT_RE = /@import\s+(?:"([^"]*)"|'([^']*)')/gi;
+
 /**
  * Every `url(...)` reference in a CSS text (a `.css` file's full content, a
  * `<style>` block's text, or a `style="…"` attribute's value), with byte
@@ -71,6 +80,11 @@ function findCssUrls(text, baseOffset) {
     const raw = m[1] ?? m[2] ?? m[3] ?? "";
     // Locate the captured group's own offset within the full match text.
     const withinMatch = m[0].indexOf(raw, m[0].indexOf("url"));
+    out.push({ raw, offset: baseOffset + m.index + Math.max(withinMatch, 0) });
+  }
+  for (const m of text.matchAll(CSS_IMPORT_RE)) {
+    const raw = m[1] ?? m[2] ?? "";
+    const withinMatch = m[0].indexOf(raw, "@import".length);
     out.push({ raw, offset: baseOffset + m.index + Math.max(withinMatch, 0) });
   }
   return out;

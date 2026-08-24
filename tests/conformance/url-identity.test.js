@@ -462,3 +462,35 @@ test("REF-08: an undecodable escape resolves verbatim or reports — never an un
   }
   covers("REF-08");
 }, TEST_MS);
+
+test("REF-11: a bare @import is a reference, exactly as @import url(...) already was", async () => {
+  // Two spellings of one at-rule, and only one was checked: a stylesheet
+  // importing a stylesheet that does not exist published green, while the
+  // identical mistake in a url() one line down blocked the build. The bare
+  // form is the commoner one in hand-written CSS.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": page("Home", '<link rel="stylesheet" href="/s.css">'),
+    "s.css": '@import "/missing-bare.css";\n@import url("/missing-url.css");\n',
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist"], tmp);
+  expectExit(r, 1, "a stylesheet importing files that do not exist");
+  for (const target of ["/missing-bare.css", "/missing-url.css"]) {
+    if (!r.stderr.includes(`${target} does not resolve`)) {
+      throw new Error(`§12: both @import spellings are references:\n${r.stderr}`);
+    }
+  }
+
+  // And neither spelling false-positives on a target that resolves, nor on an
+  // off-origin one. A url() must still be reported exactly once.
+  const ok = mkTmp();
+  writeTree(join(ok, "src"), {
+    "index.html": page("Home", '<link rel="stylesheet" href="/s.css">'),
+    "s.css": '@import "/real.css";\n@import url("/real.css");\n@import "https://cdn.example/x.css";\n',
+    "real.css": "body{color:red}\n",
+  });
+  const good = await runCli(["build", "-s", "src", "-o", "dist"], ok);
+  expectExit(good, 0, "resolvable and off-origin imports");
+  covers("REF-11");
+}, TEST_MS);
+
