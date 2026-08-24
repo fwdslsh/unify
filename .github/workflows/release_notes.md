@@ -8,7 +8,7 @@ The composition model is unchanged — no new authoring surface, nothing in the 
 - **`lang-missing` now gives actionable advice on layout-less pages** (#57). A page composed with `data-layout="none"`, `layout: none`, or no layout at all is told to set `lang` on the page itself (or its frontmatter) instead of being sent to a layout that is already correct or doesn't exist. The with-layout message is byte-identical to before.
 - **js-yaml 3 → 5** (#58). Drops the unmaintained `esprima` and `argparse@1`/`sprintf-js` transitive dependencies. Frontmatter behavior is unchanged — values still parse under the failsafe schema, so nothing changes type — and the one v5 difference that would have broken builds (empty frontmatter throwing) is absorbed.
 
-Also new in the repository: `examples/unify-docs` — unify's own documentation site, built by unify from the real `docs/` tree via `--generate`, live at <https://fwdslsh.github.io/unify/> and redeployed on every push to `docs/`. Building and deploying it is how three of the four bugs above were found; its `FINDINGS.md` is the record.
+Also new in the repository: `examples/unify-docs` — unify's own documentation site, built by unify from the real `docs/` tree via `--generate`, live at <https://unify.fwdslsh.dev/> and redeployed on every push to `docs/`. Building and deploying it is how three of the four bugs above were found; its `FINDINGS.md` is the record.
 
 ## Upgrading from 0.8.0
 
