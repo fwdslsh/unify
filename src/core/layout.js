@@ -21,9 +21,19 @@
  *     markdown.js).
  *
  * Step 4 (the discovery walk) and the explicit-path resolver (leading `/`
- * from the source root, otherwise relative to the declaring file — always
+ * from the namespace root, otherwise relative to the declaring file — always
  * the page itself, since frontmatter and `data-layout` both live IN the
  * page) are shared by both document shapes.
+ *
+ * THE NAMESPACE (§33.3): both climb VIRTUAL paths, not absolute directories,
+ * and ask `paths.js` which root holds each candidate — the source tree first,
+ * the `--generate` overlay second. A generated `docs/page.md` therefore walks
+ * `docs/` and then the root exactly as a hand-written one does. Before that,
+ * the walk started at the page's absolute directory inside the overlay,
+ * left the source root's containment check immediately, and returned "no
+ * layout" — every generated page published bare, with no diagnostic, exit 0
+ * (issue #54). `roots` defaults to the source root alone, which is exactly
+ * the namespace of a build without `--generate`.
  *
  * DIAGNOSTIC LOCATION (§14.1): `resolveHtmlLayout` and `checkLayoutDocument`
  * are handed an INCLUDE-INLINED document, so an offset in `text` is not a
@@ -43,10 +53,9 @@
  * that fragment — provenance-exact by construction rather than by span
  * arithmetic.
  */
-import { statSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { posix } from "node:path";
 import { CHECK_SPELLING } from "./diagnostics.js";
-import { contains, toRelative } from "./paths.js";
+import { locateExisting, nameOf, resolutionRoots, virtualOf, virtualResolve } from "./paths.js";
 import { findAll, getAttrNode, hasAttr, isElement, lineOf, parse, tokens } from "./html.js";
 import { spansToDiagnosticLocator, verbatimLineResolver, wholeTextSpan } from "./urls.js";
 
@@ -87,11 +96,12 @@ const UNIFY_CLASS_PREFIX = "unify-";
  *   see this module's DIAGNOSTIC LOCATION note
  * @param {string} args.pageAbsPath
  * @param {string} args.sourceRoot
+ * @param {string[]} [args.roots] - the §33.3 namespace (`paths.js`'s `resolutionRoots`)
  * @param {import('./diagnostics.js').Reporter} args.reporter
  * @returns {{none: true} | {path: string} | {problem: true}}
  */
-export function resolveHtmlLayout({ root, text, spans, resolveLine, pageAbsPath, sourceRoot, reporter }) {
-  const file = toRelative(sourceRoot, pageAbsPath);
+export function resolveHtmlLayout({ root, text, spans, resolveLine, pageAbsPath, sourceRoot, roots = resolutionRoots(sourceRoot), reporter }) {
+  const file = nameOf(roots, pageAbsPath);
   const at = documentLocator({ file, text, spans, resolveLine });
   const { onHtml, onBody, misplaced } = findDataLayoutAttrs(root);
   reportMisplaced(misplaced, { at, reporter });
@@ -105,12 +115,12 @@ export function resolveHtmlLayout({ root, text, spans, resolveLine, pageAbsPath,
     const value = (attr.value ?? "").trim();
     if (value === "none") return { none: true };
     return resolveExplicitPath(value, {
-      declaringDir: dirname(pageAbsPath), sourceRoot, at: at(attr.start), reporter,
+      declaringFile: pageAbsPath, roots, at: at(attr.start), reporter,
       spelling: (p) => `data-layout="${p}"`,
     });
   }
 
-  const found = walkForLayout(dirname(pageAbsPath), sourceRoot);
+  const found = walkForLayout(pageAbsPath, roots);
   return found ? { path: found } : { none: true };
 }
 
@@ -124,11 +134,12 @@ export function resolveHtmlLayout({ root, text, spans, resolveLine, pageAbsPath,
  * @param {string} args.mdSource - the page's raw source text (frontmatter included), to locate the `layout:` key's line
  * @param {string} args.pageAbsPath
  * @param {string} args.sourceRoot
- * @param {string} args.file - source-root-relative path, for diagnostics
+ * @param {string[]} [args.roots] - the §33.3 namespace (`paths.js`'s `resolutionRoots`)
+ * @param {string} args.file - the page's virtual path, for diagnostics
  * @param {import('./diagnostics.js').Reporter} args.reporter
  * @returns {{none: true} | {path: string} | {problem: true}}
  */
-export function resolveMarkdownLayout({ layoutValue, mdSource, pageAbsPath, sourceRoot, file, reporter }) {
+export function resolveMarkdownLayout({ layoutValue, mdSource, pageAbsPath, sourceRoot, roots = resolutionRoots(sourceRoot), file, reporter }) {
   if (layoutValue !== undefined) {
     const value = String(layoutValue).trim();
     if (value === "none") return { none: true };
@@ -137,12 +148,12 @@ export function resolveMarkdownLayout({ layoutValue, mdSource, pageAbsPath, sour
     // the key's line is already a true line in `file` — the one place in this
     // module where the naive measurement is the correct one.
     return resolveExplicitPath(value, {
-      declaringDir: dirname(pageAbsPath), sourceRoot, reporter,
+      declaringFile: pageAbsPath, roots, reporter,
       at: { file, line: frontmatterKeyLine(mdSource, "layout") },
     });
   }
 
-  const found = walkForLayout(dirname(pageAbsPath), sourceRoot);
+  const found = walkForLayout(pageAbsPath, roots);
   return found ? { path: found } : { none: true };
 }
 
@@ -273,7 +284,7 @@ function reportMisplaced(misplaced, { at, reporter }) {
  * path: for HTML the two differ whenever a fragment contributed the tag
  * carrying `data-layout`.
  */
-function resolveExplicitPath(value, { declaringDir, sourceRoot, at, reporter, spelling = (p) => `layout: ${p}` }) {
+function resolveExplicitPath(value, { declaringFile, roots, at, reporter, spelling = (p) => `layout: ${p}` }) {
   if (!value.endsWith(".html")) {
     // Name the layout this page would actually get, not a fixed literal.
     // Round 8's repair fixed the *kind* (`layout:` vs `data-layout=`); round
@@ -283,31 +294,30 @@ function resolveExplicitPath(value, { declaringDir, sourceRoot, at, reporter, sp
     // body class and stylesheet, exit 0. "A rule that shows exactly one
     // literal will have that literal copied" is this project's most repeated
     // finding; it applies to diagnostics too, so the literal has to be right.
-    const nearest = walkForLayout(declaringDir, sourceRoot);
-    const suggestion = nearest ? `/${toRelative(sourceRoot, nearest)}` : "/_layout.html";
+    const nearest = walkForLayout(declaringFile, roots);
+    const suggestion = nearest ? `/${nameOf(roots, nearest)}` : "/_layout.html";
     reporter.problem({
       ...at,
       message: `layout is not a path: "${value}"`,
       fixes: [
         `layouts are paths — write ${spelling(suggestion)} (or a relative path ending in .html)`,
         nearest
-          ? `or drop the layout selection: this page's nearest layout is ${toRelative(sourceRoot, nearest)}`
+          ? `or drop the layout selection: this page's nearest layout is ${nameOf(roots, nearest)}`
           : "or drop the layout selection to use the nearest _layout.html",
       ],
     });
     return { problem: true };
   }
 
-  const resolved = value.startsWith("/") ? resolve(sourceRoot, value.slice(1)) : resolve(declaringDir, value);
-  let isFile = false;
-  if (contains(sourceRoot, resolved)) {
-    try {
-      isFile = statSync(resolved).isFile();
-    } catch {
-      isFile = false;
-    }
-  }
-  if (!isFile) {
+  // §33.3 — the same namespace `<include src>` resolves in: a `/`-rooted value
+  // names a virtual path, a relative one is measured from the declaring page's
+  // virtual directory, and either may be satisfied by the source tree or by
+  // the overlay (source first). `layout: /_layout.html` on a generated page
+  // therefore still means the source root's layout, exactly as before — that
+  // spelling was the workaround for issue #54 and it must not change meaning.
+  const virtual = virtualResolve(roots, declaringFile, value);
+  const resolved = virtual === null ? null : locateExisting(roots, virtual);
+  if (resolved === null) {
     reporter.problem({
       ...at,
       message: `layout not found: ${value}`,
@@ -319,24 +329,36 @@ function resolveExplicitPath(value, { declaringDir, sourceRoot, at, reporter, sp
 }
 
 /**
- * §6.1 step 4: walk from `startDir` up to (and including) `sourceRoot`,
- * returning the first `_layout.html` found. "Discovery is by name; the
- * file's excluded status is irrelevant" — no exclude-set check here.
+ * §6.1 step 4: walk from the declaring file's own directory up to (and
+ * including) the namespace root, returning the first `_layout.html` found.
+ * "Discovery is by name; the file's excluded status is irrelevant" — no
+ * exclude-set check here.
+ *
+ * §33.3 — the walk climbs VIRTUAL directories and asks every root at each
+ * level, so `docs/api.md` looks for `docs/_layout.html` then `_layout.html`
+ * whichever tree wrote it, and a generated page discovers the source root's
+ * layout exactly as a hand-written sibling does. Per level the source tree
+ * wins over the overlay (`locateExisting`); nearest still beats both, because
+ * the namespace is merged one directory at a time rather than one tree at a
+ * time — a `docs/_layout.html` written by a generator is nearer to
+ * `docs/api.md` than the source root's, and is the one it gets.
+ *
+ * @param {string} declaringFile - absolute path of the page (or layout)
+ * @param {string[]} roots - the namespace, from `resolutionRoots`
+ * @returns {string|null} absolute path of the layout, or null
  */
-function walkForLayout(startDir, sourceRoot) {
-  const root = resolve(sourceRoot);
-  let dir = resolve(startDir);
-  while (contains(root, dir)) {
-    const candidate = resolve(dir, LAYOUT_FILENAME);
-    try {
-      if (statSync(candidate).isFile()) return candidate;
-    } catch {
-      // not found at this level — keep walking up
-    }
-    if (dir === root) break;
-    dir = dirname(dir);
+function walkForLayout(declaringFile, roots) {
+  const from = virtualOf(roots, declaringFile);
+  if (from === null) return null;
+  let dir = posix.dirname(from);
+  if (dir === ".") dir = "";
+  for (;;) {
+    const found = locateExisting(roots, dir === "" ? LAYOUT_FILENAME : `${dir}/${LAYOUT_FILENAME}`);
+    if (found) return found;
+    if (dir === "") return null;
+    const parent = posix.dirname(dir);
+    dir = parent === "." ? "" : parent;
   }
-  return null;
 }
 
 /**
