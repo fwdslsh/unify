@@ -370,9 +370,22 @@ export function auditManifest({
 
     // ---- language ----------------------------------------------------------
     if (record.lang === null) {
+      // §20.3's `layout` — the same shape as `generated` below. A page that
+      // composed with NO layout (`data-layout="none"`, `layout: none`, no
+      // `_layout.html` above it) has no layout to set anything on, and the
+      // standing advice sent such an author to a file that was either already
+      // correct or did not exist. A fix line that names somewhere the reader
+      // has already been is worse than no fix line, so this one names the
+      // page — in the spelling that page can actually take: frontmatter for
+      // Markdown (§10.2's `lang` key), the `<html>` element for HTML.
+      // The layout case is unchanged, byte for byte.
       add(record, "lang-missing", "incomplete",
         "the emitted <html> has no lang attribute",
-        'set it on the layout: <html lang="en">');
+        record.layout != null
+          ? 'set it on the layout: <html lang="en">'
+          : record.sourcePath.endsWith(".md")
+            ? "add lang: en to this page's frontmatter — it composed with no layout"
+            : 'set it on the page: <html lang="en"> — this page composed with no layout');
     }
 
     // ---- orphans -----------------------------------------------------------

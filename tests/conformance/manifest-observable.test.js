@@ -354,3 +354,66 @@ test("MAN-10 — iso is the declared value only when well-formed W3C-DTF, verbat
   eq(byPath.get("badday.html").datePublished.raw, "2026-02-30T00:00:00Z", "raw keeps the author's bytes");
   covers("MAN-10");
 }, TEST_MS);
+
+// ------------------------------------------------------------------- MAN-14
+
+test("MAN-14 — layout names the layout the page composed with, and is null when it composed with none", async () => {
+  const tmp = mkTmp();
+  // Four pages, one per way a page can answer "which layout?". The tree HAS a
+  // `_layout.html`, so a null below is a real resolution result rather than
+  // the trivial consequence of there being nothing to resolve.
+  writeTree(join(tmp, "src"), {
+    "_layout.html": `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Site</title><meta name="description" content="The example site."></head>
+<body><main></main></body>
+</html>
+`,
+    "index.html": page("Home", "<h1>Home</h1><p>Composed with the nearest layout.</p>"),
+    "optout.html": `<!doctype html>
+<html lang="en" data-layout="none">
+<head><meta charset="utf-8"><title>Opt Out</title><meta name="description" content="The opt-out page."></head>
+<body><h1>Opt Out</h1><p>Composed with no layout.</p></body>
+</html>
+`,
+    "post.md": `---
+title: Post
+description: The post page.
+layout: none
+lang: en
+---
+
+# Post
+
+Composed with no layout.
+`,
+    "sub/page.html": page("Sub", "<h1>Sub</h1><p>Composed with the layout one directory up.</p>"),
+  });
+  const byPath = await records(tmp);
+
+  // The resolved layout is a SOURCE-ROOT-relative path, so a page in a
+  // subdirectory names the same `_layout.html` as one at the root rather than
+  // a path relative to itself.
+  eq(byPath.get("index.html").layout, "_layout.html", "the nearest _layout.html, source-root-relative");
+  eq(byPath.get("sub/page.html").layout, "_layout.html", "the walk's result, not a path relative to the page");
+  // Two of the three ways to compose with none, on a tree that HAS a layout.
+  // Both are `null` — not `""` and not `"none"`: the field names a file, or
+  // says there is no file.
+  eq(byPath.get("optout.html").layout, null, 'data-layout="none" composed with no layout');
+  eq(byPath.get("post.html").layout, null, "frontmatter layout: none composed with no layout");
+
+  // Provenance, per §20.3: `data-layout` is consumed by §6.4 and a layout
+  // leaves no marker of its own, so this fact is NOT recoverable from the
+  // emitted bytes the rest of the record is read from. Asserted so that a
+  // future "derive it from the output" refactor fails here rather than
+  // quietly reporting the same answer for every page.
+  if (byPath.get("index.html").layout === byPath.get("optout.html").layout) {
+    throw new Error("§20.3: a page with a layout and a page without one must not report the same `layout`");
+  }
+  // §20.3's exception is closed at two fields, so `generated` is asserted
+  // beside `layout` rather than somewhere else: they are one rule.
+  const home = byPath.get("index.html");
+  if (!("generated" in home)) throw new Error("§20.3: `generated` is a field of every record");
+  eq(home.generated, false, "a source-tree page is not generated");
+  covers("MAN-14");
+}, TEST_MS);
