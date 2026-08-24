@@ -1,0 +1,222 @@
+/* unify docs — one stylesheet, no build step, no framework.
+   Light and dark from one set of custom properties. */
+
+:root {
+  --bg: #fdfdfc;
+  --fg: #1b1b19;
+  --muted: #5c5c56;
+  --rule: #e2e1dc;
+  --accent: #7a4b1e;
+  --code-bg: #f4f3ef;
+  --measure: 42rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #17171a;
+    --fg: #e8e7e3;
+    --muted: #a3a29c;
+    --rule: #303036;
+    --accent: #e0a86a;
+    --code-bg: #202026;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 1rem/1.65 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Design-time only: a layout's slot fallbacks preview in the browser, and this
+   keeps the wrapper from adding a box. Built pages contain no <slot> at all. */
+slot { display: contents; }
+
+a { color: var(--accent); text-underline-offset: 0.15em; }
+a:focus-visible, .skip:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.skip {
+  position: absolute;
+  left: -9999px;
+}
+.skip:focus {
+  left: 0.5rem;
+  top: 0.5rem;
+  z-index: 10;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+}
+
+/* ---------------------------------------------------------------- masthead */
+
+.masthead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 1rem;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.wordmark {
+  font-weight: 700;
+  font-size: 1.2rem;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  color: var(--fg);
+}
+
+.tagline {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+/* ------------------------------------------------------------------ shell */
+
+.shell {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+@media (min-width: 60rem) {
+  .shell {
+    grid-template-columns: 15rem minmax(0, 1fr);
+    align-items: start;
+  }
+  .docnav {
+    position: sticky;
+    top: 1.5rem;
+    max-height: calc(100vh - 3rem);
+    overflow-y: auto;
+  }
+}
+
+/* ------------------------------------------------------------------- nav */
+
+.docnav-title {
+  margin: 0 0 0.5rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+.docnav-title a { color: inherit; }
+
+.docnav ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-left: 1px solid var(--rule);
+}
+
+.docnav li a {
+  display: block;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.9rem;
+  text-decoration: none;
+  border-left: 2px solid transparent;
+  margin-left: -1px;
+}
+
+.docnav li a:hover {
+  text-decoration: underline;
+  border-left-color: var(--accent);
+}
+
+/* ------------------------------------------------------------------ main */
+
+main {
+  min-width: 0; /* let long code blocks scroll instead of stretching the grid */
+}
+
+main > * { max-width: var(--measure); }
+
+h1, h2, h3, h4, h5, h6 {
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  margin: 2rem 0 0.75rem;
+}
+h1 { font-size: 1.9rem; margin-top: 0; }
+h2 { font-size: 1.4rem; padding-top: 0.75rem; border-top: 1px solid var(--rule); }
+h3 { font-size: 1.1rem; }
+h4, h5, h6 { font-size: 1rem; }
+
+/* Headings carry slug ids, so every one is a deep link. */
+h2[id], h3[id], h4[id] { scroll-margin-top: 1rem; }
+
+p, ul, ol, blockquote { margin: 0 0 1rem; }
+li { margin: 0.2rem 0; }
+
+.lede { font-size: 1.1rem; color: var(--muted); }
+
+blockquote {
+  margin-inline: 0;
+  padding: 0.25rem 0 0.25rem 1rem;
+  border-left: 3px solid var(--rule);
+  color: var(--muted);
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.875em;
+  background: var(--code-bg);
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+}
+
+pre {
+  max-width: 100%;
+  overflow-x: auto;
+  background: var(--code-bg);
+  padding: 0.9rem 1rem;
+  border-radius: 6px;
+  border: 1px solid var(--rule);
+}
+pre code { background: none; padding: 0; font-size: 0.85rem; }
+
+/* Specs are full of wide tables; let them scroll rather than break the page. */
+table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  margin: 0 0 1rem;
+}
+th, td {
+  border: 1px solid var(--rule);
+  padding: 0.4rem 0.6rem;
+  text-align: left;
+  vertical-align: top;
+}
+th { background: var(--code-bg); }
+
+hr { border: 0; border-top: 1px solid var(--rule); margin: 2rem 0; }
+
+img { max-width: 100%; height: auto; }
+
+/* ----------------------------------------------------------------- footer */
+
+.site-foot {
+  border-top: 1px solid var(--rule);
+  margin-top: 3rem;
+  padding: 1.25rem 1.5rem;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+.site-foot p { margin: 0; }
+
+/* 404 opts out of the layout entirely (data-layout="none"). */
+body.plain { padding: 3rem 1.5rem; max-width: var(--measure); margin: 0 auto; }

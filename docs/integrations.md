@@ -104,7 +104,7 @@ toolchain makes assets, and the seam between them is the filesystem.
 
 ---
 
-# Four recipes
+## Four recipes
 
 The pattern above runs your toolchain *beside* unify, by you. The four recipes below are
 the common variations, and the first of them is the only place unify reaches out at all.

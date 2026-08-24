@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title> — unify docs</title>
+    <meta name="description" content="Documentation for unify, a static site generator for HTML-native composition.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="unify docs">
+    <link rel="stylesheet" href="/assets/style.css">
+  </head>
+  <body>
+    <a class="skip" href="#content">Skip to content</a>
+    <include src="/_includes/masthead.html"></include>
+    <div class="shell">
+      <include src="/_includes/docnav.html"></include>
+      <main id="content"><slot></slot></main>
+    </div>
+    <footer class="site-foot">
+      <slot name="footer">
+        <p>Built with unify itself. <a href="https://github.com/fwdslsh/unify">Source on GitHub</a>.</p>
+      </slot>
+    </footer>
+  </body>
+</html>
