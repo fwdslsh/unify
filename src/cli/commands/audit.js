@@ -136,7 +136,11 @@ export async function audit(context) {
     // `findings` — the SAME array when `--external` found nothing to add, so
     // the bytes match what build.js would have printed on its own.
     for (const line of captured.slice(0, -1)) context.reporter.stdout.write(line);
-    context.reporter.summary(formatFindings(findings));
+    // The same count `--format json`/`sarif` already carries below. Without
+    // it a run that hit a §14 problem printed the problem, said "audit:
+    // nothing to report", and exited 1 — the summary contradicting the two
+    // lines around it.
+    context.reporter.summary(formatFindings(findings, buildReporter.problemCount));
   } else {
     const report = buildReport({
       records, findings, base,

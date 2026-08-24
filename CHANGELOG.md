@@ -8,13 +8,76 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-08-24
+
+A patch release with no new authoring surface: the five primitives are
+untouched. Everything here was found by building two real sites with unify —
+this project's own documentation site, and fwdslsh.dev — and then asking what
+each of them had to work around.
+
+### Fixed
+
+- **An extensionless link is resolved under `--pretty-urls`** (#68). The flag
+  publishes `about.html` at `/about/`, so `/about` is the URL it exists to
+  produce — and it was the one spelling the rewrite ignored, reaching the
+  reference check unrewritten and failing there as unresolvable. `/about.html`
+  and `/about/` both worked; the clean form did not. It is now resolved and
+  rewritten like the others, tried as `about.html` and then as
+  `about/index.html`. A link naming no page is still a problem, and without
+  `--pretty-urls` nothing changes. Measured on fwdslsh.dev: 198 problems across
+  39 files, every one a link written the way the flag advertises, to zero.
+- **A bare `@import` is a reference** (REF-11). `@import url("/x.css")` was
+  already checked because it is a `url()`; `@import "/x.css"` — the commoner
+  spelling in hand-written CSS — was not, so a stylesheet importing a
+  stylesheet that does not exist published green while the identical mistake
+  one line down blocked the build.
+- **A repeated single-value option is a usage error** (CFG-04). `-o dist -o
+  other` published to `other` and said nothing; two `--generate` paths ran the
+  second instead of the first. Both at exit 0, both an instruction discarded in
+  silence. Repeating `--exclude` still accumulates, and repeating a boolean
+  flag is still fine.
+- **`unify audit`'s summary names the problems the same run reported**
+  (AUD-16). A run that hit a build problem and found no findings printed the
+  problem, said `audit: nothing to report`, and exited 1 — three lines that
+  read as a tool bug. The two severity axes stay separate; the summary line
+  simply stops omitting one of them.
+- **A generated asset's `--dry-run` row says `← generated`** (GEN-04). Pages
+  already did. An asset named its overlay-relative path instead, pointing the
+  reader at a file that does not exist in the source tree — the exact
+  unexplainable row the rule exists to prevent.
+- **`--generate`'s failure names the runtime that ran it.** The fix line said
+  `bun <script>` unconditionally: wrong under `npx @fwdslsh/unify`, where node
+  hosts the build, and impossible on the standalone binary, whose whole promise
+  is a machine with neither runtime installed.
+
 ### Changed
 
+- **`data-slot` is diagnosed as retired vocabulary** (§6.3, P08). `data-unify`
+  and the `unify-*` area classes were already located problems naming their
+  replacement. `data-slot`, from the same generation and with the same
+  content-loss failure mode, produced no diagnostic at all: it is inert, so a
+  page carrying it composed at exit 0 with the fill silently dropped. The cost
+  was measured on a production site, where a shared layout's `<title>` carried
+  it and every page emitted the layout's default title with nothing reported.
 - The documentation site at <https://unify.fwdslsh.dev/> now carries the same
   design as [fwdslsh.dev](https://fwdslsh.dev/): dark surfaces, the fwdslsh
   green, and one hand-written stylesheet with no client JavaScript. It is still
   built by unify from this repository's own `docs/` directory, so it cannot
   drift from the documentation it renders.
+
+### Added
+
+- **A recipe for a prebuilt package's browser files**, in
+  `docs/integrations.md`. `node_modules/` never ships and there is no copy
+  flag, so a package that already ships a browser-ready bundle had no
+  documented path into a build — which is why syntax highlighting was dead on
+  fwdslsh.dev. The recipe resolves `<pkg>/package.json` and joins from its
+  directory, which reaches files a package does not export and behaves the same
+  under both runtimes, and it is explicit about what the build does not check.
+- The head-merge title convention now appears in `docs/getting-started.md` with
+  the detail it was missing: write the layout's separator with no leading
+  space, because the join supplies it, and a page with no title of its own
+  ships the layout's title exactly as written.
 
 ## [0.8.1] - 2026-08-24
 
@@ -163,7 +226,8 @@ with generated compare-link notes only. Their diffs are on the
 [releases page](https://github.com/fwdslsh/unify/releases). Nothing here
 retroactively reconstructs detail those notes never carried.
 
-[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.8.1...HEAD
+[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.8.2...HEAD
+[0.8.2]: https://github.com/fwdslsh/unify/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/fwdslsh/unify/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/fwdslsh/unify/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/fwdslsh/unify/compare/v0.6.6...v0.7.0

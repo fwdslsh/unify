@@ -104,9 +104,9 @@ toolchain makes assets, and the seam between them is the filesystem.
 
 ---
 
-## Four recipes
+## Five recipes
 
-The pattern above runs your toolchain *beside* unify, by you. The four recipes below are
+The pattern above runs your toolchain *beside* unify, by you. The five recipes below are
 the common variations, and the first of them is the only place unify reaches out at all.
 
 ## 1. The generator context: what `--generate` hands you
@@ -296,6 +296,88 @@ The one flag that touches the network is `unify audit --external`, which fetches
 off-origin URLs your site emits and reports the ones that do not resolve. It is opt-in for
 a reason: it makes the command's result depend on somebody else's uptime. Ordinary builds
 and ordinary audits never open a socket.
+
+## 5. A prebuilt package's browser files
+
+Some packages need no toolchain at all: they ship a bundle a browser can load, and all you
+need is that file in your output. `node_modules/` is on the never-shipped list, so it
+cannot get there by being where it is — and there is no copy flag to name it with. A
+generator copies it, which keeps the dependency tracked by your package manager instead of
+by whoever last dragged files into `src/`.
+
+Anchor on the package's own `package.json` and join paths from its directory:
+
+```js
+// _scripts/vendor.mjs — run by --generate on every build
+import { copyFileSync, mkdirSync, readdirSync } from "node:fs";
+import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
+
+const generatedDir = process.argv[3];
+const require = createRequire(import.meta.url);
+
+// `<pkg>/package.json` is the one subpath an `exports` map almost always keeps, so this
+// reaches files the package does not export — which is most of them — and resolves the
+// same under both runtimes unify supports.
+const packageRoot = (pkg) => dirname(require.resolve(`${pkg}/package.json`));
+
+const md = packageRoot("markdown-it");
+
+const FILES = [[join(md, "dist/markdown-it.min.js"), "vendor/markdown-it.js"]];
+
+// A whole directory, filtered — a language pack or an icon set is usually this shape.
+// Name the extension you want: a published `dist/` is mostly things you do not.
+for (const name of readdirSync(join(md, "dist")).sort()) {
+  if (!name.endsWith(".min.js")) continue;
+  FILES.push([join(md, "dist", name), `vendor/min/${name}`]);
+}
+
+for (const [from, target] of FILES) {
+  const to = join(generatedDir, target);
+  mkdirSync(dirname(to), { recursive: true });
+  copyFileSync(from, to);
+}
+```
+
+Your pages then reference the target paths as ordinary site URLs, because that is what they
+now are:
+
+```html
+<script src="/vendor/markdown-it.js"></script>
+```
+
+**Do not resolve the subpath directly.** `require.resolve("markdown-it/dist/browser/x.js")`
+looks simpler and is the trap: a package's `exports` map decides which subpaths are
+nameable, most of the files you want are not on it, and the two runtimes disagree about
+what to do when they are not — Node raises `ERR_PACKAGE_PATH_NOT_EXPORTED` while Bun
+resolves it anyway. A generator written that way builds under the standalone binary and
+fails under `npx @fwdslsh/unify`. Resolving `package.json` and joining sidesteps the map
+entirely.
+
+**Pick a file the browser can actually execute, and check it yourself.** Packages ship
+several builds side by side: a CommonJS one ending in `module.exports = …`, an ESM entry
+whose whole body is `import x from "../lib/core.js"`, and somewhere a self-contained
+bundle. Only the last one works. unify copies bytes and checks references — it cannot tell
+you that a file you vendored throws `module is not defined`, or that it imports a sibling
+you did not copy. Open the file and look for a bundle that names no siblings.
+
+**What the build does and does not check.** A `<link href>`, `<script src>` or other URL
+attribute naming a file the generator did not write is an unresolved reference and the
+build refuses to publish, and so is a `url(...)` inside a vendored stylesheet — which means
+a CSS file referencing fonts blocks the build until you vendor those too. Nothing inside a
+`.js` file is checked, static `import` and dynamic `import()` alike, and neither is a bare
+`@import "…"` in CSS. So one HTML-referenced file is a tripwire for the whole set, and
+everything reached from JavaScript is on you.
+
+Four things worth knowing before you run it. **There is one generator per build** —
+`--generate` takes a single path and a second one silently replaces the first, so this code
+goes inside whatever generator you already have. **Delete any hand-vendored copies first**,
+or the same output path from both trees is a collision that stops the build. **Install
+before you build**: on Node a missing `node_modules` fails the build with a resolution
+error, while Bun quietly downloads the package mid-build, so a CI job that skips
+`npm ci` either breaks or publishes something nobody pinned. And in `--dry-run` every
+vendored file reports its origin as `← generated`, which is how you tell a copied
+dependency from a file you wrote.
 
 ## What stays outside unify
 

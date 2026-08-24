@@ -244,3 +244,40 @@ writeFileSync(join(outDir, "made.html"),
   }
   covers("CFG-01");
 }, 30_000);
+
+test("CFG-04 — a repeated single-value option is a usage error; flags and --exclude are not", async () => {
+  // The silent version of this published to a directory the author did not
+  // name: `-o dist -o other` kept `other` and said nothing, at exit 0. Three
+  // sides, because the repair must not catch the two repetitions that are
+  // legitimate — `--exclude` accumulates by design, and asking for `--strict`
+  // twice asks for the same thing.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html":
+      '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><title>H</title>' +
+      '<meta name="description" content="A page."></head><body><main><h1>H</h1></main></body></html>\n',
+  });
+
+  const twice = await runCli(["build", "-s", "src", "-o", "dist", "-o", "other", "--dry-run"], tmp);
+  if (twice.exit !== 2) {
+    throw new Error(`§18: a repeated -o is a usage error, got exit ${twice.exit}\n${twice.stderr}`);
+  }
+  if (!twice.stderr.includes("--output given more than once")) {
+    throw new Error(`§18: the error names the long option:\n${twice.stderr}`);
+  }
+  if (existsSync(join(tmp, "other")) || existsSync(join(tmp, "dist"))) {
+    throw new Error("§18: a usage error writes nothing");
+  }
+
+  // Legitimate repetitions still build.
+  const list = await runCli(
+    ["build", "-s", "src", "-o", "dist", "--exclude", "*.tmp", "--exclude", "*.bak", "--dry-run"],
+    tmp,
+  );
+  if (list.exit !== 0) throw new Error(`§18: --exclude accumulates:\n${list.stderr}`);
+
+  const flag = await runCli(["build", "-s", "src", "-o", "dist", "--strict", "--strict", "--dry-run"], tmp);
+  if (flag.exit !== 0) throw new Error(`§18: a repeated boolean flag is not an error:\n${flag.stderr}`);
+  covers("CFG-04");
+}, 30_000);
+

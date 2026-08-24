@@ -128,6 +128,19 @@ export function parseArgs(argv) {
       const existing = /** @type {string[]} */ (options[name] ?? []);
       options[name] = [...existing, value];
     } else {
+      // A repeated single-value option used to keep the last one and discard
+      // the rest in silence — `-o dist -o other` published to `other` at exit
+      // 0, and a second `--generate` ran instead of the first rather than as
+      // well as it. That is an author's instruction dropped without a word,
+      // which is the failure this product refuses everywhere else; the CLI
+      // boundary was simply the one place nothing was watching. A repeated
+      // FLAG stays fine (`--strict --strict` asks for the same thing twice)
+      // and so does a repeated `list` option, which is what --exclude is for.
+      if (name in options) {
+        throw new UsageError(`--${name} given more than once`, [
+          `pass it once — every value but the last was being discarded`,
+        ]);
+      }
       options[name] = value;
     }
   }

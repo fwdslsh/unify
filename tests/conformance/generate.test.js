@@ -195,6 +195,33 @@ test("GEN-04 — src/ is never mutated, and --dry-run names a generated row as g
   if (readdirSync(join(tmp, "src")).sort().join(",") !== before) {
     throw new Error("§33.3: src/ is never mutated — the overlay is why audit stays read-only");
   }
+
+  // The rule says "a file in dist/", not "a page": an ASSET the generator wrote
+  // has no source behind it either. Until 2026-08-24 its copy row named an
+  // overlay-relative path that does not exist in src/, which is precisely the
+  // unexplainable row GEN-04 exists to prevent — and the vendoring recipe in
+  // docs/integrations.md makes generated assets the common case.
+  const asset = mkTmp();
+  writeTree(join(asset, "src"), {
+    "index.html": doc("Home", '<h1>Home</h1><script src="/vendor/lib.js"></script>'),
+    "_scripts/gen.mjs":
+      'import { writeFileSync, mkdirSync } from "node:fs";\n' +
+      'import { join } from "node:path";\n' +
+      'const out = process.argv[3];\n' +
+      'mkdirSync(join(out, "vendor"), { recursive: true });\n' +
+      'writeFileSync(join(out, "vendor", "lib.js"), "export const x = 1;\\n");\n',
+  });
+  const assetDry = await runCli(
+    ["build", "-s", "src", "-o", "dist", "--generate", "_scripts/gen.mjs", "--dry-run"],
+    asset,
+  );
+  expectExit(assetDry, 0, "a dry run whose generator writes an asset");
+  expectContains(assetDry.stdout, "← generated", "the report marks a generated ASSET's origin");
+  if (/vendor\/lib\.js \(\/vendor\/lib\.js\) ← vendor\/lib\.js/.test(assetDry.stdout)) {
+    throw new Error(
+      `GEN-04: a generated asset's row must not name a source path that does not exist:\n${assetDry.stdout}`,
+    );
+  }
   covers("GEN-04");
 }, TEST_MS);
 

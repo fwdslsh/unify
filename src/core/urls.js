@@ -696,6 +696,41 @@ export function prettyLinkTarget(htmlOutputPath) {
 }
 
 /**
+ * URL-14 — the emitted page a link path names, or null when it names none.
+ *
+ * The exact output path is tried first, which is the `.html` spelling every
+ * link had before this existed. Failing that, the path is tried as a page in
+ * the two ways an EXTENSIONLESS URL can name one: `about` naming `about.html`,
+ * and `sub` naming `sub/index.html`. `--pretty-urls` publishes `about.html` at
+ * `/about/`, so `/about` is the URL the flag exists to produce — and until
+ * 2026-08-24 it was the one spelling the rewrite ignored, so it reached §12
+ * unrewritten and failed there as an unresolvable reference while `unify dev`
+ * happily served it.
+ *
+ * The two candidates cannot both be pages in a build that publishes: both
+ * `about.html` and `about/index.html` move to `about/index.html` under this
+ * flag, which is a §13 collision reported before any link is resolved. Order is
+ * therefore documentation rather than tie-breaking.
+ *
+ * A path already ending in `/` is left to the exact test alone: it is the
+ * directory spelling, `resolved` keeps its slash, and §12 resolves it by
+ * appending `index.html` itself.
+ *
+ * @param {string} resolved - normalized, no leading "/"
+ * @param {Set<string>} emittedHtmlPaths - pre-move page output paths
+ * @returns {string|null} a member of `emittedHtmlPaths`, or null
+ */
+function pageForLinkPath(resolved, emittedHtmlPaths) {
+  if (emittedHtmlPaths.has(resolved)) return resolved;
+  if (resolved === "" || resolved.endsWith("/")) return null;
+  const asHtml = `${resolved}.html`;
+  if (emittedHtmlPaths.has(asHtml)) return asHtml;
+  const asIndex = posix.join(resolved, "index.html");
+  if (emittedHtmlPaths.has(asIndex)) return asIndex;
+  return null;
+}
+
+/**
  * §11.2 links: rewrite every internal `href`/`src`/`srcset`/`poster` URL in
  * `html` (already §11.1-rewritten) that resolves to an emitted page's plain
  * `.html` output to that page's pretty URL instead. "Resolve first (against
@@ -734,8 +769,9 @@ export function applyPrettyLinks(html, { pageOutputPath, emittedHtmlPaths }) {
     const resolved = decoded.startsWith("/")
       ? posix.normalize(decoded).slice(1)
       : posix.normalize(posix.join(pageDir, decoded));
-    if (!emittedHtmlPaths.has(resolved)) return null; // URL-09: not a page — preserved untouched
-    return prettyLinkTarget(resolved) + query + fragment;
+    const page = pageForLinkPath(resolved, emittedHtmlPaths);
+    if (page === null) return null; // URL-09: not a page — preserved untouched
+    return prettyLinkTarget(page) + query + fragment;
   };
 
   for (const el of findAll(root, (n) => n.type === "element")) {

@@ -79,7 +79,7 @@
 import { spawn } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { constants, tmpdir } from "node:os";
-import { isAbsolute, join, resolve } from "node:path";
+import { basename, isAbsolute, join, resolve } from "node:path";
 import { contains, toRelative } from "./paths.js";
 import { UsageError } from "./diagnostics.js";
 
@@ -227,6 +227,18 @@ function collect(proc) {
  * @param {import('./diagnostics.js').Reporter} args.reporter
  * @returns {Promise<boolean>} false when the generator failed (P29 reported)
  */
+/**
+ * How to re-run a generator by hand, in the runtime that just ran it.
+ * A plain `node`/`bun` on PATH is named bare; anything else — a compiled unify
+ * binary above all — is named by its full path with the flag that makes it
+ * execute a script rather than re-enter its own CLI.
+ * @returns {string}
+ */
+function reproduceWith() {
+  const name = basename(process.execPath);
+  return name === "node" || name === "bun" ? name : `BUN_BE_BUN=1 ${process.execPath}`;
+}
+
 export async function runGenerator({ generatorAbs, sourceRoot, overlayDir, reporter }) {
   const root = resolve(sourceRoot);
   const rel = toRelative(root, generatorAbs);
@@ -257,7 +269,14 @@ export async function runGenerator({ generatorAbs, sourceRoot, overlayDir, repor
     message: `--generate ${rel} failed (exit ${code})${detail ? `: ${detail}` : ""}`,
     fixes: [
       "fix the generator, or drop --generate to build without it",
-      "run it directly to see its full output: bun " + rel,
+      // The command that actually reproduces this run. It used to say `bun`
+      // unconditionally, which is wrong under `npx @fwdslsh/unify` (the build
+      // is hosted by node) and impossible on the standalone binary, whose
+      // whole promise is a machine with neither runtime installed. unify
+      // spawns `process.execPath`, so naming it is both true and followable —
+      // with the same BUN_BE_BUN the spawn uses, since without it a compiled
+      // executable reads the script path as an unknown argument.
+      `run it directly to see its full output: ${reproduceWith()} ${rel}`,
     ],
   });
   if (process.env.DEBUG && err) process.stderr.write(err);

@@ -1616,3 +1616,40 @@ No layout. [Home](/)
   }
   covers("AUD-04");
 }, TEST_MS);
+
+test("AUD-16 — audit's summary names the §14 problems the same run reported", async () => {
+  // §24.6 exits 1 on a pipeline problem regardless of findings, so a run that
+  // hit one and found nothing printed the problem, said "audit: nothing to
+  // report", and exited 1 — a summary contradicting the two lines around it.
+  // The severity axes stay separate (§24.4); the summary just stops omitting
+  // the other one.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html":
+      '<!doctype html>\n<html lang="en" data-unify="/x.html"><head><meta charset="utf-8">' +
+      '<title>T</title><meta name="description" content="A page."></head>' +
+      "<body><main><h1>T</h1></main></body></html>\n",
+  });
+  const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
+  if (r.exit !== 1) throw new Error(`§24.6: a pipeline problem exits 1, got ${r.exit}`);
+  if (r.stdout.includes("audit: nothing to report")) {
+    throw new Error(`§24.6: the summary must not claim nothing to report:\n${r.stdout}`);
+  }
+  if (!/audit: no findings, and 1 problem/.test(r.stdout)) {
+    throw new Error(`§24.6: the summary names the problem count:\n${r.stdout}`);
+  }
+
+  // A clean site is unchanged.
+  const clean = mkTmp();
+  writeTree(join(clean, "src"), {
+    "index.html":
+      '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><title>T</title>' +
+      '<meta name="description" content="A page."></head><body><main><h1>T</h1></main></body></html>\n',
+  });
+  const ok = await runCli(["audit", "-s", "src", "-o", "dist"], clean);
+  if (ok.exit !== 0 || !ok.stdout.includes("audit: nothing to report")) {
+    throw new Error(`§24.3: a clean site still reports nothing:\n${ok.stdout}`);
+  }
+  covers("AUD-16");
+}, 30_000);
+
