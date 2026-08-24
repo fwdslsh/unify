@@ -64,6 +64,7 @@ const LAYOUT_FILENAME = "_layout.html";
 
 const DATA_LAYOUT = "data-layout";
 const DATA_UNIFY = "data-unify";
+const DATA_SLOT = "data-slot";
 const UNIFY_CLASS_PREFIX = "unify-";
 
 // ------------------------------------------------------------- §6.1 selection
@@ -196,8 +197,8 @@ export function checkLayoutDocument({ root, text, spans, resolveLine, file, repo
 // --------------------------------------------------------------- §6.3 / P08
 
 /**
- * §6.3 second bullet / P08: any `data-unify` attribute, and any class token
- * beginning `unify-`, anywhere in ANY source file — excluded files included;
+ * §6.3 second bullet / P08: any `data-unify` attribute, any `data-slot`
+ * attribute, and any class token beginning `unify-`, anywhere in ANY source file — excluded files included;
  * only the never-shipped list (§4.3) escapes scanning. Call once per
  * discovered `.html`/`.md` file, independent of whether the build ever loads
  * it as a page, layout, or include (the caller owns that full-tree sweep;
@@ -217,6 +218,14 @@ export function checkRetiredVocabulary({ text, file, reporter }) {
         line: lineOf(text, el.start),
         message: "data-unify is a retired spelling",
         fixes: ['write data-layout="/path.html" (or data-layout="none") on <html> or <body>'],
+      });
+    }
+    if (hasAttr(el, DATA_SLOT)) {
+      reporter.problem({
+        file,
+        line: lineOf(text, el.start),
+        message: "data-slot is a retired spelling",
+        fixes: ['write slot="name" on the page element and <slot name="name">…</slot> in the layout'],
       });
     }
     const classAttr = getAttrNode(el, "class");

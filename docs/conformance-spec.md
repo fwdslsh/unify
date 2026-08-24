@@ -251,7 +251,8 @@ A section that wants its own chrome writes a complete `_layout.html` in its dire
 ### 6.3 Misplacement and migration (problems)
 
 - `data-layout` on any element other than `<html>`/`<body>`: problem naming `<include src="…">` as the replacement — `data-layout` is never a component import.
-- Any `data-unify` attribute, and any class token beginning `unify-`, anywhere in any source file — **excluded files included**: excluded files are build material (§1) and are scanned like everything else; only the never-shipped list (§4.3) escapes scanning. A retired spelling in an excluded fragment or draft would otherwise sit silently meaning something else until the day the file is included or published. `data-unify` is a retired spelling and `unify-*` is the retired area-class vocabulary; each is a problem naming the supported replacement — `data-layout`, and `<slot name>`/`slot=` —
+- Any `data-unify` attribute, any `data-slot` attribute, and any class token beginning `unify-`, anywhere in any source file — **excluded files included**: excluded files are build material (§1) and are scanned like everything else; only the never-shipped list (§4.3) escapes scanning. A retired spelling in an excluded fragment or draft would otherwise sit silently meaning something else until the day the file is included or published. `data-unify` is a retired spelling, `data-slot` is the retired fill spelling, and `unify-*` is the retired area-class vocabulary; each is a problem naming the supported replacement — `data-layout`, `slot=`, and `<slot name>`/`slot=` —
+`data-slot` earns its place here for the same reason the other two do, and more sharply: it is inert in the current model, so a page carrying it composed at exit 0 with the fill silently dropped. The worst observed case was `<title data-slot="title">` in a shared layout, which left every page on a production site emitting the layout's default title with no diagnostic of any kind.
 
 ```
 src/index.html:2: problem: data-unify is a retired spelling
@@ -950,7 +951,7 @@ The bold IDs are the stable identifiers used by `tests/conformance/rules.tsv` an
 5. **P05** — Layout target missing or escaping the source root (§6.1)
 6. **P15** — A layout declares `data-layout` — layout chaining is not supported (§6.2)
 7. **P07** — `data-layout` on a non-root element (§6.3)
-8. **P08** — `data-unify` attribute; `unify-` class token (§6.3)
+8. **P08** — `data-unify` attribute; `data-slot` attribute; `unify-` class token (§6.3)
 9. **P09** — Unaddressed page content with no sink in a slotted layout (§7.4)
 10. **P16** — A `<slot>` nested inside another slot's fallback content — slots do not nest (§7.1). Located at the **inner** slot, which is the one that cannot exist
 11. **P10** — Frontmatter in an `.html` page (§10.5)

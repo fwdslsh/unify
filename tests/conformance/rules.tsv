@@ -47,6 +47,7 @@ LAY-05	§6.1	rule	fixture	Layout target missing or escaping the source root is a
 LAY-09	§6.3	rule	fixture	data-layout on a non-root element is a problem naming <include src> as the replacement
 LAY-10	§6.3	rule	fixture	Any data-unify attribute anywhere in any source file — excluded files included; only the never-shipped list escapes scanning — is a problem naming the supported spelling
 LAY-11	§6.3	rule	fixture	Any class token beginning unify- anywhere in any source file (excluded files included) is a problem naming the slot spelling
+LAY-15	§6.3	rule	fixture	A data-slot attribute anywhere in any source file is a problem naming slot= and <slot name> — it is inert in the current model, so it was silently dropping fills at exit 0
 LAY-12	§6.4	rule	fixture	data-layout never appears in output (removed per S07, including the none form)
 LAY-13	§6.4	rule	fixture	A <script> carrying data-polyfill is removed entirely from built output
 LAY-14	§6.2	rule	fixture	A layout that itself declares data-layout (any value, including none) is a problem P15 - layout chaining is not supported; never a silent no-op
@@ -144,7 +145,7 @@ P03	§14.2	diag	fixture	Problem: an <include> without src. The former second hal
 P04	§14.2	diag	fixture	Problem: layout reference not a .html path (bare name)
 P05	§14.2	diag	fixture	Problem: layout target missing or escaping the source root
 P07	§14.2	diag	fixture	Problem: data-layout on a non-root element
-P08	§14.2	diag	fixture	Problem: data-unify attribute; unify- class token
+P08	§14.2	diag	fixture	Problem: data-unify attribute; data-slot attribute; unify- class token
 P09	§14.2	diag	fixture	Problem: unaddressed page content with no sink in a slotted layout
 P10	§14.2	diag	fixture	Problem: frontmatter in an .html page
 P11	§14.2	diag	fixture	Problem: literal <head> in a Markdown body

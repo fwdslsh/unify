@@ -1,1841 +1,1862 @@
 {
- "fixture": "landmines",
- "description": "The adversarial set: every edge case, ambiguity, and interaction the spec had to settle, each with its EXACT declared outcome \u2014 which problem/advisory fires at what severity and location, or that the case builds clean. Cases that cannot live in git (case-only twins, symlinks, nested .git, --clean containment) are generated at runtime by runtime-cases.mjs and share this expectation schema.",
- "harnessContract": {
-  "run": "per case: unify build -s <case>/src -o <tmp>/dist <flags>, wrapped in a hard 30s timeout \u2014 the previous engine hung forever on a missing <include>; a hang is a failure, never a wait.",
-  "diagnostics": "stderr parsed via the stable `FILE:LINE: SEVERITY: ` prefix (line optional). Declared lists are exhaustive when diagnosticsExhaustive=true: one undeclared diagnostic of either severity fails the case. This is the mechanical enforcement of the closed problem/advisory catalogue (conformance spec \u00a714.2/\u00a714.3) and of the content-loss law's flip side \u2014 nothing may fire that the spec does not name.",
-  "trees": "when expectedTree is set, comparison is byte-exact and bidirectional. expectFiles/expectAbsent assert presence/absence relative to the output dir. expectContains maps output files to required substrings; expectNotContains to forbidden ones.",
-  "publish": "published=false cases pre-seed the output dir with a sentinel tree and assert it byte-untouched after the run (PUB-01), and assert exit matches.",
-  "stdout": "stdoutContains/stdoutNotContains assert substrings of stdout (the build summary). Used by the runtime-built \u00a74.4 defaulted-source-notice cases, whose entries also carry omitSourceFlag (the harness injects no implicit -s \u2014 EXC-11's predicate is the absence of --source) and outputDir (where expectFiles are asserted); diagnostics stay a stderr-only claim.",
-  "severityTokens": "the parser accepts only 'problem' and 'advisory' as severity tokens; any 'warning'/'error:' line fails the case (DIA-01)."
- },
- "harnessRules": [
-  "DIA-01",
-  "DIA-05",
-  "DIA-06",
-  "MRG-18"
- ],
- "cases": {
-  "retired-data-unify": {
-   "rules": [
-    "LAY-10",
-    "P08",
-    "DIA-03",
-    "PUB-01"
-   ],
-   "flags": [],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/index.html",
-     "line": 2,
-     "severity": "problem",
-     "containsAll": [
-      "data-unify"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true
+  "fixture": "landmines",
+  "description": "The adversarial set: every edge case, ambiguity, and interaction the spec had to settle, each with its EXACT declared outcome \u2014 which problem/advisory fires at what severity and location, or that the case builds clean. Cases that cannot live in git (case-only twins, symlinks, nested .git, --clean containment) are generated at runtime by runtime-cases.mjs and share this expectation schema.",
+  "harnessContract": {
+    "run": "per case: unify build -s <case>/src -o <tmp>/dist <flags>, wrapped in a hard 30s timeout \u2014 the previous engine hung forever on a missing <include>; a hang is a failure, never a wait.",
+    "diagnostics": "stderr parsed via the stable `FILE:LINE: SEVERITY: ` prefix (line optional). Declared lists are exhaustive when diagnosticsExhaustive=true: one undeclared diagnostic of either severity fails the case. This is the mechanical enforcement of the closed problem/advisory catalogue (conformance spec \u00a714.2/\u00a714.3) and of the content-loss law's flip side \u2014 nothing may fire that the spec does not name.",
+    "trees": "when expectedTree is set, comparison is byte-exact and bidirectional. expectFiles/expectAbsent assert presence/absence relative to the output dir. expectContains maps output files to required substrings; expectNotContains to forbidden ones.",
+    "publish": "published=false cases pre-seed the output dir with a sentinel tree and assert it byte-untouched after the run (PUB-01), and assert exit matches.",
+    "stdout": "stdoutContains/stdoutNotContains assert substrings of stdout (the build summary). Used by the runtime-built \u00a74.4 defaulted-source-notice cases, whose entries also carry omitSourceFlag (the harness injects no implicit -s \u2014 EXC-11's predicate is the absence of --source) and outputDir (where expectFiles are asserted); diagnostics stay a stderr-only claim.",
+    "severityTokens": "the parser accepts only 'problem' and 'advisory' as severity tokens; any 'warning'/'error:' line fails the case (DIA-01)."
   },
-  "retired-unify-class": {
-   "rules": [
-    "LAY-11",
-    "P08"
-   ],
-   "flags": [],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/_layout.html",
-     "line": 6,
-     "severity": "problem",
-     "containsAll": [
-      "unify-footer"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true
-  },
-  "retired-vocab-in-excluded": {
-   "rules": [
-    "LAY-10",
-    "P08"
-   ],
-   "flags": [],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/_drafts/old.html",
-     "line": 2,
-     "severity": "problem",
-     "containsAll": [
-      "data-unify"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true,
-   "note": "R1 promoted to spec text (2026-08-12): conformance \u00a76.3 now says outright that 'anywhere in any source file' includes excluded files \u2014 build material is scanned; only the never-shipped list escapes."
-  },
-  "missing-include": {
-   "rules": [
-    "INC-05",
-    "P01",
+  "harnessRules": [
+    "DIA-01",
+    "DIA-05",
     "DIA-06",
-    "DIA-07",
-    "PUB-01"
-   ],
-   "flags": [],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/index.html",
-     "line": 5,
-     "severity": "problem",
-     "containsAll": [
-      "/_includes/nope.html",
-      "casing"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true,
-   "note": "The previous engine looped forever on this input. The 30s harness timeout makes a hang a hard failure. The 'casing' assertion pins the mandatory fix line for path-shaped problems (DIA-07)."
-  },
-  "include-cycle": {
-   "rules": [
-    "INC-08",
-    "P02",
-    "DIA-08",
-    "DIA-11"
-   ],
-   "flags": [],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/index.html",
-     "line": 5,
-     "severity": "problem",
-     "containsAll": [
-      "\u2192",
-      "a.html",
-      "b.html"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true,
-   "note": "Attribution at the outermost include site \u2014 R3, promoted to contract in conformance \u00a714.1 (2026-08-12)."
-  },
-  "include-depth-10": {
-   "rules": [
-    "INC-08"
-   ],
-   "flags": [],
-   "exit": 0,
-   "published": true,
-   "diagnostics": [],
-   "diagnosticsExhaustive": true,
-   "expectContains": {
-    "index.html": [
-     "<p>deep</p>"
-    ]
-   },
-   "note": "Fencepost: a chain of exactly 10 nested expansions builds clean; 11 fails (next case). R2 promoted to spec text (2026-08-12): conformance \u00a75.1 now states the cap is inclusive \u2014 the stack holds ten files, the include pushing an eleventh is the problem."
-  },
-  "include-depth-11": {
-   "rules": [
-    "INC-08",
-    "P02",
-    "DIA-08"
-   ],
-   "flags": [],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/index.html",
-     "line": 5,
-     "severity": "problem",
-     "containsAll": [
-      "\u2192"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true
-  },
-  "include-no-src": {
-   "rules": [
-    "INC-09",
-    "P03"
-   ],
-   "flags": [],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/index.html",
-     "line": 5,
-     "severity": "problem",
-     "containsAll": [
-      "src"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true
-  },
-  "include-with-content": {
-   "rules": [
-    "INC-10",
-    "P03"
-   ],
-   "flags": [],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/index.html",
-     "line": 5,
-     "severity": "problem",
-     "containsAll": [
-      "content"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true,
-   "note": "The include target exists; exactly one problem fires \u2014 the content one. Includes are verbatim, never components."
-  },
-  "include-escape": {
-   "rules": [
-    "INC-04",
-    "P01",
-    "DIA-07"
-   ],
-   "flags": [],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/index.html",
-     "line": 5,
-     "severity": "problem",
-     "containsAll": [
-      "../../etc/passwd.html"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true
-  },
-  "include-bad-ext": {
-   "rules": [
-    "INC-05",
-    "P01"
-   ],
-   "flags": [],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/index.html",
-     "line": 5,
-     "severity": "problem",
-     "containsAll": [
-      "notes.txt"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true
-  },
-  "include-relative": {
-   "rules": [
-    "INC-03",
-    "S02"
-   ],
-   "flags": [],
-   "exit": 0,
-   "published": true,
-   "diagnostics": [],
-   "diagnosticsExhaustive": true,
-   "expectedTree": "expected"
-  },
-  "include-md-fragment": {
-   "rules": [
-    "INC-06"
-   ],
-   "flags": [],
-   "exit": 0,
-   "published": true,
-   "diagnostics": [],
-   "diagnosticsExhaustive": true,
-   "expectContains": {
-    "index.html": [
-     "<h2 id=\"from-markdown\">From markdown</h2>",
-     "A converted fragment."
-    ]
-   },
-   "expectNotContains": {
-    "index.html": [
-     "This frontmatter is ignored",
-     "<include"
-    ]
-   }
-  },
-  "layout-bare-name": {
-   "rules": [
-    "LAY-03",
-    "P04"
-   ],
-   "flags": [],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/about.md",
-     "line": 2,
-     "severity": "problem",
-     "containsAll": [
-      "default",
-      "layout: /_layout.html"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true
-  },
-  "layout-bare-name-html": {
-   "rules": [
-    "LAY-03",
-    "P04"
-   ],
-   "flags": [],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/about.html",
-     "line": 2,
-     "severity": "problem",
-     "containsAll": [
-      "default",
-      "data-layout=\"/_layout.html\""
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true,
-   "note": "Ratification round 8: the fix line used to print the Markdown spelling (`layout:`) for every page, and two repair samples went looking for a `layout:` key in an HTML page. Each kind of page is now shown its own spelling."
-  },
-  "layout-declares-layout": {
-   "rules": [
-    "LAY-14",
-    "P15",
-    "FIX-14"
-   ],
-   "flags": [],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/_layout.html",
-     "line": 4,
-     "severity": "problem",
-     "containsAll": [
-      "data-layout",
-      "not supported"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true,
-   "note": "C7 / FIX-14: a layout that declares data-layout is P15 \u2014 layout chaining is not supported and is never a silent no-op. The declared target (_base.html) exists, so the only diagnostic is P15 itself."
-  },
-  "layout-missing": {
-   "rules": [
-    "LAY-05",
-    "P05",
-    "DIA-07"
-   ],
-   "flags": [],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/index.html",
-     "line": 4,
-     "severity": "problem",
-     "containsAll": [
-      "/nope.html",
-      "casing"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true
-  },
-  "layout-escape": {
-   "rules": [
-    "LAY-05",
-    "P05"
-   ],
-   "flags": [],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/index.html",
-     "line": 4,
-     "severity": "problem",
-     "containsAll": [
-      "../outside.html"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true
-  },
-  "data-layout-on-div": {
-   "rules": [
-    "LAY-09",
-    "P07"
-   ],
-   "flags": [],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/index.html",
-     "line": 5,
-     "severity": "problem",
-     "containsAll": [
-      "include"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true
-  },
-  "data-layout-after-include": {
-   "rules": [
-    "LAY-09",
-    "P07",
-    "INC-12",
-    "DIA-06",
-    "DIA-11"
-   ],
-   "flags": [],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/index.html",
-     "line": 6,
-     "severity": "problem",
-     "containsAll": [
-      "include"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true,
-   "note": "data-layout-on-div, with one line of the page replaced by a five-line fragment above the fault. \u00a76's layout diagnostics were measured in the include-inlined text the same way \u00a77's were: the <div> is on line 6 of an 8-line index.html and the pre-fix engine printed line 11 \u2014 past the end of the file it named, so there was nothing at that address to check. Nothing here is about includes as a feature; the fragment exists only to make the two possible answers differ, exactly as in line-after-include (compose) and charset-after-include (head merge)."
-  },
-  "content-nowhere": {
-   "rules": [
-    "MRG-14",
-    "P09",
-    "MRG-15",
-    "PUB-01",
-    "DIA-03"
-   ],
-   "flags": [],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/about.html",
-     "line": 1,
-     "severity": "problem",
-     "containsAll": [
-      "_layout.html"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true,
-   "note": "The exact failure the previous implementation shipped silently (content deleted, exit 0, success banner). Here it must block publish, name the layout, and leave the sentinel output untouched."
-  },
-  "misaddressed-fill": {
-   "rules": [
-    "MRG-10",
-    "A02",
-    "FIX-06",
-    "S03",
-    "S07"
-   ],
-   "flags": [],
-   "exit": 0,
-   "published": true,
-   "diagnostics": [
-    {
-     "file": "src/index.html",
-     "line": 6,
-     "severity": "advisory",
-     "containsAll": [
-      "footer"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true,
-   "expectedTree": "expected"
-  },
-  "duplicate-slot-name": {
-   "rules": [
-    "MRG-03",
-    "A13",
-    "S03",
-    "S04"
-   ],
-   "flags": [],
-   "exit": 0,
-   "published": true,
-   "diagnostics": [
-    {
-     "file": "src/_layout.html",
-     "line": 9,
-     "severity": "advisory",
-     "containsAll": [
-      "x"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true,
-   "expectedTree": "expected"
-  },
-  "second-bare-slot": {
-   "rules": [
-    "MRG-02",
-    "A13",
-    "S03",
-    "S04"
-   ],
-   "flags": [],
-   "exit": 0,
-   "published": true,
-   "diagnostics": [
-    {
-     "file": "src/_layout.html",
-     "line": 6,
-     "severity": "advisory",
-     "containsAll": [
-      "slot"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true,
-   "expectedTree": "expected"
-  },
-  "line-after-include": {
-   "rules": [
-    "MRG-02",
-    "A13",
-    "INC-12",
-    "DIA-06",
-    "S04"
-   ],
-   "flags": [],
-   "exit": 0,
-   "published": true,
-   "diagnostics": [
-    {
-     "file": "src/_layout.html",
-     "line": 7,
-     "severity": "advisory",
-     "containsAll": [
-      "slot"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true,
-   "expectedTree": "expected",
-   "note": "The line half of \u00a714.1's FILE:LINE contract, measured in the file the diagnostic NAMES. The duplicate bare <slot> is on line 7 of a 9-line _layout.html; the five-line masthead fragment inlined above it (line 5) used to push the reported line to 12 \u2014 past the end of the file the author was told to open (ratification round 18; the pre-fix engine prints src/_layout.html:12 on this exact tree). Nothing here is about includes as a feature: the fragment exists only to make the two possible answers differ."
-  },
-  "dup-main": {
-   "rules": [
-    "MRG-05",
-    "A13",
-    "S05"
-   ],
-   "flags": [],
-   "exit": 0,
-   "published": true,
-   "diagnostics": [
-    {
-     "file": "src/_layout.html",
-     "line": 8,
-     "severity": "advisory",
-     "containsAll": [
-      "main"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true,
-   "expectedTree": "expected"
-  },
-  "slot-in-page": {
-   "rules": [
-    "MRG-04",
-    "P20",
-    "S04"
-   ],
-   "flags": [],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/index.html",
-     "line": 5,
-     "severity": "problem",
-     "containsAll": [
-      "slot"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true,
-   "note": "A04 became P20 on 2026-08-13 (ratification round 7): a <slot> outside a layout's <body> is inert, and letting it publish shipped pages whose author's intent had silently not happened. The S4 children-replacement still runs \u2014 best-effort composition (\u00a72) \u2014 it just never reaches publish."
-  },
-  "slot-inside-include": {
-   "rules": [
-    "MRG-04",
-    "P20",
-    "INC-12",
-    "DIA-06",
-    "S04"
-   ],
-   "flags": [],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/_includes/aside.html",
-     "line": 2,
-     "severity": "problem",
-     "containsAll": [
-      "slot"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true,
-   "note": "The file half of the same contract: the <slot> INC-12 lets a fragment contribute is the fragment's own text, so P20 locates in the fragment (aside.html:2), not in the host page that included it (the pre-fix engine printed src/index.html:7 here \u2014 an existing line of index.html holding an unrelated </body>, which is the worst kind of wrong: checkable-looking). Same convention \u00a712 already uses for a reference written in a fragment (stranded-underscore-asset, cascade-and-dedup) \u2014 one authored fault, one location the author can open, reported once however many pages include it. \u00a714.1 does not yet spell this out for compose-stage diagnostics; see the report accompanying this fixture for the sentence proposed for it."
-  },
-  "slot-in-layout-head": {
-   "rules": [
-    "MRG-04",
-    "P20",
-    "S04"
-   ],
-   "flags": [],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/_layout.html",
-     "line": 5,
-     "severity": "problem",
-     "containsAll": [
-      "slot"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true,
-   "note": "A04 became P20 on 2026-08-13 (ratification round 7): a <slot> outside a layout's <body> is inert, and letting it publish shipped pages whose author's intent had silently not happened. The S4 children-replacement still runs \u2014 best-effort composition (\u00a72) \u2014 it just never reaches publish."
-  },
-  "slot-in-template": {
-   "rules": [
-    "MRG-01",
-    "MRG-11",
-    "A02",
-    "FIX-10",
-    "S01"
-   ],
-   "flags": [],
-   "exit": 0,
-   "published": true,
-   "diagnostics": [
-    {
-     "file": "src/index.html",
-     "line": 6,
-     "severity": "advisory",
-     "containsAll": [
-      "x"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true,
-   "expectedTree": "expected",
-   "note": "C9: the template's slot is not unify's \u2014 the fill gets advisory 2, the template ships byte-identical, the fill's content stays in the page flow."
-  },
-  "slot-attr-edge": {
-   "rules": [
-    "MRG-07",
-    "MRG-11"
-   ],
-   "flags": [],
-   "exit": 0,
-   "published": true,
-   "diagnostics": [],
-   "diagnosticsExhaustive": true,
-   "expectedTree": "expected",
-   "note": "slot= on a nested element is the author's web-component markup: never touched, never reported, ships with the attribute intact. slot=\"\" is not a fill. Zero diagnostics is the assertion."
-  },
-  "nested-main-in-div": {
-   "rules": [
-    "MRG-06",
-    "S06"
-   ],
-   "flags": [],
-   "exit": 0,
-   "published": true,
-   "diagnostics": [],
-   "diagnosticsExhaustive": true,
-   "expectedTree": "expected",
-   "note": "R4 promoted to spec text (2026-08-12): conformance \u00a77.2 now says the first <main> unwraps at any depth \u2014 the main inside the div unwraps; the div survives."
-  },
-  "main-in-main": {
-   "rules": [
-    "MRG-06",
-    "S06"
-   ],
-   "flags": [],
-   "exit": 0,
-   "published": true,
-   "diagnostics": [],
-   "diagnosticsExhaustive": true,
-   "expectedTree": "expected",
-   "note": "Unwrap happens exactly once \u2014 now explicit in conformance \u00a77.2 (R4): the outer main's tags are deleted, the inner main survives into the output (the author's own nesting, preserved)."
-  },
-  "empty-default-main": {
-   "rules": [
-    "MRG-13",
-    "S05"
-   ],
-   "flags": [],
-   "exit": 0,
-   "published": true,
-   "diagnostics": [],
-   "diagnosticsExhaustive": true,
-   "expectedTree": "expected"
-  },
-  "empty-default-slot": {
-   "rules": [
-    "MRG-12",
-    "S04"
-   ],
-   "flags": [],
-   "exit": 0,
-   "published": true,
-   "diagnostics": [],
-   "diagnosticsExhaustive": true,
-   "expectedTree": "expected"
-  },
-  "empty-md": {
-   "rules": [
-    "MD-01",
-    "HED-02",
-    "MRG-13"
-   ],
-   "flags": [],
-   "exit": 0,
-   "published": true,
-   "diagnostics": [],
-   "diagnosticsExhaustive": true,
-   "expectedTree": "expected",
-   "note": "A zero-byte .md page builds: .html swap happens, no h1 means no page title, the layout's title stands alone (separator included \u2014 that is the specified behavior), the layout main keeps its children."
-  },
-  "head-in-markdown": {
-   "rules": [
-    "MD-18",
-    "P11"
-   ],
-   "flags": [],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/page.md",
-     "line": 3,
-     "severity": "problem",
-     "containsAll": [
-      "head"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true
-  },
-  "frontmatter-in-html": {
-   "rules": [
-    "MD-17",
-    "P10"
-   ],
-   "flags": [],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/index.html",
-     "line": 1,
-     "severity": "problem",
-     "containsAll": [
-      "frontmatter"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true
-  },
-  "collision-md-html": {
-   "rules": [
-    "COL-01",
-    "P12",
-    "PUB-01",
-    "DIA-11"
-   ],
-   "flags": [],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/about.html",
-     "line": null,
-     "severity": "problem",
-     "containsAll": [
-      "about.md",
-      "about.html"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true,
-   "note": "One problem naming both sources; attribution at the path-ordered first source \u2014 R3, promoted to contract in conformance \u00a714.1. No last-write-wins: nothing publishes."
-  },
-  "collision-pretty-landing": {
-   "rules": [
-    "COL-02",
-    "P12"
-   ],
-   "flags": [
-    "--pretty-urls"
-   ],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/about.html",
-     "line": null,
-     "severity": "problem",
-     "containsAll": [
-      "about/index"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true
-  },
-  "collision-pretty-landing-noflag": {
-   "caseDir": "collision-pretty-landing",
-   "rules": [
-    "COL-02"
-   ],
-   "flags": [],
-   "exit": 0,
-   "published": true,
-   "diagnostics": [],
-   "diagnosticsExhaustive": true,
-   "expectFiles": [
-    "about.html",
-    "about/index.html"
-   ],
-   "note": "The same tree is legal without --pretty-urls: the collision exists only under the move."
-  },
-  "underscore-guard": {
-   "rules": [
-    "EXC-06",
-    "P14",
-    "EXC-01",
-    "EXC-03"
-   ],
-   "flags": [
-    "--exclude",
-    "drafts/**"
-   ],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/_layout.html",
-     "line": 1,
-     "severity": "problem",
-     "containsAll": [
-      "--exclude"
-     ]
+    "MRG-18"
+  ],
+  "cases": {
+    "retired-data-unify": {
+      "rules": [
+        "LAY-10",
+        "P08",
+        "DIA-03",
+        "PUB-01"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 2,
+          "severity": "problem",
+          "containsAll": [
+            "data-unify"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true
     },
-    {
-     "file": "src/_notes/todo.html",
-     "line": 1,
-     "severity": "problem",
-     "containsAll": [
-      "--exclude"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true,
-   "note": "Replacing the default exclude set cannot silently publish working files: the guard names each _-page/_-dir path and the fixing --exclude line."
-  },
-  "netlify-headers": {
-   "rules": [
-    "EXC-07",
-    "EXC-01",
-    "A14"
-   ],
-   "flags": [
-    "--exclude",
-    "_*.html",
-    "--exclude",
-    "_*.md",
-    "--exclude",
-    "_includes",
-    "--exclude",
-    "_scripts"
-   ],
-   "exit": 0,
-   "published": true,
-   "diagnostics": [],
-   "diagnosticsExhaustive": true,
-   "expectedTree": "expected",
-   "note": "The conformance \u00a74.2 recipe verbatim: _headers/_redirects ship (non-page files, guard passes them), _layout.html/_includes stay excluded and still drive composition. The A14 side of the coin: with the deployment files shipping, the deployment-file advisory must stay silent \u2014 an advisory that fires on a correct site is a bug, and diagnosticsExhaustive asserts the silence."
-  },
-  "deploy-file-excluded": {
-   "rules": [
-    "A14"
-   ],
-   "flags": [],
-   "exit": 0,
-   "published": true,
-   "diagnostics": [
-    {
-     "file": "src/_headers",
-     "line": null,
-     "severity": "advisory",
-     "containsAll": [
-      "_headers",
-      "--exclude"
-     ]
+    "retired-unify-class": {
+      "rules": [
+        "LAY-11",
+        "P08"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/_layout.html",
+          "line": 6,
+          "severity": "problem",
+          "containsAll": [
+            "unify-footer"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true
     },
-    {
-     "file": "src/_redirects",
-     "line": null,
-     "severity": "advisory",
-     "containsAll": [
-      "_redirects",
-      "--exclude"
-     ]
+    "retired-vocab-in-excluded": {
+      "rules": [
+        "LAY-10",
+        "P08"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/_drafts/old.html",
+          "line": 2,
+          "severity": "problem",
+          "containsAll": [
+            "data-unify"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "R1 promoted to spec text (2026-08-12): conformance \u00a76.3 now says outright that 'anywhere in any source file' includes excluded files \u2014 build material is scanned; only the never-shipped list escapes."
     },
-    {
-     "file": "src/_routes.json",
-     "line": null,
-     "severity": "advisory",
-     "containsAll": [
-      "_routes.json",
-      "--exclude"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true,
-   "expectedTree": "expected",
-   "note": "Default excludes hold back root-level _headers/_redirects/_routes.json \u2014 known deployment files (conformance \u00a74.2), so each draws advisory A14 naming the file and the --exclude line that ships it. The advisory is the whole mechanism: the files stay excluded (expected tree is index.html alone), the build publishes, exit 0. blog/_headers draws nothing \u2014 recognition is by name at the source root only."
-  },
-  "stranded-underscore-asset": {
-   "rules": [
-    "URL-05",
-    "REF-04",
-    "P13",
-    "REF-01",
-    "DIA-11"
-   ],
-   "flags": [],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/_includes/nav.html",
-     "line": 2,
-     "severity": "problem",
-     "containsAll": [
-      "logo.png"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true,
-   "note": "The spec's own \u00a711.1 trap: the include's relative logo resolves to /_includes/logo.png, which the default exclude keeps out of the output \u2014 the reference check must fail loudly. Attribution at the provenance file \u2014 R3, promoted to contract in conformance \u00a714.1."
-  },
-  "broken-link": {
-   "rules": [
-    "REF-04",
-    "P13",
-    "PUB-01",
-    "DIA-03"
-   ],
-   "flags": [],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/index.html",
-     "line": 5,
-     "severity": "problem",
-     "containsAll": [
-      "old-name.html"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true
-  },
-  "case-mismatch-link": {
-   "rules": [
-    "REF-05",
-    "P13"
-   ],
-   "flags": [],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/index.html",
-     "line": 5,
-     "severity": "problem",
-     "containsAll": [
-      "About.html"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true
-  },
-  "handwritten-pretty-url": {
-   "rules": [
-    "REF-03",
-    "P13"
-   ],
-   "flags": [],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/index.html",
-     "line": 5,
-     "severity": "problem",
-     "containsAll": [
-      "/about/"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true,
-   "note": "Write href to the real file, never a hand-written pretty URL: /about/ resolves to /about/index.html, which no build without --pretty-urls emits."
-  },
-  "css-url-broken": {
-   "rules": [
-    "REF-01",
-    "P13"
-   ],
-   "flags": [],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/assets/style.css",
-     "line": 1,
-     "severity": "problem",
-     "containsAll": [
-      "missing.png"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true
-  },
-  "style-url-not-rewritten": {
-   "rules": [
-    "URL-03",
-    "REF-01",
-    "S01"
-   ],
-   "flags": [],
-   "exit": 0,
-   "published": true,
-   "diagnostics": [],
-   "diagnosticsExhaustive": true,
-   "expectedTree": "expected",
-   "note": "url() inside <style> and style= is never rewritten (byte-equality proves it) while BOTH are reference-checked \u2014 B5 closed (2026-08-12): \u00a712 now covers style-attribute url() too; dot.png exists, so this side builds clean. The firing twin is style-attr-url-broken."
-  },
-  "style-attr-url-broken": {
-   "rules": [
-    "REF-01",
-    "P13"
-   ],
-   "flags": [],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/index.html",
-     "line": 5,
-     "severity": "problem",
-     "containsAll": [
-      "gone.png"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true,
-   "note": "B5's firing side: a url() in a style ATTRIBUTE pointing at nothing is a broken reference like any other \u2014 rewriting stays exempt (\u00a711.1), checking does not (\u00a712). The alternative that shipped before was the silent 404."
-  },
-  "dollar-patterns": {
-   "rules": [
-    "S01",
-    "S02",
-    "S03"
-   ],
-   "flags": [],
-   "exit": 0,
-   "published": true,
-   "diagnostics": [],
-   "diagnosticsExhaustive": true,
-   "expectedTree": "expected",
-   "note": "$&, $1, $', $`, $$ inside fragments and fills must survive byte-for-byte. This is a direct regression trap for String.prototype.replace-based splicing."
-  },
-  "working-format": {
-   "rules": [
-    "A09",
-    "EXC-09"
-   ],
-   "flags": [],
-   "exit": 0,
-   "published": true,
-   "diagnostics": [
-    {
-     "file": "src/logo.fig",
-     "line": null,
-     "severity": "advisory",
-     "containsAll": [
-      "logo.fig"
-     ]
+    "missing-include": {
+      "rules": [
+        "INC-05",
+        "P01",
+        "DIA-06",
+        "DIA-07",
+        "PUB-01"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 5,
+          "severity": "problem",
+          "containsAll": [
+            "/_includes/nope.html",
+            "casing"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "The previous engine looped forever on this input. The 30s harness timeout makes a hang a hard failure. The 'casing' assertion pins the mandatory fix line for path-shaped problems (DIA-07)."
     },
-    {
-     "file": "src/logo.psd",
-     "line": null,
-     "severity": "advisory",
-     "containsAll": [
-      "logo.psd"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true,
-   "expectFiles": [
-    "index.html",
-    "logo.psd",
-    "logo.fig"
-   ],
-   "note": "Advisories never change what is published: the files still ship."
-  },
-  "working-format-strict": {
-   "caseDir": "working-format",
-   "rules": [
-    "DIA-03",
-    "A09"
-   ],
-   "flags": [
-    "--strict"
-   ],
-   "exit": 1,
-   "published": true,
-   "diagnostics": [
-    {
-     "file": "src/logo.fig",
-     "line": null,
-     "severity": "advisory",
-     "containsAll": [
-      "logo.fig"
-     ]
+    "include-cycle": {
+      "rules": [
+        "INC-08",
+        "P02",
+        "DIA-08",
+        "DIA-11"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 5,
+          "severity": "problem",
+          "containsAll": [
+            "\u2192",
+            "a.html",
+            "b.html"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "Attribution at the outermost include site \u2014 R3, promoted to contract in conformance \u00a714.1 (2026-08-12)."
     },
-    {
-     "file": "src/logo.psd",
-     "line": null,
-     "severity": "advisory",
-     "containsAll": [
-      "logo.psd"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true,
-   "note": "Under --strict the same advisories flip the exit code and block publish \u2014 a stray .psd can never cost a publish silently. | CORRECTED: --strict changes the exit code, never what is published (product-spec \u00a74, conformance \u00a714.1) \u2014 a stray .psd must not cost you a publish. This asserted published:false, the same defect as the kitchen-sink strict profile; both were written from one wrong reading of the rule."
-  },
-  "include-also-page": {
-   "rules": [
-    "A10"
-   ],
-   "flags": [],
-   "exit": 0,
-   "published": true,
-   "diagnostics": [
-    {
-     "file": "src/partials/nav.html",
-     "line": null,
-     "severity": "advisory",
-     "containsAll": [
-      "nav.html"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true,
-   "expectFiles": [
-    "index.html",
-    "partials/nav.html"
-   ]
-  },
-  "frontmatter-junk-keys": {
-   "rules": [
-    "MD-14",
-    "MD-09",
-    "MD-12",
-    "MD-13",
-    "MD-21"
-   ],
-   "flags": [],
-   "exit": 0,
-   "published": true,
-   "diagnostics": [],
-   "diagnosticsExhaustive": true,
-   "expectedTree": "expected",
-   "note": "date/featured/tags/note/weight/empty are inert plain metas \u2014 the page publishes and nothing is built from any of them (tags is AUD-15's taxonomy-inert in `audit`, never a diagnostic here). draft/permalink/slug LEFT this fixture on 2026-08-19: \u00a728.1 makes each of them P24, so a page carrying one no longer publishes at all; they are covered by tests/conformance/counter-prior.test.js. B6 closed (2026-08-12): \u00a710.2 value serialization pinned exact \u2014 plain scalars as source text ('true', '2026-01-01', '0.50' keeps its zero), quoted scalars unquoted ('Colons: kept\u2026'), empty value \u2192 content=\"\". The no-text-form firing twin is frontmatter-deep-nest (P17)."
-  },
-  "frontmatter-deep-nest": {
-   "rules": [
-    "P17",
-    "MD-21"
-   ],
-   "flags": [],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/post.md",
-     "line": 4,
-     "severity": "problem",
-     "containsAll": [
-      "og:image"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true,
-   "note": "P17: a mapping nested below a block (og: \u2192 image: \u2192 url:) has no text form \u2014 frontmatter flattens exactly one level, and both inventing a serialization and dropping the value would be silent lies. Located at the key whose value nests (line 4). The list-item-that-is-a-mapping branch is the same problem."
-  },
-  "markdown-body-line-unknown": {
-   "rules": [
-    "DIA-13",
-    "DIA-06",
-    "P20",
-    "P17",
-    "MD-21"
-   ],
-   "flags": [],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/post.md",
-     "line": null,
-     "severity": "problem",
-     "containsAll": [
-      "slot"
-     ]
+    "include-depth-10": {
+      "rules": [
+        "INC-08"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectContains": {
+        "index.html": [
+          "<p>deep</p>"
+        ]
+      },
+      "note": "Fencepost: a chain of exactly 10 nested expansions builds clean; 11 fails (next case). R2 promoted to spec text (2026-08-12): conformance \u00a75.1 now states the cap is inclusive \u2014 the stack holds ten files, the include pushing an eleventh is the problem."
     },
-    {
-     "file": "src/post.md",
-     "line": 4,
-     "severity": "problem",
-     "containsAll": [
-      "og:image"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true,
-   "note": "DIA-13, and the boundary that makes it non-obvious \u2014 both halves in one file. \u00a710.1 converts a Markdown page BEFORE inlining its includes, so a span attributed to post.md carries an offset into the CONVERTED HTML: counting newlines in the .md to reach it would name a real-looking line in the wrong place, so the line is omitted and the FILE: SEVERITY: form of DIA-06 is used (the stray <slot>, P20, first diagnostic). Frontmatter is the exception, and it is not an exception to the rule but a consequence of it: frontmatterKeyLine reads the RAW source, ahead of conversion, so P17 keeps its exact line 4 (as layout-bare-name keeps src/about.md:2 and frontmatter-invalid-yaml its line 4). The omission is a body-derived fact, not a Markdown-wide one. Closing it properly needs a converted-offset \u2192 source-line map out of markdown.js; until that exists, declining is the contract."
-  },
-  "charset-differs": {
-   "rules": [
-    "HED-01",
-    "A08"
-   ],
-   "flags": [],
-   "exit": 0,
-   "published": true,
-   "diagnostics": [
-    {
-     "file": "src/index.html",
-     "line": 4,
-     "severity": "advisory",
-     "containsAll": [
-      "charset"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true,
-   "expectContains": {
-    "index.html": [
-     "<meta charset=\"utf-8\">"
-    ]
-   },
-   "expectNotContains": {
-    "index.html": [
-     "utf-16"
-    ]
-   }
-  },
-  "charset-after-include": {
-   "rules": [
-    "HED-01",
-    "A08",
-    "INC-12",
-    "DIA-06",
-    "DIA-11"
-   ],
-   "flags": [],
-   "exit": 0,
-   "published": true,
-   "diagnostics": [
-    {
-     "file": "src/index.html",
-     "line": 5,
-     "severity": "advisory",
-     "containsAll": [
-      "charset"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true,
-   "expectContains": {
-    "index.html": [
-     "<meta charset=\"utf-8\">",
-     "og:site_name"
-    ]
-   },
-   "expectNotContains": {
-    "index.html": [
-     "utf-16"
-    ]
-   },
-   "note": "charset-differs, with a three-line fragment inlined into the page's own <head> above its <meta charset> (INC-12: includes work in the head). The charset is on line 5 of an 11-line index.html and the pre-fix engine printed line 8 \u2014 the worst shape of wrong, since line 8 exists (<body>) and looks checkable, where data-layout-after-include's overshoot at least fell off the end of the file. A08 is the only located diagnostic \u00a78 raises, so this case is head-merge.js's whole \u00a714.1 surface."
-  },
-  "charset-page-only": {
-   "rules": [
-    "HED-01"
-   ],
-   "flags": [],
-   "exit": 0,
-   "published": true,
-   "diagnostics": [],
-   "diagnosticsExhaustive": true,
-   "expectedTree": "expected",
-   "note": "Layout declares no charset: the page's is kept and moved to the head's first position on its own line with the first-content-line indentation \u2014 byte-exact."
-  },
-  "md-include-element": {
-   "rules": [
-    "MD-02",
-    "MD-19",
-    "MD-20",
-    "MD-15",
-    "INC-12",
-    "S02"
-   ],
-   "flags": [],
-   "exit": 0,
-   "published": true,
-   "diagnostics": [],
-   "diagnosticsExhaustive": true,
-   "expectedTree": "expected",
-   "note": "B2 resolved (2026-08-12): conversion first, includes resolve on the converted HTML, and a line-initial <include> is a block (the \u00a710.1 type-6 extension). Exact tree pins all three placements: line-initial paired form splices as a clean block (never <p>-wrapped), an include inside a sentence splices inline within the paragraph, and a code-fenced include is escaped text that resolution never touches. The page is layout-less, so the \u00a710.7 shell wraps it (MD-20)."
-  },
-  "srcset-poster-rewrite": {
-   "rules": [
-    "URL-01",
-    "URL-05"
-   ],
-   "flags": [],
-   "exit": 0,
-   "published": true,
-   "diagnostics": [],
-   "diagnosticsExhaustive": true,
-   "expectedTree": "expected",
-   "note": "srcset URLs rewritten per candidate with descriptors untouched; poster rewritten; both from layout provenance."
-  },
-  "base-url-subpath": {
-   "rules": [
-    "URL-10",
-    "URL-11",
-    "URL-12",
-    "REF-02"
-   ],
-   "flags": [
-    "--base-url",
-    "https://example.com/repo/"
-   ],
-   "exit": 0,
-   "published": true,
-   "diagnostics": [],
-   "diagnosticsExhaustive": true,
-   "expectedTree": "expected",
-   "note": "B3's exact trap, pinned fixed (2026-08-12): a full base URL whose path is not / must absolutize og:/twitter:/canonical as origin + path prefix \u2014 og:image /assets/hero.jpg emits https://example.com/repo/assets/hero.jpg, never https://example.com/assets/hero.jpg. href/src get the path part only; the absolute og:url is untouched (URL-12); the reference check must strip the full base to keep the absolutized values checkable (REF-02)."
-  },
-  "no-layout-anywhere": {
-   "rules": [
-    "LAY-01",
-    "SHL-01"
-   ],
-   "flags": [],
-   "exit": 0,
-   "published": true,
-   "diagnostics": [],
-   "diagnosticsExhaustive": true,
-   "expectedTree": "expected",
-   "note": "Selection step 5: no layout found anywhere \u2014 the page is emitted from its own text, byte-identical."
-  },
-  "layout-none-md": {
-   "rules": [
-    "LAY-01",
-    "MD-06",
-    "MD-20",
-    "MD-15",
-    "MD-07",
-    "MD-08"
-   ],
-   "flags": [],
-   "exit": 0,
-   "published": true,
-   "diagnostics": [],
-   "diagnosticsExhaustive": true,
-   "expectedTree": "expected",
-   "note": "B4 resolved (2026-08-12): a layout-less .md page emits inside the \u00a710.7 minimal shell \u2014 this tree is the spec's own \u00a710.7 fixture verbatim. Exact assertions: charset first, title from the first h1, metas in source order, lang on <html>, class on <body>, converted body in <body>; the present _layout.html did not apply (bidirectional exactness proves its title never leaked in) and is not emitted."
-  },
-  "stray-header-footer": {
-   "rules": [
-    "MRG-17"
-   ],
-   "flags": [],
-   "exit": 0,
-   "published": true,
-   "diagnostics": [],
-   "diagnosticsExhaustive": true,
-   "expectedTree": "expected",
-   "note": "No diagnostic. A page's own <header>/<footer> are default content and ship in place, which is what the author drew; advisory A03 fired here until it was retired, and this expected tree is byte-for-byte what it used to narrate. The advisory was the defect: unify's own \u00a77.2 unwrap hoisted a <header> written inside the page's <main> to top level and then reported it for being there, a meaningless wrapper <div> switched it off, and the repair it implied composed a <footer> inside a <footer> silently at exit 0."
-  },
-  "empty-include": {
-   "rules": [
-    "S02",
-    "INC-03"
-   ],
-   "flags": [],
-   "exit": 0,
-   "published": true,
-   "diagnostics": [],
-   "diagnosticsExhaustive": true,
-   "expectedTree": "expected"
-  },
-  "slot-in-filled-fallback": {
-   "rules": [
-    "MRG-19",
-    "P16"
-   ],
-   "flags": [],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/_layout.html",
-     "line": 8,
-     "severity": "problem",
-     "containsAll": [
-      "slot",
-      "nest"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true,
-   "note": "B1 resolved by spec amendment (2026-08-12): slots do not nest. A <slot> inside another slot's fallback is P16, located at the layout, so the fill-stranding case the old outermost-first rule created can no longer arise. The page is plain default content; the single problem is exhaustive."
-  },
-  "two-problems-one-pass": {
-   "rules": [
-    "PIP-02"
-   ],
-   "flags": [],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/pageA.html",
-     "line": 5,
-     "severity": "problem",
-     "containsAll": [
-      "gone.html"
-     ]
+    "include-depth-11": {
+      "rules": [
+        "INC-08",
+        "P02",
+        "DIA-08"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 5,
+          "severity": "problem",
+          "containsAll": [
+            "\u2192"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true
     },
-    {
-     "file": "src/pageB.md",
-     "line": 2,
-     "severity": "problem",
-     "containsAll": [
-      "default"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true,
-   "note": "Best-effort composition: both problems in one run, ordered by path \u2014 authors never fix errors one build at a time."
-  },
-  "fragment-links-ok": {
-   "rules": [
-    "REF-06",
-    "URL-02"
-   ],
-   "flags": [],
-   "exit": 0,
-   "published": true,
-   "diagnostics": [],
-   "diagnosticsExhaustive": true,
-   "expectedTree": "expected",
-   "note": "#fragment targets are never validated against ids; fragment-only links are skipped by rewriting entirely."
-  },
-  "frontmatter-invalid-yaml": {
-   "rules": [
-    "P18"
-   ],
-   "flags": [],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/post.md",
-     "line": 4,
-     "severity": "problem",
-     "containsAll": [
-      "YAML",
-      "quote any value containing a colon"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true,
-   "note": "P18: the frontmatter does not parse as YAML. Distinct from P17, which is about a value's shape in frontmatter that parsed fine \u2014 the fix here is repairing syntax, not flattening a structure. NOTE ON THE LINE: this fixture originally asserted line 3, where the unterminated `[` is opened. That was written from intuition rather than from what a parser reports, and it was wrong: js-yaml marks line 4, where it discovers the fault, which is what every compiler does for an unterminated construct and the only position actually known without reimplementing YAML. The diagnostic carries the parser's own reason so the construct is still named. ROUND 18: the fix line now names the colon. Four of six repair samples said the old wording (check quoting, indentation, and that every bracket is closed) did not tell them the cause, and the three with no documentation at all reached it only by knowing YAML. An unquoted colon is the fault that actually happens - two of five samples shipped one in round 7."
-  },
-  "frontmatter-flat-key-nest": {
-   "rules": [
-    "P17"
-   ],
-   "flags": [],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/post.md",
-     "line": 3,
-     "severity": "problem",
-     "containsAll": [
-      "og:image"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true,
-   "note": "P17 via the flat spelling: og:image: with a block under it is the same defect as og: -> image: -> url:, because both name the key og:image and it already carries its prefix. Pins that P17 eligibility is decided by the key's NAME, not by counting recursion levels \u2014 a depth-counting implementation would accept this one and reject its block-spelled twin, breaking the spelling equivalence \u00a710.2 guarantees."
-  },
-  "named-slot-in-sink-main": {
-   "rules": [
-    "P19"
-   ],
-   "flags": [],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/_layout.html",
-     "line": 9,
-     "severity": "problem",
-     "containsAll": [
-      "hero",
-      "main"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true,
-   "note": "P19: with no bare <slot>, <main> is the default-content sink AND contains a named slot, so \u00a77.4's wholesale child replacement and \u00a77.3's fill target overlapping spans. Found by implementing \u00a77 \u2014 a literal implementation crashes here, and the obvious repair (let main win) silently discards the page's slot=\"hero\" fill, which is exactly the content loss \u00a714 forbids. Ruled a problem so the layout says it is ambiguous instead of picking a loser."
-  },
-  "dry-run-diagnostics": {
-   "caseDir": "broken-link",
-   "rules": [
-    "DRY-03"
-   ],
-   "flags": [
-    "--dry-run"
-   ],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/index.html",
-     "line": 5,
-     "severity": "problem",
-     "containsAll": [
-      "old-name.html"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true,
-   "note": "DRY-03: the twin of broken-link with --dry-run added \u2014 the identical problem prints to stderr, byte-for-byte the same diagnostic a real build would produce, and (like any blocked publish) nothing is written; the sentinel output stays untouched."
-  },
-  "dry-run-mixed-outcome": {
-   "rules": [
-    "DRY-01",
-    "DRY-03"
-   ],
-   "flags": [
-    "--dry-run"
-   ],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/bad.html",
-     "line": 5,
-     "severity": "problem",
-     "containsAll": [
-      "nope.html"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true,
-   "stdoutContains": [
-    "write dist/bad.html (/bad.html) \u2190 bad.html (no layout)\nwrite dist/good.html (/good.html) \u2190 good.html (no layout)"
-   ],
-   "note": "Pins a reading the spec leaves implicit: \u00a717's report is scoped to steps 1-9 (\u00a715 \u2014 'the entire pipeline through step 9 ... plus the report'), one step short of the transactional gate (step 10), which --dry-run never reaches at all. So the report lists every page the pipeline actually composed (best-effort, PIP-02 \u2014 the same principle that puts both good.html's and bad.html's own diagnostics in one pass) even though a REAL build of this exact tree would publish NEITHER file (\u00a715: any problem anywhere blocks the whole site). The alternative reading \u2014 suppress or annotate write/copy/delete rows when reporter.canPublish is false \u2014 is defensible too and not textually excluded; flagged in the implementation report as an ambiguity worth an explicit spec sentence, not silently picked."
-  },
-  "cascade-and-dedup": {
-   "rules": [
-    "REF-07",
-    "DIA-12",
-    "PUB-01"
-   ],
-   "flags": [],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/_includes/nav.html",
-     "line": 4,
-     "severity": "problem",
-     "containsAll": [
-      "/team.html"
-     ]
+    "include-no-src": {
+      "rules": [
+        "INC-09",
+        "P03"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 5,
+          "severity": "problem",
+          "containsAll": [
+            "src"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true
     },
-    {
-     "file": "src/about.html",
-     "line": 2,
-     "severity": "problem",
-     "containsAll": [
-      "nope"
-     ]
+    "include-with-content": {
+      "rules": [
+        "INC-10",
+        "P03"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 5,
+          "severity": "problem",
+          "containsAll": [
+            "content"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "The include target exists; exactly one problem fires \u2014 the content one. Includes are verbatim, never components."
+    },
+    "include-escape": {
+      "rules": [
+        "INC-04",
+        "P01",
+        "DIA-07"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 5,
+          "severity": "problem",
+          "containsAll": [
+            "../../etc/passwd.html"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true
+    },
+    "include-bad-ext": {
+      "rules": [
+        "INC-05",
+        "P01"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 5,
+          "severity": "problem",
+          "containsAll": [
+            "notes.txt"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true
+    },
+    "include-relative": {
+      "rules": [
+        "INC-03",
+        "S02"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected"
+    },
+    "include-md-fragment": {
+      "rules": [
+        "INC-06"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectContains": {
+        "index.html": [
+          "<h2 id=\"from-markdown\">From markdown</h2>",
+          "A converted fragment."
+        ]
+      },
+      "expectNotContains": {
+        "index.html": [
+          "This frontmatter is ignored",
+          "<include"
+        ]
+      }
+    },
+    "layout-bare-name": {
+      "rules": [
+        "LAY-03",
+        "P04"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/about.md",
+          "line": 2,
+          "severity": "problem",
+          "containsAll": [
+            "default",
+            "layout: /_layout.html"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true
+    },
+    "layout-bare-name-html": {
+      "rules": [
+        "LAY-03",
+        "P04"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/about.html",
+          "line": 2,
+          "severity": "problem",
+          "containsAll": [
+            "default",
+            "data-layout=\"/_layout.html\""
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "Ratification round 8: the fix line used to print the Markdown spelling (`layout:`) for every page, and two repair samples went looking for a `layout:` key in an HTML page. Each kind of page is now shown its own spelling."
+    },
+    "layout-declares-layout": {
+      "rules": [
+        "LAY-14",
+        "P15",
+        "FIX-14"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/_layout.html",
+          "line": 4,
+          "severity": "problem",
+          "containsAll": [
+            "data-layout",
+            "not supported"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "C7 / FIX-14: a layout that declares data-layout is P15 \u2014 layout chaining is not supported and is never a silent no-op. The declared target (_base.html) exists, so the only diagnostic is P15 itself."
+    },
+    "layout-missing": {
+      "rules": [
+        "LAY-05",
+        "P05",
+        "DIA-07"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 4,
+          "severity": "problem",
+          "containsAll": [
+            "/nope.html",
+            "casing"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true
+    },
+    "layout-escape": {
+      "rules": [
+        "LAY-05",
+        "P05"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 4,
+          "severity": "problem",
+          "containsAll": [
+            "../outside.html"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true
+    },
+    "data-layout-on-div": {
+      "rules": [
+        "LAY-09",
+        "P07"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 5,
+          "severity": "problem",
+          "containsAll": [
+            "include"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true
+    },
+    "data-layout-after-include": {
+      "rules": [
+        "LAY-09",
+        "P07",
+        "INC-12",
+        "DIA-06",
+        "DIA-11"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 6,
+          "severity": "problem",
+          "containsAll": [
+            "include"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "data-layout-on-div, with one line of the page replaced by a five-line fragment above the fault. \u00a76's layout diagnostics were measured in the include-inlined text the same way \u00a77's were: the <div> is on line 6 of an 8-line index.html and the pre-fix engine printed line 11 \u2014 past the end of the file it named, so there was nothing at that address to check. Nothing here is about includes as a feature; the fragment exists only to make the two possible answers differ, exactly as in line-after-include (compose) and charset-after-include (head merge)."
+    },
+    "content-nowhere": {
+      "rules": [
+        "MRG-14",
+        "P09",
+        "MRG-15",
+        "PUB-01",
+        "DIA-03"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/about.html",
+          "line": 1,
+          "severity": "problem",
+          "containsAll": [
+            "_layout.html"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "The exact failure the previous implementation shipped silently (content deleted, exit 0, success banner). Here it must block publish, name the layout, and leave the sentinel output untouched."
+    },
+    "misaddressed-fill": {
+      "rules": [
+        "MRG-10",
+        "A02",
+        "FIX-06",
+        "S03",
+        "S07"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 6,
+          "severity": "advisory",
+          "containsAll": [
+            "footer"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected"
+    },
+    "duplicate-slot-name": {
+      "rules": [
+        "MRG-03",
+        "A13",
+        "S03",
+        "S04"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [
+        {
+          "file": "src/_layout.html",
+          "line": 9,
+          "severity": "advisory",
+          "containsAll": [
+            "x"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected"
+    },
+    "second-bare-slot": {
+      "rules": [
+        "MRG-02",
+        "A13",
+        "S03",
+        "S04"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [
+        {
+          "file": "src/_layout.html",
+          "line": 6,
+          "severity": "advisory",
+          "containsAll": [
+            "slot"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected"
+    },
+    "line-after-include": {
+      "rules": [
+        "MRG-02",
+        "A13",
+        "INC-12",
+        "DIA-06",
+        "S04"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [
+        {
+          "file": "src/_layout.html",
+          "line": 7,
+          "severity": "advisory",
+          "containsAll": [
+            "slot"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected",
+      "note": "The line half of \u00a714.1's FILE:LINE contract, measured in the file the diagnostic NAMES. The duplicate bare <slot> is on line 7 of a 9-line _layout.html; the five-line masthead fragment inlined above it (line 5) used to push the reported line to 12 \u2014 past the end of the file the author was told to open (ratification round 18; the pre-fix engine prints src/_layout.html:12 on this exact tree). Nothing here is about includes as a feature: the fragment exists only to make the two possible answers differ."
+    },
+    "dup-main": {
+      "rules": [
+        "MRG-05",
+        "A13",
+        "S05"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [
+        {
+          "file": "src/_layout.html",
+          "line": 8,
+          "severity": "advisory",
+          "containsAll": [
+            "main"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected"
+    },
+    "slot-in-page": {
+      "rules": [
+        "MRG-04",
+        "P20",
+        "S04"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 5,
+          "severity": "problem",
+          "containsAll": [
+            "slot"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "A04 became P20 on 2026-08-13 (ratification round 7): a <slot> outside a layout's <body> is inert, and letting it publish shipped pages whose author's intent had silently not happened. The S4 children-replacement still runs \u2014 best-effort composition (\u00a72) \u2014 it just never reaches publish."
+    },
+    "slot-inside-include": {
+      "rules": [
+        "MRG-04",
+        "P20",
+        "INC-12",
+        "DIA-06",
+        "S04"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/_includes/aside.html",
+          "line": 2,
+          "severity": "problem",
+          "containsAll": [
+            "slot"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "The file half of the same contract: the <slot> INC-12 lets a fragment contribute is the fragment's own text, so P20 locates in the fragment (aside.html:2), not in the host page that included it (the pre-fix engine printed src/index.html:7 here \u2014 an existing line of index.html holding an unrelated </body>, which is the worst kind of wrong: checkable-looking). Same convention \u00a712 already uses for a reference written in a fragment (stranded-underscore-asset, cascade-and-dedup) \u2014 one authored fault, one location the author can open, reported once however many pages include it. \u00a714.1 does not yet spell this out for compose-stage diagnostics; see the report accompanying this fixture for the sentence proposed for it."
+    },
+    "slot-in-layout-head": {
+      "rules": [
+        "MRG-04",
+        "P20",
+        "S04"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/_layout.html",
+          "line": 5,
+          "severity": "problem",
+          "containsAll": [
+            "slot"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "A04 became P20 on 2026-08-13 (ratification round 7): a <slot> outside a layout's <body> is inert, and letting it publish shipped pages whose author's intent had silently not happened. The S4 children-replacement still runs \u2014 best-effort composition (\u00a72) \u2014 it just never reaches publish."
+    },
+    "slot-in-template": {
+      "rules": [
+        "MRG-01",
+        "MRG-11",
+        "A02",
+        "FIX-10",
+        "S01"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 6,
+          "severity": "advisory",
+          "containsAll": [
+            "x"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected",
+      "note": "C9: the template's slot is not unify's \u2014 the fill gets advisory 2, the template ships byte-identical, the fill's content stays in the page flow."
+    },
+    "slot-attr-edge": {
+      "rules": [
+        "MRG-07",
+        "MRG-11"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected",
+      "note": "slot= on a nested element is the author's web-component markup: never touched, never reported, ships with the attribute intact. slot=\"\" is not a fill. Zero diagnostics is the assertion."
+    },
+    "nested-main-in-div": {
+      "rules": [
+        "MRG-06",
+        "S06"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected",
+      "note": "R4 promoted to spec text (2026-08-12): conformance \u00a77.2 now says the first <main> unwraps at any depth \u2014 the main inside the div unwraps; the div survives."
+    },
+    "main-in-main": {
+      "rules": [
+        "MRG-06",
+        "S06"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected",
+      "note": "Unwrap happens exactly once \u2014 now explicit in conformance \u00a77.2 (R4): the outer main's tags are deleted, the inner main survives into the output (the author's own nesting, preserved)."
+    },
+    "empty-default-main": {
+      "rules": [
+        "MRG-13",
+        "S05"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected"
+    },
+    "empty-default-slot": {
+      "rules": [
+        "MRG-12",
+        "S04"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected"
+    },
+    "empty-md": {
+      "rules": [
+        "MD-01",
+        "HED-02",
+        "MRG-13"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected",
+      "note": "A zero-byte .md page builds: .html swap happens, no h1 means no page title, the layout's title stands alone (separator included \u2014 that is the specified behavior), the layout main keeps its children."
+    },
+    "head-in-markdown": {
+      "rules": [
+        "MD-18",
+        "P11"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/page.md",
+          "line": 3,
+          "severity": "problem",
+          "containsAll": [
+            "head"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true
+    },
+    "frontmatter-in-html": {
+      "rules": [
+        "MD-17",
+        "P10"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 1,
+          "severity": "problem",
+          "containsAll": [
+            "frontmatter"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true
+    },
+    "collision-md-html": {
+      "rules": [
+        "COL-01",
+        "P12",
+        "PUB-01",
+        "DIA-11"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/about.html",
+          "line": null,
+          "severity": "problem",
+          "containsAll": [
+            "about.md",
+            "about.html"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "One problem naming both sources; attribution at the path-ordered first source \u2014 R3, promoted to contract in conformance \u00a714.1. No last-write-wins: nothing publishes."
+    },
+    "collision-pretty-landing": {
+      "rules": [
+        "COL-02",
+        "P12"
+      ],
+      "flags": [
+        "--pretty-urls"
+      ],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/about.html",
+          "line": null,
+          "severity": "problem",
+          "containsAll": [
+            "about/index"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true
+    },
+    "collision-pretty-landing-noflag": {
+      "caseDir": "collision-pretty-landing",
+      "rules": [
+        "COL-02"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectFiles": [
+        "about.html",
+        "about/index.html"
+      ],
+      "note": "The same tree is legal without --pretty-urls: the collision exists only under the move."
+    },
+    "underscore-guard": {
+      "rules": [
+        "EXC-06",
+        "P14",
+        "EXC-01",
+        "EXC-03"
+      ],
+      "flags": [
+        "--exclude",
+        "drafts/**"
+      ],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/_layout.html",
+          "line": 1,
+          "severity": "problem",
+          "containsAll": [
+            "--exclude"
+          ]
+        },
+        {
+          "file": "src/_notes/todo.html",
+          "line": 1,
+          "severity": "problem",
+          "containsAll": [
+            "--exclude"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "Replacing the default exclude set cannot silently publish working files: the guard names each _-page/_-dir path and the fixing --exclude line."
+    },
+    "netlify-headers": {
+      "rules": [
+        "EXC-07",
+        "EXC-01",
+        "A14"
+      ],
+      "flags": [
+        "--exclude",
+        "_*.html",
+        "--exclude",
+        "_*.md",
+        "--exclude",
+        "_includes",
+        "--exclude",
+        "_scripts"
+      ],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected",
+      "note": "The conformance \u00a74.2 recipe verbatim: _headers/_redirects ship (non-page files, guard passes them), _layout.html/_includes stay excluded and still drive composition. The A14 side of the coin: with the deployment files shipping, the deployment-file advisory must stay silent \u2014 an advisory that fires on a correct site is a bug, and diagnosticsExhaustive asserts the silence."
+    },
+    "deploy-file-excluded": {
+      "rules": [
+        "A14"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [
+        {
+          "file": "src/_headers",
+          "line": null,
+          "severity": "advisory",
+          "containsAll": [
+            "_headers",
+            "--exclude"
+          ]
+        },
+        {
+          "file": "src/_redirects",
+          "line": null,
+          "severity": "advisory",
+          "containsAll": [
+            "_redirects",
+            "--exclude"
+          ]
+        },
+        {
+          "file": "src/_routes.json",
+          "line": null,
+          "severity": "advisory",
+          "containsAll": [
+            "_routes.json",
+            "--exclude"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected",
+      "note": "Default excludes hold back root-level _headers/_redirects/_routes.json \u2014 known deployment files (conformance \u00a74.2), so each draws advisory A14 naming the file and the --exclude line that ships it. The advisory is the whole mechanism: the files stay excluded (expected tree is index.html alone), the build publishes, exit 0. blog/_headers draws nothing \u2014 recognition is by name at the source root only."
+    },
+    "stranded-underscore-asset": {
+      "rules": [
+        "URL-05",
+        "REF-04",
+        "P13",
+        "REF-01",
+        "DIA-11"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/_includes/nav.html",
+          "line": 2,
+          "severity": "problem",
+          "containsAll": [
+            "logo.png"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "The spec's own \u00a711.1 trap: the include's relative logo resolves to /_includes/logo.png, which the default exclude keeps out of the output \u2014 the reference check must fail loudly. Attribution at the provenance file \u2014 R3, promoted to contract in conformance \u00a714.1."
+    },
+    "broken-link": {
+      "rules": [
+        "REF-04",
+        "P13",
+        "PUB-01",
+        "DIA-03"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 5,
+          "severity": "problem",
+          "containsAll": [
+            "old-name.html"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true
+    },
+    "case-mismatch-link": {
+      "rules": [
+        "REF-05",
+        "P13"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 5,
+          "severity": "problem",
+          "containsAll": [
+            "About.html"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true
+    },
+    "handwritten-pretty-url": {
+      "rules": [
+        "REF-03",
+        "P13"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 5,
+          "severity": "problem",
+          "containsAll": [
+            "/about/"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "Write href to the real file, never a hand-written pretty URL: /about/ resolves to /about/index.html, which no build without --pretty-urls emits."
+    },
+    "css-url-broken": {
+      "rules": [
+        "REF-01",
+        "P13"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/assets/style.css",
+          "line": 1,
+          "severity": "problem",
+          "containsAll": [
+            "missing.png"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true
+    },
+    "style-url-not-rewritten": {
+      "rules": [
+        "URL-03",
+        "REF-01",
+        "S01"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected",
+      "note": "url() inside <style> and style= is never rewritten (byte-equality proves it) while BOTH are reference-checked \u2014 B5 closed (2026-08-12): \u00a712 now covers style-attribute url() too; dot.png exists, so this side builds clean. The firing twin is style-attr-url-broken."
+    },
+    "style-attr-url-broken": {
+      "rules": [
+        "REF-01",
+        "P13"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 5,
+          "severity": "problem",
+          "containsAll": [
+            "gone.png"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "B5's firing side: a url() in a style ATTRIBUTE pointing at nothing is a broken reference like any other \u2014 rewriting stays exempt (\u00a711.1), checking does not (\u00a712). The alternative that shipped before was the silent 404."
+    },
+    "dollar-patterns": {
+      "rules": [
+        "S01",
+        "S02",
+        "S03"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected",
+      "note": "$&, $1, $', $`, $$ inside fragments and fills must survive byte-for-byte. This is a direct regression trap for String.prototype.replace-based splicing."
+    },
+    "working-format": {
+      "rules": [
+        "A09",
+        "EXC-09"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [
+        {
+          "file": "src/logo.fig",
+          "line": null,
+          "severity": "advisory",
+          "containsAll": [
+            "logo.fig"
+          ]
+        },
+        {
+          "file": "src/logo.psd",
+          "line": null,
+          "severity": "advisory",
+          "containsAll": [
+            "logo.psd"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "expectFiles": [
+        "index.html",
+        "logo.psd",
+        "logo.fig"
+      ],
+      "note": "Advisories never change what is published: the files still ship."
+    },
+    "working-format-strict": {
+      "caseDir": "working-format",
+      "rules": [
+        "DIA-03",
+        "A09"
+      ],
+      "flags": [
+        "--strict"
+      ],
+      "exit": 1,
+      "published": true,
+      "diagnostics": [
+        {
+          "file": "src/logo.fig",
+          "line": null,
+          "severity": "advisory",
+          "containsAll": [
+            "logo.fig"
+          ]
+        },
+        {
+          "file": "src/logo.psd",
+          "line": null,
+          "severity": "advisory",
+          "containsAll": [
+            "logo.psd"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "Under --strict the same advisories flip the exit code and block publish \u2014 a stray .psd can never cost a publish silently. | CORRECTED: --strict changes the exit code, never what is published (product-spec \u00a74, conformance \u00a714.1) \u2014 a stray .psd must not cost you a publish. This asserted published:false, the same defect as the kitchen-sink strict profile; both were written from one wrong reading of the rule."
+    },
+    "include-also-page": {
+      "rules": [
+        "A10"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [
+        {
+          "file": "src/partials/nav.html",
+          "line": null,
+          "severity": "advisory",
+          "containsAll": [
+            "nav.html"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "expectFiles": [
+        "index.html",
+        "partials/nav.html"
+      ]
+    },
+    "frontmatter-junk-keys": {
+      "rules": [
+        "MD-14",
+        "MD-09",
+        "MD-12",
+        "MD-13",
+        "MD-21"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected",
+      "note": "date/featured/tags/note/weight/empty are inert plain metas \u2014 the page publishes and nothing is built from any of them (tags is AUD-15's taxonomy-inert in `audit`, never a diagnostic here). draft/permalink/slug LEFT this fixture on 2026-08-19: \u00a728.1 makes each of them P24, so a page carrying one no longer publishes at all; they are covered by tests/conformance/counter-prior.test.js. B6 closed (2026-08-12): \u00a710.2 value serialization pinned exact \u2014 plain scalars as source text ('true', '2026-01-01', '0.50' keeps its zero), quoted scalars unquoted ('Colons: kept\u2026'), empty value \u2192 content=\"\". The no-text-form firing twin is frontmatter-deep-nest (P17)."
+    },
+    "frontmatter-deep-nest": {
+      "rules": [
+        "P17",
+        "MD-21"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/post.md",
+          "line": 4,
+          "severity": "problem",
+          "containsAll": [
+            "og:image"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "P17: a mapping nested below a block (og: \u2192 image: \u2192 url:) has no text form \u2014 frontmatter flattens exactly one level, and both inventing a serialization and dropping the value would be silent lies. Located at the key whose value nests (line 4). The list-item-that-is-a-mapping branch is the same problem."
+    },
+    "markdown-body-line-unknown": {
+      "rules": [
+        "DIA-13",
+        "DIA-06",
+        "P20",
+        "P17",
+        "MD-21"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/post.md",
+          "line": null,
+          "severity": "problem",
+          "containsAll": [
+            "slot"
+          ]
+        },
+        {
+          "file": "src/post.md",
+          "line": 4,
+          "severity": "problem",
+          "containsAll": [
+            "og:image"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "DIA-13, and the boundary that makes it non-obvious \u2014 both halves in one file. \u00a710.1 converts a Markdown page BEFORE inlining its includes, so a span attributed to post.md carries an offset into the CONVERTED HTML: counting newlines in the .md to reach it would name a real-looking line in the wrong place, so the line is omitted and the FILE: SEVERITY: form of DIA-06 is used (the stray <slot>, P20, first diagnostic). Frontmatter is the exception, and it is not an exception to the rule but a consequence of it: frontmatterKeyLine reads the RAW source, ahead of conversion, so P17 keeps its exact line 4 (as layout-bare-name keeps src/about.md:2 and frontmatter-invalid-yaml its line 4). The omission is a body-derived fact, not a Markdown-wide one. Closing it properly needs a converted-offset \u2192 source-line map out of markdown.js; until that exists, declining is the contract."
+    },
+    "charset-differs": {
+      "rules": [
+        "HED-01",
+        "A08"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 4,
+          "severity": "advisory",
+          "containsAll": [
+            "charset"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "expectContains": {
+        "index.html": [
+          "<meta charset=\"utf-8\">"
+        ]
+      },
+      "expectNotContains": {
+        "index.html": [
+          "utf-16"
+        ]
+      }
+    },
+    "charset-after-include": {
+      "rules": [
+        "HED-01",
+        "A08",
+        "INC-12",
+        "DIA-06",
+        "DIA-11"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 5,
+          "severity": "advisory",
+          "containsAll": [
+            "charset"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "expectContains": {
+        "index.html": [
+          "<meta charset=\"utf-8\">",
+          "og:site_name"
+        ]
+      },
+      "expectNotContains": {
+        "index.html": [
+          "utf-16"
+        ]
+      },
+      "note": "charset-differs, with a three-line fragment inlined into the page's own <head> above its <meta charset> (INC-12: includes work in the head). The charset is on line 5 of an 11-line index.html and the pre-fix engine printed line 8 \u2014 the worst shape of wrong, since line 8 exists (<body>) and looks checkable, where data-layout-after-include's overshoot at least fell off the end of the file. A08 is the only located diagnostic \u00a78 raises, so this case is head-merge.js's whole \u00a714.1 surface."
+    },
+    "charset-page-only": {
+      "rules": [
+        "HED-01"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected",
+      "note": "Layout declares no charset: the page's is kept and moved to the head's first position on its own line with the first-content-line indentation \u2014 byte-exact."
+    },
+    "md-include-element": {
+      "rules": [
+        "MD-02",
+        "MD-19",
+        "MD-20",
+        "MD-15",
+        "INC-12",
+        "S02"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected",
+      "note": "B2 resolved (2026-08-12): conversion first, includes resolve on the converted HTML, and a line-initial <include> is a block (the \u00a710.1 type-6 extension). Exact tree pins all three placements: line-initial paired form splices as a clean block (never <p>-wrapped), an include inside a sentence splices inline within the paragraph, and a code-fenced include is escaped text that resolution never touches. The page is layout-less, so the \u00a710.7 shell wraps it (MD-20)."
+    },
+    "srcset-poster-rewrite": {
+      "rules": [
+        "URL-01",
+        "URL-05"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected",
+      "note": "srcset URLs rewritten per candidate with descriptors untouched; poster rewritten; both from layout provenance."
+    },
+    "base-url-subpath": {
+      "rules": [
+        "URL-10",
+        "URL-11",
+        "URL-12",
+        "REF-02"
+      ],
+      "flags": [
+        "--base-url",
+        "https://example.com/repo/"
+      ],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected",
+      "note": "B3's exact trap, pinned fixed (2026-08-12): a full base URL whose path is not / must absolutize og:/twitter:/canonical as origin + path prefix \u2014 og:image /assets/hero.jpg emits https://example.com/repo/assets/hero.jpg, never https://example.com/assets/hero.jpg. href/src get the path part only; the absolute og:url is untouched (URL-12); the reference check must strip the full base to keep the absolutized values checkable (REF-02)."
+    },
+    "no-layout-anywhere": {
+      "rules": [
+        "LAY-01",
+        "SHL-01"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected",
+      "note": "Selection step 5: no layout found anywhere \u2014 the page is emitted from its own text, byte-identical."
+    },
+    "layout-none-md": {
+      "rules": [
+        "LAY-01",
+        "MD-06",
+        "MD-20",
+        "MD-15",
+        "MD-07",
+        "MD-08"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected",
+      "note": "B4 resolved (2026-08-12): a layout-less .md page emits inside the \u00a710.7 minimal shell \u2014 this tree is the spec's own \u00a710.7 fixture verbatim. Exact assertions: charset first, title from the first h1, metas in source order, lang on <html>, class on <body>, converted body in <body>; the present _layout.html did not apply (bidirectional exactness proves its title never leaked in) and is not emitted."
+    },
+    "stray-header-footer": {
+      "rules": [
+        "MRG-17"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected",
+      "note": "No diagnostic. A page's own <header>/<footer> are default content and ship in place, which is what the author drew; advisory A03 fired here until it was retired, and this expected tree is byte-for-byte what it used to narrate. The advisory was the defect: unify's own \u00a77.2 unwrap hoisted a <header> written inside the page's <main> to top level and then reported it for being there, a meaningless wrapper <div> switched it off, and the repair it implied composed a <footer> inside a <footer> silently at exit 0."
+    },
+    "empty-include": {
+      "rules": [
+        "S02",
+        "INC-03"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected"
+    },
+    "slot-in-filled-fallback": {
+      "rules": [
+        "MRG-19",
+        "P16"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/_layout.html",
+          "line": 8,
+          "severity": "problem",
+          "containsAll": [
+            "slot",
+            "nest"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "B1 resolved by spec amendment (2026-08-12): slots do not nest. A <slot> inside another slot's fallback is P16, located at the layout, so the fill-stranding case the old outermost-first rule created can no longer arise. The page is plain default content; the single problem is exhaustive."
+    },
+    "two-problems-one-pass": {
+      "rules": [
+        "PIP-02"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/pageA.html",
+          "line": 5,
+          "severity": "problem",
+          "containsAll": [
+            "gone.html"
+          ]
+        },
+        {
+          "file": "src/pageB.md",
+          "line": 2,
+          "severity": "problem",
+          "containsAll": [
+            "default"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "Best-effort composition: both problems in one run, ordered by path \u2014 authors never fix errors one build at a time."
+    },
+    "fragment-links-ok": {
+      "rules": [
+        "REF-06",
+        "URL-02"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected",
+      "note": "#fragment targets are never validated against ids; fragment-only links are skipped by rewriting entirely."
+    },
+    "frontmatter-invalid-yaml": {
+      "rules": [
+        "P18"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/post.md",
+          "line": 4,
+          "severity": "problem",
+          "containsAll": [
+            "YAML",
+            "quote any value containing a colon"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "P18: the frontmatter does not parse as YAML. Distinct from P17, which is about a value's shape in frontmatter that parsed fine \u2014 the fix here is repairing syntax, not flattening a structure. NOTE ON THE LINE: this fixture originally asserted line 3, where the unterminated `[` is opened. That was written from intuition rather than from what a parser reports, and it was wrong: js-yaml marks line 4, where it discovers the fault, which is what every compiler does for an unterminated construct and the only position actually known without reimplementing YAML. The diagnostic carries the parser's own reason so the construct is still named. ROUND 18: the fix line now names the colon. Four of six repair samples said the old wording (check quoting, indentation, and that every bracket is closed) did not tell them the cause, and the three with no documentation at all reached it only by knowing YAML. An unquoted colon is the fault that actually happens - two of five samples shipped one in round 7."
+    },
+    "frontmatter-flat-key-nest": {
+      "rules": [
+        "P17"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/post.md",
+          "line": 3,
+          "severity": "problem",
+          "containsAll": [
+            "og:image"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "P17 via the flat spelling: og:image: with a block under it is the same defect as og: -> image: -> url:, because both name the key og:image and it already carries its prefix. Pins that P17 eligibility is decided by the key's NAME, not by counting recursion levels \u2014 a depth-counting implementation would accept this one and reject its block-spelled twin, breaking the spelling equivalence \u00a710.2 guarantees."
+    },
+    "named-slot-in-sink-main": {
+      "rules": [
+        "P19"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/_layout.html",
+          "line": 9,
+          "severity": "problem",
+          "containsAll": [
+            "hero",
+            "main"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "P19: with no bare <slot>, <main> is the default-content sink AND contains a named slot, so \u00a77.4's wholesale child replacement and \u00a77.3's fill target overlapping spans. Found by implementing \u00a77 \u2014 a literal implementation crashes here, and the obvious repair (let main win) silently discards the page's slot=\"hero\" fill, which is exactly the content loss \u00a714 forbids. Ruled a problem so the layout says it is ambiguous instead of picking a loser."
+    },
+    "dry-run-diagnostics": {
+      "caseDir": "broken-link",
+      "rules": [
+        "DRY-03"
+      ],
+      "flags": [
+        "--dry-run"
+      ],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "line": 5,
+          "severity": "problem",
+          "containsAll": [
+            "old-name.html"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "DRY-03: the twin of broken-link with --dry-run added \u2014 the identical problem prints to stderr, byte-for-byte the same diagnostic a real build would produce, and (like any blocked publish) nothing is written; the sentinel output stays untouched."
+    },
+    "dry-run-mixed-outcome": {
+      "rules": [
+        "DRY-01",
+        "DRY-03"
+      ],
+      "flags": [
+        "--dry-run"
+      ],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/bad.html",
+          "line": 5,
+          "severity": "problem",
+          "containsAll": [
+            "nope.html"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "stdoutContains": [
+        "write dist/bad.html (/bad.html) \u2190 bad.html (no layout)\nwrite dist/good.html (/good.html) \u2190 good.html (no layout)"
+      ],
+      "note": "Pins a reading the spec leaves implicit: \u00a717's report is scoped to steps 1-9 (\u00a715 \u2014 'the entire pipeline through step 9 ... plus the report'), one step short of the transactional gate (step 10), which --dry-run never reaches at all. So the report lists every page the pipeline actually composed (best-effort, PIP-02 \u2014 the same principle that puts both good.html's and bad.html's own diagnostics in one pass) even though a REAL build of this exact tree would publish NEITHER file (\u00a715: any problem anywhere blocks the whole site). The alternative reading \u2014 suppress or annotate write/copy/delete rows when reporter.canPublish is false \u2014 is defensible too and not textually excluded; flagged in the implementation report as an ambiguity worth an explicit spec sentence, not silently picked."
+    },
+    "cascade-and-dedup": {
+      "rules": [
+        "REF-07",
+        "DIA-12",
+        "PUB-01"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/_includes/nav.html",
+          "line": 4,
+          "severity": "problem",
+          "containsAll": [
+            "/team.html"
+          ]
+        },
+        {
+          "file": "src/about.html",
+          "line": 2,
+          "severity": "problem",
+          "containsAll": [
+            "nope"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "Both \u00a712/\u00a714.1 noise rules in one site, and the exhaustive list is the assertion. Four pages compose and all four carry the nav, so /team.html \u2014 a target with no source file at all \u2014 is a real fault that used to print four times and now prints once (DIA-12). /about.html DOES exist in source and failed to compose (P04), so links to it are the cascade case and are silent (REF-07) \u2014 before the exemption they printed four more times, at the fragment, advising a spelling check on a correctly-spelled path, and sorted ABOVE the one problem that mattered. Measured on a 20-page version of this shape: 21 problems, 1 real, the real one printed last."
+    },
+    "layout-bare-name-section": {
+      "rules": [
+        "LAY-03",
+        "P04"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/news/spring.md",
+          "line": 2,
+          "severity": "problem",
+          "containsAll": [
+            "news",
+            "/news/_layout.html"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "Ratification round 18: the P04 fix line used to print a hardcoded /_layout.html, which in a site with a section layout is a real, resolvable, WRONG answer \u2014 a repair sample followed it and both news articles silently lost their section body class and stylesheet at exit 0. The suggestion is now the layout this page would actually discover. layout-bare-name and -html cover the fallback wording when no layout exists at all."
+    },
+    "fill-in-wrapped-main": {
+      "rules": [
+        "MRG-06",
+        "MRG-07"
+      ],
+      "flags": [],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected",
+      "note": "slot= is collected from the direct children of <body> and of the page's first <main>, wherever that <main> sits \u2014 the wrapper <div> does not break the fill, and the consumed attribute never ships. One wrapper deeper is still the author's own markup: untouched, unreported, attribute intact. Before this, the author watched their <main> tags vanish from the output while the fill silently did nothing and slot= shipped at exit 0."
+    },
+    "page-no-body": {
+      "rules": [
+        "MRG-20",
+        "P21"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/index.html",
+          "severity": "problem",
+          "containsAll": [
+            "no <body>",
+            "complete HTML document",
+            "fragment.html"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "A page with no <body> \u2014 a bare fragment, exactly the shape of an htmx partial endpoint \u2014 under a layout. Until 2026-08-13 this crashed with an unlocated internal error (null is not an object) that blocked the whole publish; found while designing round 19. Now P21, file-level (there is no line to point at), fix naming the complete-document shape."
+    },
+    "layout-no-body": {
+      "rules": [
+        "MRG-20",
+        "P21"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/_layout.html",
+          "severity": "problem",
+          "containsAll": [
+            "no <body>",
+            "head-only"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "A layout with no <body> element. Until 2026-08-13 this published the layout's own text AS the page \u2014 the author's entire body silently dropped at exit 0, a direct \u00a77.6 content-loss violation (the round-19 shape matrix caught it). Now P21 at the layout, whose fix names the one-keystroke repair: an empty <body></body> is the legitimate \u00a77.5 head-only pattern."
+    },
+    "layout-empty-file": {
+      "rules": [
+        "MRG-20",
+        "P21"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/_layout.html",
+          "severity": "problem",
+          "containsAll": [
+            "no <body>"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "A resolved layout file that is empty. Until 2026-08-13 an accident of truthiness (`if (!layoutText)`) made a zero-byte _layout.html silently identical to having no layout at all; discovery had resolved it, so its missing <body> is P21 like any other, never a silent pass-through."
+    },
+    "fragment-file": {
+      "rules": [
+        "EXC-12"
+      ],
+      "flags": [
+        "--pretty-urls"
+      ],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected",
+      "note": "The .fragment.html opt-out (\u00a74.4): hours.fragment.html is BOTH spliced into index.html by <include> and shipped byte-for-byte at its own path; late.fragment.html contains a link to a file that does not exist and the build says nothing, because a fragment's insides resolve at runtime against whichever page consumed them; _wip.fragment.html never ships (underscore beats everything); --pretty-urls moves visit.html to visit/index.html and does not move either fragment. Before 2026-08-13 there was no way to publish a bare HTML snippet at all \u2014 every route ended in P21, P07, a synthesized shell, or the wrong content-type."
+    },
+    "overlay-layout-discovery": {
+      "rules": [
+        "GEN-08",
+        "LAY-01"
+      ],
+      "flags": [
+        "--generate",
+        "_scripts/gen.mjs"
+      ],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected",
+      "note": "Issue #54. Neither generated page names a layout: \u00a76.1 step 4's walk climbs VIRTUAL directories (\u00a733.3), so the overlay's `atroot.html` finds `_layout.html` at the namespace root and `docs/api.md` finds it after `docs/` holds none \u2014 the same layout the hand-authored `index.html` beside them gets. Before the namespace existed the walk started at the page's absolute directory inside the overlay, left the source root's containment check immediately, and returned no layout: both pages published bare, with no diagnostic and exit 0."
+    },
+    "overlay-fragment-include": {
+      "rules": [
+        "GEN-08",
+        "INC-03"
+      ],
+      "flags": [
+        "--generate",
+        "_scripts/gen.mjs"
+      ],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected",
+      "note": "Issue #55, and its mirror image. The hand-authored `_layout.html` includes `/_includes/nav.html`, which only the OVERLAY holds; the generated `posts/one.html` includes `../_includes/note.html`, measured from that page's virtual directory (`posts/`) and held only by the SOURCE tree. One namespace, read both ways. Before it, the first was `include not found` and a generator could produce every page of a section but not the nav that links them."
+    },
+    "overlay-source-collision": {
+      "rules": [
+        "GEN-05",
+        "P12",
+        "PUB-01"
+      ],
+      "flags": [
+        "--generate",
+        "_scripts/gen.mjs"
+      ],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/about.html",
+          "line": null,
+          "severity": "problem",
+          "containsAll": [
+            "about.html",
+            "(generated)"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "\u00a733.4 survives \u00a733.3: unifying the RESOLUTION namespace must not unify the OUTPUT. A virtual path present in both trees is still P12 naming both \u2014 the source file by its source path, the generated one as generated \u2014 neither wins, and nothing publishes. This case is the guard on that boundary: it passes before the namespace change and must keep passing after."
+    },
+    "overlay-namespace-precedence": {
+      "rules": [
+        "GEN-09"
+      ],
+      "flags": [
+        "--generate",
+        "_scripts/gen.mjs"
+      ],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected",
+      "note": "Both halves of \u00a733.3's precedence rule at once. `_includes/badge.html` exists in both trees and never publishes, so P12 cannot arbitrate: the SOURCE file resolves and \"Source badge.\" ships \u2014 a generator that could shadow a file the author wrote would be the silent overwrite \u00a713 exists to forbid. And `docs/_layout.html`, written only by the generator, is taken by BOTH pages in `docs/` \u2014 the generated `api.md` and the hand-authored `guide.md` \u2014 because nearest beats precedence: the namespace merges one directory at a time, not one tree at a time."
+    },
+    "include-inert-in-pre": {
+      "rules": [
+        "INC-13"
+      ],
+      "exit": 0,
+      "published": true,
+      "diagnostics": [],
+      "diagnosticsExhaustive": true,
+      "expectedTree": "expected",
+      "note": "Issue #56, decided as a behavior change: both include spellings are inert inside <pre>/<code> (\u00a75.1 item 8). Four inert occurrences ship byte-for-byte \u2014 paired form in <pre><code>, inline <code>, the SSI comment form, and a VOID include naming a NONEXISTENT target, which pins that inert means no diagnostics at all: no P01 not-found, no A01. The fifth include, outside any protection, still splices. Before the rule, all five spliced and the build printed the nav into the middle of its own example."
+    },
+    "retired-data-slot": {
+      "rules": [
+        "LAY-15",
+        "P08"
+      ],
+      "flags": [],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/_layout.html",
+          "line": 3,
+          "severity": "problem",
+          "containsAll": [
+            "data-slot"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "data-slot was inert rather than diagnosed: a page carrying it composed at exit 0 with the fill silently dropped. Found by migrating fwdslsh.dev, where <title data-slot=\"title\"> in the shared layout left every page emitting the layout's default title."
     }
-   ],
-   "diagnosticsExhaustive": true,
-   "note": "Both \u00a712/\u00a714.1 noise rules in one site, and the exhaustive list is the assertion. Four pages compose and all four carry the nav, so /team.html \u2014 a target with no source file at all \u2014 is a real fault that used to print four times and now prints once (DIA-12). /about.html DOES exist in source and failed to compose (P04), so links to it are the cascade case and are silent (REF-07) \u2014 before the exemption they printed four more times, at the fragment, advising a spelling check on a correctly-spelled path, and sorted ABOVE the one problem that mattered. Measured on a 20-page version of this shape: 21 problems, 1 real, the real one printed last."
-  },
-  "layout-bare-name-section": {
-   "rules": [
-    "LAY-03",
-    "P04"
-   ],
-   "flags": [],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/news/spring.md",
-     "line": 2,
-     "severity": "problem",
-     "containsAll": [
-      "news",
-      "/news/_layout.html"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true,
-   "note": "Ratification round 18: the P04 fix line used to print a hardcoded /_layout.html, which in a site with a section layout is a real, resolvable, WRONG answer \u2014 a repair sample followed it and both news articles silently lost their section body class and stylesheet at exit 0. The suggestion is now the layout this page would actually discover. layout-bare-name and -html cover the fallback wording when no layout exists at all."
-  },
-  "fill-in-wrapped-main": {
-   "rules": [
-    "MRG-06",
-    "MRG-07"
-   ],
-   "flags": [],
-   "exit": 0,
-   "published": true,
-   "diagnostics": [],
-   "diagnosticsExhaustive": true,
-   "expectedTree": "expected",
-   "note": "slot= is collected from the direct children of <body> and of the page's first <main>, wherever that <main> sits \u2014 the wrapper <div> does not break the fill, and the consumed attribute never ships. One wrapper deeper is still the author's own markup: untouched, unreported, attribute intact. Before this, the author watched their <main> tags vanish from the output while the fill silently did nothing and slot= shipped at exit 0."
-  },
-  "page-no-body": {
-   "rules": [
-    "MRG-20",
-    "P21"
-   ],
-   "flags": [],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/index.html",
-     "severity": "problem",
-     "containsAll": [
-      "no <body>",
-      "complete HTML document",
-      "fragment.html"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true,
-   "note": "A page with no <body> \u2014 a bare fragment, exactly the shape of an htmx partial endpoint \u2014 under a layout. Until 2026-08-13 this crashed with an unlocated internal error (null is not an object) that blocked the whole publish; found while designing round 19. Now P21, file-level (there is no line to point at), fix naming the complete-document shape."
-  },
-  "layout-no-body": {
-   "rules": [
-    "MRG-20",
-    "P21"
-   ],
-   "flags": [],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/_layout.html",
-     "severity": "problem",
-     "containsAll": [
-      "no <body>",
-      "head-only"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true,
-   "note": "A layout with no <body> element. Until 2026-08-13 this published the layout's own text AS the page \u2014 the author's entire body silently dropped at exit 0, a direct \u00a77.6 content-loss violation (the round-19 shape matrix caught it). Now P21 at the layout, whose fix names the one-keystroke repair: an empty <body></body> is the legitimate \u00a77.5 head-only pattern."
-  },
-  "layout-empty-file": {
-   "rules": [
-    "MRG-20",
-    "P21"
-   ],
-   "flags": [],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/_layout.html",
-     "severity": "problem",
-     "containsAll": [
-      "no <body>"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true,
-   "note": "A resolved layout file that is empty. Until 2026-08-13 an accident of truthiness (`if (!layoutText)`) made a zero-byte _layout.html silently identical to having no layout at all; discovery had resolved it, so its missing <body> is P21 like any other, never a silent pass-through."
-  },
-  "fragment-file": {
-   "rules": [
-    "EXC-12"
-   ],
-   "flags": [
-    "--pretty-urls"
-   ],
-   "exit": 0,
-   "published": true,
-   "diagnostics": [],
-   "diagnosticsExhaustive": true,
-   "expectedTree": "expected",
-   "note": "The .fragment.html opt-out (\u00a74.4): hours.fragment.html is BOTH spliced into index.html by <include> and shipped byte-for-byte at its own path; late.fragment.html contains a link to a file that does not exist and the build says nothing, because a fragment's insides resolve at runtime against whichever page consumed them; _wip.fragment.html never ships (underscore beats everything); --pretty-urls moves visit.html to visit/index.html and does not move either fragment. Before 2026-08-13 there was no way to publish a bare HTML snippet at all \u2014 every route ended in P21, P07, a synthesized shell, or the wrong content-type."
-  },
-  "overlay-layout-discovery": {
-   "rules": [
-    "GEN-08",
-    "LAY-01"
-   ],
-   "flags": [
-    "--generate",
-    "_scripts/gen.mjs"
-   ],
-   "exit": 0,
-   "published": true,
-   "diagnostics": [],
-   "diagnosticsExhaustive": true,
-   "expectedTree": "expected",
-   "note": "Issue #54. Neither generated page names a layout: \u00a76.1 step 4's walk climbs VIRTUAL directories (\u00a733.3), so the overlay's `atroot.html` finds `_layout.html` at the namespace root and `docs/api.md` finds it after `docs/` holds none \u2014 the same layout the hand-authored `index.html` beside them gets. Before the namespace existed the walk started at the page's absolute directory inside the overlay, left the source root's containment check immediately, and returned no layout: both pages published bare, with no diagnostic and exit 0."
-  },
-  "overlay-fragment-include": {
-   "rules": [
-    "GEN-08",
-    "INC-03"
-   ],
-   "flags": [
-    "--generate",
-    "_scripts/gen.mjs"
-   ],
-   "exit": 0,
-   "published": true,
-   "diagnostics": [],
-   "diagnosticsExhaustive": true,
-   "expectedTree": "expected",
-   "note": "Issue #55, and its mirror image. The hand-authored `_layout.html` includes `/_includes/nav.html`, which only the OVERLAY holds; the generated `posts/one.html` includes `../_includes/note.html`, measured from that page's virtual directory (`posts/`) and held only by the SOURCE tree. One namespace, read both ways. Before it, the first was `include not found` and a generator could produce every page of a section but not the nav that links them."
-  },
-  "overlay-source-collision": {
-   "rules": [
-    "GEN-05",
-    "P12",
-    "PUB-01"
-   ],
-   "flags": [
-    "--generate",
-    "_scripts/gen.mjs"
-   ],
-   "exit": 1,
-   "published": false,
-   "diagnostics": [
-    {
-     "file": "src/about.html",
-     "line": null,
-     "severity": "problem",
-     "containsAll": [
-      "about.html",
-      "(generated)"
-     ]
-    }
-   ],
-   "diagnosticsExhaustive": true,
-   "note": "\u00a733.4 survives \u00a733.3: unifying the RESOLUTION namespace must not unify the OUTPUT. A virtual path present in both trees is still P12 naming both \u2014 the source file by its source path, the generated one as generated \u2014 neither wins, and nothing publishes. This case is the guard on that boundary: it passes before the namespace change and must keep passing after."
-  },
-  "overlay-namespace-precedence": {
-   "rules": [
-    "GEN-09"
-   ],
-   "flags": [
-    "--generate",
-    "_scripts/gen.mjs"
-   ],
-   "exit": 0,
-   "published": true,
-   "diagnostics": [],
-   "diagnosticsExhaustive": true,
-   "expectedTree": "expected",
-   "note": "Both halves of \u00a733.3's precedence rule at once. `_includes/badge.html` exists in both trees and never publishes, so P12 cannot arbitrate: the SOURCE file resolves and \"Source badge.\" ships \u2014 a generator that could shadow a file the author wrote would be the silent overwrite \u00a713 exists to forbid. And `docs/_layout.html`, written only by the generator, is taken by BOTH pages in `docs/` \u2014 the generated `api.md` and the hand-authored `guide.md` \u2014 because nearest beats precedence: the namespace merges one directory at a time, not one tree at a time."
-  },
-  "include-inert-in-pre": {
-   "rules": [
-    "INC-13"
-   ],
-   "exit": 0,
-   "published": true,
-   "diagnostics": [],
-   "diagnosticsExhaustive": true,
-   "expectedTree": "expected",
-   "note": "Issue #56, decided as a behavior change: both include spellings are inert inside <pre>/<code> (\u00a75.1 item 8). Four inert occurrences ship byte-for-byte \u2014 paired form in <pre><code>, inline <code>, the SSI comment form, and a VOID include naming a NONEXISTENT target, which pins that inert means no diagnostics at all: no P01 not-found, no A01. The fifth include, outside any protection, still splices. Before the rule, all five spliced and the build printed the nav into the middle of its own example."
   }
- }
 }
