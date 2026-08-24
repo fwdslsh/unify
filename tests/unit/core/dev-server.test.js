@@ -9,6 +9,7 @@
  */
 import { afterEach, describe, expect, test } from "bun:test";
 import { writeFileSync } from "node:fs";
+import { createServer } from "node:http";
 import { basename, join } from "node:path";
 import { createDevServer, injectReloadScript, RELOAD_PATH, resolveStaticFile } from "../../../src/core/dev-server.js";
 import { UsageError } from "../../../src/core/diagnostics.js";
@@ -76,11 +77,11 @@ describe("resolveStaticFile", () => {
 
 // ============================================================= createDevServer
 
-describe("createDevServer (real Bun.serve, ephemeral port)", () => {
+describe("createDevServer (a real node:http server, ephemeral port)", () => {
   test("serves a file from the output directory with the reload script injected (WCH-05/06)", async () => {
     const dir = tempDir("serve-basic");
     writeSite(dir, { "index.html": "<html><body><h1>Home</h1></body></html>" });
-    const s = createDevServer({ outputDir: dir, port: 0 });
+    const s = await createDevServer({ outputDir: dir, port: 0 });
     try {
       const res = await fetch(`${s.url}/`);
       expect(res.status).toBe(200);
@@ -96,7 +97,7 @@ describe("createDevServer (real Bun.serve, ephemeral port)", () => {
   test("directory index: /blog/ serves blog/index.html", async () => {
     const dir = tempDir("serve-dirindex");
     writeSite(dir, { "blog/index.html": "<html><body><h1>Blog</h1></body></html>" });
-    const s = createDevServer({ outputDir: dir, port: 0 });
+    const s = await createDevServer({ outputDir: dir, port: 0 });
     try {
       const res = await fetch(`${s.url}/blog/`);
       expect(res.status).toBe(200);
@@ -109,7 +110,7 @@ describe("createDevServer (real Bun.serve, ephemeral port)", () => {
   test("serves the site's own 404.html with a real 404 status when a request matches nothing", async () => {
     const dir = tempDir("serve-404");
     writeSite(dir, { "404.html": "<html><body>Nothing here</body></html>", "index.html": "hi" });
-    const s = createDevServer({ outputDir: dir, port: 0 });
+    const s = await createDevServer({ outputDir: dir, port: 0 });
     try {
       const res = await fetch(`${s.url}/nope`);
       expect(res.status).toBe(404);
@@ -124,7 +125,7 @@ describe("createDevServer (real Bun.serve, ephemeral port)", () => {
   test("falls back to a plain 404 response when the output has no 404.html", async () => {
     const dir = tempDir("serve-404-fallback");
     writeSite(dir, { "index.html": "hi" });
-    const s = createDevServer({ outputDir: dir, port: 0 });
+    const s = await createDevServer({ outputDir: dir, port: 0 });
     try {
       const res = await fetch(`${s.url}/nope`);
       expect(res.status).toBe(404);
@@ -136,7 +137,7 @@ describe("createDevServer (real Bun.serve, ephemeral port)", () => {
   test("non-HTML assets are served as-is, with no injection", async () => {
     const dir = tempDir("serve-asset");
     writeSite(dir, { "style.css": "body{color:red}" });
-    const s = createDevServer({ outputDir: dir, port: 0 });
+    const s = await createDevServer({ outputDir: dir, port: 0 });
     try {
       const res = await fetch(`${s.url}/style.css`);
       const text = await res.text();
@@ -150,7 +151,7 @@ describe("createDevServer (real Bun.serve, ephemeral port)", () => {
   test("reload notifications are delivered over the SSE stream", async () => {
     const dir = tempDir("serve-sse");
     writeSite(dir, { "index.html": "hi" });
-    const s = createDevServer({ outputDir: dir, port: 0 });
+    const s = await createDevServer({ outputDir: dir, port: 0 });
     try {
       const res = await fetch(`${s.url}${RELOAD_PATH}`);
       expect(res.headers.get("content-type")).toContain("text/event-stream");
@@ -167,28 +168,30 @@ describe("createDevServer (real Bun.serve, ephemeral port)", () => {
     }
   });
 
-  test("throws a UsageError (exit code 2) when the port is already in use", () => {
+  test("rejects with a UsageError (exit code 2) when the port is already in use", async () => {
     // createDevServer binds the literal 127.0.0.1 address (see its own doc
-    // comment for why "localhost" the hostname STRING was rejected: Bun
-    // resolves it inconsistently across separate Bun.serve() calls, so two
-    // real `unify dev` processes on the same port did not reliably conflict
-    // — confirmed by running the actual CLI twice, see the report). Occupying
-    // that same literal address is what makes this test a faithful
-    // reproduction of the real "something else is already using this port"
-    // condition, not an artifact of the test's own setup.
+    // comment for why "localhost" the hostname STRING was rejected: a runtime
+    // resolves it inconsistently across separate binds, so two real `unify
+    // dev` processes on the same port did not reliably conflict — confirmed
+    // by running the actual CLI twice, see the report). Occupying that same
+    // literal address is what makes this test a faithful reproduction of the
+    // real "something else is already using this port" condition, not an
+    // artifact of the test's own setup.
     const dir = tempDir("serve-portinuse");
-    const occupier = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: () => new Response("occupied") });
+    const occupier = createServer((_req, res) => res.end("occupied"));
+    await new Promise((ready) => occupier.listen({ port: 0, host: "127.0.0.1" }, ready));
     try {
       let caught = null;
       try {
-        createDevServer({ outputDir: dir, port: occupier.port });
+        await createDevServer({ outputDir: dir, port: occupier.address().port });
       } catch (e) {
         caught = e;
       }
       expect(caught).toBeInstanceOf(UsageError);
       expect(caught.exitCode).toBe(2);
     } finally {
-      occupier.stop(true);
+      occupier.closeAllConnections();
+      occupier.close();
     }
   });
 });

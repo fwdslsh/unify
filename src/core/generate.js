@@ -27,6 +27,18 @@
  * binary execute a script path, which is what keeps that promise without a
  * Node installation anywhere.
  *
+ * "UNIFY'S OWN" IS `process.execPath`, AND THAT IS WHY THE PROMISE SURVIVED
+ * NODE SUPPORT (issue #49). The spawn moved from `Bun.spawn` to
+ * `node:child_process`, which runs on both runtimes; what did not move is the
+ * command, which is still whatever binary is executing this file. Under the
+ * compiled executable that is the executable (no runtime on PATH, the case
+ * `tests/conformance/compiled-binary.test.js` pins with a PATH containing
+ * neither `bun` nor `node`); under `bun src/cli.js` it is bun; under `node
+ * src/cli.js` it is node, so a generator gets the same runtime its author's
+ * unify is running on and never a second one to install. `BUN_BE_BUN=1` stays
+ * set in every case: it is what the compiled binary needs, and it is an
+ * unread environment variable to node.
+ *
  * THE SUBPROCESS IS NOT AN IMPLEMENTATION DETAIL; it is what makes §33.2's
  * three consequences true rather than aspirational, and the first design
  * loaded the module in-process and got the third one WRONG:
@@ -64,8 +76,9 @@
  * §15's transaction — and that a generator's failure is a build failure.
  */
 
+import { spawn } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { constants, tmpdir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 import { contains, toRelative } from "./paths.js";
 import { UsageError } from "./diagnostics.js";
@@ -122,26 +135,83 @@ export function removeOverlayDir(dir) {
  * all, and its line survives untouched — which is the same rule, not a
  * second one.
  *
+ * TWO OF THE SHAPES ARE NODE'S (issue #49), because the generator now runs
+ * under whichever runtime unify is running under, and node decorates a throw
+ * differently from bun. Where bun writes `1 | throw new Error("boom");` above
+ * its caret, node writes the location on one line and echoes the RAW SOURCE
+ * LINE on the next:
+ *
+ *     file:///…/gen.mjs:1          ← dropped by the path-and-line shape
+ *     throw new Error("boom");     ← dropped for sitting directly above a caret
+ *           ^
+ *     Error: boom                  ← what a P29 is for
+ *
+ * The echoed source line is the one that could not be recognised on its own —
+ * it is arbitrary source text — so it is recognised by POSITION instead, which
+ * is exactly as reliable and costs nothing under bun, where the line above the
+ * caret is a code frame the first shape already dropped.
+ *
+ * The two runtimes still do not produce the same STRING (bun says `error:`
+ * where node says `Error:`), and they cannot: this field quotes a subprocess,
+ * and a quotation is whatever was said. What it must do under both is put the
+ * author's own message in a P29 unpadded and unclipped, which is what these
+ * shapes buy — without them node's 300-character budget could be spent on a
+ * long source line before reaching the message at all.
+ *
  * @param {string} stderr
  * @returns {string} at most a few lines, joined; "" when there is nothing to say
  */
 function failureDetail(stderr) {
+  const caret = /^\s*[\^~]+\s*$/;
   const noise = [
     /^\s*\d+\s*\|/, //        code frame:  `1 | throw new Error(...)`
-    /^\s*[\^~]+\s*$/, //       the caret under it
+    caret, //                  the caret under it
     /^\s*at\s/, //             stack frame
     /^Bun v\d/, //              the runtime's version footer
     /^Node\.js v\d/,
+    /^\S*[/\\]\S*:\d+$/, //    node's location header: `file:///…/gen.mjs:1`
   ];
-  const lines = stderr
-    .split("\n")
-    .map((line) => line.trimEnd())
-    .filter((line) => line.trim() !== "" && !noise.some((re) => re.test(line)));
+  const raw = stderr.split("\n").map((line) => line.trimEnd());
+  const lines = raw.filter((line, i) =>
+    line.trim() !== "" &&
+    !noise.some((re) => re.test(line)) &&
+    !caret.test(raw[i + 1] ?? ""));
   const detail = lines.slice(0, 3).join(" / ");
   // Bounded, because a generator's stderr is arbitrary and a §14 report is
   // read by a person. The cap is generous enough that every ordinary message
   // arrives whole.
   return detail.length > 300 ? `${detail.slice(0, 299)}…` : detail;
+}
+
+/**
+ * Drain a generator subprocess: its whole stdout, its whole stderr, and the
+ * exit code P29 prints.
+ *
+ * The code needs one translation. `Bun.spawn`'s `exited` resolved to 143 for a
+ * child killed by SIGTERM; `node:child_process` reports that same child as
+ * `code === null, signal === "SIGTERM"`. Shell convention — 128 plus the
+ * signal number — is where Bun's 143 came from, so applying it here keeps a
+ * killed generator reading `failed (exit 143)` exactly as it did before,
+ * rather than `failed (exit null)`.
+ *
+ * @param {import('node:child_process').ChildProcess} proc
+ * @returns {Promise<{out: string, err: string, code: number}>}
+ */
+function collect(proc) {
+  const read = (stream) =>
+    new Promise((done) => {
+      const chunks = [];
+      stream.on("data", (chunk) => chunks.push(chunk));
+      stream.on("error", () => done(Buffer.concat(chunks).toString()));
+      stream.on("end", () => done(Buffer.concat(chunks).toString()));
+    });
+  const outP = read(proc.stdout);
+  const errP = read(proc.stderr);
+  const codeP = new Promise((done, fail) => {
+    proc.on("error", fail); // the runtime itself could not be spawned
+    proc.on("close", (code, signal) => done(code ?? 128 + (constants.signals[signal] ?? 0)));
+  });
+  return Promise.all([outP, errP, codeP]).then(([out, err, code]) => ({ out, err, code }));
 }
 
 /**
@@ -162,19 +232,12 @@ export async function runGenerator({ generatorAbs, sourceRoot, overlayDir, repor
   // path instead of re-entering its own CLI: without it, `unify gen.mjs` is an
   // unknown-argument usage error. It is harmless when `process.execPath` is an
   // ordinary `bun`, so one spawn covers both the checkout and the binary.
-  const proc = Bun.spawn({
-    cmd: [process.execPath, generatorAbs, root, overlayDir],
+  const proc = spawn(process.execPath, [generatorAbs, root, overlayDir], {
     cwd: root, // §33.2 — `./_data/x.json` means what an author expects
     env: { ...process.env, BUN_BE_BUN: "1" },
-    stdin: "ignore",
-    stdout: "pipe",
-    stderr: "pipe",
+    stdio: ["ignore", "pipe", "pipe"],
   });
-  const [out, err, code] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-    proc.exited,
-  ]);
+  const { out, err, code } = await collect(proc);
   // A generator's own stdout is its business and is passed through, so a
   // script that logs its progress still does (§33.6: unify runs the file the
   // author named and does not police it).
