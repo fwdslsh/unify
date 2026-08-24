@@ -3,23 +3,37 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title> — unify docs</title>
+    <title> · unify docs</title>
     <meta name="description" content="Documentation for unify, a static site generator for HTML-native composition.">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="unify docs">
+    <meta name="theme-color" content="#0a0e0a">
+    <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=Protest+Revolution&display=swap">
     <link rel="stylesheet" href="/assets/style.css">
   </head>
   <body>
     <a class="skip" href="#content">Skip to content</a>
     <include src="/_includes/masthead.html"></include>
     <div class="shell">
-      <include src="/_includes/docnav.html"></include>
       <main id="content"><slot></slot></main>
+      <include src="/_includes/docnav.html"></include>
     </div>
     <footer class="site-foot">
-      <slot name="footer">
-        <p>Built with unify itself. <a href="https://github.com/fwdslsh/unify">Source on GitHub</a>.</p>
-      </slot>
+      <div class="inner">
+        <slot name="footer">
+          <nav class="foot-links" aria-label="Footer">
+            <a href="https://github.com/fwdslsh/unify">GitHub</a>
+            <a href="https://www.npmjs.com/package/@fwdslsh/unify">npm</a>
+            <a href="/docs/index.html">All docs</a>
+            <a href="https://fwdslsh.dev/">fwdslsh.dev</a>
+          </nav>
+          <p>Built with unify itself, from the repository's own <code>docs/</code> tree. A simpler path forward.</p>
+          <p class="foot-family"><span>hyphn</span> · <span>rabit</span> · <span>dispatch</span> · <span>inform</span> · <span class="self">unify</span></p>
+        </slot>
+      </div>
     </footer>
   </body>
 </html>

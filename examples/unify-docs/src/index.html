@@ -2,36 +2,87 @@
 <html lang="en">
   <head>
     <title>unify documentation</title>
-    <meta name="description" content="The front page of unify's documentation site — built by unify from the repository's own docs directory.">
+    <meta name="description" content="The front page of unify's documentation site, built by unify from the repository's own docs directory.">
     <meta name="schema" content="WebPage">
   </head>
-  <body>
+  <body class="home">
     <main>
-      <h1>unify documentation</h1>
-      <p class="lede">unify composes plain HTML at build time. No template language, no
-      variables, no config — the output is the HTML and CSS you wrote.</p>
+      <section class="hero">
+        <div class="hero-grid">
+          <div class="hero-copy">
+            <h1>unify</h1>
+            <p class="tagline">HTML-native composition. No expression language, no client runtime.</p>
+            <p class="lede">A static site generator that composes the HTML you already
+            write. Five primitives: includes, layouts, slots, the underscore, and
+            fragments. The output is exactly your markup.</p>
+            <div class="cta-row">
+              <a class="btn btn-primary" href="/docs/getting-started.html">Get started</a>
+              <a class="btn btn-ghost" href="https://github.com/fwdslsh/unify">/ GitHub</a>
+            </div>
+          </div>
+          <div class="hero-demo">
+            <figure class="term" style="margin: 0;">
+              <figcaption class="term-head">
+                <span class="term-dot red"></span>
+                <span class="term-dot amber"></span>
+                <span class="term-dot green"></span>
+                <span class="term-title">terminal</span>
+              </figcaption>
+              <pre class="term-body"><span class="prompt">$</span> <span class="cmd">npx @fwdslsh/unify init</span>
+<span class="out">  scaffolded default (11 files): 9 into src,
+  AGENTS.md and DEPLOY.md at the project root</span>
+<span class="prompt">$</span> <span class="cmd">npx @fwdslsh/unify build</span>
+<span class="out">  # silent success: dist/ published, exit 0</span>
+<span class="prompt">$</span> <span class="cmd">npx @fwdslsh/unify dev</span>
+<span class="out">  serving <span class="url">http://localhost:3000</span> (output: dist)</span></pre>
+            </figure>
+          </div>
+        </div>
+      </section>
 
-      <p>This site is built by unify from the repository's own <code>docs/</code> directory.
-      Nothing is copied: the pages you are reading are generated at build time from the
-      same files a contributor edits, so they cannot drift.</p>
+      <section class="home-section">
+        <div class="inner">
+          <div class="chip-row">
+            <span class="label">The whole surface</span>
+            <code class="chip">&lt;include src&gt;</code>
+            <code class="chip">_layout.html</code>
+            <code class="chip">&lt;slot name&gt;</code>
+            <code class="chip">_underscore/</code>
+            <code class="chip">*.fragment.html</code>
+            <span class="aside">five primitives, and this site uses every one.</span>
+          </div>
+        </div>
+      </section>
 
-      <h2>Start here</h2>
-      <ul>
-        <li><a href="/docs/getting-started.html">Getting Started</a> — the tutorial.</li>
-        <li><a href="/docs/authoring-rules.html">Authoring Rules</a> — the complete authoring surface, in under sixty lines.</li>
-        <li><a href="/docs/cli-reference.html">CLI Reference</a> — every command, option, and exit code.</li>
-        <li><a href="/docs/index.html">All documentation</a> — the full index.</li>
-      </ul>
-
-      <h2>The five primitives</h2>
-      <p>The entire authoring surface, and this site uses every one of them:</p>
-      <ul>
-        <li><code>&lt;include src&gt;</code> — the masthead and this sidebar are includes.</li>
-        <li>Layouts — one <code>_layout.html</code> wraps every page here.</li>
-        <li>Slots — the footer is a named slot with fallback content.</li>
-        <li>The underscore — <code>_includes/</code> and <code>_scripts/</code> never ship.</li>
-        <li><code>*.fragment.html</code> — the generated sidebar is one.</li>
-      </ul>
+      <section class="home-section">
+        <div class="inner">
+          <h2>Start here</h2>
+          <div class="card-grid">
+            <div class="card featured">
+              <h3>Getting started</h3>
+              <p>The tutorial: install, scaffold a site, compose your first pages, publish.
+              Twenty minutes end to end.</p>
+              <a class="more" href="/docs/getting-started.html">Read the tutorial →</a>
+            </div>
+            <div class="card">
+              <h3>Authoring rules</h3>
+              <p>The complete authoring surface in under sixty lines. Hand it to any person
+              or agent writing site content.</p>
+              <a class="more" href="/docs/authoring-rules.html">Read the rules →</a>
+            </div>
+            <div class="card">
+              <h3>CLI reference</h3>
+              <p>Every command, every option, every exit code. There are no others; the page
+              says so and a test keeps it true.</p>
+              <a class="more" href="/docs/cli-reference.html">Browse the CLI →</a>
+            </div>
+          </div>
+          <p style="margin: 0.25rem 0 0; font-size: 0.875rem; color: var(--dim);">This site is
+          built by unify from the repository's own <code>docs/</code> directory at build time,
+          so it cannot drift from the documentation it renders.
+          <a href="/docs/index.html">All documentation →</a></p>
+        </div>
+      </section>
     </main>
   </body>
 </html>

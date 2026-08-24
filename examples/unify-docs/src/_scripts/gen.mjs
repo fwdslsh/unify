@@ -1,5 +1,5 @@
 /**
- * gen.mjs — the derived half of this site, run by `unify build --generate _scripts/gen.mjs`.
+ * gen.mjs, the derived half of this site, run by `unify build --generate _scripts/gen.mjs`.
  *
  * unify builds no collections, no indexes and no navigation: "derived content
  * comes from a script you own" is the rule, and this file is that script for
@@ -15,7 +15,7 @@
  *
  * The source of truth is the repository's real `docs/`, three levels above the
  * source root. Nothing is copied into this example, so the site cannot drift
- * from the documentation it renders — which is the entire point of building it.
+ * from the documentation it renders, which is the entire point of building it.
  */
 import { readFileSync, readdirSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { join, dirname, basename, resolve } from "node:path";
@@ -30,25 +30,38 @@ if (!existsSync(DOCS)) {
   // A located failure beats a half-built site: a non-zero exit is a build
   // problem, nothing publishes, and the previous dist/ is untouched.
   console.error(`gen.mjs: cannot find the repository docs at ${DOCS}`);
-  console.error("  fix: build this example from inside a unify checkout — it renders the real docs/ tree");
+  console.error("  fix: build this example from inside a unify checkout; it renders the real docs/ tree");
   process.exit(1);
 }
 
-/** Reading order, then anything else alphabetically, so the nav is not a directory listing. */
-const ORDER = [
-  "getting-started.md",
-  "authoring-rules.md",
-  "cli-reference.md",
-  "integrations.md",
-  "docker-usage.md",
-  "product-spec.md",
-  "conformance-spec.md",
-  "testing-strategy.md",
-  "cicd-workflows.md",
-  "ratification.md",
-  "ratification-protocol.md",
-  "migration-plan.md",
+/**
+ * Reading order, in curated groups, then anything else alphabetically under
+ * "More", so the nav is a table of contents, not a directory listing. The
+ * short label is what the sidebar shows; the page itself and the index keep
+ * the document's full title.
+ */
+const GROUPS = [
+  { label: "Guides", files: [
+    ["getting-started.md", "Getting started"],
+    ["authoring-rules.md", "Authoring rules"],
+    ["integrations.md", "Integrations"],
+    ["docker-usage.md", "Docker"],
+  ] },
+  { label: "Reference", files: [
+    ["cli-reference.md", "CLI reference"],
+    ["product-spec.md", "Product spec"],
+    ["conformance-spec.md", "Conformance spec"],
+  ] },
+  { label: "Project", files: [
+    ["testing-strategy.md", "Testing strategy"],
+    ["cicd-workflows.md", "CI/CD workflows"],
+    ["ratification.md", "Ratification"],
+    ["ratification-protocol.md", "Ratification protocol"],
+    ["migration-plan.md", "Migration plan"],
+  ] },
 ];
+const ORDER = GROUPS.flatMap((g) => g.files.map(([f]) => f));
+const NAV_LABEL = new Map(GROUPS.flatMap((g) => g.files.map(([f, label]) => [basename(f, ".md"), label])));
 
 const files = readdirSync(DOCS).filter((f) => f.endsWith(".md"));
 const ordered = [...ORDER.filter((f) => files.includes(f)), ...files.filter((f) => !ORDER.includes(f)).sort()];
@@ -72,7 +85,7 @@ function descriptionOf(text, title) {
   if (!raw) {
     const body = text.replace(/^#\s+.+$/m, "").replace(/^\*\*Status\*\*:.*$/m, "");
     const para = body.split(/\n\s*\n/).map((p) => p.trim()).find((p) => p && !p.startsWith("#") && !p.startsWith("|") && !p.startsWith("```") && !p.startsWith("---"));
-    raw = para ?? `${title} — unify documentation.`;
+    raw = para ?? `${title}: unify documentation.`;
   }
   const flat = raw
     .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1") // keep the link text, drop the target
@@ -95,8 +108,8 @@ function descriptionOf(text, title) {
  */
 function rewriteLinks(md, selfSlug) {
   // Code is documentation here, not navigation. These specs quote markdown and
-  // HTML constantly — `![diagram](diagram.png)` is a worked EXAMPLE of URL
-  // rewriting, not a link to an image — so rewriting inside a fence or a code
+  // HTML constantly: `![diagram](diagram.png)` is a worked EXAMPLE of URL
+  // rewriting, not a link to an image, so rewriting inside a fence or a code
   // span corrupts the very thing the page is explaining. (It did, until this
   // guard existed.) Fenced blocks are skipped wholesale; within a line, code
   // spans are split out and passed through untouched.
@@ -109,7 +122,7 @@ function rewriteLinks(md, selfSlug) {
         return line;
       }
       if (fenced) return line;
-      // Odd indices are the insides of `code spans` — leave them exactly as written.
+      // Odd indices are the insides of `code spans`: leave them exactly as written.
       return line
         .split(/(`+[^`]*`+)/)
         .map((part, i) => (i % 2 === 1 ? part : rewriteInline(part, selfSlug)))
@@ -144,8 +157,8 @@ function rewriteTarget(target, selfSlug) {
     return `/index.html${frag}`;
   }
 
-  // Everything else names a file in the repository — source, fixtures,
-  // examples, the licence — which this site does not publish. Send the reader
+  // Everything else names a file in the repository (source, fixtures,
+  // examples, the licence) which this site does not publish. Send the reader
   // to it on GitHub rather than emitting a link the reference check will
   // rightly refuse.
   const clean = pathPart.replace(/^(\.\/)+/, "").replace(/^(\.\.\/)+/, "");
@@ -154,7 +167,7 @@ function rewriteTarget(target, selfSlug) {
 
 /**
  * Heading ids are slugs of heading text, so two headings that read the same
- * within one document collide — and a duplicate id is an `unify audit` finding.
+ * within one document collide, and a duplicate id is an `unify audit` finding.
  * These specs legitimately repeat headings ("Why", "Rules", "Notes"), so the
  * duplicates are disambiguated here rather than by editing the documentation.
  */
@@ -176,7 +189,7 @@ function disambiguateHeadings(md) {
 /**
  * A document may carry a second `# Heading` mid-way (docs/integrations.md did,
  * which this site is how we found out). Two <h1> elements on one page is an
- * `unify audit` finding, so any h1 after the first is demoted here — the source
+ * `unify audit` finding, so any h1 after the first is demoted here; the source
  * document is the right place to fix it, but one stray heading should not be
  * able to break the whole site.
  */
@@ -209,7 +222,7 @@ for (const file of ordered) {
   const title = titleOf(raw, slug);
   const description = descriptionOf(raw, title);
 
-  // Drop the leading `# Heading` — the layout has no page header of its own, so
+  // Drop the leading `# Heading`: the layout has no page header of its own, so
   // the page keeps exactly one <h1>, which `audit` checks against the title.
   let body = raw.replace(/^#\s+.+?\r?\n/, "");
   body = demoteStrayH1s(body);
@@ -219,16 +232,31 @@ for (const file of ordered) {
   // No `layout:` line, and that is the point: the overlay and the source tree
   // share one path space, so `docs/<slug>.md` walks `docs/` and then the source
   // root and finds `_layout.html` exactly as a page typed into `src/docs/`
-  // would. Naming the layout here was once mandatory — the workaround for a
+  // would. Naming the layout here was once mandatory, the workaround for a
   // generated page silently publishing bare. See FINDINGS.md finding 1.
   const front = ["---", `title: ${yamlString(title)}`, `description: ${yamlString(description)}`, "schema: WebPage", "---", ""].join("\n");
   write(`docs/${slug}.md`, `${front}# ${title}\n${body}`);
   pages.push({ slug, title, description });
 }
 
+// The nav groups, with any un-curated document under "More": the same
+// grouping the sidebar and the index page both render, derived once.
+const bySlug = new Map(pages.map((p) => [p.slug, p]));
+const grouped = GROUPS.map((g) => ({
+  label: g.label,
+  pages: g.files.map(([f]) => bySlug.get(basename(f, ".md"))).filter(Boolean),
+}));
+const extras = pages.filter((p) => !ORDER.includes(`${p.slug}.md`));
+if (extras.length) grouped.push({ label: "More", pages: extras });
+
 // The documentation index.
-const indexBody = pages
-  .map((p) => `- **[${p.title}](/docs/${p.slug}.html)** — ${p.description}`)
+const indexBody = grouped
+  .flatMap((g) => [
+    `## ${g.label}`,
+    "",
+    ...g.pages.map((p) => `- **[${p.title}](/docs/${p.slug}.html)**: ${p.description}`),
+    "",
+  ])
   .join("\n");
 write(
   "docs/index.md",
@@ -244,11 +272,10 @@ write(
     "Every page below is generated from the repository's `docs/` directory at build time, so this site cannot drift from the documentation it renders.",
     "",
     indexBody,
-    "",
   ].join("\n"),
 );
 
-// The sidebar, generated from the same list the pages came from — which is the
+// The sidebar, generated from the same list the pages came from, which is the
 // natural shape of derived content, and was this script's original design. A
 // fragment written into the overlay resolves for `<include src>` exactly as one
 // in `src/_includes/` does, so `_layout.html`'s `/_includes/docnav.html` finds
@@ -257,11 +284,17 @@ write(
 write(
   "_includes/docnav.html",
   [
-    '<nav class="docnav" aria-label="Documentation">',
-    '  <p class="docnav-title"><a href="/docs/index.html">All documentation</a></p>',
-    "  <ul>",
-    ...pages.map((p) => `    <li><a href="/docs/${p.slug}.html">${escapeHtml(p.title)}</a></li>`),
-    "  </ul>",
+    '<nav class="docnav" id="docnav" aria-label="Documentation">',
+    ...grouped.flatMap((g) => [
+      "  <div>",
+      `    <p class="docnav-label">${escapeHtml(g.label)}</p>`,
+      "    <ul>",
+      ...g.pages.map((p) =>
+        `      <li><a href="/docs/${p.slug}.html">${escapeHtml(NAV_LABEL.get(p.slug) ?? p.title)}</a></li>`),
+      "    </ul>",
+      "  </div>",
+    ]),
+    '  <p class="docnav-all"><a href="/docs/index.html">All documentation →</a></p>',
     "</nav>",
     "",
   ].join("\n"),
