@@ -21,13 +21,15 @@ on:
       - ".github/workflows/deploy-docs.yml"
   workflow_dispatch:
 
-# The real public address: fwdslsh/unify is a project repository, so its
-# default Pages URL carries the repo name as a subpath. No custom domain is
-# configured (no CNAME file in this tree) — using one here without owning
-# and wiring the DNS would ship a canonical, sitemap, and JSON-LD that all
-# point somewhere that doesn't resolve.
+# The custom domain: unify.fwdslsh.dev, DNS-verified and set as this repo's
+# Pages custom domain in Settings -> Pages. No CNAME file is added to the
+# build output for this — GitHub Actions deployments ignore one if present;
+# the domain lives entirely in the repository setting, which is also what
+# provisions the certificate. (The prior address, before the domain was
+# wired up, was the default project-pages URL, fwdslsh.github.io/unify/ —
+# kept working, still resolves, GitHub will redirect it to this one.)
 env:
-  SITE_BASE_URL: https://fwdslsh.github.io/unify/
+  SITE_BASE_URL: https://unify.fwdslsh.dev/
 
 permissions:
   contents: read

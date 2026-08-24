@@ -3,17 +3,17 @@
 The dogfooding example (issue #51). It renders the repository's real `docs/` directory as
 a documentation site, using nothing but the five authoring primitives.
 
-**Live at <https://fwdslsh.github.io/unify/>**, deployed on every push to `main` that
-touches `docs/` or this directory (`.github/workflows/deploy-docs.yml`). The address below
-is that real address — `fwdslsh/unify` is a project repository, so its Pages URL carries
-the repo name as a subpath; there is no custom domain configured.
+**Live at <https://unify.fwdslsh.dev/>**, deployed on every push to `main` that touches
+`docs/` or this directory (`.github/workflows/deploy-docs.yml`). The address below is that
+real address — a custom domain, DNS-verified and configured as this repository's Pages
+domain in Settings → Pages.
 
 ```bash
 cd examples/unify-docs
 unify build -s src -o dist \
   --generate _scripts/gen.mjs \
   --pretty-urls \
-  --base-url https://fwdslsh.github.io/unify/ \
+  --base-url https://unify.fwdslsh.dev/ \
   --canonical auto \
   --search-index
 ```
@@ -22,9 +22,9 @@ Both gates pass:
 
 ```bash
 unify build -s src -o dist --generate _scripts/gen.mjs --pretty-urls \
-  --base-url https://fwdslsh.github.io/unify/ --canonical auto --search-index --dry-run --strict   # exit 0
+  --base-url https://unify.fwdslsh.dev/ --canonical auto --search-index --dry-run --strict   # exit 0
 unify audit -s src --generate _scripts/gen.mjs --pretty-urls \
-  --base-url https://fwdslsh.github.io/unify/ --canonical auto --search-index --strict            # exit 0
+  --base-url https://unify.fwdslsh.dev/ --canonical auto --search-index --strict            # exit 0
 ```
 
 18 files: 12 documentation pages, an index, a front page, a 404, the stylesheet,
@@ -99,9 +99,15 @@ Pages on every push to `main` under `docs/` or `examples/unify-docs/`, or on dem
 either gate failing stops the deploy, the same transactional guarantee `unify build` itself
 gives a local run.
 
-**One thing the workflow cannot do for itself**: GitHub Pages has to be told once, in the
-repository's own settings, to serve from Actions rather than a branch —
-**Settings → Pages → Build and deployment → Source → "GitHub Actions"**. Until that is set,
-the `deploy` job fails with GitHub's own "Pages site not found" error; the `build` job (the
-two gates plus the real build) succeeds regardless, so a red `deploy` step with a green
-`build` step means exactly this and nothing else.
+**Two things the workflow could not do for itself, both now done**: GitHub Pages' source is
+set to **Settings → Pages → Build and deployment → Source → "GitHub Actions"**, and the
+custom domain (`unify.fwdslsh.dev`, DNS-verified) is configured on the same settings page —
+which is also what provisions the certificate. No `CNAME` file lives in the build output for
+this: GitHub Actions deployments ignore one if present, and the domain lives entirely in the
+repository setting. Before the domain existed, the site was reachable at the default
+project-pages address, `fwdslsh.github.io/unify/`; that address still resolves and now
+redirects to the custom domain.
+
+If either setting is ever missing — a fresh fork, say — the `deploy` job fails with GitHub's
+own "Pages site not found," while the `build` job (both gates plus the real build) succeeds
+regardless, so a red `deploy` step next to a green `build` step means exactly this.
