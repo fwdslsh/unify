@@ -10,8 +10,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Development Commands
 
+**Two runtimes run the CLI; one runs the tests.** `src/**` is `node:*` built-ins only and works identically under Bun >= 1.2.0 and Node >= 22.12.0 — a `Bun.*` call or a Bun-only global (`import.meta.main`) in `src/` is a bug, and gate G12 (`tests/conformance/node-parity.test.js`) fails on any byte of output that depends on which runtime ran. The **test suite stays Bun's**: 58 files import `bun:test`, `bun test` is the only way to run it, and it is not to be ported. Binaries stay `bun build --compile`. Deno is not supported.
+
 ```bash
-# Install dependencies (Bun >=1.2.0 required)
+# Install dependencies (Bun >=1.2.0 required for development)
 bun install
 
 # Run tests
@@ -91,6 +93,10 @@ Path traversal safety in include/layout resolution is internal engineering — a
 - Native ES modules without transpilation; built-in test runner and bundler
 - Fast file I/O and watch capabilities; single runtime for the toolchain
 - Single-file executables — the headline install for an audience that has never heard of Bun
+
+### Why Node too (issue #49)?
+- `npx @fwdslsh/unify` is how people try a JS CLI, and hosted build platforms run npm-installable packages — being Bun-only kept unify out of them permanently, and nothing about the composition model required it
+- The cost was four call sites (`Bun.serve`, `Bun.file`, `Bun.spawn`, `import.meta.main`), all replaced with `node:*` equivalents that run on both — **no `typeof Bun` branch anywhere**, because a runtime fork means the code a contributor tests is not the code a user runs
 
 ### Why standards-first composition?
 - `<main>` is the HTML spec's own page/chrome division — the default slot costs nothing to learn

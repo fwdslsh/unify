@@ -12,7 +12,8 @@
     "access": "public"
   },
   "engines": {
-    "bun": ">=1.2.0"
+    "bun": ">=1.2.0",
+    "node": ">=22.12.0"
   },
   "scripts": {
     "test": "CLAUDECODE=1 bun test --coverage --coverage-dir=.coverage --coverage-reporter=lcov",
@@ -49,6 +50,11 @@
   },
   "peerDependencies": {
     "bun": ">=1.2.0"
+  },
+  "peerDependenciesMeta": {
+    "bun": {
+      "optional": true
+    }
   },
   "files": [
     "src/",

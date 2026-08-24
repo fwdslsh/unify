@@ -1,14 +1,25 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 /**
  * unify — the CLI.
+ *
+ * THE SHEBANG NAMES `node`, AND IT IS NOT A STATEMENT ABOUT THE PREFERRED
+ * RUNTIME (issue #49). It is the one line that decides whether `npx
+ * @fwdslsh/unify` works on a machine that has never had bun installed: an npm
+ * install links `node_modules/.bin/unify` at this file, the OS reads line 1 to
+ * decide what to exec, and `env bun` there is `command not found` no matter
+ * which runtime could have run the JavaScript. Nothing is lost on the bun
+ * side, because nothing on the bun side reads it — `bun install -g` invokes
+ * the script with bun itself, `bun src/cli.js` names the runtime on the
+ * command line, and the compiled binary has no shebang at all.
  *
  * Exit taxonomy (§14.1): 0 published (with --dry-run, would have been);
  * 1 problems found, nothing published, previous output untouched;
  * 2 invalid usage or fatal environment fault.
  */
 
-import { existsSync, statSync } from "node:fs";
+import { existsSync, realpathSync, statSync } from "node:fs";
 import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import pkg from "../package.json" with { type: "json" };
 import { Reporter, UsageError } from "./core/diagnostics.js";
 import { cleanRefusalReason, resolveSource } from "./core/paths.js";
@@ -252,8 +263,40 @@ export async function run(argv) {
   }
 }
 
+/**
+ * Is this file the program, rather than a module something else imported?
+ *
+ * `import.meta.main` alone was the check, and it is the reason `node
+ * src/cli.js` used to be a SILENT NO-OP (issue #49). bun has always had the
+ * property; node only grew it in v22.18.0, and on anything older it is
+ * `undefined` — so the whole CLI was skipped, nothing was written, nothing was
+ * printed, and the exit code was 0. A build that publishes nothing and reports
+ * success is precisely the failure the content-loss law exists to forbid, and
+ * it was reachable from the entrypoint by every node in the supported range.
+ *
+ * So the runtime's own answer is used WHEN THERE IS ONE, and otherwise the
+ * question is answered directly: is the script node was told to run this file?
+ * `realpathSync` is what makes that comparison hold for an npm install, where
+ * `argv[1]` is the `node_modules/.bin/unify` symlink while `import.meta.url`
+ * is already the link's target — comparing the two as written would fail on
+ * the install path this whole change exists to support.
+ *
+ * @returns {boolean}
+ */
+function isProgram() {
+  if (typeof import.meta.main === "boolean") return import.meta.main;
+  const entry = process.argv[1];
+  if (!entry) return false;
+  const self = fileURLToPath(import.meta.url);
+  try {
+    return realpathSync(entry) === self;
+  } catch {
+    return resolve(entry) === self; // never ran, never resolved — not the program
+  }
+}
+
 /* c8 ignore start — process wiring, exercised by the conformance harness */
-if (import.meta.main) {
+if (isProgram()) {
   try {
     process.exitCode = await run(process.argv.slice(2));
   } catch (error) {

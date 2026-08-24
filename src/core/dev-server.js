@@ -10,9 +10,32 @@
  * `outputDir` itself, so it can never leak into what `unify build` (or a
  * plain `unify watch`, which imports none of this file) ships.
  *
- * `createDevServer` throws `UsageError` (exit 2, §14.1's fatal environment
- * fault) when the port is already bound, before anything else about `dev`
- * has started.
+ * `createDevServer` rejects with `UsageError` (exit 2, §14.1's fatal
+ * environment fault) when the port is already bound, before anything else
+ * about `dev` has started.
+ *
+ * ---
+ *
+ * THE SERVER IS `node:http`, UNDER BOTH RUNTIMES (issue #49). unify runs on
+ * bun and on node, and this file is one of the two that used to be able to
+ * tell: it called `Bun.serve` and handed `Bun.file` to `Response`. Both are
+ * gone, and nothing branches on the runtime in their place — a `typeof Bun`
+ * fork here would mean the dev server a contributor tests is not the dev
+ * server a user runs, which is the whole class of bug the parity gate
+ * (testing-strategy.md G12) exists to keep out. `node:http` is native on node
+ * and Bun-implemented on bun, so one code path serves both.
+ *
+ * The two places where that swap could have changed observable behaviour, and
+ * what holds them still:
+ *
+ *   - **`content-type`** was Bun's to decide when the body was a `Bun.file`.
+ *     `CONTENT_TYPES` below is its answer table, transcribed, so a `.css` is
+ *     still `text/css;charset=utf-8` rather than a download.
+ *   - **binding is asynchronous** in `node:http` — `listen()` reports
+ *     `EADDRINUSE` on an event, where `Bun.serve` threw. So `createDevServer`
+ *     is `async` and its caller awaits it. The CONTRACT is unmoved: the port
+ *     is bound (or the `UsageError` raised) before `dev` starts a build.
+ *
  *
  * ---
  *
@@ -49,8 +72,9 @@
  * itself — the reservation is a promise about who answers, not an invitation
  * to guess sub-pages.
  */
-import { readFileSync, statSync } from "node:fs";
-import { resolve } from "node:path";
+import { createReadStream, readFileSync, statSync } from "node:fs";
+import { createServer } from "node:http";
+import { extname, resolve } from "node:path";
 import { UsageError } from "./diagnostics.js";
 import { renderPending } from "./dev-report.js";
 import { contains } from "./paths.js";
@@ -110,54 +134,209 @@ export function resolveStaticFile(outputDir, pathname) {
 }
 
 /**
- * @param {string} outputDir
- * @returns {Response}
+ * What `Bun.file(path).type` answered for each extension under bun 1.3.11,
+ * dumped once and transcribed here.
+ *
+ * This is a TRANSCRIPTION, not a design. The old code handed a `Bun.file` to
+ * `Response` and let Bun label it; `node:http` has no such table, so matching
+ * Bun's is what keeps the port a no-op. It is not cosmetic: a browser in
+ * standards mode refuses a stylesheet served as `application/octet-stream`,
+ * so getting this wrong would have broken every `unify dev` preview under
+ * node while every test stayed green — no test reads a `content-type` for a
+ * non-HTML asset, and none should have to.
+ *
+ * Two properties of Bun's lookup are preserved deliberately rather than
+ * improved on. It is CASE-SENSITIVE (`photo.JPG` was `application/octet-stream`
+ * before this change and still is), and an unlisted extension falls back to
+ * `application/octet-stream`. Both are worth fixing; neither is fixable here,
+ * because a port that also changes behaviour is a port nobody can review.
+ * That is a separate commit, with a test, changing both runtimes at once.
+ *
+ * The one header deliberately NOT reproduced is Bun's `content-disposition:
+ * filename="…"`, which it derived from the `Bun.file` blob's name. It has no
+ * disposition-type, so it is malformed under RFC 6266 §4.1, it carried no
+ * decision this server was making, and re-emitting it by hand would have
+ * written a bug down as an intention.
  */
-function notFoundResponse(outputDir) {
-  const notFoundPath = resolve(outputDir, "404.html");
-  if (isFile(notFoundPath)) {
-    const text = readFileSync(notFoundPath, "utf8");
-    return new Response(injectReloadScript(text), { status: 404, headers: { "content-type": "text/html; charset=utf-8" } });
-  }
-  return new Response("404 not found\n", { status: 404, headers: { "content-type": "text/plain; charset=utf-8" } });
+const CONTENT_TYPES = new Map();
+for (const [type, exts] of Object.entries({
+  "application/atom+xml": "atom",
+  "application/epub+zip": "epub",
+  "application/gzip": "gz",
+  "application/json;charset=utf-8": "json map",
+  "application/ld+json": "jsonld",
+  "application/manifest+json": "webmanifest",
+  "application/msword": "doc",
+  "application/pdf": "pdf",
+  "application/postscript": "ps eps ai",
+  "application/rls-services+xml": "rs",
+  "application/rss+xml": "rss",
+  "application/toml": "toml",
+  "application/ttml+xml": "ttml",
+  "application/vnd.ms-excel": "xls",
+  "application/vnd.ms-fontobject": "eot",
+  "application/vnd.ms-powerpoint": "ppt",
+  "application/vnd.oasis.opendocument.presentation": "odp",
+  "application/vnd.oasis.opendocument.spreadsheet": "ods",
+  "application/vnd.oasis.opendocument.text": "odt",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+  "application/wasm": "wasm",
+  "application/x-7z-compressed": "7z",
+  "application/x-bzip2": "bz2",
+  "application/x-httpd-php": "php",
+  "application/x-mobipocket-ebook": "mobi",
+  "application/x-perl": "pl",
+  "application/x-rar-compressed": "rar",
+  "application/x-sh": "sh",
+  "application/x-sql": "sql",
+  "application/x-subrip": "srt",
+  "application/x-tar": "tar",
+  "application/xhtml+xml": "xhtml",
+  "application/xml": "xml",
+  "application/zip": "zip",
+  "audio/midi": "mid midi",
+  "audio/mpeg": "mp3",
+  "audio/ogg": "oga ogg opus",
+  "audio/webm": "weba",
+  "audio/x-aac": "aac",
+  "audio/x-flac": "flac",
+  "audio/x-m4a": "m4a",
+  "audio/x-wav": "wav",
+  "font/otf": "otf",
+  "font/ttf": "ttf",
+  "font/woff": "woff",
+  "font/woff2": "woff2",
+  "image/apng": "apng",
+  "image/avif": "avif",
+  "image/gif": "gif",
+  "image/heic": "heic",
+  "image/heif": "heif",
+  "image/jpeg": "jpg jpeg jpe",
+  "image/png": "png",
+  "image/svg+xml": "svg svgz",
+  "image/tiff": "tif tiff",
+  "image/vnd.adobe.photoshop": "psd",
+  "image/webp": "webp",
+  "image/x-icon": "ico",
+  "image/x-ms-bmp": "bmp",
+  "model/gltf-binary": "glb",
+  "model/gltf+json": "gltf",
+  "model/mtl": "mtl",
+  "model/obj": "obj",
+  "model/stl": "stl",
+  "text/cache-manifest": "manifest appcache",
+  "text/calendar": "ics",
+  "text/css;charset=utf-8": "css",
+  "text/csv": "csv",
+  "text/html;charset=utf-8": "html htm",
+  "text/javascript;charset=utf-8": "js mjs cjs ts tsx jsx",
+  "text/markdown": "md markdown",
+  "text/plain;charset=utf-8": "txt text log ini conf",
+  "text/rtf": "rtf",
+  "text/tab-separated-values": "tsv",
+  "text/vtt": "vtt",
+  "text/x-c": "c h cpp",
+  "text/x-java-source": "java",
+  "text/x-vcard": "vcf",
+  "text/yaml": "yaml yml",
+  "video/3gpp": "3gp",
+  "video/mp4": "mp4",
+  "video/mpeg": "mpg mpeg",
+  "video/ogg": "ogv",
+  "video/quicktime": "mov",
+  "video/webm": "webm",
+  "video/x-m4v": "m4v",
+  "video/x-matroska": "mkv",
+  "video/x-msvideo": "avi",
+})) {
+  for (const ext of exts.split(" ")) CONTENT_TYPES.set(`.${ext}`, type);
 }
 
-/** One open SSE connection's send function. */
-function sseResponse(clients) {
-  const encoder = new TextEncoder();
-  let send;
-  const stream = new ReadableStream({
-    start(controller) {
-      controller.enqueue(encoder.encode(": connected\n\n"));
-      send = () => {
-        try {
-          controller.enqueue(encoder.encode("data: reload\n\n"));
-        } catch {
-          /* the client is gone; cancel() below removes it */
-        }
-      };
-      clients.add(send);
-    },
-    cancel() {
-      clients.delete(send);
-    },
-  });
-  return new Response(stream, {
-    headers: { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" },
-  });
+/** Bun's own fallback for an unknown extension, and for no extension at all. */
+const DEFAULT_CONTENT_TYPE = "application/octet-stream";
+
+/**
+ * @param {string} filePath
+ * @returns {string}
+ */
+function contentTypeFor(filePath) {
+  return CONTENT_TYPES.get(extname(filePath)) ?? DEFAULT_CONTENT_TYPE;
 }
 
 /**
- * @param {Request} req
+ * One complete string body, with the explicit `content-length` Bun set for a
+ * string `Response` — without it `node:http` falls back to chunked encoding,
+ * which is a different set of bytes on the wire for the same document.
+ * @param {import('node:http').ServerResponse} res
+ * @param {number} status
+ * @param {string} contentType
+ * @param {string} body
+ */
+function respond(res, status, contentType, body) {
+  const bytes = Buffer.from(body, "utf8");
+  res.writeHead(status, { "content-type": contentType, "content-length": bytes.length });
+  res.end(bytes);
+}
+
+/**
+ * @param {import('node:http').ServerResponse} res
+ * @param {string} outputDir
+ */
+function sendNotFound(res, outputDir) {
+  const notFoundPath = resolve(outputDir, "404.html");
+  if (isFile(notFoundPath)) {
+    const text = readFileSync(notFoundPath, "utf8");
+    respond(res, 404, "text/html; charset=utf-8", injectReloadScript(text));
+    return;
+  }
+  respond(res, 404, "text/plain; charset=utf-8", "404 not found\n");
+}
+
+/**
+ * Hold one SSE connection open and register its send function.
+ *
+ * No `content-length`: this response never ends until the client leaves, so
+ * chunked encoding is the point here rather than the accident it would be
+ * above.
+ * @param {import('node:http').ServerResponse} res
+ * @param {Set<() => void>} clients
+ */
+function openReloadStream(res, clients) {
+  res.writeHead(200, {
+    "content-type": "text/event-stream",
+    "cache-control": "no-cache",
+    connection: "keep-alive",
+  });
+  res.write(": connected\n\n");
+  const send = () => {
+    try {
+      res.write("data: reload\n\n");
+    } catch {
+      /* the client is gone; the close handler below removes it */
+    }
+  };
+  clients.add(send);
+  const drop = () => clients.delete(send);
+  res.on("close", drop);
+  res.on("error", drop);
+}
+
+/**
+ * @param {import('node:http').IncomingMessage} req
+ * @param {import('node:http').ServerResponse} res
  * @param {string} outputDir
  * @param {Set<() => void>} clients
  * @param {() => string} report - the current §27 report, read at request time
  *   so a request always gets the latest FINISHED one (§27.4)
- * @returns {Promise<Response>}
  */
-async function handleRequest(req, outputDir, clients, report) {
-  const url = new URL(req.url);
-  if (url.pathname === RELOAD_PATH) return sseResponse(clients);
+function handleRequest(req, res, outputDir, clients, report) {
+  // `req.url` is a path under `node:http` and was an absolute URL under
+  // `Bun.serve`; a base makes both parse, and an absolute-form request line
+  // (what a proxy sends) still wins over the base, as it did before.
+  const url = new URL(req.url, "http://127.0.0.1");
+  if (url.pathname === RELOAD_PATH) return openReloadStream(res, clients);
 
   // §27.2, above. Answered before any filesystem lookup because the path is
   // this server's, not the site's — and `report()` is a value already in
@@ -165,9 +344,7 @@ async function handleRequest(req, outputDir, clients, report) {
   // the reload script like every other HTML response this server sends, which
   // is what makes the same stream that refreshes a page refresh the report.
   if (url.pathname === REPORT_PATH) {
-    return new Response(injectReloadScript(report()), {
-      headers: { "content-type": "text/html; charset=utf-8" },
-    });
+    return respond(res, 200, "text/html; charset=utf-8", injectReloadScript(report()));
   }
   // §27.2's directory redirect — "as any directory would" is the web's
   // convention, not a symmetry with the static half below, which does not
@@ -177,20 +354,31 @@ async function handleRequest(req, outputDir, clients, report) {
   // permanent redirect for a development-only path would outlive the process
   // in the browser's cache.
   if (url.pathname === REPORT_PATH.slice(0, -1)) {
-    return new Response(null, { status: 302, headers: { location: REPORT_PATH } });
+    res.writeHead(302, { location: REPORT_PATH, "content-length": 0 });
+    return res.end();
   }
   // The same 404 every other missing path gets — this server has one 404
   // behaviour, and a reserved path is not a reason to invent a second one.
-  if (url.pathname.startsWith(REPORT_PATH)) return notFoundResponse(outputDir);
+  if (url.pathname.startsWith(REPORT_PATH)) return sendNotFound(res, outputDir);
 
   const filePath = resolveStaticFile(outputDir, decodeURIComponent(url.pathname));
-  if (!filePath) return notFoundResponse(outputDir);
+  if (!filePath) return sendNotFound(res, outputDir);
 
   if (filePath.endsWith(".html")) {
     const text = readFileSync(filePath, "utf8");
-    return new Response(injectReloadScript(text), { headers: { "content-type": "text/html; charset=utf-8" } });
+    return respond(res, 200, "text/html; charset=utf-8", injectReloadScript(text));
   }
-  return new Response(Bun.file(filePath));
+  // Streamed, not buffered — `Bun.file` streamed too, and a site's largest
+  // mirror-copied asset has no business being read whole into memory to be
+  // previewed.
+  res.writeHead(200, {
+    "content-type": contentTypeFor(filePath),
+    "content-length": statSync(filePath).size,
+  });
+  const body = createReadStream(filePath);
+  body.on("error", () => res.destroy());
+  res.on("error", () => body.destroy());
+  body.pipe(res);
 }
 
 /**
@@ -204,30 +392,45 @@ async function handleRequest(req, outputDir, clients, report) {
  *   document from the moment it binds and swaps it whole. The default IS that
  *   first answer — kept here rather than at the call site so the guarantee is
  *   the server's own and cannot be lost by a caller that forgets it.
- * @returns {{url: string, port: number, notifyReload(): void, setReport(html: string): void, stop(): void}}
+ * @returns {Promise<{url: string, port: number, notifyReload(): void, setReport(html: string): void, stop(): void}>}
  * @throws {UsageError} when the port is already in use (§14.1, exit 2)
  */
-export function createDevServer({ outputDir, port, report = renderPending() }) {
+export async function createDevServer({ outputDir, port, report = renderPending() }) {
   /** @type {Set<() => void>} */
   const clients = new Set();
   let currentReport = report;
-  let server;
+
+  const server = createServer((req, res) => {
+    try {
+      handleRequest(req, res, outputDir, clients, () => currentReport);
+    } catch {
+      // A throw on the request path (a malformed percent-escape reaching
+      // `decodeURIComponent` is the realistic one) used to become Bun's own
+      // 500 page. `node:http` would take the whole process down with it
+      // instead, and a dev server that dies on a stray URL is worse than one
+      // that says 500 — so the status is preserved and the body is plain.
+      if (res.headersSent) res.destroy();
+      else respond(res, 500, "text/plain; charset=utf-8", "500 internal server error\n");
+    }
+  });
+
   try {
-    server = Bun.serve({
-      port,
+    await new Promise((listening, failed) => {
+      server.once("error", failed);
       // The literal loopback address, not the name "localhost": confirmed
-      // empirically (see the report) that Bun resolves the HOSTNAME STRING
-      // "localhost" to either ::1 or 127.0.0.1 independently on each
-      // Bun.serve() call, so two separate `unify dev` processes on the same
-      // port do not reliably conflict — the second can silently succeed by
-      // landing on the other address family, which breaks the §14.1 "a port
-      // already in use is a fatal environment error" contract. Binding the
-      // literal address makes the conflict — and therefore this catch below
-      // — deterministic. The URL a user types is unaffected: a browser
-      // resolves "localhost" to 127.0.0.1 the same way, and `url` below
-      // still reads that way.
-      hostname: "127.0.0.1",
-      fetch: (req) => handleRequest(req, outputDir, clients, () => currentReport),
+      // empirically (see the report) that a runtime resolves the HOSTNAME
+      // STRING "localhost" to either ::1 or 127.0.0.1 independently on each
+      // bind, so two separate `unify dev` processes on the same port do not
+      // reliably conflict — the second can silently succeed by landing on the
+      // other address family, which breaks the §14.1 "a port already in use
+      // is a fatal environment error" contract. Binding the literal address
+      // makes the conflict — and therefore this catch below — deterministic.
+      // The URL a user types is unaffected: a browser resolves "localhost" to
+      // 127.0.0.1 the same way, and `url` below still reads that way.
+      server.listen({ port, host: "127.0.0.1" }, () => {
+        server.removeListener("error", failed);
+        listening();
+      });
     });
   } catch (err) {
     if (err && err.code === "EADDRINUSE") {
@@ -238,9 +441,12 @@ export function createDevServer({ outputDir, port, report = renderPending() }) {
     throw err;
   }
 
+  // `port: 0` asks the OS to choose; this is what it chose.
+  const boundPort = server.address().port;
+
   return {
-    url: `http://localhost:${server.port}`,
-    port: server.port,
+    url: `http://localhost:${boundPort}`,
+    port: boundPort,
     /** Tell every open reload connection to refresh. Called after every rebuild, success or failure. */
     notifyReload() {
       for (const send of clients) send();
@@ -255,7 +461,12 @@ export function createDevServer({ outputDir, port, report = renderPending() }) {
       currentReport = html;
     },
     stop() {
-      server.stop(true);
+      // `closeAllConnections()` is what `Bun.serve`'s `stop(true)` meant here:
+      // an open reload stream never ends on its own, so `close()` alone would
+      // wait on it forever and `unify dev` would hang on ctrl-c with a browser
+      // tab still connected.
+      server.closeAllConnections();
+      server.close();
     },
   };
 }
