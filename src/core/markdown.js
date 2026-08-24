@@ -52,11 +52,21 @@
  * key lines only — deliberately not a general YAML parser, since the value
  * semantics already come from js-yaml and this indexer's only job is "which
  * line is this key on".
+ *
+ * On js-yaml 5 (upgraded from 3, issue #58 — 4.x dropped `safeLoad`/`safeDump`
+ * in favor of a safe-by-default `load`, which this module already called, so
+ * that jump was a no-op here): the package now ships flat named exports with
+ * no default export, so this imports `loadAll`/`FAILSAFE_SCHEMA` by name
+ * rather than a `yaml` default namespace. `parseFrontmatterYaml` below calls
+ * `loadAll` rather than `load` for one reason — see the comment there.
+ * `FAILSAFE_SCHEMA` itself, every scalar case above, and the `.reason`/
+ * `.mark.line` shape the catch block reads all verified identical across the
+ * jump.
  */
 
 import { readFile } from "node:fs/promises";
 import MarkdownIt from "markdown-it";
-import yaml from "js-yaml";
+import { loadAll as yamlLoadAll, FAILSAFE_SCHEMA } from "js-yaml";
 import { toRelative } from "./paths.js";
 
 // --------------------------------------------------------------- engine
@@ -468,7 +478,19 @@ function parseFrontmatterYaml(yamlText, { file, reporter }) {
   if (yamlText === null) return {};
   let parsed;
   try {
-    parsed = yaml.load(yamlText, { schema: yaml.FAILSAFE_SCHEMA });
+    // `loadAll`, not `load`: js-yaml 5's `load` throws "expected a document,
+    // but the input is empty" for a document-free body (blank, or comments
+    // only), where js-yaml 3's `load` returned `undefined` for the same
+    // input — a documented 4.x behavior change. `loadAll` never throws for
+    // zero documents (returning `[]` is its ordinary, defined behavior for an
+    // empty stream), so `[0]` reproduces the old `undefined` exactly, and the
+    // `typeof parsed !== "object"` check below already turns that into `{}`,
+    // same as it always has. `yamlText` can never hold more than one
+    // document — `splitFrontmatter`'s lazy match stops at the first top-level
+    // `---` it finds, so a second document separator would have already
+    // ended the frontmatter capture before reaching here — so `[0]` never
+    // silently discards a real second document either.
+    parsed = yamlLoadAll(yamlText, { schema: FAILSAFE_SCHEMA })[0];
   } catch (err) {
     // js-yaml carries the real position on the thrown error. `mark.line` is
     // 0-based and relative to the frontmatter body, which starts on the line
