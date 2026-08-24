@@ -377,6 +377,62 @@ test("REF-08/URL-08: an ENCODED authored link is pretty-rewritten like a raw one
   covers("REF-08");
 }, TEST_MS);
 
+test("URL-14: an extensionless link is pretty-rewritten, and a typo still fails", async () => {
+  // The spelling --pretty-urls exists to produce was the one spelling the
+  // rewrite ignored: /about reached §12 unrewritten and failed as an
+  // unresolvable reference, while `unify dev` served it by falling a directory
+  // request through to its index.html. Measured on a real site before the fix:
+  // 198 problems across 39 files, every one a link written the advertised way.
+  //
+  // Two-sided on purpose. Relaxing the check instead of teaching the rewrite
+  // would make the typo below silently publish a dead link.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": page(
+      "Home",
+      '<a href="/about">bare</a><a href="/sub">dir</a><a href="/style.css">asset</a>',
+    ),
+    "about.html": page("About"),
+    "sub/index.html": page("Sub"),
+    "style.css": "body{}",
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--pretty-urls"], tmp);
+  expectExit(r, 0, "extensionless links under --pretty-urls");
+  const out = read(tmp, "dist", "index.html");
+  if (!out.includes('href="/about/"')) {
+    throw new Error(`§11.2: /about must reach the page's pretty URL:\n${out}`);
+  }
+  if (!out.includes('href="/sub/"')) {
+    throw new Error(`§11.2: /sub must reach sub/index.html's pretty URL:\n${out}`);
+  }
+  if (!out.includes('href="/style.css"')) {
+    throw new Error(`§11.2: a non-page URL stays untouched:\n${out}`);
+  }
+
+  // A name that is no page is still a problem — the check was taught nothing.
+  const typo = mkTmp();
+  writeTree(join(typo, "src"), {
+    "index.html": page("Home", '<a href="/nope">typo</a>'),
+    "about.html": page("About"),
+  });
+  const bad = await runCli(["build", "-s", "src", "-o", "dist", "--pretty-urls"], typo);
+  expectExit(bad, 1, "extensionless link naming no page");
+  if (!bad.stderr.includes("/nope does not resolve")) {
+    throw new Error(`§12 must still report an extensionless typo:\n${bad.stderr}`);
+  }
+
+  // Without --pretty-urls the page is emitted at /about.html and /about names
+  // nothing, so the extensionless form must keep failing.
+  const plain = mkTmp();
+  writeTree(join(plain, "src"), {
+    "index.html": page("Home", '<a href="/about">bare</a>'),
+    "about.html": page("About"),
+  });
+  const noflag = await runCli(["build", "-s", "src", "-o", "dist"], plain);
+  expectExit(noflag, 1, "extensionless link without --pretty-urls");
+  covers("URL-14");
+}, TEST_MS);
+
 test("REF-08: an undecodable escape resolves verbatim or reports — never an unlocated fatal", async () => {
   // Pins the malformed-escape guard, two-sided. `/100%.html` is not a decodable
   // URI, so the segment is kept as written: it then matches a file literally

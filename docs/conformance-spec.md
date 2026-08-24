@@ -812,7 +812,13 @@ Fixture: `src/_includes/nav.html` contains `<img src="logo.png">` and `<a href="
 | `./contact.html?form=1` | `/contact/?form=1` |
 | `/blog.html#latest` | `/blog/#latest` |
 | `sub/index.html` | `/sub/` |
+| `/about` | `/about/` (extensionless) |
+| `/sub` | `/sub/` (extensionless, naming `sub/index.html`) |
 | `/404.html` | `/404.html` (never moved, never transformed) |
+
+**The extensionless spelling names a page too.** `--pretty-urls` publishes `about.html` at `/about/`, so `/about` is the URL the flag exists to produce and the one an author reaches for; it is resolved against the emitted page set exactly as `/about.html` is, and emits the same `/about/`. A URL with no trailing slash and no `.html` is tried first as `X.html` and then as `X/index.html`; if neither is an emitted page it is preserved untouched, and §12 reports it unchanged, so a genuine typo still fails loudly. The two candidates can never both be pages in a build that publishes — `about.html` and `about/index.html` both move to `about/index.html` under this flag, which is a §13 collision that blocks the build before any link is resolved.
+
+This was not so until 2026-08-24: the rewrite was keyed on the `.html` output alone, so `/about` reached §12 unrewritten and failed as an unresolvable reference. The cost was measured on a real site — 198 problems across 39 files on fwdslsh.dev, every one of them a link spelled the way `--pretty-urls` advertises — and the inconsistency ran inside unify itself, because `unify dev` already served `/about` by falling through a directory request to its `index.html`, as every static host does. The flag rejected at build time the spelling its own server answered.
 
 Preserved untouched: external URLs, `mailto:`/`tel:`/`data:`, fragment-only links, and URLs to non-page files (`/assets/doc.pdf`, `/style.css`). Query and fragment always survive transformation. In a **moved** page, every remaining relative URL (to assets etc.) is emitted root-relative per §11.1, so `![diagram](diagram.png)` beside a Markdown page keeps working. A `<meta http-equiv="refresh">` URL is transformed like a link, because it is one: a redirect to `/about.html` in a build that emits `about/index.html` names nothing.
 

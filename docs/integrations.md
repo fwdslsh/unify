@@ -104,9 +104,9 @@ toolchain makes assets, and the seam between them is the filesystem.
 
 ---
 
-## Four recipes
+## Five recipes
 
-The pattern above runs your toolchain *beside* unify, by you. The four recipes below are
+The pattern above runs your toolchain *beside* unify, by you. The five recipes below are
 the common variations, and the first of them is the only place unify reaches out at all.
 
 ## 1. The generator context: what `--generate` hands you
@@ -296,6 +296,66 @@ The one flag that touches the network is `unify audit --external`, which fetches
 off-origin URLs your site emits and reports the ones that do not resolve. It is opt-in for
 a reason: it makes the command's result depend on somebody else's uptime. Ordinary builds
 and ordinary audits never open a socket.
+
+## 5. A prebuilt package's browser files
+
+Some packages need no toolchain at all: they ship the `.js` and `.css` a browser can load
+as-is, and all you need is those files in your output. `node_modules/` is on the
+never-shipped list, so they cannot get there by being where they are — and there is no
+copy flag to name them with. A generator copies them, which keeps the dependency pinned in
+`package.json` instead of pinned to whenever somebody last dragged files into `src/`.
+
+Resolve the package rather than hardcoding a path into `node_modules/`. The layout of that
+directory is the package manager's business — pnpm and Yarn PnP do not put files where npm
+does — and `import.meta.resolve` asks the runtime the question directly:
+
+```js
+// _scripts/vendor.mjs — run by --generate on every build
+import { copyFileSync, mkdirSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+
+const generatedDir = process.argv[3];
+
+// Each entry is [what the package exports, where the site should serve it].
+const FILES = [
+  ["highlight.js/styles/github-dark.css", "vendor/highlight.css"],
+  ["highlight.js/lib/core.js", "vendor/highlight.js"],
+];
+
+for (const [specifier, target] of FILES) {
+  const from = fileURLToPath(import.meta.resolve(specifier));
+  const to = join(generatedDir, target);
+  mkdirSync(dirname(to), { recursive: true });
+  copyFileSync(from, to);
+}
+```
+
+Your pages then reference the target paths as ordinary site URLs, because that is what they
+now are:
+
+```html
+<link rel="stylesheet" href="/vendor/highlight.css">
+<script type="module" src="/vendor/highlight.js"></script>
+```
+
+**The build checks this for you, in one direction only.** A `<link href>` or `<script src>`
+naming a file the generator failed to copy is an unresolved reference, and the build
+refuses to publish — the recipe cannot silently half-work. What the reference check cannot
+see is a path inside a JavaScript string: `await import("/vendor/highlight.js")` is opaque
+to it, so a broken path there fails in the browser rather than at build time. Reference
+vendored files from HTML attributes where you can, and treat a dynamic `import()` as
+unchecked.
+
+**Copy what the browser loads, and nothing else.** A package's published directory usually
+carries `.d.ts` files, source maps, and CommonJS builds alongside the one file you want;
+naming each file explicitly, as `FILES` does above, keeps your output honest about its own
+size. Nothing you skip is missed — unify emits exactly what the generator wrote.
+
+Two things worth knowing. The generator runs under **unify's own runtime**, so this recipe
+works from the standalone binary on a machine with neither Node nor Bun installed, as long
+as `node_modules` is on disk. And in `--dry-run` every vendored file reports its origin as
+`← generated`, which is how you tell a copied dependency from a file you wrote.
 
 ## What stays outside unify
 

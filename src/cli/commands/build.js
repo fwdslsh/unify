@@ -742,7 +742,11 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
         action: "copy",
         outputPath: `${displayOutput}/${outputPathOf.get(a.relPath)}`,
         url: publishModule.urlForOutputPath(outputPathOf.get(a.relPath), prefix),
-        from: a.relPath,
+        // GEN-04 applies to every row, not only pages: a generated ASSET has no
+        // source file behind it either, and naming its overlay-relative path
+        // pointed the reader at something that does not exist in src/. The
+        // vendoring recipe (integrations.md) makes this the common case.
+        from: a.generated ? "generated" : a.relPath,
       })),
       // §21.1 — a generated artifact is a write like any other, so it carries
       // the same address the report gives every other row. `from` names what

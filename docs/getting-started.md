@@ -93,7 +93,7 @@ Three things are happening:
 </html>
 ```
 
-Built result: the layout's `<main>` content is replaced by the page's, and the page's title is joined onto the layout's — `<title>Home — My Site</title>`. The layout carries the separator, so pages write only their own name.
+Built result: the layout's `<main>` content is replaced by the page's, and the page's title is joined onto the layout's — `<title>Home — My Site</title>`. The layout carries the separator, so pages write only their own name. Write that separator with **no leading space** — `<title>— My Site</title>`, not `<title> — My Site</title>` — because the join supplies the space itself. The difference only shows on a page that has no title of its own: nothing is joined, so the layout's title ships exactly as written, leading space and all. (`unify audit` reports such a page, since every page sharing one title is a page a search result cannot tell apart.)
 
 Two details worth knowing:
 

@@ -292,3 +292,66 @@ test("what stays outside unify — there is no --run, and the refusal says so", 
   // not exist quietly.
   expectExit(r, 2, "`--run \"<shell command>\"` is named as absent and must be");
 }, TEST_MS);
+
+// --------------------------------------------- recipe 5: a prebuilt package
+
+const R5 = "5. A prebuilt package's browser files";
+
+test("recipe 5 — the generator resolves a package and vendors its files into the build", async () => {
+  // The recipe's literal, run against a real package layout. Nothing is stubbed:
+  // `import.meta.resolve` is asked the real question about a real node_modules
+  // tree, which is the whole point of the recipe preferring it to a hardcoded
+  // path. The package is hand-built in the temp tree so the test needs no
+  // network and no install.
+  const generator = codeBlock(R5, "js", 0);
+  const markup = codeBlock(R5, "html", 0).trim();
+
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": page("Home", `<h1>Home</h1>\n${markup}`),
+    "_scripts/vendor.mjs": generator,
+  });
+  // A minimal package matching the specifiers the recipe names, plus the noise
+  // a real one carries — the .d.ts must NOT reach dist/.
+  writeTree(join(tmp, "node_modules", "highlight.js"), {
+    "package.json": JSON.stringify({ name: "highlight.js", version: "0.0.0", exports: { "./": "./" } }),
+    "styles/github-dark.css": ".hljs{color:#c9d1d9}\n",
+    "lib/core.js": "export function highlight() {}\n",
+    "lib/core.d.ts": "export declare function highlight(): void;\n",
+  });
+
+  const r = await runCli(
+    ["build", "-s", "src", "-o", "dist", "--generate", "_scripts/vendor.mjs"],
+    tmp,
+  );
+  expectExit(r, 0, "recipe 5's generator");
+
+  const css = join(tmp, "dist", "vendor", "highlight.css");
+  const js = join(tmp, "dist", "vendor", "highlight.js");
+  if (!existsSync(css) || !existsSync(js)) {
+    throw new Error(`recipe 5 must vendor both files:\n${readdirSync(join(tmp, "dist"), { recursive: true })}`);
+  }
+  if (readFileSync(css, "utf8") !== ".hljs{color:#c9d1d9}\n") {
+    throw new Error("recipe 5: a vendored file ships byte-for-byte");
+  }
+  // "Copy what the browser loads, and nothing else."
+  if (existsSync(join(tmp, "dist", "vendor", "core.d.ts"))) {
+    throw new Error("recipe 5: only the named files are copied");
+  }
+}, TEST_MS);
+
+test("recipe 5 — a vendored file the generator did not write fails the build", async () => {
+  // The recipe's claim that the build checks this "in one direction only".
+  // The HTML side is checked: drop the generator and the same markup must fail
+  // rather than publish a page whose stylesheet 404s.
+  const markup = codeBlock(R5, "html", 0).trim();
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), { "index.html": page("Home", `<h1>Home</h1>\n${markup}`) });
+
+  const r = await runCli(["build", "-s", "src", "-o", "dist"], tmp);
+  expectExit(r, 1, "vendored files referenced but never generated");
+  if (!r.stderr.includes("/vendor/highlight.css does not resolve")) {
+    throw new Error(`recipe 5: the reference check is what makes this self-verifying:\n${r.stderr}`);
+  }
+  if (existsSync(join(tmp, "dist"))) throw new Error("§15: a failed build publishes nothing");
+}, TEST_MS);
