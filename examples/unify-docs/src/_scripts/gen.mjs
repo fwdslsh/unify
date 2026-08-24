@@ -216,13 +216,12 @@ for (const file of ordered) {
   body = disambiguateHeadings(body);
   body = rewriteLinks(body, slug);
 
-  // `layout:` is named explicitly, and it has to be: a page written into the
-  // --generate overlay does NOT participate in layout discovery — the walk looks
-  // upward from the overlay directory, never reaching the source root's
-  // _layout.html — so without this every generated page publishes bare, with no
-  // chrome, no stylesheet and no <html lang>, and nothing warns. An explicit
-  // `/`-rooted layout resolves from the source root and works. See FINDINGS.md.
-  const front = ["---", `title: ${yamlString(title)}`, `description: ${yamlString(description)}`, "layout: /_layout.html", "schema: WebPage", "---", ""].join("\n");
+  // No `layout:` line, and that is the point: the overlay and the source tree
+  // share one path space, so `docs/<slug>.md` walks `docs/` and then the source
+  // root and finds `_layout.html` exactly as a page typed into `src/docs/`
+  // would. Naming the layout here was once mandatory — the workaround for a
+  // generated page silently publishing bare. See FINDINGS.md finding 1.
+  const front = ["---", `title: ${yamlString(title)}`, `description: ${yamlString(description)}`, "schema: WebPage", "---", ""].join("\n");
   write(`docs/${slug}.md`, `${front}# ${title}\n${body}`);
   pages.push({ slug, title, description });
 }
@@ -237,7 +236,6 @@ write(
     "---",
     'title: "All documentation"',
     'description: "Every unify document, in reading order, rendered from the repository\'s own docs directory."',
-    "layout: /_layout.html",
     "schema: WebPage",
     "---",
     "",
@@ -250,22 +248,24 @@ write(
   ].join("\n"),
 );
 
-// The sidebar is NOT generated, and cannot be: an `<include>` resolves from the
-// source root on disk, so a fragment written into the overlay is invisible to
-// `<include src>` even though pages written there are scanned normally. (Verified:
-// `include not found: /_includes/docnav.html`. See FINDINGS.md.)
-//
-// So the nav is hand-authored, and this script asserts it stays complete instead.
-// A missing entry is a located build failure rather than a page nobody can reach —
-// which is the same guarantee generating it would have given.
-const navPath = join(sourceRoot, "_includes", "docnav.html");
-const navHtml = existsSync(navPath) ? readFileSync(navPath, "utf8") : "";
-const missing = pages.filter((p) => !navHtml.includes(`/docs/${p.slug}.html`));
-if (missing.length > 0) {
-  console.error(`gen.mjs: _includes/docnav.html is missing ${missing.length} page(s): ${missing.map((p) => p.slug).join(", ")}`);
-  console.error("  fix: add a <li><a href=\"/docs/<slug>.html\"> entry for each, in reading order");
-  process.exit(1);
-}
+// The sidebar, generated from the same list the pages came from — which is the
+// natural shape of derived content, and was this script's original design. A
+// fragment written into the overlay resolves for `<include src>` exactly as one
+// in `src/_includes/` does, so `_layout.html`'s `/_includes/docnav.html` finds
+// this file. It could not, once: the nav had to be hand-authored in `src/` and
+// this script asserted it stayed complete instead. See FINDINGS.md finding 2.
+write(
+  "_includes/docnav.html",
+  [
+    '<nav class="docnav" aria-label="Documentation">',
+    '  <p class="docnav-title"><a href="/docs/index.html">All documentation</a></p>',
+    "  <ul>",
+    ...pages.map((p) => `    <li><a href="/docs/${p.slug}.html">${escapeHtml(p.title)}</a></li>`),
+    "  </ul>",
+    "</nav>",
+    "",
+  ].join("\n"),
+);
 
 function escapeHtml(s) {
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");

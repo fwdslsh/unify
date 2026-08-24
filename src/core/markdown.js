@@ -57,7 +57,7 @@
 import { readFile } from "node:fs/promises";
 import MarkdownIt from "markdown-it";
 import yaml from "js-yaml";
-import { toRelative } from "./paths.js";
+import { nameOf, resolutionRoots } from "./paths.js";
 
 // --------------------------------------------------------------- engine
 
@@ -367,12 +367,12 @@ function splitFrontmatter(source) {
  * treating an `.html` source as ordinary markup.
  *
  * @param {string} source
- * @param {{path: string, sourceRoot: string, reporter: import('./diagnostics.js').Reporter}} ctx
+ * @param {{path: string, sourceRoot: string, roots?: string[], reporter: import('./diagnostics.js').Reporter}} ctx
  */
-export function checkHtmlFrontmatter(source, { path, sourceRoot, reporter }) {
+export function checkHtmlFrontmatter(source, { path, sourceRoot, roots = resolutionRoots(sourceRoot), reporter }) {
   if (!/^---[ \t]*(?:\r?\n|$)/.test(source)) return;
   reporter.problem({
-    file: toRelative(sourceRoot, path),
+    file: nameOf(roots, path),
     line: 1,
     message: "HTML pages have no frontmatter; use <head> (frontmatter here would render as visible text)",
   });
@@ -621,10 +621,13 @@ function metaElement(key, value) {
  *     implementation report.
  *
  * @param {string} source
- * @param {{path: string, sourceRoot: string, reporter: import('./diagnostics.js').Reporter}} options
+ * @param {{path: string, sourceRoot: string, roots?: string[], reporter: import('./diagnostics.js').Reporter}} options
+ *   `roots` is the §33.3 namespace (`paths.js`'s `resolutionRoots`), which names
+ *   a generated page by the virtual path its generator gave it; it defaults to
+ *   the source root alone — the namespace of a build without `--generate`.
  */
-export function convert(source, { path, sourceRoot, reporter }) {
-  const file = toRelative(sourceRoot, path);
+export function convert(source, { path, sourceRoot, roots = resolutionRoots(sourceRoot), reporter }) {
+  const file = nameOf(roots, path);
   const { yamlText, body, bodyStartLine } = splitFrontmatter(source);
   const data = parseFrontmatterYaml(yamlText, { file, reporter });
   // §28.1 — page mode only. `convertFragment` never reaches this line, which is
@@ -674,12 +677,12 @@ export function convert(source, { path, sourceRoot, reporter }) {
  * `convertMarkdown: (p) => convertFragment(p, { sourceRoot, reporter })`.
  *
  * @param {string} path - absolute path
- * @param {{sourceRoot: string, reporter: import('./diagnostics.js').Reporter}} options
+ * @param {{sourceRoot: string, roots?: string[], reporter: import('./diagnostics.js').Reporter}} options
  * @returns {Promise<string>}
  */
-export async function convertFragment(path, { sourceRoot, reporter }) {
+export async function convertFragment(path, { sourceRoot, roots = resolutionRoots(sourceRoot), reporter }) {
   const source = await readFile(path, "utf8");
-  const file = toRelative(sourceRoot, path);
+  const file = nameOf(roots, path);
   const { body, bodyStartLine } = splitFrontmatter(source);
   const { html } = convertBody(body, bodyStartLine, { file, reporter });
   return html;

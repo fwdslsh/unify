@@ -1752,6 +1752,79 @@
    "diagnosticsExhaustive": true,
    "expectedTree": "expected",
    "note": "The .fragment.html opt-out (§4.4): hours.fragment.html is BOTH spliced into index.html by <include> and shipped byte-for-byte at its own path; late.fragment.html contains a link to a file that does not exist and the build says nothing, because a fragment's insides resolve at runtime against whichever page consumed them; _wip.fragment.html never ships (underscore beats everything); --pretty-urls moves visit.html to visit/index.html and does not move either fragment. Before 2026-08-13 there was no way to publish a bare HTML snippet at all — every route ended in P21, P07, a synthesized shell, or the wrong content-type."
+  },
+  "overlay-layout-discovery": {
+   "rules": [
+    "GEN-08",
+    "LAY-01"
+   ],
+   "flags": [
+    "--generate",
+    "_scripts/gen.mjs"
+   ],
+   "exit": 0,
+   "published": true,
+   "diagnostics": [],
+   "diagnosticsExhaustive": true,
+   "expectedTree": "expected",
+   "note": "Issue #54. Neither generated page names a layout: §6.1 step 4's walk climbs VIRTUAL directories (§33.3), so the overlay's `atroot.html` finds `_layout.html` at the namespace root and `docs/api.md` finds it after `docs/` holds none — the same layout the hand-authored `index.html` beside them gets. Before the namespace existed the walk started at the page's absolute directory inside the overlay, left the source root's containment check immediately, and returned no layout: both pages published bare, with no diagnostic and exit 0."
+  },
+  "overlay-fragment-include": {
+   "rules": [
+    "GEN-08",
+    "INC-03"
+   ],
+   "flags": [
+    "--generate",
+    "_scripts/gen.mjs"
+   ],
+   "exit": 0,
+   "published": true,
+   "diagnostics": [],
+   "diagnosticsExhaustive": true,
+   "expectedTree": "expected",
+   "note": "Issue #55, and its mirror image. The hand-authored `_layout.html` includes `/_includes/nav.html`, which only the OVERLAY holds; the generated `posts/one.html` includes `../_includes/note.html`, measured from that page's virtual directory (`posts/`) and held only by the SOURCE tree. One namespace, read both ways. Before it, the first was `include not found` and a generator could produce every page of a section but not the nav that links them."
+  },
+  "overlay-source-collision": {
+   "rules": [
+    "GEN-05",
+    "P12",
+    "PUB-01"
+   ],
+   "flags": [
+    "--generate",
+    "_scripts/gen.mjs"
+   ],
+   "exit": 1,
+   "published": false,
+   "diagnostics": [
+    {
+     "file": "src/about.html",
+     "line": null,
+     "severity": "problem",
+     "containsAll": [
+      "about.html",
+      "(generated)"
+     ]
+    }
+   ],
+   "diagnosticsExhaustive": true,
+   "note": "§33.4 survives §33.3: unifying the RESOLUTION namespace must not unify the OUTPUT. A virtual path present in both trees is still P12 naming both — the source file by its source path, the generated one as generated — neither wins, and nothing publishes. This case is the guard on that boundary: it passes before the namespace change and must keep passing after."
+  },
+  "overlay-namespace-precedence": {
+   "rules": [
+    "GEN-09"
+   ],
+   "flags": [
+    "--generate",
+    "_scripts/gen.mjs"
+   ],
+   "exit": 0,
+   "published": true,
+   "diagnostics": [],
+   "diagnosticsExhaustive": true,
+   "expectedTree": "expected",
+   "note": "Both halves of §33.3's precedence rule at once. `_includes/badge.html` exists in both trees and never publishes, so P12 cannot arbitrate: the SOURCE file resolves and \"Source badge.\" ships — a generator that could shadow a file the author wrote would be the silent overwrite §13 exists to forbid. And `docs/_layout.html`, written only by the generator, is taken by BOTH pages in `docs/` — the generated `api.md` and the hand-authored `guide.md` — because nearest beats precedence: the namespace merges one directory at a time, not one tree at a time."
   }
  }
 }
