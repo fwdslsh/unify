@@ -40,8 +40,8 @@ error if `docs/` is missing.
 
 | Primitive | Where |
 |---|---|
-| `<include src>` | the masthead and the sidebar, both in `src/_includes/` |
-| Layout | one `src/_layout.html` wraps every page; discovery is automatic |
+| `<include src>` | the masthead, hand-authored in `src/_includes/`; the sidebar, generated into the overlay's `_includes/` |
+| Layout | one `src/_layout.html` wraps every page, generated ones included; discovery is automatic and no page names it |
 | Named slot | the footer, with fallback content the pages don't override |
 | Underscore | `_includes/` and `_scripts/` are read by the build and never ship |
 | `data-layout="none"` | `src/404.html` opts out of the chrome entirely |
@@ -64,9 +64,12 @@ overlay directory. `gen.mjs` uses them to do four things:
    404 a reader finds later.
 3. **Disambiguate repeated headings**, because heading ids are slugs and two identical
    headings in one document would collide into a duplicate id.
-4. **Assert the sidebar is complete.** The sidebar is hand-authored and the generator fails
-   the build if a document is missing from it — see `FINDINGS.md`, finding 2, for why it
-   cannot be generated.
+4. **Generate the sidebar**, from the same list the pages came from, so a new document
+   cannot be published unreachable. It is written to the overlay's `_includes/docnav.html`
+   and picked up by `_layout.html`'s ordinary `<include src="/_includes/docnav.html">`: the
+   overlay and `src/` share one path space, so an include resolves across the boundary in
+   either direction. It was hand-authored with a completeness assertion standing in for
+   this until issue #55 was fixed — see `FINDINGS.md`, finding 2.
 
 ## What it found
 
@@ -75,3 +78,9 @@ turned up — one bug that contradicts the documented `--generate` contract (gen
 silently get no layout), a related gap in include resolution, an undocumented trap for
 HTML-authored docs sites, one genuine defect in the documentation (fixed), and five things
 that worked better than expected.
+
+The first two were one flaw — the overlay joined the scan but not the resolution namespace —
+and are fixed ([#54](https://github.com/fwdslsh/unify/issues/54),
+[#55](https://github.com/fwdslsh/unify/issues/55)). This example carried the workarounds for
+both, and removing them is how the fix was proved: no page names a layout any more, and the
+sidebar is generated rather than hand-authored and asserted.
