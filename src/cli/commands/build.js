@@ -267,7 +267,7 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
   // §20.1's membership set, accumulated as each page's FINAL text is produced
   // — the manifest reads the bytes §15 would publish (§20.2), so it is filled
   // from the rewritten text below rather than from `composedPages`.
-  /** @type {{sourcePath: string, outputPath: string, html: string}[]} */
+  /** @type {{sourcePath: string, outputPath: string, html: string, generated: boolean, layout: string|null}[]} */
   const manifestPages = [];
   for (const p of composedPages) {
     const pageOutputPath = collisions.computeOutputPath({ path: p.relPath, kind: "page" }, { prettyUrls: false });
@@ -286,7 +286,20 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
     // every surface that NAMES its source has to know. Without this the
     // audit reported `log.html` at a path the author cannot open, under a
     // fix line telling them to rename a file they never wrote.
-    manifestPages.push({ sourcePath: p.relPath, outputPath: finalOutputPath, html: rewritten, generated: p.generated === true });
+    //
+    // §20.3 — `layout` is the same shape one step over: the layout this page
+    // resolved to, or `null` when it composed with none (`data-layout="none"`,
+    // `layout: none`, no `_layout.html` above it). It rides along here rather
+    // than being re-derived downstream because `buildPage` is the only place
+    // that KNOWS — §17's report already prints the same fact as `← page +
+    // layout` vs `← page (no layout)`, from this very value.
+    manifestPages.push({
+      sourcePath: p.relPath,
+      outputPath: finalOutputPath,
+      html: rewritten,
+      generated: p.generated === true,
+      layout: p.layoutFile ?? null,
+    });
   }
 
   // §4.4/EXC-09 — mirror copy: every emitted asset, byte-for-byte, same

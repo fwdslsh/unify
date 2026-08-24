@@ -1133,7 +1133,7 @@ One record per **composed page** — exactly the set §12 checks and §15 publis
 
 ### 20.2 Extraction source
 
-Every field is read from the page's **emitted text**: the exact bytes §15 would publish, after includes (§5), Markdown conversion (§10), composition (§7–§9), and all three URL phases (§11). Frontmatter, layout files, and include sources are never consulted again. A Markdown page's `title` reaches the manifest only because §10.2 put it in the emitted `<head>`; a layout-supplied `<meta name="description">` is read from each page that shipped it, once per page. That is what makes HTML and Markdown equal citizens here and keeps the manifest honest about what a crawler will actually see.
+Every field is read from the page's **emitted text**: the exact bytes §15 would publish, after includes (§5), Markdown conversion (§10), composition (§7–§9), and all three URL phases (§11). The exception is named and closed at two fields — `generated` and `layout`, which are provenance and are argued in §20.3. Frontmatter, layout files, and include sources are never consulted again. A Markdown page's `title` reaches the manifest only because §10.2 put it in the emitted `<head>`; a layout-supplied `<meta name="description">` is read from each page that shipped it, once per page. That is what makes HTML and Markdown equal citizens here and keeps the manifest honest about what a crawler will actually see.
 
 `<template>` contents are not scanned, matching §7.1's rule for slots: markup inside a template is inert in the shipped page, so it declares nothing.
 
@@ -1146,6 +1146,8 @@ Every record carries every field. A field with nothing to read is `null` (scalar
 | Field | Type | Read from the emitted document |
 |---|---|---|
 | `sourcePath` | string | the source-root-relative path of the page that composed |
+| `generated` | boolean | §33.4 — `true` when the page came from the `--generate` overlay rather than the source tree. **Provenance, not a reading of the emitted text** (below) |
+| `layout` | string\|null | the source-root-relative path of the layout §6 resolved for this page, `null` when it composed with none. **Provenance, not a reading of the emitted text** (below) |
 | `outputPath` | string | the output-root-relative path §13 resolved |
 | `path` | string | §20.5 — the site-root-relative address this output path answers to |
 | `url` | string\|null | §20.5 — the absolute public URL, or `null` with no `--base-url` |
@@ -1170,6 +1172,10 @@ Every record carries every field. A field with nothing to read is `null` (scalar
 | `fragmentLinks` | array | §20.9 — `{target, id}` for each internal link carrying a fragment; `target` is the output path, `id` the fragment without `#` |
 | `linksIn` | string[] | §20.9 — output paths of internal pages that link to this one, deduplicated, sorted |
 | `conflicts` | array | §20.4 — `{field, kept, discarded}`, ordered by field name |
+
+**Two fields are provenance rather than a reading of the emitted text**, and they are the whole of §20.2's exception: `generated`, which names the tree the page came from, and `layout`, which names the layout it composed with. Neither is recoverable from the bytes §20.2 reads — composition consumes `data-layout` (§6.4) and a layout leaves no marker of its own in what it produced, while the `--generate` overlay is scanned exactly as the source tree is (§33.3) — so a consumer that needs either fact has only two alternatives, and both have shipped and been wrong. It can re-derive the fact, which is a second reading of a question the build already answered and free to disagree with the first; or it can reason without it and state something untrue. `generated` was added when `unify audit` located a generated page at a source path the author could not open, under a fix line telling them to rename a file they never wrote. `layout` was added when `lang-missing` told an author to set `lang` on the layout — on a page that had resolved **no layout at all**, so the advice named either a file that was already correct or no file at all. §24 is where both facts are spent: a fix line is a sentence about what the author should edit next, and it cannot name a file that the reader can open — nor decline to name one that does not exist — without them.
+
+These are the only two, and the boundary is deliberate. Provenance is admitted here when a **finding cannot be phrased truthfully without it**, never as a general record of how a page was built: the source of each field, the includes it inlined, the frontmatter it declared, and the layout's own text all stay out, because §20.2's rule — that the manifest is a reading of what a consumer receives — is what keeps every other field honest about what a crawler will actually see. §17's report prints these same two facts (`← page + layout`, `← page (no layout)`, `← generated`) from the same values, so the record and the report cannot drift.
 
 **Text content** everywhere in this table means the concatenated character data of the element and its descendants, with `<script>`, `<style>`, `<template>`, and `<noscript>` subtrees omitted, each run of ASCII whitespace collapsed to one space, and the result trimmed. Comments contribute nothing.
 

@@ -78,6 +78,10 @@ import { stripBaseUrl, resolveReference } from "./references.js";
  *
  * @typedef {object} PageRecord
  * @property {string} sourcePath
+ * @property {boolean} generated - §33.4 — true when the page came from the
+ *   `--generate` overlay rather than the source tree
+ * @property {string|null} layout - §20.3 — the source-root-relative path of
+ *   the layout this page composed with, `null` when it composed with none
  * @property {string} outputPath
  * @property {string} path
  * @property {string|null} url
@@ -332,7 +336,7 @@ function declaredType(data) {
  * Extract one record's own fields — everything except `linksIn`, which is a
  * relation over the whole manifest and so is filled by `buildManifest` once
  * every record exists (§20.9).
- * @param {{sourcePath: string, outputPath: string, html: string}} page
+ * @param {{sourcePath: string, outputPath: string, html: string, generated?: boolean, layout?: string|null}} page
  * @param {import('./urls.js').BaseUrlConfig|null} base
  * @returns {PageRecord & {_hrefs: string[]}}
  */
@@ -537,6 +541,14 @@ function extract(page, base) {
     // §33.4 — true when this page came from the --generate overlay rather
     // than the source tree. §20.3: present on every record, boolean always.
     generated: page.generated === true,
+    // §20.3 — the layout this page composed with, or `null` when it composed
+    // with none. The one other field, with `generated`, that is PROVENANCE
+    // rather than a reading of the emitted text: composition consumed
+    // `data-layout` (§6.4), so the emitted bytes carry no trace of which
+    // layout produced them, or of whether one did. §20.3 states the carve-out
+    // and why a consumer needs the fact — the short version is that advice
+    // naming "the layout" is unactionable on a page that has none.
+    layout: page.layout ?? null,
     outputPath: page.outputPath,
     path,
     url: base ? base.origin + path : null,
