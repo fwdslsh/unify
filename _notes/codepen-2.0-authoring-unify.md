@@ -85,6 +85,7 @@ The only route to genuinely authoring unify sites *in* CodePen. The precedent is
 What would have to be true:
 
 - **A Block must be installable the way Blocks are installed.** The Nunjucks Block pins an npm dependency. unify is Bun-only, on purpose, with no Node build. This is the crux, and it is a *product* decision, not an engineering detail.
+  - **Superseded 2026-08-24 (issue #49).** This bullet is no longer true, and it was the crux, so the analysis above it should be re-read with that in mind: unify runs on Node >= 22.12.0 as well as Bun, and `npx @fwdslsh/unify` works. The runtime coupling turned out to be four call sites, not a product decision.
 - **unify would have to behave as a compiler stage, not a CLI.** Its contract today is `dist/`, exit codes, and a transactional all-or-nothing publish. A Block hands HTML/CSS/JS primitives downstream to other Blocks. The composition core would need to be callable as a library over a file tree — which, encouragingly, is roughly how `src/` is already structured (`compose.js`, `layout.js`, `includes.js`, `head-merge.js` are separable from the CLI).
 - **The output is a good citizen.** unify emits no `<slot>`, no `data-layout`, and no injected JavaScript. As the HTML Block sitting upstream of Sass/TypeScript/Tailwind Blocks, it would compose cleanly.
 

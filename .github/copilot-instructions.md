@@ -70,7 +70,9 @@ bun tests/conformance/check-suite-hygiene.mjs           # suite hygiene gate
 bun run build:linux    # also build:macos, build:windows — compile the standalone binary
 ```
 
-There is no `bun run build`, `serve`, `build:advanced`, `lint`, `format`, `docs:*`, `benchmark`, or `check:coverage` script, and no `example/` directory. Bun >= 1.2.0 is the only supported runtime.
+There is no `bun run build`, `serve`, `build:advanced`, `lint`, `format`, `docs:*`, `benchmark`, or `check:coverage` script, and no `example/` directory.
+
+Bun >= 1.2.0 runs the tests and builds the binaries; the CLI itself runs on Bun and on Node >= 22.12.0, and must behave identically on both (gate G12). So `src/**` uses `node:*` built-ins only — never suggest a `Bun.*` call, a `bun:` import, or `import.meta.main` there. Tests are the opposite: they are Bun's, they import `bun:test`, and they are not to be ported. Deno is not supported.
 
 ## Testing rules that constrain suggestions
 

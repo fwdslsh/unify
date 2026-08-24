@@ -11,12 +11,18 @@ bun install
 bun test
 ```
 
-Bun >= 1.2.0 is the only supported runtime. There are no Node or Deno builds, no lint or format step, and no docs generator. The only other scripts are `bun run build:linux`, `build:macos`, and `build:windows`, which compile the standalone binary.
+**Bun >= 1.2.0 develops; Bun and Node >= 22.12.0 both run the CLI.** There is no Deno build, no lint or format step, and no docs generator. The only other scripts are `bun run build:linux`, `build:macos`, and `build:windows`, which compile the standalone binary.
 
-Run the CLI straight from source:
+The split is worth understanding before you change anything under `src/`:
+
+- **The test suite is Bun's** — 58 files import `bun:test`, and `bun test` is the only way to run it. Do not port it.
+- **The CLI is both runtimes'.** `src/**` uses `node:*` built-ins and nothing else; a `Bun.*` call or a Bun-only global anywhere in `src/` is a bug, because it makes the CLI a contributor tests different from the one a user runs. Output must be byte-identical under either runtime, and gate **G12** checks exactly that.
+
+Run the CLI straight from source, under either:
 
 ```bash
 bun src/cli.js build --source src --output dist
+node src/cli.js build --source src --output dist
 ```
 
 ## Read these first
@@ -101,11 +107,11 @@ The release metric is the conformance ledger: every gated rule recorded green, b
 4. Run `bun test`, both gate scripts above, and confirm the CLI surface is still exactly what `docs/cli-reference.md` lists — a surviving retired flag is a finding, not a feature.
 5. Describe what changed and which rule IDs it affects.
 
-Release gates G1–G11 in `docs/testing-strategy.md` §6 define when a release ships. Each is a command with an exit code; none is a judgment call. **CI is green and must stay green** — every gate is a command with an exit code, and a red run is a regression, never progress.
+Release gates G1–G12 in `docs/testing-strategy.md` §6 define when a release ships. Each is a command with an exit code; none is a judgment call. **CI is green and must stay green** — every gate is a command with an exit code, and a red run is a regression, never progress.
 
 ## Reporting issues
 
-Include the unify version (`unify --version`), the Bun version (`bun --version`), your OS, a minimal source tree that reproduces the problem, the exact command, and the full diagnostics. Silent failure is a bug by definition — if unify did the wrong thing without saying so, say that explicitly; it is the highest-priority class of bug in this project.
+Include the unify version (`unify --version`), which runtime you are on and its version (`bun --version` or `node --version`, or say you are running the standalone binary), your OS, a minimal source tree that reproduces the problem, the exact command, and the full diagnostics. Silent failure is a bug by definition — if unify did the wrong thing without saying so, say that explicitly; it is the highest-priority class of bug in this project.
 
 ## License
 
