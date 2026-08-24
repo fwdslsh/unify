@@ -3,12 +3,17 @@
 The dogfooding example (issue #51). It renders the repository's real `docs/` directory as
 a documentation site, using nothing but the five authoring primitives.
 
+**Live at <https://fwdslsh.github.io/unify/>**, deployed on every push to `main` that
+touches `docs/` or this directory (`.github/workflows/deploy-docs.yml`). The address below
+is that real address — `fwdslsh/unify` is a project repository, so its Pages URL carries
+the repo name as a subpath; there is no custom domain configured.
+
 ```bash
 cd examples/unify-docs
 unify build -s src -o dist \
   --generate _scripts/gen.mjs \
   --pretty-urls \
-  --base-url https://unify.fwdslsh.dev/ \
+  --base-url https://fwdslsh.github.io/unify/ \
   --canonical auto \
   --search-index
 ```
@@ -17,9 +22,9 @@ Both gates pass:
 
 ```bash
 unify build -s src -o dist --generate _scripts/gen.mjs --pretty-urls \
-  --base-url https://unify.fwdslsh.dev/ --canonical auto --search-index --dry-run --strict   # exit 0
+  --base-url https://fwdslsh.github.io/unify/ --canonical auto --search-index --dry-run --strict   # exit 0
 unify audit -s src --generate _scripts/gen.mjs --pretty-urls \
-  --base-url https://unify.fwdslsh.dev/ --canonical auto --search-index --strict            # exit 0
+  --base-url https://fwdslsh.github.io/unify/ --canonical auto --search-index --strict            # exit 0
 ```
 
 18 files: 12 documentation pages, an index, a front page, a 404, the stylesheet,
@@ -84,3 +89,19 @@ and are fixed ([#54](https://github.com/fwdslsh/unify/issues/54),
 [#55](https://github.com/fwdslsh/unify/issues/55)). This example carried the workarounds for
 both, and removing them is how the fix was proved: no page names a layout any more, and the
 sidebar is generated rather than hand-authored and asserted.
+
+## Deployment
+
+`.github/workflows/deploy-docs.yml` builds this example and publishes `dist/` to GitHub
+Pages on every push to `main` under `docs/` or `examples/unify-docs/`, or on demand via
+`workflow_dispatch`. It runs the same two gates as above — `build --dry-run --strict`, then
+`audit --strict` — before the real `build --clean --strict` that is actually published;
+either gate failing stops the deploy, the same transactional guarantee `unify build` itself
+gives a local run.
+
+**One thing the workflow cannot do for itself**: GitHub Pages has to be told once, in the
+repository's own settings, to serve from Actions rather than a branch —
+**Settings → Pages → Build and deployment → Source → "GitHub Actions"**. Until that is set,
+the `deploy` job fails with GitHub's own "Pages site not found" error; the `build` job (the
+two gates plus the real build) succeeds regardless, so a red `deploy` step with a green
+`build` step means exactly this and nothing else.

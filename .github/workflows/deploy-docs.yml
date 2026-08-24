@@ -1,0 +1,87 @@
+name: Deploy docs
+
+# Publishes examples/unify-docs — unify's own documentation site, built by
+# unify from the repository's real docs/ directory (issue #51) — to GitHub
+# Pages. --generate reads ../../../docs relative to the example's source
+# root, so this always renders whatever is on the branch being deployed;
+# nothing here copies content.
+#
+# Requires a one-time repository setting this workflow cannot make for
+# itself: Settings -> Pages -> Build and deployment -> Source ->
+# "GitHub Actions". Until that is set, the deploy job fails with a clear
+# "Pages site not found" error rather than doing nothing silently.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "docs/**"
+      - "examples/unify-docs/**"
+      - ".github/workflows/deploy-docs.yml"
+  workflow_dispatch:
+
+# The real public address: fwdslsh/unify is a project repository, so its
+# default Pages URL carries the repo name as a subpath. No custom domain is
+# configured (no CNAME file in this tree) — using one here without owning
+# and wiring the DNS would ship a canonical, sitemap, and JSON-LD that all
+# point somewhere that doesn't resolve.
+env:
+  SITE_BASE_URL: https://fwdslsh.github.io/unify/
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one deployment in flight; a newer push wins over a stale one still
+# building, but never cancels a deployment already in progress.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # The pre-publish gate, same discipline as any other unify site: the
+      # whole build and every check writing nothing, then the completeness
+      # audit — both --strict, both must exit 0 before anything is published.
+      - name: Verify — build --dry-run --strict
+        run: |
+          bun src/cli.js build -s examples/unify-docs/src -o examples/unify-docs/dist \
+            --generate _scripts/gen.mjs --pretty-urls \
+            --base-url "$SITE_BASE_URL" --canonical auto --search-index \
+            --dry-run --strict
+      - name: Verify — audit --strict
+        run: |
+          bun src/cli.js audit -s examples/unify-docs/src \
+            --generate _scripts/gen.mjs --pretty-urls \
+            --base-url "$SITE_BASE_URL" --canonical auto --search-index \
+            --strict
+
+      - name: Build
+        run: |
+          bun src/cli.js build -s examples/unify-docs/src -o examples/unify-docs/dist \
+            --generate _scripts/gen.mjs --pretty-urls --clean \
+            --base-url "$SITE_BASE_URL" --canonical auto --search-index --strict
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: examples/unify-docs/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
