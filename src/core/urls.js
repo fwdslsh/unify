@@ -584,6 +584,9 @@ export function rewriteProvenanceUrls(composedHtml, { provenanceOf, pageFile, pa
   };
 
   for (const el of findAll(root, (n) => n.type === "element")) {
+    // §5.1 item 8 — an <include> in emitted output is an inert sample; its
+    // src ships byte-for-byte, so §11 never rewrites it.
+    if (el.tag.toLowerCase() === "include") continue;
     for (const attrName of SINGLE_URL_ATTRS) {
       const attr = getAttrNode(el, attrName);
       if (!attr || !attr.value) continue;
@@ -736,6 +739,9 @@ export function applyPrettyLinks(html, { pageOutputPath, emittedHtmlPaths }) {
   };
 
   for (const el of findAll(root, (n) => n.type === "element")) {
+    // §5.1 item 8 — an <include> in emitted output is an inert sample; its
+    // src ships byte-for-byte, so §11 never rewrites it.
+    if (el.tag.toLowerCase() === "include") continue;
     for (const attrName of SINGLE_URL_ATTRS) {
       const attr = getAttrNode(el, attrName);
       if (!attr || !attr.value) continue;
@@ -867,6 +873,8 @@ export function applyBaseUrl(html, base) {
   const edits = [];
 
   for (const el of findAll(root, (n) => n.type === "element")) {
+    // §5.1 item 8 — inert include samples are never rewritten (see above).
+    if (el.tag.toLowerCase() === "include") continue;
     const originEligible = isCanonicalLink(el);
     for (const attrName of SINGLE_URL_ATTRS) {
       const attr = getAttrNode(el, attrName);

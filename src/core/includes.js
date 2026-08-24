@@ -280,17 +280,70 @@ export async function inlineIncludes({
   return spliceWithProvenance(text, edits, relFile);
 }
 
+/** Opening or closing `<pre>`/`<code>` tag, textually (see `inertRanges`). */
+const PROTECT_TAG = /<(\/?)(pre|code)\b[^>]*>/gi;
+
 /**
- * Both include spellings, in source order.
+ * §5.1 item 8 — code samples are not directives. Both include spellings are
+ * inert wherever they sit textually inside a `<pre>` or `<code>` element, so a
+ * page DOCUMENTING unify can show the syntax without the build splicing a nav
+ * into the middle of its own example (issue #56, found building
+ * examples/unify-docs). The regions are computed on the same raw text the scan
+ * reads — textual, like everything else in this module: opening and closing
+ * tags counted with one nesting depth across both names (so
+ * `<pre><code>…</code></pre>` is one region), case-insensitive, an unclosed
+ * opener protecting to end of text, a self-closed `<pre/>` opening nothing.
+ * An inert occurrence is never yielded at all, so no resolution runs and no
+ * diagnostic — P01's not-found, A01's void-include — can fire on content.
+ * Exactly `pre` and `code`: `<script>`/`<style>`/`<textarea>` are unchanged.
+ *
+ * @param {string} text
+ * @returns {[number, number][]} sorted, non-overlapping [start, end) ranges
+ */
+function inertRanges(text) {
+  /** @type {[number, number][]} */
+  const ranges = [];
+  let depth = 0;
+  let start = 0;
+  for (const m of text.matchAll(PROTECT_TAG)) {
+    if (m[0].endsWith("/>")) continue;
+    if (m[1] === "") {
+      if (depth === 0) start = m.index;
+      depth += 1;
+    } else if (depth > 0) {
+      depth -= 1;
+      if (depth === 0) ranges.push([start, m.index + m[0].length]);
+    }
+  }
+  if (depth > 0) ranges.push([start, text.length]);
+  return ranges;
+}
+
+/**
+ * Both include spellings, in source order — minus any occurrence inside a
+ * `<pre>`/`<code>` region (§5.1 item 8), which is content, not a directive.
  * @param {string} text
  */
 function* findIncludes(text) {
+  const inert = inertRanges(text);
+  const isInert = (/** @type {number} */ i) => inert.some(([s, e]) => i >= s && i < e);
   /** @type {{match: string, spec: string|null, form: string, index: number, content?: string}[]} */
   const found = [];
-  for (const m of text.matchAll(INCLUDE_TAG)) {
+  // exec, not matchAll: INCLUDE_TAG's paired form seeks its close LAZILY, so a
+  // match that STARTS inside an inert region can extend past it and swallow a
+  // real directive's `</include>` further down (the fixture's void-sample case).
+  // Skipping such a match must therefore resume right after its OPENING tag,
+  // not after everything the lazy close-seek consumed.
+  INCLUDE_TAG.lastIndex = 0;
+  for (let m; (m = INCLUDE_TAG.exec(text)); ) {
+    if (isInert(m.index)) {
+      INCLUDE_TAG.lastIndex = m.index + m[0].indexOf(">") + 1;
+      continue;
+    }
     found.push({ match: m[0], spec: srcOf(m[1]), form: "src", index: m.index, content: m[2] });
   }
   for (const m of text.matchAll(SSI_TAG)) {
+    if (isInert(m.index)) continue;
     found.push({ match: m[0], spec: m[2], form: m[1].toLowerCase(), index: m.index });
   }
   yield* found.sort((a, b) => a.index - b.index);

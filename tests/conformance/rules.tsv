@@ -38,6 +38,7 @@ INC-09	§5.1	rule	fixture	<include> without src is a problem
 INC-10	§5.1	rule	fixture	<include> with non-whitespace content between its tags is a problem; includes never take fills
 INC-11	§5.1	rule	fixture	Void <include> builds identically and carries advisory A01
 INC-12	§5.1	rule	fixture	Inlining is textual and pre-parse for HTML hosts (in Markdown: post-conversion, §10.1 — timing is the only difference): includes work anywhere (head, Markdown); fragment top-level elements become the host's (may carry slot= fills or contribute <slot> elements)
+INC-13	§5.1	rule	fixture	Both include spellings are INERT inside <pre>/<code>: textual regions on the raw scanned text, one nesting depth across both names, case-insensitive, unclosed opener protects to end, self-closed opens nothing. An inert occurrence ships byte-for-byte and produces NO diagnostic (no P01 not-found even for a nonexistent target, no A01 for the void form) — it is content showing the syntax, not a directive. Exactly pre and code; script/style/textarea unchanged. Applies in HTML hosts and in Markdown post-conversion alike
 LAY-01	§6.1	rule	fixture	Layout selection order, first match wins: data-layout=none / frontmatter layout:none; data-layout=V; frontmatter layout:V; nearest _layout.html walking up; else none
 LAY-02	§6.1	rule	fixture	Discovery walk is by file name; the layout file's excluded status is irrelevant
 LAY-03	§6.1	rule	fixture	Explicit layout value not ending .html (bare name) is a problem before any existence check

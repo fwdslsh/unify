@@ -106,7 +106,8 @@ The pattern above stays worth knowing for anything a generator cannot see. Fixtu
 
 ## 3. In HTML, a raw `<include>` inside `<pre><code>` is spliced — a docs-site trap
 
-**Severity: minor, but sharp for anyone documenting unify.** Includes are textual and run
+**Severity: minor, but sharp for anyone documenting unify.**
+**Status: fixed** — [#56](https://github.com/fwdslsh/unify/issues/56), resolved as a *behavior change* rather than the documentation fix originally proposed: both include spellings are now inert inside `<pre>`/`<code>` (conformance-spec §5.1 item 8; fixture `tests/fixtures/landmines/include-inert-in-pre`). The account below is left as written. Includes are textual and run
 before parsing, so they are found inside `<pre>` too:
 
 | Where | Result |
@@ -181,7 +182,7 @@ and code spans.
 |---|---|---|---|
 | 1 | Overlay pages get no layout, silently | **Bug** — contradicts the documented contract | **Fixed** — [#54](https://github.com/fwdslsh/unify/issues/54), PR #61 |
 | 2 | Overlay fragments invisible to `<include>` | Design gap, same boundary | **Fixed** — [#55](https://github.com/fwdslsh/unify/issues/55), PR #61 |
-| 3 | Raw `<include>` splices inside HTML `<pre>` | Doc gap | One line in the authoring rules |
+| 3 | Raw `<include>` splices inside HTML `<pre>` | **Fixed** — behavior change, §5.1 item 8 | Includes are inert inside `<pre>`/`<code>` |
 | 4 | Two `<h1>` in `integrations.md` | Defect | **Fixed** |
 | 5 | Scale, anchors, audit, advisories, reference check | Working well | — |
 | 6 | Generator rewrote inside code spans | Example bug | **Fixed** |

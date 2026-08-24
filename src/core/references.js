@@ -241,6 +241,10 @@ export function collectHtmlReferences(text) {
   const { root } = parse(text);
   const refs = [];
   for (const el of findAll(root, (n) => n.type === "element")) {
+    // §5.1 item 8 — an <include> element in emitted output is an inert code
+    // sample (a live one was spliced away before emit), so its src is content,
+    // not a reference: §12 reads nothing from it.
+    if (el.tag.toLowerCase() === "include") continue;
     for (const attrName of ["href", "src", "poster"]) {
       const attr = getAttrNode(el, attrName);
       if (attr && attr.value) refs.push({ raw: attr.value, offset: attr.valueStart });
