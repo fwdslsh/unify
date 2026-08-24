@@ -9,7 +9,7 @@ minimal reproduction where the behaviour was surprising.
 ## 1. Pages written into the `--generate` overlay get no layout — bug
 
 **Severity: bug. It contradicts the documented contract, and it fails silently.**
-**Status: fixed** — [#54](https://github.com/fwdslsh/unify/issues/54), PR #56. Resolution note at the end of this finding; the account below is left as it was written.
+**Status: fixed** — [#54](https://github.com/fwdslsh/unify/issues/54), PR #61. Resolution note at the end of this finding; the account below is left as it was written.
 
 `docs/cli-reference.md` says of `--generate`:
 
@@ -58,7 +58,7 @@ above inherits `lang` correctly). The audit finding was a true symptom of a diff
 Worth knowing that `lang-missing` on a page that should have a layout means *"this page has
 no layout"*, not *"your layout is missing lang"*.
 
-**Resolution (PR #56).** Discovery was made to treat the overlay as part of the source tree —
+**Resolution (PR #61).** Discovery was made to treat the overlay as part of the source tree —
 the first of the two options above. §6.1 step 4's walk now climbs *virtual* directories and
 consults both roots at each level, so a generated `docs/api.md` looks for `docs/_layout.html`
 and then `_layout.html` exactly as a hand-written page in that position does. The
@@ -71,7 +71,7 @@ rule; `tests/fixtures/landmines/overlay-layout-discovery` is the fixture.
 ## 2. An `<include>` cannot resolve a file the generator wrote — same boundary
 
 **Severity: worth a decision.**
-**Status: fixed** — [#55](https://github.com/fwdslsh/unify/issues/55), PR #56. Resolution note at the end of this finding; the account below is left as it was written.
+**Status: fixed** — [#55](https://github.com/fwdslsh/unify/issues/55), PR #61. Resolution note at the end of this finding; the account below is left as it was written.
 
 The sidebar was going to be generated, since its contents are derived from the docs list.
 `gen.mjs` wrote `_includes/docnav.html` into the overlay and `_layout.html` included it:
@@ -93,7 +93,7 @@ and `gen.mjs` *asserts it is complete*, failing the build with a fix line if a d
 missing from it. That recovers the guarantee generating it would have given — no unreachable
 page — without writing into `src/`.
 
-**Resolution (PR #56).** Include resolution was made to see the overlay — the first of the two
+**Resolution (PR #61).** Include resolution was made to see the overlay — the first of the two
 options above — and symmetrically: one namespace, so a hand-authored `_layout.html` finds a
 fragment the generator wrote, and a generated page finds a fragment the author wrote, with a
 relative path measured from the generated page's own place in the tree. The sidebar is
@@ -179,8 +179,8 @@ and code spans.
 
 | # | Finding | Kind | Action |
 |---|---|---|---|
-| 1 | Overlay pages get no layout, silently | **Bug** — contradicts the documented contract | **Fixed** — [#54](https://github.com/fwdslsh/unify/issues/54), PR #56 |
-| 2 | Overlay fragments invisible to `<include>` | Design gap, same boundary | **Fixed** — [#55](https://github.com/fwdslsh/unify/issues/55), PR #56 |
+| 1 | Overlay pages get no layout, silently | **Bug** — contradicts the documented contract | **Fixed** — [#54](https://github.com/fwdslsh/unify/issues/54), PR #61 |
+| 2 | Overlay fragments invisible to `<include>` | Design gap, same boundary | **Fixed** — [#55](https://github.com/fwdslsh/unify/issues/55), PR #61 |
 | 3 | Raw `<include>` splices inside HTML `<pre>` | Doc gap | One line in the authoring rules |
 | 4 | Two `<h1>` in `integrations.md` | Defect | **Fixed** |
 | 5 | Scale, anchors, audit, advisories, reference check | Working well | — |
@@ -190,7 +190,7 @@ Findings 1 and 2 are one issue wearing two hats: **the `--generate` overlay is p
 scan but not part of the resolution namespace.** That single sentence is missing from the
 documentation, and finding 1 argues it should be missing from the implementation instead.
 
-**Resolved that way.** PR #56 unified the namespace rather than documenting the gap: the
+**Resolved that way.** PR #61 unified the namespace rather than documenting the gap: the
 overlay and the source tree are one path space, so layout discovery and `<include>` see
 across the boundary in both directions. Conformance spec §33.3 now states the rule, its
 precedence (the source tree wins a tie; nearest still wins the walk), and the two failures
