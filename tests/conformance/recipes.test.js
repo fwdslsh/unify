@@ -28,7 +28,7 @@
  * Real CLI spawns only (hygiene H3); no mocks (H1); no skips (H4).
  */
 import { test } from "bun:test";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
 import { ROOT, mkTmp, runCli, writeTree } from "./support.mjs";
 
@@ -297,61 +297,86 @@ test("what stays outside unify — there is no --run, and the refusal says so", 
 
 const R5 = "5. A prebuilt package's browser files";
 
-test("recipe 5 — the generator resolves a package and vendors its files into the build", async () => {
-  // The recipe's literal, run against a real package layout. Nothing is stubbed:
-  // `import.meta.resolve` is asked the real question about a real node_modules
-  // tree, which is the whole point of the recipe preferring it to a hardcoded
-  // path. The package is hand-built in the temp tree so the test needs no
-  // network and no install.
+/**
+ * The recipe's generator must behave identically under BOTH runtimes unify
+ * supports, and that is the whole point of the technique it teaches: an earlier
+ * draft resolved the package SUBPATH directly, which Bun accepts and node
+ * rejects with ERR_PACKAGE_PATH_NOT_EXPORTED, so it built from the standalone
+ * binary and failed under `npx @fwdslsh/unify`. `runCli` spawns
+ * `process.execPath`, which under `bun test` is always bun — so a bun-only
+ * assertion here would have passed on exactly the draft that was broken.
+ *
+ * markdown-it is a real dependency of this repo, so node_modules already holds
+ * it: no install, no network, and a genuine `exports` map to resolve around.
+ */
+function nodeBin() {
+  const node = Bun.which("node");
+  if (!node) throw new Error("recipe 5 must be proven under node too (see G12's requireNode)");
+  return node;
+}
+
+/** The recipe's tree, built against this repo's own node_modules. */
+function recipeTree() {
   const generator = codeBlock(R5, "js", 0);
   const markup = codeBlock(R5, "html", 0).trim();
-
   const tmp = mkTmp();
   writeTree(join(tmp, "src"), {
     "index.html": page("Home", `<h1>Home</h1>\n${markup}`),
     "_scripts/vendor.mjs": generator,
   });
-  // A minimal package matching the specifiers the recipe names, plus the noise
-  // a real one carries — the .d.ts must NOT reach dist/.
-  writeTree(join(tmp, "node_modules", "highlight.js"), {
-    "package.json": JSON.stringify({ name: "highlight.js", version: "0.0.0", exports: { "./": "./" } }),
-    "styles/github-dark.css": ".hljs{color:#c9d1d9}\n",
-    "lib/core.js": "export function highlight() {}\n",
-    "lib/core.d.ts": "export declare function highlight(): void;\n",
+  // Resolve from the repo, where markdown-it is installed.
+  symlinkSync(join(ROOT, "node_modules"), join(tmp, "node_modules"));
+  return tmp;
+}
+
+test("recipe 5 — the generator vendors the package's browser bundle, under bun AND node", async () => {
+  const tmp = recipeTree();
+
+  const bun = await runCli(["build", "-s", "src", "-o", "dist", "--generate", "_scripts/vendor.mjs"], tmp);
+  expectExit(bun, 0, "recipe 5's generator under bun");
+
+  const vendored = join(tmp, "dist", "vendor", "markdown-it.js");
+  if (!existsSync(vendored)) throw new Error("recipe 5 must vendor the browser bundle");
+  const bytes = readFileSync(vendored);
+  if (bytes.length < 1000) throw new Error("recipe 5 vendored something implausibly small");
+
+  // The directory loop copied the .min.mjs siblings and nothing else.
+  const esm = readdirSync(join(tmp, "dist", "vendor", "min"));
+  if (esm.length === 0) throw new Error("recipe 5's directory loop copied nothing");
+  if (esm.some((f) => !f.endsWith(".min.js"))) {
+    throw new Error(`recipe 5's filter must copy only .min.js: ${esm.join(", ")}`);
+  }
+
+  // The claim the earlier draft got wrong. node must agree with bun, byte for byte.
+  const nodeTmp = recipeTree();
+  const r = Bun.spawnSync({
+    cmd: [nodeBin(), join(ROOT, "src", "cli.js"), "build", "-s", "src", "-o", "dist", "--generate", "_scripts/vendor.mjs"],
+    cwd: nodeTmp,
+    stdout: "pipe",
+    stderr: "pipe",
   });
-
-  const r = await runCli(
-    ["build", "-s", "src", "-o", "dist", "--generate", "_scripts/vendor.mjs"],
-    tmp,
-  );
-  expectExit(r, 0, "recipe 5's generator");
-
-  const css = join(tmp, "dist", "vendor", "highlight.css");
-  const js = join(tmp, "dist", "vendor", "highlight.js");
-  if (!existsSync(css) || !existsSync(js)) {
-    throw new Error(`recipe 5 must vendor both files:\n${readdirSync(join(tmp, "dist"), { recursive: true })}`);
+  if (r.exitCode !== 0) {
+    throw new Error(
+      `recipe 5's generator must run under node as well as bun — a package's exports map is
+` +
+      `exactly where the two disagree:\n${r.stderr.toString()}`,
+    );
   }
-  if (readFileSync(css, "utf8") !== ".hljs{color:#c9d1d9}\n") {
-    throw new Error("recipe 5: a vendored file ships byte-for-byte");
-  }
-  // "Copy what the browser loads, and nothing else."
-  if (existsSync(join(tmp, "dist", "vendor", "core.d.ts"))) {
-    throw new Error("recipe 5: only the named files are copied");
-  }
-}, TEST_MS);
+  const underNode = readFileSync(join(nodeTmp, "dist", "vendor", "markdown-it.js"));
+  if (!underNode.equals(bytes)) throw new Error("recipe 5: both runtimes must vendor identical bytes");
+}, 60_000);
 
-test("recipe 5 — a vendored file the generator did not write fails the build", async () => {
-  // The recipe's claim that the build checks this "in one direction only".
-  // The HTML side is checked: drop the generator and the same markup must fail
-  // rather than publish a page whose stylesheet 404s.
+test("recipe 5 — an HTML-referenced file the generator did not write fails the build", async () => {
+  // The recipe's stated tripwire, and the limit of it: the HTML reference is
+  // checked, so dropping the generator must block the publish.
   const markup = codeBlock(R5, "html", 0).trim();
   const tmp = mkTmp();
   writeTree(join(tmp, "src"), { "index.html": page("Home", `<h1>Home</h1>\n${markup}`) });
 
   const r = await runCli(["build", "-s", "src", "-o", "dist"], tmp);
-  expectExit(r, 1, "vendored files referenced but never generated");
-  if (!r.stderr.includes("/vendor/highlight.css does not resolve")) {
-    throw new Error(`recipe 5: the reference check is what makes this self-verifying:\n${r.stderr}`);
+  expectExit(r, 1, "a vendored file referenced but never generated");
+  if (!r.stderr.includes("/vendor/markdown-it.js does not resolve")) {
+    throw new Error(`recipe 5: the reference check is the tripwire:\n${r.stderr}`);
   }
   if (existsSync(join(tmp, "dist"))) throw new Error("§15: a failed build publishes nothing");
 }, TEST_MS);
