@@ -9,9 +9,12 @@
  * never reads or writes HTML itself).
  *
  * The server binds BEFORE the watch loop starts, so a taken port fails fast
- * (`createDevServer` throws `UsageError` — §14.1's fatal environment fault,
- * exit 2) with no build attempted at all — consistent with every other exit-2
- * case in this CLI (checked up front, before real work starts).
+ * (`createDevServer` rejects with `UsageError` — §14.1's fatal environment
+ * fault, exit 2) with no build attempted at all — consistent with every other
+ * exit-2 case in this CLI (checked up front, before real work starts). The
+ * `await` is load-bearing rather than incidental: `node:http` reports
+ * `EADDRINUSE` on an event rather than by throwing (issue #49), so dropping it
+ * would start a build against a port that never bound.
  *
  * §27 — THE LOCAL AUDIT VIEW is wired here and only here, because `unify dev`
  * is the only command that answers a URL (§27.5: `watch` has no server,
@@ -42,7 +45,7 @@ import { watch } from "./watch.js";
  */
 export async function dev(context, opts = {}) {
   const { output, settings, reporter } = context;
-  const devServer = createDevServer({ outputDir: output, port: settings.port });
+  const devServer = await createDevServer({ outputDir: output, port: settings.port });
   opts.onReady?.(devServer);
 
   reporter.summary(`serving ${devServer.url} (output: ${output})`);

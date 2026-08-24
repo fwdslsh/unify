@@ -1491,3 +1491,128 @@ test("AUD-12: a canonical with no scheme of its own, or one unify cannot compare
   expectNoFinding(f, "canonical-scheme-mismatch", "§24.4: both sides must be the web's two schemes");
   covers("AUD-12");
 }, TEST_MS);
+
+// ------------------------------------------------- review round 5 regressions
+
+/**
+ * The `fix:` line printed under the `[id]` finding on `path` (§24.5's second
+ * line), or `null` when that page reports no finding of that id.
+ */
+function fixLineFor(stdout, path, id) {
+  const lines = stdout.split("\n");
+  const at = lines.findIndex((l) => l.startsWith(`${path}: `) && l.endsWith(`[${id}]`));
+  if (at === -1) return null;
+  const next = lines[at + 1] ?? "";
+  return next.startsWith("  fix: ") ? next.slice("  fix: ".length) : null;
+}
+
+test("AUD-04: the lang-missing fix line names the layout only when the page HAS one", async () => {
+  // The standing fix line said "set it on the layout" unconditionally. On a
+  // page that resolved NO layout that advice is unactionable in both
+  // directions — the named layout is either already correct or does not exist
+  // — and a fix line that sends a reader somewhere they have already been is
+  // worse than no fix line. §20.3's `layout` is what lets this one tell the
+  // two cases apart.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    // A layout that supplies no lang, so every page below emits none and all
+    // three collect the finding. Its own `lang` is what the WITH-layout fix
+    // line tells the author to add.
+    "_layout.html": `<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Example Site</title>
+<meta name="description" content="A site whose layout forgot its language."></head>
+<body><main></main></body>
+</html>
+`,
+    "index.html": `<!doctype html>
+<html>
+<head><title>Home</title><meta name="description" content="The home page of the example site."></head>
+<body><main><h1>Home</h1><p>Composed with the layout.</p>
+<a href="/optout.html">Opt out</a> <a href="/post.html">Post</a></main></body>
+</html>
+`,
+    "optout.html": `<!doctype html>
+<html data-layout="none">
+<head><meta charset="utf-8"><title>Opt Out</title>
+<meta name="description" content="An HTML page that composes with no layout."></head>
+<body><main><h1>Opt Out</h1><p>No layout.</p><a href="/">Home</a></main></body>
+</html>
+`,
+    "post.md": `---
+title: Post
+description: A Markdown page that composes with no layout.
+layout: none
+---
+
+# Post
+
+No layout. [Home](/)
+`,
+  });
+  const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
+  expectExit(r, 0, "three pages emitting no lang");
+  // The finding itself is correct on all three — only the advice differs.
+  for (const p of ["index.html", "optout.html", "post.md"]) {
+    if (fixLineFor(r.stdout, p, "lang-missing") === null) {
+      throw new Error(`§24.4: lang-missing must fire on ${p}\nstdout:\n${r.stdout}`);
+    }
+  }
+
+  // Composed WITH a layout: the standing advice, unchanged. The layout is
+  // where one edit fixes every page under it, which is why it stays first.
+  const withLayout = fixLineFor(r.stdout, "index.html", "lang-missing");
+  if (withLayout !== 'set it on the layout: <html lang="en">') {
+    throw new Error(
+      `§24.4: a page that composed WITH a layout keeps the layout advice.\ngot: ${JSON.stringify(withLayout)}`,
+    );
+  }
+
+  // Composed WITHOUT one: the fix must name the page, and must not send the
+  // reader to a layout. These two assertions are the regression — before
+  // §20.3 carried `layout`, both of these lines were the string above.
+  for (const [p, wanted] of [
+    ["optout.html", 'set it on the page: <html lang="en"> — this page composed with no layout'],
+    ["post.md", "add lang: en to this page's frontmatter — it composed with no layout"],
+  ]) {
+    const got = fixLineFor(r.stdout, p, "lang-missing");
+    if (got !== wanted) {
+      throw new Error(
+        `§24.4: a page that composed with NO layout must be told what to edit on ITSELF.\n`
+        + `${p}\n  expected: ${JSON.stringify(wanted)}\n  got:      ${JSON.stringify(got)}`,
+      );
+    }
+    if (/\bthe layout\b/.test(got)) {
+      throw new Error(`§24.4: ${p} resolved no layout — the fix line must not name one.\ngot: ${got}`);
+    }
+  }
+
+  // The Markdown page is told to write frontmatter and the HTML page is told
+  // to write an attribute: each names the spelling THAT page can take, which
+  // is the whole point of splitting the message.
+  const md = fixLineFor(r.stdout, "post.md", "lang-missing");
+  if (!md.includes("lang: en") || md.includes("<html")) {
+    throw new Error(`§24.4: a Markdown page has no <html> to edit — name the frontmatter key.\ngot: ${md}`);
+  }
+
+  // A tree with no layout ANYWHERE is the third way to compose without one,
+  // and it must read the same as the opt-outs above.
+  const bare = mkTmp();
+  writeTree(join(bare, "src"), {
+    "index.html": `<!doctype html>
+<html>
+<head><title>Home</title><meta name="description" content="The only page, and no layout in the tree."></head>
+<body><h1>Home</h1><p>No layout exists to set it on.</p></body>
+</html>
+`,
+  });
+  const b = await runCli(["audit", "-s", "src", "-o", "dist"], bare);
+  expectExit(b, 0, "a tree with no _layout.html at all");
+  const bareFix = fixLineFor(b.stdout, "index.html", "lang-missing");
+  if (bareFix !== 'set it on the page: <html lang="en"> — this page composed with no layout') {
+    throw new Error(
+      `§24.4: no _layout.html in the tree is the same case as data-layout="none".\ngot: ${JSON.stringify(bareFix)}`,
+    );
+  }
+  covers("AUD-04");
+}, TEST_MS);

@@ -28,13 +28,15 @@ curl -fsSL https://raw.githubusercontent.com/fwdslsh/unify/main/install.sh | bas
 
 Installs to `~/.local/bin`; the script accepts `--global`, `--dir PATH`, `--version vX.Y.Z`, `--force`, and `--dry-run`. Binaries are attached to [GitHub releases](https://github.com/fwdslsh/unify/releases). No Windows binary yet — use the install below.
 
-**Bun or npm:**
+**Node or Bun:**
 
 ```bash
-bun add -g @fwdslsh/unify    # or: npm install -g @fwdslsh/unify
+npx @fwdslsh/unify build     # no install at all
+npm install -g @fwdslsh/unify
+bun add -g @fwdslsh/unify
 ```
 
-Bun >= 1.2.0 is the only supported runtime — the installed `unify` script runs under `bun`, and there are no Node or Deno builds. Never heard of Bun? Use the binary above.
+Node >= 22.12.0 or Bun >= 1.2.0. The same `unify` runs on both and produces byte-identical output; the installed script picks Node by default, and `bun add -g` runs it under Bun. Deno is not supported. Never heard of either? Use the binary above.
 
 ## Quick start
 

@@ -285,12 +285,19 @@ describe("P17 — a frontmatter value with no text form (§10.2)", () => {
     const r = reporter();
     const out = convert('---\ntitle: "unterminated\n---\n\n# Body\n', { path: "/s/post.md", sourceRoot: "/s", reporter: r });
     expect(r.diags).toHaveLength(1);
-    // The quote opens on line 2; the parser reports line 3, where it reaches
-    // end-of-stream. For an unterminated construct that is one line past the
-    // cause — standard compiler behaviour, and the only position known without
-    // reimplementing YAML, which is why the message carries the parser's own
-    // reason so the construct is still named.
-    expect(r.diags[0]).toMatchObject({ file: "post.md", line: 3, severity: "problem" });
+    // The quote opens on line 2, and nothing in the frontmatter follows it —
+    // the fault is discovered at true end-of-input. js-yaml 5 (unlike 3, whose
+    // parser synthesized a phantom line past the last real one to report an
+    // EOF-discovered fault, one line beyond the construct's own line) reports
+    // the mark on the real last line, line 2 itself — still the parser's own
+    // position, still standard compiler behaviour for "ran out of input while
+    // a construct was open," and still the only position known without
+    // reimplementing YAML. (When a real line *does* follow the unterminated
+    // construct — see the frontmatter-invalid-yaml landmine fixture — js-yaml
+    // 3 and 5 agree exactly, because there is no EOF to synthesize a line
+    // past.) The message still carries the parser's own reason so the
+    // construct is still named.
+    expect(r.diags[0]).toMatchObject({ file: "post.md", line: 2, severity: "problem" });
     expect(r.diags[0].message).toContain("double quoted scalar");
     // Frontmatter that fails to parse contributes no keys at all — same as if it
     // were absent, so the title fallback (§10.3) still reaches the body's h1.

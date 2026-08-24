@@ -53,7 +53,7 @@ import * as html from "../../core/html.js";
 import * as includes from "../../core/includes.js";
 import * as layout from "../../core/layout.js";
 import * as markdown from "../../core/markdown.js";
-import { contains, isNeverShipped, toRelative } from "../../core/paths.js";
+import { contains, isNeverShipped, locateVirtual, nameOf, resolutionRoots, toRelative } from "../../core/paths.js";
 import * as publishModule from "../../core/publish.js";
 import * as references from "../../core/references.js";
 import * as urls from "../../core/urls.js";
@@ -127,6 +127,11 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
 
 /** The build proper, with §33's overlay already produced (or absent). */
 async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulted, overlayDir }) {
+  // §33.3 — THE RESOLUTION NAMESPACE, computed once and threaded everywhere a
+  // path is resolved or named. The overlay joins the scan (below) and this: a
+  // generated page walks for `_layout.html` and an `<include src>` finds a
+  // generated fragment because both ask the namespace, not one directory.
+  const roots = resolutionRoots(sourceRoot, overlayDir);
   const files = scanSourceTree(sourceRoot, output, settings.exclude, reporter, overlayDir);
 
   // §6.3/P08 — every .html/.md source file, excluded or not (§1: a "page" by
@@ -145,8 +150,8 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
   }
 
   const layoutCache = new Map(); // absolute layout path -> Promise<{text, spans, file, broken}>
-  const convertMarkdown = (absPath) => markdown.convertFragment(absPath, { sourceRoot, reporter });
-  const resolveLine = makeSourceLineResolver(sourceRoot);
+  const convertMarkdown = (absPath) => markdown.convertFragment(absPath, { sourceRoot, roots, reporter });
+  const resolveLine = makeSourceLineResolver(roots);
   // A10 (§14.3): every file consumed AS a layout or an include, anywhere in
   // the build — accumulated here (buildPage/loadLayout add to it as they go)
   // and checked below, once composition is done, against the pages that
@@ -169,7 +174,7 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
     // diagnostic the comment below exists to prevent.
     const problemsBefore = reporter.problemsReported;
     try {
-      const composed = await buildPage(page, { sourceRoot, reporter, layoutCache, convertMarkdown, consumedAsIncludeOrLayout, resolveLine });
+      const composed = await buildPage(page, { sourceRoot, roots, reporter, layoutCache, convertMarkdown, consumedAsIncludeOrLayout, resolveLine });
       // A page whose OWN processing reported a new problem (an unresolved
       // <include> left verbatim in the output by includes.js's own
       // best-effort splice, a P16/P09 mid-composition failure, …) is excluded
@@ -267,7 +272,7 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
   // §20.1's membership set, accumulated as each page's FINAL text is produced
   // — the manifest reads the bytes §15 would publish (§20.2), so it is filled
   // from the rewritten text below rather than from `composedPages`.
-  /** @type {{sourcePath: string, outputPath: string, html: string}[]} */
+  /** @type {{sourcePath: string, outputPath: string, html: string, generated: boolean, layout: string|null}[]} */
   const manifestPages = [];
   for (const p of composedPages) {
     const pageOutputPath = collisions.computeOutputPath({ path: p.relPath, kind: "page" }, { prettyUrls: false });
@@ -286,7 +291,20 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
     // every surface that NAMES its source has to know. Without this the
     // audit reported `log.html` at a path the author cannot open, under a
     // fix line telling them to rename a file they never wrote.
-    manifestPages.push({ sourcePath: p.relPath, outputPath: finalOutputPath, html: rewritten, generated: p.generated === true });
+    //
+    // §20.3 — `layout` is the same shape one step over: the layout this page
+    // resolved to, or `null` when it composed with none (`data-layout="none"`,
+    // `layout: none`, no `_layout.html` above it). It rides along here rather
+    // than being re-derived downstream because `buildPage` is the only place
+    // that KNOWS — §17's report already prints the same fact as `← page +
+    // layout` vs `← page (no layout)`, from this very value.
+    manifestPages.push({
+      sourcePath: p.relPath,
+      outputPath: finalOutputPath,
+      html: rewritten,
+      generated: p.generated === true,
+      layout: p.layoutFile ?? null,
+    });
   }
 
   // §4.4/EXC-09 — mirror copy: every emitted asset, byte-for-byte, same
@@ -862,18 +880,21 @@ function addressLine(baseConfig) {
  * line in the wrong place — exactly the failure this resolver exists to end,
  * so it declines instead. (Closing it properly means a converted-offset →
  * source-line map out of markdown.js; noted, not attempted here.)
- * @param {string} sourceRoot
+ * @param {string[]} roots - the §33.3 namespace: `file` is a VIRTUAL path, so
+ *   the line of a fault inside a generated fragment is read out of the overlay
+ *   copy that actually holds it, not guessed at from a source path with no file
+ *   behind it.
  * @returns {(file: string, fileOffset: number) => number|undefined}
  */
-function makeSourceLineResolver(sourceRoot) {
-  /** @type {Map<string, string|null>} source-root-relative path -> raw text, or null when unreadable */
+function makeSourceLineResolver(roots) {
+  /** @type {Map<string, string|null>} virtual path -> raw text, or null when unreadable */
   const cache = new Map();
   return (file, fileOffset) => {
     if (extname(file).toLowerCase() === ".md") return undefined;
     if (!cache.has(file)) {
       let text = null;
       try {
-        text = readFileSync(resolve(sourceRoot, file), "utf8");
+        text = readFileSync(locateVirtual(roots, file), "utf8");
       } catch {
         text = null; // deleted mid-build, or a synthetic name: no line, never a guessed one
       }
@@ -1037,12 +1058,12 @@ function trackIncludedFiles(spans, entryFile, consumedAsIncludeOrLayout) {
  * not this function).
  * @returns {Promise<{text: string, spans: {start:number,end:number,file:string,fileOffset:number}[], layoutFile: string|null}|null>}
  */
-async function buildPage(page, { sourceRoot, reporter, layoutCache, convertMarkdown, consumedAsIncludeOrLayout, resolveLine }) {
+async function buildPage(page, { sourceRoot, roots, reporter, layoutCache, convertMarkdown, consumedAsIncludeOrLayout, resolveLine }) {
   const pageFile = page.relPath;
 
   if (extname(page.absPath) === ".md") {
     const source = readFileSync(page.absPath, "utf8");
-    const md = markdown.convert(source, { path: page.absPath, sourceRoot, reporter });
+    const md = markdown.convert(source, { path: page.absPath, sourceRoot, roots, reporter });
 
     // Layout selection reads the frontmatter value markdown.js already
     // parsed — resolved BEFORE assembly, because §10.7's shell (charset
@@ -1050,7 +1071,7 @@ async function buildPage(page, { sourceRoot, reporter, layoutCache, convertMarkd
     // supplies it) are different documents for the exact same page (see the
     // seam this task exists to close, described in CLAUDE.md/the task brief).
     const resolution = layout.resolveMarkdownLayout({
-      layoutValue: md.layout, mdSource: source, pageAbsPath: page.absPath, sourceRoot, file: pageFile, reporter,
+      layoutValue: md.layout, mdSource: source, pageAbsPath: page.absPath, sourceRoot, roots, file: pageFile, reporter,
     });
     if (resolution.problem) return null;
 
@@ -1060,7 +1081,7 @@ async function buildPage(page, { sourceRoot, reporter, layoutCache, convertMarkd
       // DIA-13: `md.html` is converted output, so its newline count numbers a
       // document the author never wrote — includes.js omits the line rather
       // than guessing one (the file is still exact).
-      text: md.html, file: page.absPath, sourceRoot, reporter, convertMarkdown, linesAreSource: false,
+      text: md.html, file: page.absPath, sourceRoot, roots, reporter, convertMarkdown, linesAreSource: false,
     });
     trackIncludedFiles(inlinedBody.spans, pageFile, consumedAsIncludeOrLayout);
     const assembled = { ...md, html: inlinedBody.text, htmlSpans: inlinedBody.spans };
@@ -1070,7 +1091,7 @@ async function buildPage(page, { sourceRoot, reporter, layoutCache, convertMarkd
       return { ...compose.compose({ pageText, pageFile, pageSpans, layoutText: null, resolveLine, reporter }), layoutFile: null };
     }
 
-    const loaded = await loadLayout(resolution.path, { sourceRoot, reporter, convertMarkdown, layoutCache, consumedAsIncludeOrLayout, resolveLine });
+    const loaded = await loadLayout(resolution.path, { sourceRoot, roots, reporter, convertMarkdown, layoutCache, consumedAsIncludeOrLayout, resolveLine });
     if (loaded.broken) return null; // P15 already reported once for the layout itself
     const { text: pageText, spans: pageSpans } = compose.assembleMarkdownDocument(assembled, { standalone: false, pageFile });
     return {
@@ -1084,8 +1105,8 @@ async function buildPage(page, { sourceRoot, reporter, layoutCache, convertMarkd
 
   // .html
   const raw = readFileSync(page.absPath, "utf8");
-  markdown.checkHtmlFrontmatter(raw, { path: page.absPath, sourceRoot, reporter }); // P10
-  const inlined = await includes.inlineIncludes({ text: raw, file: page.absPath, sourceRoot, reporter, convertMarkdown });
+  markdown.checkHtmlFrontmatter(raw, { path: page.absPath, sourceRoot, roots, reporter }); // P10
+  const inlined = await includes.inlineIncludes({ text: raw, file: page.absPath, sourceRoot, roots, reporter, convertMarkdown });
   trackIncludedFiles(inlined.spans, pageFile, consumedAsIncludeOrLayout);
   const { root } = html.parse(inlined.text);
   // Same `spans`/`resolveLine` pair `compose()` gets below: §6's diagnostics
@@ -1093,7 +1114,7 @@ async function buildPage(page, { sourceRoot, reporter, layoutCache, convertMarkd
   // the include-inlined text too, so they need the same translation back to a
   // real source line as §7's — layout.js's own DIAGNOSTIC LOCATION note.
   const resolution = layout.resolveHtmlLayout({
-    root, text: inlined.text, spans: inlined.spans, resolveLine, pageAbsPath: page.absPath, sourceRoot, reporter,
+    root, text: inlined.text, spans: inlined.spans, resolveLine, pageAbsPath: page.absPath, sourceRoot, roots, reporter,
   });
   if (resolution.problem) return null;
 
@@ -1101,7 +1122,7 @@ async function buildPage(page, { sourceRoot, reporter, layoutCache, convertMarkd
     return { ...compose.compose({ pageText: inlined.text, pageFile, pageSpans: inlined.spans, layoutText: null, resolveLine, reporter }), layoutFile: null };
   }
 
-  const loaded = await loadLayout(resolution.path, { sourceRoot, reporter, convertMarkdown, layoutCache, consumedAsIncludeOrLayout, resolveLine });
+  const loaded = await loadLayout(resolution.path, { sourceRoot, roots, reporter, convertMarkdown, layoutCache, consumedAsIncludeOrLayout, resolveLine });
   if (loaded.broken) return null;
   return {
     ...compose.compose({
@@ -1123,10 +1144,14 @@ async function buildPage(page, { sourceRoot, reporter, layoutCache, convertMarkd
  * A10 "used as a layout" fact is likewise recorded exactly once here rather
  * than once per referencing page.
  */
-function loadLayout(absPath, { sourceRoot, reporter, convertMarkdown, layoutCache, consumedAsIncludeOrLayout, resolveLine }) {
+function loadLayout(absPath, { sourceRoot, roots, reporter, convertMarkdown, layoutCache, consumedAsIncludeOrLayout, resolveLine }) {
   if (layoutCache.has(absPath)) return layoutCache.get(absPath);
   const promise = (async () => {
-    const file = toRelative(sourceRoot, absPath);
+    // §33.3 — a layout is named by its virtual path, so a generated one is
+    // `docs/_layout.html` (the name its generator gave it) in every diagnostic
+    // and in §17's `from` column, and the A10 bookkeeping below keys on the
+    // same string the scan used.
+    const file = nameOf(roots, absPath);
     consumedAsIncludeOrLayout.add(file);
     let raw;
     try {
@@ -1134,7 +1159,7 @@ function loadLayout(absPath, { sourceRoot, reporter, convertMarkdown, layoutCach
     } catch {
       return { text: "", spans: [], file, broken: true };
     }
-    const inlined = await includes.inlineIncludes({ text: raw, file: absPath, sourceRoot, reporter, convertMarkdown });
+    const inlined = await includes.inlineIncludes({ text: raw, file: absPath, sourceRoot, roots, reporter, convertMarkdown });
     trackIncludedFiles(inlined.spans, file, consumedAsIncludeOrLayout);
     const { root } = html.parse(inlined.text);
     const { broken } = layout.checkLayoutDocument({

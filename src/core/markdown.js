@@ -52,12 +52,22 @@
  * key lines only — deliberately not a general YAML parser, since the value
  * semantics already come from js-yaml and this indexer's only job is "which
  * line is this key on".
+ *
+ * On js-yaml 5 (upgraded from 3, issue #58 — 4.x dropped `safeLoad`/`safeDump`
+ * in favor of a safe-by-default `load`, which this module already called, so
+ * that jump was a no-op here): the package now ships flat named exports with
+ * no default export, so this imports `loadAll`/`FAILSAFE_SCHEMA` by name
+ * rather than a `yaml` default namespace. `parseFrontmatterYaml` below calls
+ * `loadAll` rather than `load` for one reason — see the comment there.
+ * `FAILSAFE_SCHEMA` itself, every scalar case above, and the `.reason`/
+ * `.mark.line` shape the catch block reads all verified identical across the
+ * jump.
  */
 
 import { readFile } from "node:fs/promises";
 import MarkdownIt from "markdown-it";
-import yaml from "js-yaml";
-import { toRelative } from "./paths.js";
+import { loadAll as yamlLoadAll, FAILSAFE_SCHEMA } from "js-yaml";
+import { nameOf, resolutionRoots } from "./paths.js";
 
 // --------------------------------------------------------------- engine
 
@@ -367,12 +377,12 @@ function splitFrontmatter(source) {
  * treating an `.html` source as ordinary markup.
  *
  * @param {string} source
- * @param {{path: string, sourceRoot: string, reporter: import('./diagnostics.js').Reporter}} ctx
+ * @param {{path: string, sourceRoot: string, roots?: string[], reporter: import('./diagnostics.js').Reporter}} ctx
  */
-export function checkHtmlFrontmatter(source, { path, sourceRoot, reporter }) {
+export function checkHtmlFrontmatter(source, { path, sourceRoot, roots = resolutionRoots(sourceRoot), reporter }) {
   if (!/^---[ \t]*(?:\r?\n|$)/.test(source)) return;
   reporter.problem({
-    file: toRelative(sourceRoot, path),
+    file: nameOf(roots, path),
     line: 1,
     message: "HTML pages have no frontmatter; use <head> (frontmatter here would render as visible text)",
   });
@@ -468,7 +478,19 @@ function parseFrontmatterYaml(yamlText, { file, reporter }) {
   if (yamlText === null) return {};
   let parsed;
   try {
-    parsed = yaml.load(yamlText, { schema: yaml.FAILSAFE_SCHEMA });
+    // `loadAll`, not `load`: js-yaml 5's `load` throws "expected a document,
+    // but the input is empty" for a document-free body (blank, or comments
+    // only), where js-yaml 3's `load` returned `undefined` for the same
+    // input — a documented 4.x behavior change. `loadAll` never throws for
+    // zero documents (returning `[]` is its ordinary, defined behavior for an
+    // empty stream), so `[0]` reproduces the old `undefined` exactly, and the
+    // `typeof parsed !== "object"` check below already turns that into `{}`,
+    // same as it always has. `yamlText` can never hold more than one
+    // document — `splitFrontmatter`'s lazy match stops at the first top-level
+    // `---` it finds, so a second document separator would have already
+    // ended the frontmatter capture before reaching here — so `[0]` never
+    // silently discards a real second document either.
+    parsed = yamlLoadAll(yamlText, { schema: FAILSAFE_SCHEMA })[0];
   } catch (err) {
     // js-yaml carries the real position on the thrown error. `mark.line` is
     // 0-based and relative to the frontmatter body, which starts on the line
@@ -621,10 +643,13 @@ function metaElement(key, value) {
  *     implementation report.
  *
  * @param {string} source
- * @param {{path: string, sourceRoot: string, reporter: import('./diagnostics.js').Reporter}} options
+ * @param {{path: string, sourceRoot: string, roots?: string[], reporter: import('./diagnostics.js').Reporter}} options
+ *   `roots` is the §33.3 namespace (`paths.js`'s `resolutionRoots`), which names
+ *   a generated page by the virtual path its generator gave it; it defaults to
+ *   the source root alone — the namespace of a build without `--generate`.
  */
-export function convert(source, { path, sourceRoot, reporter }) {
-  const file = toRelative(sourceRoot, path);
+export function convert(source, { path, sourceRoot, roots = resolutionRoots(sourceRoot), reporter }) {
+  const file = nameOf(roots, path);
   const { yamlText, body, bodyStartLine } = splitFrontmatter(source);
   const data = parseFrontmatterYaml(yamlText, { file, reporter });
   // §28.1 — page mode only. `convertFragment` never reaches this line, which is
@@ -674,12 +699,12 @@ export function convert(source, { path, sourceRoot, reporter }) {
  * `convertMarkdown: (p) => convertFragment(p, { sourceRoot, reporter })`.
  *
  * @param {string} path - absolute path
- * @param {{sourceRoot: string, reporter: import('./diagnostics.js').Reporter}} options
+ * @param {{sourceRoot: string, roots?: string[], reporter: import('./diagnostics.js').Reporter}} options
  * @returns {Promise<string>}
  */
-export async function convertFragment(path, { sourceRoot, reporter }) {
+export async function convertFragment(path, { sourceRoot, roots = resolutionRoots(sourceRoot), reporter }) {
   const source = await readFile(path, "utf8");
-  const file = toRelative(sourceRoot, path);
+  const file = nameOf(roots, path);
   const { body, bodyStartLine } = splitFrontmatter(source);
   const { html } = convertBody(body, bodyStartLine, { file, reporter });
   return html;

@@ -30,9 +30,9 @@
  */
 
 import { readFile } from "node:fs/promises";
-import { dirname, extname, resolve } from "node:path";
+import { extname } from "node:path";
 import { CHECK_SPELLING, formatChain } from "./diagnostics.js";
-import { contains, toRelative } from "./paths.js";
+import { locateVirtual, nameOf, resolutionRoots, virtualResolve } from "./paths.js";
 import { declaresSlot, mergeSlottedInclude } from "./slotted-include.js";
 
 /**
@@ -65,30 +65,39 @@ function srcOf(attrs) {
 /**
  * Resolve an include target to an absolute path (§5.1 steps 1–2).
  *
+ * Resolution runs in the §33.3 **namespace**, not against one directory: the
+ * spec becomes a virtual path (root-relative, or relative to the including
+ * file's own virtual directory), and only then does the filesystem say which
+ * root holds it — the source tree first, the `--generate` overlay second
+ * (`paths.js`'s `resolutionRoots`). That is what lets a source `_layout.html`
+ * include `/_includes/nav.html` that a generator wrote, and a generated page
+ * include `./sibling.html` that the author wrote, with one spelling each.
+ *
  * @param {object} args
  * @param {string} args.spec - the path as written
  * @param {'src'|'virtual'|'file'} args.form
  * @param {string} args.fromFile - absolute path of the including file
- * @param {string} args.sourceRoot
+ * @param {string[]} args.roots - the namespace, from `resolutionRoots`
  * @returns {{path: string}|{escapes: true}}
  */
-function resolveTarget({ spec, form, fromFile, sourceRoot }) {
-  let resolved;
+function resolveTarget({ spec, form, fromFile, roots }) {
+  let virtual;
   if (form === "virtual") {
-    resolved = resolve(sourceRoot, spec.replace(/^\//, ""));
+    // `virtual=` is root-relative by SSI's definition, leading slash or not.
+    const bare = spec.replace(/^\//, "");
+    if (bare.startsWith("/")) return { escapes: true };
+    virtual = virtualResolve(roots, fromFile, `/${bare}`);
   } else if (form === "file") {
     // `file=` is filesystem-relative by SSI's definition and cannot be absolute.
     if (spec.startsWith("/")) return { escapes: true };
-    resolved = resolve(dirname(fromFile), spec);
+    virtual = virtualResolve(roots, fromFile, spec);
   } else {
-    resolved = spec.startsWith("/")
-      ? resolve(sourceRoot, spec.slice(1))
-      : resolve(dirname(fromFile), spec);
+    virtual = virtualResolve(roots, fromFile, spec);
   }
   // Traversal safety is internal and always on — an escaping path is simply not
   // a path the build will read, reported with the same shape as not-found.
-  if (!contains(sourceRoot, resolved)) return { escapes: true };
-  return { path: resolved };
+  if (virtual === null) return { escapes: true };
+  return { path: locateVirtual(roots, virtual) };
 }
 
 /**
@@ -98,6 +107,9 @@ function resolveTarget({ spec, form, fromFile, sourceRoot }) {
  * @param {string} args.text
  * @param {string} args.file - absolute path of the file `text` came from
  * @param {string} args.sourceRoot
+ * @param {string[]} [args.roots] - the §33.3 namespace this build resolves in
+ *   (`paths.js`'s `resolutionRoots`); defaults to the source root alone, which
+ *   is exactly the namespace of a build without `--generate`
  * @param {import('./diagnostics.js').Reporter} args.reporter
  * @param {(path: string) => Promise<string>} args.convertMarkdown - §5.1 step 4
  * @param {string[]} [args.stack] - resolved paths currently being expanded;
@@ -113,13 +125,17 @@ export async function inlineIncludes({
   text,
   file,
   sourceRoot,
+  roots = resolutionRoots(sourceRoot),
   reporter,
   convertMarkdown,
   stack = [file],
   origin = null,
   linesAreSource = true,
 }) {
-  const relFile = toRelative(sourceRoot, file);
+  // §33.3 — a file is named by its VIRTUAL path, so a diagnostic about a
+  // generated fragment says `_includes/nav.html`, the name the author's
+  // generator gave it, and never the overlay's temp path.
+  const relFile = nameOf(roots, file);
   /** @type {{index:number,length:number,text:string,spans:{start:number,end:number,file:string,fileOffset:number}[]}[]} */
   const edits = [];
 
@@ -156,7 +172,7 @@ export async function inlineIncludes({
       });
     }
 
-    const target = resolveTarget({ spec, form, fromFile: file, sourceRoot });
+    const target = resolveTarget({ spec, form, fromFile: file, roots });
     if ("escapes" in target || !isPage(target.path)) {
       reporter.problem({
         ...at,
@@ -167,7 +183,7 @@ export async function inlineIncludes({
       continue;
     }
 
-    const chain = [...stack, target.path].map((p) => toRelative(sourceRoot, p));
+    const chain = [...stack, target.path].map((p) => nameOf(roots, p));
     if (stack.includes(target.path)) {
       reporter.problem({ ...chainAt, message: `include cycle: ${formatChain(chain)}` });
       continue;
@@ -200,6 +216,7 @@ export async function inlineIncludes({
       text: body,
       file: target.path,
       sourceRoot,
+      roots,
       reporter,
       convertMarkdown,
       stack: [...stack, target.path],
@@ -218,7 +235,7 @@ export async function inlineIncludes({
     // and each has its own problem, located at the INCLUDE element in the file
     // that wrote it — where the author can act — and naming the fragment too,
     // because the fix is as likely to be in one file as the other.
-    const fragmentRel = toRelative(sourceRoot, target.path);
+    const fragmentRel = nameOf(roots, target.path);
     if (!isFragment(target.path)) {
       reporter.problem({
         ...at,
@@ -263,17 +280,70 @@ export async function inlineIncludes({
   return spliceWithProvenance(text, edits, relFile);
 }
 
+/** Opening or closing `<pre>`/`<code>` tag, textually (see `inertRanges`). */
+const PROTECT_TAG = /<(\/?)(pre|code)\b[^>]*>/gi;
+
 /**
- * Both include spellings, in source order.
+ * §5.1 item 8 — code samples are not directives. Both include spellings are
+ * inert wherever they sit textually inside a `<pre>` or `<code>` element, so a
+ * page DOCUMENTING unify can show the syntax without the build splicing a nav
+ * into the middle of its own example (issue #56, found building
+ * examples/unify-docs). The regions are computed on the same raw text the scan
+ * reads — textual, like everything else in this module: opening and closing
+ * tags counted with one nesting depth across both names (so
+ * `<pre><code>…</code></pre>` is one region), case-insensitive, an unclosed
+ * opener protecting to end of text, a self-closed `<pre/>` opening nothing.
+ * An inert occurrence is never yielded at all, so no resolution runs and no
+ * diagnostic — P01's not-found, A01's void-include — can fire on content.
+ * Exactly `pre` and `code`: `<script>`/`<style>`/`<textarea>` are unchanged.
+ *
+ * @param {string} text
+ * @returns {[number, number][]} sorted, non-overlapping [start, end) ranges
+ */
+function inertRanges(text) {
+  /** @type {[number, number][]} */
+  const ranges = [];
+  let depth = 0;
+  let start = 0;
+  for (const m of text.matchAll(PROTECT_TAG)) {
+    if (m[0].endsWith("/>")) continue;
+    if (m[1] === "") {
+      if (depth === 0) start = m.index;
+      depth += 1;
+    } else if (depth > 0) {
+      depth -= 1;
+      if (depth === 0) ranges.push([start, m.index + m[0].length]);
+    }
+  }
+  if (depth > 0) ranges.push([start, text.length]);
+  return ranges;
+}
+
+/**
+ * Both include spellings, in source order — minus any occurrence inside a
+ * `<pre>`/`<code>` region (§5.1 item 8), which is content, not a directive.
  * @param {string} text
  */
 function* findIncludes(text) {
+  const inert = inertRanges(text);
+  const isInert = (/** @type {number} */ i) => inert.some(([s, e]) => i >= s && i < e);
   /** @type {{match: string, spec: string|null, form: string, index: number, content?: string}[]} */
   const found = [];
-  for (const m of text.matchAll(INCLUDE_TAG)) {
+  // exec, not matchAll: INCLUDE_TAG's paired form seeks its close LAZILY, so a
+  // match that STARTS inside an inert region can extend past it and swallow a
+  // real directive's `</include>` further down (the fixture's void-sample case).
+  // Skipping such a match must therefore resume right after its OPENING tag,
+  // not after everything the lazy close-seek consumed.
+  INCLUDE_TAG.lastIndex = 0;
+  for (let m; (m = INCLUDE_TAG.exec(text)); ) {
+    if (isInert(m.index)) {
+      INCLUDE_TAG.lastIndex = m.index + m[0].indexOf(">") + 1;
+      continue;
+    }
     found.push({ match: m[0], spec: srcOf(m[1]), form: "src", index: m.index, content: m[2] });
   }
   for (const m of text.matchAll(SSI_TAG)) {
+    if (isInert(m.index)) continue;
     found.push({ match: m[0], spec: m[2], form: m[1].toLowerCase(), index: m.index });
   }
   yield* found.sort((a, b) => a.index - b.index);

@@ -143,7 +143,7 @@ The predicate is the CLI's own argument resolution and nothing else — no marke
 For `<include src="P">…</include>`, `<include src="P">`, `<!--#include virtual="P" -->`, or `<!--#include file="P" -->` in file F:
 
 1. `virtual="P"`: resolve P against the source root (a leading `/` is permitted and equivalent). `file="P"`: P must be relative; resolve against `dirname(F)`. `<include src="P">`: if P starts with `/`, resolve against the source root, else against `dirname(F)`.
-2. The resolved path must lie inside the source root. Escaping it (`../…`) is a problem (same shape as not-found; traversal safety is internal and always on).
+2. The resolved path must lie inside the source root — under `--generate`, inside the §33.3 **namespace**, where the source root and the generated overlay share one path space and the source tree wins a tie. Escaping it (`../…`) is a problem (same shape as not-found; traversal safety is internal and always on).
 3. The target must exist and end in `.html` or `.md`; otherwise a problem:
 
 ```
@@ -170,8 +170,9 @@ src/index.html:9: problem: <include> with content: _includes/card.html is not a 
 ```
 
 7. The void form (no closing tag) builds identically and carries advisory A01 (§14.3).
+8. **Code samples are not directives.** Both spellings are **inert** wherever they sit textually inside a `<pre>` or `<code>` element: between an opening `<pre`/`<code` tag and its matching close, with one nesting depth counted across both names (so `<pre><code>…</code></pre>` is a single region), case-insensitive, an unclosed opener protecting to the end of the text, and a self-closed `<pre/>` opening nothing. An inert occurrence ships byte-for-byte as authored and produces **no diagnostic** — not P01's not-found (its target may not exist; it is a sample), not A01's void-include. The regions are computed on the same raw text the scan reads, before any parsing — textual, like the splice itself — so the rule applies identically in an HTML host and in a Markdown page's converted HTML (where fenced code was already entity-escaped and never matched; this rule additionally covers raw HTML `<pre>`/`<code>` written in Markdown). Exactly `pre` and `code`, no other elements: `<script>`, `<style>`, and `<textarea>` are unchanged. A page that wants the syntax *displayed* still writes the escaped form (`&lt;include`), since a browser parses a raw `<include>` inside `<pre>` as an empty element; what this rule guarantees is that unify never splices content into the middle of an example. Downstream, an `<include>` element that reaches emitted output is by definition inert (a live one was spliced away before emit), so the sample stays byte-for-byte all the way through: **§11 never rewrites its `src`** and **§12 never reads a reference from it** — its target may name a never-emitted or nonexistent path, because it is a sample, not a link.
 
-Inlining is textual and happens before parsing, so an include may appear anywhere — `<head>` included — and a fragment's top-level elements become the host's (a fragment included at body top level may therefore carry `slot=` fills, and a fragment included in a layout body may contribute `<slot>` elements; both are consequences of this ordering, not extra rules). In a Markdown page the same textual inlining runs on the converted HTML (§10.1); the timing is the only difference.
+Inlining is textual and happens before parsing, so an include may appear anywhere outside item 8's inert regions — `<head>` included — and a fragment's top-level elements become the host's (a fragment included at body top level may therefore carry `slot=` fills, and a fragment included in a layout body may contribute `<slot>` elements; both are consequences of this ordering, not extra rules). In a Markdown page the same textual inlining runs on the converted HTML (§10.1); the timing is the only difference.
 
 ### 5.2 Fixture — nested include with relative resolution
 
@@ -222,10 +223,10 @@ Inlining is textual and happens before parsing, so an include may appear anywher
 1. `data-layout="none"` on the page's `<html>` or `<body>`, or frontmatter `layout: none` → no layout. Includes and URL rules still apply.
 2. `data-layout="V"` on the page's `<html>` or `<body>` → explicit layout V.
 3. Frontmatter `layout: V` → explicit layout V.
-4. Walk from the page's directory up to the source root; the first `_layout.html` found applies. (Discovery is by name; the file's excluded status is irrelevant.)
+4. Walk from the page's directory up to the source root; the first `_layout.html` found applies. (Discovery is by name; the file's excluded status is irrelevant.) Under `--generate` the walk climbs **virtual** directories and consults both roots at each level (§33.3), so a generated page discovers a layout exactly as a hand-written page in the same position does.
 5. Otherwise: no layout; the page is emitted as-is.
 
-An explicit V other than `none` must be a path ending in `.html`: `/`-prefixed resolves from the source root, anything else relative to the declaring file. A value without a `.html` extension is a problem (before any existence check):
+An explicit V other than `none` must be a path ending in `.html`: `/`-prefixed resolves from the source root — the §33.3 namespace root under `--generate` — anything else relative to the declaring file. A value without a `.html` extension is a problem (before any existence check):
 
 ```
 src/about.md:2: problem: layout is not a path: "default"
@@ -1133,7 +1134,7 @@ One record per **composed page** — exactly the set §12 checks and §15 publis
 
 ### 20.2 Extraction source
 
-Every field is read from the page's **emitted text**: the exact bytes §15 would publish, after includes (§5), Markdown conversion (§10), composition (§7–§9), and all three URL phases (§11). Frontmatter, layout files, and include sources are never consulted again. A Markdown page's `title` reaches the manifest only because §10.2 put it in the emitted `<head>`; a layout-supplied `<meta name="description">` is read from each page that shipped it, once per page. That is what makes HTML and Markdown equal citizens here and keeps the manifest honest about what a crawler will actually see.
+Every field is read from the page's **emitted text**: the exact bytes §15 would publish, after includes (§5), Markdown conversion (§10), composition (§7–§9), and all three URL phases (§11). The exception is named and closed at two fields — `generated` and `layout`, which are provenance and are argued in §20.3. Frontmatter, layout files, and include sources are never consulted again. A Markdown page's `title` reaches the manifest only because §10.2 put it in the emitted `<head>`; a layout-supplied `<meta name="description">` is read from each page that shipped it, once per page. That is what makes HTML and Markdown equal citizens here and keeps the manifest honest about what a crawler will actually see.
 
 `<template>` contents are not scanned, matching §7.1's rule for slots: markup inside a template is inert in the shipped page, so it declares nothing.
 
@@ -1146,6 +1147,8 @@ Every record carries every field. A field with nothing to read is `null` (scalar
 | Field | Type | Read from the emitted document |
 |---|---|---|
 | `sourcePath` | string | the source-root-relative path of the page that composed |
+| `generated` | boolean | §33.4 — `true` when the page came from the `--generate` overlay rather than the source tree. **Provenance, not a reading of the emitted text** (below) |
+| `layout` | string\|null | the source-root-relative path of the layout §6 resolved for this page, `null` when it composed with none. **Provenance, not a reading of the emitted text** (below) |
 | `outputPath` | string | the output-root-relative path §13 resolved |
 | `path` | string | §20.5 — the site-root-relative address this output path answers to |
 | `url` | string\|null | §20.5 — the absolute public URL, or `null` with no `--base-url` |
@@ -1170,6 +1173,10 @@ Every record carries every field. A field with nothing to read is `null` (scalar
 | `fragmentLinks` | array | §20.9 — `{target, id}` for each internal link carrying a fragment; `target` is the output path, `id` the fragment without `#` |
 | `linksIn` | string[] | §20.9 — output paths of internal pages that link to this one, deduplicated, sorted |
 | `conflicts` | array | §20.4 — `{field, kept, discarded}`, ordered by field name |
+
+**Two fields are provenance rather than a reading of the emitted text**, and they are the whole of §20.2's exception: `generated`, which names the tree the page came from, and `layout`, which names the layout it composed with. Neither is recoverable from the bytes §20.2 reads — composition consumes `data-layout` (§6.4) and a layout leaves no marker of its own in what it produced, while the `--generate` overlay is scanned exactly as the source tree is (§33.3) — so a consumer that needs either fact has only two alternatives, and both have shipped and been wrong. It can re-derive the fact, which is a second reading of a question the build already answered and free to disagree with the first; or it can reason without it and state something untrue. `generated` was added when `unify audit` located a generated page at a source path the author could not open, under a fix line telling them to rename a file they never wrote. `layout` was added when `lang-missing` told an author to set `lang` on the layout — on a page that had resolved **no layout at all**, so the advice named either a file that was already correct or no file at all. §24 is where both facts are spent: a fix line is a sentence about what the author should edit next, and it cannot name a file that the reader can open — nor decline to name one that does not exist — without them.
+
+These are the only two, and the boundary is deliberate. Provenance is admitted here when a **finding cannot be phrased truthfully without it**, never as a general record of how a page was built: the source of each field, the includes it inlined, the frontmatter it declared, and the layout's own text all stay out, because §20.2's rule — that the manifest is a reading of what a consumer receives — is what keeps every other field honest about what a crawler will actually see. §17's report prints these same two facts (`← page + layout`, `← page (no layout)`, `← generated`) from the same values, so the record and the report cannot drift.
 
 **Text content** everywhere in this table means the concatenated character data of the element and its descendants, with `<script>`, `<style>`, `<template>`, and `<noscript>` subtrees omitted, each run of ASCII whitespace collapsed to one space, and the result trimmed. Comments contribute nothing.
 
@@ -2222,7 +2229,37 @@ The generated directory is a **fresh, empty directory outside the source tree**,
 - **`src/` is never mutated.** The supported workflow does not edit the author's tree, so `audit` stays read-only (§24.2) and a failed build leaves nothing behind to clean up.
 - **The watcher cannot see it.** §16 coalesces saves into rebuilds; a generator writing into a watched directory would trigger the rebuild that runs the generator that writes into the watched directory. Putting the directory outside the source tree makes that loop structurally impossible rather than filtered — the distinction §5's own history recommends.
 
-Files in the generated directory are scanned **exactly as source files are**: `.html`/`.md` are pages, everything else mirror-copies, a leading underscore excludes, `.fragment.html` opts out. A generated page resolves layouts, includes, and URLs by the same rules, and §4 through §13 do not know the difference. `--dry-run` marks a generated row's origin (`← generated`), which is the one place the difference is visible — and it must be visible there, because a file in `dist/` with no source file behind it is otherwise unexplainable.
+Files in the generated directory are scanned **exactly as source files are**: `.html`/`.md` are pages, everything else mirror-copies, a leading underscore excludes, `.fragment.html` opts out. `--dry-run` marks a generated row's origin (`← generated`), which is the one place the difference is visible — and it must be visible there, because a file in `dist/` with no source file behind it is otherwise unexplainable.
+
+**The resolution namespace.** The two directories are **one path space**. Every scanned file, from either tree, is named by its path *relative to the root it was found under* — `docs/api.md`, whether an author wrote it in `src/docs/` or a generator wrote it into the overlay. That name is the file's **virtual path**, and it is the path every rule in §4 through §13 operates on: what `<include src="/…">` names, what §6.1 step 4's walk climbs, what §13 keys a collision on, and what §14.1 prints as a diagnostic's `file`. So "a generated page resolves layouts, includes and URLs by the same rules, and §4 through §13 do not know the difference" is a statement about *paths*, and this is what makes it true.
+
+Resolution therefore happens in the virtual path space, and only afterwards asks which directory holds the file:
+
+- **§6.1 step 4, the discovery walk**, climbs virtual directories from the page's own up to the root, taking the first `_layout.html` that *any* root holds at each level. A generated `docs/api.md` looks for `docs/_layout.html`, then `_layout.html`, and finds the source tree's, the overlay's, or neither — exactly as a hand-written `docs/api.md` in the same position would.
+- **§5.1 steps 1–2 and §6.1 steps 2–3, the written paths**, resolve the same way: a `/`-rooted value names a virtual path from the namespace root; a relative one is measured from the declaring file's own **virtual** directory. `<include src="/_includes/nav.html">` in a hand-authored layout finds the fragment a generator wrote, and `<include src="./sibling.html">` in a generated page finds the file an author wrote. "Must lie inside the source root" (§5.1 step 2) is read as *inside the namespace*: a path climbing above the root is still the escape it always was, reported with the not-found shape.
+
+**Precedence is the source tree.** Where one virtual path could be satisfied from both directories, the file in the **source tree** is the one resolved. For any path that *publishes* the question never arises — §33.4's P12 refuses the build before composition could depend on the answer. It arises only for paths that never publish, an underscore-excluded fragment or a `_layout.html`, and there the author's own file must win: a generator able to shadow a file the author wrote would be exactly the silent overwrite §13 exists to forbid. Nearest still beats precedence inside the walk, because the namespace merges **one directory at a time, not one tree at a time** — a `docs/_layout.html` a generator wrote is nearer to `docs/api.md` than the source root's `_layout.html`, and is the one that page gets.
+
+Worked, with `--generate _scripts/gen.mjs` writing the three overlay files:
+
+```
+src/_layout.html            <include src="/_includes/nav.html">, <main>
+src/_includes/head.html     hand-authored fragment
+src/index.html
+overlay/_includes/nav.html  written by the generator
+overlay/docs/_layout.html   written by the generator
+overlay/docs/api.md         written by the generator, declares no layout
+```
+
+| Resolution | Answer | Why |
+|---|---|---|
+| `docs/api.md`'s layout | `docs/_layout.html` (generated) | the walk's first level, `docs/`, and the overlay holds it |
+| `index.html`'s layout | `_layout.html` (source) | the walk reaches the root; the overlay has none there |
+| `/_includes/nav.html` from `src/_layout.html` | the generated fragment | one namespace: the source tree does not hold this path |
+| `/_includes/head.html` from `docs/api.md` | the source fragment | same namespace, read the other way |
+| `./api.md` from `overlay/docs/_layout.html` | `docs/api.md` | relative to the declaring file's *virtual* directory, `docs/` |
+
+An implementation that joins the overlay to the scan but not to this namespace produces two failures that look unrelated and are one: a generated page discovers no layout and publishes **bare, with no diagnostic and exit 0** (the content-loss law's worst shape — §14 exists to forbid it), and a generated fragment is invisible to `<include>`, so a generator can produce every page of a section and then not the nav that links them.
 
 ### 33.4 Collisions between the two trees
 

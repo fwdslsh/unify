@@ -1,6 +1,6 @@
 {
   "name": "@fwdslsh/unify",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "A static site generator for HTML-native composition: includes, layouts, and slots in plain HTML — no expression language, no client runtime",
   "type": "module",
   "main": "src/cli.js",
@@ -12,7 +12,8 @@
     "access": "public"
   },
   "engines": {
-    "bun": ">=1.2.0"
+    "bun": ">=1.2.0",
+    "node": ">=22.12.0"
   },
   "scripts": {
     "test": "CLAUDECODE=1 bun test --coverage --coverage-dir=.coverage --coverage-reporter=lcov",
@@ -41,7 +42,7 @@
   },
   "homepage": "https://github.com/fwdslsh/unify#readme",
   "dependencies": {
-    "js-yaml": "^3.15.1",
+    "js-yaml": "^5.3.0",
     "markdown-it": "^14.3.0"
   },
   "devDependencies": {
@@ -49,6 +50,11 @@
   },
   "peerDependencies": {
     "bun": ">=1.2.0"
+  },
+  "peerDependenciesMeta": {
+    "bun": {
+      "optional": true
+    }
   },
   "files": [
     "src/",

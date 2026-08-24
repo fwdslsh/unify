@@ -53,6 +53,7 @@ Drives the **installed entrypoint** (`bun src/cli.js`, and the compiled binary i
 - For each of the five `init` templates: `unify init <t>` exits 0; the scaffold matches the §19 contract (each primitive exactly once, checked structurally); `unify build --dry-run --strict` exits **0** (SCF-04/DIA-10 — the advisory-discipline assertion); `unify build` publishes; every internal link in the output resolves.
 - `unify dev` smoke: serves the output on the chosen port, injects reload only into served HTML, `dist/` contains no reload script, an edit triggers a reload event, ctrl-c exits clean.
 - The product-spec §2 walkthrough site is built verbatim and its stated output asserted.
+- **The same golden path under the other runtime** (`tests/conformance/node-parity.test.js`, gate G12). unify supports Bun and Node, and `bun test` spawns Bun everywhere, so nothing else in the suite can see a Node-only break — and there was one: the entrypoint guard was `import.meta.main`, which Node only grew in v22.18.0, so on an older Node the CLI was skipped entirely and exited **0** having written nothing. Every runtime the product claims needs one test that runs it, or the claim is untested by construction.
 
 *Proves*: the five-minute site is real; the commands users type work end to end.
 *Cannot prove*: rule-by-rule correctness — a golden path can be green while an edge rule is wrong. That is Tier 1's job.
@@ -231,6 +232,7 @@ The release ships when a clean CI run on the release commit satisfies **all** of
 | G9 | Suite hygiene | `check-suite-hygiene.mjs` exits 0 |
 | G10 | Docs lockstep | `docs/authoring-rules.md` ≤ 60 lines and linked from the README, whose own summaries of it stay consistent (product-spec §7, item 5) |
 | G11 | Binary parity | the compiled Linux x86_64 binary passes the Tier-0 golden path; Linux ARM64 and macOS x86_64/ARM64 release binaries build successfully (parity runs where runners exist) |
+| G12 | Runtime parity | `node src/cli.js` passes the Tier-0 golden path for all five templates and emits a scaffold, a `dist/`, a stdout and a stderr byte-identical to the `bun src/cli.js` run; needs a `node` >= `package.json`'s `engines.node` on PATH, and fails rather than skips without one |
 
 Coverage is reported alongside the gates for the record. It gates nothing.
 

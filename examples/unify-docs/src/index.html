@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>unify documentation</title>
+    <meta name="description" content="The front page of unify's documentation site — built by unify from the repository's own docs directory.">
+    <meta name="schema" content="WebPage">
+  </head>
+  <body>
+    <main>
+      <h1>unify documentation</h1>
+      <p class="lede">unify composes plain HTML at build time. No template language, no
+      variables, no config — the output is the HTML and CSS you wrote.</p>
+
+      <p>This site is built by unify from the repository's own <code>docs/</code> directory.
+      Nothing is copied: the pages you are reading are generated at build time from the
+      same files a contributor edits, so they cannot drift.</p>
+
+      <h2>Start here</h2>
+      <ul>
+        <li><a href="/docs/getting-started.html">Getting Started</a> — the tutorial.</li>
+        <li><a href="/docs/authoring-rules.html">Authoring Rules</a> — the complete authoring surface, in under sixty lines.</li>
+        <li><a href="/docs/cli-reference.html">CLI Reference</a> — every command, option, and exit code.</li>
+        <li><a href="/docs/index.html">All documentation</a> — the full index.</li>
+      </ul>
+
+      <h2>The five primitives</h2>
+      <p>The entire authoring surface, and this site uses every one of them:</p>
+      <ul>
+        <li><code>&lt;include src&gt;</code> — the masthead and this sidebar are includes.</li>
+        <li>Layouts — one <code>_layout.html</code> wraps every page here.</li>
+        <li>Slots — the footer is a named slot with fallback content.</li>
+        <li>The underscore — <code>_includes/</code> and <code>_scripts/</code> never ship.</li>
+        <li><code>*.fragment.html</code> — the generated sidebar is one.</li>
+      </ul>
+    </main>
+  </body>
+</html>

@@ -1,6 +1,6 @@
 # Advanced examples
 
-Five sites. Four were built by an agent that had never seen unify before — it was given
+Six sites. Four were built by an agent that had never seen unify before — it was given
 `docs/authoring-rules.md`, a client brief, and the compiled CLI, in a sandbox with no other
 documentation. They are kept because they passed review, not because they were written to
 be examples: what they show is what the 60 lines actually lead someone to build.
@@ -22,6 +22,20 @@ unify build -s src -o dist --pretty-urls --base-url https://fernhollow.pages.dev
 | named slots | 1 | 0 | 1 |
 | `data-layout="none"` | 1 | 1 | 0 |
 | catalogue loading | in page | in page | fetched per family |
+
+## `unify-docs` — the dogfooding site
+
+The sixth is different in kind: it is unify's own documentation site, built by unify from the
+repository's real `docs/` directory (issue #51). Nothing is copied — `_scripts/gen.mjs` reads
+`../../../docs` through `--generate`, so the site cannot drift from the documentation it
+renders. It exercises the production layer end to end (`--pretty-urls`, `--base-url`,
+`--canonical auto`, `sitemap.xml`, `--search-index`, `schema:`) and both gates pass:
+`build --dry-run --strict` and `audit --strict` each exit 0.
+
+It was built to be a source of friction rather than a showcase, and
+[`unify-docs/FINDINGS.md`](unify-docs/FINDINGS.md) is the result: a bug in the `--generate`
+contract (generated pages silently get no layout), a related gap in include resolution, one
+real defect in the docs (fixed), and five things that worked better than expected.
 
 `AUTHORS-NOTES.md` in each is the author's own write-up, unedited — including what it found
 unclear. That is more useful than a tidy narration would be.

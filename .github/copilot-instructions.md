@@ -53,7 +53,7 @@ Suggesting any of these is a regression, not a feature. `data-unify` and `unify-
 
 ## Non-goals — do not "helpfully" add these
 
-No templating language (no `{{ }}`, `{% %}`, variables, loops, conditionals, or props). No component framework. No configuration language — `unify.yaml` is saved CLI flags and nothing more. No style scoping. No general-purpose web server. No plugin API: the extension interface is the filesystem, and generators run before the build. No collections, pagination, RSS, or taxonomies. No build cache. No security theater.
+No templating language (no `{{ }}`, `{% %}`, variables, loops, conditionals, or props). No component framework. No configuration language — `unify.yaml` is saved CLI flags and nothing more. No style scoping. No general-purpose web server. No plugin API — nothing hooks into composition. The filesystem is the primary interface and generators run before the build; a minimal public API (product-spec §5) can drive a whole build or audit from another program but grants no hooks. No collections, pagination, RSS, or taxonomies. No build cache. No security theater.
 
 `docs/product-spec.md` §5 carries the reasoning and the accepted costs; §6 is the post-MVP candidate list and is the roadmap.
 
@@ -70,7 +70,9 @@ bun tests/conformance/check-suite-hygiene.mjs           # suite hygiene gate
 bun run build:linux    # also build:macos, build:windows — compile the standalone binary
 ```
 
-There is no `bun run build`, `serve`, `build:advanced`, `lint`, `format`, `docs:*`, `benchmark`, or `check:coverage` script, and no `example/` directory. Bun >= 1.2.0 is the only supported runtime.
+There is no `bun run build`, `serve`, `build:advanced`, `lint`, `format`, `docs:*`, `benchmark`, or `check:coverage` script, and no `example/` directory.
+
+Bun >= 1.2.0 runs the tests and builds the binaries; the CLI itself runs on Bun and on Node >= 22.12.0, and must behave identically on both (gate G12). So `src/**` uses `node:*` built-ins only — never suggest a `Bun.*` call, a `bun:` import, or `import.meta.main` there. Tests are the opposite: they are Bun's, they import `bun:test`, and they are not to be ported. Deno is not supported.
 
 ## Testing rules that constrain suggestions
 
