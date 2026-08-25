@@ -87,8 +87,14 @@ describe("fingerprint", () => {
 
 describe("buildReport / serializeJson", () => {
   test("carries schemaVersion, baseUrl, summary, pages, and findings — nothing else invented", () => {
+    const doc = {
+      source: { path: "a.html", generated: false, layout: null },
+      outputPath: "a.html",
+      document: { path: "/a.html", url: null, html: { attributes: {} }, head: { title: null, meta: [], link: [], base: [] }, body: { attributes: {}, headings: [] } },
+      analysis: { visibleText: "", ids: [], titleTexts: [], langTexts: [], jsonLd: [], strayMetadata: [], linksOut: [], linksIn: [], fragmentLinks: [], refresh: null },
+    };
     const report = buildReport({
-      records: [{ sourcePath: "a.html" }],
+      documents: [doc],
       findings: [finding()],
       base: null,
       problemCount: 2,
@@ -97,7 +103,11 @@ describe("buildReport / serializeJson", () => {
     expect(report.schemaVersion).toBe(1);
     expect(report.baseUrl).toBeNull();
     expect(report.summary).toEqual({ broken: 0, incomplete: 1, problems: 2, advisories: 1 });
-    expect(report.pages).toEqual([{ sourcePath: "a.html" }]);
+    // `pages` is the serialized {source, generated, outputPath, document} shape
+    // — source/generated/layout string+boolean fields plus the DocumentSnapshot
+    // whole; the private `analysis` half is never serialized (§22 of the
+    // release brief), and `layout` provenance is not in the page object either.
+    expect(report.pages).toEqual([{ source: "a.html", generated: false, outputPath: "a.html", document: doc.document }]);
     expect(report.findings).toHaveLength(1);
     expect(report.findings[0]).not.toHaveProperty("distinguisher");
     expect(Object.keys(report.findings[0]).sort()).toEqual(
@@ -109,14 +119,14 @@ describe("buildReport / serializeJson", () => {
 
   test("baseUrl is origin + pathPrefix when --base-url was supplied", () => {
     const report = buildReport({
-      records: [], findings: [], problemCount: 0, advisoryCount: 0,
+      documents: [], findings: [], problemCount: 0, advisoryCount: 0,
       base: { origin: "https://example.com", pathPrefix: "/repo/", scheme: "https:" },
     });
     expect(report.baseUrl).toBe("https://example.com/repo/");
   });
 
   test("serializeJson is two-space-indented with a trailing newline, and parses back to the same value", () => {
-    const report = buildReport({ records: [], findings: [], base: null, problemCount: 0, advisoryCount: 0 });
+    const report = buildReport({ documents: [], findings: [], base: null, problemCount: 0, advisoryCount: 0 });
     const text = serializeJson(report);
     expect(text.endsWith("\n")).toBe(true);
     expect(text).toContain('  "schemaVersion": 1');
@@ -127,7 +137,7 @@ describe("buildReport / serializeJson", () => {
 describe("serializeSarif", () => {
   test("maps id/file/evidence/fingerprint/severity mechanically, field for field", () => {
     const report = buildReport({
-      records: [], findings: [finding({ severity: "broken" })], base: null, problemCount: 0, advisoryCount: 0,
+      documents: [], findings: [finding({ severity: "broken" })], base: null, problemCount: 0, advisoryCount: 0,
     });
     const sarif = JSON.parse(serializeSarif(report));
     expect(sarif.version).toBe("2.1.0");
@@ -142,7 +152,7 @@ describe("serializeSarif", () => {
 
   test("incomplete maps to warning", () => {
     const report = buildReport({
-      records: [], findings: [finding({ severity: "incomplete" })], base: null, problemCount: 0, advisoryCount: 0,
+      documents: [], findings: [finding({ severity: "incomplete" })], base: null, problemCount: 0, advisoryCount: 0,
     });
     const sarif = JSON.parse(serializeSarif(report));
     expect(sarif.runs[0].results[0].level).toBe("warning");
@@ -150,7 +160,7 @@ describe("serializeSarif", () => {
 
   test("rules[] declares every distinct ruleId used in results, and nothing else", () => {
     const report = buildReport({
-      records: [],
+      documents: [],
       findings: [finding({ id: "a" }), finding({ id: "a", file: "x" }), finding({ id: "b" })],
       base: null, problemCount: 0, advisoryCount: 0,
     });

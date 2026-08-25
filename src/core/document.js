@@ -273,8 +273,12 @@ export function extractDocument(html, { path = null, url = null } = {}) {
       if (inHead) base.push(attributesOf(node));
       else strayMetadata.push({ tag: "base", key: null });
     } else if (tag === "meta") {
-      const name = (getAttr(node, "name") ?? "").trim().toLowerCase();
-      const property = (getAttr(node, "property") ?? "").trim().toLowerCase();
+      // Decoded, matching every other name/property comparison in this
+      // module and in document-selectors.js's metaRole chain (§20.4): a
+      // name/property comparison is on the character-reference-decoded
+      // value everywhere, never on the raw attribute bytes.
+      const name = decodeEntities(getAttr(node, "name") ?? "").trim().toLowerCase();
+      const property = decodeEntities(getAttr(node, "property") ?? "").trim().toLowerCase();
       // §20.11 — read document-wide, before the head-scope branch below: a
       // redirect meta written outside <head> is still a redirect, and this
       // reading has to see it before deciding whether it also counts as
@@ -307,7 +311,8 @@ export function extractDocument(html, { path = null, url = null } = {}) {
       } else {
         // Every other rel — stylesheet, preload, icon — is legal in the body
         // and does its job there. Only canonical is inert outside the head.
-        const rel = (getAttr(node, "rel") ?? "").trim().toLowerCase().split(/\s+/);
+        // Decoded, matching every other rel comparison (§20.4).
+        const rel = decodeEntities(getAttr(node, "rel") ?? "").trim().toLowerCase().split(/\s+/);
         if (rel.includes("canonical")) strayMetadata.push({ tag: "link", key: "canonical" });
       }
     } else if (tag === "script" && isJsonLdScript(node)) {

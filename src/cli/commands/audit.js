@@ -111,11 +111,11 @@ export async function audit(context) {
   // empty report, which is the louder and more honest failure.
   const run = consumeLastAuditRun();
   let findings = run.findings;
-  const { records, base, htmlFiles } = run;
+  const { documents, base, htmlFiles } = run;
 
   // ---- §31.3 — the network check ---------------------------------------
   if (context.settings.external) {
-    const owners = collectExternalReferences(records, htmlFiles, base);
+    const owners = collectExternalReferences(documents, htmlFiles, base);
     if (owners.size > 0) {
       // Every failure is a finding, including all of them (§31.3). There is
       // no "the network is down" branch here on purpose: see probeUrls for
@@ -143,7 +143,7 @@ export async function audit(context) {
     context.reporter.summary(formatFindings(findings, buildReporter.problemCount));
   } else {
     const report = buildReport({
-      records, findings, base,
+      documents, findings, base,
       problemCount: buildReporter.problemCount,
       advisoryCount: buildReporter.advisoryCount,
     });

@@ -279,6 +279,49 @@ test("FEED-03: membership requires the declared type, indexable, and self-canoni
   covers("FEED-03");
 }, TEST_MS);
 
+test("FEED-03: declaredTypes widening — ANY declared type in the list qualifies, not just the first; a page whose JSON-LD declares WebPage before Article is a candidate", async () => {
+  // §20.4: declaredTypes(doc) lists every accepted declaration (meta THEN
+  // JSON-LD, in order), and §29.1's membership reads `declaredTypes(doc)
+  // .some(t => t === "Article" || t === "BlogPosting")` — the 0.9 widening,
+  // not `declaredTypes(doc)[0]`. A page whose JSON-LD declares WebPage
+  // FIRST and Article SECOND is a feed candidate under the widened rule and
+  // would have been excluded under the retired first-wins reading.
+  const when = "2026-02-01T09:00:00Z";
+  const widened = page(
+    "Widened",
+    "<h1>Widened</h1>",
+    `<meta name="date" content="${when}">\n` +
+      `<script type="application/ld+json">{"@type":"WebPage"}</script>\n` +
+      `<script type="application/ld+json">{"@type":"Article"}</script>\n`,
+  );
+  // Adjacent negative control: WebPage is the ONLY declared type, so this
+  // page must stay excluded — proves the case above isn't passing because
+  // membership stopped checking the type at all.
+  const webpageOnly = page(
+    "WebPage Only",
+    "<h1>WebPage Only</h1>",
+    `<meta name="date" content="${when}">\n` +
+      `<script type="application/ld+json">{"@type":"WebPage"}</script>\n`,
+  );
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": page("Home"),
+    "widened.html": widened,
+    "webpage-only.html": webpageOnly,
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", BASE], tmp);
+  expectExit(r, 0, "declaredTypes widening build");
+  const xml = read(tmp, "dist", "feed.xml");
+  const titles = feedEntries(xml).map((e) => tagText(e, "title"));
+  if (!titles.includes("Widened")) {
+    throw new Error(`§29.1/§20.4: a page declaring WebPage before Article in JSON-LD must be a feed candidate (the widening) — got {${titles.join(", ")}}.\n${xml}`);
+  }
+  if (titles.includes("WebPage Only")) {
+    throw new Error(`§29.1: a page declaring only WebPage must stay excluded — got {${titles.join(", ")}}.\n${xml}`);
+  }
+  covers("FEED-03");
+}, TEST_MS);
+
 // ------------------------------------------------------------------- §29.4 (ordering, ties, determinism)
 
 test("FEED-03: entries order by datePublished descending, ties break by output path ascending, and two builds are byte-identical", async () => {

@@ -4,12 +4,17 @@
  * The third projection of the §20 manifest, after §21's sitemap and the
  * canonical/structured-data writers — and the smallest of the three, because
  * it is nothing but a projection. Every value in `search-index.json` is
- * already sitting on a page record: `url`/`path` (§20.5), `title`,
- * `description`, `headings`, `text` (§20.7). There is no page-reading
- * anywhere in this file — if a value this module needs is not already a
- * field of `PageRecord`, the defect is that §20's manifest lacks the field,
- * and the fix belongs in `manifest.js`, not here (§30.2: "it is a
- * projection, not an extractor").
+ * already sitting on a `BuildDocument` or reachable through a shared
+ * selector: `url`/`path` (§20.5), `title`, `description` (`titleOf`/
+ * `descriptionOf`), `headings`, `text` (§20.7). There is no page-reading
+ * anywhere in this file — if a value this module needs is not already
+ * reachable that way, the defect is that §20's manifest lacks the field,
+ * and the fix belongs in `manifest.js`/`document-selectors.js`, not here
+ * (§30.2: "it is a projection, not an extractor").
+ *
+ * Ported onto the 0.9 `BuildDocument` model minimally for this batch —
+ * `search-index.js` and `--search-index` are removed outright in the batch
+ * that adds `catalog.json`/`search-corpus.json` in their place.
  *
  * Two things this module owns and nothing else does:
  *
@@ -31,10 +36,10 @@
  *     sentence; those are a search engine's decisions and unify ships no
  *     search runtime, product-spec §6.5.2).
  *
- * Membership is imported, not restated: `isCompletablePage` is §21.2's own
- * predicate (record exists, `indexable`, not `404.html`, self-canonical),
- * exported by `sitemap.js` for exactly this reason (§22.4 is its other
- * caller). A lookalike here would be the second-interpretation defect
+ * Membership is imported, not restated: `isPublicDestination` is
+ * `document-selectors.js`'s own shared predicate (document exists,
+ * `indexable`, not `404.html`, self-canonical), used by every 0.9 built-in
+ * projection for exactly this reason. A lookalike here would be the second-interpretation defect
  * product-spec §6.2 exists to forbid — sitemap membership and search
  * membership answer the same question ("is this page a destination the site
  * presents in its own right, that a `noindex` author did not ask to hide?")
@@ -50,7 +55,7 @@
  * when wanted, exactly like `completeCanonical`/`generateStructuredData`.
  */
 
-import { isCompletablePage } from "./sitemap.js";
+import { descriptionOf, isPublicDestination, titleOf } from "./document-selectors.js";
 
 /** The output path of the site's search manifest (§30.1). */
 export const SEARCH_INDEX_PATH = "search-index.json";
@@ -68,7 +73,7 @@ export const SCHEMA_VERSION = 1;
  * U+2000–U+200A (the EN QUAD .. HAIR SPACE block), U+202F (NARROW NO-BREAK
  * SPACE), U+205F (MEDIUM MATHEMATICAL SPACE), U+3000 (IDEOGRAPHIC SPACE).
  *
- * `record.text` has already had every run of ASCII whitespace collapsed to
+ * `analysis.visibleText` has already had every run of ASCII whitespace collapsed to
  * one space by §20.3's `textContent` — deliberately not touching these
  * codepoints, which is the obligation this module discharges. So the only
  * whitespace shapes left to fold are: a lone separator from this set, and a
@@ -86,7 +91,7 @@ const SPACE_SEPARATORS = /[\u00A0\u2000-\u200A\u202F\u205F\u3000]/g;
  *
  * The second `replace` only ever collapses *spaces the first one produced or
  * exposed* — it is not a second, broader whitespace rule sneaking in a `\s+`
- * collapse of tabs or newlines. Those cannot occur in `record.text` to begin
+ * collapse of tabs or newlines. Those cannot occur in `analysis.visibleText` to begin
  * with (§20.3 already collapsed them), so a plain `/ +/g` is the whole of
  * what "runs collapse" requires here.
  * @param {string} text
@@ -103,54 +108,62 @@ export function foldSpaceSeparators(text) {
  * serialization downstream reproduces §30.1's `url, title, description,
  * headings, text` without re-asserting it.
  *
- * `url` is `record.url`, falling back to `record.path` with no `--base-url`
- * (§30.2) — a root-relative address is still one a page on this site can
- * link a search result to, and refusing to emit the file without a public
- * address would make the flag useless for the local case it is used for
- * most. `record.url` is `null` exactly when `--base-url` was not supplied
- * (§20.5), so the fallback is an ordinary nullish default, not a second
- * activation test.
+ * `url` is `doc.document.url`, falling back to `doc.document.path` with no
+ * `--base-url` (§30.2) — a root-relative address is still one a page on
+ * this site can link a search result to, and refusing to emit the file
+ * without a public address would make the flag useless for the local case
+ * it is used for most. `doc.document.url` is `null` exactly when
+ * `--base-url` was not supplied (§20.5), so the fallback is an ordinary
+ * nullish default, not a second activation test.
  *
- * `title`/`description`/`headings` are the record's own, unchanged —
- * already `null`/`[]` on a page that declares neither (§20.3). `headings` is
- * passed through as `record.headings` itself: its own shape,
- * `{level, text, id}` in document order, is already exactly §30.1's example.
+ * `title`/`description` come from the shared selectors; `headings` is
+ * `doc.document.body.headings` itself — its own shape, `{level, id, text}`
+ * in document order, is already exactly §30.1's example (this module
+ * transposes nothing).
  *
  * Only `text` is transformed, and by exactly one function (§30.3). A
  * heading's own `text` is a *different* field — §20.3's per-element text
- * content, not §20.7's page-level `text` this section is folding — and nothing
- * in §30 asks it to fold too; a client comparing a typed query against
- * `pages[].text` is the consumer §20.3's obligation names, and a heading
- * label in a results list is not that comparison.
- * @param {import('./manifest.js').PageRecord} record
- * @returns {{url: string, title: string|null, description: string|null, headings: {level:number,text:string,id:string|null}[], text: string}}
+ * content, not §20.7's page-level `visibleText` this section is folding —
+ * and nothing in §30 asks it to fold too; a client comparing a typed query
+ * against `pages[].text` is the consumer §20.3's obligation names, and a
+ * heading label in a results list is not that comparison.
+ *
+ * Ported minimally onto the 0.9 `BuildDocument` model for this batch —
+ * `search-index.js`/`--search-index` are removed outright in the next batch
+ * (release-brief §30, `--catalog`/`--search-corpus`), so this port reads
+ * exactly the fields the brief names for it (`document.path`/`url`,
+ * `titleOf`, `descriptionOf`, `document.body.headings`,
+ * `analysis.visibleText`) rather than adopting the wider selector surface.
+ * @param {import('./manifest.js').BuildDocument} doc
+ * @returns {{url: string, title: string|null, description: string|null, headings: {level:number,id:string|null,text:string}[], text: string}}
  */
-export function searchIndexEntry(record) {
+export function searchIndexEntry(doc) {
   return {
-    url: record.url ?? record.path,
-    title: record.title,
-    description: record.description,
-    headings: record.headings,
-    text: foldSpaceSeparators(record.text),
+    url: doc.document.url ?? doc.document.path,
+    title: titleOf(doc),
+    description: descriptionOf(doc),
+    headings: doc.document.body.headings,
+    text: foldSpaceSeparators(doc.analysis.visibleText),
   };
 }
 
 /**
  * §30.1 — the whole document: `{schemaVersion, pages}`, `pages` filtered to
  * §21.2's membership predicate and left in manifest order (§20.1's own
- * output-path order, which `records` already carries — nothing here sorts).
- * @param {import('./manifest.js').PageRecord[]} records
+ * output-path order, which `documents` already carries — nothing here sorts).
+ * @param {import('./manifest.js').BuildDocument[]} documents
  * @param {import('./urls.js').BaseUrlConfig|null} base
  * @returns {{schemaVersion: number, pages: ReturnType<typeof searchIndexEntry>[]}}
  */
-export function searchIndexDocument(records, base) {
+export function searchIndexDocument(documents, base) {
   const pages = [];
-  for (const record of records) {
-    // §30.2 — §21.2's predicate, imported rather than restated (isCompletablePage,
-    // exported by sitemap.js for exactly this sharing). "noindex means do not
-    // show this page in search results, and a site search IS search results."
-    if (!isCompletablePage(record, base)) continue;
-    pages.push(searchIndexEntry(record));
+  for (const doc of documents) {
+    // §30.2 — §21.2's predicate, imported rather than restated
+    // (`isPublicDestination`, `document-selectors.js`'s own shared
+    // membership predicate). "noindex means do not show this page in search
+    // results, and a site search IS search results."
+    if (!isPublicDestination(doc, base)) continue;
+    pages.push(searchIndexEntry(doc));
   }
   return { schemaVersion: SCHEMA_VERSION, pages };
 }
@@ -188,7 +201,7 @@ export function serializeSearchIndex(doc) {
  * fire would be dead code with a signature, not defensiveness.
  *
  * @param {object} args
- * @param {import('./manifest.js').PageRecord[]} args.records - the §20 manifest
+ * @param {import('./manifest.js').BuildDocument[]} args.documents - the §20 manifest
  * @param {import('./urls.js').BaseUrlConfig|null} args.base
  * @param {Map<string,string>} args.emittedFromSource - output path -> the
  *   source path it came from, for every file the site emits from its own
@@ -198,13 +211,13 @@ export function serializeSearchIndex(doc) {
  *   authored `search-index.json` suppressed generation (§21.5's rule,
  *   §30.4)
  */
-export function generateSearchIndex({ records, base, emittedFromSource }) {
+export function generateSearchIndex({ documents, base, emittedFromSource }) {
   const generated = new Map();
   // §21.5/§30.4 — the author's file is the site's search manifest: never
   // overwritten, never merged into. Suppression happens before anything is
   // computed, exactly as §21.5 suppresses sitemap generation on an authored
   // sitemap.xml.
   if (emittedFromSource.has(SEARCH_INDEX_PATH)) return generated;
-  generated.set(SEARCH_INDEX_PATH, serializeSearchIndex(searchIndexDocument(records, base)));
+  generated.set(SEARCH_INDEX_PATH, serializeSearchIndex(searchIndexDocument(documents, base)));
   return generated;
 }

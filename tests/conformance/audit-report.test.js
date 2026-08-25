@@ -142,7 +142,7 @@ test("RPT-01: --format json's findings match --format human's ids, severities an
   covers("RPT-01");
 }, TEST_MS);
 
-test("RPT-01: pages holds one §20 record per emitted page, with the record's own fields, in manifest (output-path) order", async () => {
+test("RPT-01: pages holds one §31.1 page per emitted document — source/generated/outputPath plus the whole DocumentSnapshot — in manifest (output-path) order", async () => {
   const tmp = mkTmp();
   writeTree(join(tmp, "src"), {
     "index.html": page({ title: "Home", desc: "The home page.", h1: "Home", body: '<p>Welcome.</p><a href="/about.html">About</a>' }),
@@ -168,23 +168,41 @@ test("RPT-01: pages holds one §20 record per emitted page, with the record's ow
     throw new Error(`§20.1: pages must be in manifest (output-path) order.\ngot: ${data.pages.map((p) => p.outputPath).join(", ")}`);
   }
 
-  if (bare(aboutRec.sourcePath) !== "about.html") throw new Error(`§20.3: sourcePath mismatch: ${JSON.stringify(aboutRec.sourcePath)}`);
-  if (aboutRec.title !== "About Us") throw new Error(`§20.3: title mismatch: ${JSON.stringify(aboutRec.title)}`);
-  if (aboutRec.description !== "Who we are.") throw new Error(`§20.3: description mismatch: ${JSON.stringify(aboutRec.description)}`);
-  if (aboutRec.h1 !== "About") throw new Error(`§20.3: h1 mismatch: ${JSON.stringify(aboutRec.h1)}`);
-  if (aboutRec.lang !== "en") throw new Error(`§20.3: lang mismatch: ${JSON.stringify(aboutRec.lang)}`);
-  if (aboutRec.path !== "/about.html") throw new Error(`§20.5: path mismatch: ${JSON.stringify(aboutRec.path)}`);
-  if (aboutRec.url !== "https://example.com/about.html") throw new Error(`§20.5: url mismatch: ${JSON.stringify(aboutRec.url)}`);
-  if (homeRec.path !== "/" || homeRec.url !== "https://example.com/") {
-    throw new Error(`§20.5: a trailing index.html segment must be dropped.\npath: ${homeRec.path}, url: ${homeRec.url}`);
+  const descriptionOf = (rec) => rec.document.head.meta.find((m) => m.name === "description")?.content ?? null;
+  const h1Of = (rec) => rec.document.body.headings.find((h) => h.level === 1)?.text ?? null;
+
+  if (bare(aboutRec.source) !== "about.html") throw new Error(`§31.1: source mismatch: ${JSON.stringify(aboutRec.source)}`);
+  if (aboutRec.generated !== false) throw new Error(`§31.1: generated must be false for a source-tree page: ${JSON.stringify(aboutRec.generated)}`);
+  if (aboutRec.document.head.title !== "About Us") throw new Error(`§20.3: title mismatch: ${JSON.stringify(aboutRec.document.head.title)}`);
+  if (descriptionOf(aboutRec) !== "Who we are.") throw new Error(`§20.3: description mismatch: ${JSON.stringify(descriptionOf(aboutRec))}`);
+  if (h1Of(aboutRec) !== "About") throw new Error(`§20.3: h1 mismatch: ${JSON.stringify(h1Of(aboutRec))}`);
+  if (aboutRec.document.html.attributes.lang !== "en") throw new Error(`§20.3: lang mismatch: ${JSON.stringify(aboutRec.document.html.attributes.lang)}`);
+  if (aboutRec.document.path !== "/about.html") throw new Error(`§20.5: path mismatch: ${JSON.stringify(aboutRec.document.path)}`);
+  if (aboutRec.document.url !== "https://example.com/about.html") throw new Error(`§20.5: url mismatch: ${JSON.stringify(aboutRec.document.url)}`);
+  if (homeRec.document.path !== "/" || homeRec.document.url !== "https://example.com/") {
+    throw new Error(`§20.5: a trailing index.html segment must be dropped.\npath: ${homeRec.document.path}, url: ${homeRec.document.url}`);
   }
-  if (!Array.isArray(aboutRec.headings) || aboutRec.headings.length !== 1 || aboutRec.headings[0].level !== 1 || aboutRec.headings[0].text !== "About") {
-    throw new Error(`§20.3: headings must be the record's real array, not a derived summary.\nheadings: ${JSON.stringify(aboutRec.headings)}`);
+  const headings = aboutRec.document.body.headings;
+  if (!Array.isArray(headings) || headings.length !== 1 || headings[0].level !== 1 || headings[0].text !== "About") {
+    throw new Error(`§20.3: body.headings must be the document's real array, not a derived summary.\nheadings: ${JSON.stringify(headings)}`);
   }
-  // A spot check that this is the WHOLE record (§31.1: "the same record every
-  // other feature reads, serialized"), not a curated subset of it.
-  for (const key of ["sourcePath", "outputPath", "path", "url", "title", "description", "lang", "canonical", "robots", "h1", "headings", "text", "linksOut", "linksIn", "jsonLd", "ids", "conflicts", "taxonomyKeys"]) {
-    if (!(key in aboutRec)) throw new Error(`§31.1: pages must carry the full §20 record — missing field "${key}"`);
+  // A spot check that this is the WHOLE DocumentSnapshot (§31.1: "the
+  // DocumentSnapshot whole ... in document.js's own key order"), not a
+  // curated subset of it — and that the private analysis half never leaks in.
+  for (const key of ["source", "generated", "outputPath", "document"]) {
+    if (!(key in aboutRec)) throw new Error(`§31.1: a page must carry "${key}"`);
+  }
+  for (const key of ["path", "url", "html", "head", "body"]) {
+    if (!(key in aboutRec.document)) throw new Error(`§31.1: document must carry "${key}"`);
+  }
+  for (const key of ["title", "meta", "link", "base"]) {
+    if (!(key in aboutRec.document.head)) throw new Error(`§31.1: document.head must carry "${key}"`);
+  }
+  for (const key of ["attributes", "headings"]) {
+    if (!(key in aboutRec.document.body)) throw new Error(`§31.1: document.body must carry "${key}"`);
+  }
+  if ("analysis" in aboutRec || "layout" in aboutRec) {
+    throw new Error(`§31.1: the private analysis half and layout provenance must never be serialized on a page: ${JSON.stringify(Object.keys(aboutRec))}`);
   }
   covers("RPT-01");
 }, TEST_MS);

@@ -284,6 +284,16 @@ describe("headings", () => {
     const d = snap(html);
     expect(d.body.headings).toEqual([{ level: 1, id: null, text: "Content" }]);
   });
+
+  test("heading text decodes character references exactly once", () => {
+    // §20.3: textContent already resolves character references; a heading
+    // whose source is double-encoded (the author literally typed "&amp;amp;")
+    // must decode to a single "&amp;", not to a bare "&" — that would require
+    // decoding twice.
+    const html = doc("", "<h2>Tea &amp;amp; Coffee</h2>");
+    const d = snap(html);
+    expect(d.body.headings).toEqual([{ level: 2, id: null, text: "Tea &amp; Coffee" }]);
+  });
 });
 
 // ------------------------------------------------------------- visibleText

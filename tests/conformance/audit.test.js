@@ -293,6 +293,41 @@ Words in the post.
   covers("AUD-04");
 }, TEST_MS);
 
+test("AUD-04: schema-incomplete reads declaredTypes by INCLUSION over the whole list, not the first entry — a WebPage meta declaration before an Article JSON-LD one still fires", async () => {
+  // §20.4/MAN-08's 0.9 widening: declaredTypes(doc) lists every accepted
+  // declaration (meta before JSON-LD, in order) and audit.js's own
+  // `declaredTypes(doc).find(t => t === "Article" || t === "BlogPosting")`
+  // tests inclusion over the whole list — never `declaredTypes(doc)[0]`,
+  // the retired single-scalar reading. Here the FIRST declaration is
+  // WebPage (a meta, which sorts before any JSON-LD entry); Article is
+  // declared second, by JSON-LD. schema-incomplete must still fire on the
+  // missing date, because Article is IN the list.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": page("Home", '<p>Welcome.</p><a href="/post.html">Post</a>'),
+    "post.html": `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>A Post</title>
+<meta name="description" content="A post about widening.">
+<meta name="schema" content="WebPage">
+<script type="application/ld+json">{"@type":"Article"}</script>
+</head>
+<body>
+<h1>A Post</h1>
+<p>Words in the post.</p>
+<a href="/">Home</a>
+</body>
+</html>
+`,
+  });
+  const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
+  expectExit(r, 0, "WebPage meta then Article JSON-LD, no date");
+  expectFinding(r, "schema-incomplete", "§20.4/MAN-08: Article is in declaredTypes even though it is not the first entry");
+  covers("AUD-04", "MAN-08");
+}, TEST_MS);
+
 test("AUD-04: sitemap disagreement — a listed page that refuses indexing", async () => {
   const tmp = mkTmp();
   writeTree(join(tmp, "src"), {
@@ -370,6 +405,56 @@ test("AUD-05: title/heading mismatch is containment, so a layout's title suffix 
   expectExit(r, 0, "a prepended title suffix");
   expectNoFinding(r, "title-h1-mismatch", "§24.4: containment in either direction is the whole test");
   covers("AUD-05");
+}, TEST_MS);
+
+test("AUD-04/MAN-03 — heading scope is main-first (0.9 change): a layout's <h1> in a <header> outside <main> does not count as the page's own heading", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    // The layout's own chrome carries an <h1> OUTSIDE <main> — a site name in
+    // the header, a common pattern. Before 0.9, headings were read
+    // document-wide, so this <h1> would have satisfied every page's
+    // h1-missing/h1-multiple/title-h1-mismatch check regardless of what the
+    // page itself wrote. The 0.9 scope is the first <main>, else <body>, else
+    // the document (§20.3/§20.7), so a page whose own content has no <h1>
+    // must still draw h1-missing even though the layout's <header> has one.
+    "_layout.html": `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Example Site</title>
+<meta name="description" content="The example site."></head>
+<body>
+<header><h1>Example Site</h1></header>
+<main><slot></slot></main>
+</body>
+</html>
+`,
+    // No <h1> of its own — only <p> content that fills <main>.
+    "index.html": "<!doctype html>\n<html>\n<head><title>Home</title></head>\n<body>\n<p>No heading here.</p>\n</body>\n</html>\n",
+    // A positive control on the SAME layout: a page that DOES write its own
+    // <h1> inside main is clean — proving the layout's chrome is genuinely
+    // excluded rather than the finding being broken outright.
+    "about.html": "<!doctype html>\n<html>\n<head><title>About</title></head>\n<body>\n<h1>About</h1>\n<p>Words.</p>\n</body>\n</html>\n",
+  });
+  const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
+  expectExit(r, 0, "a missing h1 is incomplete, not a pipeline problem");
+  const home = r.stdout.split("\n").filter((l) => l.startsWith("index.html: ") && l.includes("[h1-missing]"));
+  if (home.length !== 1) {
+    throw new Error(`§20.3/§24.4: the layout's chrome <h1> is outside <main> and must not satisfy index.html's own h1-missing check:\n${r.stdout}`);
+  }
+  const about = r.stdout.split("\n").filter((l) => l.startsWith("about.html: ") && l.includes("[h1-missing]"));
+  if (about.length !== 0) {
+    throw new Error(`§20.3: about.html writes its own <h1> inside <main> and must be clean (vacuity check for the finding itself):\n${r.stdout}`);
+  }
+
+  // The emitted bytes prove the scope, independent of the finding: the
+  // chrome <h1> DOES ship on index.html — it is excluded from the READING,
+  // not dropped from the page.
+  const built = await runCli(["build", "-s", "src", "-o", "dist"], tmp);
+  expectExit(built, 0, "the layout composes normally");
+  const emitted = readFileSync(join(tmp, "dist", "index.html"), "utf8");
+  if (!emitted.includes("<header><h1>Example Site</h1></header>")) {
+    throw new Error(`the fixture is vacuous: the layout's chrome <h1> never reached the emitted page:\n${emitted}`);
+  }
+  covers("AUD-04", "MAN-03");
 }, TEST_MS);
 
 test("AUD-05: nothing counts characters — a 2-character title and a 400-character description are clean", async () => {
@@ -1614,7 +1699,13 @@ No layout. [Home](/)
       `§24.4: no _layout.html in the tree is the same case as data-layout="none".\ngot: ${JSON.stringify(bareFix)}`,
     );
   }
-  covers("AUD-04");
+  // This is MAN-14's own observable half: `source.layout` is not in audit's
+  // published page shape (§31.1), so the only way a CLI run can show it
+  // differs between "composed with a layout" and "composed with none" is
+  // through advice that reads it — which is exactly what every assertion
+  // above did, three ways (a real layout, data-layout="none", and no
+  // _layout.html in the tree at all).
+  covers("AUD-04", "MAN-14");
 }, TEST_MS);
 
 test("AUD-16 — audit's summary names the §14 problems the same run reported", async () => {

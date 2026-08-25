@@ -172,6 +172,19 @@ implementers → test-fix loop → two Opus reviewers (spec-fidelity + correctne
   (manifest/catalog/corpus/taxonomy/generator), authoring-rules wording sweep,
   getting-started/cli-reference consistency, new
   `docs/guides/catalog-and-search.md`, E2E blog fixture per brief §29.7.
+  **Taxonomy scope, named explicitly so B3's §28.2 rewrite does not go
+  unreconciled**: B3 deleted the 0.8 `taxonomy-inert` finding outright
+  (conformance-spec §28.2) on the grounds that product-spec §6.3.9's own
+  closing clause — diagnostics exist "to prevent confident cross-generator
+  assumptions ..., not to reserve ordinary metadata names without cause" —
+  cuts against keeping it. That leaves product-spec itself unamended and in
+  direct conflict with the conformance spec until this batch: §6.3.9's own
+  first sentence ("`tags` and `categories` carry an audit finding stating
+  that they create neither collections nor taxonomies") and §4's frontmatter
+  paragraph ("`tags` and `categories` still build nothing and `unify audit`
+  says so once per page") both still promise the finding B3 removed. B6 must
+  edit both passages to state the 0.9 reading (ordinary metadata, inert by
+  design, reported by nothing) before this rewrite is complete.
 - **B7 — cleanup + release.** Dead-code sweep (helpers only populating removed
   fields), version bump, CHANGELOG, full validation: `bun test` (traceability
   `--runtime` included), node-parity gate, compiled-binary and scaffold suites,

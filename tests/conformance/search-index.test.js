@@ -188,8 +188,8 @@ test('SRCH-01: top-level keys are exactly ["schemaVersion","pages"]; a page\'s k
         title: "Full Page",
         description: "A description.",
         headings: [
-          { level: 1, text: "Full Page", id: "top" },
-          { level: 2, text: "Sub", id: null },
+          { level: 1, id: "top", text: "Full Page" },
+          { level: 2, id: null, text: "Sub" },
         ],
         text: "Full Page Sub Hello world.",
       },
@@ -410,6 +410,42 @@ test('SRCH-03: the fold list is closed — a Unicode codepoint outside it (OGHAM
     );
   }
   covers("SRCH-03");
+}, TEST_MS);
+
+test("SRCH-01: headings inherits §20.3's 0.9 main-scope — a chrome heading outside <main> is absent from a page's headings", async () => {
+  // §20.3's 0.9 heading-scope change (first <main>, else <body>, else the
+  // whole document) is not re-derived here — it applies to
+  // document.body.headings itself, and search-index.js reads that field
+  // verbatim (§30.2). A layout's own <h2> outside <main> must not leak into
+  // the page's search-index entry even though it is a real, rendered
+  // heading on the emitted page.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "_layout.html": `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title></title></head>
+<body>
+<header><h2>Chrome Heading</h2></header>
+<main><slot></slot></main>
+</body>
+</html>
+`,
+    "index.html": `<!doctype html>
+<html>
+<head><title>Home</title></head>
+<body><main><h1>Home</h1></main></body>
+</html>
+`,
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--search-index"], tmp);
+  expectExit(r, 0, "chrome-heading build");
+  const { data } = parseSearchIndex(tmp);
+  if (data.pages.length !== 1) throw new Error(`§30.1: expected exactly one indexed page, got ${data.pages.length}`);
+  const headings = data.pages[0].headings;
+  if (headings.length !== 1 || headings[0].text !== "Home") {
+    throw new Error(`§20.3/§30.2: headings must be main-scoped — the layout's chrome <h2> must not appear.\n  actual: ${JSON.stringify(headings)}`);
+  }
+  covers("SRCH-01");
 }, TEST_MS);
 
 test("REF-04 — /search-index.json linked without --search-index names the flag; with it, resolves", async () => {

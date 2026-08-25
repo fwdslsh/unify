@@ -21,13 +21,13 @@
  * manifest already holds": `href` and `src` values §12 skipped for being on
  * another origin, the og:/twitter: image URLs, JSON-LD URL-valued properties
  * (§12's list), and a `<link rel="canonical">` naming another site. Read as a
- * PageRecord-only scope, that sentence contradicts its own first clause: §20.9
+ * BuildDocument-only scope, that sentence contradicts its own first clause: §20.9
  * defines `linksOut` as internal links only ("External... URLs never
  * participate"), so no §20 field holds an ordinary off-origin `<a href>` at
  * all, and "href and src values §12 skipped for being on another origin"
- * would then name a set no PageRecord field carries. "The manifest" is read
+ * would then name a set no `BuildDocument` field carries. "The manifest" is read
  * here as this build's already-computed pipeline state, not literally §20's
- * PageRecord shape: the four items named are exactly §12's own reference
+ * envelope shape: the four items named are exactly §12's own reference
  * surface (`references.js`'s `collectHtmlReferences`, the one function that
  * already reads href/src/poster/srcset, og:/twitter: content, and a
  * `<link>`'s href of any rel — canonical included), COMPLEMENTED — kept
@@ -45,8 +45,8 @@
  * this repair"), so it structurally never yields an off-origin URL.
  * `jsonLdOffOriginUrls` below is the complementary half of that same closed
  * 5-property list (`url`, `logo`, `image`, `thumbnailUrl`, `contentUrl`),
- * walking `record.jsonLd` directly — already-parsed JSON on the manifest
- * record, so reading it here is not a second parse of the page, only a
+ * walking `doc.analysis.jsonLd` directly — already-parsed JSON on the
+ * envelope, so reading it here is not a second parse of the page, only a
  * second FILTER over data §20.8 already extracted.
  */
 import { collectHtmlReferences, stripBaseUrl } from "./references.js";
@@ -155,22 +155,22 @@ function jsonLdOffOriginUrls(data, base) {
  *     cannot supply these: its own JSON-LD branch (`jsonLdReferences`) accepts
  *     ONLY root-relative values, by §12's own design, so it can never yield an
  *     off-origin URL. `jsonLdOffOriginUrls` below is the complementary filter
- *     over the same closed 5-property list, read from `record.jsonLd` — a
- *     manifest field, not a re-parse.
- * @param {import('./manifest.js').PageRecord[]} records
+ *     over the same closed 5-property list, read from `doc.analysis.jsonLd` —
+ *     a manifest field, not a re-parse.
+ * @param {import('./manifest.js').BuildDocument[]} documents
  * @param {Map<string, string>} htmlByOutputPath - output path -> the page's
  *   final emitted HTML text (the same text §12 checked and §20 was derived
- *   from); a record with no entry is skipped (defensive — every composed
+ *   from); a document with no entry is skipped (defensive — every composed
  *   page's output path is a key in practice)
  * @param {import('./urls.js').BaseUrlConfig|null} base
- * @returns {Map<string, import('./manifest.js').PageRecord>}
+ * @returns {Map<string, import('./manifest.js').BuildDocument>}
  */
-export function collectExternalReferences(records, htmlByOutputPath, base) {
+export function collectExternalReferences(documents, htmlByOutputPath, base) {
   const owner = new Map();
   const scheme = base ? base.scheme : "https:";
-  // First in manifest order wins (`!owner.has`) — records are visited in
+  // First in manifest order wins (`!owner.has`) — documents are visited in
   // §20.1's own order, so this needs no separate sort.
-  const note = (value, record) => {
+  const note = (value, doc) => {
     if (!isOffOrigin(value, base)) return;
     const url = withScheme(value, scheme);
     // Only what this check can actually answer for. `--external` reports
@@ -181,22 +181,22 @@ export function collectExternalReferences(records, htmlByOutputPath, base) {
     // on another scheme is out of this flag's scope, which is a smaller and
     // truer claim than a finding about it.
     if (!/^https?:\/\//i.test(url)) return;
-    if (!owner.has(url)) owner.set(url, record);
+    if (!owner.has(url)) owner.set(url, doc);
   };
 
-  for (const record of records) {
+  for (const doc of documents) {
     // §12 reads an attribute's VALUE, not its bytes: character references
     // resolve first (`href="/a&amp;b.html"` names the file `a&b.html`), and
     // the obligation runs the same way here — an off-origin URL emitted with
-    // an entity in it must fetch the DECODED address. `record.jsonLd`'s
+    // an entity in it must fetch the DECODED address. `doc.analysis.jsonLd`'s
     // strings need no such step; they are already-parsed JSON, never HTML.
-    const text = htmlByOutputPath.get(record.outputPath);
+    const text = htmlByOutputPath.get(doc.outputPath);
     if (text !== undefined) {
-      for (const ref of collectHtmlReferences(text)) note(decodeEntities(ref.raw), record);
+      for (const ref of collectHtmlReferences(text)) note(decodeEntities(ref.raw), doc);
     }
-    for (const entry of record.jsonLd) {
+    for (const entry of doc.analysis.jsonLd) {
       if (entry.error !== null) continue; // §24.4's jsonld-invalid owns that page
-      for (const url of jsonLdOffOriginUrls(entry.data, base)) note(url, record);
+      for (const url of jsonLdOffOriginUrls(entry.data, base)) note(url, doc);
     }
   }
   return owner;

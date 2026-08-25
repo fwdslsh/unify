@@ -123,6 +123,27 @@ export function fingerprint(finding) {
 }
 
 /**
+ * §31.1/§22 of the release brief — one `BuildDocument` reduced to the audit
+ * JSON page shape, explicit key order: `source`, `generated`, `outputPath`,
+ * `document` (the `DocumentSnapshot` whole — `path`, `url`, `html`, `head`,
+ * `body`, in `document.js`'s own key order). `layout` provenance is
+ * deliberately NOT in this object — it stays internal to audit's own fix
+ * lines — and the private `analysis` half (visible text, ids, JSON-LD, link
+ * graph…) is never serialized: findings already carry the diagnostic facts
+ * external automation normally needs (§22's own words), and this is a build
+ * artifact's page shape, not a mirror of the envelope.
+ * @param {import('./manifest.js').BuildDocument} doc
+ */
+function serializePage(doc) {
+  return {
+    source: doc.source.path,
+    generated: doc.source.generated === true,
+    outputPath: doc.outputPath,
+    document: doc.document,
+  };
+}
+
+/**
  * The finding fields §31.1's document publishes — `distinguisher` is
  * deliberately excluded: it exists only to compute `fingerprint` above and is
  * not part of the documented JSON shape (contrast the spec's own worked
@@ -150,10 +171,11 @@ function serializeFinding(f) {
  * §31.1 — the document `--format json`/`--format sarif` both serialize.
  *
  * @param {object} args
- * @param {import('./manifest.js').PageRecord[]} args.records - §20's manifest,
- *   in manifest order; serialized into `pages` UNCHANGED, per §31.1's own
- *   text: "the §20 records serialized — the records themselves, not a
- *   summary"
+ * @param {import('./manifest.js').BuildDocument[]} args.documents - §20's
+ *   manifest, in manifest order; each envelope reduced to §31.1's audit page
+ *   shape (`serializePage`, below) — `source`/`generated`/`outputPath` plus
+ *   the `DocumentSnapshot` whole; the private `analysis` half is never
+ *   serialized (§22 of the release brief)
  * @param {import('./audit.js').Finding[]} args.findings - §24.5's order
  *   (source path, then finding id); `auditManifest`'s own return already
  *   holds this order, and merging in `external-unreachable` findings must
@@ -166,7 +188,7 @@ function serializeFinding(f) {
  * @param {number} args.advisoryCount - §14 advisories, deduplicated
  * @returns {object}
  */
-export function buildReport({ records, findings, base, problemCount, advisoryCount }) {
+export function buildReport({ documents, findings, base, problemCount, advisoryCount }) {
   return {
     schemaVersion: SCHEMA_VERSION,
     baseUrl: base ? `${base.origin}${base.pathPrefix}` : null,
@@ -176,7 +198,7 @@ export function buildReport({ records, findings, base, problemCount, advisoryCou
       problems: problemCount,
       advisories: advisoryCount,
     },
-    pages: records,
+    pages: documents.map(serializePage),
     findings: findings.map(serializeFinding),
   };
 }

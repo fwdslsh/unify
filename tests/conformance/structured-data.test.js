@@ -742,6 +742,41 @@ test("P23 — a type unify does not generate is a located problem, case-sensitiv
   covers("P23");
 }, TEST_MS);
 
+test("P23/SD-09 — an entity-encoded schema meta is validated and generates identically to a plain one, and neither depends on what any other page declares", async () => {
+  // §20.4: name/property comparisons happen on the decoded value everywhere
+  // — checkSchemaDeclarations (P23) must see the same declaration
+  // generateStructuredData's declaredTypes(doc) sees, or build.js's own
+  // "checkSchemaDeclarations's return is a superset of the pages that can
+  // generate" invariant (§26.5) breaks: a lone page with an entity-encoded
+  // name would fail to set anyDeclaration, so generation would be skipped
+  // for the WHOLE SITE regardless of what that page's own declaredTypes(doc)
+  // says — building byte-identically to no declaration at all — and the
+  // encoded value would reach neither the accepted-type list nor P23.
+  const encoded = mkTmp();
+  writeTree(encoded, {
+    "src/index.html": doc({ title: "Encoded", head: '<meta name="sch&#101;ma" content="Article">\n', body: "<h1>Encoded</h1>\n" }),
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", BASE], encoded);
+  expectExit(r, 0, "an entity-encoded schema meta, alone in the site");
+  const { data } = onlyBlock(read(encoded, "dist", "index.html"), "§26.5: the encoded declaration alone must still generate");
+  if (data["@type"] !== "Article") {
+    throw new Error(`§20.4: an entity-encoded name="sch&#101;ma" must be read as "schema", same as the plain spelling\n${JSON.stringify(data)}`);
+  }
+
+  // Same encoding, an unacceptable value: P23 must still fire — the
+  // declaration reaches validation, not just generation.
+  const badEncoded = mkTmp();
+  writeTree(badEncoded, {
+    "src/index.html": doc({ title: "Encoded", head: '<meta name="sch&#101;ma" content="Product">\n', body: "<h1>Encoded</h1>\n" }),
+  });
+  const bad = await runCli(["build", "-s", "src", "-o", "dist"], badEncoded);
+  expectExit(bad, 1, "an entity-encoded schema meta naming an unaccepted type");
+  expectIncludes(bad.stderr, "problem:", "P23: an entity-encoded declaration is validated exactly like a plain one");
+  expectIncludes(bad.stderr, "Product", "P23: the message names the value it refused");
+
+  covers("P23", "SD-09");
+}, TEST_MS);
+
 // ================================================================= §26.7
 // Ordering, the dry-run line, and audit.
 

@@ -24,7 +24,7 @@
  */
 
 import { decodeXmlEntities } from "./entities.js";
-import { classifyCanonicalValue } from "./document-selectors.js";
+import { canonicalOf, classifyCanonicalValue, isPublicDestination, publicationDatesOf } from "./document-selectors.js";
 import { findAll, innerText, parse } from "./html.js";
 import { isSkippedUrl, splitUrl } from "./urls.js";
 import { stripBaseUrl, resolveReference } from "./references.js";
@@ -72,8 +72,8 @@ const xmlUnescape = decodeXmlEntities;
  * §24.4's own test for two findings that are *about* that question rather than
  * about membership.
  *
- * Exported for the same reason `isCompletablePage` is: a lookalike drifts. The
- * evaluator first asked it by way of `!isCompletablePage(...)`, which is a
+ * Exported for the same reason `isPublicDestination` is: a lookalike drifts. The
+ * evaluator first asked it by way of `!isPublicDestination(...)`, which is a
  * different question with the same answer on most pages and the wrong answer on
  * a `noindex` page that names itself — membership fails there for the robots
  * reason, and reading that as "the canonical disagrees" produced a finding
@@ -83,12 +83,12 @@ const xmlUnescape = decodeXmlEntities;
  * self-canonical. It names something this build cannot confirm is this page,
  * and the conservative reading is the one that does not claim agreement.
  *
- * @param {import('./manifest.js').PageRecord} record
+ * @param {import('./manifest.js').BuildDocument} doc
  * @param {import('./urls.js').BaseUrlConfig|null} base
  * @returns {boolean}
  */
-export function isSelfCanonical(record, base) {
-  const kind = classifyCanonical(record, base);
+export function isSelfCanonical(doc, base) {
+  const kind = classifyCanonical(doc, base);
   return kind === "none" || kind === "self";
 }
 
@@ -121,18 +121,18 @@ export function isSelfCanonical(record, base) {
  *     sitemap advertising a URL whose canonical points away from it.
  *
  * The four-state core this delegates to, `classifyCanonicalValue(canonical,
- * outputPath, base)`, lives in `document-selectors.js` so a caller holding a
- * value and an output path (no `PageRecord` needed — a doc-level selector,
- * for instance) can ask the same question. This wrapper is a one-line
- * adapter kept for every existing `PageRecord`-shaped caller; the
- * classification logic itself, and the history behind it, moved with it —
- * see `classifyCanonicalValue`'s own docstring there.
- * @param {import('./manifest.js').PageRecord} record
+ * outputPath, base)`, lives in `document-selectors.js` so a caller holding
+ * just a value and an output path (no `BuildDocument` needed) can ask the
+ * same question. This wrapper is a one-line adapter over `canonicalOf(doc)`
+ * kept for every existing `BuildDocument`-shaped caller; the classification
+ * logic itself, and the history behind it, moved with it — see
+ * `classifyCanonicalValue`'s own docstring there.
+ * @param {import('./manifest.js').BuildDocument} doc
  * @param {import('./urls.js').BaseUrlConfig|null} base
  * @returns {'none'|'self'|'elsewhere'|'unknown'}
  */
-export function classifyCanonical(record, base) {
-  return classifyCanonicalValue(record.canonical, record.outputPath, base);
+export function classifyCanonical(doc, base) {
+  return classifyCanonicalValue(canonicalOf(doc), doc.outputPath, base);
 }
 
 /** The two schemes a page is served under. Nothing else is comparable. */
@@ -174,14 +174,14 @@ const WEB_SCHEMES = new Set(["http:", "https:"]);
  * question to `classifyCanonical` above, which *is* now backed by the
  * relocated core, so it is not a second reading of that question either.
  *
- * @param {import('./manifest.js').PageRecord} record
+ * @param {import('./manifest.js').BuildDocument} doc
  * @param {import('./urls.js').BaseUrlConfig|null} base
  * @returns {boolean}
  */
-export function canonicalSchemeMismatch(record, base) {
+export function canonicalSchemeMismatch(doc, base) {
   if (!base) return false; // no address, no scheme to compare against (§24.4)
-  if (classifyCanonical(record, base) !== "self") return false;
-  const declared = schemeOf(record.canonical);
+  if (classifyCanonical(doc, base) !== "self") return false;
+  const declared = schemeOf(canonicalOf(doc));
   // Both sides must be the web's two. `--base-url` accepts any scheme that has
   // a host (cli.js rejects only an origin-less one), so an `ftp:` base reaches
   // here, and under one unify has no basis for calling either side wrong.
@@ -207,42 +207,23 @@ function schemeOf(url) {
 
 /**
  * §21.2/§21.3 — the sitemap entries for a manifest, in manifest order.
- * @param {import('./manifest.js').PageRecord[]} records
+ *
+ * Membership is `document-selectors.js`'s shared `isPublicDestination`
+ * (0.9's replacement for this file's own `isCompletablePage`) so a page
+ * cannot be in the sitemap but absent from another projection that asks the
+ * identical question through the same function.
+ * @param {import('./manifest.js').BuildDocument[]} documents
  * @param {import('./urls.js').BaseUrlConfig|null} base
  * @returns {{loc: string, lastmod: string|null}[]}
  */
-export function entriesFor(records, base) {
+export function entriesFor(documents, base) {
   const out = [];
-  for (const record of records) {
-    if (!isCompletablePage(record, base)) continue;
-    if (record.url === null) continue; // unreachable while §21.1 gates on --base-url; stated, not assumed
-    out.push({ loc: record.url, lastmod: record.dateModified?.iso ?? null });
+  for (const doc of documents) {
+    if (!isPublicDestination(doc, base)) continue;
+    if (doc.document.url === null) continue; // unreachable while §21.1 gates on --base-url; stated, not assumed
+    out.push({ loc: doc.document.url, lastmod: publicationDatesOf(doc).modified?.iso ?? null });
   }
   return out;
-}
-
-/**
- * §21.2's membership predicate, exported because §22.4 uses it **unchanged**
- * rather than a lookalike.
- *
- * Sharing it is not tidiness. §22 stamps a canonical onto the pages this
- * returns true for, and the two exclusions carry their weight in that direction
- * too: a `noindex` page must not be stamped, because a canonical on a page the
- * author told crawlers to drop manufactures the exact contradiction
- * product-spec §6.3.2 asks unify to report; and a page consolidated onto
- * another already has the canonical it wants, which is why it left the sitemap.
- *
- * The name says "completable" rather than "indexable" because that is the
- * question both callers ask: is this page one the site presents as a
- * destination in its own right?
- * @param {import('./manifest.js').PageRecord} record
- * @param {import('./urls.js').BaseUrlConfig|null} base
- * @returns {boolean}
- */
-export function isCompletablePage(record, base) {
-  if (!record.robots.indexable) return false;
-  if (record.outputPath === "404.html") return false;
-  return isSelfCanonical(record, base);
 }
 
 /** One `<url>` line, newline included. The single place an entry becomes bytes. */
@@ -311,7 +292,7 @@ export function splitEntries(entries) {
  * §21 — generate the site's sitemap, or explain why it did not.
  *
  * @param {object} args
- * @param {import('./manifest.js').PageRecord[]} args.records - the §20 manifest
+ * @param {import('./manifest.js').BuildDocument[]} args.documents - the §20 manifest
  * @param {import('./urls.js').BaseUrlConfig|null} args.base - null suppresses generation (§21.1)
  * @param {Map<string,string>} args.emittedFromSource - output path -> the
  *   source path it came from, for every file the site emits from its own tree.
@@ -321,7 +302,7 @@ export function splitEntries(entries) {
  * @returns {Map<string,string>} generated output path -> text; empty when
  *   generation was suppressed for any reason
  */
-export function generateSitemap({ records, base, emittedFromSource, reporter }) {
+export function generateSitemap({ documents, base, emittedFromSource, reporter }) {
   const generated = new Map();
   if (!base) return generated; // §21.1 — no public address, no sitemap, no report
 
@@ -329,7 +310,7 @@ export function generateSitemap({ records, base, emittedFromSource, reporter }) 
   // before any path is claimed, so this is not a collision and raises nothing.
   if (emittedFromSource.has(SITEMAP_PATH)) return generated;
 
-  const parts = splitEntries(entriesFor(records, base));
+  const parts = splitEntries(entriesFor(documents, base));
 
   if (parts.length === 1) {
     generated.set(SITEMAP_PATH, serializeUrlset(parts[0]));
