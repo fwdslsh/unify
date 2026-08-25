@@ -2029,7 +2029,7 @@ Product-spec §6.5.2. One JSON file a client-side search library or an external 
       "url": "https://example.com/about.html",
       "title": "About — Example",
       "description": "Who we are.",
-      "headings": [{ "level": 1, "text": "About", "id": "about" }],
+      "headings": [{ "level": 1, "id": "about", "text": "About" }],
       "text": "About Who we are and what we do."
     }
   ]

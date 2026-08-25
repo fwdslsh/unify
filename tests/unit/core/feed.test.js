@@ -17,8 +17,9 @@
  * conformance demonstrates that the pipe exists; this file explores what flows
  * through it.
  *
- * Records are hand-built in §20's shape, same convention as sitemap.test.js.
- * No mocks — Reporter, parseBaseUrl and generateFeed are the real code.
+ * BuildDocuments are hand-built in §20's shape, same convention as
+ * sitemap.test.js. No mocks — Reporter, parseBaseUrl and generateFeed are the
+ * real code.
  */
 import { describe, expect, test } from "bun:test";
 import { FEED_PATH, checkFeedLocs, generateFeed } from "../../../src/core/feed.js";
@@ -34,26 +35,65 @@ function reporter() {
   return { r, lines };
 }
 
-/** The record shape §29 consumes, with §20's defaults for everything unstated. */
-const rec = (over = {}) => ({
-  sourcePath: "post.html",
-  outputPath: "post.html",
-  path: "/blog/post.html",
-  url: "https://example.com/blog/post.html",
-  title: "Post",
-  description: "A post.",
-  author: null,
-  lang: "en",
-  canonical: null,
-  robots: { raw: null, directives: [], indexable: true, followable: true },
-  schemaType: "BlogPosting",
-  datePublished: { raw: "2026-08-02T21:30:00Z", iso: "2026-08-02T21:30:00Z" },
-  dateModified: null,
-  ...over,
-});
+/**
+ * The BuildDocument shape §29 consumes, with §20's defaults for everything
+ * unstated. `description`/`author`/`robots`/`schema`/`date`/`lastmod` are
+ * the meta CONTENT strings a page would declare (or null for "declared
+ * nothing"); `canonical` is the `rel=canonical` href; `schema` becomes
+ * `<meta name="schema">` (declaredTypes(doc)'s meta-declared half).
+ */
+const doc = (over = {}) => {
+  const {
+    sourcePath = "post.html",
+    outputPath = "post.html",
+    path = "/blog/post.html",
+    url = "https://example.com/blog/post.html",
+    title = "Post",
+    description = "A post.",
+    author = null,
+    lang = "en",
+    canonical = null,
+    robots = null,
+    schema = "BlogPosting",
+    date = "2026-08-02T21:30:00Z",
+    lastmod = null,
+  } = over;
+  const meta = [];
+  if (description !== null) meta.push({ name: "description", content: description });
+  if (author !== null) meta.push({ name: "author", content: author });
+  if (robots !== null) meta.push({ name: "robots", content: robots });
+  if (schema !== null) meta.push({ name: "schema", content: schema });
+  if (date !== null) meta.push({ name: "date", content: date });
+  if (lastmod !== null) meta.push({ name: "lastmod", content: lastmod });
+  const link = [];
+  if (canonical !== null) link.push({ rel: "canonical", href: canonical });
+  return {
+    source: { path: sourcePath, generated: false, layout: null },
+    outputPath,
+    document: {
+      path,
+      url,
+      html: { attributes: lang !== null ? { lang } : {} },
+      head: { title, meta, link, base: [] },
+      body: { attributes: {}, headings: [] },
+    },
+    analysis: {
+      visibleText: "",
+      ids: [],
+      titleTexts: title !== null ? [title] : [],
+      langTexts: lang !== null ? [lang] : [],
+      jsonLd: [],
+      strayMetadata: [],
+      linksOut: [],
+      linksIn: [],
+      fragmentLinks: [],
+      refresh: null,
+    },
+  };
+};
 
-const gen = (records, over = {}) =>
-  generateFeed({ records, base: BASE, emittedFromSource: new Map(), reporter: reporter().r, ...over });
+const gen = (documents, over = {}) =>
+  generateFeed({ documents, base: BASE, emittedFromSource: new Map(), reporter: reporter().r, ...over });
 
 /** Entry blocks of a feed, so assertions cannot match the feed-level header. */
 const entries = (xml) => [...xml.matchAll(/<entry\b[^>]*>([\s\S]*?)<\/entry>/g)].map((m) => m[1]);
@@ -63,7 +103,7 @@ const unescape = (s) =>
 
 describe("§29.5 the entry address (unit twin of conformance FEED-02)", () => {
   test("a RELATIVE authored canonical is resolved against the page's own URL", () => {
-    const xml = gen([rec({ canonical: "post.html" })]).get(FEED_PATH);
+    const xml = gen([doc({ canonical: "post.html" })]).get(FEED_PATH);
     const [entry] = entries(xml);
     // The exact absolute value, not a shape check: the failure this pins
     // produced a value that was merely SHORTER, and survived lax assertions.
@@ -72,14 +112,14 @@ describe("§29.5 the entry address (unit twin of conformance FEED-02)", () => {
   });
 
   test("an ABSOLUTE authored canonical passes through untouched — the case every old test had", () => {
-    const xml = gen([rec({ canonical: "https://example.com/blog/post.html" })]).get(FEED_PATH);
+    const xml = gen([doc({ canonical: "https://example.com/blog/post.html" })]).get(FEED_PATH);
     expect(entries(xml)[0]).toContain("<id>https://example.com/blog/post.html</id>");
   });
 });
 
 describe("§29.6 full-content URLs (unit twin of conformance FEED-05)", () => {
   test("every href and src in <content> is absolutized, from both relative forms", () => {
-    const record = rec({ outputPath: "posts/entry.html", path: "/blog/posts/entry.html", url: "https://example.com/blog/posts/entry.html" });
+    const record = doc({ outputPath: "posts/entry.html", path: "/blog/posts/entry.html", url: "https://example.com/blog/posts/entry.html" });
     // What the EMITTED page holds by feed time: §11.3 has prefixed the
     // root-relative link with the path prefix, and §11.1 left the page's own
     // relative link alone. Both must leave here absolute.
@@ -136,10 +176,38 @@ describe("§29.7 which locators are checked (unit twin of conformance FEED-06)",
 
 describe("§29.1 activation is membership, not declaration", () => {
   test("a candidate that fails the date condition yields NO feed — a zero-entry feed cannot be valid Atom", () => {
-    expect(gen([rec({ datePublished: { raw: "2026-08-02", iso: "2026-08-02" } })]).size).toBe(0);
+    expect(gen([doc({ date: "2026-08-02" })]).size).toBe(0);
   });
 
   test("the same record with a full instant yields the feed — the silence above is the date's doing", () => {
-    expect(gen([rec()]).get(FEED_PATH)).toContain("<entry");
+    expect(gen([doc()]).get(FEED_PATH)).toContain("<entry");
+  });
+});
+
+describe("§29.1/§21.3 declaredTypes widening — 0.9 membership is ANY declared type, not the first", () => {
+  test("a page whose JSON-LD declares WebPage first and Article second is a candidate — the retired scalar schemaType would have missed it", () => {
+    const d = doc({ schema: null });
+    d.analysis.jsonLd = [
+      { raw: '{"@type":"WebPage"}', data: { "@type": "WebPage" }, error: null },
+      { raw: '{"@type":"Article"}', data: { "@type": "Article" }, error: null },
+    ];
+    const xml = gen([d]).get(FEED_PATH);
+    expect(xml).toContain("<entry");
+  });
+
+  test("a page declaring Organization alongside Article JSON-LD is still a candidate — inclusion over the whole list, not a single winner", () => {
+    const d = doc({ schema: null });
+    d.analysis.jsonLd = [
+      { raw: '{"@type":"Organization"}', data: { "@type": "Organization" }, error: null },
+      { raw: '{"@type":"Article"}', data: { "@type": "Article" }, error: null },
+    ];
+    const xml = gen([d]).get(FEED_PATH);
+    expect(xml).toContain("<entry");
+  });
+
+  test("neither WebPage nor Organization alone is a candidate", () => {
+    const d = doc({ schema: null });
+    d.analysis.jsonLd = [{ raw: '{"@type":"WebPage"}', data: { "@type": "WebPage" }, error: null }];
+    expect(gen([d]).size).toBe(0);
   });
 });

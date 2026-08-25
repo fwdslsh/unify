@@ -417,36 +417,43 @@ test("P24 — the key's own line survives a quoted key and whitespace before the
   covers("P24", "P17");
 }, TEST_MS);
 
-// =============================================== §28.2 — MAN-13 and AUD-15
-// The two that are findings: they describe content, and a site may legitimately
-// emit them. What they must not do is IMPLY a collection.
+// ===================================================== §28.2 — CPR-02
+// 0.9 deletes the 0.8 taxonomy-inert finding and its taxonomyKeys field
+// outright: tags/categories are ordinary metadata, inert by design, and
+// `unify audit` reports NOTHING about either key — not a finding of its own,
+// and not metadata-in-body either. This subsection pins the ABSENCE: a page
+// declaring tags:/categories:, or writing the equivalent meta by hand, in the
+// head or the body, builds and audits identically to one that declares
+// neither.
 
-test("AUD-15 — tags and categories build fine and draw one taxonomy-inert per page, keys in sorted order", async () => {
+test("CPR-02 — tags/categories are ordinary metadata: they build fine and audit reports nothing about them anywhere", async () => {
   const tmp = mkTmp();
   writeTree(join(tmp, "src"), {
-    "index.html": home("post", "hand", "bare"),
-    // A list value emits one meta per item (§10.2) — still ONE finding, because
-    // "this page's taxonomy built nothing" is one fact however many tags spell it.
+    "index.html": home("post", "bare", "hand", "body", "other", "none"),
+    // A list value and a scalar value, both plain frontmatter keys (§10.2) —
+    // no different from any other list/scalar key this table does not reserve.
     "post.md": md("Post", ["description: A post about tagging.", "lang: en", "tags:\n  - a\n  - b", "categories: notes"]),
-    // §28.2's "the key declares it whatever its value", which is §28.1's rule
-    // read for the finding: a bare `tags:` emits `<meta name="tags" content="">`
-    // (§10.2's empty value) and expresses the same belief in a collection. This
-    // is the one place a taxonomyKeys entry parts company with its neighbours in
-    // §20.3's table, which read a value and record null when it is empty.
+    // A bare key with no value is still an ordinary empty-valued meta (§10.2) —
+    // no different from any other frontmatter key declared with no value.
     "bare.md": md("Bare", ["description: A page whose tags key carries no value.", "lang: en", "tags:"]),
-    // §28.2 reads the EMITTED document, so an HTML page writing the meta by
-    // hand collects the same finding — that is what keeps the sentence true of
-    // it, and it is the closed-set rule's own consequence.
+    // An HTML author may write the identical meta by hand.
     "hand.html": page("Hand", '<meta name="tags" content="a">\n'),
+    // §20.3's head scope: a `<meta name="tags">` in the BODY declares nothing
+    // to any consumer, exactly like any other stray body meta unify does not
+    // read there.
+    "body.html": page("Body", "", '<p>Words.</p>\n<meta name="tags" content="a">'),
+    // Two near-miss keys, neither of which is `tags`/`categories`.
+    "other.html": page("Other", '<meta name="keywords" content="a, b">\n<meta name="taxonomy" content="notes">\n'),
+    "none.html": page("None"),
   });
 
-  // The keys are ordinary metadata: the build is clean and both pages publish.
+  // The keys are ordinary metadata: the build is clean and every page publishes.
   const built = await runCli(["build", "-s", "src", "-o", "dist"], tmp);
   expectExit(built, 0, "§28.2: tags and categories are not addressed to the build");
   expectSilent(built, "§28.2: a page declaring tags and categories");
-  expectEmitted(tmp, "post.html", "hand.html", "bare.html");
+  expectEmitted(tmp, "post.html", "hand.html", "bare.html", "body.html", "other.html", "none.html");
   if (!read(tmp, "dist", "bare.html").includes('<meta name="tags" content="">')) {
-    throw new Error(`§10.2: a bare 'tags:' emits an empty-valued meta, which is what §28.2 reads as a declaration:\n${read(tmp, "dist", "bare.html")}`);
+    throw new Error(`§10.2: a bare 'tags:' emits an empty-valued meta:\n${read(tmp, "dist", "bare.html")}`);
   }
   const out = read(tmp, "dist", "post.html");
   for (const meta of [
@@ -456,92 +463,30 @@ test("AUD-15 — tags and categories build fine and draw one taxonomy-inert per 
   ]) {
     if (!out.includes(meta)) throw new Error(`§10.2: ${meta} must ship as an ordinary meta:\n${out}`);
   }
-
-  const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
-  expectExit(r, 0, "§24.6: findings without --strict never change the exit code");
-
-  const post = expectFinding(r, "taxonomy-inert", "§28.2: a Markdown page declaring both keys", "post.md:");
-  if (!post.line.startsWith("post.md: incomplete: ")) {
-    throw new Error(`§28.2: incomplete rather than broken — nothing about the page is wrong:\n${post.line}`);
-  }
-  // Both keys, in ONE finding, in sorted order.
-  const at = ["categories", "tags"].map((k) => post.line.indexOf(k));
-  if (at[0] === -1 || at[1] === -1 || at[0] > at[1]) {
-    throw new Error(`§28.2: the finding names the keys it declares in sorted order:\n${post.line}`);
-  }
-  // The evidence says what did NOT happen. What is absent is a mechanism the
-  // author may have been expecting, which is §24.3's own line.
-  for (const absent of [/index/i, /archive/i, /feed/i, /route/i]) {
-    if (!absent.test(post.line)) {
-      throw new Error(`§28.2: the evidence must say what did not happen (no index page, no archive, no feed of that term, no route):\n${post.line}`);
-    }
-  }
-
-  const hand = expectFinding(r, "taxonomy-inert", "§28.2: a hand-written meta collects the same finding", "hand.html:");
-  if (!hand.line.startsWith("hand.html: incomplete: ")) {
-    throw new Error(`§28.2: the HTML page's finding is the same finding, at the same severity:\n${hand.line}`);
-  }
-  const bare = expectFinding(r, "taxonomy-inert", "§28.2: the key declares it whatever its value", "bare.md:");
-  if (!bare.line.startsWith("bare.md: incomplete: ")) {
-    throw new Error(`§28.2: an empty-valued key is the same finding at the same severity:\n${bare.line}`);
-  }
-  const fired = ids(r.stdout).filter((id) => id === "taxonomy-inert");
-  if (fired.length !== 3) {
-    throw new Error(`§28.2: one finding PER PAGE — expected 3 (post.md, hand.html, bare.md), got ${fired.length}\n${r.stdout}`);
-  }
-  covers("AUD-15");
-}, TEST_MS);
-
-test("MAN-13 — taxonomyKeys is head-scoped and closed: a body meta and a fourth key name declare nothing", async () => {
-  const tmp = mkTmp();
-  writeTree(join(tmp, "src"), {
-    "index.html": home("body", "other", "none"),
-    // §20.3's head scope, which §28.2 inherits by reading `the emitted head`.
-    // A `<meta name="tags">` in the BODY is inert — no consumer reads it there,
-    // so it implies no collection either, and taxonomy-inert must not fire.
-    "body.html": page("Body", "", '<p>Words.</p>\n<meta name="tags" content="a">'),
-    // Nor does anything ELSE happen to it: §24.4's metadata-in-body names a
-    // CLOSED set — <title>, <base>, <meta charset>, <link rel="canonical">,
-    // and <meta> carrying description, robots, schema, og:* or twitter:* — and
-    // `tags` is in none of them, so the body meta draws no finding at all.
-    "other.html": page("Other", '<meta name="keywords" content="a, b">\n<meta name="taxonomy" content="notes">\n'),
-    "none.html": page("None"),
-  });
-  const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
-  expectExit(r, 0, "a site whose heads declare no taxonomy key");
-  expectNoFinding(r, "taxonomy-inert", "§20.3/§28.2: head scope, and a closed set of exactly {tags, categories}");
-  expectNoFinding(r, "metadata-in-body", "§24.4: `tags` is not in metadata-in-body's closed set");
-
-  // Vacuity guard: the pages have to have been read for the silence to mean
-  // anything, so build the same tree and check they emitted.
-  expectExit(await runCli(["build", "-s", "src", "-o", "dist"], tmp), 0, "the same tree, published");
-  expectEmitted(tmp, "body.html", "other.html", "none.html");
   if (!read(tmp, "dist", "body.html").includes('<meta name="tags" content="a">')) {
     throw new Error("the fixture is vacuous: the body meta never reached the emitted page");
   }
-  covers("MAN-13");
-}, TEST_MS);
 
-test("AUD-15 — --strict gates the finding, and build never consults it", async () => {
-  const tmp = mkTmp();
-  writeTree(join(tmp, "src"), {
-    "index.html": home("post"),
-    "post.md": md("Post", ["description: A post about tagging.", "lang: en", "tags: a"]),
-  });
-  const strict = await runCli(["audit", "-s", "src", "-o", "dist", "--strict"], tmp);
-  expectExit(strict, 1, "§24.6: any finding, of either severity, under --strict");
-  expectFinding(strict, "taxonomy-inert", "§28.2 under --strict");
-
-  // §24.7: `build` derives the manifest and never calls the evaluator, so the
-  // same tree publishes — under --strict — with no mention of the finding on
-  // either stream.
-  const built = await runCli(["build", "-s", "src", "-o", "dist", "--strict"], tmp);
-  expectExit(built, 0, "§24.7: build never audits");
-  if (`${built.stdout}${built.stderr}`.includes("taxonomy-inert")) {
-    throw new Error(`§24.7: build reported an audit finding:\n${built.stdout}\n${built.stderr}`);
+  // §24.6: `audit` reports NOTHING about tags/categories, whatever their value,
+  // wherever they sit, hand-written or frontmatter-synthesized — no finding of
+  // its own (the retired taxonomy-inert), and metadata-in-body says nothing
+  // either, since `tags` is not in that closed set.
+  const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
+  expectExit(r, 0, "§24.6: a site declaring tags/categories only, and nothing else wrong");
+  expectSilent(r, "§28.2: tags/categories draw no diagnostic and audit's stdout carries no finding naming them");
+  if (r.stdout.toLowerCase().includes("taxonomy")) {
+    throw new Error(`§28.2: 0.9 deletes the taxonomy-inert finding outright — audit must never mention it:\n${r.stdout}`);
   }
-  expectEmitted(tmp, "post.html");
-  covers("AUD-15");
+  expectNoFinding(r, "metadata-in-body", "§24.4: `tags` is not in metadata-in-body's closed set");
+  if (ids(r.stdout).length !== 0) {
+    throw new Error(`§28.2: a site declaring only tags/categories should audit clean — got:\n${r.stdout}`);
+  }
+
+  // §24.6 under --strict too: no finding means exit 0 even with the flag on,
+  // which is the sharpest form of "reported by nothing".
+  const strict = await runCli(["audit", "-s", "src", "-o", "dist", "--strict"], tmp);
+  expectExit(strict, 0, "§28.2: nothing to gate — --strict changes nothing when there is no finding");
+  covers("CPR-02");
 }, TEST_MS);
 
 // ========================================================= §28.3 — CPR-01

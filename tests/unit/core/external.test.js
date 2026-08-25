@@ -135,8 +135,16 @@ describe("probeUrls", () => {
 });
 
 describe("collectExternalReferences", () => {
+  /**
+   * The minimal BuildDocument shape this module reads: `outputPath` and
+   * `analysis.jsonLd` — nothing else here reads `document` or any other
+   * `analysis` field, so the fixture carries only what §31.3 consumes.
+   */
   const rec = (over) => ({
-    sourcePath: "p.html", outputPath: "p.html", url: null, canonical: null, jsonLd: [], ...over,
+    source: { path: over.sourcePath ?? "p.html", generated: false, layout: null },
+    outputPath: "p.html",
+    analysis: { jsonLd: [] },
+    ...over,
   });
   /** A minimal complete document — collectHtmlReferences scans every element regardless of head/body placement. */
   const doc = (bodyHtml, headHtml = "") => `<!doctype html><html><head>${headHtml}</head><body>${bodyHtml}</body></html>`;
@@ -160,8 +168,8 @@ describe("collectExternalReferences", () => {
     expect([...owners.keys()].sort()).toEqual(
       [`${base}/elsewhere.html`, `${base}/img.png`, `${base}/canon.html`, `${base}/og.png`].sort(),
     );
-    expect(owners.get(`${base}/elsewhere.html`).sourcePath).toBe("a.html");
-    expect(owners.get(`${base}/og.png`).sourcePath).toBe("b.html");
+    expect(owners.get(`${base}/elsewhere.html`).source.path).toBe("a.html");
+    expect(owners.get(`${base}/og.png`).source.path).toBe("b.html");
     // A root-relative href is internal — §12's job, never this module's.
     expect(owners.has("/internal.html")).toBe(false);
   });
@@ -169,11 +177,11 @@ describe("collectExternalReferences", () => {
   test("JSON-LD URL-valued properties, off-origin half — the one source collectHtmlReferences's own JSON-LD branch can never supply (it accepts root-relative values only)", () => {
     const records = [rec({
       sourcePath: "b.html", outputPath: "b.html",
-      jsonLd: [{ raw: "{}", error: null, data: { "@type": "WebPage", logo: `${base}/logo.png`, url: "/internal.html" } }],
+      analysis: { jsonLd: [{ raw: "{}", error: null, data: { "@type": "WebPage", logo: `${base}/logo.png`, url: "/internal.html" } }] },
     })];
     const owners = collectExternalReferences(records, new Map(), null);
     expect([...owners.keys()]).toEqual([`${base}/logo.png`]);
-    expect(owners.get(`${base}/logo.png`).sourcePath).toBe("b.html");
+    expect(owners.get(`${base}/logo.png`).source.path).toBe("b.html");
     // A root-relative json-ld url is internal — §12's job, never this module's.
     expect(owners.has("/internal.html")).toBe(false);
   });
@@ -189,15 +197,15 @@ describe("collectExternalReferences", () => {
     ]);
     const owners = collectExternalReferences(records, htmlByOutputPath, null);
     expect(owners.size).toBe(1);
-    expect(owners.get(`${base}/shared.png`).sourcePath).toBe("first.html");
+    expect(owners.get(`${base}/shared.png`).source.path).toBe("first.html");
   });
 
   test("@context's value is a term definition, not data — never collected even under a listed property name", () => {
     const records = [rec({
-      jsonLd: [{
+      analysis: { jsonLd: [{
         raw: "{}", error: null,
         data: { "@context": { url: `${base}/should-not-collect` }, "@type": "Thing", logo: `${base}/collected.png` },
-      }],
+      }] },
     })];
     const owners = collectExternalReferences(records, new Map(), null);
     expect(owners.has(`${base}/should-not-collect`)).toBe(false);
@@ -237,7 +245,7 @@ describe("collectExternalReferences", () => {
   test("a page absent from htmlByOutputPath contributes no href/src references but its JSON-LD is still read", () => {
     const records = [rec({
       sourcePath: "a.html", outputPath: "a.html",
-      jsonLd: [{ raw: "{}", error: null, data: { "@type": "Thing", logo: `${base}/still-found.png` } }],
+      analysis: { jsonLd: [{ raw: "{}", error: null, data: { "@type": "Thing", logo: `${base}/still-found.png` } }] },
     })];
     const owners = collectExternalReferences(records, new Map(), null);
     expect([...owners.keys()]).toEqual([`${base}/still-found.png`]);

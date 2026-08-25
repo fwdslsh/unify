@@ -143,20 +143,24 @@ test("RPT-01: pages is the §20 manifest serialized — the records themselves, 
   const r = await runCli(["audit", "--format", "json"], tmp);
   const doc = parseJson(r, "pages shape");
   if (doc.pages.length !== 2) throw new Error(`expected 2 page records, got ${doc.pages.length}`);
-  // A SUMMARY would carry a handful of headline fields; the RECORD carries
-  // §20's whole table, including fields no summary would ever bother with.
-  const required = [
-    "sourcePath", "outputPath", "path", "url", "title", "description", "lang", "canonical", "robots",
-    "refresh", "h1", "headings", "text", "image", "author", "datePublished", "dateModified", "schemaType",
-    "taxonomyKeys", "jsonLd", "ids", "linksOut", "fragmentLinks", "linksIn", "conflicts",
-  ];
+  // A SUMMARY would carry a handful of headline fields; the PAGE carries
+  // §31.1's whole shape — source/generated/outputPath plus the DocumentSnapshot
+  // whole (document.js's own key order: path, url, html, head, body) — never a
+  // curated subset, and never the private analysis half (§22 of the release
+  // brief: linksOut/linksIn/jsonLd/ids/conflicts and the rest stay internal).
   for (const p of doc.pages) {
-    for (const key of required) {
-      if (!(key in p)) throw new Error(`page record for ${p.sourcePath} is missing §20 field "${key}": ${JSON.stringify(p)}`);
+    for (const key of ["source", "generated", "outputPath", "document"]) {
+      if (!(key in p)) throw new Error(`page for ${JSON.stringify(p.source)} is missing §31.1 field "${key}": ${JSON.stringify(p)}`);
     }
+    for (const key of ["path", "url", "html", "head", "body"]) {
+      if (!(key in p.document)) throw new Error(`document for ${JSON.stringify(p.source)} is missing §20.3 field "${key}": ${JSON.stringify(p)}`);
+    }
+    if ("analysis" in p) throw new Error(`the private analysis half must never be serialized on a page: ${JSON.stringify(Object.keys(p))}`);
   }
-  const home = doc.pages.find((p) => p.sourcePath === "index.html");
-  if (home.linksOut[0] !== "about.html") throw new Error(`expected index.html to link out to about.html, got ${JSON.stringify(home.linksOut)}`);
+  const home = doc.pages.find((p) => p.source === "index.html");
+  if (home.document.head.title !== "Home") {
+    throw new Error(`the page's own title must survive serialization: ${JSON.stringify(home.document.head.title)}`);
+  }
   covers("RPT-01");
 }, TEST_MS);
 

@@ -188,8 +188,8 @@ test('SRCH-01: top-level keys are exactly ["schemaVersion","pages"]; a page\'s k
         title: "Full Page",
         description: "A description.",
         headings: [
-          { level: 1, text: "Full Page", id: "top" },
-          { level: 2, text: "Sub", id: null },
+          { level: 1, id: "top", text: "Full Page" },
+          { level: 2, id: null, text: "Sub" },
         ],
         text: "Full Page Sub Hello world.",
       },
