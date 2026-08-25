@@ -293,6 +293,41 @@ Words in the post.
   covers("AUD-04");
 }, TEST_MS);
 
+test("AUD-04: schema-incomplete reads declaredTypes by INCLUSION over the whole list, not the first entry — a WebPage meta declaration before an Article JSON-LD one still fires", async () => {
+  // §20.4/MAN-08's 0.9 widening: declaredTypes(doc) lists every accepted
+  // declaration (meta before JSON-LD, in order) and audit.js's own
+  // `declaredTypes(doc).find(t => t === "Article" || t === "BlogPosting")`
+  // tests inclusion over the whole list — never `declaredTypes(doc)[0]`,
+  // the retired single-scalar reading. Here the FIRST declaration is
+  // WebPage (a meta, which sorts before any JSON-LD entry); Article is
+  // declared second, by JSON-LD. schema-incomplete must still fire on the
+  // missing date, because Article is IN the list.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": page("Home", '<p>Welcome.</p><a href="/post.html">Post</a>'),
+    "post.html": `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>A Post</title>
+<meta name="description" content="A post about widening.">
+<meta name="schema" content="WebPage">
+<script type="application/ld+json">{"@type":"Article"}</script>
+</head>
+<body>
+<h1>A Post</h1>
+<p>Words in the post.</p>
+<a href="/">Home</a>
+</body>
+</html>
+`,
+  });
+  const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
+  expectExit(r, 0, "WebPage meta then Article JSON-LD, no date");
+  expectFinding(r, "schema-incomplete", "§20.4/MAN-08: Article is in declaredTypes even though it is not the first entry");
+  covers("AUD-04", "MAN-08");
+}, TEST_MS);
+
 test("AUD-04: sitemap disagreement — a listed page that refuses indexing", async () => {
   const tmp = mkTmp();
   writeTree(join(tmp, "src"), {
@@ -1664,7 +1699,13 @@ No layout. [Home](/)
       `§24.4: no _layout.html in the tree is the same case as data-layout="none".\ngot: ${JSON.stringify(bareFix)}`,
     );
   }
-  covers("AUD-04");
+  // This is MAN-14's own observable half: `source.layout` is not in audit's
+  // published page shape (§31.1), so the only way a CLI run can show it
+  // differs between "composed with a layout" and "composed with none" is
+  // through advice that reads it — which is exactly what every assertion
+  // above did, three ways (a real layout, data-layout="none", and no
+  // _layout.html in the tree at all).
+  covers("AUD-04", "MAN-14");
 }, TEST_MS);
 
 test("AUD-16 — audit's summary names the §14 problems the same run reported", async () => {

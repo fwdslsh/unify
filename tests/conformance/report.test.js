@@ -134,7 +134,7 @@ test("RPT-01: --format json is one JSON document — schemaVersion, baseUrl, sum
   covers("RPT-01");
 }, TEST_MS);
 
-test("RPT-01: pages is the §20 manifest serialized — the records themselves, not a summary", async () => {
+test("RPT-01: pages is one reduced page shape per BuildDocument — never the private analysis half", async () => {
   const tmp = mkTmp();
   writeTree(join(tmp, "src"), {
     "index.html": page("Home", "The home page.", "Home", "", `<a href="/about.html">About</a>\n`),

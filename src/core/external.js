@@ -155,8 +155,8 @@ function jsonLdOffOriginUrls(data, base) {
  *     cannot supply these: its own JSON-LD branch (`jsonLdReferences`) accepts
  *     ONLY root-relative values, by §12's own design, so it can never yield an
  *     off-origin URL. `jsonLdOffOriginUrls` below is the complementary filter
- *     over the same closed 5-property list, read from `record.jsonLd` — a
- *     manifest field, not a re-parse.
+ *     over the same closed 5-property list, read from `doc.analysis.jsonLd` —
+ *     a manifest field, not a re-parse.
  * @param {import('./manifest.js').BuildDocument[]} documents
  * @param {Map<string, string>} htmlByOutputPath - output path -> the page's
  *   final emitted HTML text (the same text §12 checked and §20 was derived

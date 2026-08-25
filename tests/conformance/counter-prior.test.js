@@ -1,5 +1,5 @@
 /**
- * §28 — counter-prior frontmatter: P24, MAN-13, AUD-15, CPR-01.
+ * §28 — counter-prior frontmatter: P24, CPR-01, CPR-02.
  *
  * §28 states its own purpose in one clause, and every test below is shaped by
  * both halves of it: these diagnostics "exist to prevent confident
@@ -12,9 +12,10 @@
  *     metadata about their own content (§28.1's deliberate opposite of §26.4's
  *     P23), a `.md` fragment's frontmatter is never read at all (§5.1 step 4),
  *     and `drafts`/`permalink_style`/`sluggify` are not those keys.
- *   - `tags`/`categories` in the emitted HEAD are `taxonomy-inert`; the same
- *     meta in the BODY declares nothing (§20.3's head scope), and no third key
- *     name joins the closed set.
+ *   - `tags`/`categories` are ordinary metadata, inert by design (§28.2,
+ *     0.9): they build fine wherever declared and `audit` reports nothing
+ *     about them, in the HEAD or the BODY — the 0.8 `taxonomy-inert`
+ *     finding is deleted outright, not relocated.
  *   - `date`/`lastmod` are the counterexample §28.3 keeps the section honest
  *     with: they ARE read, so the key draws nothing and only a malformed VALUE
  *     is reported, by `audit`, as `date-unusable`.

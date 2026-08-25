@@ -193,6 +193,30 @@ test("CAN-03: an authored canonical with an empty or absent href is still author
   covers("CAN-03");
 }, TEST_MS);
 
+test("CAN-03: an authored canonical whose rel is entity-encoded is still authored — completion must not stamp a second one", async () => {
+  // §20.4: attribute-value comparisons happen on the decoded value
+  // everywhere in the pipeline (metaValues/linksWithRel read through
+  // document.js's decoded attributesOf). declaresCanonical must read `rel`
+  // the same way, or a raw-byte comparison here disagrees with the
+  // selector layer: it would decide the page declares no canonical, stamp
+  // a second one, and unify audit would then report the self-inflicted
+  // metadata-conflict on a page whose only fault was an unusual but valid
+  // encoding of an ordinary attribute value.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": page("Home"),
+    "entities.html": page("Entities", '  <link rel="cano&#110;ical" href="/entities.html">\n'),
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", BASE, "--canonical", "auto"], tmp);
+  expectExit(r, 0, "entity-encoded rel");
+  const out = read(tmp, "dist", "entities.html");
+  const n = [...out.matchAll(/rel="cano(?:nical|&#110;ical)"/g)].length;
+  if (n !== 1) {
+    throw new Error(`§22.3: entities.html authored one canonical (entity-encoded rel) and must keep exactly one, found ${n}:\n${out}`);
+  }
+  covers("CAN-03");
+}, TEST_MS);
+
 test("CAN-02/SIT-02: completion never changes the sitemap — the invariant the design rests on", async () => {
   // §22 decides membership from a manifest read BEFORE completion; §21 decides
   // from the manifest read AFTER. They agree only because a completed canonical

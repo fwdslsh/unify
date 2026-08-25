@@ -125,7 +125,7 @@ function unwrapCdata(inner) {
 /**
  * §29.3 — does this W3C-DTF value carry a time? The grammar has exactly one
  * form that does not (`YYYY-MM-DD`), so "not that form" is "has a time" for
- * any value that has already passed `isoDate` (manifest.js) — which every
+ * any value that has already passed `isoDate` (document-selectors.js) — which every
  * `.iso` this module reads has, by construction.
  * @param {string} iso
  * @returns {boolean}

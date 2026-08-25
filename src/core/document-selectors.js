@@ -13,21 +13,24 @@
  * export live in this one module, on purpose, rather than in two:
  *
  *  - **Value-level cores** (`isoDate`, `parseRobotsValue`, `declaredType`,
- *    `intOrNull`, `classifyCanonicalValue`) — relocated here verbatim from
- *    `manifest.js`/`sitemap.js`, where they still live too: those modules
- *    now import the implementation from here and delegate, so this
- *    relocation changes zero observable behavior while making this module
- *    the one place the logic is written. Each ports its cited §20 semantics
- *    byte-for-byte — same inputs, same outputs, same edge decisions.
- *  - **Doc-level selectors** (`titleOf` through `isPublicDestination`) —
- *    new here, over the `{document, analysis}` envelope `extractDocument`
- *    (`document.js`) produces. They are unit-tested in this module but not
- *    yet wired into the build pipeline; migrating every built-in consumer
- *    onto them is a call-site change, not a reimplementation. A selector
- *    that needs the page's output path (`isPublicDestination`) reads it off
- *    `envelope.outputPath` — a field `extractDocument` does not produce
- *    itself but the eventual `BuildDocument` carries alongside
- *    `document`/`analysis`.
+ *    `intOrNull`, `classifyCanonicalValue`) — relocated here from their
+ *    former homes in `manifest.js`/`sitemap.js`. Those modules no longer
+ *    define or export this logic themselves; `sitemap.js` imports
+ *    `classifyCanonicalValue` (and the doc-level selectors it needs) from
+ *    here directly, and `manifest.js` no longer calls any of these cores at
+ *    all — its per-field extraction was deleted along with `PageRecord`.
+ *    This module is now the only place the logic is written. Each ports its
+ *    cited §20 semantics byte-for-byte from the 0.8 implementation — same
+ *    inputs, same outputs, same edge decisions.
+ *  - **Doc-level selectors** (`titleOf` through `isPublicDestination`) — the
+ *    interpretation layer every built-in consumer now reads a page's facts
+ *    through: `manifest.js` (assembling `analysis`/provenance), `audit.js`
+ *    (every finding predicate), `canonical.js`, `feed.js`,
+ *    `structured-data.js`, `sitemap.js`, `dev-report.js`, and
+ *    `search-index.js`. A selector that needs the page's output path
+ *    (`isPublicDestination`) reads it off `envelope.outputPath` — a field
+ *    `extractDocument` (`document.js`) does not produce itself but the
+ *    `BuildDocument` envelope carries alongside `document`/`analysis`.
  *
  * Snapshot attribute values arrive from `document.js` already
  * character-reference-decoded but untrimmed (its own `attributesOf` never
@@ -126,13 +129,18 @@ export function declaredType(data) {
  * emitting the float it silently becomes would be a value the page never
  * declared.
  *
- * Relocated verbatim, so its own quirk ports with it: `manifest.js` calls
- * this with an already-`nonEmpty`-read `Field.kept` value, and `nonEmpty`
- * here decodes character references again — a double decode this module's
- * own doc-level selectors are careful to avoid, but changing it here would
- * change `manifest.js`'s output on a double-encoded `content` (e.g.
- * `&amp;#54;00`), which the byte-for-byte relocation contract forbids. Fixing
- * it belongs with the model-swap that removes this call shape, not here.
+ * The one function in this module that decodes a value TWICE, and — unlike
+ * every doc-level selector above, which owns its own single decode on an
+ * already-decoded snapshot value — this is deliberately retained rather
+ * than fixed by this batch. `manifest.js` no longer calls this at all; its
+ * only caller now is `preferredImageOf` below, which hands it a value
+ * `trimmedOrNull`/`firstMetaMatch` already decoded once, so `nonEmpty`'s own
+ * decode inside `intOrNull` is a second pass. On an ordinary `content` this
+ * is a no-op (decoding is idempotent once no entities remain); it changes
+ * behavior only on a double-encoded value (`content="&amp;#54;00"`), which
+ * `intOrNull` still resolves to `600` rather than leaving the literal text
+ * `&#54;00` unparsed as digits would. That is the 0.8 behavior this port
+ * keeps byte-for-byte rather than a new decision made here.
  * @param {unknown} raw
  * @returns {number|null}
  */

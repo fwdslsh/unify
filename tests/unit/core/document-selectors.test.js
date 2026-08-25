@@ -118,6 +118,17 @@ describe("langOf", () => {
   test("absent lang attribute is null", () => {
     expect(langOf(envelope(doc()))).toBeNull();
   });
+
+  test("reads analysis.langTexts, not the snapshot's first-<html> attributes: a second <html> element's lang wins when the first declares none", () => {
+    // B3 addendum 2: `langOf` reads `doc.analysis.langTexts[0]` (the first
+    // non-empty lang across every <html> element document-wide) rather than
+    // `document.html.attributes.lang` (the snapshot's FIRST <html> element
+    // only, via `findFirst`). This is the case where the two readings
+    // diverge — reachable through a textual <include> of a full document.
+    const e = envelope('<!doctype html><html><head><title>x</title></head><body>'
+      + '<html lang="fr"></html></body></html>');
+    expect(langOf(e)).toBe("fr");
+  });
 });
 
 describe("descriptionOf / authorOf", () => {
@@ -334,11 +345,14 @@ describe("metadataConflicts", () => {
   });
 
   test("two <html> elements with differing lang: conflict recorded from analysis.langTexts", () => {
-    // `document.js`'s snapshot keeps only the FIRST <html> element
-    // (`findFirst`), so `langOf` alone cannot see a second one — reachable
-    // through a textual <include> of a full document. `analysis.langTexts`
-    // collects every <html> element's lang document-wide, which is what
-    // this conflict is read from.
+    // `document.js`'s snapshot keeps only the FIRST <html> element's
+    // attributes (`findFirst`); `metadataConflicts` needs every <html>
+    // element's lang document-wide (reachable through a textual <include>
+    // of a full document), which is why it reads `analysis.langTexts`
+    // rather than `document.html.attributes.lang`. Both elements declare a
+    // lang here, so this fixture alone does not distinguish `langOf`'s two
+    // possible readings — see the discriminating case in the `langOf`
+    // describe block above.
     const e = envelope('<!doctype html><html lang="en"><head><title>x</title></head><body>'
       + '<html lang="fr"></html></body></html>');
     expect(metadataConflicts(e)).toEqual([{ field: "lang", kept: "en", discarded: ["fr"] }]);
@@ -502,6 +516,17 @@ describe("preferredImageOf", () => {
       ),
     );
     expect(preferredImageOf(e)).toEqual({ url: "/card.png", width: null, height: null, fromOg: false });
+  });
+
+  test("a meta dual-spelled name=description property=og:image plays only its name role (B3 addendum 1): the description branch, not og:image, claims it", () => {
+    const e = envelope(
+      doc(
+        '<meta name="description" property="og:image" content="/x.png">' +
+          '<meta name="twitter:image" content="/tw.png">',
+      ),
+    );
+    expect(descriptionOf(e)).toBe("/x.png");
+    expect(preferredImageOf(e)).toEqual({ url: "/tw.png", width: null, height: null, fromOg: false });
   });
 });
 

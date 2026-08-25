@@ -404,7 +404,7 @@ test("MAN-10 — iso is the declared value only when well-formed W3C-DTF, verbat
 
 // ------------------------------------------------------------------- MAN-14
 
-test("MAN-14 — source.layout names the layout the page composed with, and is null when it composed with none", async () => {
+test("LAY-01 — four ways to answer \"which layout?\": a real layout, data-layout=\"none\", layout: none in frontmatter, and a nearest-_layout.html walk-up all resolve as composition, not as source.layout provenance", async () => {
   const tmp = mkTmp();
   // Four pages, one per way a page can answer "which layout?". The tree HAS a
   // `_layout.html`, so a null below is a real resolution result rather than
@@ -438,12 +438,15 @@ Composed with no layout.
   });
   const byPath = await records(tmp);
 
-  // Note: `source` itself is not in this file's audit page shape (§31.1
-  // deliberately omits layout provenance from the published page; it stays
-  // internal to audit's own fix lines). This test therefore reaches
-  // `document.body.headings`/`title` as its own vacuity check and derives
-  // `source.layout`'s CLI-observable half indirectly, through emitted output:
-  // a page WITH the layout carries the layout's own chrome (its <main>
+  // Note: `source.layout` itself is not observable here. §31.1 deliberately
+  // omits layout provenance from audit's published page shape — it stays
+  // internal to audit's own fix lines, where tests/conformance/audit.test.js's
+  // "AUD-04: the lang-missing fix line names the layout only when the page
+  // HAS one" is MAN-14's real CLI-observable coverage (three shapes: a real
+  // layout, data-layout="none", and no _layout.html in the tree at all).
+  // This test's own subject is LAY-01's resolution order — which layout, if
+  // any, composes with each of these pages — read through emitted output: a
+  // page WITH a layout carries the layout's own chrome (its <main>
   // wrapping), a page WITHOUT one does not.
   eq(h1Of(byPath.get("index.html")), "Home", "vacuity check: the page composed");
   eq(h1Of(byPath.get("optout.html")), "Opt Out", "vacuity check: the opt-out page composed");
@@ -460,7 +463,7 @@ Composed with no layout.
 
   const post = readFileSync(join(tmp, "dist", "post.html"), "utf8");
   if (post.includes("<main>")) throw new Error(`post.html declared layout: none and must not carry the layout's <main>:\n${post}`);
-  covers("MAN-14");
+  covers("LAY-01");
 }, TEST_MS);
 
 // ------------------------------------------------------------- MD-14/MAN-02

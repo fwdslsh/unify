@@ -37,7 +37,7 @@ import { canonicalSchemeMismatch, classifyCanonical } from "./sitemap.js";
 import { stringProperty, subjectObject } from "./structured-data.js";
 import {
   canonicalOf, declaredTypes, descriptionOf, langOf, metadataConflicts,
-  preferredImageOf, publicationDatesOf, robotsPolicyOf, titleOf,
+  preferredImageOf, publicationDatesOf, refreshOf, robotsPolicyOf, titleOf,
 } from "./document-selectors.js";
 
 /**
@@ -128,41 +128,6 @@ export function sortFindings(findings) {
 }
 
 /**
- * §24.4's `metadata-conflict` reads `document-selectors.js`'s
- * `metadataConflicts(doc)`, which computes conflicts for exactly the four
- * fields the standard that defines them says a page may declare **once**:
- * `canonical`, `title`, `description`, `lang`. Three more fields were on this
- * list in the 0.8 model and came off before the selector was written — the
- * reasoning stays here because it is why the set is exactly these four and
- * not a larger one:
- *
- *   - **`image`.** The Open Graph protocol defines arrays by repeating the
- *     tag — "if a tag can have multiple values, just put multiple versions of
- *     the same meta tag on your page; the first is given preference during
- *     conflicts" — and ogp.me's own `og:image` example ships two. A page with
- *     several share images is correct, common, and was being told to delete
- *     valid tags.
- *   - **the declared structured-data type.** §20.8 reads a bounded set of
- *     declarations deliberately. An `Organization` block beside a
- *     `BreadcrumbList` is routine and recommended, and every consumer parses
- *     every block, so a second declaration is not "ignored".
- *   - **`author`.** The HTML spec defines the `author` metadata name as "the
- *     name of *one of* the page's authors" — plural by construction.
- *   - **`robots`.** Crawlers read the union of the directives across every
- *     `robots` meta, so splitting `noindex, nofollow` across two tags is a
- *     documented spelling of one policy. §20.6 unions them, which removes
- *     the conflict entirely rather than reclassifying it.
- *   - **`datePublished`/`dateModified`.** `article:published_time` beside
- *     `<meta name="date">` is ordinary belt-and-braces markup naming one
- *     instant at two granularities, and §20.3 maps both spellings to one
- *     field. Telling that author to "keep one" pushes them to drop the
- *     property crawlers read. Two genuinely different dates *are* a
- *     contradiction, but distinguishing them from two spellings of one date
- *     needs a comparison §20.10 does not expose — so the conservative answer
- *     is silence, which is the right default for a `broken` severity.
- */
-
-/**
  * §24.4 — the immediate-refresh chain starting at `doc`, when it returns to
  * `doc`; null when it does not.
  *
@@ -182,9 +147,10 @@ export function sortFindings(findings) {
  *   and ending at `doc`
  */
 function redirectChain(doc, byOutputPath) {
-  const immediate = (d) =>
-    (d.analysis.refresh !== null && d.analysis.refresh.seconds === 0 && d.analysis.refresh.target !== null
-      ? d.analysis.refresh.target : null);
+  const immediate = (d) => {
+    const refresh = refreshOf(d);
+    return refresh !== null && refresh.seconds === 0 && refresh.target !== null ? refresh.target : null;
+  };
   const chain = [doc];
   const seen = new Set([doc.outputPath]);
   let current = doc;
@@ -352,7 +318,7 @@ export function auditManifest({
     }
 
     // ---- headings ------------------------------------------------------------
-    // §20.9's 0.9 scope change: `headings` is `doc.document.body.headings`,
+    // §20.3's 0.9 scope change: `headings` is `doc.document.body.headings`,
     // scoped to the first `<main>`, else `<body>`, else the document root
     // (`document.js`'s own §20.7 scope, reused here rather than a second
     // walk) — a chrome `<h1>` outside `<main>` no longer counts as the
@@ -445,9 +411,40 @@ export function auditManifest({
     // `metadataConflicts(doc)` is the 0.9 replacement for a stored
     // `conflicts` array: it computes conflicts, on demand, for exactly the
     // four fields whose defining standard says a page may declare once
-    // (`canonical`, `title`, `description`, `lang` — see this file's own
-    // note above `redirectChain`), so every conflict this returns is already
-    // one `metadata-conflict` renders; there is no second filter here.
+    // (`canonical`, `title`, `description`, `lang`). Five more fields were
+    // on this list in the 0.8 model and came off before the selector was
+    // written — the reasoning stays here because it is why the set is
+    // exactly these four and not a larger one:
+    //
+    //   - `image`. The Open Graph protocol defines arrays by repeating the
+    //     tag — "if a tag can have multiple values, just put multiple
+    //     versions of the same meta tag on your page; the first is given
+    //     preference during conflicts" — and ogp.me's own `og:image`
+    //     example ships two. A page with several share images is correct,
+    //     common, and was being told to delete valid tags.
+    //   - the declared structured-data type. §20.8 reads a bounded set of
+    //     declarations deliberately. An `Organization` block beside a
+    //     `BreadcrumbList` is routine and recommended, and every consumer
+    //     parses every block, so a second declaration is not "ignored".
+    //   - `author`. The HTML spec defines the `author` metadata name as
+    //     "the name of *one of* the page's authors" — plural by
+    //     construction.
+    //   - `robots`. Crawlers read the union of the directives across every
+    //     `robots` meta, so splitting `noindex, nofollow` across two tags
+    //     is a documented spelling of one policy. §20.6 unions them, which
+    //     removes the conflict entirely rather than reclassifying it.
+    //   - `datePublished`/`dateModified`. `article:published_time` beside
+    //     `<meta name="date">` is ordinary belt-and-braces markup naming
+    //     one instant at two granularities, and §20.3 maps both spellings
+    //     to one field. Telling that author to "keep one" pushes them to
+    //     drop the property crawlers read. Two genuinely different dates
+    //     *are* a contradiction, but distinguishing them from two
+    //     spellings of one date needs a comparison §20.10 does not
+    //     expose — so the conservative answer is silence, which is the
+    //     right default for a `broken` severity.
+    //
+    // So every conflict `metadataConflicts` returns is already one
+    // `metadata-conflict` renders; there is no second filter here.
     for (const conflict of metadataConflicts(doc)) {
       add(doc, "metadata-conflict", "broken",
         `the page declares ${conflict.discarded.length + 1} different values for ${conflict.field}: ` +
@@ -613,7 +610,7 @@ export function auditManifest({
     const chain = redirectChain(doc, byOutputPath);
     if (chain !== null) {
       add(doc, "redirect-loop", "broken",
-        `the page declares content=${JSON.stringify(doc.analysis.refresh.raw)} and the chain returns to it: ` +
+        `the page declares content=${JSON.stringify(refreshOf(doc).raw)} and the chain returns to it: ` +
         `${chain.map((d) => d.source.path).join(" → ")}`,
         "point one redirect on that chain at a page that stays, or remove it — a reader who follows it never arrives");
     }

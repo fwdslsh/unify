@@ -177,7 +177,14 @@ export function checkSchemaDeclarations({ html, outputPath, locate, reporter }) 
   const head = findFirst(root, (n) => isElement(n, "head"));
   let generable = false;
 
-  for (const el of findAll(root, (n) => isElement(n, "meta") && (getAttr(n, "name") ?? "").trim().toLowerCase() === "schema")) {
+  // Decoded, matching document-selectors.js's metaValues (§20.4) — the
+  // reading generateStructuredData's activation (declaredTypes(doc)[0])
+  // goes through. A raw comparison here would miss an entity-encoded
+  // name="sch&#101;ma" that the selector layer sees as declared, letting
+  // this function's `generable` return a false negative that lets
+  // build.js's superset invariant (§26.5) silently fail, and letting the
+  // declaration bypass P23 validation entirely.
+  for (const el of findAll(root, (n) => isElement(n, "meta") && decodeEntities(getAttr(n, "name") ?? "").trim().toLowerCase() === "schema")) {
     if (head !== null && !isInside(el, "head")) continue;
     const value = attrText(getAttr(el, "content"));
     if (value === null) continue; // `content=""`, or none at all: names no type

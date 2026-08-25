@@ -328,4 +328,24 @@ describe("§20.11 the resolved refresh target (MAN-12)", () => {
     expect(d.analysis.refresh.seconds).toBe(3);
     expect(d.analysis.refresh.url).toBe("/a&amp;b.html"); // still-encoded, per §20.11
   });
+
+  test("the draft-only fields do not survive on the final envelope, and analysis carries exactly the §20.3/§20.9/§20.11 field set", () => {
+    // manifest.js's own docstring states the invariant: `analysis.rawHrefs`
+    // and the draft-only `_rawHrefs`/`_refreshRaw` must not survive on the
+    // final envelope — deleted after resolution, as `_hrefs` was deleted in
+    // the 0.8 model. Nothing else in this file asserts it, so a mutation
+    // that dropped either `delete` (or that forgot to strip `rawHrefs` out
+    // of the draft's `analysis`) would pass the rest of the suite silently.
+    const d = only(doc(
+      `<link rel="canonical" href="/index.html">`,
+      `<a href="/about.html">About</a><meta http-equiv="refresh" content="5">`,
+    ));
+    expect(Object.keys(d.analysis).sort()).toEqual([
+      "fragmentLinks", "ids", "jsonLd", "langTexts", "linksIn", "linksOut",
+      "refresh", "strayMetadata", "titleTexts", "visibleText",
+    ]);
+    expect("rawHrefs" in d.analysis).toBe(false);
+    expect("_rawHrefs" in d).toBe(false);
+    expect("_refreshRaw" in d).toBe(false);
+  });
 });

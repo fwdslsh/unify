@@ -22,6 +22,7 @@
  * evaluation command's business (§22.5).
  */
 
+import { decodeEntities } from "./entities.js";
 import { findAll, findFirst, getAttr, isElement, parse } from "./html.js";
 import { isPublicDestination } from "./document-selectors.js";
 
@@ -112,7 +113,13 @@ export function declaresCanonical(html) {
   // either, and §22.2 already has nowhere to insert one.
   const head = findFirst(root, (n) => isElement(n, "head"));
   if (head === null) return false;
+  // Decoded, matching the pipeline's own reading of `rel` everywhere else
+  // (§20.4's canonicalOf/metadataConflicts, via document.js's attributesOf):
+  // a raw comparison here would miss a `rel="cano&#110;ical"` that the
+  // selector layer sees as declared, letting --canonical auto insert a
+  // second canonical onto a page that already has one.
   return findAll(head, (n) =>
-    isElement(n, "link") && (getAttr(n, "rel") ?? "").trim().toLowerCase().split(/\s+/).includes("canonical"),
+    isElement(n, "link")
+    && decodeEntities(getAttr(n, "rel") ?? "").trim().toLowerCase().split(/\s+/).includes("canonical"),
   ).length > 0;
 }
