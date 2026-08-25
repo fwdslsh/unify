@@ -15,8 +15,11 @@
  *
  *     process.argv[2] = the absolute path of the source root
  *     process.argv[3] = the absolute path of the generated directory
+ *     process.argv[4] = the absolute path of a read-only generator-context.json
  *
- * No module to import, no object passed in, no return value read, no
+ * argv[4] is additive: it was added after argv[2]/argv[3] shipped, and a
+ * generator that ignores it keeps working exactly as it did before it
+ * existed. No module to import, no object passed in, no return value read, no
  * callback. The working directory is the source root, so `./_data/x.json` in
  * a generator means what an author reading the source tree would expect.
  *
@@ -133,19 +136,26 @@ export function makeOverlayDir() {
  * scanned `overlay/` subdirectory AND, beside it, any `generator-context.json`
  * `writeGeneratorContext` wrote for this same build. One lifecycle, one
  * removal; best effort, since a leak costs only disk.
+ *
+ * `dir` must be a `makeOverlayDir()` return (its basename is always
+ * `"overlay"`) — this deletes `dirname(dir)`, i.e. the whole temp root, so a
+ * caller passing anything else risks deleting an unrelated parent directory.
+ * The guard below makes a wrong argument a no-op instead of that.
+ * @param {string} dir
  */
 export function removeOverlayDir(dir) {
+  if (basename(dir) !== "overlay") return; // not a makeOverlayDir() return — refuse
   try {
     rmSync(dirname(dir), { recursive: true, force: true });
   } catch { /* best effort */ }
 }
 
 /**
- * §18/§33.2 — write the versioned generator context beside the overlay
+ * §33.2 — write the versioned generator context beside the overlay
  * directory (never inside it — see `makeOverlayDir`'s comment) and return its
  * absolute path, ready to become `process.argv[4]`.
  *
- * Every parameter here is a value the §18.3 boundary is willing to publish as
+ * Every parameter here is a value §33.2's boundary is willing to publish as
  * a stable machine contract; there is no `settings` object anywhere in this
  * function's signature on purpose — a generator reads exactly this shape, and
  * nothing about unify's internal option names can leak through by accident.
@@ -380,7 +390,7 @@ export async function runGenerator({ generatorAbs, sourceRoot, overlayDir, conte
   // author cannot opt into this themselves — the generator is a fresh
   // subprocess, so nothing they export reaches it.
   const args = process.versions.bun ? ["--no-install"] : [];
-  // argv[4] — §18's generator context, additive: argv[2]/argv[3] keep their
+  // argv[4] — §33.2's generator context, additive: argv[2]/argv[3] keep their
   // positions exactly as before, so a generator that ignores this fourth
   // argument works exactly as it did before this contract existed.
   const proc = spawn(process.execPath, [...args, generatorAbs, root, overlayDir, contextPath], {

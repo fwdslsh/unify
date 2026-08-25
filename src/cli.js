@@ -249,7 +249,7 @@ export async function run(argv) {
   }
 
   const reporter = new Reporter({ strict: settings.strict });
-  // §18 — the actual subcommand, carried alongside `settings` rather than
+  // §33.2 — the actual subcommand, carried alongside `settings` rather than
   // folded into it: it is not a saved-flag concept (unify.yaml has nothing
   // named `command`), only the generator context's `command` field reads it,
   // and every command handler below (build/audit/dev/watch) already receives

@@ -11,6 +11,7 @@
  */
 import { createHash } from "node:crypto";
 import pkg from "../../package.json" with { type: "json" };
+import { effectiveBaseUrl } from "./urls.js";
 
 export const SCHEMA_VERSION = 1;
 
@@ -191,7 +192,7 @@ function serializeFinding(f) {
 export function buildReport({ documents, findings, base, problemCount, advisoryCount }) {
   return {
     schemaVersion: SCHEMA_VERSION,
-    baseUrl: base ? `${base.origin}${base.pathPrefix}` : null,
+    baseUrl: effectiveBaseUrl(base),
     summary: {
       broken: findings.filter((f) => f.severity === "broken").length,
       incomplete: findings.filter((f) => f.severity === "incomplete").length,

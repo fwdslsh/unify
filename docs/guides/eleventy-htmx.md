@@ -155,7 +155,7 @@ $ unify build -s src --generate ../_scripts/eleventy.mjs --dry-run
   fix: name a file inside the source tree, e.g. --generate _scripts/gen.mjs
 ```
 
-`src/_scripts/eleventy.mjs` is 24 lines of code under its comments. Stripped to its
+`src/_scripts/eleventy.mjs` is 26 lines of code under its comments. Stripped to its
 decisions:
 
 ```js
@@ -204,13 +204,16 @@ get the result the guide predicted:
 3. **`context.site.baseUrl` as Eleventy global data.** `process.argv[4]` is
    `generator-context.json` — a versioned snapshot of the same effective settings unify's
    own build is about to apply, read once, straight off disk, with no import from unify.
-   Under `unify build --generate _scripts/eleventy.mjs --pretty-urls` the flag is missing,
-   so `context.site.baseUrl` is `null`, and every generated template that reads `baseUrl`
-   from Eleventy's data cascade renders a relative link exactly as before argv[4] existed;
-   add `--base-url https://ashgrove.example/` (§11) and the same templates see the string
-   unify itself will publish, with no second `--base-url` to keep in sync by hand. The `?.`
-   guards a standalone run with no fourth argument at all (see the `try`/`catch` discussion
-   below) — under unify, argv[4] is always supplied, so the guard never fires there.
+   `view-page.11ty.js` reads it back as `data.baseUrl` and renders an `og:url` meta tag from
+   it. Under `unify build --generate _scripts/eleventy.mjs --pretty-urls` the flag is
+   missing, so `context.site.baseUrl` is `null` and the `og:url` tag is omitted entirely; add
+   `--base-url https://ashgrove.example/` (§11) and the same pages carry
+   `<meta property="og:url" content="https://ashgrove.example/notes/…">` — the exact address
+   unify itself will publish that page under, with no second `--base-url` to keep in sync by
+   hand. This is not defensive: remove the line and every release-notes page loses its
+   `og:url` tag whenever `--base-url` is set. The `?.` guards a standalone run with no fourth
+   argument at all (see the "run it directly" fix line below) — under unify, argv[4] is
+   always supplied, so the guard never fires there.
 4. **An absolute `configPath`.** Two settings exist only in a config *file*, and Eleventy's
    auto-discovery would look in the working directory — the source root, where an
    `eleventy.config.mjs` would mirror-copy into `dist/`. The file lives under `_11ty/`
@@ -1031,7 +1034,7 @@ Four conditions, and you want most of them:
   this pays for itself.
 - **You already have Eleventy**, or a comparable generator, and something is written against it
   — an existing content tree, a team that knows it, a config you do not want to re-derive. The
-  point of `--generate` is that keeping it costs 24 lines.
+  point of `--generate` is that keeping it costs 26 lines.
 - **You want unify's composition and checks on top**: one layout with slots, one head-merge
   rule, `--pretty-urls`, a reference check that refuses to publish a broken link, and a
   transactional publish. If you do not want those, use Eleventy on its own; it is a complete

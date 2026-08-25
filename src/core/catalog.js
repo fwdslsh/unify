@@ -40,6 +40,7 @@
  */
 
 import { isPublicDestination } from "./document-selectors.js";
+import { effectiveBaseUrl } from "./urls.js";
 
 /** The output path of the site's catalog (brief §4.1). */
 export const CATALOG_PATH = "assets/unify/catalog.json";
@@ -97,7 +98,7 @@ export function catalogDocument(documents, base) {
     if (!isPublicDestination(doc, base)) continue;
     pages.push(catalogEntry(doc));
   }
-  return { schemaVersion: SCHEMA_VERSION, baseUrl: base ? `${base.origin}${base.pathPrefix}` : null, pages };
+  return { schemaVersion: SCHEMA_VERSION, baseUrl: effectiveBaseUrl(base), pages };
 }
 
 /**
