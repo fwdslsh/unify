@@ -1,11 +1,11 @@
 # Advanced examples
 
-Six sites. Four were built by an agent that had never seen unify before — it was given
+Seven sites. Four were built by an agent that had never seen unify before — it was given
 `docs/authoring-rules.md`, a client brief, and the compiled CLI, in a sandbox with no other
 documentation. They are kept because they passed review, not because they were written to
 be examples: what they show is what the 60 lines actually lead someone to build.
 
-The first two are one brief solved two ways; the third is a later, larger brief; the fourth integrates a Svelte component (its extra steps: `npm install`, then `npm run build:calculator && npm run build:notes` — the build scripts live in `_scripts/` at the example root). The fifth, `htmx-fragments`, is the one hand-maintained exception: no sandboxed agent could download htmx, so it is written and tested by the maintainers to document the fragment + htmx pattern. All build clean:
+The first two are one brief solved two ways; the third is a later, larger brief; the fourth integrates a Svelte component (its extra steps: `npm install`, then `npm run build:calculator && npm run build:notes` — the build scripts live in `_scripts/` at the example root). The fifth, `htmx-fragments`, is hand-maintained: no sandboxed agent could download htmx, so it is written and tested by the maintainers to document the fragment + htmx pattern. The sixth and seventh are hand-maintained too, and have sections of their own below. All build clean:
 
 ```bash
 cd seed-library
@@ -39,6 +39,34 @@ real defect in the docs (fixed), and five things that worked better than expecte
 
 `AUTHORS-NOTES.md` in each is the author's own write-up, unedited — including what it found
 unclear. That is more useful than a tidy narration would be.
+
+## `eleventy-htmx` — another generator's output, adopted as source
+
+The seventh answers "can I keep the generator I already have?". Ashgrove Instruments is a
+product front page, three documentation pages, six release notes, and a release stream
+filtered by topic — where the filter is a real page you can link to *and* an htmx swap when
+JavaScript is available. Eleventy owns the collection, the pagination and the data cascade;
+unify owns every page's chrome, `<head>`, URLs and checks. `src/_scripts/eleventy.mjs` is 24
+lines: it constructs Eleventy with unify's overlay directory as its output and calls
+`write()`. Nothing Eleventy-shaped exists in unify core, and nothing unify-shaped exists in
+the Eleventy config — the existing `--generate` seam was already enough.
+
+```bash
+cd eleventy-htmx
+npm install
+npm run build
+```
+
+`npm install` brings both dependencies — Eleventy, and the `unify` binary the four scripts
+call — so `npm run build`, `check`, `audit` and `dev` all work with no global install.
+
+23 files: 11 authored pages, 4 generated pages, 5 fragments, 3 assets. Both gates exit 0
+(`build --dry-run --strict` and `audit --strict`), on Bun and on Node, with byte-identical
+output. [`docs/guides/eleventy-htmx.md`](../docs/guides/eleventy-htmx.md) is the guide: the
+division-of-responsibilities table, the measured watch behaviour edit case by edit case
+(including what the watcher cannot see, because it lives outside the source root), what a
+thousand-note input does to build time, and a plain account of what this stack cannot
+deploy and should not attempt.
 
 ## The patterns worth copying
 
@@ -102,6 +130,31 @@ unify rewrites `href`/`src` but never `hx-get`, so a root-relative value would s
 miss the `--base-url` prefix — relative to the page, they resolve at any deploy address.
 And the default month is *included* into the page at build time, so the content is there
 before htmx loads, with JavaScript off, and for every crawler; the buttons only swap it.
+
+**A whole second generator, adopted through one flag.** `eleventy-htmx` runs Eleventy
+inside `--generate` and hands unify its output. The seam is one directory: Eleventy's
+output directory is the overlay unify created for that build, so everything it writes is
+scanned, composed into `src/_layout.html` by the ordinary discovery walk,
+reference-checked, collision-checked and published in the same transaction as the files
+you wrote by hand. Three settings do the real work — Eleventy's input is `"."` (relative to
+the working directory, which is the source root), its template formats are narrowed to
+`md` and `11ty.js` so it does not claim the authored `.html` pages, and a global
+`permalink: false` means it reads the release notes into a collection and writes none of
+them. Two hazards are worth taking from it. An Eleventy layout on top of a unify layout
+exits 0 and publishes two mastheads, two footers and a `<!doctype html>` in the middle of
+the body, so the example renames Eleventy's `layout:` key out of existence rather than
+trusting nobody to use it. And a generator is a subprocess on **every** rebuild — which is
+what keeps watch output honest, and what makes a thousand-note content tree a three-second
+editor loop.
+
+It also answers the `hx-get` addressing question the opposite way to `htmx-fragments`
+above, and both answers are right. Page-relative values resolve at any deploy address but
+need a flat directory layout; `eleventy-htmx` uses `--pretty-urls`, which moves pages a
+directory deeper, so it writes every fetched address root-absolute in the *published*
+spelling — the one string that is correct both in the copy unify splices into a page and in
+the byte-for-byte copy htmx fetches. The price is stated rather than hidden: that site
+deploys at a domain root only, because a subpath `--base-url` prefixes the `href` beside
+each `hx-get` and leaves the `hx-get` alone.
 
 **A Svelte component on one page, without adopting a framework for the site.**
 `forge-svelte` integrates a fee estimator maintained as a `.svelte` file by someone

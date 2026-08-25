@@ -398,3 +398,8 @@ Plainly, so you can plan around it rather than discover it:
 
 Each of these is a decision rather than a gap. The seam is the filesystem, in both
 directions, and it stays narrow enough to hold in your head.
+
+For the case where the other tool is a whole static-site generator — Eleventy owning
+collections, pagination and a data cascade while unify owns every page's composition — see
+[the Eleventy + htmx guide](guides/eleventy-htmx.md), worked end to end in
+[`examples/eleventy-htmx`](../examples/eleventy-htmx).

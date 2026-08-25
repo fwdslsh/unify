@@ -1,0 +1,7 @@
+# Everything here is reproducible from package-lock.json and `unify build`.
+node_modules/
+dist/
+
+# The repository root ignores package-lock.json (line 99); this example commits its
+# own, so `npm install` reproduces the exact Eleventy that produced the tested output.
+!package-lock.json
