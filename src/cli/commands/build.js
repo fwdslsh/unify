@@ -76,6 +76,12 @@ import * as generate from "../../core/generate.js";
  * @param {import('../../core/diagnostics.js').Reporter} context.reporter
  * @param {boolean} [context.sourceDefaulted] - §4.4 EXC-11: true only when
  *   nothing chose the source root (no --source, no unify.yaml key, no src/)
+ * @param {"build"|"dev"|"watch"|"audit"} [context.command] - the actual
+ *   subcommand running this build (cli.js's own `resolveSettings` names it);
+ *   defaulted to "build" only for the handful of unit tests that call this
+ *   function directly with no command at all — every real caller supplies one.
+ *   Read solely to fill §33.2's generator-context `command` field (below); it
+ *   changes nothing else about the pipeline.
  * @returns {Promise<number>}
  *
  * Two keys on `settings` are set by a command rather than by a flag, and both
@@ -90,36 +96,60 @@ import * as generate from "../../core/generate.js";
  * and `unify dev` IS `unify watch` plus a server — there is no other seam
  * between the two that reaches a rebuild.
  */
-export async function build({ sourceRoot, output, settings, reporter, sourceDefaulted = false }) {
+export async function build({ sourceRoot, output, settings, reporter, sourceDefaulted = false, command = "build" }) {
   // ---- §33 — the generator seam, BEFORE §2 step 1 --------------------------
   // It runs before the scan on purpose (§33.5): it sees the source tree as it
   // is on disk and nothing else — no manifest, no composed pages, no output —
   // which is the boundary that keeps this a seam rather than a plugin API. A
   // generator cannot observe unify's intermediate state, so no future change
   // to that state can break one.
+  // Everything the generator seam creates — the overlay dir, the context
+  // file, the generator's own run — lives inside this one try so the single
+  // `finally` below covers it on every exit: success, a P29 failure, and a
+  // throw out of `makeOverlayDir`/`writeGeneratorContext`/`runGenerator`
+  // alike. That is what makes §33.2's lifecycle promise ("deleted on a
+  // successful run, on a P29 failure, and on every path in between") true
+  // rather than true-for-two-of-three-paths.
   let overlayDir = null;
-  if (settings.generate) {
-    const generatorAbs = generate.resolveGeneratorPath(settings.generate, sourceRoot);
-    overlayDir = generate.makeOverlayDir();
-    const ok = await generate.runGenerator({ generatorAbs, sourceRoot, overlayDir, reporter });
-    if (!ok) {
-      // P29 stops the build BEFORE the scan: a partial overlay is a site
-      // nobody described, and §15's transaction leaves the previous dist/
-      // untouched exactly as any other problem would.
-      //
-      // The two lines before the return are not optional. Returning straight
-      // out skipped them and the build exited 1 having printed NOTHING —
-      // a silent failure, which is worse than the fault it was reporting and
-      // exactly what §14 exists to forbid. Every other exit from this
-      // function passes through the same pair; this one had to as well.
-      relocateDiagnosticsToCwd(reporter, sourceRoot);
-      reporter.flush();
-      generate.removeOverlayDir(overlayDir);
-      return 1;
-    }
-  }
-
   try {
+    if (settings.generate) {
+      const generatorAbs = generate.resolveGeneratorPath(settings.generate, sourceRoot);
+      overlayDir = generate.makeOverlayDir();
+      // §33.2 — the generator context is derived from the SAME settings the rest
+      // of this file reads, computed here rather than reused from `runBuild`'s
+      // own `baseConfig` because the context has to exist BEFORE the scan
+      // (§33.5), and `runBuild` (and its `baseConfig`) hasn't run yet. Parsing
+      // is pure and deterministic, so a second call here and `runBuild`'s own
+      // below produce the identical `{origin, pathPrefix}` for the same flag.
+      const baseConfig = settings.baseUrl ? urls.parseBaseUrl(settings.baseUrl) : null;
+      const contextPath = generate.writeGeneratorContext({
+        overlayDir,
+        sourceRoot,
+        output,
+        command,
+        baseUrl: urls.effectiveBaseUrl(baseConfig),
+        prettyUrls: settings.prettyUrls === true,
+        canonical: settings.canonical === "auto" ? "auto" : null,
+        catalogPath: settings.catalog === true ? catalog.CATALOG_PATH : null,
+        searchCorpusPath: settings.searchCorpus === true ? searchCorpus.SEARCH_CORPUS_PATH : null,
+      });
+      const ok = await generate.runGenerator({ generatorAbs, sourceRoot, overlayDir, contextPath, reporter });
+      if (!ok) {
+        // P29 stops the build BEFORE the scan: a partial overlay is a site
+        // nobody described, and §15's transaction leaves the previous dist/
+        // untouched exactly as any other problem would.
+        //
+        // The two lines before the return are not optional. Returning straight
+        // out skipped them and the build exited 1 having printed NOTHING —
+        // a silent failure, which is worse than the fault it was reporting and
+        // exactly what §14 exists to forbid. Every other exit from this
+        // function passes through the same pair; this one had to as well.
+        relocateDiagnosticsToCwd(reporter, sourceRoot);
+        reporter.flush();
+        return 1;
+      }
+    }
+
     return await runBuild({ sourceRoot, output, settings, reporter, sourceDefaulted, overlayDir });
   } finally {
     if (overlayDir !== null) generate.removeOverlayDir(overlayDir);

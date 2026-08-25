@@ -18,6 +18,12 @@ export const data = {
 export function render(data) {
   const { label, slug, blurb } = data.view;
   const heading = slug === "all" ? "Release notes" : label;
+  const path = slug === "all" ? "notes/" : `notes/${slug}/`;
+  // baseUrl comes from generator-context.json (argv[4], §33.2), read once in
+  // _scripts/eleventy.mjs and threaded through Eleventy's data cascade. Without
+  // --base-url it is null and this line is blank; with it, og:url carries the exact
+  // origin and path prefix unify itself is about to publish this page under.
+  const ogUrl = data.baseUrl ? `\n    <meta property="og:url" content="${data.baseUrl}${path}">` : "";
   // The <head> carries data and nothing else: this page's own title and description. The
   // layout owns the charset, the stylesheet, the icon and the " — Ashgrove Instruments"
   // suffix, and a page that repeated any of them would double-suffix the title or raise a
@@ -43,7 +49,7 @@ export function render(data) {
 <html>
   <head>
     <title>${escapeHtml(heading)}</title>
-    <meta name="description" content="${escapeHtml(blurb)}">
+    <meta name="description" content="${escapeHtml(blurb)}">${ogUrl}
   </head>
   <body>
     <p slot="aside">Every change ships with a note. The <a href="/docs/index.html">documentation</a> always describes the current firmware.</p>

@@ -257,6 +257,66 @@ writeFileSync(join(outDir, "from-data.html"),
     covers("GEN-03");
   }, 30_000);
 
+  test("GEN-12 — under watch, command names \"watch\" and each rebuild gets a fresh generatedRoot", async () => {
+    // The command name reaches the context through watch.js's own default
+    // (`command = "watch"`) rather than through build.js's own default —
+    // a code path GEN-12's other tests (spawned once via `build`/`audit`)
+    // never exercise. Two rebuilds' contexts also have to differ in
+    // paths.generatedRoot, which is §33.2's "fresh per rebuild" lifecycle
+    // promise: the fresh-overlay-per-build structure gives it for free, but
+    // nothing outside this file has ever read two contexts from one long-lived
+    // watch process to check.
+    const tmp = mkTmp();
+    const log = join(tmp, "ctx-log.jsonl");
+    writeTree(tmp, {
+      "src/index.html": '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><title>Home</title><meta name="description" content="Home."></head><body><h1>Home</h1></body></html>\n',
+      // JSON.stringify with no indentation, so each context is exactly ONE
+      // line in the log — writeGeneratorContext's own file is two-space
+      // pretty-printed and would otherwise split across several "lines" of
+      // this JSONL log.
+      "src/_scripts/gen.mjs": `import { appendFileSync, readFileSync } from "node:fs";
+const [, , , , contextPath] = process.argv;
+appendFileSync(${JSON.stringify(log)}, JSON.stringify(JSON.parse(readFileSync(contextPath, "utf8"))) + "\\n");
+`,
+    });
+    const readLines = () => existsSync(log) ? readFileSync(log, "utf8").trim().split("\n").filter(Boolean) : [];
+
+    const w = start(["watch", "--generate", "_scripts/gen.mjs"], tmp);
+    await w.ready;
+    try {
+      await waitUntil(() => readLines().length >= 1, "the first watch build's generator-context");
+    } catch {
+      throw new Error(`the first watch build must run the generator:\n${w.stderr}`);
+    }
+    const first = JSON.parse(readLines()[0]);
+    if (first.command !== "watch") {
+      throw new Error(`command must be "watch" under \`unify watch\`, got ${JSON.stringify(first.command)}`);
+    }
+
+    // Any change triggers a rebuild; the generator itself is untouched, so a
+    // second line in the log can only come from a second, fresh context.
+    writeFileSync(join(tmp, "src/index.html"),
+      '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><title>Home</title><meta name="description" content="Home, edited."></head><body><h1>Home</h1></body></html>\n');
+    try {
+      await waitUntil(() => readLines().length >= 2, "the rebuild's generator-context");
+    } catch {
+      throw new Error(`a rebuild under watch must re-run the generator with a fresh context:\n${w.stderr}`);
+    }
+    const second = JSON.parse(readLines()[1]);
+    if (second.command !== "watch") {
+      throw new Error(`command must stay "watch" on a rebuild, got ${JSON.stringify(second.command)}`);
+    }
+    if (second.paths.generatedRoot === first.paths.generatedRoot) {
+      throw new Error(
+        `§33.2: each rebuild must get a fresh paths.generatedRoot, not reuse the previous build's: ${second.paths.generatedRoot}`,
+      );
+    }
+
+    w.proc.kill("SIGTERM");
+    await waitForExit(w.proc);
+    covers("GEN-12");
+  }, 30_000);
+
   test("WCH-02 — watch output after an edit sequence is identical to a fresh build", async () => {
     const tmp = mkTmp();
     writeTree(tmp, SITE);

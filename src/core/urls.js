@@ -906,6 +906,21 @@ export function parseBaseUrl(raw) {
   return { origin: u.origin, pathPrefix: path, scheme: u.protocol };
 }
 
+/**
+ * The site's effective, fully-resolved base URL — `${base.origin}${base.pathPrefix}`,
+ * or `null` without `--base-url` — as one function rather than a string every
+ * caller re-derives. `catalog.json`, `audit --format json` (`report.js`) and
+ * the `--generate` context (`generate.js`) all publish this same value, and
+ * §6.1 forbids re-deriving a URL from one flag in more than one place: a
+ * second literal is a second reading of `parseBaseUrl`'s output that could
+ * silently drift from the others.
+ * @param {BaseUrlConfig|null} base - `parseBaseUrl`'s return, or `null`
+ * @returns {string|null}
+ */
+export function effectiveBaseUrl(base) {
+  return base ? `${base.origin}${base.pathPrefix}` : null;
+}
+
 function isOgOrTwitterMeta(el) {
   const property = getAttr(el, "property");
   if (property && /^og:/i.test(property)) return true;
