@@ -46,7 +46,7 @@ The seventh answers "can I keep the generator I already have?". Ashgrove Instrum
 product front page, three documentation pages, six release notes, and a release stream
 filtered by topic — where the filter is a real page you can link to *and* an htmx swap when
 JavaScript is available. Eleventy owns the collection, the pagination and the data cascade;
-unify owns every page's chrome, `<head>`, URLs and checks. `src/_scripts/eleventy.mjs` is 21
+unify owns every page's chrome, `<head>`, URLs and checks. `src/_scripts/eleventy.mjs` is 24
 lines: it constructs Eleventy with unify's overlay directory as its output and calls
 `write()`. Nothing Eleventy-shaped exists in unify core, and nothing unify-shaped exists in
 the Eleventy config — the existing `--generate` seam was already enough.
