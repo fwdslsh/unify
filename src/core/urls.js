@@ -555,7 +555,67 @@ export function parseRefreshMeta(el) {
  *   itself" branch resolves or is left exactly as written
  * @returns {string}
  */
-export function rewriteProvenanceUrls(composedHtml, { provenanceOf, pageFile, pageMoved = false }) {
+/**
+ * The length changes an edit list will impose, in the PRE-edit text's space.
+ *
+ * §11 replaces attribute VALUES in place, which the reference locator relied
+ * on being length-preserving — and it is not. `--pretty-urls` turns
+ * `/notes/index.html` into `/notes/`, losing ten bytes, so every reference
+ * AFTER it in the same file sat that much earlier in the final text than in
+ * the composed text the span table describes. A broken link on line 18 was
+ * reported at line 15, and with enough rewrites ahead of it the drift can
+ * cross a file boundary and name a file containing no such link.
+ *
+ * `build.js` already unwinds §22/§26's insertions to map a final offset back
+ * to the pre-insertion text; this is the same idea for §11's replacements,
+ * and it is what the locator's own comment named as the general fix
+ * ("`urls.js` tracking spans through its own edits too").
+ *
+ * `at` and `len` are the edit's position and length in the text it was
+ * applied to; `delta` is what the replacement adds (negative when it
+ * shortens). Edits that change no length are dropped — they were never the
+ * problem, and carrying them would make the unwind loop do arithmetic for
+ * nothing.
+ * @param {{start:number,end:number,replacement:string}[]} edits
+ * @returns {{at:number,len:number,delta:number}[]} ascending by `at`
+ */
+function shiftsOf(edits) {
+  return [...edits]
+    .sort((a, b) => a.start - b.start)
+    .map((e) => ({ at: e.start, len: e.end - e.start, delta: e.replacement.length - (e.end - e.start) }))
+    .filter((sh) => sh.delta !== 0);
+}
+
+/**
+ * Map an offset in a rewritten text back to the text §11 was handed.
+ *
+ * `stages` is in REVERSE APPLICATION ORDER — the same discipline, and for the
+ * same reason, as `build.js`'s insertion unwind: each stage's `at` values are
+ * positions in the text THAT stage was applied to, so the most recent has to
+ * be undone first or the arithmetic compares positions from two different
+ * texts. An offset landing INSIDE a rewritten value has no exact preimage, so
+ * it maps to the edit's own start — a real position in the pre-edit text,
+ * which is what §14.1 needs to number a line rather than guess one.
+ * @param {number} offset
+ * @param {{at:number,len:number,delta:number}[][]} stages
+ * @returns {number}
+ */
+export function unshiftUrlRewrites(offset, stages) {
+  let pos = offset;
+  for (const shifts of stages) {
+    let acc = 0;
+    for (const sh of shifts) {
+      const startAfter = sh.at + acc;
+      if (pos >= startAfter + sh.len + sh.delta) acc += sh.delta;
+      else if (pos >= startAfter) { pos = sh.at; acc = null; break; }
+      else break;
+    }
+    if (acc !== null) pos -= acc;
+  }
+  return pos;
+}
+
+export function rewriteProvenanceUrls(composedHtml, { provenanceOf, pageFile, pageMoved = false, shifts = null }) {
   const { root } = parse(composedHtml);
   const edits = [];
 
@@ -623,6 +683,7 @@ export function rewriteProvenanceUrls(composedHtml, { provenanceOf, pageFile, pa
       if (next !== null) edits.push({ start: refresh.start, end: refresh.end, replacement: next });
     }
   }
+  if (shifts) shifts.push(...shiftsOf(edits));
   return applyEdits(composedHtml, edits);
 }
 
@@ -747,7 +808,7 @@ function pageForLinkPath(resolved, emittedHtmlPaths) {
  *   (pre-move) `.html` output path, e.g. {"about.html","menu/index.html",...}
  * @returns {string}
  */
-export function applyPrettyLinks(html, { pageOutputPath, emittedHtmlPaths }) {
+export function applyPrettyLinks(html, { pageOutputPath, emittedHtmlPaths, shifts = null }) {
   const pageDir = posix.dirname(pageOutputPath);
   const { root } = parse(html);
   const edits = [];
@@ -799,6 +860,7 @@ export function applyPrettyLinks(html, { pageOutputPath, emittedHtmlPaths }) {
       if (pretty !== null) edits.push({ start: refresh.start, end: refresh.end, replacement: pretty });
     }
   }
+  if (shifts) shifts.push(...shiftsOf(edits));
   return applyEdits(html, edits);
 }
 
@@ -904,7 +966,7 @@ function prefixRootRelative(value, base, includeOrigin) {
  * @param {BaseUrlConfig} base
  * @returns {string}
  */
-export function applyBaseUrl(html, base) {
+export function applyBaseUrl(html, base, { shifts = null } = {}) {
   const { root } = parse(html);
   const edits = [];
 
@@ -940,6 +1002,7 @@ export function applyBaseUrl(html, base) {
       if (next !== refresh.url) edits.push({ start: refresh.start, end: refresh.end, replacement: next });
     }
   }
+  if (shifts) shifts.push(...shiftsOf(edits));
   return applyEdits(html, edits);
 }
 
@@ -961,13 +1024,31 @@ export function applyBaseUrl(html, base) {
  * @param {BaseUrlConfig|null} [args.base]
  * @returns {string}
  */
-export function rewriteUrls(composedHtml, { provenanceOf, pageFile, pageOutputPath, prettyUrls = false, emittedHtmlPaths, base = null }) {
+export function rewriteUrls(composedHtml, { provenanceOf, pageFile, pageOutputPath, prettyUrls = false, emittedHtmlPaths, base = null, shifts = null }) {
+  // Each stage's shifts are measured in the text THAT stage received, so they
+  // are collected per stage and stacked most-recent-first — the order
+  // `unshiftUrlRewrites` has to undo them in. Passing one flat array instead
+  // would mix positions from three different texts, which is the bug the
+  // insertion unwind in build.js already had to learn once.
+  const collect = (list) => { if (shifts && list.length) shifts.unshift(list); };
+
+  const s1 = shifts ? [] : null;
   let out = rewriteProvenanceUrls(composedHtml, {
     provenanceOf,
     pageFile,
     pageMoved: pageWillMove(pageOutputPath, prettyUrls),
+    shifts: s1,
   });
-  if (prettyUrls) out = applyPrettyLinks(out, { pageOutputPath, emittedHtmlPaths });
-  if (base) out = applyBaseUrl(out, base);
+  if (s1) collect(s1);
+  if (prettyUrls) {
+    const s2 = shifts ? [] : null;
+    out = applyPrettyLinks(out, { pageOutputPath, emittedHtmlPaths, shifts: s2 });
+    if (s2) collect(s2);
+  }
+  if (base) {
+    const s3 = shifts ? [] : null;
+    out = applyBaseUrl(out, base, { shifts: s3 });
+    if (s3) collect(s3);
+  }
   return out;
 }

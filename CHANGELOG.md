@@ -27,6 +27,18 @@ honest, and the examples gain a gate.
   see is mangled markup pointing nowhere near the cause. Fragments now keep
   their last good bytes. Blanking *pages* on a failure unify cannot attribute
   is unchanged.
+- **A diagnostic's line survives `--pretty-urls`** (#72, URL-15). §11 replaces
+  attribute values in place but not at equal length — `/notes/index.html`
+  becomes `/notes/`, ten bytes shorter — so every reference after one of those
+  sat earlier in the final text than in the composed text the span table
+  describes, and the located line drifted backwards by however many rewrites
+  preceded it. A broken link on line 18 was reported at line 15, naming a line
+  whose content had nothing to do with the diagnostic; with enough drift the
+  position could cross a file boundary and name a file containing no such link
+  at all. Each rewrite stage now reports the shifts it imposed, and the
+  reference locator unwinds them before querying the spans, exactly as §22 and
+  §26's insertions were already unwound. This affected every `--pretty-urls`
+  user; the diagnostic itself was always correct, only its position was wrong.
 - **P29 stops printing the runtime's error object** (#76, GEN-10). A generator
   that could not read a file — the commonest failure there is — reported
   `… open '/x.json' /     path: "/x.json", /  syscall: "open",`: the path

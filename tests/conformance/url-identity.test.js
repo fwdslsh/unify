@@ -494,3 +494,58 @@ test("REF-11: a bare @import is a reference, exactly as @import url(...) already
   covers("REF-11");
 }, TEST_MS);
 
+
+// ------------------------------------------------------------------- URL-15
+
+test("URL-15 — a diagnostic's line survives §11's own length changes", async () => {
+  // §11 replaces attribute values in place but not at equal length:
+  // `--pretty-urls` turns `/notes/index.html` into `/notes/`, ten bytes
+  // shorter. Every reference after one of those sat earlier in the final text
+  // than in the composed text the span table describes, so the located line
+  // drifted BACKWARDS — a broken link on line 18 reported at line 15, naming
+  // a line whose content has nothing to do with the diagnostic.
+  //
+  // Asserted against a fixed, known line rather than "the same under both
+  // flags", so it cannot pass by both answers being wrong together.
+  const tmp = mkTmp();
+  const linky = Array.from({ length: 12 },
+    () => '    <p><a href="/notes/index.html">n</a> <a href="/docs/index.html">d</a></p>').join("\n");
+  const page = [
+    "<!doctype html>",
+    '<html lang="en">',
+    "  <head><title>Home</title><meta name=\"description\" content=\"Home page.\"></head>",
+    "  <body>",
+    "    <h1>Home</h1>",
+    linky,
+    '    <p><a href="/nope.html">broken</a></p>', // <- line 18
+    "  </body>",
+    "</html>",
+    "",
+  ].join("\n");
+  const leaf = (name) =>
+    `<!doctype html>\n<html lang="en">\n<head><title>${name}</title>` +
+    `<meta name="description" content="The ${name} page."></head>\n<body><h1>${name}</h1></body>\n</html>\n`;
+  writeTree(join(tmp, "src"), {
+    "index.html": page,
+    "notes/index.html": leaf("notes"),
+    "docs/index.html": leaf("docs"),
+  });
+
+  const BROKEN_LINE = page.split("\n").findIndex((l) => l.includes("/nope.html")) + 1;
+
+  // Every §11 combination must name the same real line. `--base-url` is in
+  // here because it uses the identical edit shape and would drift the same way
+  // the moment its rewrites landed before a checked reference.
+  for (const flags of [[], ["--pretty-urls"], ["--base-url", "https://example.com/"],
+    ["--pretty-urls", "--base-url", "https://example.com/"]]) {
+    const r = await runCli(["build", "-s", "src", "-o", "dist", "--dry-run", ...flags], tmp);
+    const line = (r.stderr.split("\n").find((l) => l.includes("/nope.html does not resolve")) ?? "");
+    const m = line.match(/index\.html:(\d+):/);
+    if (!m) throw new Error(`no located problem for ${flags.join(" ") || "(no flags)"}:\n${r.stderr}`);
+    if (Number(m[1]) !== BROKEN_LINE) {
+      throw new Error(
+        `with ${flags.join(" ") || "(no flags)"} the broken link on line ${BROKEN_LINE} was reported at line ${m[1]}`);
+    }
+  }
+  covers("URL-15");
+}, 30_000);
