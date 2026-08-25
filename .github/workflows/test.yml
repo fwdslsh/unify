@@ -182,19 +182,18 @@ jobs:
           node src/cli.js audit -s examples/eleventy-htmx/src \
             --generate _scripts/eleventy.mjs --pretty-urls --strict
 
-  # Always-on gate G14: the release notes describe the version in
-  # package.json. `.github/workflows/release_notes.md` is pasted verbatim into
-  # the GitHub release body, and nothing read it back until it had been wrong
-  # twice — 0.8.2 still carrying 0.8.1's text, and 0.8.3 shipping without a
-  # change that landed after the notes were written.
-  #
-  # This job goes red between bumping the version and rewriting the notes.
-  # That is the point: they are two halves of one change, and the failure
-  # message says which half is missing.
+  # Always-on gate G14: the CHANGELOG has a section for the version in
+  # package.json, because the release body IS that section
+  # (extract-release-notes.mjs; release.yml composes the body from it). This
+  # replaced a hand-maintained release_notes.md that was wrong at both
+  # releases that used it while the CHANGELOG was right both times — the
+  # failure was never the writing, it was having two of it. This job goes red
+  # between bumping the version and writing its section: they are two halves
+  # of one change, and the failure message says which half is missing.
   release-notes:
-    name: Release notes match the version (G14)
+    name: Changelog covers the version (G14)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
-      - run: bun tests/conformance/check-release-notes.mjs
+      - run: bun .github/workflows/extract-release-notes.mjs > /dev/null
