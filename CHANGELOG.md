@@ -39,6 +39,21 @@ honest, and the examples gain a gate.
   `  first-post.md: no date` survives because a bare filename is not a JS
   identifier, and multi-line messages still arrive whole.
 
+- **The generator subprocess never network-installs** (#75, GEN-11). Bun
+  auto-installs an import it cannot resolve, so a generator whose dependency
+  was missing fetched it from npm and the build exited 0 — while node failed
+  the same tree inside P29. The two runtimes disagreed about whether there was
+  a build at all, and it failed in the direction that hides the problem: bun
+  resolves through its global cache and leaves no `node_modules`, so the tree
+  that built looked identical to the tree that could not. The compiled binary
+  did it too, quietly reaching the network on the path whose whole promise is
+  a machine with neither runtime installed. The spawn now carries
+  `--no-install` wherever it is valid. This is the one place unify asks which
+  runtime it is, guarded on `process.versions.bun` rather than the
+  executable's name — which is `unify-linux` on the binary — and the
+  `--generate` contract is unchanged: `argv[2]` is still the source root and
+  `argv[3]` the generated directory.
+
 ### Added
 
 - **Gate G13: every example builds in CI** (#77). `examples/` holds seven
