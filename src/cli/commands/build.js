@@ -374,9 +374,9 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
   if (settings.canonical === "auto") {
     const preliminary = buildManifest({ pages: manifestPages, base: baseConfig });
     for (const page of manifestPages) {
-      const record = preliminary.byOutputPath.get(page.outputPath);
-      if (!record) continue;
-      const completed = completeCanonical(page.html, record, baseConfig);
+      const doc = preliminary.byOutputPath.get(page.outputPath);
+      if (!doc) continue;
+      const completed = completeCanonical(page.html, doc, baseConfig);
       if (completed.text === page.html) continue;
       noteInsertions(page, completed.insertions);
       page.html = completed.text;
@@ -418,7 +418,7 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
   // POST-completion text, exactly as §22's is derived from the pre-completion
   // one. Skipped when no page declared a generable type: that return value is a
   // superset of the pages that can generate (§26.5's conditions 1 and 2 leave
-  // the meta as the only surviving source of `schemaType`), so skipping it can
+  // the meta as the only surviving source of a declared type), so skipping it can
   // never suppress a block — it only spares a site that opted into nothing the
   // derivation, which is what "a site that writes none is the golden path,
   // unchanged" costs to mean.
@@ -426,9 +426,9 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
   if (anyDeclaration) {
     const preliminary = buildManifest({ pages: manifestPages, base: baseConfig });
     for (const page of manifestPages) {
-      const record = preliminary.byOutputPath.get(page.outputPath);
-      if (!record) continue;
-      const block = generateStructuredData(page.html, record);
+      const doc = preliminary.byOutputPath.get(page.outputPath);
+      if (!doc) continue;
+      const block = generateStructuredData(page.html, doc);
       if (block.text === page.html) continue;
       // Prepended, not appended: §26 wrote into the text §22 had already
       // lengthened, so it is the one the locator must undo first (`noteInsertions`).
@@ -468,16 +468,16 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
     ...assetFiles.map((a) => [outputPathOf.get(a.relPath), a.relPath]),
   ]);
   const generated = sitemap.generateSitemap({
-    records: manifest.records, base: baseConfig, emittedFromSource, reporter,
+    documents: manifest.documents, base: baseConfig, emittedFromSource, reporter,
   });
   for (const [outPath, text] of generated) tempFiles.set(outPath, text);
 
   // ---- §29 — feed generation, the manifest's second projection. -----------
   // Same shape as §21 immediately above, one document type over: reads
-  // `manifest.records` and nothing else about the page (`pageHtml` is the one
-  // exception, and only under --feed-full — see feed.js's own module comment
-  // for why that still isn't a second interpretation of the site). No
-  // ordering dependency against sitemap generation either direction; wired
+  // `manifest.documents` and nothing else about the page (`pageHtml` is the
+  // one exception, and only under --feed-full — see feed.js's own module
+  // comment for why that still isn't a second interpretation of the site).
+  // No ordering dependency against sitemap generation either direction; wired
   // beside it because both are manifest projections that join `tempFiles`
   // before §12's reference check and §15's transactional publish. Reuses
   // `emittedFromSource` — built once, immediately above, for exactly this
@@ -488,25 +488,25 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
   // generation above (`page.html = completed.text` / `page.html =
   // block.text`), and it is the exact text `buildManifest` just read to
   // produce `manifest` itself — so `pageHtml` never disagrees with what
-  // `record.title`/`record.canonical`/etc. say about the same page.
+  // `titleOf(doc)`/`canonicalOf(doc)`/etc. say about the same page.
   const pageHtml = settings.feedFull
     ? new Map(manifestPages.map((p) => [p.outputPath, p.html]))
     : null;
   const generatedFeed = feed.generateFeed({
-    records: manifest.records, base: baseConfig, feedFull: settings.feedFull,
+    documents: manifest.documents, base: baseConfig, feedFull: settings.feedFull,
     pageHtml, emittedFromSource, reporter,
   });
   for (const [outPath, text] of generatedFeed) tempFiles.set(outPath, text);
 
   // ---- §30 — the search manifest, the manifest's third projection. --------
   // Unlike sitemap/feed, activation is the flag ALONE (§30.1) — nothing about
-  // a page declares "index me", so there is no record-derived condition to
-  // check the way `generateSitemap`/`generateFeed` check `base`/`schemaType`.
+  // a page declares "index me", so there is no document-derived condition to
+  // check the way `generateSitemap`/`generateFeed` check `base`/declared type.
   // Unconditional on `baseConfig`: `searchIndexEntry` already falls back to
-  // `record.path` with no --base-url (§30.2), so gating this on `base` would
-  // make the flag useless for the local-preview case it exists for.
+  // `doc.document.path` with no --base-url (§30.2), so gating this on `base`
+  // would make the flag useless for the local-preview case it exists for.
   const generatedSearchIndex = settings.searchIndex
-    ? searchIndex.generateSearchIndex({ records: manifest.records, base: baseConfig, emittedFromSource })
+    ? searchIndex.generateSearchIndex({ documents: manifest.documents, base: baseConfig, emittedFromSource })
     : new Map();
   for (const [outPath, text] of generatedSearchIndex) tempFiles.set(outPath, text);
 
@@ -607,7 +607,7 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
   // build that emitted (or shipped an authored) file never consults it.
   const wouldGenerate = new Map();
   if (!tempFiles.has(feed.FEED_PATH)) {
-    const candidates = manifest.records.some((rec) => feed.isFeedCandidate(rec));
+    const candidates = manifest.documents.some((doc) => feed.isFeedCandidate(doc));
     wouldGenerate.set(feed.FEED_PATH,
       baseConfig === null
         ? "feed.xml is generated, not authored: this build generates it only under --base-url, from pages declaring schema: Article or BlogPosting with a dated time"
@@ -678,7 +678,7 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
   // interesting one, unobserved, inside a development server.
   const findings = settings.audit || settings.onEvaluation
     ? auditManifest({
-      records: manifest.records,
+      documents: manifest.documents,
       byOutputPath: manifest.byOutputPath,
       base: baseConfig,
       sitemapLocs,
@@ -852,7 +852,7 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
   // reaches this line at all, which is exactly the signal `dev.js` reads to say
   // so rather than leave a stale report looking current.
   settings.onEvaluation?.({
-    records: manifest.records,
+    documents: manifest.documents,
     findings,
     address: addressLine(baseConfig),
     diagnostics: reporter.sorted(),

@@ -13,9 +13,9 @@
  *    when its `data` is a single object that is not a `@graph` wrapper, and
  *    only that object's own string-valued properties are read. An array and a
  *    graph are several entities, and deciding which of them is *this page* is
- *    a judgement rather than a reading — §20.8 drew that line for `schemaType`
- *    and this is the same line, applied to one more question, so the two
- *    cannot disagree about what a block declares.
+ *    a judgement rather than a reading — §20.8 drew that line for
+ *    `declaredTypes` and this is the same line, applied to one more
+ *    question, so the two cannot disagree about what a block declares.
  *
  *  - **P23 (§26.4)** — `<meta name="schema">` is unify's own key, defined by
  *    no standard, so constraining its values constrains unify's vocabulary
@@ -29,8 +29,8 @@
  *    also switches generation off (§26.5), so the two never fight.
  *
  *  - **The generator (§26.5–§26.8)** — one `<script type="application/ld+json">`
- *    before `</head>`, built from **record fields only** (§20), never from
- *    frontmatter. That is §20.2's equal-citizen rule doing its work: an HTML
+ *    before `</head>`, built from **shared selectors over the final document
+ *    only** (§20), never from frontmatter. That is §20.2's equal-citizen rule doing its work: an HTML
  *    page generates exactly what a Markdown page with the same emitted head
  *    generates, and character references are already resolved (§20.3) so the
  *    JSON carries the text a reader sees.
@@ -44,7 +44,7 @@
  *     body). §22.3's rule, one artifact over.
  *
  *  2. **Nothing here invents a fact.** No `publisher`, no `@id`, no
- *     `articleBody`/`wordCount`/`keywords` derived from `record.text`, no
+ *     `articleBody`/`wordCount`/`keywords` derived from `analysis.visibleText`, no
  *     `isPartOf`/`breadcrumb`/`speakable`, no image dimensions, and no date
  *     from any source but an authored well-formed one (§26.8). `author` is a
  *     **plain string** and never `{"@type": "Person", …}`: `<meta
@@ -65,6 +65,9 @@
 
 import { decodeEntities } from "./entities.js";
 import { findAll, findFirst, getAttr, isElement, isInside, parse } from "./html.js";
+import {
+  authorOf, canonicalOf, declaredTypes, descriptionOf, langOf, preferredImageOf, publicationDatesOf, titleOf,
+} from "./document-selectors.js";
 
 /**
  * §26.4 — the closed set, spelled exactly. Not a claim that other types do not
@@ -93,7 +96,7 @@ const TYPE_LIST = `${GENERATED_TYPES.slice(0, -1).join(", ")}, or ${GENERATED_TY
  * severities are claims about a document, and a claim about the wrong node of
  * a graph is worse than no claim. A later revision that wants those pages must
  * first say *which* node is the page, in §26, with the rule written down.
- * @param {import('./manifest.js').JsonLdEntry} entry
+ * @param {import('./document.js').JsonLdEntry} entry
  * @returns {Record<string, unknown>|null}
  */
 export function subjectObject(entry) {
@@ -157,9 +160,10 @@ function attrText(value) {
  * The return value is not the rule and must never become it: it says only
  * whether this page *might* generate, so the caller can skip deriving a
  * manifest for a site that opted into nothing (§26.5's "the declaration is the
- * whole opt-in"). Whether a page generates is `record.schemaType`'s answer
- * alone (§26.5's condition 1) — this is a superset of it by construction,
- * since under condition 2 the surviving `schemaType` is always a meta's.
+ * whole opt-in"). Whether a page generates is the caller's own
+ * `declaredTypes(doc)[0]` reading alone (§26.5's condition 1) — this is a
+ * superset of it by construction, since under condition 2 (`jsonLd` empty)
+ * the surviving declared type is always a meta's.
  *
  * @param {object} args
  * @param {string} args.html - the page's emitted text
@@ -206,7 +210,8 @@ export function checkSchemaDeclarations({ html, outputPath, locate, reporter }) 
 /**
  * §26.6 — the object to serialize, in the section's own property order.
  *
- * Every value is a **record field** (§20), never frontmatter, and every one is
+ * Every value comes from a **shared selector over the final document** (§20),
+ * never frontmatter, and every one is
  * omitted when its source is absent. §26.6 argues four of these choices rather
  * than asserting them, and every one is visible in the lines below.
  * `headline` for an article and `name` for a page: a `WebPage` defines no
@@ -221,23 +226,27 @@ export function checkSchemaDeclarations({ html, outputPath, locate, reporter }) 
  * so a page whose `date:` is not W3C-DTF generates no `datePublished` — and
  * says so, through §26.3's `date-unusable`, rather than emitting a value that
  * is invalid where it lands.
- * @param {import('./manifest.js').PageRecord} record
+ * @param {import('./manifest.js').BuildDocument} doc
+ * @param {string} type - the accepted declared type generation activated on
+ *   (`generateStructuredData`'s own reading of `declaredTypes(doc)`)
  * @returns {Record<string, string>}
  */
-function structuredDataFor(record) {
+function structuredDataFor(doc, type) {
   /** @type {Record<string, string>} */
-  const out = { "@context": "https://schema.org", "@type": record.schemaType };
+  const out = { "@context": "https://schema.org", "@type": type };
   const put = (key, value) => {
     if (value !== null && value !== undefined) out[key] = value;
   };
-  put(record.schemaType === "WebPage" ? "name" : "headline", record.title);
-  put("description", record.description);
-  put("url", record.canonical ?? record.url);
-  put("image", record.image === null ? null : record.image.url);
-  put("author", record.author);
-  put("datePublished", record.datePublished === null ? null : record.datePublished.iso);
-  put("dateModified", record.dateModified === null ? null : record.dateModified.iso);
-  put("inLanguage", record.lang);
+  const { published, modified } = publicationDatesOf(doc);
+  const image = preferredImageOf(doc);
+  put(type === "WebPage" ? "name" : "headline", titleOf(doc));
+  put("description", descriptionOf(doc));
+  put("url", canonicalOf(doc) ?? doc.document.url);
+  put("image", image === null ? null : image.url);
+  put("author", authorOf(doc));
+  put("datePublished", published === null ? null : published.iso);
+  put("dateModified", modified === null ? null : modified.iso);
+  put("inLanguage", langOf(doc));
   return out;
 }
 
@@ -271,20 +280,30 @@ function serialize(data) {
  * (§22.2's rule, unchanged).
  *
  * @param {string} html - the page's emitted text, after §11's URL phases and §22
- * @param {import('./manifest.js').PageRecord} record - derived from THAT text
+ * @param {import('./manifest.js').BuildDocument} doc - derived from THAT text
  * @returns {{text: string, insertions: {at: number, length: number}[]}} the
  *   text to publish, and where bytes were added — §14.1's diagnostic locator
  *   indexes span tables computed BEFORE this ran, so it needs to undo them.
  */
-export function generateStructuredData(html, record) {
+export function generateStructuredData(html, doc) {
   const unchanged = { text: html, insertions: [] };
-  if (record.schemaType === null || !ACCEPTED.has(record.schemaType)) return unchanged;
   // §26.5's condition 2, document-wide: `jsonLd` is every `ld+json` block the
   // page emits, head or body (§20.3), a `<template>`'s contents excluded
   // (§20.2). Head-scoping it here would generate a second, contradicting block
   // onto a page that wrote its own after its content — which §24.4's
   // `metadata-in-body` says outright is where `ld+json` does its job.
-  if (record.jsonLd.length > 0) return unchanged;
+  if (doc.analysis.jsonLd.length > 0) return unchanged;
+  // Condition 1: the page's own `<meta name="schema">` declarations, first
+  // non-empty in document order, must name one of the three generated types.
+  // With `jsonLd` confirmed empty above, `declaredTypes(doc)` reduces to
+  // exactly the meta-declared types (its own ordering rule reads meta before
+  // JSON-LD) — reading it here rather than a second `metaValues(doc,
+  // "schema")` walk keeps this file from ever computing "the first declared
+  // type" a way `document-selectors.js` could disagree with. Do NOT restore a
+  // stored `schemaType` field merely because this needs one bounded value —
+  // the 0.9 model computes it here, at the one call site that needs it.
+  const type = declaredTypes(doc)[0] ?? null;
+  if (type === null || !ACCEPTED.has(type)) return unchanged;
 
   const { root } = parse(html);
   const head = findFirst(root, (n) => isElement(n, "head"));
@@ -310,7 +329,7 @@ export function generateStructuredData(html, record) {
   const eol = lead !== "" ? lead : (html.includes("\r\n") ? "\r\n" : "\n");
   const element = [
     '<script type="application/ld+json">',
-    ...serialize(structuredDataFor(record)).split("\n"),
+    ...serialize(structuredDataFor(doc, type)).split("\n"),
     "</script>",
   ].join(eol);
   // The element first, then the reused whitespace — so `</head>` keeps the
