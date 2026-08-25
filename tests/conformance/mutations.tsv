@@ -7,11 +7,11 @@ src/core/publish.js	publish-no-encode	return pathPrefix + encodePathSegments(rel
 src/core/publish.js	publish-encode-prefix	return pathPrefix + encodePathSegments(rel);	return encodePathSegments(pathPrefix) + encodePathSegments(rel);	§20.5: the --base-url prefix is authored as a URL and is never re-encoded
 src/core/references.js	ref-no-decode	const path = decodePathSegments(rawPath);	const path = rawPath;	REF-08: the spelling §20.5 publishes must resolve
 src/core/manifest.js	man-h1-double-decode	h1: orNull(headings.find((h) => h.level === 1)?.text ?? null),	h1: nonEmpty(headings.find((h) => h.level === 1)?.text ?? null),	§20.3: h1 must equal headings[0].text — one element, one string
-src/core/manifest.js	man-text-double-decode	  return readText(out);	  return readText(decodeEntities(out));	§20.3: decoding happens exactly once
-src/core/manifest.js	man-collapse-before-decode	function readText(raw) {\n  return collapse(decodeEntities(raw));	function readText(raw) {\n  return decodeEntities(collapse(raw));	§20.3: references resolve BEFORE whitespace collapses
-src/core/manifest.js	man-no-enter-separator	    if (separates) out += " ";\n    for (const child	    for (const child	§20.3: entering and leaving a non-inline element each contribute one space
-src/core/manifest.js	man-br-inline	"sub", "sup",	"br", "sub", "sup",	§20.3: <br> separates lines, so it separates words
-src/core/manifest.js	man-no-inline-list	const separates = node.type === "element" && !INLINE.has(tag);	const separates = node.type === "element";	§20.3: the inline set is closed and load-bearing
+src/core/document.js	man-text-double-decode	  return readText(out);	  return readText(decodeEntities(out));	§20.3: decoding happens exactly once
+src/core/document.js	man-collapse-before-decode	function readText(raw) {\n  return collapse(decodeEntities(raw));	function readText(raw) {\n  return decodeEntities(collapse(raw));	§20.3: references resolve BEFORE whitespace collapses
+src/core/document.js	man-no-enter-separator	    if (separates) out += " ";\n    for (const child	    for (const child	§20.3: entering and leaving a non-inline element each contribute one space
+src/core/document.js	man-br-inline	"sub", "sup",	"br", "sub", "sup",	§20.3: <br> separates lines, so it separates words
+src/core/document.js	man-no-inline-list	const separates = node.type === "element" && !INLINE.has(tag);	const separates = node.type === "element";	§20.3: the inline set is closed and load-bearing
 src/core/manifest.js	man-iso-loose-time	    if (Number(hh) > 23 \|\| Number(mm) > 59) return null;		§20.10: 24:00 and 23:60 are not times of day
 src/core/manifest.js	man-iso-loose-offset	      if (offsetMinutes > 59 \|\| offsetHours * 60 + offsetMinutes > 14 * 60) return null;		§20.10: the offset bound is ±14:00
 src/core/manifest.js	man-last-record-wins	for (const rec of drafts) if (!byOutputPath.has(rec.outputPath)) byOutputPath.set(rec.outputPath, rec);	for (const rec of drafts) byOutputPath.set(rec.outputPath, rec);	§20.1: a duplicated output path keeps the FIRST record, deterministically
