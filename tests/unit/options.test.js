@@ -65,10 +65,22 @@ describe("parseArgs", () => {
     expect(() => parseArgs(["--strict=yes"])).toThrow(UsageError);
   });
 
-  test("--search-index is a boolean flag, like --strict or --clean (§30.1)", () => {
-    expect(parseArgs(["--search-index"]).options["search-index"]).toBe(true);
-    expect(parseArgs([]).options["search-index"]).toBeUndefined();
-    expect(() => parseArgs(["--search-index=yes"])).toThrow(UsageError);
+  test("--catalog and --search-corpus are boolean flags, like --strict or --clean, and are independent of each other (§30.1)", () => {
+    expect(parseArgs(["--catalog"]).options.catalog).toBe(true);
+    expect(parseArgs([]).options.catalog).toBeUndefined();
+    expect(() => parseArgs(["--catalog=yes"])).toThrow(UsageError);
+
+    expect(parseArgs(["--search-corpus"]).options["search-corpus"]).toBe(true);
+    expect(parseArgs([]).options["search-corpus"]).toBeUndefined();
+    expect(() => parseArgs(["--search-corpus=yes"])).toThrow(UsageError);
+
+    const both = parseArgs(["--catalog", "--search-corpus"]).options;
+    expect(both.catalog).toBe(true);
+    expect(both["search-corpus"]).toBe(true);
+  });
+
+  test("--search-index is retired: unknown like any other removed option", () => {
+    expect(() => parseArgs(["--search-index"])).toThrow(UsageError);
   });
 });
 

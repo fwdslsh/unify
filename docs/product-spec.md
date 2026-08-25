@@ -274,7 +274,8 @@ Options:
       --base-url <url>     the site's whole address (https://site.example/repo/): prefix root-relative links, make og:/canonical absolute for share crawlers, and generate sitemap.xml and feed.xml
       --canonical auto     add a canonical link to pages that author none, from the site address
       --feed-full          include each entry's full rendered content in feed.xml (needs --base-url)
-      --search-index       write search-index.json for a client-side search library
+      --catalog            write assets/unify/catalog.json — a browse/filter/TOC projection of every public page
+      --search-corpus      write assets/unify/search-corpus.json — normalized page text for client-side search
       --generate <path>    run one JavaScript file from your source tree before the build
       --dry-run            run the full build and every check, print the report, write nothing
       --strict             advisories count as problems for the exit code (with `audit`, findings too)

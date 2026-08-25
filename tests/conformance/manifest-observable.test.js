@@ -10,11 +10,11 @@
  * `{source, generated, outputPath, document}` — the same envelope every
  * discovery feature reads (§6.1: one semantic source, no second extractor) —
  * so every one of these rules is now assertable from outside, against the
- * real binary, with nothing imported. `unify build --search-index` is the
- * second CLI surface used below: `search-index.json`'s `text` field is the
- * one place `analysis.visibleText` (private, never serialized on an audit
- * page) becomes externally observable, so the text-content rules route
- * through it instead.
+ * real binary, with nothing imported. `unify build --search-corpus` is the
+ * second CLI surface used below: `assets/unify/search-corpus.json`'s `text`
+ * field is the one place `analysis.visibleText` (private, never serialized on
+ * an audit page) becomes externally observable, so the text-content rules
+ * route through it instead.
  *
  * That makes the assertions here worth more than the ones they replace would
  * have been. A test importing `buildManifest` would pin the function; this pins
@@ -58,19 +58,20 @@ async function records(tmp, extraArgs = []) {
 }
 
 /**
- * Build the tree, `build --search-index`, and return `search-index.json`'s
- * pages keyed by `url` (root-relative, since no --base-url is passed here) —
- * the one CLI-observable projection of `analysis.visibleText`, which an audit
- * page never carries (§22 of the release brief: the private half is never
- * serialized). §30.3 folds a closed set of Unicode space separators, which is
- * irrelevant to every assertion below (none of them uses those codepoints).
+ * Build the tree, `build --search-corpus`, and return
+ * `assets/unify/search-corpus.json`'s pages keyed by `path` (root-relative,
+ * since no --base-url is passed here) — the one CLI-observable projection of
+ * `analysis.visibleText`, which an audit page never carries (§22 of the
+ * release brief: the private half is never serialized). §30.5 folds a closed
+ * set of Unicode space separators, which is irrelevant to every assertion
+ * below (none of them uses those codepoints).
  */
 async function searchTextByPath(tmp, extraArgs = []) {
-  const r = await runCli(["build", "-s", "src", "-o", "dist", "--search-index", ...extraArgs], tmp);
-  if (r.exit !== 0) throw new Error(`build --search-index failed (exit ${r.exit}):\n${r.stdout}\n${r.stderr}`);
-  const raw = readFileSync(join(tmp, "dist", "search-index.json"), "utf8");
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--search-corpus", ...extraArgs], tmp);
+  if (r.exit !== 0) throw new Error(`build --search-corpus failed (exit ${r.exit}):\n${r.stdout}\n${r.stderr}`);
+  const raw = readFileSync(join(tmp, "dist", "assets", "unify", "search-corpus.json"), "utf8");
   const doc = JSON.parse(raw);
-  return new Map(doc.pages.map((p) => [p.url, p]));
+  return new Map(doc.pages.map((p) => [p.path, p]));
 }
 
 const eq = (actual, expected, what) => {
@@ -143,7 +144,7 @@ test("MAN-02 — <template> contents are never scanned, and deriving the manifes
   if (!homeText.includes("Real text.")) throw new Error(`the surrounding text must still be read: ${homeText}`);
 
   // "deriving the manifest changes no output": the audited/indexed bytes come
-  // from the same build --search-index just ran, so its emitted page must
+  // from the same build --search-corpus just ran, so its emitted page must
   // still carry the template untouched.
   const emitted = readFileSync(join(tmp, "dist", "index.html"), "utf8");
   if (!emitted.includes("<template>")) throw new Error("the template must ship untouched");
