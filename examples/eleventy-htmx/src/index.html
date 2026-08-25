@@ -1,0 +1,39 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Redpoll river-level sensor</title>
+    <meta name="description" content="Redpoll is a solar river-level sensor built in Ashgrove: one ultrasonic head, one radio, and a year of battery in the dark.">
+  </head>
+  <body>
+    <main>
+      <h1>Redpoll</h1>
+      <p class="lede">A river-level sensor you can hang off a footbridge in twenty minutes and
+      leave there for a year.</p>
+
+      <p>Redpoll measures the distance to the water forty times a minute, keeps the median,
+      and sends one packet an hour over LoRaWAN. It runs from a 2&nbsp;W panel and a single
+      cell, it reports its own battery and tilt, and it stores its calibration on the board
+      so a replacement head can be swapped in on the bank without a laptop.</p>
+
+      <ul class="spec">
+        <li><strong>Range</strong> — 0.25&nbsp;m to 8&nbsp;m, ±3&nbsp;mm at 2&nbsp;m</li>
+        <li><strong>Power</strong> — 2&nbsp;W panel, 18650 cell, 14 months measured in shade</li>
+        <li><strong>Radio</strong> — LoRaWAN 1.0.4, EU868 or US915</li>
+        <li><strong>Housing</strong> — cast aluminium, IP67, 780&nbsp;g on the bracket</li>
+      </ul>
+
+      <p>Start with the <a href="/docs/quickstart.html">quickstart</a>, then
+      <a href="/docs/calibration.html">calibrate against a staff gauge</a>. Every firmware
+      and hardware change is written up in the <a href="/notes/index.html">release notes</a>.</p>
+
+      <section class="latest">
+        <h2>Latest releases</h2>
+        <!-- Spliced in at build time by unify. Eleventy wrote this file into the overlay;
+             unify treats it as an ordinary include, so the list is in the page before htmx
+             loads, with JavaScript off, and for every crawler. It is never fetched. -->
+        <include src="/latest.fragment.html"></include>
+        <p><a href="/notes/index.html">All releases</a></p>
+      </section>
+    </main>
+  </body>
+</html>

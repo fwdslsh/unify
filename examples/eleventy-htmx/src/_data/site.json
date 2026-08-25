@@ -1,0 +1,21 @@
+{
+  "name": "Ashgrove Instruments",
+  "latestOnHome": 3,
+  "topics": [
+    {
+      "slug": "firmware",
+      "label": "Firmware",
+      "blurb": "Firmware releases for the Redpoll sensor."
+    },
+    {
+      "slug": "hardware",
+      "label": "Hardware",
+      "blurb": "Enclosure, bracket and board revisions."
+    },
+    {
+      "slug": "field-notes",
+      "label": "Field notes",
+      "blurb": "Readings and observations from the river."
+    }
+  ]
+}
