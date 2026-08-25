@@ -882,11 +882,12 @@ Use plain unify when:
 
 - **Your pages are pages.** A marketing site, a documentation set, a portfolio, a handbook.
   `<include>` for shared chrome, `_layout.html` for the wrapper, `slot=` for the one section
-  that differs. `unify init docs` scaffolds it and passes both gates from the moment it exists.
+  that differs. `unify init docs` scaffolds exactly that, and `build --dry-run --strict` and
+  `audit --strict` both exit 0 on it before you have edited a line.
 - **You have one derived page** — an index, a list of five things. Write it by hand, or write
-  a fifteen-line generator that reads the frontmatter and emits it. `integrations.md` recipe 1
-  is a complete generator in twelve lines. Installing Eleventy to produce one index page is a
-  dependency, a lockfile, a config file and a build-time cost in exchange for a loop.
+  a short generator that reads the frontmatter and emits it — `integrations.md` recipe 1 is a
+  complete one in fourteen lines. Installing Eleventy to produce a single index page buys you
+  a dependency, a lockfile, a config file and a per-save subprocess in exchange for a loop.
 - **The data is small enough to ship in the page.** The `seed-library` example renders all 27
   varieties at build time and filters them with a small inline script: no request, so nothing
   can 404 at a subpath address and the page works from `file://`. That beats an htmx swap on
