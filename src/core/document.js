@@ -189,6 +189,7 @@ function attributesOf(el) {
  * @property {string} visibleText
  * @property {string[]} ids
  * @property {string[]} titleTexts
+ * @property {string[]} langTexts
  * @property {JsonLdEntry[]} jsonLd
  * @property {{tag:string, key:string|null}[]} strayMetadata
  * @property {string[]} rawHrefs
@@ -222,6 +223,8 @@ export function extractDocument(html, { path = null, url = null } = {}) {
   const base = [];
   const titleTexts = [];
   let title = null;
+  /** @type {string[]} every `<html>` element's non-empty `lang`, document-wide, in document order. */
+  const langTexts = [];
 
   /** @type {JsonLdEntry[]} */
   const jsonLd = [];
@@ -246,6 +249,15 @@ export function extractDocument(html, { path = null, url = null } = {}) {
     // "this page declares one id twice" is only answerable if both survive.
     const idAttr = nonEmpty(getAttr(node, "id"));
     if (idAttr !== null) ids.push(idAttr);
+
+    // Document-wide like `id`, not head-scoped: `manifest.js`'s own `lang`
+    // reading collects every `<html>` element it finds, and a second `<html>`
+    // (e.g. from a textual `<include>` of a full document) is a real,
+    // reachable shape this selector layer has to see the same way.
+    if (tag === "html") {
+      const lang = nonEmpty(getAttr(node, "lang"));
+      if (lang !== null) langTexts.push(lang);
+    }
 
     if (tag === "title") {
       if (inHead) {
@@ -339,6 +351,7 @@ export function extractDocument(html, { path = null, url = null } = {}) {
     visibleText: textContent(scope),
     ids,
     titleTexts,
+    langTexts,
     jsonLd,
     strayMetadata,
     rawHrefs,

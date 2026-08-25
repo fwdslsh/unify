@@ -24,6 +24,7 @@
  */
 
 import { decodeXmlEntities } from "./entities.js";
+import { classifyCanonicalValue } from "./document-selectors.js";
 import { findAll, innerText, parse } from "./html.js";
 import { isSkippedUrl, splitUrl } from "./urls.js";
 import { stripBaseUrl, resolveReference } from "./references.js";
@@ -119,35 +120,19 @@ export function isSelfCanonical(record, base) {
  *     names exactly that pairing — `noindex` plus an off-site canonical, and a
  *     sitemap advertising a URL whose canonical points away from it.
  *
+ * The four-state core this delegates to, `classifyCanonicalValue(canonical,
+ * outputPath, base)`, lives in `document-selectors.js` so a caller holding a
+ * value and an output path (no `PageRecord` needed — a doc-level selector,
+ * for instance) can ask the same question. This wrapper is a one-line
+ * adapter kept for every existing `PageRecord`-shaped caller; the
+ * classification logic itself, and the history behind it, moved with it —
+ * see `classifyCanonicalValue`'s own docstring there.
  * @param {import('./manifest.js').PageRecord} record
  * @param {import('./urls.js').BaseUrlConfig|null} base
  * @returns {'none'|'self'|'elsewhere'|'unknown'}
  */
 export function classifyCanonical(record, base) {
-  if (record.canonical === null) return "none";
-
-  // ONE owner for "is this URL on this site?" — `stripBaseUrl`, which parses.
-  // It returns a path for this site, in every spelling of the address
-  // (`HTTPS://EXAMPLE.COM/x`, `https://EXAMPLE.com/x`, `//example.com/x`,
-  // `http://example.com/x`, `https://example.com:443/x` are all this page by
-  // RFC 3986 §6.2.2.1 and §6.2.3), and the URL untouched for any other host.
-  // So a value still carrying an authority HERE is, by that function's own
-  // answer, another site.
-  //
-  // This block used to parse the URL a second time and compare hosts itself.
-  // That was written before §12's own comparison was fixed, and mutation
-  // testing then showed the two agreeing on every input — a second
-  // interpretation of a question §12 already answers, which is the defect
-  // product-spec §6.1 exists to forbid rather than a safety net. What is
-  // load-bearing is the *classification*: without this line an off-origin
-  // canonical reads as `unknown`, and neither finding fires.
-  const stripped = base ? stripBaseUrl(record.canonical, base) : record.canonical;
-  if (base && /^([a-z][a-z0-9+.-]*:)?\/\//i.test(stripped)) return "elsewhere";
-
-  if (isSkippedUrl(stripped)) return "unknown";
-  const target = resolveReference(stripped, record.outputPath);
-  if (target === null) return "unknown";
-  return target === record.outputPath ? "self" : "elsewhere";
+  return classifyCanonicalValue(record.canonical, record.outputPath, base);
 }
 
 /** The two schemes a page is served under. Nothing else is comparable. */
@@ -179,6 +164,15 @@ const WEB_SCHEMES = new Set(["http:", "https:"]);
  * one canonical has one answer. Not a partition of the three — canonical-noindex
  * and sitemap-canonical-disagree share the `elsewhere` branch and a page can
  * collect both.
+ *
+ * Unlike `classifyCanonical`, this function's own body stays here rather
+ * than being split into a value-level core in `document-selectors.js`: it is
+ * not one of that module's doc-level selectors, and extracting a
+ * `canonicalSchemeMismatchValue(canonical, outputPath, base)` today would
+ * need to drag `WEB_SCHEMES`/`schemeOf` — both sitemap-local — along with it,
+ * for a core no other consumer would call. It already delegates its host
+ * question to `classifyCanonical` above, which *is* now backed by the
+ * relocated core, so it is not a second reading of that question either.
  *
  * @param {import('./manifest.js').PageRecord} record
  * @param {import('./urls.js').BaseUrlConfig|null} base

@@ -35,10 +35,16 @@
 
 import { decodeEntities } from "./entities.js";
 import { nonEmpty, orNull, readText, textContent } from "./document.js";
+import { declaredType, intOrNull, isoDate, parseRobotsValue } from "./document-selectors.js";
 import { findAll, findFirst, getAttr, innerText, isElement, isInside, isJsonLdScript, parse } from "./html.js";
 import { urlForOutputPath } from "./publish.js";
 import { isSkippedUrl, parseRefreshMeta, splitUrl } from "./urls.js";
 import { stripBaseUrl, resolveReference } from "./references.js";
+
+// `isoDate` now lives in document-selectors.js; re-exported here so existing
+// importers (tests/unit/core/manifest.test.js among them) keep resolving it
+// from this module until they are migrated to import it directly.
+export { isoDate };
 
 /**
  * @typedef {object} DateValue
@@ -123,60 +129,10 @@ function decodeURIComponentSafe(s) {
   }
 }
 
-/**
- * §6.3.6's date rule, isolated so no consumer re-implements it: a value is a
- * date only when it is written as a W3C/ISO 8601 date or date-time AND names
- * a real calendar day. Everything else is `null` — the build clock, the
- * filesystem, the filename, and Git history are not fallbacks and are never
- * consulted anywhere in this module.
- * @param {unknown} raw
- * @returns {string|null} the trimmed value when valid, else null
- */
-export function isoDate(raw) {
-  if (typeof raw !== "string") return null;
-  const s = raw.trim();
-  // W3C-DTF exactly (§20.10): the literal `T`, and a time-zone designator
-  // whenever a time is present. A space separator and a bare local time are
-  // the two forms other tools accept and this one must not — each is invalid
-  // wherever unify would emit it (a sitemap <lastmod>, a JSON-LD dateModified).
-  const m = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(Z|[+-]\d{2}:\d{2}))?$/.exec(s);
-  if (!m) return null;
-  const [, y, mo, d, hh, mm, ss, tzd] = m;
-  const year = Number(y), month = Number(mo), day = Number(d);
-  if (month < 1 || month > 12 || day < 1) return null;
-  // Real calendar day, leap years included: Date.UTC normalizes an overflow
-  // (2026-02-30 → March 2), so comparing the parts back is the check.
-  const dt = new Date(Date.UTC(year, month - 1, day));
-  if (dt.getUTCFullYear() !== year || dt.getUTCMonth() !== month - 1 || dt.getUTCDate() !== day) return null;
-  if (hh !== undefined) {
-    if (Number(hh) > 23 || Number(mm) > 59) return null;
-    if (ss !== undefined && Number(ss) > 59) return null;
-    if (tzd !== "Z") {
-      const offsetHours = Number(tzd.slice(1, 3));
-      const offsetMinutes = Number(tzd.slice(4, 6));
-      if (offsetMinutes > 59 || offsetHours * 60 + offsetMinutes > 14 * 60) return null;
-    }
-  }
-  return s; // verbatim, never normalized — reformatting is an edit to content
-}
-
 /** A `{raw, iso}` date value, or null when nothing was declared (§20.3). */
 function dateValue(raw) {
   const value = nonEmpty(raw);
   return value === null ? null : { raw: value, iso: isoDate(value) };
-}
-
-/**
- * An integer-valued dimension, or null — never a coercion (§20.3). Bounded at
- * the safe-integer ceiling: a twenty-digit `content` is not a pixel count, and
- * emitting the float it silently becomes would be a value the page never
- * declared.
- */
-function intOrNull(raw) {
-  const v = nonEmpty(raw);
-  if (v === null || !/^\d+$/.test(v)) return null;
-  const n = Number(v);
-  return Number.isSafeInteger(n) ? n : null;
 }
 
 /**
@@ -214,31 +170,6 @@ function parseRobots(values) {
   // two booleans are computed from the whole set.
   const raw = values.length === 0 ? null : values.join(", ");
   return parseRobotsValue(raw);
-}
-
-function parseRobotsValue(raw) {
-  if (raw === null) return { raw: null, directives: [], indexable: true, followable: true };
-  const directives = raw.split(",").map((t) => t.trim().toLowerCase()).filter(Boolean);
-  return {
-    raw,
-    directives,
-    indexable: !directives.includes("noindex") && !directives.includes("none"),
-    followable: !directives.includes("nofollow") && !directives.includes("none"),
-  };
-}
-
-/**
- * §20.8 — `schemaType` reads a *single object's string* `@type` and nothing
- * else. An array, a `@graph`, a missing `@type`, or a non-string `@type`
- * declares nothing: bounded reading, because guessing which entity of a graph
- * "is" the page is exactly the invented-fact class product-spec §6.1 forbids.
- * @param {any} data
- * @returns {string|null}
- */
-function declaredType(data) {
-  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
-  const t = data["@type"];
-  return typeof t === "string" && t.trim() !== "" ? t.trim() : null;
 }
 
 /**
