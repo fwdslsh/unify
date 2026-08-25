@@ -244,13 +244,46 @@ Runs one JavaScript file from your source tree before the build scans anything. 
 
 It names a **file**, never a command. There is no shell, no argument list, and no way to say "and then run this other thing" — a path is something you wrote and can read. The path resolves against the source root and must stay inside it.
 
-The whole interface is two positional arguments:
+The whole interface is three positional arguments:
 
 ```js
-const [, , sourceRoot, generatedDir] = process.argv;
+const [, , sourceRoot, generatedDir, contextPath] = process.argv;
 ```
 
 `sourceRoot` is your source tree; `generatedDir` is an empty directory that exists only for this build. Files written into `generatedDir` join the build as an overlay — scanned, composed, checked, published, and colliding with a same-named source file exactly like any other page. Files written anywhere else are your own business. There is no unify module to import, no object passed in, and no return value read.
+
+`contextPath` is new in 0.9 and additive: a generator written before it existed, reading only `sourceRoot`/`generatedDir`, keeps working exactly as it did. It names a JSON file — read-only, yours to consult or ignore — that tells you the handful of build facts unify is willing to promise as a stable contract:
+
+```json
+{
+  "schemaVersion": 1,
+  "unifyVersion": "0.9.0",
+  "command": "build",
+  "paths": {
+    "sourceRoot": "/project/src",
+    "generatedRoot": "/tmp/unify-generated-abc123/overlay",
+    "outputRoot": "/project/dist"
+  },
+  "site": {
+    "baseUrl": "https://example.com/docs/",
+    "prettyUrls": true,
+    "canonical": "auto"
+  },
+  "outputs": {
+    "catalog": "assets/unify/catalog.json",
+    "searchCorpus": null
+  }
+}
+```
+
+```js
+const context = JSON.parse(readFileSync(process.argv[4], "utf8"));
+if (context.site.baseUrl) {
+  // build absolute URLs the same way the rest of the site does
+}
+```
+
+`schemaVersion` starts at `1` and only bumps when a field's meaning changes in a way an existing reader would misread — a new field showing up is not a bump, so pinning to `schemaVersion === 1` is safe across 0.9 releases. `command` is the subcommand actually running (`build`/`dev`/`watch`/`audit` — `audit` runs generators too). `site.baseUrl` is `--base-url`'s effective, fully-resolved value (or `null` without the flag) — never the raw string you passed. `outputs.catalog`/`outputs.searchCorpus` are the paths those files will land at, output-root-relative, or `null` when the matching flag is off — the paths only, since neither file's *content* exists yet at this point in the build. There's nothing else in it: no settings dump, no environment, no manifest (the build hasn't scanned anything yet, so there's nothing to report). The file is temporary — gone by the time the build finishes, success or failure — so read it during the generator's own run and don't expect it to still be there afterward.
 
 **Your generated files and your source files share one set of paths.** A file is known by its path inside whichever directory it was written to, so `docs/api.md` means the same page whether you typed it into `src/docs/` or your script wrote it into `generatedDir`. Everything follows from that:
 

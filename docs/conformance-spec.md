@@ -2304,9 +2304,12 @@ The path is resolved against the source root and must stay inside it (§4.3's co
 ```
 process.argv[2] = the absolute path of the source root
 process.argv[3] = the absolute path of the generated directory
+process.argv[4] = the absolute path of generator-context.json
 ```
 
-That is the interface. There is no unify module to import, no object passed in, no return value read, and no callback. The generator writes files into `process.argv[3]` and returns; anything it writes anywhere else is its own business and unify neither collects nor notices it (§33.6).
+`argv[4]` is additive. It was not part of the original two-argument contract, and it does not change what `argv[2]`/`argv[3]` are or where they sit: a generator written against the two-argument contract — one that reads only those two positions and never looks past them — keeps working exactly as it did before this argument existed. Nothing about the seam becomes mandatory ceremony by its addition.
+
+Otherwise the interface is unchanged. There is no unify module to import, no object passed in, no return value read, and no callback. The generator writes files into `process.argv[3]`, may read `process.argv[4]`, and returns; anything it writes anywhere else is its own business and unify neither collects nor notices it (§33.6).
 
 The working directory is the **source root**, so `./_data/authors.json` in a generator means what an author reading the source tree would expect.
 
@@ -2319,6 +2322,50 @@ The working directory is the **source root**, so `./_data/authors.json` in a gen
 - **Every rebuild re-runs it.** Watch mode is full rebuilds only (§16), and a module cache that returned the first build's copy would make every rebuild after the first silently skip the generator — the site would go stale while the build reported success. A new process has no module cache to consult, so the requirement holds structurally. It cannot be met by loading the generator in-process behind a cache-busting query string: a runtime is free to ignore the query when caching a file URL, and Bun does, which makes that spelling a no-op that reports success.
 
 The subprocess is therefore part of the contract and not an implementation detail. An implementation that loads the generator in-process satisfies none of the three: it hands `process.exit()` the build's own exit code, it has no separate stderr to locate P29 from, and it must invent a cache defeat that the runtime is entitled to ignore.
+
+**`generator-context.json`, the file `process.argv[4]` names, is a versioned, read-only snapshot of the handful of build facts unify is willing to publish as a stable machine contract.** unify writes it once per generator run — before invoking the generator, alongside (never inside) the generated directory `argv[3]` names — and it is exactly this shape, key order included:
+
+```json
+{
+  "schemaVersion": 1,
+  "unifyVersion": "0.9.0",
+  "command": "build",
+  "paths": {
+    "sourceRoot": "/project/src",
+    "generatedRoot": "/tmp/unify-generated-abc123/overlay",
+    "outputRoot": "/project/dist"
+  },
+  "site": {
+    "baseUrl": "https://example.com/docs/",
+    "prettyUrls": true,
+    "canonical": "auto"
+  },
+  "outputs": {
+    "catalog": "assets/unify/catalog.json",
+    "searchCorpus": null
+  }
+}
+```
+
+| Field | Type | Content |
+|---|---|---|
+| `schemaVersion` | number | `1`. See the versioning rule below |
+| `unifyVersion` | string | the running unify's own version (`package.json`'s `version`, the same source `--version` reads) — accurate under `bun`, `node`, and the compiled binary alike |
+| `command` | `"build"` \| `"dev"` \| `"watch"` \| `"audit"` | the subcommand actually running this build or rebuild — `audit` runs generators too (§24.2's read-only guarantee is about what `audit` *writes*, not about whether it runs the generator seam) |
+| `paths.sourceRoot` | string | absolute path, identical to `argv[2]` |
+| `paths.generatedRoot` | string | absolute path, identical to `argv[3]` |
+| `paths.outputRoot` | string | absolute path of this build's output directory |
+| `site.baseUrl` | string \| null | `--base-url`'s effective value, `${base.origin}${base.pathPrefix}` (§11.3) — the identical construction `catalog.json` (§30) and `audit --format json` (§31.1) already use — or `null` when the flag was not given. Never the raw flag string |
+| `site.prettyUrls` | boolean | whether `--pretty-urls` (§11.2) is in effect |
+| `site.canonical` | `"auto"` \| null | `--canonical auto`'s value, or `null` |
+| `outputs.catalog` | string \| null | `assets/unify/catalog.json`, output-root-relative, when `--catalog` is set; `null` otherwise |
+| `outputs.searchCorpus` | string \| null | `assets/unify/search-corpus.json`, output-root-relative, when `--search-corpus` is set; `null` otherwise |
+
+**Versioning.** The context carries its own `schemaVersion`, independent of `unifyVersion`, starting at `1`. A field's meaning or shape changing in a way an existing reader would misread is what bumps it — reusing `command`'s existing values for a new meaning, for instance, or changing `site.baseUrl` from a string to an object. Adding a new field, or a new value to a closed set like `command`'s, is additive within the same `schemaVersion`, exactly as `argv[4]` itself was additive to the two-argument contract above: a generator reading `schemaVersion 1` today keeps reading a valid `schemaVersion 1` document as this contract grows, the same guarantee `argv[2]`/`argv[3]` already make for a generator that predates `argv[4]` entirely.
+
+**Lifecycle.** The context file is temporary build state, not a build artifact: it lives in the same per-build temporary location as the generated directory, is a read-only input as far as the generator is concerned (unify never reads it back), and is deleted with the rest of the build's generator state — on a successful run, on a P29 failure, and on every path in between — never surviving to be published, never appearing in `dist/` or in a `--dry-run` row (§33.3's origin marking is about generated *pages*, and this is not one). §16's full-rebuilds-only rule gives a fresh context, matching a fresh overlay, on every rebuild for free — the same file at the same relative position, its `paths.generatedRoot` and effective `site`/`outputs` values current as of that rebuild's own settings, never a stale copy from an earlier one.
+
+**The boundary is the same one §33.6 restates for the seam as a whole, sharpened for this one file: stable machine-contract fields only.** The table above is the complete set unify is willing to promise; nothing else about a running build is exposed through it. No environment variables, no secrets, no reporter or parser object, no internal callback, no mutable build state, no intermediate page collection, and no internal option name that isn't one of these fields' own — the context is built from exactly the parameters above, never from a serialized `settings` object, so nothing about unify's own internals can leak through by accident as the CLI's option surface grows. Most pointedly, **no manifest field appears here, because at the point this file is written the manifest does not exist yet**: §33.5's ordering is unchanged by this file's addition — the generator, and therefore the context it reads, still runs before §2 step 1, the scan, so there is no composed page, no `BuildDocument`, no catalog or search-corpus *content* (only the two output-root-relative *paths* those artifacts will land at, which are computable from flags alone) for this file to describe.
 
 ### 33.3 The overlay
 
