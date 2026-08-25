@@ -141,11 +141,11 @@ jobs:
           set -euo pipefail
           bun src/cli.js build -s examples/unify-docs/src -o /tmp/unify-docs \
             --generate _scripts/gen.mjs --pretty-urls \
-            --base-url https://unify.fwdslsh.dev/ --canonical auto --search-index \
+            --base-url https://unify.fwdslsh.dev/ --canonical auto --catalog --search-corpus \
             --dry-run --strict
           bun src/cli.js audit -s examples/unify-docs/src \
             --generate _scripts/gen.mjs --pretty-urls \
-            --base-url https://unify.fwdslsh.dev/ --canonical auto --search-index \
+            --base-url https://unify.fwdslsh.dev/ --canonical auto --catalog --search-corpus \
             --strict
 
   # G13, the half that needs a package install. Deliberately run on NODE:

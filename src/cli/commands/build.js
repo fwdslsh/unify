@@ -61,7 +61,8 @@ import { buildManifest } from "../../core/manifest.js";
 import { auditManifest, formatFindings } from "../../core/audit.js";
 import * as sitemap from "../../core/sitemap.js";
 import * as feed from "../../core/feed.js";
-import * as searchIndex from "../../core/search-index.js";
+import * as catalog from "../../core/catalog.js";
+import * as searchCorpus from "../../core/search-corpus.js";
 import { completeCanonical } from "../../core/canonical.js";
 import { checkSchemaDeclarations, generateStructuredData } from "../../core/structured-data.js";
 import * as robots from "../../core/robots.js";
@@ -498,17 +499,45 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
   });
   for (const [outPath, text] of generatedFeed) tempFiles.set(outPath, text);
 
-  // ---- §30 — the search manifest, the manifest's third projection. --------
-  // Unlike sitemap/feed, activation is the flag ALONE (§30.1) — nothing about
-  // a page declares "index me", so there is no document-derived condition to
-  // check the way `generateSitemap`/`generateFeed` check `base`/declared type.
-  // Unconditional on `baseConfig`: `searchIndexEntry` already falls back to
-  // `doc.document.path` with no --base-url (§30.2), so gating this on `base`
-  // would make the flag useless for the local-preview case it exists for.
-  const generatedSearchIndex = settings.searchIndex
-    ? searchIndex.generateSearchIndex({ documents: manifest.documents, base: baseConfig, emittedFromSource })
+  // ---- §30 — the catalog and the search corpus, the manifest's third and
+  // fourth projections. ------------------------------------------------------
+  // Unlike sitemap/feed, activation is each flag ALONE (§30.1) — nothing
+  // about a page declares "catalog me" or "index me", so there is no
+  // document-derived condition to check the way `generateSitemap`/
+  // `generateFeed` check `base`/declared type. Unconditional on `baseConfig`:
+  // both projections read `doc.document.path`/`.url`, which already fall
+  // back correctly with no --base-url, so gating either on `base` would make
+  // the flag useless for the local-preview case it exists for. Independent
+  // of each other too — `--search-corpus` does not imply `--catalog`.
+  const catalogAncestorConflict = settings.catalog
+    ? generatedPathAncestorConflict(catalog.CATALOG_PATH, emittedFromSource)
+    : null;
+  if (catalogAncestorConflict) {
+    reporter.problem({
+      file: catalogAncestorConflict.source,
+      message: `${catalogAncestorConflict.source} occupies ${catalogAncestorConflict.ancestor}, which ${catalog.CATALOG_PATH} needs as a directory`,
+      fixes: ["rename or move this file so the assets/unify/ path is free to be a directory, or drop --catalog"],
+    });
+  }
+  const generatedCatalog = settings.catalog && !catalogAncestorConflict
+    ? catalog.generateCatalog({ documents: manifest.documents, base: baseConfig, emittedFromSource })
     : new Map();
-  for (const [outPath, text] of generatedSearchIndex) tempFiles.set(outPath, text);
+  for (const [outPath, text] of generatedCatalog) tempFiles.set(outPath, text);
+
+  const corpusAncestorConflict = settings.searchCorpus
+    ? generatedPathAncestorConflict(searchCorpus.SEARCH_CORPUS_PATH, emittedFromSource)
+    : null;
+  if (corpusAncestorConflict) {
+    reporter.problem({
+      file: corpusAncestorConflict.source,
+      message: `${corpusAncestorConflict.source} occupies ${corpusAncestorConflict.ancestor}, which ${searchCorpus.SEARCH_CORPUS_PATH} needs as a directory`,
+      fixes: ["rename or move this file so the assets/unify/ path is free to be a directory, or drop --search-corpus"],
+    });
+  }
+  const generatedSearchCorpus = settings.searchCorpus && !corpusAncestorConflict
+    ? searchCorpus.generateSearchCorpus({ documents: manifest.documents, base: baseConfig, emittedFromSource })
+    : new Map();
+  for (const [outPath, text] of generatedSearchCorpus) tempFiles.set(outPath, text);
 
   // ---- §12 — the reference check, against the completed temp tree. --------
   const htmlFiles = new Map();
@@ -601,10 +630,10 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
     });
   }
 
-  // §12's second fix line for the three generated root names. Computed here,
-  // not in references.js, because only this loop knows WHY a file was not
-  // generated this run — and only for names absent from the output, so a
-  // build that emitted (or shipped an authored) file never consults it.
+  // §12's second fix line for the four generated paths (REF-04). Computed
+  // here, not in references.js, because only this loop knows WHY a file was
+  // not generated this run — and only for paths absent from the output, so
+  // a build that emitted (or shipped an authored) file never consults it.
   const wouldGenerate = new Map();
   if (!tempFiles.has(feed.FEED_PATH)) {
     const candidates = manifest.documents.some((doc) => feed.isFeedCandidate(doc));
@@ -619,9 +648,13 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
     wouldGenerate.set(sitemap.SITEMAP_PATH,
       "sitemap.xml is generated, not authored: this build generates it only under --base-url");
   }
-  if (!tempFiles.has(searchIndex.SEARCH_INDEX_PATH) && settings.searchIndex !== true) {
-    wouldGenerate.set(searchIndex.SEARCH_INDEX_PATH,
-      "search-index.json is generated, not authored: this build generates it only under --search-index");
+  if (!tempFiles.has(catalog.CATALOG_PATH) && settings.catalog !== true) {
+    wouldGenerate.set(catalog.CATALOG_PATH,
+      "assets/unify/catalog.json is generated, not authored: this build generates it only under --catalog");
+  }
+  if (!tempFiles.has(searchCorpus.SEARCH_CORPUS_PATH) && settings.searchCorpus !== true) {
+    wouldGenerate.set(searchCorpus.SEARCH_CORPUS_PATH,
+      "assets/unify/search-corpus.json is generated, not authored: this build generates it only under --search-corpus");
   }
 
   references.checkReferences({
@@ -776,14 +809,20 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
         url: publishModule.urlForOutputPath(outPath, prefix),
         from: "generated (--base-url)",
       })),
-      // §30.4 — likewise, named for the flag that actually produced it rather
-      // than --base-url: §30.1/§30.2 activate on --search-index alone, with
-      // or without a site address.
-      ...[...generatedSearchIndex.keys()].map((outPath) => ({
+      // §30.6 — likewise, named for the flag that actually produced each one
+      // rather than --base-url: activation is `--catalog`/`--search-corpus`
+      // alone, with or without a site address.
+      ...[...generatedCatalog.keys()].map((outPath) => ({
         action: "write",
         outputPath: `${displayOutput}/${outPath}`,
         url: publishModule.urlForOutputPath(outPath, prefix),
-        from: "generated (--search-index)",
+        from: "generated (--catalog)",
+      })),
+      ...[...generatedSearchCorpus.keys()].map((outPath) => ({
+        action: "write",
+        outputPath: `${displayOutput}/${outPath}`,
+        url: publishModule.urlForOutputPath(outPath, prefix),
+        from: "generated (--search-corpus)",
       })),
       ...plan.delete.map((rel) => ({ action: "delete", outputPath: `${displayOutput}/${rel}` })),
     ];
@@ -1053,6 +1092,30 @@ function makeReferenceLocator(
  */
 function shouldPublish(reporter) {
   return reporter.canPublish;
+}
+
+/**
+ * §30.6/§13 — a generated path that sits under a directory (only
+ * `assets/unify/catalog.json`/`search-corpus.json` do; every earlier
+ * generated file sat at the output root, where the directory always
+ * exists) can have one of its own ancestor segments already occupied by an
+ * ordinary authored file — `mkdir`ing over it during publish would throw a
+ * raw, unlocated errno. Checked against `emittedFromSource`, which already
+ * holds every authored file's own output path before either generator
+ * runs, so an authored `assets/unify` (no extension) or `assets` blocks
+ * `assets/unify/catalog.json` here, located at the source file that holds
+ * the path.
+ * @param {string} generatedPath
+ * @param {Map<string,string>} emittedFromSource
+ * @returns {{ancestor: string, source: string}|null}
+ */
+function generatedPathAncestorConflict(generatedPath, emittedFromSource) {
+  const segments = generatedPath.split("/");
+  for (let i = 1; i < segments.length; i++) {
+    const ancestor = segments.slice(0, i).join("/");
+    if (emittedFromSource.has(ancestor)) return { ancestor, source: emittedFromSource.get(ancestor) };
+  }
+  return null;
 }
 
 // ------------------------------------------------------------- per-page build

@@ -20,7 +20,8 @@ Options:
       --canonical auto     add a canonical link to pages that author none, from the site address
       --base-url <url>     the site's whole address (https://site.example/repo/): prefix root-relative links, make og:/canonical absolute for share crawlers, and generate sitemap.xml
       --feed-full          include each entry's full rendered content in feed.xml (needs --base-url)
-      --search-index       write search-index.json for a client-side search library
+      --catalog            write assets/unify/catalog.json — a browse/filter/TOC projection of every public page
+      --search-corpus      write assets/unify/search-corpus.json — normalized page text for client-side search
       --generate <path>    run one JavaScript file from your source tree before the build
       --dry-run            run the full build and every check, print the report, write nothing
       --strict             advisories count as problems for the exit code (with `audit`, findings too)
@@ -178,20 +179,64 @@ Each entry's `<id>` and `<link>` are the page's own canonical (authored, or comp
 
 If your source tree already contains a `feed.xml`, that file **is** the site's feed: unify ships it untouched and generates nothing, exactly as it treats an authored `sitemap.xml`. The `blog` template's own generator writes one for this reason.
 
-## Search manifest (`search-index.json`)
+## Catalog (`catalog.json`)
 
-`--search-index` writes `search-index.json` at the output root — a flat, standard document a client-side search library (or an external indexer) can read instead of re-parsing your site. Unlike the sitemap or the feed, this is a plain flag: nothing about a page declares "index me", so it runs with or without `--base-url` (URLs are root-relative without one, absolute with).
+`--catalog` writes `assets/unify/catalog.json` — a compact, HTML-shaped projection of every public page, meant for browse/filter/TOC/metadata-driven UI: blog listings, tag facets, a command palette, a page chooser. It is a plain flag, independent of `--search-corpus` and of the sitemap and the feed: it runs with or without `--base-url` (`path` is root-relative without one, `url` is absolute with).
+
+```json
+{
+  "schemaVersion": 1,
+  "baseUrl": "https://example.com/",
+  "pages": [
+    {
+      "path": "/posts/unify-and-htmx/",
+      "url": "https://example.com/posts/unify-and-htmx/",
+      "html": { "attributes": { "lang": "en" } },
+      "head": {
+        "title": "Unify and HTMX",
+        "meta": [
+          { "name": "description", "content": "A practical static-site architecture." },
+          { "name": "tags", "content": "unify" },
+          { "name": "tags", "content": "htmx" }
+        ],
+        "link": [{ "rel": "canonical", "href": "https://example.com/posts/unify-and-htmx/" }],
+        "base": []
+      },
+      "body": {
+        "attributes": { "class": "post" },
+        "headings": [{ "level": 1, "id": "unify-and-htmx", "text": "Unify and HTMX" }]
+      }
+    }
+  ]
+}
+```
+
+`head.meta`/`head.link`/`head.base` are every element of that kind, in document order, attributes preserved whole — arbitrary `tags:`/`series:`/`audience:` frontmatter shows up here exactly as the equivalent hand-written `<meta>` would, repeats and all. There is no body text and no JSON-LD in this file: a long article grows the corpus below, not this one, and a JSON-LD block can itself be as large as an article, so neither belongs in a record meant to stay bounded per page.
+
+Membership is the sitemap's own rule: `noindex`/`none` pages, `404.html`, and pages consolidated elsewhere by their own canonical are left out — the identical set `search-corpus.json` uses, so the two files always describe the same pages.
+
+If your source tree already contains `assets/unify/catalog.json`, that file is the site's catalog: unify ships it untouched and generates nothing.
+
+## Search corpus (`search-corpus.json`)
+
+`--search-corpus` writes `assets/unify/search-corpus.json` — the normalized text a client-side search implementation indexes however it likes. It does **not** imply `--catalog`; pass both for a full search UI:
+
+```bash
+unify dev --catalog --search-corpus
+```
 
 ```json
 {
   "schemaVersion": 1,
   "pages": [
-    { "url": "/about.html", "title": "About — Example", "description": "Who we are.", "headings": [{ "level": 1, "text": "About", "id": "about" }], "text": "About Who we are and what we do." }
+    { "path": "/posts/unify-and-htmx/", "text": "Unify and HTMX A practical static-site architecture…" }
   ]
 }
 ```
 
-Membership is the same rule as the sitemap and `--canonical auto`: `noindex`/`none` pages, `404.html`, and pages consolidated elsewhere by their own canonical are left out. `text` is the page's visible main content, with every Unicode space character (`&nbsp;` included) folded to an ordinary space so a search box comparing a typed query against it can actually match — nothing else is touched: no case folding, no stemming, no stop-word removal, no truncation, no character count. An authored `search-index.json` in your source tree ships untouched, the same rule feeds and sitemaps follow.
+Deliberately minimal: no `url`, `title`, `headings`, or metadata — those already live in `catalog.json`, keyed by the same `path`, so a result joins back with `catalogByPath.get(hit.path)`. `text` is the page's visible main content, with every Unicode space character (`&nbsp;` included) folded to an ordinary space so a search box comparing a typed query against it can actually match — nothing else is touched: no case folding, no stemming, no stop-word removal, no truncation, no character count.
+
+Same membership as the catalog, same author-wins rule: a `src/assets/unify/search-corpus.json` you wrote ships untouched.
 
 ### `--generate <path>`
 

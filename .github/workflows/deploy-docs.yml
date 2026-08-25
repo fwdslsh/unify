@@ -66,20 +66,20 @@ jobs:
         run: |
           bun src/cli.js build -s examples/unify-docs/src -o examples/unify-docs/dist \
             --generate _scripts/gen.mjs --pretty-urls \
-            --base-url "$SITE_BASE_URL" --canonical auto --search-index \
+            --base-url "$SITE_BASE_URL" --canonical auto --catalog --search-corpus \
             --dry-run --strict
       - name: Verify — audit --strict
         run: |
           bun src/cli.js audit -s examples/unify-docs/src \
             --generate _scripts/gen.mjs --pretty-urls \
-            --base-url "$SITE_BASE_URL" --canonical auto --search-index \
+            --base-url "$SITE_BASE_URL" --canonical auto --catalog --search-corpus \
             --strict
 
       - name: Build
         run: |
           bun src/cli.js build -s examples/unify-docs/src -o examples/unify-docs/dist \
             --generate _scripts/gen.mjs --pretty-urls --clean \
-            --base-url "$SITE_BASE_URL" --canonical auto --search-index --strict
+            --base-url "$SITE_BASE_URL" --canonical auto --catalog --search-corpus --strict
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

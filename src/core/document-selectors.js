@@ -26,8 +26,8 @@
  *    interpretation layer every built-in consumer now reads a page's facts
  *    through: `manifest.js` (assembling `analysis`/provenance), `audit.js`
  *    (every finding predicate), `canonical.js`, `feed.js`,
- *    `structured-data.js`, `sitemap.js`, `dev-report.js`, and
- *    `search-index.js`. A selector that needs the page's output path
+ *    `structured-data.js`, `sitemap.js`, `dev-report.js`, `catalog.js`, and
+ *    `search-corpus.js`. A selector that needs the page's output path
  *    (`isPublicDestination`) reads it off `envelope.outputPath` — a field
  *    `extractDocument` (`document.js`) does not produce itself but the
  *    `BuildDocument` envelope carries alongside `document`/`analysis`.

@@ -539,7 +539,8 @@ function checkOne({ raw, offset }, containingOutputPath, { base, emittedPaths, u
     context: stripped,
     // §12 — one target earns a second fix line: a root name this build WOULD
     // generate under other conditions (feed.xml, sitemap.xml,
-    // search-index.json). The standing line is wrong on both counts there —
+    // assets/unify/catalog.json, assets/unify/search-corpus.json). The
+    // standing line is wrong on both counts there —
     // the spelling is right and no source file is missing — and round 27
     // watched two authors, told to check a correct spelling, ship `../feed.xml`
     // and a build-twice theory respectively. build.js owns the condition text,
