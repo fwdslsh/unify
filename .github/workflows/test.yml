@@ -181,3 +181,19 @@ jobs:
             --generate _scripts/eleventy.mjs --pretty-urls --dry-run --strict
           node src/cli.js audit -s examples/eleventy-htmx/src \
             --generate _scripts/eleventy.mjs --pretty-urls --strict
+
+  # Always-on gate G14: the CHANGELOG has a section for the version in
+  # package.json, because the release body IS that section
+  # (extract-release-notes.mjs; release.yml composes the body from it). This
+  # replaced a hand-maintained release_notes.md that was wrong at both
+  # releases that used it while the CHANGELOG was right both times — the
+  # failure was never the writing, it was having two of it. This job goes red
+  # between bumping the version and writing its section: they are two halves
+  # of one change, and the failure message says which half is missing.
+  release-notes:
+    name: Changelog covers the version (G14)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun .github/workflows/extract-release-notes.mjs > /dev/null

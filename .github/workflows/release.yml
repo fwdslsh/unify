@@ -94,6 +94,13 @@ jobs:
           bun tests/conformance/check-suite-hygiene.mjs
           bun tests/conformance/check-module-graph.mjs
           bun tests/conformance/check-traceability.mjs --runtime .conformance-ledger.jsonl
+          # G14. The release body is CHANGELOG.md's section for this version,
+          # extracted below — so the gate is simply that the extraction
+          # succeeds. This replaced a hand-maintained release_notes.md that was
+          # wrong at both releases that used it (stale at 0.8.2, missing a
+          # late change at 0.8.3) while the CHANGELOG was right both times:
+          # the failure was never the writing, it was having two of it.
+          bun .github/workflows/extract-release-notes.mjs > /dev/null
 
       # One runner cross-compiles every target, so there is no build matrix.
       # These names are the contract install.sh downloads by ("unify-$os-$arch",
@@ -146,7 +153,7 @@ jobs:
               echo "| \`$f\` | [download](https://github.com/${{ github.repository }}/releases/download/$TAG/$f) |"
             done
             echo
-            cat .github/workflows/release_notes.md
+            bun .github/workflows/extract-release-notes.mjs
           } > release-body.md
           pre="${{ steps.rel.outputs.prerelease == 'true' && '--prerelease' || '' }}"
           assets="unify-linux-x86_64 unify-linux-arm64 unify-darwin-x86_64 unify-darwin-arm64"
