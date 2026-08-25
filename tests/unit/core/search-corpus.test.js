@@ -2,9 +2,11 @@
  * Unit tests for src/core/search-corpus.js — conformance-spec §30 (Tier 3;
  * no conformance authority, testing-strategy §2).
  *
- * §30's CLI-observable behavior is pinned by
- * tests/conformance/search-corpus.test.js against the real binary. This
- * file follows the tests/unit/core/sitemap.test.js precedent for the pure
+ * §30's CLI-observable behavior is pinned by tests/conformance/catalog.test.js
+ * against the real binary — that file covers both `catalog.json` and
+ * `search-corpus.json` together (its own header explains why: the two share
+ * activation/membership/suppression/determinism rules that would otherwise be
+ * proven twice). This file follows the tests/unit/core/sitemap.test.js precedent for the pure
  * function surface, plus the folding tests moved over from the retired
  * tests/unit/core/search-index.test.js — `foldSpaceSeparators` itself is
  * unchanged, only relocated.

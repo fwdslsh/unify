@@ -1,10 +1,9 @@
 /**
  * `catalog.js` — the release-0.9 catalog projection.
  *
- * `assets/unify/catalog.json` under `--catalog`: brief §4.1/§8-§10 (the
- * conformance-spec §30 rewrite that names this contract normatively lands in
- * the batch after this one). A compact, bounded projection of every public
- * page's `<html>`/`<head>`/`<body>` shape — attributes, title, meta, link,
+ * `assets/unify/catalog.json` under `--catalog`: conformance-spec §30.1-§30.2,
+ * §30.4, §30.6-§30.7, tracing back to brief §4.1/§8-§10. A compact, bounded
+ * projection of every public page's `<html>`/`<head>`/`<body>` shape — attributes, title, meta, link,
  * base, and a flat main-scoped heading sequence — for browse/filter/TOC/
  * metadata-driven UI. No body text (that is `search-corpus.js`'s job), no
  * JSON-LD script bodies (private analysis only, brief §9.4), no source path,
@@ -15,14 +14,13 @@
  * this module emits already sits on a `BuildDocument`, produced once by
  * `document.js`'s single extraction pass over the final emitted HTML and
  * carried untouched. `catalogEntry` below does not re-derive `html`/`head`/
- * `body` from anything — it reads `doc.document.html`/`.head`/`.body`
- * verbatim, which is `document.js`'s own `DocumentSnapshot`, already shaped
- * exactly to brief §8's schema. That is not a coincidence to preserve by
- * hand: `doc.document` IS the catalog entry, minus its own `path`/`url`
- * fields sitting beside `html`/`head`/`body` rather than nested under them —
- * the same snapshot `audit --format json` already serializes as `document`
- * (report.js's `serializePage`), so the two surfaces cannot drift into two
- * readings of one page.
+ * `body` from anything — it spreads `doc.document` (already `{path, url,
+ * html, head, body}`, in that order, brief §8's schema exactly), so `doc.
+ * document` IS the catalog entry, literally the same object's own fields,
+ * not a hand-copied echo of it. That is deliberate: it is the same snapshot
+ * `audit --format json` already serializes as `document` (report.js's
+ * `serializePage`), so the two surfaces cannot drift into two readings of
+ * one page — a field `document.js` adds later reaches both for free.
  *
  * Membership is imported, not restated: `isPublicDestination` is
  * `document-selectors.js`'s shared predicate (document exists, indexable,
@@ -56,54 +54,50 @@ export const CATALOG_PATH = "assets/unify/catalog.json";
 export const SCHEMA_VERSION = 1;
 
 /**
- * One page's catalog entry, in the fixed key order brief §8.1/addenda
- * fixes: `{path, url, html, head, body}`. `html`/`head`/`body` are
- * `doc.document`'s own fields, read verbatim — this function performs no
- * extraction, no filtering, no re-shaping. The bound is already enforced
- * upstream: `document.js`'s `extractDocument` never puts `<style>` contents,
- * script bodies, or the body's text into the snapshot in the first place
- * (only `analysis.jsonLd`/`analysis.visibleText`, on the private half this
- * module never reads), so there is nothing here to strip.
+ * One page's catalog entry: `doc.document` itself, spread into a fresh
+ * object in its own fixed key order, brief §8.1/addenda fixes:
+ * `{path, url, html, head, body}` — the order `document.js`'s
+ * `DocumentSnapshot` already produces, so the spread changes nothing about
+ * it. This function performs no extraction, no filtering, no re-shaping,
+ * and — because it is a spread rather than a hand-picked field list — no
+ * future `DocumentSnapshot` field can reach `audit --format json`'s
+ * `document` without also reaching this entry. The bound is already
+ * enforced upstream: `document.js`'s `extractDocument` never puts `<style>`
+ * contents, script bodies, or the body's text into the snapshot in the
+ * first place (only `analysis.jsonLd`/`analysis.visibleText`, on the
+ * private half this module never reads), so there is nothing here to strip.
  * @param {import('./manifest.js').BuildDocument} doc
- * @returns {{path: string|null, url: string|null, html: import('./document.js').DocumentSnapshot['html'], head: import('./document.js').DocumentSnapshot['head'], body: import('./document.js').DocumentSnapshot['body']}}
+ * @returns {import('./document.js').DocumentSnapshot}
  */
 export function catalogEntry(doc) {
-  return {
-    path: doc.document.path,
-    url: doc.document.url,
-    html: doc.document.html,
-    head: doc.document.head,
-    body: doc.document.body,
-  };
+  return { ...doc.document };
 }
 
 /**
  * The whole catalog document: `{schemaVersion, baseUrl, pages}` (brief §8).
  *
- * `baseUrl` is the build's `--base-url` value exactly as the author typed
- * it — the raw flag string, not a value reconstructed from the parsed
- * `BaseUrlConfig`'s `origin`/`pathPrefix` (which can normalize away a
- * missing trailing slash or similar). `null` when the flag was not given.
- * This is deliberately a second, separate parameter from `base`: `base`
- * (the parsed `BaseUrlConfig`, or `null`) still drives membership and
- * `document.path`/`.url` through `isPublicDestination`/`document.js`, but
- * "exactly as given" only has one honest source, the unparsed string.
+ * `baseUrl` is `${base.origin}${base.pathPrefix}` — `null` when `base` is
+ * `null` (no `--base-url`) — the identical construction `report.js`'s
+ * `buildReport` uses for `unify audit --format json`'s own `baseUrl` field.
+ * This is deliberate, not incidental: every `url` in this same document is
+ * built from that same normalized `base` (§20.5), so a consumer resolving
+ * `new URL(page.path, catalog.baseUrl)` gets the site's real address,
+ * path prefix included, rather than a raw flag string that can omit it.
  *
  * `pages` is filtered to the shared membership predicate and left in
  * manifest order — §20.1's own output-path order, which `documents` already
  * carries; nothing here sorts.
  * @param {import('./manifest.js').BuildDocument[]} documents
  * @param {import('./urls.js').BaseUrlConfig|null} base
- * @param {string|null} baseUrl
  * @returns {{schemaVersion: number, baseUrl: string|null, pages: ReturnType<typeof catalogEntry>[]}}
  */
-export function catalogDocument(documents, base, baseUrl) {
+export function catalogDocument(documents, base) {
   const pages = [];
   for (const doc of documents) {
     if (!isPublicDestination(doc, base)) continue;
     pages.push(catalogEntry(doc));
   }
-  return { schemaVersion: SCHEMA_VERSION, baseUrl: baseUrl ?? null, pages };
+  return { schemaVersion: SCHEMA_VERSION, baseUrl: base ? `${base.origin}${base.pathPrefix}` : null, pages };
 }
 
 /**
@@ -131,7 +125,6 @@ export function serializeCatalog(doc) {
  * @param {object} args
  * @param {import('./manifest.js').BuildDocument[]} args.documents - the §20 manifest
  * @param {import('./urls.js').BaseUrlConfig|null} args.base
- * @param {string|null} [args.baseUrl] - the raw `--base-url` value, or `null`
  * @param {Map<string,string>} args.emittedFromSource - output path -> the
  *   source path it came from, for every file the site emits from its own
  *   tree (pages and assets alike).
@@ -139,12 +132,12 @@ export function serializeCatalog(doc) {
  *   authored `assets/unify/catalog.json` suppressed generation. Only the
  *   exact path is reserved — `assets/unify/` itself is not.
  */
-export function generateCatalog({ documents, base, baseUrl = null, emittedFromSource }) {
+export function generateCatalog({ documents, base, emittedFromSource }) {
   const generated = new Map();
   // The author's file is the site's catalog: never overwritten, never
   // merged into. Suppression happens before anything is computed, exactly
   // as an authored sitemap.xml/feed.xml suppress their own generation.
   if (emittedFromSource.has(CATALOG_PATH)) return generated;
-  generated.set(CATALOG_PATH, serializeCatalog(catalogDocument(documents, base, baseUrl)));
+  generated.set(CATALOG_PATH, serializeCatalog(catalogDocument(documents, base)));
   return generated;
 }

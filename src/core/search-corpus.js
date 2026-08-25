@@ -1,17 +1,17 @@
 /**
  * `search-corpus.js` — the release-0.9 full-text search projection.
  *
- * `assets/unify/search-corpus.json` under `--search-corpus` (brief §4.2,
- * §5.2, §11). Intentionally minimal: each page contributes only the public
- * path that joins it back to `catalog.json`, plus its normalized visible
- * text. No url, no title, no headings, no metadata, no description, no
- * tags, no canonical — every one of those already lives in the catalog
- * (brief §11), and duplicating them here would give a consumer two answers
- * to the same question about one page.
+ * `assets/unify/search-corpus.json` under `--search-corpus`: conformance-spec
+ * §30.1, §30.3-§30.7, tracing back to brief §4.2, §5.2, §11. Intentionally
+ * minimal: each page contributes only the public path that joins it back to
+ * `catalog.json`, plus its normalized visible text. No url, no title, no
+ * headings, no metadata, no description, no tags, no canonical — every one
+ * of those already lives in the catalog (§30.3), and duplicating them here
+ * would give a consumer two answers to the same question about one page.
  *
  * Membership is imported, not restated: the same `isPublicDestination`
  * predicate `catalog.js`/`sitemap.js` call, so the corpus and the catalog
- * always describe the identical page set (brief §10) — a client can zip
+ * always describe the identical page set (§30.4) — a client can zip
  * `catalog.pages` and `corpus.pages` by `path` without first reconciling
  * two membership answers.
  *
@@ -21,15 +21,17 @@
  * separator (U+00A0, the general punctuation space block, U+202F, U+205F,
  * U+3000) to U+0020 and collapse the runs that creates. `analysis.visibleText`
  * has already had ASCII whitespace runs collapsed by `document.js`'s
- * `textContent`; this function is the only place left that folds the
- * remaining Unicode space shapes for a consumer that will compare a typed
- * query against `pages[].text`. Nothing else is folded: no case folding, no
- * stemming, no stop-word removal, no truncation, no character count — those
- * are a search engine's decisions, and unify ships no search runtime
- * (product-spec §6.5.2).
+ * `textContent`; this function discharges that obligation for the indexing
+ * consumer §20.3 names — `audit.js`'s `text-duplicate` finding discharges it
+ * separately, with a wider fold, for the comparison consumer (§30.5), so
+ * this is not the only place the obligation is met, only the only place
+ * *this* consumer's reading of it lives. Nothing else is folded here: no
+ * case folding, no stemming, no stop-word removal, no truncation, no
+ * character count — those are a search engine's decisions, and unify ships
+ * no search runtime (product-spec §6.5.2).
  *
- * Activation (brief §5.2) is the CLI flag `--search-corpus` alone, and it
- * does NOT imply `--catalog` — the two are independent opt-ins, exactly as
+ * Activation (§30.1) is the CLI flag `--search-corpus` alone, and it does
+ * NOT imply `--catalog` — the two are independent opt-ins, exactly as
  * `catalog.js`'s own module comment states from the other side.
  */
 

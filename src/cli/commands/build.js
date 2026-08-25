@@ -509,14 +509,32 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
   // back correctly with no --base-url, so gating either on `base` would make
   // the flag useless for the local-preview case it exists for. Independent
   // of each other too — `--search-corpus` does not imply `--catalog`.
-  const generatedCatalog = settings.catalog
-    ? catalog.generateCatalog({
-        documents: manifest.documents, base: baseConfig, baseUrl: settings.baseUrl ?? null, emittedFromSource,
-      })
+  const catalogAncestorConflict = settings.catalog
+    ? generatedPathAncestorConflict(catalog.CATALOG_PATH, emittedFromSource)
+    : null;
+  if (catalogAncestorConflict) {
+    reporter.problem({
+      file: catalogAncestorConflict.source,
+      message: `${catalogAncestorConflict.source} occupies ${catalogAncestorConflict.ancestor}, which ${catalog.CATALOG_PATH} needs as a directory`,
+      fixes: ["rename or move this file so the assets/unify/ path is free to be a directory, or drop --catalog"],
+    });
+  }
+  const generatedCatalog = settings.catalog && !catalogAncestorConflict
+    ? catalog.generateCatalog({ documents: manifest.documents, base: baseConfig, emittedFromSource })
     : new Map();
   for (const [outPath, text] of generatedCatalog) tempFiles.set(outPath, text);
 
-  const generatedSearchCorpus = settings.searchCorpus
+  const corpusAncestorConflict = settings.searchCorpus
+    ? generatedPathAncestorConflict(searchCorpus.SEARCH_CORPUS_PATH, emittedFromSource)
+    : null;
+  if (corpusAncestorConflict) {
+    reporter.problem({
+      file: corpusAncestorConflict.source,
+      message: `${corpusAncestorConflict.source} occupies ${corpusAncestorConflict.ancestor}, which ${searchCorpus.SEARCH_CORPUS_PATH} needs as a directory`,
+      fixes: ["rename or move this file so the assets/unify/ path is free to be a directory, or drop --search-corpus"],
+    });
+  }
+  const generatedSearchCorpus = settings.searchCorpus && !corpusAncestorConflict
     ? searchCorpus.generateSearchCorpus({ documents: manifest.documents, base: baseConfig, emittedFromSource })
     : new Map();
   for (const [outPath, text] of generatedSearchCorpus) tempFiles.set(outPath, text);
@@ -612,10 +630,10 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
     });
   }
 
-  // §12's second fix line for the three generated root names. Computed here,
-  // not in references.js, because only this loop knows WHY a file was not
-  // generated this run — and only for names absent from the output, so a
-  // build that emitted (or shipped an authored) file never consults it.
+  // §12's second fix line for the four generated paths (REF-04). Computed
+  // here, not in references.js, because only this loop knows WHY a file was
+  // not generated this run — and only for paths absent from the output, so
+  // a build that emitted (or shipped an authored) file never consults it.
   const wouldGenerate = new Map();
   if (!tempFiles.has(feed.FEED_PATH)) {
     const candidates = manifest.documents.some((doc) => feed.isFeedCandidate(doc));
@@ -1074,6 +1092,30 @@ function makeReferenceLocator(
  */
 function shouldPublish(reporter) {
   return reporter.canPublish;
+}
+
+/**
+ * §30.6/§13 — a generated path that sits under a directory (only
+ * `assets/unify/catalog.json`/`search-corpus.json` do; every earlier
+ * generated file sat at the output root, where the directory always
+ * exists) can have one of its own ancestor segments already occupied by an
+ * ordinary authored file — `mkdir`ing over it during publish would throw a
+ * raw, unlocated errno. Checked against `emittedFromSource`, which already
+ * holds every authored file's own output path before either generator
+ * runs, so an authored `assets/unify` (no extension) or `assets` blocks
+ * `assets/unify/catalog.json` here, located at the source file that holds
+ * the path.
+ * @param {string} generatedPath
+ * @param {Map<string,string>} emittedFromSource
+ * @returns {{ancestor: string, source: string}|null}
+ */
+function generatedPathAncestorConflict(generatedPath, emittedFromSource) {
+  const segments = generatedPath.split("/");
+  for (let i = 1; i < segments.length; i++) {
+    const ancestor = segments.slice(0, i).join("/");
+    if (emittedFromSource.has(ancestor)) return { ancestor, source: emittedFromSource.get(ancestor) };
+  }
+  return null;
 }
 
 // ------------------------------------------------------------- per-page build

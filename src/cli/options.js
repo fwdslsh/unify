@@ -44,8 +44,10 @@ const OPTIONS = {
   // syntactic parser like every entry here: the closed set (human/json/sarif)
   // and its usage error are audit.js's own concern, the same split
   // `--canonical`'s value ("auto" only) already keeps between this file and
-  // cli.js. Ignored by every command but `audit`, exactly as `--catalog`/
-  // `--search-corpus` are ignored by `audit` and read only by `build`.
+  // cli.js. Ignored by every command but `audit`, the same way `--clean` and
+  // `--dry-run` are each read by exactly one command — unlike `--catalog`/
+  // `--search-corpus`, which `build.js` reads and `audit` therefore observes
+  // too, since `audit` runs the same build pipeline and never publishes it.
   format: { kind: "string", example: "json" },
   // §31.3 — the one network operation in the whole product (product-spec
   // §6.1: builds are offline and deterministic without qualification), so it

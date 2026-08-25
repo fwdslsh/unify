@@ -137,6 +137,25 @@ test("SRCH-01: two independent flags — absent, neither file is generated or re
   covers("SRCH-01");
 }, TEST_MS);
 
+test("SRCH-01: only the two exact paths are reserved — an unrelated authored file under assets/unify/ ships byte-for-byte beside the generated catalog and corpus", async () => {
+  const tmp = mkTmp();
+  const ownContent = '{"mine": true}\n';
+  writeTree(join(tmp, "src"), {
+    "index.html": page({ title: "Home" }),
+    "assets/unify/other.json": ownContent,
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--catalog", "--search-corpus"], tmp);
+  expectExit(r, 0, "build with an unrelated file under assets/unify/");
+  if (!existsSync(join(tmp, "dist", CATALOG_PATH)) || !existsSync(join(tmp, "dist", CORPUS_PATH))) {
+    throw new Error("§30.1: an unrelated file under assets/unify/ must not suppress either generated file");
+  }
+  const shipped = read(tmp, "dist", "assets", "unify", "other.json");
+  if (shipped !== ownContent) {
+    throw new Error(`§30.1: assets/unify/ itself is NOT reserved — an unrelated authored file there ships byte-for-byte.\n  expected: ${JSON.stringify(ownContent)}\n  actual:   ${JSON.stringify(shipped)}`);
+  }
+  covers("SRCH-01");
+}, TEST_MS);
+
 test("SRCH-01: --dry-run shows each as its own write row, named by the flag that produced it, and writes nothing to disk", async () => {
   const tmp = mkTmp();
   writeTree(join(tmp, "src"), { "index.html": page({ title: "Home" }) });
@@ -439,6 +458,29 @@ test("SRCH-06: --dry-run shows an authored file as an ordinary copy from source,
   covers("SRCH-06");
 }, TEST_MS);
 
+test("SRCH-06: an authored file occupying an ancestor segment of the generated path is a located problem, not a raw mkdir errno", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": page({ title: "Home" }),
+    "assets/unify": "not a directory\n",
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--catalog", "--search-corpus"], tmp);
+  if (r.exit !== 1) throw new Error(`expected a located problem, not a crash: exit ${r.exit}\nstdout:\n${r.stdout}\nstderr:\n${r.stderr}`);
+  if (!r.stderr.includes("assets/unify") || !r.stderr.includes(CATALOG_PATH)) {
+    throw new Error(`§30.6/§13: the problem must be located at the occupying source file and name the generated catalog path.\n${r.stderr}`);
+  }
+  if (!r.stderr.includes(CORPUS_PATH)) {
+    throw new Error(`§30.6/§13: the problem must also be raised for the corpus path.\n${r.stderr}`);
+  }
+  if (/EEXIST|ENOTDIR|at Object\.mkdir/.test(r.stderr)) {
+    throw new Error(`§14: a raw errno/stack trace leaked instead of a located problem.\n${r.stderr}`);
+  }
+  if (existsSync(join(tmp, "dist"))) {
+    throw new Error("§15: a build with a problem must publish nothing");
+  }
+  covers("SRCH-06");
+}, TEST_MS);
+
 test("REF-04 — /assets/unify/catalog.json and /assets/unify/search-corpus.json linked without their flags name the flag; with it, resolve", async () => {
   // Round 27's §12 second-fix-line rule, the catalog/corpus spelling.
   const tmp = mkTmp();
@@ -465,7 +507,7 @@ test("REF-04 — /assets/unify/catalog.json and /assets/unify/search-corpus.json
 
 // ------------------------------------------------------------------- §30.7
 
-test("SRCH-07: base-url path prefix is reflected in path/url; baseUrl is null without the flag and the exact string with it, and pages stay in manifest order in both files", async () => {
+test("SRCH-07: base-url path prefix is reflected in path/url; baseUrl is null without the flag and origin+pathPrefix with it, and pages stay in manifest order in both files", async () => {
   const files = {
     "index.html": page({ title: "Home" }),
     "z.html": page({ title: "Z" }),
@@ -483,12 +525,21 @@ test("SRCH-07: base-url path prefix is reflected in path/url; baseUrl is null wi
 
   const withBase = mkTmp();
   writeTree(join(withBase, "src"), files);
-  const RAW = "https://example.com/repo"; // no trailing slash, deliberately
+  const RAW = "https://example.com/repo"; // no trailing slash, deliberately —
+  // baseUrl must still come out normalized (origin+pathPrefix), matching
+  // every `url` in this same document and `audit --format json`'s own
+  // baseUrl for the identical build.
+  const NORMALIZED = "https://example.com/repo/";
   const b = await runCli(["build", "-s", "src", "-o", "dist", "--catalog", "--search-corpus", "--base-url", RAW], withBase);
   expectExit(b, 0, "with-base build");
   const catalogB = parseJsonFile(readCatalogRaw(withBase), "catalog.json");
-  if (catalogB.baseUrl !== RAW) {
-    throw new Error(`§30.2: baseUrl must be the --base-url value EXACTLY AS GIVEN, never reconstructed.\n  expected: ${JSON.stringify(RAW)}\n  actual:   ${JSON.stringify(catalogB.baseUrl)}`);
+  if (catalogB.baseUrl !== NORMALIZED) {
+    throw new Error(`§30.2: baseUrl must be origin+pathPrefix, the same construction audit --format json uses — not the raw --base-url string.\n  expected: ${JSON.stringify(NORMALIZED)}\n  actual:   ${JSON.stringify(catalogB.baseUrl)}`);
+  }
+  const auditB = await runCli(["audit", "-s", "src", "--catalog", "--search-corpus", "--base-url", RAW, "--format", "json"], withBase);
+  const auditJsonB = parseJsonFile(auditB.stdout, "audit --format json");
+  if (auditJsonB.baseUrl !== catalogB.baseUrl) {
+    throw new Error(`§30.2: catalog.json's baseUrl must agree with audit --format json's baseUrl for the identical build.\n  catalog: ${JSON.stringify(catalogB.baseUrl)}\n  audit:   ${JSON.stringify(auditJsonB.baseUrl)}`);
   }
   const expectedOrder = [
     "https://example.com/repo/a.html",

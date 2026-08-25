@@ -149,37 +149,38 @@ describe("§30.2/§30.4 catalogDocument", () => {
   const base = parseBaseUrl("https://example.com/");
 
   test("top-level shape is exactly schemaVersion, baseUrl, pages, in that order", () => {
-    const d = catalogDocument([], base, "https://example.com/");
+    const d = catalogDocument([], base);
     expect(Object.keys(d)).toEqual(["schemaVersion", "baseUrl", "pages"]);
   });
 
   test("schemaVersion is always 1", () => {
-    expect(catalogDocument([], base, null).schemaVersion).toBe(SCHEMA_VERSION);
+    expect(catalogDocument([], null).schemaVersion).toBe(SCHEMA_VERSION);
     expect(SCHEMA_VERSION).toBe(1);
   });
 
-  test("baseUrl is the raw string exactly as given, not reconstructed from BaseUrlConfig", () => {
-    // A trailing-slash-free author string that parseBaseUrl would normalize
-    // differently if this module reconstructed it instead of keeping the raw
-    // string verbatim.
+  test("baseUrl is origin+pathPrefix, the SAME construction unify audit --format json's own baseUrl uses — not the raw flag string", () => {
+    // A trailing-slash-free author string. If this reconstructed the raw
+    // flag string instead of `base.origin`/`base.pathPrefix`, baseUrl would
+    // read "https://example.com" here rather than the normalized form every
+    // `url` in the same document is already built from (§20.5).
     const raw = "https://example.com";
-    const d = catalogDocument([], parseBaseUrl(raw), raw);
-    expect(d.baseUrl).toBe("https://example.com");
+    const d = catalogDocument([], parseBaseUrl(raw));
+    expect(d.baseUrl).toBe("https://example.com/");
   });
 
-  test("baseUrl is null when the argument is omitted or explicitly null", () => {
-    expect(catalogDocument([], null, null).baseUrl).toBeNull();
-    expect(catalogDocument([], base).baseUrl).toBeNull();
+  test("baseUrl is null when base is omitted or explicitly null", () => {
+    expect(catalogDocument([], null).baseUrl).toBeNull();
+    expect(catalogDocument([]).baseUrl).toBeNull();
   });
 
   test("membership is §21.2's shared predicate: noindex, none, 404.html, and off-page canonical excluded", () => {
-    expect(catalogDocument([doc({ robots: "noindex" })], base, null).pages).toEqual([]);
-    expect(catalogDocument([doc({ robots: "none" })], base, null).pages).toEqual([]);
-    expect(catalogDocument([doc({ robots: "nofollow" })], base, null).pages).toHaveLength(1);
-    expect(catalogDocument([doc({ outputPath: "404.html", url: "https://example.com/404.html" })], base, null).pages)
+    expect(catalogDocument([doc({ robots: "noindex" })], base).pages).toEqual([]);
+    expect(catalogDocument([doc({ robots: "none" })], base).pages).toEqual([]);
+    expect(catalogDocument([doc({ robots: "nofollow" })], base).pages).toHaveLength(1);
+    expect(catalogDocument([doc({ outputPath: "404.html", url: "https://example.com/404.html" })], base).pages)
       .toEqual([]);
-    expect(catalogDocument([doc({ canonical: "https://example.com/other.html" })], base, null).pages).toEqual([]);
-    expect(catalogDocument([doc({ canonical: "https://example.com/p.html" })], base, null).pages).toHaveLength(1);
+    expect(catalogDocument([doc({ canonical: "https://example.com/other.html" })], base).pages).toEqual([]);
+    expect(catalogDocument([doc({ canonical: "https://example.com/p.html" })], base).pages).toHaveLength(1);
   });
 
   test("manifest order is preserved — filtering never reorders", () => {
@@ -188,11 +189,11 @@ describe("§30.2/§30.4 catalogDocument", () => {
       doc({ outputPath: "b.html", url: "https://example.com/b.html", path: "/b.html", robots: "noindex" }),
       doc({ outputPath: "c.html", url: "https://example.com/c.html", path: "/c.html" }),
     ];
-    expect(catalogDocument(documents, base, null).pages.map((p) => p.path)).toEqual(["/a.html", "/c.html"]);
+    expect(catalogDocument(documents, base).pages.map((p) => p.path)).toEqual(["/a.html", "/c.html"]);
   });
 
   test("an empty manifest is a well-formed empty document, not a refusal", () => {
-    expect(catalogDocument([], base, null)).toEqual({ schemaVersion: 1, baseUrl: null, pages: [] });
+    expect(catalogDocument([], null)).toEqual({ schemaVersion: 1, baseUrl: null, pages: [] });
   });
 });
 
@@ -236,16 +237,15 @@ describe("§30.1/§30.6 generateCatalog — activation is the caller's, suppress
   });
 
   test("with no authored file, generation produces one entry at CATALOG_PATH", () => {
-    const generated = generateCatalog({ documents: [doc()], base, baseUrl: null, emittedFromSource: new Map() });
+    const generated = generateCatalog({ documents: [doc()], base, emittedFromSource: new Map() });
     expect([...generated.keys()]).toEqual([CATALOG_PATH]);
-    expect(generated.get(CATALOG_PATH)).toBe(serializeCatalog(catalogDocument([doc()], base, null)));
+    expect(generated.get(CATALOG_PATH)).toBe(serializeCatalog(catalogDocument([doc()], base)));
   });
 
   test("an authored assets/unify/catalog.json suppresses generation entirely", () => {
     const generated = generateCatalog({
       documents: [doc()],
       base,
-      baseUrl: null,
       emittedFromSource: new Map([[CATALOG_PATH, CATALOG_PATH]]),
     });
     expect(generated.size).toBe(0);
@@ -255,7 +255,6 @@ describe("§30.1/§30.6 generateCatalog — activation is the caller's, suppress
     const generated = generateCatalog({
       documents: [doc()],
       base,
-      baseUrl: null,
       emittedFromSource: new Map([["sitemap.xml", "sitemap.xml"]]),
     });
     expect(generated.size).toBe(1);
@@ -265,7 +264,6 @@ describe("§30.1/§30.6 generateCatalog — activation is the caller's, suppress
     const generated = generateCatalog({
       documents: [doc({ url: null, path: "/p.html" })],
       base: null,
-      baseUrl: null,
       emittedFromSource: new Map(),
     });
     const parsed = JSON.parse(generated.get(CATALOG_PATH));
@@ -275,7 +273,7 @@ describe("§30.1/§30.6 generateCatalog — activation is the caller's, suppress
   });
 
   test("an empty manifest still generates a well-formed, empty catalog", () => {
-    const generated = generateCatalog({ documents: [], base, baseUrl: null, emittedFromSource: new Map() });
+    const generated = generateCatalog({ documents: [], base: null, emittedFromSource: new Map() });
     expect(generated.get(CATALOG_PATH)).toBe('{\n  "schemaVersion": 1,\n  "baseUrl": null,\n  "pages": []\n}\n');
   });
 });

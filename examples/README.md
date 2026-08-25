@@ -29,7 +29,7 @@ The sixth is different in kind: it is unify's own documentation site, built by u
 repository's real `docs/` directory (issue #51). Nothing is copied — `_scripts/gen.mjs` reads
 `../../../docs` through `--generate`, so the site cannot drift from the documentation it
 renders. It exercises the production layer end to end (`--pretty-urls`, `--base-url`,
-`--canonical auto`, `sitemap.xml`, `--search-index`, `schema:`) and both gates pass:
+`--canonical auto`, `sitemap.xml`, `--catalog`, `--search-corpus`, `schema:`) and both gates pass:
 `build --dry-run --strict` and `audit --strict` each exit 0.
 
 It was built to be a source of friction rather than a showcase, and

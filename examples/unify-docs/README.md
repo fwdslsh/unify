@@ -19,20 +19,20 @@ unify build -s src -o dist \
   --pretty-urls \
   --base-url https://unify.fwdslsh.dev/ \
   --canonical auto \
-  --search-index
+  --catalog --search-corpus
 ```
 
 Both gates pass:
 
 ```bash
 unify build -s src -o dist --generate _scripts/gen.mjs --pretty-urls \
-  --base-url https://unify.fwdslsh.dev/ --canonical auto --search-index --dry-run --strict   # exit 0
+  --base-url https://unify.fwdslsh.dev/ --canonical auto --catalog --search-corpus --dry-run --strict   # exit 0
 unify audit -s src --generate _scripts/gen.mjs --pretty-urls \
-  --base-url https://unify.fwdslsh.dev/ --canonical auto --search-index --strict            # exit 0
+  --base-url https://unify.fwdslsh.dev/ --canonical auto --catalog --search-corpus --strict            # exit 0
 ```
 
-19 files: 12 documentation pages, an index, a front page, a 404, the stylesheet, the
-favicon, `sitemap.xml`, and `search-index.json`.
+20 files: 12 documentation pages, an index, a front page, a 404, the stylesheet, the
+favicon, `sitemap.xml`, `assets/unify/catalog.json`, and `assets/unify/search-corpus.json`.
 
 ## It renders the real docs, not a copy
 
@@ -56,7 +56,8 @@ error if `docs/` is missing.
 | `data-layout="none"` | `src/404.html` opts out of the chrome entirely |
 
 Plus the production layer: `--pretty-urls`, `--base-url`, `--canonical auto`,
-`sitemap.xml`, `--search-index`, and `schema: WebPage` on every generated page. The front
+`sitemap.xml`, `--catalog`, `--search-corpus`, and `schema: WebPage` on every generated
+page. The front
 page also demonstrates root-attribute merging: `src/index.html` declares
 `<body class="home">`, the union with the layout's `<body>` carries it into the output,
 and the stylesheet uses it to swap the sidebar shell for the full-width hero.
