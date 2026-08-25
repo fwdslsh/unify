@@ -352,6 +352,46 @@ writeFileSync(join(outDir, "from-data.html"),
     expect(healed).toContain("fixed");
     covers("WCH-04");
   }, 30_000);
+
+  test("WCH-08 — a failing rebuild never error-pages a fragment", async () => {
+    // A `*.fragment.html` is shipped byte-for-byte and never composed (§5),
+    // so it has no error presentation to offer. It used to be caught by the
+    // error-page filter anyway — `.endsWith(".html")` is true of it — which
+    // made watch the one place that guarantee lapsed, and it failed
+    // invisibly: a page announces "Build error" on reload, while a fragment
+    // is fetched by hx-get and swapped into a page that still looks fine, so
+    // a whole document lands inside an element.
+    //
+    // The failure has to be UNATTRIBUTABLE for the fallback to engage. A bad
+    // reference is attributable to the page that carries it, so only that
+    // page is error-paged and a fragment is never in scope; a generator
+    // failure is P29 located at a `_`-prefixed `.mjs` that maps to no output
+    // path, which is what unions the placeholder across every known good
+    // page. That is the case this rule is about.
+    const tmp = mkTmp();
+    writeTree(tmp, SITE);
+    writeFileSync(join(tmp, "src/bits.fragment.html"), "<ul><li>a real fragment</li></ul>\n");
+    mkdirSync(join(tmp, "src/_scripts"), { recursive: true });
+    writeFileSync(join(tmp, "src/_scripts/gen.mjs"), "// healthy: writes nothing\n");
+    const dist = join(tmp, "dist");
+    const w = start(["watch", "--generate", "_scripts/gen.mjs"], tmp);
+    await w.ready;
+    const good = await waitForContent(
+      join(dist, "bits.fragment.html"), (t) => t.includes("a real fragment"), "the fragment to publish");
+
+    // Break the generator: P29, unattributable, so every known good page is
+    // replaced by the error page.
+    writeFileSync(join(tmp, "src/_scripts/gen.mjs"), 'throw new Error("generator down");\n');
+    await waitForContent(
+      join(dist, "index.html"), (t) => t.includes("unify-watch-error-page"), "the failing rebuild's error page");
+
+    // The PAGE is error-paged — WCH-04 is untouched — and the fragment is not.
+    const frag = readFileSync(join(dist, "bits.fragment.html"), "utf8");
+    expect(frag).toBe(good);
+    expect(frag).not.toContain("unify-watch-error-page");
+    expect(frag).not.toContain("<!doctype");
+    covers("WCH-08");
+  }, 30_000);
 });
 
 describe("§16 dev server", () => {

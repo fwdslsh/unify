@@ -291,3 +291,57 @@ test("GEN-07 — audit runs the generator and still writes nothing", async () =>
   }
   covers("GEN-07");
 }, TEST_MS);
+
+// ------------------------------------------------------------------- GEN-10
+
+test("GEN-10 — P29 drops the runtime's inspected error object, not the message", async () => {
+  // The commonest generator failure of all: it cannot read a file. Both
+  // runtimes print the thrown Error's own fields under the message, and
+  // neither the code-frame nor the stack-frame shape recognised them, so the
+  // diagnostic ended `… open '/x.json' /     path: "/x.json", /  syscall:
+  // "open",` — the path restated, then a comma terminating nothing. A reader
+  // cannot tell that from unify's own output being broken.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": doc("Home", "<h1>Home</h1>"),
+    "_scripts/gen.mjs": 'import { readFileSync } from "node:fs";\nreadFileSync("/definitely/not/here.json");\n',
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--generate", "_scripts/gen.mjs", "--dry-run"], tmp);
+  const line = r.stderr.split("\n").find((l) => l.includes("problem:")) ?? "";
+
+  // What the author needs is present…
+  if (!line.includes("/definitely/not/here.json")) {
+    throw new Error(`P29 must carry the generator's message:\n${r.stderr}`);
+  }
+  // …and the object's machine-printed tail is not. `syscall:`/`errno:`/`code:`
+  // are the properties; a bare `}` is node's object close; `node:fs:` is its
+  // internal location header, which carries no slash and so escaped the
+  // file-location shape.
+  for (const noise of [/\bsyscall:/, /\berrno:/, /\bcode:\s*['"]/, /\/\s*\}\s*$/, /node:fs:\d+/]) {
+    if (noise.test(line)) {
+      throw new Error(`P29 leaked the runtime's inspected error object (${noise}):\n${line}`);
+    }
+  }
+  covers("GEN-10", "P29");
+}, TEST_MS);
+
+test("GEN-10 — a generator's own indented lines are not mistaken for properties", async () => {
+  // The shape keys on indentation PLUS a JS identifier, so it must not eat a
+  // generator reporting its own findings. `first-post.md` is not an
+  // identifier; the line survives, and so does the multi-line message.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": doc("Home", "<h1>Home</h1>"),
+    "_scripts/gen.mjs":
+      'process.stderr.write("2 notes are missing a date:\\n  first-post.md: no date\\n  second-post.md: no date\\n");\n' +
+      "process.exit(1);\n",
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--generate", "_scripts/gen.mjs", "--dry-run"], tmp);
+  const line = r.stderr.split("\n").find((l) => l.includes("problem:")) ?? "";
+  for (const want of ["2 notes are missing a date:", "first-post.md: no date", "second-post.md: no date"]) {
+    if (!line.includes(want)) {
+      throw new Error(`P29 dropped a generator's own line (${want}):\n${line}`);
+    }
+  }
+  covers("GEN-10");
+}, TEST_MS);

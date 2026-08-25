@@ -8,6 +8,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.3] - 2026-08-25
+
+A patch release with no authoring-surface change: the five primitives are
+untouched and a 0.8.2 site builds identically. Two diagnostics get more
+honest, and the examples gain a gate.
+
+### Fixed
+
+- **A fragment is never replaced by the error page** (#73, WCH-08). While
+  `watch`/`dev` was running, a failing rebuild replaced every emitted `.html`
+  file with the error placeholder — and `*.fragment.html` matched that filter,
+  so a bare snippet became a complete `<!doctype html>` document. It was the
+  one place the byte-for-byte fragment guarantee lapsed, and it failed
+  invisibly: a blanked page announces itself on reload, while a blanked
+  fragment is fetched by `hx-get` or `fetch()` and swapped into a page that
+  still looks fine, so a whole document lands inside an element and what you
+  see is mangled markup pointing nowhere near the cause. Fragments now keep
+  their last good bytes. Blanking *pages* on a failure unify cannot attribute
+  is unchanged.
+- **P29 stops printing the runtime's error object** (#76, GEN-10). A generator
+  that could not read a file — the commonest failure there is — reported
+  `… open '/x.json' /     path: "/x.json", /  syscall: "open",`: the path
+  restated, then a comma terminating nothing. Both runtimes print a thrown
+  `Error`'s fields under the message, and neither the code-frame nor the
+  stack-frame shape recognised them. They are dropped now, along with node's
+  internal location header (`node:fs:560`), which carried no slash and so
+  escaped the existing file-location shape. A generator's own words are
+  untouched: an unindented line survives whatever it says, a generator listing
+  `  first-post.md: no date` survives because a bare filename is not a JS
+  identifier, and multi-line messages still arrive whole.
+
+### Added
+
+- **Gate G13: every example builds in CI** (#77). `examples/` holds seven
+  sites and CI built one, so an example could stop working unnoticed — which
+  had already happened twice, once with a deploy workflow carrying a flag cut
+  three releases earlier. All seven now run `build --dry-run --strict`; the
+  two that are audit-clean also run `audit --strict`. The four
+  sandbox-authored sites are deliberately not audit-gated, because they carry
+  41 `incomplete` findings and always have, and demanding cleanliness there
+  would be a new requirement rather than a regression check. The two examples
+  that need `npm install` run on **node**, because bun auto-installs a missing
+  import and would let an undeclared dependency pass a gate an `npx` user
+  fails (#75).
+
 ## [0.8.2] - 2026-08-24
 
 A patch release with no new authoring surface: the five primitives are
@@ -226,7 +271,8 @@ with generated compare-link notes only. Their diffs are on the
 [releases page](https://github.com/fwdslsh/unify/releases). Nothing here
 retroactively reconstructs detail those notes never carried.
 
-[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.8.2...HEAD
+[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.8.3...HEAD
+[0.8.3]: https://github.com/fwdslsh/unify/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/fwdslsh/unify/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/fwdslsh/unify/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/fwdslsh/unify/compare/v0.7.0...v0.8.0

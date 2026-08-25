@@ -170,6 +170,31 @@ function failureDetail(stderr) {
     /^Bun v\d/, //              the runtime's version footer
     /^Node\.js v\d/,
     /^\S*[/\\]\S*:\d+$/, //    node's location header: `file:///…/gen.mjs:1`
+    /^node:\S+:\d+$/, //       …and its INTERNAL one: `node:fs:560`, which the
+    //                         shape above misses because it carries no slash.
+    //                         A generator that fails inside a node builtin
+    //                         (the commonest way of all — a missing file)
+    //                         otherwise spends the first of three lines on it.
+    // The INSPECTED ERROR OBJECT's own properties, and the brace that closes
+    // it (GEN-11). Both runtimes print a thrown Error's fields under the
+    // message, and neither shape above recognised them, so the commonest
+    // failure of all — a generator that cannot read a file — reported:
+    //
+    //     … open '/x.json' /     path: "/x.json", /  syscall: "open",
+    //
+    // The message is already whole by the end of the first line; what follows
+    // re-states the path and then trails a comma that terminates nothing. A
+    // reader cannot tell that from unify's own output being broken, which is
+    // the worst thing a §14 diagnostic can look like.
+    //
+    // Keyed on INDENTATION plus a JS-identifier key, which is what separates a
+    // machine-printed property from a generator's own words: `errno: -2` is
+    // dropped, an unindented line is kept whatever it says, and a generator
+    // listing `  first-post.md: no date` keeps it too, because a bare filename
+    // is not an identifier. Multi-line generator messages still survive — the
+    // three-line budget below exists for them.
+    /^\s+[A-Za-z_$][\w$]*:\s/, //  `  syscall: "open",`
+    /^\s*\}[,;]?\s*$/, //          the `}` closing node's object tail
   ];
   const raw = stderr.split("\n").map((line) => line.trimEnd());
   const lines = raw.filter((line, i) =>
@@ -247,6 +272,7 @@ export async function runGenerator({ generatorAbs, sourceRoot, overlayDir, repor
   // path instead of re-entering its own CLI: without it, `unify gen.mjs` is an
   // unknown-argument usage error. It is harmless when `process.execPath` is an
   // ordinary `bun`, so one spawn covers both the checkout and the binary.
+  //
   const proc = spawn(process.execPath, [generatorAbs, root, overlayDir], {
     cwd: root, // §33.2 — `./_data/x.json` means what an author expects
     env: { ...process.env, BUN_BE_BUN: "1" },

@@ -278,10 +278,26 @@ export async function writeErrorPages({ outputDir, targets, html }) {
  * good" set `computeErrorPageTargets`'s fallback uses. Intended to be called
  * only right after a fully successful rebuild, so it never itself observes
  * an error page.
+ *
+ * A FRAGMENT IS NOT A PAGE, so it is never error-paged (WCH-08). `.html` is
+ * the right test for a page and the wrong one for `*.fragment.html`, which
+ * §5 ships byte-for-byte and never composes: replacing one with an error
+ * document made watch the single place in the product where that guarantee
+ * lapsed. It also failed invisibly, which a blanked page does not — a page
+ * says "Build error" the moment you reload it, while a fragment is fetched
+ * by `hx-get` or `fetch()` and swapped into a page that otherwise looks
+ * fine, so a whole `<!doctype html>` lands inside a `<div>` and what the
+ * author sees is mangled markup pointing nowhere near the real cause.
+ *
+ * Excluding them leaves the last good bytes in place, which is both more
+ * correct and more useful: a fragment has no error presentation to offer.
+ * Blanking PAGES on an unattributable failure is untouched — that is WCH-04
+ * being honest about not knowing which pages a failure reached.
  * @param {string} outputDir
  * @returns {Promise<Set<string>>}
  */
 export async function knownGoodPages(outputDir) {
   const snap = await snapshotDirectory(outputDir);
-  return new Set([...snap.keys()].filter((p) => p.endsWith(".html")));
+  return new Set([...snap.keys()]
+    .filter((p) => p.endsWith(".html") && !p.endsWith(".fragment.html")));
 }
