@@ -19,6 +19,14 @@ on:
       - "docs/**"
       - "examples/unify-docs/**"
       - ".github/workflows/deploy-docs.yml"
+      # The site is rendered BY src/ as much as FROM docs/: an engine change
+      # can alter every emitted page with no docs/ edit at all. v0.8.3 proved
+      # it — enabling Markdown tables (src/core/markdown.js) turned 247 rows
+      # of literal pipe text into 27 real <table> elements, and only reached
+      # the live site because that release's merges happened to touch docs/
+      # too. A src-only rendering fix would have left the site stale until
+      # someone remembered the manual dispatch.
+      - "src/**"
   workflow_dispatch:
 
 # The custom domain: unify.fwdslsh.dev, DNS-verified and set as this repo's
