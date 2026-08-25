@@ -881,7 +881,7 @@ A URL is internal when, after stripping the `--base-url` prefix — the path pre
 
 A `url(...)` in any CSS unify emits is a reference, and so is an `@import` naming its target as a bare string — `@import "/base.css"`. The two spellings of one at-rule were not treated alike: `@import url("…")` was already a `url()` and checked, while the bare form, which is the commoner one in hand-written CSS, was not, so a stylesheet importing a stylesheet that does not exist published green while the identical mistake in a `url()` one line down blocked the build.
 
-One unresolved target earns a second fix line: a reference to exactly `feed.xml`, `sitemap.xml`, or `search-index.json` at the output root, in a build that did not emit it. For that author the standing fix line is wrong on both counts — the spelling is right, and no source file is missing — because the name belongs to a file *this build generates under other conditions*, and the second line states the condition: `--base-url` for the sitemap; `--search-index` for the search manifest; and for the feed, whichever actually failed — no `--base-url`, no page declaring `schema: Article`/`BlogPosting`, or no declared date carrying a time of day (each day-only date already reported as A17). Ratification round 27 is the evidence: two of five authors hit this exact P13 mid-iteration and, told to check a spelling that was correct, one shipped `../feed.xml` and the other invented a build-twice model. The line names only the three root names §21/§29/§30 own, appears only when the file was not emitted, and changes nothing about what resolves — an authored or generated file at that name has always satisfied the check. `#fragment` targets are not validated against ids — that is a reader's judgment, not a build gate.
+One unresolved target earns a second fix line: a reference to exactly `feed.xml`, `sitemap.xml`, `assets/unify/catalog.json`, or `assets/unify/search-corpus.json`, in a build that did not emit it. For that author the standing fix line is wrong on both counts — the spelling is right, and no source file is missing — because the name belongs to a file *this build generates under other conditions*, and the second line states the condition: `--base-url` for the sitemap; `--catalog`/`--search-corpus` for the catalog and the search corpus, each stating its own flag independently of the other (§30.1); and for the feed, whichever actually failed — no `--base-url`, no page declaring `schema: Article`/`BlogPosting`, or no declared date carrying a time of day (each day-only date already reported as A17). Ratification round 27 is the evidence: two of five authors hit this exact P13 mid-iteration and, told to check a spelling that was correct, one shipped `../feed.xml` and the other invented a build-twice model. The line names only the four generated paths §21/§29/§30 own, appears only when the file was not emitted, and changes nothing about what resolves — an authored or generated file at that path has always satisfied the check. `#fragment` targets are not validated against ids — that is a reader's judgment, not a build gate.
 
 One absence is **not** reported: a URL that resolves to the output path of a **source page that exists but failed to compose**. That page emitted no file because of a problem of its own — already reported, and already blocking the publish — so a second diagnostic located at the *link* sends the author to a correctly-spelled path in the wrong file, and, diagnostics being path-ordered, usually prints above the one problem that matters. Measured on a twenty-page site with one page failing to compose: twenty-one problems printed, one of them real, the real one last. A reference to a target with no source file at all, and a reference to a source file that exists but is *excluded* (the stranded underscore asset above), are not this case and still fail here, loudly.
 
@@ -1054,7 +1054,7 @@ Keeping the list and naming the outcome are both required: suppressing the list 
 
 ## 18. `unify.yaml`
 
-Optional, at the source root; never emitted. Keys are the long option names with the same meanings: `source`, `output`, `clean`, `exclude` (a list, replacing the default like the flag), `pretty-urls`, `base-url`, `canonical`, `feed-full`, `search-index`, `strict`, `port`, `generate`. CLI flags win on conflict. No behavior exists that only the file can express.
+Optional, at the source root; never emitted. Keys are the long option names with the same meanings: `source`, `output`, `clean`, `exclude` (a list, replacing the default like the flag), `pretty-urls`, `base-url`, `canonical`, `feed-full`, `catalog`, `search-corpus`, `strict`, `port`, `generate`. CLI flags win on conflict. No behavior exists that only the file can express.
 
 **On the command line, a single-value option may be given once.** `exclude` is the one list — repeating it accumulates, which is what it is for — and repeating a boolean flag asks for the same thing twice and is fine. Repeating anything that carries a value (`-o dist -o other`, two `--generate` paths) is a **usage error** (exit 2). It used to keep the last one and discard the rest in silence, which published to a directory the author did not name and ran a generator instead of the one they asked for, both at exit 0: an instruction dropped without a word, which is the failure §7.6 refuses everywhere the author's content is concerned and the CLI boundary had no equivalent of.
 
@@ -1328,7 +1328,7 @@ Generation is additive: it writes one new file (or, at protocol scale, a small s
 
 ### 21.2 Membership
 
-A document is included exactly when the shared **`isPublicDestination(doc, base)`** selector (§20.4) answers `true`. That selector is **all** of the following, and this is where the closed list it computes still lives — this subsection owns the definition even though `sitemap.js` and §30's search manifest both call the one function directly, and `feed.js` builds its own membership (§29.4) from the same underlying selectors rather than a second reading of any one of these four conditions:
+A document is included exactly when the shared **`isPublicDestination(doc, base)`** selector (§20.4) answers `true`. That selector is **all** of the following, and this is where the closed list it computes still lives — this subsection owns the definition even though `sitemap.js` and §30's catalog and search corpus both call the one function directly, and `feed.js` builds its own membership (§29.4) from the same underlying selectors rather than a second reading of any one of these four conditions:
 
 1. It has a document at all (§20.1) — so assets, `.fragment.html` files, excluded sources, and pages that failed to compose are already out.
 2. `robotsPolicyOf(doc).indexable` is `true` (§20.6). A `noindex` or `none` page is excluded: listing a page the author told crawlers to drop is a contradiction the sitemap should not publish.
@@ -2017,48 +2017,107 @@ An authored `feed.xml` **suppresses generation entirely** (§21.5's rule, unchan
 
 ---
 
-## 30. The search manifest
+## 30. The catalog and the search corpus
 
-Product-spec §6.5.2. One JSON file a client-side search library or an external indexer can read instead of re-parsing the site.
+Product-spec §6.5.2. Two independent JSON artifacts under `assets/unify/`: a compact, HTML-shaped structural projection of every public page (`catalog.json`) for browse/filter/TOC/metadata-driven UI, and a minimal full-text projection (`search-corpus.json`) that a client-side search implementation indexes however it chooses. Both are projections of §20's `BuildDocument` and nothing here reads a page — the rule §20 states once, applied twice.
 
-### 30.1 Activation and shape
+### 30.1 Activation, output paths, and independence
 
-`--search-index` writes `search-index.json` at the output root. It is a flag rather than a consequence because, unlike a sitemap or a feed, nothing about a site declares that it wants one — there is no page-level statement meaning "I am searchable", and inventing one would be the unify-only content schema product-spec §6.3.7 forbids templates from teaching.
+`--catalog` writes `assets/unify/catalog.json`; `--search-corpus` writes `assets/unify/search-corpus.json`. Each is a flag rather than a consequence, for the same reason the retired `--search-index` was one: nothing about a page declares "catalog me" or "index me", and inventing such a declaration would be the unify-only content schema product-spec §6.3.7 forbids templates from teaching. **Neither flag implies the other** — a consumer that wants only full-text search data is never forced to also ship the catalog, and a browse/filter UI that never searches body text never pays for the corpus it does not read. A site wanting a full client-side search UI passes both.
+
+Both paths sit under `assets/unify/` rather than the output root, a location decision stated once for both files: this directory groups unify-generated, machine-consumed runtime assets away from navigable site pages, keeps the output root free of files a browsing reader would stumble into, and needs no dot-directory or `/.well-known/` behavior a host might not serve. **Only the two exact paths above are reserved — `assets/unify/` itself is not**, and a source tree is free to keep its own files anywhere else under that name.
+
+Neither flag is gated on `--base-url`. `document.path`/`document.url` already answer correctly with no base URL — root-relative and `null` respectively (§20.5) — so requiring `--base-url` would make either flag useless for the local-preview case it is most used in.
+
+### 30.2 The catalog schema
 
 ```json
 {
   "schemaVersion": 1,
+  "baseUrl": "https://example.com/",
   "pages": [
     {
-      "url": "https://example.com/about.html",
-      "title": "About — Example",
-      "description": "Who we are.",
-      "headings": [{ "level": 1, "id": "about", "text": "About" }],
-      "text": "About Who we are and what we do."
+      "path": "/posts/unify-and-htmx/",
+      "url": "https://example.com/posts/unify-and-htmx/",
+      "html": { "attributes": { "lang": "en" } },
+      "head": {
+        "title": "Unify and HTMX",
+        "meta": [
+          { "name": "description", "content": "A practical static-site architecture." },
+          { "name": "tags", "content": "unify" },
+          { "name": "tags", "content": "htmx" },
+          { "property": "article:published_time", "content": "2026-08-25T09:00:00-05:00" }
+        ],
+        "link": [{ "rel": "canonical", "href": "https://example.com/posts/unify-and-htmx/" }],
+        "base": []
+      },
+      "body": {
+        "attributes": { "class": "post" },
+        "headings": [{ "level": 1, "id": "unify-and-htmx", "text": "Unify and HTMX" }]
+      }
     }
   ]
 }
 ```
 
-Top-level keys are `schemaVersion` and `pages`, and a page's keys are `url`, `title`, `description`, `headings`, `text` — the names product-spec §6.5.2 fixes, in that order, with no others. `title` and `description` are `null` when the page declares none; `headings` is `[]`; `text` is `""`. Serialization is two-space-indented JSON with a trailing newline, and `pages` is in manifest order (§20.1), so two builds of one tree are byte-identical.
+Top-level keys are `schemaVersion`, `baseUrl`, `pages`, in that order. `baseUrl` is the `--base-url` value **exactly as the author typed it**, `null` without the flag — deliberately not reconstructed from the parsed `BaseUrlConfig`, which can normalize away a detail (a missing trailing slash) the author's own string still carries. `pages` is filtered to §30.4's shared membership and left in manifest order (§20.1); nothing here sorts.
 
-`schemaVersion` is `1`. It exists so a consumer can refuse a document it does not understand rather than mis-read one, and it changes only when a field's **meaning** changes; adding a field does not.
+A page's keys, in order, are `path`, `url`, `html`, `head`, `body` — and this is not a shape invented for the catalog. It is `document`, the `DocumentSnapshot` §20.3 already defines and §31.1 already serializes whole inside `unify audit --format json`'s own `document` field, with `path`/`url` promoted beside `html`/`head`/`body` rather than nested under them. `catalogEntry` performs no extraction of its own: every value is `doc.document`'s own field, read verbatim. That is deliberate — an audit page's `document` and one catalog entry cannot drift into two readings of one page, because they are the same object, produced by the same single extraction pass (§20.2).
 
-### 30.2 It is a projection, not an extractor
+The bound this buys is stated once, entirely in §20.3's own terms:
 
-Every value comes from a `BuildDocument` and nothing here reads a page. `url` is `document.url`, and `document.path` when no `--base-url` was given — a root-relative reference is still an address a page on this site can link to, and refusing to emit the file without an address would make the flag useless for the local case it is most used in. `title` and `description` come from the shared selectors `titleOf`/`descriptionOf`; `headings` is `document.body.headings` itself, which §20.3 now scopes to the first `<main>`, else `<body>`, else the whole document — a chrome heading outside that scope (a layout's `<header>`, for instance) does not appear in a page's `headings` here, exactly as it does not appear in `document.body.headings` anywhere else; `text` is §20.7's `analysis.visibleText`.
+- `html.attributes` — the emitted `<html>`'s attributes, arbitrary `data-*` included.
+- `head.title`, `head.meta`, `head.link`, `head.base` — bounded head data only. No `<style>` contents, no script bodies, no raw head HTML. Arbitrary metadata vocabulary, repeated values, declaration order, and the `name`/`property` distinction all survive untouched (release-brief §12, replacing the retired taxonomy concepts): a page with `tags:` written twice in frontmatter keeps two `meta` entries here, in the order the author wrote them.
+- `body.attributes`, `body.headings` — body attributes, and the flat, main-scoped heading sequence §20.3 already defines. No hierarchy is constructed; a consumer building a nested table of contents does so from `level` itself.
 
-Membership is **`isPublicDestination`** (`document-selectors.js`), the shared predicate every 0.9 built-in projection uses: the document exists, is `indexable`, is not `404.html`, and is self-canonical. `noindex` means *do not show this page in search results*, and a site search is search results; a page consolidated onto another would return the reader to a URL its own author retired.
+**No body text, ever, in this file.** `analysis.visibleText` lives on `DocumentAnalysis`, the private half of extraction, and `catalogEntry` never reads it — that is `search-corpus.json`'s field, not this one's, so a long article's body grows the corpus and leaves the catalog entry's size unchanged beyond its own head data and headings. **No JSON-LD script bodies either.** `analysis.jsonLd` stays private for the same reason: a structured-data block can itself carry an entire article body or a product dataset, and copying it into a file meant to stay one bounded record per page would defeat the reason the catalog exists. `declaredTypes(doc)` (§20.8) remains the selector a consumer of `analysis` builds a structured-data reading from; the catalog does not attempt to save that consumer the trouble.
 
-### 30.3 `text` is folded here, and §20.3 says it must be
+`schemaVersion` is `1` — a consumer's refusal signal rather than a build number, independent of the corpus's own (§30.3, versioning rule stated once at §30.7). Within version 1, only additive optional fields may be added; a change to an existing field's meaning is what earns a `2`.
 
-§20.3 keeps U+00A0 in `text` because the author chose a character that forbids a line break, and states the obligation this section discharges: *any projection of this field that is searched or compared must fold U+00A0 and the other Unicode space separators at index time, and say so where it is specified*. This is that place. Every Unicode space separator — U+00A0, U+2000–U+200A, U+202F, U+205F, U+3000 — becomes U+0020, runs collapse, and the result is trimmed. A reader typing `New York` with an ordinary space finds a page that wrote it with U+00A0, which they could not do against the unfolded field.
+### 30.3 The search corpus schema
 
-Nothing else is folded. No case folding, no stemming, no stop-word removal, no truncation, and no character count: those are a search engine's decisions, and unify does not ship a search runtime (§6.5.2).
+```json
+{
+  "schemaVersion": 1,
+  "pages": [
+    { "path": "/posts/unify-and-htmx/", "text": "Unify and HTMX A practical static-site architecture…" }
+  ]
+}
+```
 
-### 30.4 Collisions and checks
+Top-level keys are `schemaVersion`, `pages`. A page's keys are `path`, `text`, and **nothing else** — no `url`, no `title`, no `description`, no `headings`, no metadata, no canonical. Every one of those already lives in `catalog.json`, and duplicating any here would give a consumer two answers to the same question about one page. `path` is the join key, and it is the join key deliberately — the one field the two files share verbatim: a consumer builds `new Map(catalog.pages.map(p => [p.path, p]))` once and looks a search hit's `path` up in it to recover everything else about that page.
 
-An authored `search-index.json` suppresses generation entirely and ships byte-for-byte (§21.5's rule). A generated path already occupied is **P22**. The file is listed in `--dry-run` and published transactionally like every other write. Its `url` values are not re-checked, and the reason is that there is nothing to check: `document.url` and `document.path` are **computed from an output path that exists by construction** (§20.5), not authored, so unlike a sitemap's `<loc>` or a feed's `<id>` there is no author-supplied value here that could name something the site does not emit. §21.6 exists because an authored sitemap can carry one; this file cannot.
+`text` is `analysis.visibleText` (§20.7), folded by §30.5 below. `pages` is filtered to the identical §30.4 membership predicate `catalog.json` uses and left in manifest order — a client zipping the two files by `path` never has to reconcile two membership answers, because there is only one.
+
+`schemaVersion` is `1`, independent of the catalog's own (release-brief §27): a change to one file's meaning never forces the other to bump.
+
+### 30.4 Shared membership
+
+Both files use the identical **`isPublicDestination(doc, base)`** selector §21.2 defines and owns: the document exists, is indexable (`robotsPolicyOf(doc).indexable`), its output path is not `404.html`, and it is self-canonical. A page the author marked `noindex`, or consolidated onto another page by its own canonical, is absent from both files for the reason §21.2 already states for the sitemap — a `noindex` page returning through a site-search box is the same contradiction as one returning through a crawler's index.
+
+Reusing the sitemap's own predicate, rather than a second reading of "which pages does this site publish", is why the catalog and the corpus cannot describe two different page sets from one build: `sitemap.js`, `catalog.js`, and `search-corpus.js` all call the one function, and none of them reimplements it.
+
+### 30.5 Text folding
+
+`search-corpus.json`'s `text` is where §20.3's own deferred obligation is discharged, and the only place it is: §20.3 keeps a decoded U+00A0 in `analysis.visibleText` because the author chose a character that forbids a line break, and states that *any projection of this field that is searched or compared must fold U+00A0 and the other Unicode space separators at index time, and say so where it is specified*. This is that place — the catalog carries no free text, so it has no obligation to discharge.
+
+Every Unicode space separator — U+00A0, U+2000–U+200A, U+202F, U+205F, U+3000 — becomes U+0020, the runs folding can create collapse, and the result is trimmed. A reader typing `New York` with an ordinary space finds a page that wrote it with U+00A0, which they could not match against the unfolded field.
+
+Nothing else is folded: no case folding, no stemming, no stop-word removal, no truncation, no character count. Those are a search engine's decisions, and unify ships no search runtime (product-spec §6.5.2).
+
+### 30.6 Authored files, collisions, and publish
+
+An authored file at exactly `assets/unify/catalog.json` or `assets/unify/search-corpus.json` **suppresses generation of that file entirely**, the same author-wins rule an authored `sitemap.xml`/`feed.xml` follow (§21.5): the author's file is the site's catalog or corpus, ships byte-for-byte, and unify neither overwrites it nor merges into it. Suppression is checked before either projection is computed, so an authored file costs nothing to detect. `--dry-run` shows it as an ordinary copy from source, with no generated row for the path it occupies.
+
+**Neither file can raise P22.** P22 exists for a generated path a *split* can still produce after its own primary file is suppressed — `sitemap.xml`'s numbered parts are that case (§21.5). `catalog.json` and `search-corpus.json` each fix exactly one location, unconditionally, with no size cap and no split: by the time either generator runs, the suppression check above has already proven its one path absent from the tree's own emitted files, so there is no second path left for either to collide on. This corrects, rather than restates, the retired search manifest's own §30.4, which claimed a P22 that this path shape could never actually produce.
+
+Once generated, both files join the temporary tree exactly like any other write, and need **no special-casing** to do so. They become checkable reference *targets* for free: §12's `emittedPaths` is built from every file the finished temp tree holds, generated and authored alike, so a page's own `<a href="/assets/unify/catalog.json">` resolves the same way a link to any other emitted file does. Neither file is itself scanned as a *source* of references — §12 scans `.html` and `.css` output, and JSON carries no `href`/`url()` syntax for it to find, so there is nothing inside either file for a reference checker to look for. And neither gets a dedicated internal-value check the way an authored `sitemap.xml`/`feed.xml` does (§21.6/§29.7): a *generated* file's `path`/`url` values are already correct by construction (§20.5), so such a check would find nothing, and an *authored* file is held to no such guarantee — unify makes no built-in use of a catalog or corpus's own contents the way §21.6 consumes a sitemap's `<loc>` to verify crawler-facing correctness, so there is no reader inside unify for a wrong value to mislead. Both files participate in §15's transactional publish and a watch rebuild's full-rebuild rule (§16) exactly as any other generated write does.
+
+### 30.7 Determinism and versioning
+
+Both files are two-space-indented JSON with a trailing newline. `pages` is manifest order (§20.1) in both — the build's own output-path order, not a sort either file introduces. Head arrays (`meta`, `link`, `base`) and heading arrays keep the document order §20.3 already fixed. No timestamp, build id, random value, or filesystem/Git-derived data ever reaches either file (product-spec §6.1). The result: the same final page bytes and the same build settings produce byte-identical `catalog.json` and `search-corpus.json` across repeated builds of one tree.
+
+`schemaVersion: 1` is an independent contract per file (§30.2/§30.3), and the versioning rule itself is stated once here: within version 1, only additive optional fields may be added to either file; a change to an existing field's meaning, or its removal, requires that file's own version to increment. A version bump to one file never requires or implies one to the other, and neither is tied to unify's own package version.
 
 ---
 

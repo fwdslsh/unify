@@ -791,7 +791,7 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
         url: publishModule.urlForOutputPath(outPath, prefix),
         from: "generated (--base-url)",
       })),
-      // §30.4 — likewise, named for the flag that actually produced each one
+      // §30.6 — likewise, named for the flag that actually produced each one
       // rather than --base-url: activation is `--catalog`/`--search-corpus`
       // alone, with or without a site address.
       ...[...generatedCatalog.keys()].map((outPath) => ({
