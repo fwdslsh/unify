@@ -29,10 +29,14 @@ const OPTIONS = {
   "feed-full": { kind: "flag" },
   "dry-run": { kind: "flag" },
   strict: { kind: "flag" },
-  // §30.1 — a flag rather than a consequence: unlike a sitemap or a feed,
-  // nothing about a page declares "index me", so there is no record-derived
-  // condition that could activate this the way `--base-url` activates §21.
-  "search-index": { kind: "flag" },
+  // §30.1 — flags rather than a consequence: unlike a sitemap or a feed,
+  // nothing about a page declares "catalog me" or "index me", so there is no
+  // record-derived condition that could activate either the way
+  // `--base-url` activates §21. Independent of each other too: `catalog`
+  // writes `assets/unify/catalog.json`, `search-corpus` writes
+  // `assets/unify/search-corpus.json`, and neither implies the other.
+  catalog: { kind: "flag" },
+  "search-corpus": { kind: "flag" },
   // §33.1 — a PATH in the source tree, never a command. Saved in unify.yaml
   // like any other long option.
   generate: { kind: "value" },
@@ -40,8 +44,8 @@ const OPTIONS = {
   // syntactic parser like every entry here: the closed set (human/json/sarif)
   // and its usage error are audit.js's own concern, the same split
   // `--canonical`'s value ("auto" only) already keeps between this file and
-  // cli.js. Ignored by every command but `audit`, exactly as `--search-index`
-  // is ignored by `audit` and read only by `build`.
+  // cli.js. Ignored by every command but `audit`, exactly as `--catalog`/
+  // `--search-corpus` are ignored by `audit` and read only by `build`.
   format: { kind: "string", example: "json" },
   // §31.3 — the one network operation in the whole product (product-spec
   // §6.1: builds are offline and deterministic without qualification), so it
@@ -55,7 +59,7 @@ const OPTIONS = {
 };
 
 /** Keys `unify.yaml` may carry — the long option names, minus the ones that make no sense to save. */
-const CONFIG_KEYS = ["source", "output", "clean", "exclude", "pretty-urls", "base-url", "canonical", "feed-full", "search-index", "strict", "port", "generate"];
+const CONFIG_KEYS = ["source", "output", "clean", "exclude", "pretty-urls", "base-url", "canonical", "feed-full", "catalog", "search-corpus", "strict", "port", "generate"];
 
 const SHORT = Object.fromEntries(
   Object.entries(OPTIONS)

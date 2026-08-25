@@ -61,7 +61,8 @@ import { buildManifest } from "../../core/manifest.js";
 import { auditManifest, formatFindings } from "../../core/audit.js";
 import * as sitemap from "../../core/sitemap.js";
 import * as feed from "../../core/feed.js";
-import * as searchIndex from "../../core/search-index.js";
+import * as catalog from "../../core/catalog.js";
+import * as searchCorpus from "../../core/search-corpus.js";
 import { completeCanonical } from "../../core/canonical.js";
 import { checkSchemaDeclarations, generateStructuredData } from "../../core/structured-data.js";
 import * as robots from "../../core/robots.js";
@@ -498,17 +499,27 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
   });
   for (const [outPath, text] of generatedFeed) tempFiles.set(outPath, text);
 
-  // ---- §30 — the search manifest, the manifest's third projection. --------
-  // Unlike sitemap/feed, activation is the flag ALONE (§30.1) — nothing about
-  // a page declares "index me", so there is no document-derived condition to
-  // check the way `generateSitemap`/`generateFeed` check `base`/declared type.
-  // Unconditional on `baseConfig`: `searchIndexEntry` already falls back to
-  // `doc.document.path` with no --base-url (§30.2), so gating this on `base`
-  // would make the flag useless for the local-preview case it exists for.
-  const generatedSearchIndex = settings.searchIndex
-    ? searchIndex.generateSearchIndex({ documents: manifest.documents, base: baseConfig, emittedFromSource })
+  // ---- §30 — the catalog and the search corpus, the manifest's third and
+  // fourth projections. ------------------------------------------------------
+  // Unlike sitemap/feed, activation is each flag ALONE (§30.1) — nothing
+  // about a page declares "catalog me" or "index me", so there is no
+  // document-derived condition to check the way `generateSitemap`/
+  // `generateFeed` check `base`/declared type. Unconditional on `baseConfig`:
+  // both projections read `doc.document.path`/`.url`, which already fall
+  // back correctly with no --base-url, so gating either on `base` would make
+  // the flag useless for the local-preview case it exists for. Independent
+  // of each other too — `--search-corpus` does not imply `--catalog`.
+  const generatedCatalog = settings.catalog
+    ? catalog.generateCatalog({
+        documents: manifest.documents, base: baseConfig, baseUrl: settings.baseUrl ?? null, emittedFromSource,
+      })
     : new Map();
-  for (const [outPath, text] of generatedSearchIndex) tempFiles.set(outPath, text);
+  for (const [outPath, text] of generatedCatalog) tempFiles.set(outPath, text);
+
+  const generatedSearchCorpus = settings.searchCorpus
+    ? searchCorpus.generateSearchCorpus({ documents: manifest.documents, base: baseConfig, emittedFromSource })
+    : new Map();
+  for (const [outPath, text] of generatedSearchCorpus) tempFiles.set(outPath, text);
 
   // ---- §12 — the reference check, against the completed temp tree. --------
   const htmlFiles = new Map();
@@ -619,9 +630,13 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
     wouldGenerate.set(sitemap.SITEMAP_PATH,
       "sitemap.xml is generated, not authored: this build generates it only under --base-url");
   }
-  if (!tempFiles.has(searchIndex.SEARCH_INDEX_PATH) && settings.searchIndex !== true) {
-    wouldGenerate.set(searchIndex.SEARCH_INDEX_PATH,
-      "search-index.json is generated, not authored: this build generates it only under --search-index");
+  if (!tempFiles.has(catalog.CATALOG_PATH) && settings.catalog !== true) {
+    wouldGenerate.set(catalog.CATALOG_PATH,
+      "assets/unify/catalog.json is generated, not authored: this build generates it only under --catalog");
+  }
+  if (!tempFiles.has(searchCorpus.SEARCH_CORPUS_PATH) && settings.searchCorpus !== true) {
+    wouldGenerate.set(searchCorpus.SEARCH_CORPUS_PATH,
+      "assets/unify/search-corpus.json is generated, not authored: this build generates it only under --search-corpus");
   }
 
   references.checkReferences({
@@ -776,14 +791,20 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
         url: publishModule.urlForOutputPath(outPath, prefix),
         from: "generated (--base-url)",
       })),
-      // §30.4 — likewise, named for the flag that actually produced it rather
-      // than --base-url: §30.1/§30.2 activate on --search-index alone, with
-      // or without a site address.
-      ...[...generatedSearchIndex.keys()].map((outPath) => ({
+      // §30.4 — likewise, named for the flag that actually produced each one
+      // rather than --base-url: activation is `--catalog`/`--search-corpus`
+      // alone, with or without a site address.
+      ...[...generatedCatalog.keys()].map((outPath) => ({
         action: "write",
         outputPath: `${displayOutput}/${outPath}`,
         url: publishModule.urlForOutputPath(outPath, prefix),
-        from: "generated (--search-index)",
+        from: "generated (--catalog)",
+      })),
+      ...[...generatedSearchCorpus.keys()].map((outPath) => ({
+        action: "write",
+        outputPath: `${displayOutput}/${outPath}`,
+        url: publishModule.urlForOutputPath(outPath, prefix),
+        from: "generated (--search-corpus)",
       })),
       ...plan.delete.map((rel) => ({ action: "delete", outputPath: `${displayOutput}/${rel}` })),
     ];
