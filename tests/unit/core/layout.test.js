@@ -13,7 +13,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { checkLayoutDocument, resolveHtmlLayout } from "../../../src/core/layout.js";
+import { checkLayoutDocument, resolveHtmlLayout, inertRanges} from "../../../src/core/layout.js";
 import { inlineIncludes } from "../../../src/core/includes.js";
 import { lineOf, parse } from "../../../src/core/html.js";
 import { Reporter } from "../../../src/core/diagnostics.js";
@@ -121,5 +121,59 @@ describe("§14.1 — a fragment-contributed fault is reported IN the fragment", 
     // The fix still names the LAYOUT — the file whose role is wrong — even
     // though the markup was written elsewhere.
     expect(reporter.diagnostics[0].fixes[0]).toContain("_layout.html");
+  });
+});
+
+// ---------------------------------------------------------------- §6.3 LAY-16
+
+describe("inertRanges — where a retired spelling is a sample, not markup", () => {
+  /** True when every needle sits inside some inert range. */
+  const covered = (text, file, ...needles) => {
+    const r = inertRanges(text, file);
+    return needles.every((n) => {
+      const i = text.indexOf(n);
+      return i !== -1 && r.some(([s, e]) => i >= s && i < e);
+    });
+  };
+
+  test("HTML: <pre>/<code> nest as one region", () => {
+    const t = '<pre><code>SAMPLE</code></pre>';
+    expect(covered(t, "a.html", "SAMPLE")).toBe(true);
+    // Backticks carry no meaning in HTML.
+    expect(inertRanges("`SAMPLE`", "a.html")).toEqual([]);
+  });
+
+  test("Markdown: a fence closes only on the same character, at least as long", () => {
+    expect(covered("```\nSAMPLE\n```\n", "a.md", "SAMPLE")).toBe(true);
+    expect(covered("~~~\nSAMPLE\n~~~\n", "a.md", "SAMPLE")).toBe(true);
+    // A tilde run does not close a backtick fence, so protection runs on.
+    expect(covered("```\nSAMPLE\n~~~\nAFTER\n", "a.md", "SAMPLE", "AFTER")).toBe(true);
+    // A longer closing run is still a close.
+    expect(covered("```\nSAMPLE\n`````\n", "a.md", "SAMPLE")).toBe(true);
+    // An unclosed fence protects to end of text.
+    expect(covered("```\nSAMPLE\n", "a.md", "SAMPLE")).toBe(true);
+  });
+
+  test("Markdown: an indented block needs a blank line before it", () => {
+    expect(covered("para\n\n    SAMPLE\n", "a.md", "SAMPLE")).toBe(true);
+    // Interrupting a paragraph is NOT a code block — this stays markup.
+    const t = "para\n    SAMPLE\n";
+    const i = t.indexOf("SAMPLE");
+    expect(inertRanges(t, "a.md").some(([s, e]) => i >= s && i < e)).toBe(false);
+  });
+
+  test("Markdown: an inline span closes on an equal-length backtick run", () => {
+    expect(covered("use `SAMPLE` here", "a.md", "SAMPLE")).toBe(true);
+    // A double-backtick span may contain a single backtick.
+    expect(covered("use ``a ` SAMPLE`` here", "a.md", "SAMPLE")).toBe(true);
+    // An unmatched run opens nothing.
+    const t = "use `SAMPLE here";
+    const i = t.indexOf("SAMPLE");
+    expect(inertRanges(t, "a.md").some(([s, e]) => i >= s && i < e)).toBe(false);
+  });
+
+  test("ranges come back sorted and merged", () => {
+    const r = inertRanges("`a`\n\n```\nb\n```\n\n`c`\n", "a.md");
+    for (let i = 1; i < r.length; i += 1) expect(r[i][0]).toBeGreaterThan(r[i - 1][1] - 1);
   });
 });

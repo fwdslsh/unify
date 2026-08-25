@@ -27,6 +27,20 @@ honest, and the examples gain a gate.
   see is mangled markup pointing nowhere near the cause. Fragments now keep
   their last good bytes. Blanking *pages* on a failure unify cannot attribute
   is unchanged.
+- **A retired spelling inside code is a sample, not a declaration** (#71,
+  LAY-16). P08 parses raw source as HTML, so a page *documenting* the retired
+  vocabulary was reported as a page *using* it — a well-formed sample is
+  indistinguishable from authored markup to a parser that was never told the
+  difference. unify's own documentation site went red the day the conformance
+  spec gained a sentence about `data-slot`, and the spec had to name the
+  attribute without showing it on an element; it now spells the tag out. The
+  check is inert inside `<pre>`/`<code>` — the same regions §5.1 item 8
+  already makes inert for `<include>` — and, in Markdown, inside fenced
+  blocks, indented blocks and inline spans. Deliberately the CommonMark
+  reading rather than a looser one, because every inert byte is a byte P08
+  stops protecting: an indented run counts only after a blank line, so an
+  indented *continuation* of a paragraph is still markup and a retired
+  spelling in it is still reported.
 - **A diagnostic's line survives `--pretty-urls`** (#72, URL-15). §11 replaces
   attribute values in place but not at equal length — `/notes/index.html`
   becomes `/notes/`, ten bytes shorter — so every reference after one of those
