@@ -126,18 +126,25 @@ The build produces 23 files: 11 authored pages, 4 generated pages, 5 fragments, 
 
 ## 4. Running Eleventy through `--generate`
 
-`--generate` names **one file you wrote**, and its whole interface is two positional
+`--generate` names **one file you wrote**, and its whole interface is three positional
 arguments:
 
 ```js
-const [, , sourceRoot, generatedDir] = process.argv;
+const [, , sourceRoot, generatedDir, contextPath] = process.argv;
 ```
 
 `sourceRoot` is the absolute path of your source tree, `generatedDir` an absolute path to
-an empty directory that exists only for this build, and the working directory is the
-source root. There is nothing to import. Everything written into `generatedDir` joins the
-build as ordinary source — scanned, composed, reference-checked, collision-checked, and
-published inside the same transaction as the files you wrote by hand.
+an empty directory that exists only for this build, and `contextPath` the absolute path of
+`generator-context.json` — a versioned, read-only snapshot unify wrote for this one build:
+`schemaVersion`, `unifyVersion`, the running `command`, the same three paths, the effective
+site settings (`baseUrl`, `prettyUrls`, `canonical`), and where `--catalog`/`--search-corpus`
+will land. The working directory is the source root. There is nothing to import. All three
+arguments are always supplied — a generator that reads only the first two keeps working
+exactly as it did before `contextPath` existed.
+
+Everything written into `generatedDir` joins the build as ordinary source — scanned,
+composed, reference-checked, collision-checked, and published inside the same transaction as
+the files you wrote by hand.
 
 The runtime is unify's own, spawned as a subprocess, so a generator runs on a machine with
 no Node installation. The flag's value must resolve inside the source root:
@@ -159,6 +166,7 @@ import { join } from "node:path";
 
 const sourceRoot = process.argv[2] ?? process.cwd();
 const generatedDir = process.argv[3] ?? mkdtempSync(join(tmpdir(), "eleventy-preview-"));
+const context = process.argv[4] ? JSON.parse(readFileSync(process.argv[4], "utf8")) : null;
 const site = JSON.parse(readFileSync("_data/site.json", "utf8"));
 
 const views = [
@@ -173,6 +181,7 @@ const eleventy = new Eleventy(".", generatedDir, {
     cfg.setTemplateFormats(["md", "11ty.js"]);
     cfg.addGlobalData("permalink", false);
     cfg.addGlobalData("views", views);
+    cfg.addGlobalData("baseUrl", context?.site.baseUrl ?? null);
     cfg.addCollection("releases", (api) =>
       [...api.getFilteredByGlob("notes/*.md")].sort((a, b) => b.date - a.date));
   },
@@ -181,7 +190,7 @@ const eleventy = new Eleventy(".", generatedDir, {
 await eleventy.write();
 ```
 
-Five of those lines are not obvious. Three carry the integration; two are defensive, and
+Six of those lines are not obvious. Four carry the integration; two are defensive, and
 saying which is which matters, because a reader who removes one to test the claim should
 get the result the guide predicted:
 
@@ -192,15 +201,25 @@ get the result the guide predicted:
    what makes the mistake hard to spot.
 2. **Output `generatedDir`.** This is the whole integration. Eleventy writes into unify's
    overlay and nowhere else.
-3. **An absolute `configPath`.** Two settings exist only in a config *file*, and Eleventy's
+3. **`context.site.baseUrl` as Eleventy global data.** `process.argv[4]` is
+   `generator-context.json` — a versioned snapshot of the same effective settings unify's
+   own build is about to apply, read once, straight off disk, with no import from unify.
+   Under `unify build --generate _scripts/eleventy.mjs --pretty-urls` the flag is missing,
+   so `context.site.baseUrl` is `null`, and every generated template that reads `baseUrl`
+   from Eleventy's data cascade renders a relative link exactly as before argv[4] existed;
+   add `--base-url https://ashgrove.example/` (§11) and the same templates see the string
+   unify itself will publish, with no second `--base-url` to keep in sync by hand. The `?.`
+   guards a standalone run with no fourth argument at all (see the `try`/`catch` discussion
+   below) — under unify, argv[4] is always supplied, so the guard never fires there.
+4. **An absolute `configPath`.** Two settings exist only in a config *file*, and Eleventy's
    auto-discovery would look in the working directory — the source root, where an
    `eleventy.config.mjs` would mirror-copy into `dist/`. The file lives under `_11ty/`
    instead, and is named explicitly.
-4. **`setUseGitIgnore(false)`** is defensive, and a no-op in this tree: there is no
+5. **`setUseGitIgnore(false)`** is defensive, and a no-op in this tree: there is no
    `src/.gitignore`, so removing the line produces a byte-identical overlay. The hazard is
    real all the same — write one (`printf 'notes/\n' > src/.gitignore`) and every
    collection empties silently: no error, and an empty release list on every page.
-5. **`setTemplateFormats(["md", "11ty.js"])`** is defensive too. Eleventy's default formats
+6. **`setTemplateFormats(["md", "11ty.js"])`** is defensive too. Eleventy's default formats
    are `["liquid", "md", "njk", "html", "11ty.js"]`, so without this line the authored
    `.html` pages are entered into the template set. They are still never written, because
    of the global `permalink: false` below, and removing the line produces a byte-identical
