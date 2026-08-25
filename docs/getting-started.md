@@ -137,7 +137,7 @@ Everything here is converted to HTML and dropped into the layout
 exactly like an HTML page's content.
 ```
 
-Frontmatter supplies the head: `title` (if you skip it, the first `# Heading` is the title), `layout`, `class`, `lang`, `dir`, `schema` (`Article`, `WebPage`, or `BlogPosting`, spelled exactly — it writes that page's JSON-LD from what the page already declares), and any other key becomes a `<meta>` tag (`description`, `author`; an `og:` block becomes `property=` metas). Headings get anchor `id`s automatically. There are no collections and no draft mechanism, and unify says so rather than letting a key look like it worked: `draft:`, `permalink:`, and `slug:` are **build errors** naming what to do instead — hold a page back by renaming it with a leading underscore (`_draft.md`), and change a page's address by renaming or moving the source file. `tags:` and `categories:` are allowed and become ordinary `<meta>` tags, but nothing is built from them — no index, no archive, no feed — and `unify audit` reports that once per page.
+Frontmatter supplies the head: `title` (if you skip it, the first `# Heading` is the title), `layout`, `class`, `lang`, `dir`, `schema` (`Article`, `WebPage`, or `BlogPosting`, spelled exactly — it writes that page's JSON-LD from what the page already declares), and any other key becomes a `<meta>` tag (`description`, `author`; an `og:` block becomes `property=` metas). Headings get anchor `id`s automatically. There are no collections and no draft mechanism, and unify says so rather than letting a key look like it worked: `draft:`, `permalink:`, and `slug:` are **build errors** naming what to do instead — hold a page back by renaming it with a leading underscore (`_draft.md`), and change a page's address by renaming or moving the source file. `tags:` and `categories:` are allowed and become ordinary `<meta>` tags, but nothing is built from them — no index, no archive, no feed — they're inert by design, meaningful only to a consumer that chooses to interpret them (a catalog consumer included).
 
 One more key does something: `schema: Article` (or `WebPage`, or `BlogPosting`) writes the page's JSON-LD for you, out of what the page already says — title, description, canonical, `og:image`, `author`, `date`, `lastmod`, `lang`. It invents nothing, so a `date:` it cannot read as `2026-01-02` is left out and reported rather than guessed at, and a `<script type="application/ld+json">` you write yourself wins outright. That is the escape hatch for every other type.
 
@@ -204,7 +204,7 @@ Two more `audit`-only flags, for wiring it into other tools: `--format json` (or
 
 Deploying under a subpath (GitHub Pages project sites)? Give `--base-url` the site's whole address: `unify build --pretty-urls --base-url https://you.github.io/repo-name/`. The path part prefixes every root-relative link; the domain absolutizes `og:` and canonical URLs, which is what Facebook, LinkedIn and Slack fetch when someone shares a page. A bare `/repo-name/` is rejected — it would prefix the links and leave the share metadata unfetchable.
 
-## Feeds and a search index
+## Feeds, a catalog, and a search corpus
 
 Declare what a page *is* and unify writes its feed entry for you — no script, no `posts/` convention:
 
@@ -222,7 +222,7 @@ src/posts/hello.md: advisory: date is "2026-01-02", which names a day rather tha
 
 Want each entry's full rendered content in the feed, not just a summary? Add `--feed-full`. Want to write the feed yourself instead — RSS, extra fields, a generator script — just ship your own `src/feed.xml`: an authored file always wins, and unify generates nothing (`unify init blog`'s own feed is exactly this, and it still builds and audits clean).
 
-`--search-index` writes `search-index.json` at the output root: every indexable page's URL, title, description, heading outline, and visible text, ready for a client-side search library to read instead of re-parsing your site. It works with or without `--base-url` (root-relative locally, absolute once you give it an address), and an authored `src/search-index.json` overrides it the same way a feed does.
+`--catalog` writes `assets/unify/catalog.json`: a compact, HTML-shaped record of every public page — its head data, root attributes, and heading outline, no body text — for a blog list, a tag facet, or a page chooser to read instead of re-parsing your site. `--search-corpus` writes `assets/unify/search-corpus.json`: just each page's `path` and its normalized visible text, for a client-side search library to index however it likes. The two are independent flags — pass one, the other, or both for a full search UI — and each works with or without `--base-url` (`path` root-relative locally, `url` absolute once you give it an address). A search hit only carries `path` and `text`; look the rest up by joining it against the catalog's own `path`. An authored `src/assets/unify/catalog.json` or `src/assets/unify/search-corpus.json` overrides the matching file the same way a feed does. See [`guides/catalog-and-search.md`](guides/catalog-and-search.md) for a worked blog listing and search UI built on both files.
 
 ## Anything else derived from other files
 

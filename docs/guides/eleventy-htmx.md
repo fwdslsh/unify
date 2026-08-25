@@ -24,15 +24,12 @@ codes.
 
 unify has no collections, no data cascade, no pagination, and no taxonomy. That is a
 decision rather than a gap — `authoring-rules.md` says it in one line ("Derived files (a
-post index) come from a script you write and run yourself"), and `unify audit` will tell
-you so to your face if you write a `tags:` key and wait for an index to appear:
-
-```
-$ unify audit -s src --generate _scripts/eleventy.mjs --pretty-urls
-notes/2026-06-30-firmware-2-6-0.md: incomplete: the page declares <meta name="tags">, and unify built nothing from it: no index page, no archive, no feed of any term, and no route [taxonomy-inert]
-  fix: write the index yourself — a script that emits the page before the build — or drop the keys if nothing reads them
-audit: 0 broken, 1 incomplete
-```
+post index) come from a script you write and run yourself"). Write a `tags:` key and wait
+for an index to appear, and nothing happens, silently: `tags`/`categories` synthesize to
+ordinary `<meta>` tags exactly like any other frontmatter key, unify builds no index,
+archive, feed, or route from them, and `unify audit` reports nothing about them either —
+they are inert by design, meaningful only to a consumer that chooses to interpret them.
+That consumer is Eleventy's `addCollection`, covered next.
 
 Eleventy has all four, plus permalinks, and it is happy to be driven from a script. unify
 is the half Eleventy leaves you to assemble by hand: layout discovery, slot filling, head
@@ -326,9 +323,9 @@ schema: BlogPosting
 Eleventy reads `topic` as collection data. unify, which reserves no such key, emits it as
 metadata on the published page — `<meta name="topic" content="firmware">` — and neither
 tool is confused. `schema: BlogPosting` is unify's, and gives that page a JSON-LD block
-built from what it already declares. Use `tags:` instead and you get the `taxonomy-inert`
-finding from §1: correct, because unify really did build nothing from it, and unnecessary,
-because Eleventy is right there.
+built from what it already declares. Use `tags:` instead and unify builds nothing from it
+and reports nothing either (§1): correct, because tags are inert metadata by design, and
+unnecessary, because Eleventy is right there.
 
 ## 6. Generating pages and fragments
 
@@ -994,8 +991,9 @@ stable sorting, escaping. If Eleventy is in the tree, `addCollection` and `pagin
 the answer, and your generator is the twenty-four lines that hand its output to unify.
 
 The mirror-image mistake is reimplementing them inside *unify* — waiting for `tags:` to build
-an archive, or asking for a collections feature. unify will not grow one; the `taxonomy-inert`
-finding exists to say so at the moment you would otherwise wonder.
+an archive, or asking for a collections feature. unify will not grow one, and stays silent
+about it on purpose: `tags:`/`categories:` are ordinary, inert metadata (§1), not a hook
+waiting for a feature to arrive.
 
 **Using two layout systems.** Covered in §7 with the emitted evidence: the build exits 0 and
 publishes two mastheads, two footers, two `<title>` elements and a `<!doctype html>` inside
