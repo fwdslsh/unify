@@ -249,7 +249,12 @@ export async function run(argv) {
   }
 
   const reporter = new Reporter({ strict: settings.strict });
-  const context = { sourceRoot, output, settings, reporter, template, sourceDefaulted };
+  // §18 — the actual subcommand, carried alongside `settings` rather than
+  // folded into it: it is not a saved-flag concept (unify.yaml has nothing
+  // named `command`), only the generator context's `command` field reads it,
+  // and every command handler below (build/audit/dev/watch) already receives
+  // and forwards this whole context object.
+  const context = { sourceRoot, output, settings, reporter, template, sourceDefaulted, command };
 
   switch (command) {
     case "build":
