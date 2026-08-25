@@ -28,9 +28,6 @@
 
       <section class="latest">
         <h2>Latest releases</h2>
-        <!-- Spliced in at build time by unify. Eleventy wrote this file into the overlay;
-             unify treats it as an ordinary include, so the list is in the page before htmx
-             loads, with JavaScript off, and for every crawler. It is never fetched. -->
         <include src="/latest.fragment.html"></include>
         <p><a href="/notes/index.html">All releases</a></p>
       </section>

@@ -8,14 +8,6 @@
     <link rel="stylesheet" href="/assets/css/site.css">
     <script src="/assets/js/htmx.min.js" defer></script>
   </head>
-  <!-- hx-boost="true" here makes every ordinary anchor in the site a background fetch
-       that swaps the body element, so navigating keeps the stylesheet and the script
-       instead of reloading them. It is safe at this level because every anchor on every
-       page of this site points at a real HTML document: nothing links to a raw
-       .fragment.html and nothing links to a feed. htmx processes explicit verbs before it
-       boosts anything, so the release-note tabs — which carry their own hx-get — are left
-       alone to do their own smaller swap. With JavaScript off, all of them are just
-       links. -->
   <body hx-boost="true">
     <include src="/_includes/header.fragment.html"></include>
     <main><slot></slot></main>

@@ -12,28 +12,61 @@ generated pages into `src/_layout.html` by the same discovery walk it uses for h
 ones, and reference-checks, collision-checks and publishes them in the same transaction.
 Neither tool knows the other exists.
 
+[`docs/guides/eleventy-htmx.md`](../../docs/guides/eleventy-htmx.md) is the long-form
+guide: the same ground plus measured watch behaviour, build cost at a thousand notes, the
+deploy limits, and §14 on when *not* to adopt this stack. Read
+[`docs/authoring-rules.md`](../../docs/authoring-rules.md) first — every page, layout and
+fragment here obeys it.
+
+**Most sites should not do this.** A normal unify site is HTML, CSS and unify: no
+`package.json`, no `node_modules/`, no generator. This example is the far end of what
+unify can accommodate, not a recommended starting point. Adopt it when the content is
+genuinely a collection *and* you already have a generator you do not want to re-derive; if
+you have a dozen pages and one list, write the list by hand or with a fourteen-line
+generator, and skip all of this. Guide §14 has the full version.
+
 ```bash
 cd examples/eleventy-htmx
 npm install
-unify build -s src -o dist \
-  --generate _scripts/eleventy.mjs \
-  --pretty-urls
+npm run build
 ```
 
-From a checkout of this repository, substitute `bun ../../src/cli.js` (or
-`node ../../src/cli.js`) for `unify`.
+`npm install` is not optional, and it is the step that puts both dependencies in place:
+Eleventy, and the `unify` binary the four scripts call (`node_modules/.bin/unify`,
+resolved from the pinned `@fwdslsh/unify` devDependency). Use `npm ci` if you want the
+committed `package-lock.json` enforced exactly.
+
+**On Bun, a missing `node_modules/` is not an error.** Bun's default `--install=auto`
+network-installs `@11ty/eleventy` into its global cache when no `node_modules/` exists, so
+`bun ../../src/cli.js build …` exits 0 in a tree where `npm install` was never run —
+against whatever `^3.1.6` resolves to today, ignoring the lockfile. A green Bun build is
+therefore not evidence that the tested Eleventy ran. Node fails loudly in the same tree
+(`ERR_MODULE_NOT_FOUND` inside P29), so run the Node build, or `npm ci`, when you want the
+lockfile to be what proves it.
+
+From a checkout of this repository you can also run the CLI in `src/` directly, which is
+the only way to exercise *this* checkout rather than the pinned published release:
+
+```bash
+bun ../../src/cli.js build -s src -o dist --generate _scripts/eleventy.mjs --pretty-urls
+node ../../src/cli.js build -s src -o dist --generate _scripts/eleventy.mjs --pretty-urls
+```
 
 Both gates pass:
 
 ```bash
-unify build -s src -o dist --generate _scripts/eleventy.mjs --pretty-urls --dry-run --strict  # exit 0
-unify audit -s src --generate _scripts/eleventy.mjs --pretty-urls --strict                    # exit 0
+npm run check   # unify build … --dry-run --strict   exit 0
+npm run audit   # unify audit … --strict             exit 0
 ```
 
 23 files: 11 authored pages, 4 generated pages, 5 fragments, and 3 assets.
 
-`package.json` wraps these as `npm run check`, `npm run audit`, `npm run publish` and
+`package.json` wraps these as `npm run check`, `npm run audit`, `npm run build` and
 `npm run dev` — the same flags in every one, so the gate checks what actually ships.
+`npm run build` is the one to deploy from: it is the only script carrying `--clean`, and a
+rebuild without `--clean` prunes a deleted page but leaves its now-empty directory behind
+at the retired URL. (Do not add `--clean` to `dev` — it applies at startup only, and would
+delete the output from under a running server on every restart.)
 
 ## Who decides what
 
@@ -61,32 +94,69 @@ The one-sentence version: **Eleventy decides what pages exist; unify decides wha
 | Layout | one `src/_layout.html` wraps every page, generated ones included — no page names it, and there is no Eleventy layout anywhere in the tree |
 | Named slot | `<slot name="aside">`, filled by `src/docs/index.html` and by the four generated pages, showing its fallback on everything else |
 | Underscore | `_data/`, `_scripts/`, `_11ty/` and `_includes/` are read by the build and never ship |
-| `.fragment.html` | the five generated snippets: spliced in at build time *and* served byte-for-byte to `hx-get` |
+| `.fragment.html` | four view fragments, each spliced in at build time *and* served byte-for-byte to `hx-get`; plus `latest.fragment.html`, which is only spliced in — nothing fetches it |
 
 Plus `--pretty-urls` and `schema: BlogPosting` on the six release notes, which gives each
 one a JSON-LD block.
+
+The published HTML carries no explanatory comments: the commentary lives in this file, and
+in the JavaScript comments inside `_11ty/`, which never reach the output. A teaching
+example still has to ship what a real site would.
+
+### Reading the markup
+
+Four things in the tree are worth knowing before you read it:
+
+- **`hx-boost="true"` on the layout's `<body>`** makes every ordinary anchor a background
+  fetch that swaps the body element, so navigating keeps the stylesheet and the script
+  instead of reloading them. It is safe at that level *here* because every anchor on every
+  page points at a real HTML document.
+- **The masthead's links are ordinary source spellings** (`/docs/index.html`), the ones
+  `authoring-rules.md` asks for; unify rewrites each to its published address (`/docs/`).
+  Generated *fragments* are the exception, and the next section is about why.
+- **`src/docs/index.html`'s `<nav slot="aside">`** is a named-slot fill. It is a direct
+  child of `<body>`, which is where `slot=` counts, and it replaces the layout's `<slot>`
+  element tag and all — the layout supplies the surrounding `<aside>`, so what the page
+  writes is the *contents*. Omit it and the layout's fallback ships instead.
+- **`src/index.html`'s `<include src="/latest.fragment.html">`** is spliced in at build
+  time. Eleventy wrote that file into the overlay; unify treats it as an ordinary include,
+  so the list is in the page before htmx loads, with JavaScript off, and for every
+  crawler. Nothing ever fetches it.
 
 ## The generator
 
 `--generate` names one file and hands it two arguments — the source root and an empty
 overlay directory — with the working directory set to the source root. It runs as a
 subprocess of unify's own runtime, so there is no second runtime to install, and a non-zero
-exit is a located build failure (P29) that leaves the previous `dist/` untouched.
+exit is a located build failure (P29) that leaves the previous `dist/` untouched. P29's
+second `fix:` line tells you to run the generator directly, so this one defaults both
+arguments and works standalone: `bun _scripts/eleventy.mjs` from `src/` writes a preview
+overlay into a temporary directory and prints where.
 
-`src/_scripts/eleventy.mjs` is 21 lines of code under its comments. It:
+`src/_scripts/eleventy.mjs` is 24 lines of code under its comments. It:
 
 1. **Reads `_data/site.json` directly** — cwd is the source root, so this is the same file
    Eleventy's data cascade exposes to templates as `site`.
 2. **Constructs Eleventy with input `"."` and output `generatedDir`.** The input must be
-   relative to cwd; an absolute path silently disables directory data files and permalinks.
-   Nothing is ever written into the source tree, which is why `unify audit` stays read-only.
-3. **Restricts the template formats to `md` and `11ty.js`.** Without this Eleventy also
-   claims the authored `.html` pages and writes them on top of the source tree.
+   relative to cwd: an absolute path still honours every permalink, but it silently stops
+   directory data files (`<dir>/<dir>.json` and friends) from resolving, which is what
+   makes that mistake hard to spot. Nothing is ever written into the source tree, which is
+   why `unify audit` stays read-only.
+3. **Restricts the template formats to `md` and `11ty.js`.** Eleventy's defaults include
+   `html`, so this keeps the authored `.html` pages out of the template set entirely. It
+   is belt-and-braces on top of the global `permalink: false` below, which is what actually
+   keeps them unwritten — remove the line and the overlay is byte-identical. Eleventy could
+   not write "on top of the source tree" in any case: its output directory is the overlay.
 4. **Sets `permalink: false` globally.** The release notes are unify's pages; Eleventy reads
    them into a collection and writes none of them. Only the three templates opt back in.
 5. **Names an absolute `configPath`.** Two settings — `markdownTemplateEngine` and
    `keys.layout` — exist only in a config *file*, and the file lives under `_11ty/` so it
    never ships; Eleventy's auto-discovery would otherwise look in the source root.
+
+A sixth line, `setUseGitIgnore(false)`, is defensive rather than load-bearing: there is no
+`src/.gitignore` in this tree, so removing it changes nothing today. Add one — or move the
+example's own `.gitignore` inside `src/` — and every collection empties silently, with no
+error and an empty release list on every page.
 
 Those last two config keys are load-bearing, not hygiene. `markdownTemplateEngine: false`
 is why `src/notes/2026-06-30-firmware-2-6-0.md` can contain a code sample with
@@ -175,8 +245,8 @@ address of a filtered view is the tab's own `href`.
 ## Files
 
 ```
-package.json                       four scripts; @11ty/eleventy is the only dependency
-package-lock.json                  committed, so npm install reproduces the tested Eleventy
+package.json                       four scripts; Eleventy and unify are the dependencies
+package-lock.json                  committed, so npm ci reproduces the tested Eleventy
 src/
   _layout.html                     the one layout: two slots, hx-boost, the asset links
   _includes/{header,footer}.fragment.html

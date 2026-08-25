@@ -54,15 +54,19 @@ the Eleventy config — the existing `--generate` seam was already enough.
 ```bash
 cd eleventy-htmx
 npm install
-unify build -s src -o dist --generate _scripts/eleventy.mjs --pretty-urls
+npm run build
 ```
+
+`npm install` brings both dependencies — Eleventy, and the `unify` binary the four scripts
+call — so `npm run build`, `check`, `audit` and `dev` all work with no global install.
 
 23 files: 11 authored pages, 4 generated pages, 5 fragments, 3 assets. Both gates exit 0
 (`build --dry-run --strict` and `audit --strict`), on Bun and on Node, with byte-identical
 output. [`docs/guides/eleventy-htmx.md`](../docs/guides/eleventy-htmx.md) is the guide: the
 division-of-responsibilities table, the measured watch behaviour edit case by edit case
-(including the ones that do *not* re-run), what a thousand-note input does to build time,
-and a plain account of what this stack cannot deploy and should not attempt.
+(including what the watcher cannot see, because it lives outside the source root), what a
+thousand-note input does to build time, and a plain account of what this stack cannot
+deploy and should not attempt.
 
 ## The patterns worth copying
 

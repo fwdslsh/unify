@@ -1,8 +1,10 @@
 // Shared markup for all three templates, so a fragment and the page that includes it can
 // never disagree about what a release list looks like.
 //
-// .mjs, not .js: _11ty/ is inside Eleventy's input directory, and .11ty.js is a template
-// format. A helper module named .js would be scanned as a template.
+// The extension carries no meaning here: `render.js` builds identically. Eleventy's
+// `11ty.js` template format matches `.11ty.js`, `.11ty.cjs` and `.11ty.mjs` and nothing
+// else, so what a helper module inside the input directory has to avoid is the `.11ty.`
+// infix — not the `.js` ending.
 
 export const escapeHtml = (s) =>
   String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");

@@ -14,7 +14,9 @@ This is the stack at its most elaborate. §14 is the honest counterweight: a nor
 site is HTML, CSS and unify, and it should stay that way until something forces the issue.
 
 Every command below is run from `examples/eleventy-htmx`, after `npm install`, and `unify`
-means the installed CLI. From a checkout of this repository, substitute
+means the CLI that step puts in `node_modules/.bin/` — the example lists `@fwdslsh/unify`
+in `devDependencies` beside Eleventy, so the four npm scripts resolve with no global
+install. To exercise *this* checkout rather than the pinned published release, substitute
 `bun ../../src/cli.js` or `node ../../src/cli.js` — same flags, same output, same exit
 codes.
 
@@ -71,16 +73,18 @@ than by discipline:
 - **Eleventy writes nothing into the source tree.** Its output directory is the overlay
   unify hands it. `unify audit` therefore stays read-only, and a failed build leaves no
   debris.
-- **Eleventy claims only two template formats**, `md` and `11ty.js`. Without that it also
-  claims the authored `.html` pages and rewrites them.
+- **Eleventy claims only two template formats**, `md` and `11ty.js`. Eleventy's defaults
+  include `html`, so this keeps the authored `.html` pages out of its template set
+  entirely — belt-and-braces on top of the global `permalink: false` that already stops
+  Eleventy writing anything it was not asked to.
 
 ## 3. Project structure
 
 The whole example, as it is on disk:
 
 ```
-package.json                       four scripts; @11ty/eleventy is the only dependency
-package-lock.json                  committed, so npm install reproduces the tested Eleventy
+package.json                       four scripts; Eleventy and unify are the dependencies
+package-lock.json                  committed, so npm ci reproduces both exactly
 node_modules/                      installed here, beside src/ — never inside it
 src/
   _layout.html                     the one layout: two slots, hx-boost, the asset links
@@ -102,7 +106,7 @@ src/
   assets/js/htmx.min.js               vendored, 51,238 bytes, htmx 2.0.10
 ```
 
-Three placements are load-bearing.
+Two placements are load-bearing.
 
 **`package.json` and `node_modules/` sit beside `src/`, never inside it.** `node_modules/`
 is on the never-shipped list so it could not publish anyway, but a `package.json` at the
@@ -112,9 +116,11 @@ source root is an ordinary file and would mirror-copy straight into `dist/`.
 and `_includes/` are read by the build and never ship — the default `--exclude _*` covers
 all four with no configuration.
 
-**The helper is `.mjs`, not `.js`.** `_11ty/` is inside Eleventy's input directory and
-`.11ty.js` is a template format, so a helper module named `render.js` would be scanned as
-a template. `render.mjs` is not.
+A third placement looks load-bearing and is not: the shared helper's `.mjs` extension
+carries no meaning. Eleventy's `11ty.js` template format matches `.11ty.js`, `.11ty.cjs`
+and `.11ty.mjs` and nothing else, so renaming the helper to `render.js` builds an identical
+overlay. What a helper inside the input directory has to avoid is the `.11ty.` infix, not
+the `.js` ending — the rule people reach for here is the wrong way round.
 
 The build produces 23 files: 11 authored pages, 4 generated pages, 5 fragments, 3 assets.
 
@@ -142,15 +148,17 @@ $ unify build -s src --generate ../_scripts/eleventy.mjs --dry-run
   fix: name a file inside the source tree, e.g. --generate _scripts/gen.mjs
 ```
 
-`src/_scripts/eleventy.mjs` is 21 lines of code under its comments. Stripped to its
+`src/_scripts/eleventy.mjs` is 24 lines of code under its comments. Stripped to its
 decisions:
 
 ```js
 import Eleventy from "@11ty/eleventy";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const [, , sourceRoot, generatedDir] = process.argv;
+const sourceRoot = process.argv[2] ?? process.cwd();
+const generatedDir = process.argv[3] ?? mkdtempSync(join(tmpdir(), "eleventy-preview-"));
 const site = JSON.parse(readFileSync("_data/site.json", "utf8"));
 
 const views = [
@@ -173,21 +181,32 @@ const eleventy = new Eleventy(".", generatedDir, {
 await eleventy.write();
 ```
 
-Five of those lines are not obvious, and each is load-bearing:
+Five of those lines are not obvious. Three carry the integration; two are defensive, and
+saying which is which matters, because a reader who removes one to test the claim should
+get the result the guide predicted:
 
 1. **Input `"."`, not `sourceRoot`.** Eleventy's input directory must be relative to the
-   working directory. An absolute path silently disables directory data files and
-   permalinks rather than erroring.
+   working directory. An absolute path does **not** break permalinks — every computed and
+   static permalink in this example still applies — but it silently stops directory data
+   files (`<dir>/<dir>.json` and friends) from resolving, with no error. That asymmetry is
+   what makes the mistake hard to spot.
 2. **Output `generatedDir`.** This is the whole integration. Eleventy writes into unify's
    overlay and nowhere else.
-3. **`setUseGitIgnore(false)`.** A `.gitignore` at the source root otherwise empties every
-   collection.
-4. **`setTemplateFormats(["md", "11ty.js"])`.** Without it Eleventy also claims the
-   authored `.html` pages.
-5. **An absolute `configPath`.** Two settings exist only in a config *file*, and Eleventy's
+3. **An absolute `configPath`.** Two settings exist only in a config *file*, and Eleventy's
    auto-discovery would look in the working directory — the source root, where an
    `eleventy.config.mjs` would mirror-copy into `dist/`. The file lives under `_11ty/`
    instead, and is named explicitly.
+4. **`setUseGitIgnore(false)`** is defensive, and a no-op in this tree: there is no
+   `src/.gitignore`, so removing the line produces a byte-identical overlay. The hazard is
+   real all the same — write one (`printf 'notes/\n' > src/.gitignore`) and every
+   collection empties silently: no error, and an empty release list on every page.
+5. **`setTemplateFormats(["md", "11ty.js"])`** is defensive too. Eleventy's default formats
+   are `["liquid", "md", "njk", "html", "11ty.js"]`, so without this line the authored
+   `.html` pages are entered into the template set. They are still never written, because
+   of the global `permalink: false` below, and removing the line produces a byte-identical
+   overlay. It is here so the separation is stated in configuration rather than left to
+   one setting's side effect. Eleventy could not write "on top of the source tree" in any
+   case: its output directory is `argv[3]`.
 
 Those two file-only settings are not hygiene:
 
@@ -211,18 +230,29 @@ when it does not.
 
 **There is no `try`/`catch`, deliberately.** If Eleventy throws, the process exits non-zero
 with Eleventy's own message on stderr, and unify reports it as a located problem, stopping
-the build before the scan and leaving the previous `dist/` untouched:
+the build before the scan and leaving the previous `dist/` untouched. Here is a real one —
+`data.collections.releases` misspelled `releasez` in `view-fragment.11ty.js`:
 
 ```
 $ unify build -s src -o dist --generate _scripts/eleventy.mjs --pretty-urls
-src/_scripts/eleventy.mjs: problem: --generate _scripts/eleventy.mjs failed (exit 1): error: Eleventy could not resolve a template
+[11ty] Wrote 0 files in 0.16 seconds (v3.1.6)
+src/_scripts/eleventy.mjs: problem: --generate _scripts/eleventy.mjs failed (exit 1): [11ty] Problem writing Eleventy templates: / [11ty] 1. Having trouble rendering 11ty.js template ./_11ty/view-fragment.11ty.js (via TemplateContentRenderError) / [11ty] 2. undefined is not an object (evaluating 'entries.map') (via TypeError)
   fix: fix the generator, or drop --generate to build without it
   fix: run it directly to see its full output: bun _scripts/eleventy.mjs
 EXIT=1
 ```
 
+Three details in that report. The first line is Eleventy's own stdout, passed straight
+through — a generator's output is its business. The ` / ` separators are unify collapsing a
+multi-line stderr into one located line. And the runtime named in the last `fix:` line is
+whichever one is running unify: `bun` or `node` when unify was started by one of those, and
+`BUN_BE_BUN=1 /path/to/unify` when it is the compiled single-file binary, because that is
+the command that actually reproduces the subprocess.
+
 That is the whole report — no output directory was created, and nothing else ran. Catching
-the error could only make it less specific.
+the error could only make it less specific. Following the `fix:` line works: the generator
+defaults both arguments, so running it with none writes a preview overlay into a temporary
+directory (never into `src/`) and shows Eleventy's full unabridged output.
 
 ## 5. Collections and data
 
@@ -309,7 +339,8 @@ snippet, shipped byte-for-byte, never composed into a layout.** It is not an htm
 `latest.11ty.js` emits `latest.fragment.html` — three list items for the front page —
 which is spliced in with `<include>` at build time and never fetched by anything.
 
-Here is a whole generated fragment, as published (1301 bytes):
+Here is a whole generated fragment as published — `dist/notes/firmware.fragment.html`, all
+1301 bytes of it, nothing elided:
 
 ```html
   <nav class="topic-tabs" hx-target="#releases" hx-swap="innerHTML">
@@ -324,9 +355,21 @@ Here is a whole generated fragment, as published (1301 bytes):
       <time datetime="2026-06-30">30 June 2026</time>
       <span>Calibration is stored on the board, and the serial console gains a dump command for the whole configuration.</span>
     </li>
-    …
+    <li>
+      <a href="/notes/2026-03-11-firmware-2-5-0/">Firmware 2.5.0</a>
+      <time datetime="2026-03-11">11 March 2026</time>
+      <span>Tilt is reported on every uplink, join backoff is fixed at fifteen minutes, and the console gains a read command.</span>
+    </li>
+    <li>
+      <a href="/notes/2026-01-14-firmware-2-4-0/">Firmware 2.4.0</a>
+      <time datetime="2026-01-14">14 January 2026</time>
+      <span>The median window grows from 16 samples to 40, and a no-echo reading is now reported as a flag instead of a plausible number.</span>
+    </li>
   </ul>
 ```
+
+No `<html>`, no `<head>`, no layout: a `.fragment.html` is exactly what the generator
+wrote. The `all` view is the same markup with all six notes (2161 bytes).
 
 Two things about the addresses in it are covered in §9, and they are the sharpest rules in
 this document.
@@ -347,17 +390,44 @@ link breaks at once, which at least breaks loudly:
 ```
 $ # export const hrefFor = (entry) => `/notes/${entry.page.fileSlug}/`;
 $ unify build -s src -o dist --generate _scripts/eleventy.mjs --pretty-urls --dry-run
-src/index.html:33: problem: /notes/firmware-2-6-0/ does not resolve to any emitted file
+src/index.html:30: problem: /notes/firmware-2-6-0/ does not resolve to any emitted file
 src/latest.fragment.html:2: problem: /notes/mounting-bracket/ does not resolve to any emitted file
+src/latest.fragment.html:3: problem: /notes/weir-pool-trial/ does not resolve to any emitted file
 src/notes/all.fragment.html:7: problem: /notes/firmware-2-6-0/ does not resolve to any emitted file
-…
+…                                                        (11 more, one per broken link)
+would publish nothing — 15 problems; dist/ would be left untouched
 EXIT=1
 ```
 
-Note the paths in those diagnostics. `src/notes/all.fragment.html` and
-`src/latest.fragment.html` are *generated* files, reported under the source root with a
-line number exactly as a file you wrote would be. Generated output is not a second class of
-input — it is checked, located and blamed like everything else.
+Note the **paths** in those diagnostics. `src/notes/all.fragment.html` and
+`src/latest.fragment.html` are *generated* files, reported under the source root exactly as
+a file you wrote would be. Generated output is not a second class of input — it is checked,
+blamed and refused like everything else, and the fifteen problems are fifteen real broken
+links.
+
+**Do not trust the line numbers in that particular block.** This is worth knowing before
+you go looking at the line the build named, and it is not specific to generated files.
+unify resolves a reference's provenance through span tables recorded *before* §11's URL
+rewriting, and `--pretty-urls` is a length-*changing* rewrite (`/notes/index.html` → `/notes/`
+loses ten bytes). Any reference that follows an earlier rewritten link inside the same
+output page is therefore reported a few lines early, and the drift can cross a file
+boundary: the first line above blames `src/index.html:30`, which is `<h2>Latest
+releases</h2>` in a file that contains no such link at all. The link really lives at
+`src/latest.fragment.html:2`, which `<include>` splices into that page. Re-run the same
+build without `--pretty-urls` and every location is exact:
+
+```
+$ unify build -s src -o dist --generate _scripts/eleventy.mjs --dry-run
+src/latest.fragment.html:2: problem: /notes/firmware-2-6-0/ does not resolve to any emitted file
+src/latest.fragment.html:3: problem: /notes/mounting-bracket/ does not resolve to any emitted file
+src/latest.fragment.html:4: problem: /notes/weir-pool-trial/ does not resolve to any emitted file
+…
+```
+
+(That run reports more problems, because without `--pretty-urls` the tabs' `/notes/firmware/`
+hrefs do not resolve either — which is §9's rule seen from the other side.) The message and
+the refusal are right in both runs; only the file-and-line attribution drifts, and only
+under a rewrite that changes a URL's length.
 
 ## 7. Using unify layouts over generated output
 
@@ -578,13 +648,24 @@ Introduce the same typo into the `<include src>` and the build refuses to publis
 ```
 $ # <include src="/notes/${slug}.fragmnt.html">
 $ unify build -s src -o dist --generate _scripts/eleventy.mjs --pretty-urls --dry-run --strict
-src/notes/firmware.html:11: problem: include not found: /notes/firmware.fragmnt.html
-  in: <include src="/notes/firmware.fragmnt.html"></include>
 src/notes/field-notes.html:11: problem: include not found: /notes/field-notes.fragmnt.html
   in: <include src="/notes/field-notes.fragmnt.html"></include>
+  fix: create it, or point src at an existing .html or .md file
+  fix: check the path spelling and casing
+src/notes/firmware.html:11: problem: include not found: /notes/firmware.fragmnt.html
+  in: <include src="/notes/firmware.fragmnt.html"></include>
+  fix: create it, or point src at an existing .html or .md file
+  fix: check the path spelling and casing
+…                                       (src/notes/hardware.html:11 and src/notes/index.html:11, the same)
+serving from / — the domain root (no --base-url)
+structured data: 6 pages would gain a JSON-LD block
+…                                       (the full copy/write listing)
 would publish nothing — 4 problems; dist/ would be left untouched
 EXIT=1
 ```
+
+Diagnostics are ordered by path and then by line (§14.1), which is why `field-notes` comes
+before `firmware` and not in generation order.
 
 Which is why every page in this example includes the fragment it also serves, with the same
 string. `<include src>` and `hx-get` in a generated page are character-identical:
@@ -606,8 +687,45 @@ Four npm scripts, carrying identical flags so the gate checks what actually ship
 "dev": "unify dev -s src -o dist --generate _scripts/eleventy.mjs --pretty-urls",
 "check": "unify build -s src -o dist --generate _scripts/eleventy.mjs --pretty-urls --dry-run --strict",
 "audit": "unify audit -s src --generate _scripts/eleventy.mjs --pretty-urls --strict",
-"publish": "unify build -s src -o dist --generate _scripts/eleventy.mjs --pretty-urls --clean"
+"build": "unify build -s src -o dist --generate _scripts/eleventy.mjs --pretty-urls --clean"
 ```
+
+They call a bare `unify`, and what resolves it is `npm install`: the example lists
+`@fwdslsh/unify` beside `@11ty/eleventy` in `devDependencies`, so the binary lands in
+`node_modules/.bin/`. That is also the reason `npm install` is not optional here, and the
+reason a Bun user can be fooled into thinking it is — Bun's default `--install=auto`
+network-installs `@11ty/eleventy` when no `node_modules/` exists, so `bun …/cli.js build`
+exits 0 in a tree that was never installed, against whatever `^3.1.6` resolves to today and
+ignoring `package-lock.json`. Node fails loudly in the same tree, inside P29:
+
+```
+$ node ../../src/cli.js build -s src -o dist --generate _scripts/eleventy.mjs --pretty-urls
+src/_scripts/eleventy.mjs: problem: --generate _scripts/eleventy.mjs failed (exit 1): Error [ERR_MODULE_NOT_FOUND]: Cannot find package '@11ty/eleventy' imported from /…/src/_scripts/eleventy.mjs /   code: 'ERR_MODULE_NOT_FOUND' / }
+  fix: fix the generator, or drop --generate to build without it
+  fix: run it directly to see its full output: node _scripts/eleventy.mjs
+EXIT=1
+```
+
+So a green Bun build is not evidence that the tested Eleventy ran. Use `npm ci`, or run the
+Node build, when you want the lockfile to be what proves it. (`BUN_CONFIG_NO_INSTALL=1` does
+not help: the generator is a fresh subprocess, and the auto-install happens there.)
+
+`npm run build` is the one to deploy from, because it is the only script carrying
+`--clean`. A rebuild without `--clean` prunes a deleted page's content correctly — every
+derived list loses it in the same rebuild — but leaves the now-empty directory behind at
+the retired URL, and they accumulate across a watch session:
+
+```
+$ mv src/notes/2026-06-30-firmware-2-6-0.md /tmp/     # then rebuild, no --clean
+$ grep -c 2026-06-30-firmware-2-6-0 dist/notes/index.html dist/latest.fragment.html
+dist/notes/index.html:0
+dist/latest.fragment.html:0                           ← content correctly gone
+$ find dist -type d -empty
+dist/notes/2026-06-30-firmware-2-6-0                  ← directory left behind
+```
+
+Do not add `--clean` to `dev` or `watch` to fix that: it applies at startup only, so all it
+would do is delete the output from under a running server every time you restart it.
 
 ### What re-runs, measured
 
@@ -622,7 +740,7 @@ _scripts/eleventy.mjs --pretty-urls` against the example and making each edit wh
 
 | You edit | Rebuild | Eleventy re-runs | Verified in the output |
 |---|---|---|---|
-| **(a)** an Eleventy Markdown post (`src/notes/2026-06-30-firmware-2-6-0.md`) | yes | yes | the composed post page's `<title>`, **and** all four view fragments, all four view pages, `latest.fragment.html`, and the front page |
+| **(a)** an Eleventy Markdown post (`src/notes/2026-06-30-firmware-2-6-0.md`) | yes | yes | seven files: the composed post page, the two views that contain it (`all` and its own topic `firmware`) as fragment *and* page, `latest.fragment.html`, and the front page. The other two views come back byte-identical — a firmware note cannot appear in the hardware or field-notes list |
 | **(a2)** adding a new post; deleting one | yes | yes | new page appears and enters every derived list; on delete the page is removed and the lists lose it |
 | **(b)** `src/_data/site.json` (`latestOnHome: 3 → 1`) | yes | yes | `latest.fragment.html` drops to one `<li>`, and so does the front page's Latest section |
 | **(b2)** `src/_data/site.json` (adding a topic) | yes | yes | a new `notes/<slug>/index.html` **and** `notes/<slug>.fragment.html` appear, and a new tab appears in every fragment; reverting removes both |
@@ -662,18 +780,46 @@ force one.
 
 ### A failing generator mid-session
 
-Break the generator while `unify dev` is running and the previous site stays served:
+**Watch is not transactional, and this is the one place that matters.** `unify build`
+really does leave the previous `dist/` byte-for-byte untouched when the generator fails
+(§4). `unify dev` and `unify watch` deliberately do the opposite: a failed rebuild replaces
+every page in the output directory with the WCH-04 "Build error" placeholder carrying the
+problem, so the browser tab in front of you shows the failure instead of quietly serving a
+site that no longer matches the source.
+
+Break the generator while `unify dev` is running:
 
 ```
-src/_scripts/eleventy.mjs: problem: --generate _scripts/eleventy.mjs failed (exit 1): error: Eleventy could not resolve a template
+src/_scripts/eleventy.mjs: problem: --generate _scripts/eleventy.mjs failed (exit 1): error: the river gauge is dry
   fix: fix the generator, or drop --generate to build without it
   fix: run it directly to see its full output: bun _scripts/eleventy.mjs
 rebuild failed: 1 problem
 ```
 
-`dist/` still holds its 23 files, and all 15 published pages still answered `200` over HTTP
-while the generator was broken. Fix it and the next save logs `rebuilt` as usual. The build
-is transactional under watch for the same reason it is on the command line.
+`dist/` still holds 23 files and `GET /` still answers `200` — but what it answers with is
+the placeholder. Measured against the running server:
+
+```
+files in dist:                         23
+GET / HTTP status:                     200
+GET / contains "Redpoll":               0     ← the site is not being served
+GET / contains "Build error":           2
+pages replaced by the placeholder:  15 of 15
+fragments replaced:                   5 of 5
+```
+
+That last line deserves its own sentence, because it is the one exception to the
+`.fragment.html` byte-for-byte contract anywhere in unify: a fetched fragment is a bare
+snippet in every build, and a *failed watch rebuild* writes a whole 661-byte HTML document
+into it. An `hx-get` swap during a broken dev session therefore injects `<!doctype html>`
+into `#releases`. Nothing about that reaches a deploy — the placeholder is dev-only and
+`unify build` never writes one — but it will confuse you for a minute if a swap misbehaves
+right after a failed save.
+
+Fix the generator and the next save logs `rebuilt`; the restored `dist/` is byte-identical
+to a fresh `unify build` (verified with `diff -r`). The rule to carry away: **transactional
+is a `unify build` guarantee. Under watch, a failure is written into the output on
+purpose.**
 
 ### The dev server's reload script reaches fetched fragments
 
@@ -762,15 +908,26 @@ a stylesheet. From a real build with `--base-url https://example.com/redpoll/`:
 <!-- the composed page: href prefixed, hx-get untouched -->
 <a href="/redpoll/notes/firmware/" hx-get="/notes/firmware.fragment.html" aria-current="page">Firmware</a>
 
-<!-- the stylesheet link is prefixed … -->
+<!-- the stylesheet link is prefixed -->
 <link rel="stylesheet" href="/redpoll/assets/css/site.css">
-<!-- … and a url() inside that stylesheet is not -->
-body { background-image: url(/assets/img/redpoll.svg); }
 ```
 
 Exit 0, 25 files, and `unify audit --strict` at that same base URL reports `audit: nothing
-to report`. Every tab still navigates correctly and every tab's swap 404s. The example's stylesheet therefore contains **no `url()` at all, on purpose**, and
-the example's documented deploy target is a domain root.
+to report`. Every tab still navigates correctly and every tab's swap 404s.
+
+The stylesheet has the same shape of problem, one layer down. The `<link>` above is
+prefixed; a `url()` *inside* the file it names is not, so this — an illustration, not
+output from this example — would keep pointing at an address the subpath deploy does not
+serve:
+
+```css
+/* what a url() would do under --base-url https://example.com/redpoll/ */
+body { background-image: url(/assets/img/redpoll.svg); }   /* not rewritten */
+```
+
+The example's stylesheet therefore contains **no `url()` at all, on purpose** — the only
+`url(` in `src/assets/css/site.css` is inside a comment saying so — and the example's
+documented deploy target is a domain root.
 
 If you must deploy under a subpath, you have three options and they are all real work: write
 every fetched address relative to the page (which `--pretty-urls` complicates, because it
@@ -792,7 +949,7 @@ EXIT=2
 ```
 
 And an authored `feed.xml`, `sitemap.xml`, `search-index.json` or `robots.txt` always
-suppresses generation and ships byte-for-byte, exactly like an authored `robots.txt`.
+suppresses generation and ships byte-for-byte.
 
 For CI, `unify audit --strict` is the gate — it runs the whole pipeline, publishes nothing,
 and never creates the output directory. Both gates pass on Bun and on Node with
@@ -812,7 +969,7 @@ audit: nothing to report                                                        
 and templates an index — in a project that already has Eleventy installed. Every one of
 those is a solved problem with edge cases you have not met yet: date parsing, draft handling,
 stable sorting, escaping. If Eleventy is in the tree, `addCollection` and `pagination` are
-the answer, and your generator is the twenty-one lines that hand its output to unify.
+the answer, and your generator is the twenty-four lines that hand its output to unify.
 
 The mirror-image mistake is reimplementing them inside *unify* — waiting for `tags:` to build
 an archive, or asking for a collections feature. unify will not grow one; the `taxonomy-inert`
@@ -844,9 +1001,6 @@ and the reference check covers both; let them differ and only one of them is che
 it at `src/` and `unify audit` stops being read-only, a failed build leaves debris, and — under
 watch — the generator's own writes trigger the rebuild that runs the generator.
 
-**Naming a helper module `.js` inside the Eleventy input directory.** `.11ty.js` is a template
-format, so `render.js` is scanned as a template and fails in a confusing way. Use `.mjs`.
-
 **Forgetting that `npm install` is outside the watcher.** Restart `unify dev` after it. See §10.
 
 ## 13. When this architecture is appropriate
@@ -858,7 +1012,7 @@ Four conditions, and you want most of them:
   this pays for itself.
 - **You already have Eleventy**, or a comparable generator, and something is written against it
   — an existing content tree, a team that knows it, a config you do not want to re-derive. The
-  point of `--generate` is that keeping it costs 21 lines.
+  point of `--generate` is that keeping it costs 24 lines.
 - **You want unify's composition and checks on top**: one layout with slots, one head-merge
   rule, `--pretty-urls`, a reference check that refuses to publish a broken link, and a
   transactional publish. If you do not want those, use Eleventy on its own; it is a complete
@@ -886,9 +1040,11 @@ Use plain unify when:
   that differs. `unify init docs` scaffolds exactly that, and `build --dry-run --strict` and
   `audit --strict` both exit 0 on it before you have edited a line.
 - **You have one derived page** — an index, a list of five things. Write it by hand, or write
-  a short generator that reads the frontmatter and emits it — `integrations.md` recipe 1 is a
-  complete one in fourteen lines. Installing Eleventy to produce a single index page buys you
-  a dependency, a lockfile, a config file and a per-save subprocess in exchange for a loop.
+  a short generator that emits it: `integrations.md` recipe 1 is a complete generator in
+  fourteen lines, and the one that reads post frontmatter to build an index and a feed ships
+  as `_scripts/gen.mjs` in the `blog` template (`unify init blog`). Installing Eleventy to
+  produce a single index page buys you a dependency, a lockfile, a config file and a
+  per-save subprocess in exchange for a loop.
 - **The data is small enough to ship in the page.** The `seed-library` example renders all 27
   varieties at build time and filters them with a small inline script: no request, so nothing
   can 404 at a subpath address and the page works from `file://`. That beats an htmx swap on
