@@ -47,6 +47,44 @@ function envelope(html, { outputPath = "p.html", path = null, url = null } = {})
 }
 
 // ================================================================
+// Headless / malformed documents — no <head>, no <html>, empty input,
+// metadata nested in <template>. `extractDocument` reads the whole tree as
+// head when there is no <head> element (§20's headless reading); selectors
+// see whatever `extractDocument` hands them, so this pins the reading at
+// this layer before consumers migrate onto it.
+// ================================================================
+
+describe("selectors over headless/malformed input", () => {
+  test("no <head> element: the whole document is read as head", () => {
+    const e = envelope('<html><body><title>NoHead</title><meta name="description" content="d"></body></html>');
+    expect(titleOf(e)).toBe("NoHead");
+    expect(descriptionOf(e)).toBe("d");
+  });
+
+  test("no <html> element: a bare <head>/<title> is still read", () => {
+    const e = envelope('<head><title>NoHtml</title></head><body></body>');
+    expect(titleOf(e)).toBe("NoHtml");
+  });
+
+  test("empty string input: every selector answers its empty case, no throw", () => {
+    const e = envelope("");
+    expect(titleOf(e)).toBeNull();
+    expect(descriptionOf(e)).toBeNull();
+    expect(canonicalOf(e)).toBeNull();
+    expect(robotsPolicyOf(e)).toEqual({ raw: null, directives: [], indexable: true, followable: true });
+  });
+
+  test("a <link rel=canonical> nested inside <template> is never touched", () => {
+    const e = envelope(
+      "<!doctype html><html><head><title>t</title>"
+        + '<template><link rel="canonical" href="/nope"></template>'
+        + "</head><body></body></html>",
+    );
+    expect(canonicalOf(e)).toBeNull();
+  });
+});
+
+// ================================================================
 // titleOf / langOf / descriptionOf / authorOf
 // ================================================================
 
@@ -83,19 +121,31 @@ describe("langOf", () => {
 });
 
 describe("descriptionOf / authorOf", () => {
-  test("first non-empty description wins, trimmed", () => {
+  test("an empty declaration is skipped in favor of the next non-empty one, trimmed", () => {
     const e = envelope(
       doc('<meta name="description" content="   "><meta name="description" content="  Real one  ">'),
     );
     expect(descriptionOf(e)).toBe("Real one");
   });
 
+  test("first-wins between two differing non-empty declarations", () => {
+    const e = envelope(
+      doc('<meta name="description" content="First one"><meta name="description" content="Second one">'),
+    );
+    expect(descriptionOf(e)).toBe("First one");
+  });
+
   test("no description meta: null", () => {
     expect(descriptionOf(envelope(doc()))).toBeNull();
   });
 
-  test("first non-empty author wins, trimmed", () => {
+  test("an empty author declaration is skipped in favor of the next non-empty one, trimmed", () => {
     const e = envelope(doc('<meta name="author" content="">  <meta name="author" content=" Ada ">'));
+    expect(authorOf(e)).toBe("Ada");
+  });
+
+  test("first-wins between two differing non-empty authors", () => {
+    const e = envelope(doc('<meta name="author" content="Ada"><meta name="author" content="Bob">'));
     expect(authorOf(e)).toBe("Ada");
   });
 
@@ -124,6 +174,11 @@ describe("metaValues", () => {
   test("no match: empty array", () => {
     expect(metaValues(envelope(doc()), "nope")).toEqual([]);
   });
+
+  test("a leading/trailing-whitespace name attribute is still matched, trimmed", () => {
+    const e = envelope(doc('<meta name="  Description  " content="hi">'));
+    expect(metaValues(e, "description")).toEqual(["hi"]);
+  });
 });
 
 describe("propertyValues", () => {
@@ -146,6 +201,18 @@ describe("linksWithRel", () => {
     expect(found[0].href).toBe("/a");
   });
 
+  test("a rel token that merely contains the target as a substring does not match", () => {
+    const e = envelope(doc('<link rel="canonicalized" href="/a">'));
+    expect(linksWithRel(e, "canonical")).toEqual([]);
+  });
+
+  test("a leading/trailing-whitespace rel value is still matched, trimmed then split", () => {
+    const e = envelope(doc('<link rel="  canonical alternate  " href="/a">'));
+    const found = linksWithRel(e, "canonical");
+    expect(found).toHaveLength(1);
+    expect(found[0].href).toBe("/a");
+  });
+
   test("order preserved across repeats", () => {
     const e = envelope(doc('<link rel="canonical" href="/first"><link rel="canonical" href="/second">'));
     expect(linksWithRel(e, "canonical").map((l) => l.href)).toEqual(["/first", "/second"]);
@@ -161,11 +228,16 @@ describe("linksWithRel", () => {
 // ================================================================
 
 describe("canonicalOf", () => {
-  test("first rel~=canonical link with a non-empty trimmed href wins", () => {
+  test("an empty href is skipped in favor of the next non-empty one, trimmed", () => {
     const e = envelope(
       doc('<link rel="canonical" href="   "><link rel="canonical" href="  /real.html  ">'),
     );
     expect(canonicalOf(e)).toBe("/real.html");
+  });
+
+  test("first-wins between two differing non-empty canonicals", () => {
+    const e = envelope(doc('<link rel="canonical" href="/a"><link rel="canonical" href="/b">'));
+    expect(canonicalOf(e)).toBe("/a");
   });
 
   test("no canonical link: null", () => {
@@ -256,9 +328,20 @@ describe("metadataConflicts", () => {
     expect(metadataConflicts(e)).toEqual([{ field: "description", kept: "A", discarded: ["B"] }]);
   });
 
-  test("lang is never reported — one <html>, one attribute, no second declaration possible", () => {
+  test("a single <html> lang is not a conflict", () => {
     const e = envelope(doc("", "", 'lang="en"'));
     expect(metadataConflicts(e).some((c) => c.field === "lang")).toBe(false);
+  });
+
+  test("two <html> elements with differing lang: conflict recorded from analysis.langTexts", () => {
+    // `document.js`'s snapshot keeps only the FIRST <html> element
+    // (`findFirst`), so `langOf` alone cannot see a second one — reachable
+    // through a textual <include> of a full document. `analysis.langTexts`
+    // collects every <html> element's lang document-wide, which is what
+    // this conflict is read from.
+    const e = envelope('<!doctype html><html lang="en"><head><title>x</title></head><body>'
+      + '<html lang="fr"></html></body></html>');
+    expect(metadataConflicts(e)).toEqual([{ field: "lang", kept: "en", discarded: ["fr"] }]);
   });
 
   test("conflicts are ordered by field name", () => {
@@ -327,6 +410,13 @@ describe("publicationDatesOf", () => {
   test("empty date meta declares nothing; next non-empty one wins", () => {
     const e = envelope(doc('<meta name="date" content="  "><meta name="date" content="2026-03-04">'));
     expect(publicationDatesOf(e).published).toEqual({ raw: "2026-03-04", iso: "2026-03-04" });
+  });
+
+  test("a meta dual-spelled name=date property=article:modified_time plays only its name role, matching manifest.js's exclusive chain", () => {
+    const e = envelope(doc('<meta name="date" property="article:modified_time" content="2026-01-02">'));
+    const dates = publicationDatesOf(e);
+    expect(dates.published).toEqual({ raw: "2026-01-02", iso: "2026-01-02" });
+    expect(dates.modified).toBeNull();
   });
 });
 
@@ -402,6 +492,16 @@ describe("preferredImageOf", () => {
       doc('<meta property="og:image" content="/first.png"><meta property="og:image" content="/second.png">'),
     );
     expect(preferredImageOf(e).url).toBe("/first.png");
+  });
+
+  test("a meta dual-spelled name=twitter:image property=og:image plays only its name role, matching manifest.js's exclusive chain", () => {
+    const e = envelope(
+      doc(
+        '<meta name="twitter:image" property="og:image" content="/card.png">' +
+          '<meta property="og:image:width" content="600"><meta property="og:image:height" content="315">',
+      ),
+    );
+    expect(preferredImageOf(e)).toEqual({ url: "/card.png", width: null, height: null, fromOg: false });
   });
 });
 

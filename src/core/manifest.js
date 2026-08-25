@@ -41,9 +41,9 @@ import { urlForOutputPath } from "./publish.js";
 import { isSkippedUrl, parseRefreshMeta, splitUrl } from "./urls.js";
 import { stripBaseUrl, resolveReference } from "./references.js";
 
-// `isoDate` now lives in document-selectors.js (batch B2); re-exported here
-// so existing importers (tests/unit/core/manifest.test.js among them) keep
-// resolving it from this module until the B3 model swap moves them over.
+// `isoDate` now lives in document-selectors.js; re-exported here so existing
+// importers (tests/unit/core/manifest.test.js among them) keep resolving it
+// from this module until they are migrated to import it directly.
 export { isoDate };
 
 /**

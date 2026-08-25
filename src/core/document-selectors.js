@@ -1,40 +1,45 @@
 /**
  * `document-selectors.js` — the shared interpretation layer over a
- * `{document, analysis}` envelope (brief §14).
+ * `{document, analysis}` envelope (implementation-brief §14, "shared
+ * semantic selectors" — distinct from conformance-spec §14, the diagnostics
+ * reporter that every other bare `§n` in `src/` refers to).
  *
  * A built-in consumer that wants a fact about a page — its canonical, its
  * publication date, whether it is a public destination — asks a selector
  * here rather than re-walking `document.head.meta`/`link` with its own
- * reading of "what counts". §14.1's rule governs every function below: a
- * selector *computes* an answer from the snapshot/analysis it is given; it
- * never persists that answer back onto the envelope. Two kinds of export
- * live in this one module, on purpose, rather than in two:
+ * reading of "what counts". The brief's §14.1 rule governs every function
+ * below: a selector *computes* an answer from the snapshot/analysis it is
+ * given; it never persists that answer back onto the envelope. Two kinds of
+ * export live in this one module, on purpose, rather than in two:
  *
  *  - **Value-level cores** (`isoDate`, `parseRobotsValue`, `declaredType`,
  *    `intOrNull`, `classifyCanonicalValue`) — relocated here verbatim from
  *    `manifest.js`/`sitemap.js`, where they still live too: those modules
- *    now import the implementation from here and delegate, so this batch
- *    changes zero observable behavior while making this module the one
- *    place the logic is written. Each ports its cited §20 semantics
+ *    now import the implementation from here and delegate, so this
+ *    relocation changes zero observable behavior while making this module
+ *    the one place the logic is written. Each ports its cited §20 semantics
  *    byte-for-byte — same inputs, same outputs, same edge decisions.
  *  - **Doc-level selectors** (`titleOf` through `isPublicDestination`) —
- *    new in this batch, over the `{document, analysis}` envelope
- *    `extractDocument` (`document.js`) produces. They are unit-tested here
- *    but not yet wired into the build pipeline; the model-swap batch moves
- *    every built-in consumer onto them as a call-site migration rather than
- *    a reimplementation. A selector that needs the page's output path
- *    (`isPublicDestination`) reads it off `envelope.outputPath` — a field
- *    `extractDocument` does not produce itself but the eventual
- *    `BuildDocument` carries alongside `document`/`analysis`.
+ *    new here, over the `{document, analysis}` envelope `extractDocument`
+ *    (`document.js`) produces. They are unit-tested in this module but not
+ *    yet wired into the build pipeline; migrating every built-in consumer
+ *    onto them is a call-site change, not a reimplementation. A selector
+ *    that needs the page's output path (`isPublicDestination`) reads it off
+ *    `envelope.outputPath` — a field `extractDocument` does not produce
+ *    itself but the eventual `BuildDocument` carries alongside
+ *    `document`/`analysis`.
  *
  * Snapshot attribute values arrive from `document.js` already
  * character-reference-decoded but untrimmed (its own `attributesOf` never
  * trims). Every doc-level selector below owns its own trimming and
  * emptiness test on top of that — trim, then empty string means "declared
  * nothing" — which is `document.js`'s `nonEmpty`/`orNull` discipline applied
- * to a value that is already decoded, so nothing here decodes a value
- * twice. Metadata name/property/rel comparisons are per HTML's own rule for
- * a metadata name: the attribute's value, trimmed and lowercased.
+ * to a value that is already decoded. That discipline holds everywhere
+ * except `intOrNull` below, ported as a value-level core from a call site
+ * that already double-decodes (noted at its own definition) — every other
+ * function here decodes a value at most once. Metadata name/property/rel
+ * comparisons are per HTML's own rule for a metadata name: the attribute's
+ * value, trimmed and lowercased.
  */
 
 import { nonEmpty } from "./document.js";
@@ -120,6 +125,14 @@ export function declaredType(data) {
  * the safe-integer ceiling: a twenty-digit `content` is not a pixel count, and
  * emitting the float it silently becomes would be a value the page never
  * declared.
+ *
+ * Relocated verbatim, so its own quirk ports with it: `manifest.js` calls
+ * this with an already-`nonEmpty`-read `Field.kept` value, and `nonEmpty`
+ * here decodes character references again — a double decode this module's
+ * own doc-level selectors are careful to avoid, but changing it here would
+ * change `manifest.js`'s output on a double-encoded `content` (e.g.
+ * `&amp;#54;00`), which the byte-for-byte relocation contract forbids. Fixing
+ * it belongs with the model-swap that removes this call shape, not here.
  * @param {unknown} raw
  * @returns {number|null}
  */
@@ -155,9 +168,20 @@ export function classifyCanonicalValue(canonical, outputPath, base) {
   if (canonical === null) return "none";
 
   // ONE owner for "is this URL on this site?" — `stripBaseUrl`, which parses.
-  // It returns a path for this site, in every spelling of the address, and
-  // the URL untouched for any other host. So a value still carrying an
-  // authority HERE is, by that function's own answer, another site.
+  // It returns a path for this site, in every spelling of the address
+  // (`HTTPS://EXAMPLE.COM/x`, `https://EXAMPLE.com/x`, `//example.com/x`,
+  // `http://example.com/x`, `https://example.com:443/x` are all this page by
+  // RFC 3986 §6.2.2.1 and §6.2.3), and the URL untouched for any other host.
+  // So a value still carrying an authority HERE is, by that function's own
+  // answer, another site.
+  //
+  // This block used to parse the URL a second time and compare hosts itself.
+  // That was written before §12's own comparison was fixed, and mutation
+  // testing then showed the two agreeing on every input — a second
+  // interpretation of a question §12 already answers, which is the defect
+  // product-spec §6.1 exists to forbid rather than a safety net. What is
+  // load-bearing is the *classification*: without this line an off-origin
+  // canonical reads as `unknown`, and neither finding fires.
   const stripped = base ? stripBaseUrl(canonical, base) : canonical;
   if (base && /^([a-z][a-z0-9+.-]*:)?\/\//i.test(stripped)) return "elsewhere";
 
@@ -286,24 +310,60 @@ function firstMetaMatch(doc, predicate) {
   return null;
 }
 
+// `manifest.js`'s own extraction is one exclusive `if`/`else if` chain over
+// `name`/`property` (§20's `extract()`): a single `<meta>` fills exactly one
+// role, the first branch it matches, in this order. `date`/`lastmod` (name)
+// come before `article:published_time`/`article:modified_time` (property);
+// `twitter:image` (name) comes before `og:image`/`og:image:width`/
+// `og:image:height` (property). A tag that carries BOTH a matched `name` and
+// a matched `property` — real, dual-spelled markup
+// (`<meta property="og:image" name="twitter:image" content="/x.png">`) —
+// therefore plays only its `name` role there, never its `property` role too.
+// `publicationDatesOf`/`preferredImageOf` read `name` and `property` as
+// independent axes per meta; without this ordering a dual-spelled tag would
+// count toward both `published` and `modified`, or both `og:image` and
+// `twitter:image`, which is not what `manifest.js`'s `record.image`/
+// `record.datePublished`/`record.dateModified` compute from the same tag.
+// This reproduces that single-owner precedence for exactly the roles below.
+const META_ROLE_ORDER = [
+  "date", "lastmod", "twitter:image",
+  "article:published_time", "article:modified_time",
+  "og:image", "og:image:width", "og:image:height",
+];
+
+/** This meta's one role among `META_ROLE_ORDER`, by manifest.js's own precedence, or null. */
+function metaRole(m) {
+  const name = (m.name ?? "").trim().toLowerCase();
+  const property = (m.property ?? "").trim().toLowerCase();
+  if (name === "date") return "date";
+  if (name === "lastmod") return "lastmod";
+  if (name === "twitter:image") return "twitter:image";
+  if (property === "article:published_time") return "article:published_time";
+  if (property === "article:modified_time") return "article:modified_time";
+  if (property === "og:image") return "og:image";
+  if (property === "og:image:width") return "og:image:width";
+  if (property === "og:image:height") return "og:image:height";
+  return null;
+}
+
 /**
  * `{published, modified}`, each `{raw, iso}` or `null`. `published` reads
  * `<meta name="date">` and `<meta property="article:published_time">`;
  * `modified` reads `name="lastmod"` and `property="article:modified_time"`.
  * The first non-empty declaration wins across BOTH spellings in head order —
  * the snapshot's `head.meta` array already preserves document order, so a
- * single pass over it reproduces today's single-pass first-wins.
+ * single pass over it reproduces today's single-pass first-wins. A meta that
+ * matches one spelling by `name` and another by `property` plays only its
+ * `name` role (`metaRole`), matching `manifest.js`'s exclusive chain.
  */
 export function publicationDatesOf(doc) {
   const publishedRaw = firstMetaMatch(doc, (m) => {
-    const name = (m.name ?? "").trim().toLowerCase();
-    const property = (m.property ?? "").trim().toLowerCase();
-    return name === "date" || property === "article:published_time";
+    const role = metaRole(m);
+    return role === "date" || role === "article:published_time";
   });
   const modifiedRaw = firstMetaMatch(doc, (m) => {
-    const name = (m.name ?? "").trim().toLowerCase();
-    const property = (m.property ?? "").trim().toLowerCase();
-    return name === "lastmod" || property === "article:modified_time";
+    const role = metaRole(m);
+    return role === "lastmod" || role === "article:modified_time";
   });
   return {
     published: publishedRaw === null ? null : { raw: publishedRaw, iso: isoDate(publishedRaw) },
@@ -314,23 +374,22 @@ export function publicationDatesOf(doc) {
 /**
  * `{url, width, height, fromOg}`, or null when neither spelling declares an
  * image. `og:image` wins over `twitter:image` AS SPELLINGS — not a
- * document-order race between them — with first-wins within each spelling.
- * Dimensions come from `og:image:width`/`og:image:height` only when the url
- * came from `og:image`: they describe THAT image, and attaching them to a
- * `twitter:image` would report a size the page never claimed for that file.
+ * document-order race between them — with first-wins within each spelling. A
+ * meta that matches `og:image` by `property` and ALSO matches `twitter:image`
+ * by `name` plays only its `name` role (`metaRole`), matching
+ * `manifest.js`'s exclusive chain. Dimensions come from
+ * `og:image:width`/`og:image:height` only when the url came from `og:image`:
+ * they describe THAT image, and attaching them to a `twitter:image` would
+ * report a size the page never claimed for that file.
  */
 export function preferredImageOf(doc) {
-  const ogImage = firstMetaMatch(doc, (m) => (m.property ?? "").trim().toLowerCase() === "og:image");
-  const twitterImage = firstMetaMatch(doc, (m) => (m.name ?? "").trim().toLowerCase() === "twitter:image");
+  const ogImage = firstMetaMatch(doc, (m) => metaRole(m) === "og:image");
+  const twitterImage = firstMetaMatch(doc, (m) => metaRole(m) === "twitter:image");
   const fromOg = ogImage !== null;
   const url = fromOg ? ogImage : twitterImage;
   if (url === null) return null;
-  const width = fromOg
-    ? intOrNull(firstMetaMatch(doc, (m) => (m.property ?? "").trim().toLowerCase() === "og:image:width"))
-    : null;
-  const height = fromOg
-    ? intOrNull(firstMetaMatch(doc, (m) => (m.property ?? "").trim().toLowerCase() === "og:image:height"))
-    : null;
+  const width = fromOg ? intOrNull(firstMetaMatch(doc, (m) => metaRole(m) === "og:image:width")) : null;
+  const height = fromOg ? intOrNull(firstMetaMatch(doc, (m) => metaRole(m) === "og:image:height")) : null;
   return { url, width, height, fromOg };
 }
 
@@ -343,7 +402,7 @@ export function preferredImageOf(doc) {
  * two sources by document position and kept only the first; `declaredTypes`
  * lists every meta declaration before every JSON-LD one. No 0.9 consumer
  * depends on a single winner — membership and findings use set-inclusion —
- * and the spec rewrite (B3) states this order as the new rule.
+ * and the spec rewrite states this order as the new rule.
  */
 export function declaredTypes(doc) {
   const metaTypes = metaValues(doc, "schema").map(trimmedOrNull).filter((v) => v !== null);
@@ -363,20 +422,25 @@ function conflictFor(field, values) {
  * `[{field, kept, discarded}]` for exactly the fields §24.4's
  * `metadata-conflict` renders: `canonical` (every accepted canonical href),
  * `description` (every non-empty description content), `title` (every
- * accepted `analysis.titleTexts` entry). `lang` is never included — one
- * `<html>` element carries one `lang` attribute, and `document.js`'s
- * first-occurrence-wins already collapses a repeated attribute to a single
- * value before this selector ever sees it, so there is no second
- * declaration left to conflict with the first. Ordered by field name.
+ * accepted `analysis.titleTexts` entry), `lang` (every non-empty `lang` from
+ * every `<html>` element, document-wide — `analysis.langTexts`). A single
+ * `<html>` element carries one `lang` attribute, but the snapshot's
+ * `document.html.attributes` — what `langOf` reads — keeps only the FIRST
+ * `<html>` element (`document.js`'s `findFirst`); a second `<html>` element
+ * (reachable through a textual `<include>` of a full document) is invisible
+ * to `langOf` but not to `analysis.langTexts`, which is why `lang` is read
+ * from there rather than from `langOf`. Ordered by field name.
  */
 export function metadataConflicts(doc) {
   const canonicalValues = linksWithRel(doc, "canonical").map((l) => trimmedOrNull(l.href)).filter((v) => v !== null);
   const descriptionValues = metaValues(doc, "description").map(trimmedOrNull).filter((v) => v !== null);
   const titleValues = doc.analysis.titleTexts;
+  const langValues = doc.analysis.langTexts;
   return [
+    conflictFor("title", titleValues),
+    conflictFor("lang", langValues),
     conflictFor("canonical", canonicalValues),
     conflictFor("description", descriptionValues),
-    conflictFor("title", titleValues),
   ]
     .filter((c) => c !== null)
     .sort((a, b) => (a.field < b.field ? -1 : a.field > b.field ? 1 : 0));

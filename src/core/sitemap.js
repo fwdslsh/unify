@@ -120,20 +120,13 @@ export function isSelfCanonical(record, base) {
  *     names exactly that pairing — `noindex` plus an off-site canonical, and a
  *     sitemap advertising a URL whose canonical points away from it.
  *
- * §14/batch B2 — the four-state core this delegates to,
- * `classifyCanonicalValue(canonical, outputPath, base)`, now lives in
- * `document-selectors.js` so a caller holding a value and an output path
- * (no `PageRecord` needed — a doc-level selector, for instance) can ask the
- * same question. This wrapper is a one-line adapter kept for every existing
- * `PageRecord`-shaped caller; the classification logic itself moved.
- *
- * This block used to parse the URL a second time and compare hosts itself.
- * That was written before §12's own comparison was fixed, and mutation
- * testing then showed the two agreeing on every input — a second
- * interpretation of a question §12 already answers, which is the defect
- * product-spec §6.1 exists to forbid rather than a safety net. What is
- * load-bearing is the *classification*: without `stripBaseUrl` an off-origin
- * canonical reads as `unknown`, and neither finding fires.
+ * The four-state core this delegates to, `classifyCanonicalValue(canonical,
+ * outputPath, base)`, lives in `document-selectors.js` so a caller holding a
+ * value and an output path (no `PageRecord` needed — a doc-level selector,
+ * for instance) can ask the same question. This wrapper is a one-line
+ * adapter kept for every existing `PageRecord`-shaped caller; the
+ * classification logic itself, and the history behind it, moved with it —
+ * see `classifyCanonicalValue`'s own docstring there.
  * @param {import('./manifest.js').PageRecord} record
  * @param {import('./urls.js').BaseUrlConfig|null} base
  * @returns {'none'|'self'|'elsewhere'|'unknown'}
@@ -172,15 +165,14 @@ const WEB_SCHEMES = new Set(["http:", "https:"]);
  * and sitemap-canonical-disagree share the `elsewhere` branch and a page can
  * collect both.
  *
- * Batch B2 note: unlike `classifyCanonical`, this function's own body stays
- * here rather than being split into a value-level core in
- * `document-selectors.js`. It is not one of that batch's named doc-level
- * selectors, and extracting a `canonicalSchemeMismatchValue(canonical,
- * outputPath, base)` today would need to drag `WEB_SCHEMES`/`schemeOf` — both
- * sitemap-local — along with it, for a core no B2 consumer would call. It
- * already delegates its host question to `classifyCanonical` above, which
- * *is* now backed by the relocated core, so it is not a second reading of
- * that question either.
+ * Unlike `classifyCanonical`, this function's own body stays here rather
+ * than being split into a value-level core in `document-selectors.js`: it is
+ * not one of that module's doc-level selectors, and extracting a
+ * `canonicalSchemeMismatchValue(canonical, outputPath, base)` today would
+ * need to drag `WEB_SCHEMES`/`schemeOf` — both sitemap-local — along with it,
+ * for a core no other consumer would call. It already delegates its host
+ * question to `classifyCanonical` above, which *is* now backed by the
+ * relocated core, so it is not a second reading of that question either.
  *
  * @param {import('./manifest.js').PageRecord} record
  * @param {import('./urls.js').BaseUrlConfig|null} base
