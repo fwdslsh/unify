@@ -34,6 +34,7 @@
  */
 
 import { decodeEntities } from "./entities.js";
+import { nonEmpty, orNull, readText, textContent } from "./document.js";
 import { findAll, findFirst, getAttr, innerText, isElement, isInside, isJsonLdScript, parse } from "./html.js";
 import { urlForOutputPath } from "./publish.js";
 import { isSkippedUrl, parseRefreshMeta, splitUrl } from "./urls.js";
@@ -113,55 +114,6 @@ import { stripBaseUrl, resolveReference } from "./references.js";
  * @property {Conflict[]} conflicts
  */
 
-/** Subtrees whose characters are not visible page text (§20.3). */
-const INVISIBLE = new Set(["script", "style", "template", "noscript"]);
-
-/**
- * §20.3's closed inline set: leaving one of these contributes no separator;
- * leaving any other element contributes one space. Without the separator
- * `<p>a</p><p>b</p>` reads as `ab`; with an unconditional one `a <em>b</em>!`
- * reads as `a b !`. `<br>` is absent on purpose — it separates lines, so it
- * separates words.
- */
-const INLINE = new Set([
-  "a", "abbr", "b", "bdi", "bdo", "cite", "code", "data", "dfn", "em", "i", "img",
-  "kbd", "mark", "q", "rp", "rt", "ruby", "s", "samp", "small", "span", "strong",
-  "sub", "sup", "time", "u", "var", "wbr",
-]);
-
-/**
- * §20.3's text-content rule: the character data of `el` and its descendants
- * with `INVISIBLE` subtrees omitted, whitespace runs collapsed to one space,
- * and the result trimmed. Comments contribute nothing.
- *
- * Implemented over the parser's node tree rather than by stripping tags from
- * a raw slice, because the raw slice would keep the contents of a `<script>`
- * — which is exactly the "visible text" mistake that makes duplicate-content
- * detection report two pages as identical when only their inline analytics
- * snippet is.
- * @param {import('./html.js').Node} el
- * @returns {string}
- */
-function textContent(el) {
-  let out = "";
-  const visit = (node) => {
-    if (node.type === "text") { out += node.data; return; }
-    if (node.type !== "element" && node.type !== "root") return;
-    const tag = node.type === "element" ? node.tag.toLowerCase() : "";
-    if (INVISIBLE.has(tag)) return;
-    // Entering AND leaving: leaving alone fuses a parent's own text with a
-    // block child's ("<div>Intro<p>Para</p></div>" -> "IntroPara"). The
-    // doubled separator between two adjacent blocks costs nothing, because
-    // `collapse` runs over the result.
-    const separates = node.type === "element" && !INLINE.has(tag);
-    if (separates) out += " ";
-    for (const child of node.children ?? []) visit(child);
-    if (separates) out += " ";
-  };
-  for (const child of el.children ?? []) visit(child);
-  return readText(out);
-}
-
 /** A fragment is percent-encoded like any URL part; an undecodable one stays verbatim. */
 function decodeURIComponentSafe(s) {
   try {
@@ -169,49 +121,6 @@ function decodeURIComponentSafe(s) {
   } catch {
     return s;
   }
-}
-
-/** Collapse every run of ASCII whitespace to one space and trim (§20.3). */
-function collapse(s) {
-  return s.replace(/[ \t\n\r\f]+/g, " ").trim();
-}
-
-/**
- * §20.3's reading of one raw slice of emitted markup: resolve character
- * references, then collapse.
- *
- * The order is not interchangeable and this helper exists so no call site can
- * pick the wrong one. Collapsing first leaves whitespace a reference
- * INTRODUCES uncollapsed — `a&#32;&#32;b` keeps two spaces, `a&#10;b` keeps a
- * raw newline in a field the spec says is collapsed — so two fields reading
- * the same characters disagree. Every text-bearing field goes through here or
- * through `textContent`, which applies the same order, and nothing decodes a
- * value either of them has already returned.
- * @param {string} raw
- * @returns {string}
- */
-function readText(raw) {
-  return collapse(decodeEntities(raw));
-}
-
-/** Trim-only emptiness, for a value already read by `readText`/`textContent`. */
-function orNull(s) {
-  return typeof s === "string" && s.trim() !== "" ? s.trim() : null;
-}
-
-/**
- * `""` and whitespace-only both mean "declared nothing" (§20.3). Character
- * references resolve here too: an attribute carries them exactly as element
- * text does, so `content="Tea &amp; Coffee"` is `Tea & Coffee` in the record.
- *
- * For RAW slices only — an attribute value, straight from the parser. A value
- * `readText` or `textContent` already returned must use `orNull` instead, or it
- * decodes twice and reports text no page displays.
- */
-function nonEmpty(s) {
-  if (typeof s !== "string") return null;
-  const trimmed = decodeEntities(s).trim();
-  return trimmed === "" ? null : trimmed;
 }
 
 /**
