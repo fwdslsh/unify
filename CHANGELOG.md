@@ -82,6 +82,20 @@ honest, and the examples gain a gate.
 
 ### Added
 
+- **Markdown converts with markdown-it's standard feature set** (§10.1,
+  MD-22) — its default preset, rather than the narrowed `commonmark` one. Over
+  that preset this adds exactly two grammars, measured rather than assumed:
+  **GFM pipe tables** and **strikethrough**. Tables are why it was found: a
+  pipe table converted to a paragraph of literal `| Flag | Meaning |` text, and
+  unify's own documentation site shipped **247 such rows across eight pages
+  with not one `<table>` element** — the conformance spec's head-merge table
+  and collision matrix among them. A file that renders correctly in a
+  repository should not look broken once unify publishes it. `linkify` and
+  `typographer` are markdown-it *options* rather than rules and remain off, so
+  no address or quotation mark is rewritten unless asked for; those options
+  and markdown-it's plugin interface are where per-site Markdown configuration
+  would go if it is wanted. If you write documentation in Markdown, your
+  tables start rendering; nothing else about your pages changes.
 - **Gate G13: every example builds in CI** (#77). `examples/` holds seven
   sites and CI built one, so an example could stop working unnoticed — which
   had already happened twice, once with a deploy workflow carrying a flag cut
