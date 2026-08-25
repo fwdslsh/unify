@@ -7,8 +7,8 @@ nothing about Eleventy, and Eleventy needs to know nothing about unify: the seam
 directory. Every path, command, literal and number in this document was taken from
 `examples/eleventy-htmx` by running it. Read
 [`../authoring-rules.md`](../authoring-rules.md) first — every page, layout and fragment
-below obeys it — and [`../integrations.md`](../integrations.md) for the four other things
-`--generate` is used for.
+below obeys it — and [`../integrations.md`](../integrations.md), whose five recipes cover
+the other things `--generate` is used for.
 
 This is the stack at its most elaborate. §14 is the honest counterweight: a normal unify
 site is HTML, CSS and unify, and it should stay that way until something forces the issue.
@@ -354,9 +354,10 @@ src/notes/all.fragment.html:7: problem: /notes/firmware-2-6-0/ does not resolve 
 EXIT=1
 ```
 
-Note the paths in those diagnostics: `src/notes/all.fragment.html` is a *generated* file,
-reported at its overlay path and its line number like any file you wrote. Generated output
-is not a second class of input.
+Note the paths in those diagnostics. `src/notes/all.fragment.html` and
+`src/latest.fragment.html` are *generated* files, reported under the source root with a
+line number exactly as a file you wrote would be. Generated output is not a second class of
+input — it is checked, located and blamed like everything else.
 
 ## 7. Using unify layouts over generated output
 
@@ -907,5 +908,6 @@ it is harder, because by then the pages exist only inside templates. Start plain
 The example is [`examples/eleventy-htmx`](../../examples/eleventy-htmx), and its own README
 covers the same ground from the code's side. The composition rules every generated page obeys
 are in [`../authoring-rules.md`](../authoring-rules.md); the exact flag surface is in
-[`../cli-reference.md`](../cli-reference.md); the other four uses of `--generate` are in
+[`../cli-reference.md`](../cli-reference.md); the other uses of `--generate` — image
+derivatives, a CMS pull, vendoring a package's browser files — are in
 [`../integrations.md`](../integrations.md).
