@@ -102,3 +102,82 @@ jobs:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
       - run: bun tests/conformance/check-traceability.mjs --static --baseline tests/conformance/phase-gaps/baseline.txt
+
+  # Always-on gate G13: every example still builds. `examples/` holds seven
+  # sites and CI used to build one, so an example could stop working and
+  # nothing would notice — which is not hypothetical: a deploy workflow
+  # carried `--copy` for three releases after that flag was cut, and the
+  # eleventy-htmx example shipped a first draft whose production script was
+  # named `publish`, not `build`. Both were caught by a person looking, which
+  # is not a control.
+  #
+  # They are also load-bearing rather than decorative: examples/README.md
+  # cites four of them as the evidence that docs/authoring-rules.md is
+  # sufficient to author from. Evidence that silently stops building is worse
+  # than none, because it is still being cited.
+  #
+  # `build --dry-run --strict` is the gate for ALL of them; `audit --strict`
+  # only for the two that already meet it. The four sandbox-authored sites
+  # carry 41 `incomplete` findings between them (share images with no
+  # declared dimensions, mostly), and they always have — demanding audit
+  # cleanliness here would be a new requirement wearing a regression gate's
+  # clothes, and it would land this job red on the day it merged.
+  examples:
+    name: Examples build (G13)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - name: Dependency-free examples
+        run: |
+          set -euo pipefail
+          for ex in seed-library seed-library-alt seed-library-ondemand htmx-fragments; do
+            echo "── $ex"
+            bun src/cli.js build -s "examples/$ex/src" -o "/tmp/$ex" --dry-run --strict
+          done
+      - name: unify-docs (build and audit, as deploy-docs.yml gates it)
+        run: |
+          set -euo pipefail
+          bun src/cli.js build -s examples/unify-docs/src -o /tmp/unify-docs \
+            --generate _scripts/gen.mjs --pretty-urls \
+            --base-url https://unify.fwdslsh.dev/ --canonical auto --search-index \
+            --dry-run --strict
+          bun src/cli.js audit -s examples/unify-docs/src \
+            --generate _scripts/gen.mjs --pretty-urls \
+            --base-url https://unify.fwdslsh.dev/ --canonical auto --search-index \
+            --strict
+
+  # G13, the half that needs a package install. Deliberately run on NODE:
+  # bun auto-installs an import it cannot resolve, so a missing dependency
+  # would be fetched from npm mid-build and the gate would pass while a
+  # `npx @fwdslsh/unify` user fails on the same tree (issue #75). Running the
+  # generator seam under node is what makes this gate mean anything.
+  examples-npm:
+    name: Examples with dependencies (G13)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: bun install --frozen-lockfile
+      - name: forge-svelte
+        run: |
+          set -euo pipefail
+          cd examples/forge-svelte
+          npm install
+          npm run build:calculator && npm run build:notes
+          cd "$GITHUB_WORKSPACE"
+          node src/cli.js build -s examples/forge-svelte/src -o /tmp/forge-svelte --dry-run --strict
+      - name: eleventy-htmx
+        run: |
+          set -euo pipefail
+          cd examples/eleventy-htmx
+          npm ci
+          cd "$GITHUB_WORKSPACE"
+          node src/cli.js build -s examples/eleventy-htmx/src -o /tmp/eleventy-htmx \
+            --generate _scripts/eleventy.mjs --pretty-urls --dry-run --strict
+          node src/cli.js audit -s examples/eleventy-htmx/src \
+            --generate _scripts/eleventy.mjs --pretty-urls --strict

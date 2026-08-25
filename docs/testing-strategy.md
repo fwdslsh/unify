@@ -233,6 +233,7 @@ The release ships when a clean CI run on the release commit satisfies **all** of
 | G10 | Docs lockstep | `docs/authoring-rules.md` ≤ 60 lines and linked from the README, whose own summaries of it stay consistent (product-spec §7, item 5) |
 | G11 | Binary parity | the compiled Linux x86_64 binary passes the Tier-0 golden path; Linux ARM64 and macOS x86_64/ARM64 release binaries build successfully (parity runs where runners exist) |
 | G12 | Runtime parity | `node src/cli.js` passes the Tier-0 golden path for all five templates and emits a scaffold, a `dist/`, a stdout and a stderr byte-identical to the `bun src/cli.js` run; needs a `node` >= `package.json`'s `engines.node` on PATH, and fails rather than skips without one |
+| G13 | Examples build | every site in `examples/` passes `build --dry-run --strict` with the flags its README documents, and the two that are audit-clean (`unify-docs`, `eleventy-htmx`) also pass `audit --strict`. The four sandbox-authored sites are deliberately not audit-gated: they carry 41 `incomplete` findings and always have, so requiring it would be a new demand rather than a regression check. `forge-svelte` and `eleventy-htmx` install first and run on **node**, because bun auto-installs a missing import and would let an undeclared dependency pass a gate an `npx` user fails (#75) |
 
 Coverage is reported alongside the gates for the record. It gates nothing.
 
