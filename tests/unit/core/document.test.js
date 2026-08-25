@@ -53,6 +53,11 @@ describe("html/body attributes", () => {
     expect(Object.keys(d.html.attributes)).toEqual(["lang"]);
   });
 
+  test("attribute values are decoded but NOT trimmed", () => {
+    const d = snap(`<html lang="  fr  "><head></head><body></body></html>`);
+    expect(d.html.attributes.lang).toBe("  fr  ");
+  });
+
   test("absent <html>/<body> element reads as {}", () => {
     const d = snap(`<div>no html or body here</div>`);
     expect(d.html.attributes).toEqual({});
@@ -71,6 +76,11 @@ describe("title extraction", () => {
   test("whitespace collapse and entity decoding", () => {
     const d = snap(doc("<title>  Tea   &amp;\n  Coffee  </title>"));
     expect(d.head.title).toBe("Tea & Coffee");
+  });
+
+  test("a doubly-escaped reference decodes exactly once", () => {
+    const d = snap(doc("<title>a &amp;amp; b</title>"));
+    expect(d.head.title).toBe("a &amp; b");
   });
 
   test("empty/whitespace-only title skipped; next non-empty wins; titleTexts shows only accepted", () => {
@@ -189,6 +199,38 @@ describe("head scope", () => {
     expect(d.head.meta).toEqual([{ name: "description", content: "whole doc" }]);
     expect(d.head.title).toBe("T");
     expect(a.strayMetadata).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------- strayMetadata
+
+describe("strayMetadata", () => {
+  test("§24.4 closed-set meta keys are reported when body-placed; a non-closed-set name is not", () => {
+    const html = doc(
+      "",
+      '<meta charset="utf-8">' +
+        '<meta name="description" content="d">' +
+        '<meta name="robots" content="noindex">' +
+        '<meta name="schema" content="Article">' +
+        '<meta name="twitter:card" content="summary">' +
+        '<meta property="og:title" content="t">' +
+        '<meta name="keywords" content="a,b">',
+    );
+    const a = analysis(html);
+    expect(a.strayMetadata).toEqual([
+      { tag: "meta", key: "charset" },
+      { tag: "meta", key: "description" },
+      { tag: "meta", key: "robots" },
+      { tag: "meta", key: "schema" },
+      { tag: "meta", key: "twitter:card" },
+      { tag: "meta", key: "og:title" },
+    ]);
+  });
+
+  test("body-placed <link rel=\"canonical\"> is reported; rel=\"stylesheet\" is not", () => {
+    const html = doc("", '<link rel="canonical" href="/c"><link rel="stylesheet" href="/s.css">');
+    const a = analysis(html);
+    expect(a.strayMetadata).toEqual([{ tag: "link", key: "canonical" }]);
   });
 });
 
@@ -335,6 +377,12 @@ describe("ids", () => {
     const a = analysis(html);
     expect(a.ids).toEqual(["head-id", "a", "b", "a"]);
   });
+
+  test("empty and whitespace-only ids excluded; a decoded id is kept", () => {
+    const html = doc("", '<div id=""></div><div id="   "></div><div id="a&amp;b"></div>');
+    const a = analysis(html);
+    expect(a.ids).toEqual(["a&b"]);
+  });
 });
 
 // --------------------------------------------------------------- rawHrefs
@@ -374,6 +422,21 @@ describe("refresh", () => {
   test("no refresh meta: null", () => {
     const a = analysis(doc());
     expect(a.refresh).toBeNull();
+  });
+
+  test("raw is the content attribute exactly as emitted — verbatim, undecoded, untrimmed", () => {
+    const html = doc('<meta http-equiv="refresh" content=" 5 ; url=/x">');
+    const a = analysis(html);
+    expect(a.refresh.raw).toBe(" 5 ; url=/x");
+  });
+
+  test("raw stays undecoded even when the content value carries a character reference", () => {
+    const html = doc('<meta http-equiv="refresh" content="0;&#32;url=/a.html">');
+    const a = analysis(html);
+    expect(a.refresh.raw).toBe("0;&#32;url=/a.html");
+    // The undecoded raw and the parsed url agree: neither reads the entity as
+    // whitespace, so `url` is null rather than contradicting `raw`.
+    expect(a.refresh.url).toBeNull();
   });
 });
 

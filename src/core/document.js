@@ -39,7 +39,7 @@ import { findAll, findFirst, getAttr, innerText, isElement, isInside, isJsonLdSc
 import { parseRefreshMeta } from "./urls.js";
 
 /** Subtrees whose characters are not visible page text (§20.3). */
-export const INVISIBLE = new Set(["script", "style", "template", "noscript"]);
+const INVISIBLE = new Set(["script", "style", "template", "noscript"]);
 
 /**
  * §20.3's closed inline set: leaving one of these contributes no separator;
@@ -48,7 +48,7 @@ export const INVISIBLE = new Set(["script", "style", "template", "noscript"]);
  * reads as `a b !`. `<br>` is absent on purpose — it separates lines, so it
  * separates words.
  */
-export const INLINE = new Set([
+const INLINE = new Set([
   "a", "abbr", "b", "bdi", "bdo", "cite", "code", "data", "dfn", "em", "i", "img",
   "kbd", "mark", "q", "rp", "rt", "ruby", "s", "samp", "small", "span", "strong",
   "sub", "sup", "time", "u", "var", "wbr",
@@ -147,7 +147,16 @@ function attributesOf(el) {
     const name = attr.name.toLowerCase();
     if (seen.has(name)) continue;
     seen.add(name);
-    out[name] = decodeEntities(attr.value ?? "");
+    const value = decodeEntities(attr.value ?? "");
+    // `out[name] = value` for name === "__proto__" sets the object's
+    // [[Prototype]] instead of an own property (a string value makes it a
+    // silent no-op), which would drop an attribute the author wrote. Every
+    // other name goes through the plain assignment.
+    if (name === "__proto__") {
+      Object.defineProperty(out, name, { value, enumerable: true, writable: true, configurable: true });
+    } else {
+      out[name] = value;
+    }
   }
   return out;
 }
@@ -166,9 +175,14 @@ function attributesOf(el) {
  * @property {string|null} error
  *
  * @typedef {object} RefreshReading
- * @property {string} raw - the decoded, non-empty `content` value
+ * @property {string} raw - the `content` value exactly as emitted (verbatim,
+ *   undecoded — `parseRefreshMeta`'s own reading; matches manifest.js's
+ *   `RefreshValue.raw`, so a consumer that swaps to this module gets the same
+ *   string, e.g. in an audit finding)
  * @property {number} seconds
- * @property {string|null} url
+ * @property {string|null} url - the RAW, still-encoded URL slice as parsed;
+ *   a consumer decodes it (see manifest.js's `decodeEntities(raw.url)`) —
+ *   nothing here decodes a value `parseRefreshMeta` already sliced out
  * @property {boolean} hasSecondPart
  *
  * @typedef {object} DocumentAnalysis
@@ -184,10 +198,13 @@ function attributesOf(el) {
 /**
  * Extract a `{document, analysis}` pair from one final emitted HTML document.
  *
- * A single document-order pass over every element does the reading; `path`
- * and `url` are pure passthrough — this module has no opinion on either and
- * never derives one, because a build's URL provenance (pretty URLs, a
- * `--base-url` origin) is a fact of the pipeline, not of the bytes.
+ * One document-order pass collects the head/analysis readings; the scoped
+ * readings (headings, visible text) walk the resolved `<main>`/`<body>`/root
+ * subtree separately, because their scope is not known until the whole tree
+ * is available. `path` and `url` are pure passthrough — this module has no
+ * opinion on either and never derives one, because a build's URL provenance
+ * (pretty URLs, a `--base-url` origin) is a fact of the pipeline, not of the
+ * bytes.
  *
  * @param {string} html
  * @param {{path?: string|null, url?: string|null}} [options]
@@ -253,7 +270,7 @@ export function extractDocument(html, { path = null, url = null } = {}) {
       const refresh = parseRefreshMeta(node);
       if (refresh !== null && refreshFirst === null) {
         refreshFirst = {
-          raw: nonEmpty(getAttr(node, "content")),
+          raw: refresh.raw,
           seconds: refresh.seconds,
           url: refresh.url,
           hasSecondPart: refresh.hasSecondPart,
