@@ -181,3 +181,20 @@ jobs:
             --generate _scripts/eleventy.mjs --pretty-urls --dry-run --strict
           node src/cli.js audit -s examples/eleventy-htmx/src \
             --generate _scripts/eleventy.mjs --pretty-urls --strict
+
+  # Always-on gate G14: the release notes describe the version in
+  # package.json. `.github/workflows/release_notes.md` is pasted verbatim into
+  # the GitHub release body, and nothing read it back until it had been wrong
+  # twice — 0.8.2 still carrying 0.8.1's text, and 0.8.3 shipping without a
+  # change that landed after the notes were written.
+  #
+  # This job goes red between bumping the version and rewriting the notes.
+  # That is the point: they are two halves of one change, and the failure
+  # message says which half is missing.
+  release-notes:
+    name: Release notes match the version (G14)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun tests/conformance/check-release-notes.mjs

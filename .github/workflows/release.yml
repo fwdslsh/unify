@@ -94,6 +94,12 @@ jobs:
           bun tests/conformance/check-suite-hygiene.mjs
           bun tests/conformance/check-module-graph.mjs
           bun tests/conformance/check-traceability.mjs --runtime .conformance-ledger.jsonl
+          # G14. This file is pasted verbatim into the release body below, and
+          # was wrong at two consecutive releases before anything checked it:
+          # 0.8.2 still held 0.8.1's text (caught by hand), and 0.8.3 shipped
+          # missing a change that landed after the notes were written (not
+          # caught). Last gate before the body is composed.
+          bun tests/conformance/check-release-notes.mjs
 
       # One runner cross-compiles every target, so there is no build matrix.
       # These names are the contract install.sh downloads by ("unify-$os-$arch",
