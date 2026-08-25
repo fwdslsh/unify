@@ -170,6 +170,31 @@ function failureDetail(stderr) {
     /^Bun v\d/, //              the runtime's version footer
     /^Node\.js v\d/,
     /^\S*[/\\]\S*:\d+$/, //    node's location header: `file:///…/gen.mjs:1`
+    /^node:\S+:\d+$/, //       …and its INTERNAL one: `node:fs:560`, which the
+    //                         shape above misses because it carries no slash.
+    //                         A generator that fails inside a node builtin
+    //                         (the commonest way of all — a missing file)
+    //                         otherwise spends the first of three lines on it.
+    // The INSPECTED ERROR OBJECT's own properties, and the brace that closes
+    // it (GEN-11). Both runtimes print a thrown Error's fields under the
+    // message, and neither shape above recognised them, so the commonest
+    // failure of all — a generator that cannot read a file — reported:
+    //
+    //     … open '/x.json' /     path: "/x.json", /  syscall: "open",
+    //
+    // The message is already whole by the end of the first line; what follows
+    // re-states the path and then trails a comma that terminates nothing. A
+    // reader cannot tell that from unify's own output being broken, which is
+    // the worst thing a §14 diagnostic can look like.
+    //
+    // Keyed on INDENTATION plus a JS-identifier key, which is what separates a
+    // machine-printed property from a generator's own words: `errno: -2` is
+    // dropped, an unindented line is kept whatever it says, and a generator
+    // listing `  first-post.md: no date` keeps it too, because a bare filename
+    // is not an identifier. Multi-line generator messages still survive — the
+    // three-line budget below exists for them.
+    /^\s+[A-Za-z_$][\w$]*:\s/, //  `  syscall: "open",`
+    /^\s*\}[,;]?\s*$/, //          the `}` closing node's object tail
   ];
   const raw = stderr.split("\n").map((line) => line.trimEnd());
   const lines = raw.filter((line, i) =>
@@ -247,7 +272,44 @@ export async function runGenerator({ generatorAbs, sourceRoot, overlayDir, repor
   // path instead of re-entering its own CLI: without it, `unify gen.mjs` is an
   // unknown-argument usage error. It is harmless when `process.execPath` is an
   // ordinary `bun`, so one spawn covers both the checkout and the binary.
-  const proc = spawn(process.execPath, [generatorAbs, root, overlayDir], {
+  //
+  // `--no-install` is what keeps the two runtimes AGREEING (GEN-11), and it is
+  // the ONE place unify asks which runtime it is. That is a deliberate
+  // exception to the no-fork rule, taken because it REMOVES a fork rather than
+  // adding one: bun auto-installs an import it cannot resolve, so a generator
+  // with a missing dependency fetched it from npm and the build exited 0,
+  // while node failed the same tree with ERR_MODULE_NOT_FOUND inside P29.
+  // Without the flag the two runtimes disagree about whether there was a build
+  // at all — a divergence G12 cannot see, because it compares emitted bytes
+  // and here one side emits none.
+  //
+  // It fails in the direction that hides the problem: bun resolves through its
+  // global cache and leaves no `node_modules`, so the tree that built looks
+  // identical to the tree that cannot. The COMPILED BINARY does it too, which
+  // is the worst case — that path's whole promise is a machine with neither
+  // runtime installed, and it was quietly reaching the network to make a
+  // broken build succeed (§31 reserves unify's only network call for
+  // `audit --external`).
+  //
+  // `process.versions.bun` rather than `typeof Bun`, and rather than the
+  // executable's name, because only it is true on all three launch paths.
+  // Measured:
+  //
+  //     node src/cli.js    basename `node`         versions.bun null
+  //     bun src/cli.js     basename `bun`          versions.bun 1.3.11
+  //     unify-linux        basename `unify-linux`  versions.bun 1.3.11
+  //
+  // A name check would miss the binary — the one that most needs it. Node has
+  // no `versions.bun` and would reject the flag outright, so the guard is what
+  // makes this safe rather than a matter of taste.
+  //
+  // The flag must be an ARGUMENT: bun exposes no environment equivalent. Seven
+  // candidates were measured, including `bunfig.toml` reached through
+  // `XDG_CONFIG_HOME`, and every one still auto-installed. That is also why an
+  // author cannot opt into this themselves — the generator is a fresh
+  // subprocess, so nothing they export reaches it.
+  const args = process.versions.bun ? ["--no-install"] : [];
+  const proc = spawn(process.execPath, [...args, generatorAbs, root, overlayDir], {
     cwd: root, // §33.2 — `./_data/x.json` means what an author expects
     env: { ...process.env, BUN_BE_BUN: "1" },
     stdio: ["ignore", "pipe", "pipe"],

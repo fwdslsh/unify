@@ -291,3 +291,108 @@ test("GEN-07 — audit runs the generator and still writes nothing", async () =>
   }
   covers("GEN-07");
 }, TEST_MS);
+
+// ------------------------------------------------------------------- GEN-10
+
+test("GEN-10 — P29 drops the runtime's inspected error object, not the message", async () => {
+  // The commonest generator failure of all: it cannot read a file. Both
+  // runtimes print the thrown Error's own fields under the message, and
+  // neither the code-frame nor the stack-frame shape recognised them, so the
+  // diagnostic ended `… open '/x.json' /     path: "/x.json", /  syscall:
+  // "open",` — the path restated, then a comma terminating nothing. A reader
+  // cannot tell that from unify's own output being broken.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": doc("Home", "<h1>Home</h1>"),
+    "_scripts/gen.mjs": 'import { readFileSync } from "node:fs";\nreadFileSync("/definitely/not/here.json");\n',
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--generate", "_scripts/gen.mjs", "--dry-run"], tmp);
+  const line = r.stderr.split("\n").find((l) => l.includes("problem:")) ?? "";
+
+  // What the author needs is present…
+  if (!line.includes("/definitely/not/here.json")) {
+    throw new Error(`P29 must carry the generator's message:\n${r.stderr}`);
+  }
+  // …and the object's machine-printed tail is not. `syscall:`/`errno:`/`code:`
+  // are the properties; a bare `}` is node's object close; `node:fs:` is its
+  // internal location header, which carries no slash and so escaped the
+  // file-location shape.
+  for (const noise of [/\bsyscall:/, /\berrno:/, /\bcode:\s*['"]/, /\/\s*\}\s*$/, /node:fs:\d+/]) {
+    if (noise.test(line)) {
+      throw new Error(`P29 leaked the runtime's inspected error object (${noise}):\n${line}`);
+    }
+  }
+  covers("GEN-10", "P29");
+}, TEST_MS);
+
+test("GEN-10 — a generator's own indented lines are not mistaken for properties", async () => {
+  // The shape keys on indentation PLUS a JS identifier, so it must not eat a
+  // generator reporting its own findings. `first-post.md` is not an
+  // identifier; the line survives, and so does the multi-line message.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": doc("Home", "<h1>Home</h1>"),
+    "_scripts/gen.mjs":
+      'process.stderr.write("2 notes are missing a date:\\n  first-post.md: no date\\n  second-post.md: no date\\n");\n' +
+      "process.exit(1);\n",
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--generate", "_scripts/gen.mjs", "--dry-run"], tmp);
+  const line = r.stderr.split("\n").find((l) => l.includes("problem:")) ?? "";
+  for (const want of ["2 notes are missing a date:", "first-post.md: no date", "second-post.md: no date"]) {
+    if (!line.includes(want)) {
+      throw new Error(`P29 dropped a generator's own line (${want}):\n${line}`);
+    }
+  }
+  covers("GEN-10");
+}, TEST_MS);
+
+// ------------------------------------------------------------------- GEN-11
+
+test("GEN-11 — the generator subprocess never network-installs, and argv is unshifted", async () => {
+  // Bun auto-installs an import it cannot resolve. A generator with a missing
+  // dependency therefore FETCHED IT FROM npm and the build exited 0, while
+  // node failed the same tree inside P29 — a disagreement about whether there
+  // was a build at all, which G12 cannot see because it compares emitted bytes
+  // and here one side emits none. The compiled binary did it too, on the path
+  // whose whole promise is a machine with neither runtime installed.
+  //
+  // Asserted through `process.execArgv`, which the generator can read, so this
+  // is deterministic and needs no network: the alternative — importing a real
+  // uninstalled package and expecting failure — passes for the wrong reason on
+  // an offline runner.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": doc("Home", "<h1>Home</h1>"),
+    "_scripts/gen.mjs":
+      'import { writeFileSync } from "node:fs";\n' +
+      "writeFileSync(process.argv[3] + '/probe.json', JSON.stringify({\n" +
+      "  execArgv: process.execArgv,\n" +
+      "  argv2: process.argv[2],\n" +
+      "  argv3: process.argv[3],\n" +
+      "}));\n",
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--generate", "_scripts/gen.mjs"], tmp);
+  if (r.exit !== 0) throw new Error(`the healthy generator must still build:\n${r.stderr}`);
+
+  const probe = JSON.parse(readFileSync(join(tmp, "dist", "probe.json"), "utf8"));
+
+  // The flag is present exactly where it is valid. Node has no
+  // `process.versions.bun` and would reject `--no-install` outright.
+  if (process.versions.bun) {
+    if (!probe.execArgv.includes("--no-install")) {
+      throw new Error(`the generator spawn must carry --no-install under bun:\n${JSON.stringify(probe.execArgv)}`);
+    }
+  } else if (probe.execArgv.includes("--no-install")) {
+    throw new Error("--no-install must never be passed to node");
+  }
+
+  // §33.2's contract survives it: the flag goes before the script path, so the
+  // generator's own argv still starts at the source root.
+  if (probe.argv2 !== join(tmp, "src")) {
+    throw new Error(`argv[2] must still be the source root, got ${probe.argv2}`);
+  }
+  if (!probe.argv3 || probe.argv3 === probe.argv2) {
+    throw new Error(`argv[3] must still be the generated directory, got ${probe.argv3}`);
+  }
+  covers("GEN-11", "GEN-02");
+}, TEST_MS);

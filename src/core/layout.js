@@ -209,9 +209,132 @@ export function checkLayoutDocument({ root, text, spans, resolveLine, file, repo
  * @param {string} args.file - source-root-relative path
  * @param {import('./diagnostics.js').Reporter} args.reporter
  */
+/** Opening or closing `<pre>`/`<code>` tag, textually (see `inertRanges`). */
+const PROTECT_TAG = /<(\/?)(pre|code)\b[^>]*>/gi;
+/** A fenced block's opening or closing line: up to three spaces, then ``` or ~~~. */
+const FENCE_LINE = /^ {0,3}(`{3,}|~{3,})/;
+/** A run of backticks delimiting an inline code span. */
+const BACKTICK_RUN = /`+/g;
+
+/**
+ * §6.3 — the regions of a source file where a retired spelling is CONTENT
+ * rather than markup, and P08 must stay silent.
+ *
+ * This is #56's rule (`inertRanges` in includes.js) applied to the one check
+ * that never got it. A page DOCUMENTING unify has to be able to show the
+ * vocabulary it is telling you not to use, and until this existed it could
+ * not: unify's own documentation site went red the day `conformance-spec.md`
+ * gained a sentence about `data-slot`, because P08 parses raw source as HTML
+ * and a well-formed sample is indistinguishable from authored markup to a
+ * parser that was never told the difference (issue #71).
+ *
+ * TWO VOCABULARIES, because P08 runs on raw text and a `.md` file has not
+ * been converted yet. In HTML, code is `<pre>`/`<code>` — the same textual
+ * depth count includes.js uses, so the two checks agree about what a code
+ * sample is. In Markdown it is the three forms the language actually has,
+ * and all three had to be covered because all three were measured failing:
+ * fenced blocks, indented blocks, and inline spans. HTML's rule applies to
+ * Markdown too, since a `.md` file may contain raw HTML.
+ *
+ * The Markdown rules are deliberately the CommonMark ones rather than
+ * something looser, because every byte marked inert is a byte P08 stops
+ * protecting. An indented run only counts when a blank line precedes it —
+ * CommonMark forbids an indented code block from interrupting a paragraph —
+ * so a continuation line that merely happens to be indented is still markup,
+ * and a `data-unify` sitting in it is still reported.
+ *
+ * @param {string} text
+ * @param {string} file - source-root-relative path; only its extension is read
+ * @returns {[number, number][]} sorted, non-overlapping [start, end) ranges
+ */
+export function inertRanges(text, file) {
+  /** @type {[number, number][]} */
+  const ranges = [];
+
+  // ---- HTML `<pre>`/`<code>`, one nesting depth across both names.
+  let depth = 0;
+  let open = 0;
+  for (const m of text.matchAll(PROTECT_TAG)) {
+    if (m[0].endsWith("/>")) continue;
+    if (m[1] === "") {
+      if (depth === 0) open = m.index;
+      depth += 1;
+    } else if (depth > 0) {
+      depth -= 1;
+      if (depth === 0) ranges.push([open, m.index + m[0].length]);
+    }
+  }
+  if (depth > 0) ranges.push([open, text.length]);
+
+  if (posix.extname(file).toLowerCase() === ".md") {
+    // ---- Fenced and indented blocks, line by line. One pass, because a
+    // fence suspends every other rule until it closes — an indented line
+    // inside a fence is fence content, not a second code block.
+    let at = 0;
+    let fence = null; // the opening run, while one is open
+    let indentStart = null; // start offset of an indented run
+    let blankBefore = true; // an indented block may not interrupt a paragraph
+    for (const line of text.split("\n")) {
+      const lineEnd = at + line.length;
+      const fenceHit = FENCE_LINE.exec(line);
+      if (fence !== null) {
+        // Only a run of the SAME character and at least the opener's length closes it.
+        if (fenceHit && fenceHit[1][0] === fence.char && fenceHit[1].length >= fence.len) {
+          ranges.push([fence.start, lineEnd]);
+          fence = null;
+        }
+      } else if (fenceHit) {
+        if (indentStart !== null) { ranges.push([indentStart, at - 1]); indentStart = null; }
+        fence = { start: at, char: fenceHit[1][0], len: fenceHit[1].length };
+      } else if (/^(\t| {4})/.test(line) && (blankBefore || indentStart !== null)) {
+        if (indentStart === null) indentStart = at;
+      } else if (line.trim() !== "" && indentStart !== null) {
+        ranges.push([indentStart, at - 1]);
+        indentStart = null;
+      }
+      if (fence === null && indentStart === null) blankBefore = line.trim() === "";
+      at = lineEnd + 1;
+    }
+    if (fence !== null) ranges.push([fence.start, text.length]);
+    if (indentStart !== null) ranges.push([indentStart, text.length]);
+
+    // ---- Inline spans: a backtick run closes on a run of EQUAL length, which
+    // is what lets ``` `` ` `` ``` show a backtick. Runs already inside a
+    // block range are skipped so a fence's own ``` never opens a span.
+    const blocks = [...ranges];
+    const inBlock = (i) => blocks.some(([s, e]) => i >= s && i < e);
+    /** @type {{index:number,len:number}[]} */
+    const runs = [];
+    for (const m of text.matchAll(BACKTICK_RUN)) {
+      if (!inBlock(m.index)) runs.push({ index: m.index, len: m[0].length });
+    }
+    for (let i = 0; i < runs.length; i += 1) {
+      const j = runs.findIndex((r, k) => k > i && r.len === runs[i].len);
+      if (j === -1) continue;
+      ranges.push([runs[i].index, runs[j].index + runs[j].len]);
+      i = j;
+    }
+  }
+
+  // ---- Merge, so the membership test below is a simple scan.
+  ranges.sort((a, b) => a[0] - b[0]);
+  /** @type {[number, number][]} */
+  const merged = [];
+  for (const r of ranges) {
+    const last = merged[merged.length - 1];
+    if (last && r[0] <= last[1]) last[1] = Math.max(last[1], r[1]);
+    else merged.push([r[0], r[1]]);
+  }
+  return merged;
+}
+
 export function checkRetiredVocabulary({ text, file, reporter }) {
   const { root } = parse(text);
+  const inert = inertRanges(text, file);
+  const isInert = (offset) => inert.some(([s, e]) => offset >= s && offset < e);
   for (const el of findAll(root, (n) => n.type === "element")) {
+    // A sample is not a declaration (§6.3, issue #71).
+    if (isInert(el.start)) continue;
     if (hasAttr(el, DATA_UNIFY)) {
       reporter.problem({
         file,

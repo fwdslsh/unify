@@ -10,13 +10,19 @@
  * value, unvalidated, exactly as `data-layout` is the unvalidated attribute
  * value for an HTML page; one validator, owned elsewhere, should judge both).
  *
- * Dependency choice — CommonMark engine: markdown-it, in its `commonmark`
- * preset (`html: true`). Justification, stated deliberately per the brief:
- *   - The preset exists specifically to match the CommonMark spec (it drops
- *     tables/strikethrough/linkify/typographer, none of which unify wants —
- *     "CommonMark, no extensions"). Hand-rolling a full CommonMark parser
- *     (unlike the frontmatter grammar below) would mean re-deriving a large,
- *     intricate spec — link reference definitions, lazy continuation, list
+ * Dependency choice — CommonMark engine: markdown-it, in its DEFAULT preset
+ * (`html: true`). Justification, stated deliberately per the brief:
+ *   - It is a conformance-tested CommonMark engine, which is why it was
+ *     chosen, and it is used in its OWN default configuration rather than a
+ *     narrowed one.
+ *
+ *     This bullet used to say the `commonmark` preset "drops
+ *     tables/strikethrough/linkify/typographer, none of which unify wants".
+ *     That was not a decision anyone made — it was a rationalisation of
+ *     whatever the preset happened to do, written as though it were a
+ *     requirement — and it was wrong. See the engine block below.
+ *   - Hand-rolling a full CommonMark parser (unlike the frontmatter grammar
+ *     below) would mean re-deriving a large, intricate spec — link reference definitions, lazy continuation, list
  *     tightness, emphasis flanking rules, seven HTML-block start conditions —
  *     with much higher odds of silent divergence than reusing a
  *     conformance-tested engine.
@@ -71,7 +77,35 @@ import { nameOf, resolutionRoots } from "./paths.js";
 
 // --------------------------------------------------------------- engine
 
-const md = new MarkdownIt("commonmark", { html: true });
+// §10.1 — markdown-it's DEFAULT preset: its standard feature set, not a
+// narrowed one.
+//
+// This was `new MarkdownIt("commonmark", …)`, on the reading that §10 meant
+// "CommonMark, no extensions". The consequence was a pipe table publishing as
+// a paragraph of literal `| Flag | Meaning |` text, and unify's own
+// documentation site shipped 247 such rows across eight pages with not one
+// `<table>` element — the conformance spec's head-merge table and collision
+// matrix among them, the pages a reader most needs a table for. A file that
+// rendered correctly in the repository looked broken once unify published it,
+// which is the wrong way round for a tool whose pitch is that the output is
+// what you wrote.
+//
+// What the default preset actually adds over `commonmark`, measured rather
+// than assumed — exactly two grammars:
+//
+//     tables          | A | B |  ->  <table>…            (was literal text)
+//     strikethrough   ~~struck~~ ->  <s>struck</s>       (was literal text)
+//     linkify         www.example.com  ->  unchanged     (an OPTION, still off)
+//     typographer     "quoted" -- ...  ->  unchanged     (an OPTION, still off)
+//
+// linkify and typographer are options rather than rules, so they stay off
+// without being suppressed: neither rewrites an author's text unless someone
+// asks for it. That, and markdown-it's plugin interface, are where per-site
+// Markdown configuration would go if it is ever wanted. Nothing here builds
+// that — unify has no configuration surface beyond saved CLI flags (§18) —
+// but the seam is the library's own and is not closed off by this choice.
+const md = new MarkdownIt({ html: true });
+
 const escapeHtml = md.utils.escapeHtml;
 
 /**

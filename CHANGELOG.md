@@ -8,6 +8,106 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.3] - 2026-08-25
+
+A patch release with no authoring-surface change: the five primitives are
+untouched and a 0.8.2 site builds identically. Two diagnostics get more
+honest, and the examples gain a gate.
+
+### Fixed
+
+- **A fragment is never replaced by the error page** (#73, WCH-08). While
+  `watch`/`dev` was running, a failing rebuild replaced every emitted `.html`
+  file with the error placeholder — and `*.fragment.html` matched that filter,
+  so a bare snippet became a complete `<!doctype html>` document. It was the
+  one place the byte-for-byte fragment guarantee lapsed, and it failed
+  invisibly: a blanked page announces itself on reload, while a blanked
+  fragment is fetched by `hx-get` or `fetch()` and swapped into a page that
+  still looks fine, so a whole document lands inside an element and what you
+  see is mangled markup pointing nowhere near the cause. Fragments now keep
+  their last good bytes. Blanking *pages* on a failure unify cannot attribute
+  is unchanged.
+- **A retired spelling inside code is a sample, not a declaration** (#71,
+  LAY-16). P08 parses raw source as HTML, so a page *documenting* the retired
+  vocabulary was reported as a page *using* it — a well-formed sample is
+  indistinguishable from authored markup to a parser that was never told the
+  difference. unify's own documentation site went red the day the conformance
+  spec gained a sentence about `data-slot`, and the spec had to name the
+  attribute without showing it on an element; it now spells the tag out. The
+  check is inert inside `<pre>`/`<code>` — the same regions §5.1 item 8
+  already makes inert for `<include>` — and, in Markdown, inside fenced
+  blocks, indented blocks and inline spans. Deliberately the CommonMark
+  reading rather than a looser one, because every inert byte is a byte P08
+  stops protecting: an indented run counts only after a blank line, so an
+  indented *continuation* of a paragraph is still markup and a retired
+  spelling in it is still reported.
+- **A diagnostic's line survives `--pretty-urls`** (#72, URL-15). §11 replaces
+  attribute values in place but not at equal length — `/notes/index.html`
+  becomes `/notes/`, ten bytes shorter — so every reference after one of those
+  sat earlier in the final text than in the composed text the span table
+  describes, and the located line drifted backwards by however many rewrites
+  preceded it. A broken link on line 18 was reported at line 15, naming a line
+  whose content had nothing to do with the diagnostic; with enough drift the
+  position could cross a file boundary and name a file containing no such link
+  at all. Each rewrite stage now reports the shifts it imposed, and the
+  reference locator unwinds them before querying the spans, exactly as §22 and
+  §26's insertions were already unwound. This affected every `--pretty-urls`
+  user; the diagnostic itself was always correct, only its position was wrong.
+- **P29 stops printing the runtime's error object** (#76, GEN-10). A generator
+  that could not read a file — the commonest failure there is — reported
+  `… open '/x.json' /     path: "/x.json", /  syscall: "open",`: the path
+  restated, then a comma terminating nothing. Both runtimes print a thrown
+  `Error`'s fields under the message, and neither the code-frame nor the
+  stack-frame shape recognised them. They are dropped now, along with node's
+  internal location header (`node:fs:560`), which carried no slash and so
+  escaped the existing file-location shape. A generator's own words are
+  untouched: an unindented line survives whatever it says, a generator listing
+  `  first-post.md: no date` survives because a bare filename is not a JS
+  identifier, and multi-line messages still arrive whole.
+
+- **The generator subprocess never network-installs** (#75, GEN-11). Bun
+  auto-installs an import it cannot resolve, so a generator whose dependency
+  was missing fetched it from npm and the build exited 0 — while node failed
+  the same tree inside P29. The two runtimes disagreed about whether there was
+  a build at all, and it failed in the direction that hides the problem: bun
+  resolves through its global cache and leaves no `node_modules`, so the tree
+  that built looked identical to the tree that could not. The compiled binary
+  did it too, quietly reaching the network on the path whose whole promise is
+  a machine with neither runtime installed. The spawn now carries
+  `--no-install` wherever it is valid. This is the one place unify asks which
+  runtime it is, guarded on `process.versions.bun` rather than the
+  executable's name — which is `unify-linux` on the binary — and the
+  `--generate` contract is unchanged: `argv[2]` is still the source root and
+  `argv[3]` the generated directory.
+
+### Added
+
+- **Markdown converts with markdown-it's standard feature set** (§10.1,
+  MD-22) — its default preset, rather than the narrowed `commonmark` one. Over
+  that preset this adds exactly two grammars, measured rather than assumed:
+  **GFM pipe tables** and **strikethrough**. Tables are why it was found: a
+  pipe table converted to a paragraph of literal `| Flag | Meaning |` text, and
+  unify's own documentation site shipped **247 such rows across eight pages
+  with not one `<table>` element** — the conformance spec's head-merge table
+  and collision matrix among them. A file that renders correctly in a
+  repository should not look broken once unify publishes it. `linkify` and
+  `typographer` are markdown-it *options* rather than rules and remain off, so
+  no address or quotation mark is rewritten unless asked for; those options
+  and markdown-it's plugin interface are where per-site Markdown configuration
+  would go if it is wanted. If you write documentation in Markdown, your
+  tables start rendering; nothing else about your pages changes.
+- **Gate G13: every example builds in CI** (#77). `examples/` holds seven
+  sites and CI built one, so an example could stop working unnoticed — which
+  had already happened twice, once with a deploy workflow carrying a flag cut
+  three releases earlier. All seven now run `build --dry-run --strict`; the
+  two that are audit-clean also run `audit --strict`. The four
+  sandbox-authored sites are deliberately not audit-gated, because they carry
+  41 `incomplete` findings and always have, and demanding cleanliness there
+  would be a new requirement rather than a regression check. The two examples
+  that need `npm install` run on **node**, because bun auto-installs a missing
+  import and would let an undeclared dependency pass a gate an `npx` user
+  fails (#75).
+
 ## [0.8.2] - 2026-08-24
 
 A patch release with no new authoring surface: the five primitives are
@@ -226,7 +326,8 @@ with generated compare-link notes only. Their diffs are on the
 [releases page](https://github.com/fwdslsh/unify/releases). Nothing here
 retroactively reconstructs detail those notes never carried.
 
-[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.8.2...HEAD
+[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.8.3...HEAD
+[0.8.3]: https://github.com/fwdslsh/unify/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/fwdslsh/unify/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/fwdslsh/unify/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/fwdslsh/unify/compare/v0.7.0...v0.8.0

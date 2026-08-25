@@ -269,6 +269,8 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
   // POST-rewrite text maps back through spans computed against the
   // PRE-rewrite composed text.
   const pageSpansByOutputPath = new Map();
+  /** @type {Map<string, {at:number,len:number,delta:number}[][]>} §11's own length changes, reverse application order */
+  const urlShiftsByOutputPath = new Map();
   // §20.1's membership set, accumulated as each page's FINAL text is produced
   // — the manifest reads the bytes §15 would publish (§20.2), so it is filled
   // from the rewritten text below rather than from `composedPages`.
@@ -276,6 +278,11 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
   const manifestPages = [];
   for (const p of composedPages) {
     const pageOutputPath = collisions.computeOutputPath({ path: p.relPath, kind: "page" }, { prettyUrls: false });
+    // §11 changes lengths (`/notes/index.html` -> `/notes/`), so the span
+    // table below is only queryable with a FINAL offset once those changes are
+    // undone. Collected here because this is the only place that knows both
+    // the page and the rewrites it received.
+    const urlShifts = [];
     const rewritten = urls.rewriteUrls(p.html, {
       provenanceOf: urls.spansToLocator(p.spans, p.relPath),
       pageFile: p.relPath,
@@ -283,10 +290,12 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
       prettyUrls: settings.prettyUrls,
       emittedHtmlPaths,
       base: baseConfig,
+      shifts: urlShifts,
     });
     const finalOutputPath = outputPathOf.get(p.relPath);
     tempFiles.set(finalOutputPath, rewritten);
     pageSpansByOutputPath.set(finalOutputPath, p.spans);
+    if (urlShifts.length) urlShiftsByOutputPath.set(finalOutputPath, urlShifts);
     // §33.4 — a generated page has no file in the author's source tree, so
     // every surface that NAMES its source has to know. Without this the
     // audit reported `log.html` at a path the author cannot open, under a
@@ -618,7 +627,8 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
   references.checkReferences({
     htmlFiles, cssFiles, emittedPaths: new Set(tempFiles.keys()), base: baseConfig, reporter, wouldGenerate,
     locate: makeReferenceLocator(
-      pageSpansByOutputPath, htmlFiles, cssFiles, resolveLine, insertionsByOutputPath, preInsertionByOutputPath),
+      pageSpansByOutputPath, htmlFiles, cssFiles, resolveLine, insertionsByOutputPath, preInsertionByOutputPath,
+      urlShiftsByOutputPath),
     // §12's cascade exemption: the output paths of pages that exist in source
     // and failed to compose. Only this loop knows which absences are that —
     // from inside the check, a page that emitted nothing and a page that never
@@ -919,14 +929,17 @@ function makeSourceLineResolver(roots) {
  *
  * `pageSpansByOutputPath` holds each composed page's OWN spans, valid
  * against its PRE-rewrite composed text. §11's rewrites (`urls.rewriteUrls`)
- * only ever replace attribute VALUE bytes in place — never insert or delete
- * a byte before content that itself was not rewritten — so querying those
- * spans with an offset taken from the FINAL text is exact for any reference
- * with no EARLIER length-changing rewrite before it in the same output
- * file. A fully general fix would mean `urls.js` tracking spans through its
- * own edits too, which nothing this repository checks needs (every fixture
- * requiring real attribution — this one — resolves correctly under the
- * above); named here rather than silently assumed.
+ * replace attribute VALUE bytes in place — but NOT at equal length, which
+ * this comment used to assume and which cost a real bug (#72, URL-15).
+ * `--pretty-urls` turns `/notes/index.html` into `/notes/`, losing ten bytes,
+ * so every reference after it sat that much earlier in the final text than in
+ * the composed text the spans describe: a broken link on line 18 reported at
+ * line 15, and with enough rewrites ahead of it the drift can cross a file
+ * boundary and name a file containing no such link at all.
+ *
+ * So `urls.rewriteUrls` now reports the shifts it imposed — the general fix
+ * this comment previously named and declined — and they are unwound below
+ * alongside §22/§26's insertions.
  *
  * Once the right span is found, its position in that file's OWN raw text
  * gives a real line number through `resolveLine` — the same resolver
@@ -948,6 +961,7 @@ function makeSourceLineResolver(roots) {
 function makeReferenceLocator(
   pageSpansByOutputPath, htmlFiles, cssFiles, resolveLine,
   insertionsByOutputPath = new Map(), preInsertionByOutputPath = new Map(),
+  urlShiftsByOutputPath = new Map(),
 ) {
   return (outputFile, offset) => {
     const spans = pageSpansByOutputPath.get(outputFile);
@@ -1002,7 +1016,12 @@ function makeReferenceLocator(
       else if (local >= ins.at) { shift += local - ins.at; generatedFile = ins.file ?? outputFile; }
     }
     const generated = generatedFile !== null;
-    const spanOffset = offset - shift;
+    // Insertions undone; now §11's own length changes. The order is forced:
+    // §22/§26 insert into the text §11 already rewrote, so an offset has to
+    // come back through the insertions before it means anything to the
+    // rewrite shifts. Undoing them the other way round compares a
+    // post-insertion position against a pre-insertion `at`.
+    const spanOffset = urls.unshiftUrlRewrites(offset - shift, urlShiftsByOutputPath.get(outputFile) ?? []);
     const hit = spans ? urls.spansToSourceLocator(spans, outputFile)(spanOffset) : null;
     // The last resort: no span covers this offset, so the OUTPUT file is its
     // own provenance. The text numbered has to be the PRE-INSERTION one, and
