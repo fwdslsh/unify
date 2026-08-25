@@ -967,8 +967,9 @@ $ unify build -s src -o dist --generate _scripts/eleventy.mjs --pretty-urls --ca
 EXIT=2
 ```
 
-And an authored `feed.xml`, `sitemap.xml`, `search-index.json` or `robots.txt` always
-suppresses generation and ships byte-for-byte.
+And an authored `feed.xml`, `sitemap.xml`, `assets/unify/catalog.json`,
+`assets/unify/search-corpus.json` or `robots.txt` always suppresses generation and ships
+byte-for-byte.
 
 For CI, `unify audit --strict` is the gate — it runs the whole pipeline, publishes nothing,
 and never creates the output directory. Both gates pass on Bun and on Node with
