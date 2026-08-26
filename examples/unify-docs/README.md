@@ -31,8 +31,9 @@ unify audit -s src --generate _scripts/gen.mjs --pretty-urls \
   --base-url https://unify.fwdslsh.dev/ --canonical auto --catalog --search-corpus --strict            # exit 0
 ```
 
-20 files: 12 documentation pages, an index, a front page, a 404, the stylesheet, the
-favicon, `sitemap.xml`, `assets/unify/catalog.json`, and `assets/unify/search-corpus.json`.
+21 files: 12 documentation pages, an index, a front page, the examples gallery, a 404,
+the stylesheet, the favicon, `sitemap.xml`, `assets/unify/catalog.json`, and
+`assets/unify/search-corpus.json`.
 
 ## It renders the real docs, not a copy
 
@@ -120,3 +121,11 @@ redirects to the custom domain.
 If either setting is ever missing (a fresh fork, say) the `deploy` job fails with GitHub's
 own "Pages site not found," while the `build` job (both gates plus the real build) succeeds
 regardless, so a red `deploy` step next to a green `build` step means exactly this.
+
+**The examples gallery under `unify dev`.** `src/examples/index.html`'s five "View live"
+links resolve against `location.href` no matter what, so `unify dev` on this site still
+builds and serves `/examples/` correctly. Only the deploy workflow's separate assembly
+steps (`.github/workflows/deploy-docs.yml`) ever produce the five `/examples/<name>/`
+trees those links point at, so following one locally 404s — the same dead end a visitor
+with JavaScript off sees from the page's `<noscript>` fallback, just reached by a
+different path.
