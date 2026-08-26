@@ -1,0 +1,10 @@
+{
+  "round": 29,
+  "engineCommit": "5896194 (release/0.9.0 lineage, v0.9.0)",
+  "brief": "_notes/BRIEF-r27.md byte-unchanged",
+  "rules": "docs/authoring-rules.md @ 5896194",
+  "samples": {"h1-h5": "haiku", "s1": "sonnet"},
+  "launchedUtc": "2026-08-26T03:52:41Z",
+  "isolation": "unshare mount ns; repo, /tmp, bun+npm caches, session transcripts masked; probe verified NO context + zero doc hits; first probe caught the 0.8.2 npm package source in the bun cache (masked in response)",
+  "preregistration": "_notes/ratification-round-29-preregistration.md (committed 5896194, before launch)"
+}
