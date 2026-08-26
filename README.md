@@ -107,7 +107,7 @@ unify init [template]    scaffold a starter site
 
 ## Examples
 
-[`examples/`](examples/) holds five complete sites, each building clean under `unify build --dry-run --strict`. Four were authored by agents given nothing but the sixty-line authoring rules and a client brief, and kept because they passed review — so they show what the rules actually lead someone to build. Between them: pages generated from a data file, client-side filtering, a section with its own chrome, a page with no chrome for embedding, deploying under a subdirectory, htmx swapping `.fragment.html` panels, and a Svelte component compiled to an ordinary asset. [`examples/README.md`](examples/README.md) names the pattern in each.
+[`examples/`](examples/) holds eight complete sites, each building clean under `unify build --dry-run --strict`. Four were authored by agents given nothing but the sixty-line authoring rules and a client brief, and kept because they passed review — so they show what the rules actually lead someone to build; the other four are hand-maintained, including unify's own documentation site built by unify, another generator (Eleventy) adopted as source through `--generate`, and a blog whose browse, filter, and search UI is data-driven from `--catalog`/`--search-corpus`. Between them: pages generated from a data file, client-side filtering, a section with its own chrome, a page with no chrome for embedding, deploying under a subdirectory, htmx swapping `.fragment.html` panels, a Svelte component compiled to an ordinary asset, and client-side search over generated JSON. [`examples/README.md`](examples/README.md) names the pattern in each.
 
 ## Documentation
 
@@ -118,8 +118,9 @@ unify init [template]    scaffold a starter site
 - **[CLI Reference](docs/cli-reference.md)** — every command, option, and exit code.
 - **[Integrations](docs/integrations.md)** — the compile-to-asset pattern: Svelte, TypeScript, or anything with a compiler, without adopting a framework.
 - **[Eleventy + htmx](docs/guides/eleventy-htmx.md)** — the advanced stack: another generator produces data-driven pages, unify composes them, htmx enhances them. Optional layers, and when not to reach for them.
+- **[Catalog and Search](docs/guides/catalog-and-search.md)** — a blog list, facets, and a search box built client-side from the two files `--catalog`/`--search-corpus` write.
 - **[Docker Usage](docs/docker-usage.md)** — running the CLI in a container.
-- **[Examples](examples/README.md)** — five complete sites and the patterns they demonstrate.
+- **[Examples](examples/README.md)** — eight complete sites and the patterns they demonstrate.
 
 **How unify is defined**
 

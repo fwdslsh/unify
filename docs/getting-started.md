@@ -241,4 +241,4 @@ The script writes real pages into `src/`, where they get layouts, head merging, 
 - [`product-spec.md`](product-spec.md) — the product contract, including what unify refuses to do and why
 - [`conformance-spec.md`](conformance-spec.md) — the exact composition rules, for implementers and the curious
 - [`integrations.md`](integrations.md) — putting a Svelte component (or anything else with a compiler) on one page
-- [`../examples/README.md`](../examples/README.md) — five complete sites, and the pattern each one shows
+- [`../examples/README.md`](../examples/README.md) — eight complete sites, and the pattern each one shows
