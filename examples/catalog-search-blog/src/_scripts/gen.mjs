@@ -56,8 +56,8 @@ function readFrontmatter(text) {
 // "0" is a valid ISO year) — the same idiom assets/js/blog.js uses so both
 // renderings of the same list agree.
 function newestFirst(a, b) {
-  const ts = (d) => {
-    const t = Date.parse(d || "");
+  const ts = (p) => {
+    const t = Date.parse(p.date || "");
     return Number.isNaN(t) ? -Infinity : t;
   };
   return ts(b) - ts(a);
