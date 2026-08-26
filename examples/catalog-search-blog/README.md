@@ -40,9 +40,11 @@ search box and facets inert. `unify dev` serves and rebuilds on change:
 unify dev -s src -o dist --generate _scripts/gen.mjs --catalog --search-corpus
 ```
 
-then open <http://localhost:3000/>. (`--pretty-urls`/`--base-url` are left off here only
-because `dev` serves at the domain root; both work under `dev` exactly as they do under
-`build`.)
+then open <http://localhost:3000/>. (`--pretty-urls`/`--base-url` are left off here because
+`--base-url` changes every emitted path to start with its subpath while `dev` always serves
+the built output at the root, so the two only combine usefully when the base URL has no
+path segment — this example's `https://example.com/blog/` does, so it is a `build`-only
+flag here.)
 
 ## What each generated file contains
 

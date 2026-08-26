@@ -293,3 +293,9 @@ The search box is the one view that architecture cannot pre-build — a query is
 text, not a fixed set of tag values — which is exactly the gap `search-corpus.json` exists
 to fill: no server, no generated page per possible query, one JSON file fetched once and
 searched entirely in the browser.
+
+---
+
+The runnable version of everything above is
+[`examples/catalog-search-blog`](../../examples/catalog-search-blog), built and audited by
+CI (gate G13).

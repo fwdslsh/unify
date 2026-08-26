@@ -33,8 +33,6 @@ const posts = catalog.pages
   .filter((p) => ["BlogPosting", "Article"].includes(metaValue(p, "schema")))
   .sort((a, b) => ts(b) - ts(a));
 
-const byPath = new Map(catalog.pages.map((p) => [p.path, p]));
-
 const tags = [...new Set(posts.flatMap((p) => metaValues(p, "tags")))].sort();
 const series = [...new Set(posts.map((p) => metaValue(p, "series")).filter(Boolean))].sort();
 
@@ -105,7 +103,10 @@ function render() {
     const li = document.createElement("li");
     const a = document.createElement("a");
     a.href = post.path; // already the page's real emitted address
-    a.textContent = post.head.title;
+    // The layout appends " — Fieldnotes" to every <title> (head-merge §8);
+    // strip it so the client-rendered list reads the same bare title as the
+    // JS-off fallback _scripts/gen.mjs writes.
+    a.textContent = post.head.title.replace(/ — Fieldnotes$/, "");
     li.append(a);
 
     const meta = document.createElement("p");
@@ -134,7 +135,3 @@ function render() {
 
 searchInput.addEventListener("input", render);
 render();
-
-// Kept for anything that wants to inspect the join from a console: the same
-// lookup render() uses internally.
-window.__byPath = byPath;

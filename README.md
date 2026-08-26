@@ -118,6 +118,7 @@ unify init [template]    scaffold a starter site
 - **[CLI Reference](docs/cli-reference.md)** — every command, option, and exit code.
 - **[Integrations](docs/integrations.md)** — the compile-to-asset pattern: Svelte, TypeScript, or anything with a compiler, without adopting a framework.
 - **[Eleventy + htmx](docs/guides/eleventy-htmx.md)** — the advanced stack: another generator produces data-driven pages, unify composes them, htmx enhances them. Optional layers, and when not to reach for them.
+- **[Catalog and Search](docs/guides/catalog-and-search.md)** — a blog list, facets, and a search box built client-side from the two files `--catalog`/`--search-corpus` write.
 - **[Docker Usage](docs/docker-usage.md)** — running the CLI in a container.
 - **[Examples](examples/README.md)** — eight complete sites and the patterns they demonstrate.
 

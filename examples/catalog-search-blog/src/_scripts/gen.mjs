@@ -50,8 +50,22 @@ function readFrontmatter(text) {
   return data;
 }
 
+// Newest-first sorting shared by the series pages and the fallback list, with
+// a missing or unparsable date sinking to the end instead of landing at the
+// Unix epoch's year-1970 (or, worse, Date.parse(0)'s year-2000 — the string
+// "0" is a valid ISO year) — the same idiom assets/js/blog.js uses so both
+// renderings of the same list agree.
+function newestFirst(a, b) {
+  const ts = (d) => {
+    const t = Date.parse(d || "");
+    return Number.isNaN(t) ? -Infinity : t;
+  };
+  return ts(b) - ts(a);
+}
+
 const postsDir = join(sourceRoot, "posts");
 const posts = readdirSync(postsDir)
+  .sort()
   .filter((f) => f.endsWith(".md"))
   .map((file) => {
     const fm = readFrontmatter(readFileSync(join(postsDir, file), "utf8"));
@@ -70,7 +84,7 @@ if (bySeries.size > 0) mkdirSync(seriesDir, { recursive: true });
 
 const navItems = [];
 for (const [series, entries] of [...bySeries].sort(([a], [b]) => a.localeCompare(b))) {
-  entries.sort((a, b) => Date.parse(b.date || 0) - Date.parse(a.date || 0));
+  entries.sort(newestFirst);
   const routePath = `series/${series}.html`;
   const canonicalTag = baseUrl ? `\n    <link rel="canonical" href="/${routePath}">` : "";
   const items = entries
@@ -115,7 +129,7 @@ writeFileSync(
 // which is also what keeps every post reachable without one hand-maintained
 // nav (`unify audit`'s page-orphan finding would otherwise catch exactly the
 // posts that declare no `series`).
-const allPosts = [...posts].sort((a, b) => Date.parse(b.date || 0) - Date.parse(a.date || 0));
+const allPosts = [...posts].sort(newestFirst);
 writeFileSync(
   join(generatedDir, "_includes", "post-list.html"),
   allPosts.map((p) => `<li><a href="/posts/${p.slug}.html">${esc(p.title)}</a></li>`).join("\n") + "\n"
