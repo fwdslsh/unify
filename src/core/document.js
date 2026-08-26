@@ -24,14 +24,15 @@
  * live in a module of their own so every consumer reads one interpretation
  * rather than growing a second.
  *
- * `manifest.js` (conformance-spec §20) imports its low-level text machinery
- * from here rather than keeping a second copy: `textContent`, `readText`,
- * `collapse`, `nonEmpty`, `orNull` all port §20.3's exact discipline —
- * decode-then-collapse order, `nonEmpty` for a raw attribute slice vs
- * `orNull` for text a helper already normalized (never double-decode),
- * `findAll`'s default `template` skip, and `INVISIBLE` subtree omission with
- * enter/leave separators for non-`INLINE` elements (`<br>` deliberately not
- * inline — it separates lines, so it separates words).
+ * The low-level text machinery lives here rather than in a second copy:
+ * `textContent`, `readText`, `collapse`, `nonEmpty`, `orNull` all port
+ * §20.3's exact discipline — decode-then-collapse order, `nonEmpty` for a raw
+ * attribute slice vs `orNull` for text a helper already normalized (never
+ * double-decode), `findAll`'s default `template` skip, and `INVISIBLE`
+ * subtree omission with enter/leave separators for non-`INLINE` elements
+ * (`<br>` deliberately not inline — it separates lines, so it separates
+ * words). `nonEmpty` is the one of the five with an outside consumer
+ * (`document-selectors.js`); the rest are `extractDocument`'s own internals.
  */
 
 import { decodeEntities } from "./entities.js";
@@ -67,7 +68,7 @@ const INLINE = new Set([
  * @param {import('./html.js').Node} el
  * @returns {string}
  */
-export function textContent(el) {
+function textContent(el) {
   let out = "";
   const visit = (node) => {
     if (node.type === "text") { out += node.data; return; }
@@ -88,7 +89,7 @@ export function textContent(el) {
 }
 
 /** Collapse every run of ASCII whitespace to one space and trim (§20.3). */
-export function collapse(s) {
+function collapse(s) {
   return s.replace(/[ \t\n\r\f]+/g, " ").trim();
 }
 
@@ -106,12 +107,12 @@ export function collapse(s) {
  * @param {string} raw
  * @returns {string}
  */
-export function readText(raw) {
+function readText(raw) {
   return collapse(decodeEntities(raw));
 }
 
 /** Trim-only emptiness, for a value already read by `readText`/`textContent`. */
-export function orNull(s) {
+function orNull(s) {
   return typeof s === "string" && s.trim() !== "" ? s.trim() : null;
 }
 
