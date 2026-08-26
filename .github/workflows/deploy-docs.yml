@@ -2,9 +2,12 @@ name: Deploy docs
 
 # Publishes examples/unify-docs — unify's own documentation site, built by
 # unify from the repository's real docs/ directory (issue #51) — to GitHub
-# Pages. --generate reads ../../../docs relative to the example's source
-# root, so this always renders whatever is on the branch being deployed;
-# nothing here copies content.
+# Pages, together with live copies of five other examples assembled under
+# its dist/examples/<name>/ (see "Assemble example galleries" below, which
+# is what the site's own /examples/ gallery page links to at runtime).
+# --generate reads ../../../docs relative to the example's source root, so
+# this always renders whatever is on the branch being deployed; nothing
+# here copies content.
 #
 # Requires a one-time repository setting this workflow cannot make for
 # itself: Settings -> Pages -> Build and deployment -> Source ->
@@ -131,7 +134,7 @@ jobs:
             --dry-run --strict
           bun src/cli.js build -s examples/seed-library/src \
             -o examples/unify-docs/dist/examples/seed-library \
-            --pretty-urls --base-url "$SITE_BASE_URL"examples/seed-library/ --clean
+            --pretty-urls --base-url "$SITE_BASE_URL"examples/seed-library/ --clean --strict
 
       - name: Assemble example — seed-library-alt
         run: |
@@ -146,7 +149,8 @@ jobs:
             --dry-run --strict
           bun src/cli.js build -s examples/seed-library-alt/src \
             -o examples/unify-docs/dist/examples/seed-library-alt \
-            --pretty-urls --base-url "$SITE_BASE_URL"examples/seed-library-alt/ --exclude '_*'
+            --pretty-urls --base-url "$SITE_BASE_URL"examples/seed-library-alt/ --exclude '_*' \
+            --strict
 
       - name: Assemble example — seed-library-ondemand
         run: |
@@ -157,7 +161,8 @@ jobs:
             --dry-run --strict
           bun src/cli.js build -s examples/seed-library-ondemand/src \
             -o examples/unify-docs/dist/examples/seed-library-ondemand \
-            --pretty-urls --base-url "$SITE_BASE_URL"examples/seed-library-ondemand/ --clean
+            --pretty-urls --base-url "$SITE_BASE_URL"examples/seed-library-ondemand/ --clean \
+            --strict
 
       - name: Assemble example — htmx-fragments
         run: |
@@ -167,7 +172,7 @@ jobs:
             --dry-run --strict
           bun src/cli.js build -s examples/htmx-fragments/src \
             -o examples/unify-docs/dist/examples/htmx-fragments \
-            --base-url "$SITE_BASE_URL"examples/htmx-fragments/
+            --base-url "$SITE_BASE_URL"examples/htmx-fragments/ --strict
 
       - name: Assemble example — catalog-search-blog
         run: |
@@ -181,7 +186,7 @@ jobs:
             -o examples/unify-docs/dist/examples/catalog-search-blog \
             --generate _scripts/gen.mjs --pretty-urls \
             --base-url "$SITE_BASE_URL"examples/catalog-search-blog/ \
-            --catalog --search-corpus
+            --catalog --search-corpus --strict
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

@@ -1,6 +1,9 @@
 # CI/CD workflows
 
-What actually runs, and what each job is allowed to mean. Two workflow files exist: `.github/workflows/test.yml` (every push and PR) and `.github/workflows/release.yml` (releases and prereleases).
+What actually runs, and what each job is allowed to mean. Three workflow files exist:
+`.github/workflows/test.yml` (every push and PR), `.github/workflows/release.yml`
+(releases and prereleases), and `.github/workflows/deploy-docs.yml` (publishes the live
+`unify-docs` site — see below).
 
 ## `test.yml` — seven jobs
 
@@ -112,6 +115,19 @@ Two ways in, and two jobs, all defined in this repo:
    No npm token is involved. The job publishes with **trusted publishing**: npm mints a short-lived credential from the workflow's OIDC identity, so there is nothing to store or rotate, and provenance is attached automatically. It needs three things, and fails plainly without them: `id-token: write` on the workflow (set), npm >= 11.5.1 (the step upgrades npm first — GitHub runners still ship 10.x), and the package configured on npmjs.com under **Settings → Trusted Publisher** with this repository and `release.yml` as the workflow filename. That last one is a one-time setup on npm's side; until it exists, publishing fails with an authorization error rather than falling back to anything.
 
 **`docker`** needs `release`, builds `docker/Dockerfile`, and pushes `fwdslsh/unify:<tag>` — plus `:latest` for a stable release only, so a prerelease never moves the tag `docker pull fwdslsh/unify` resolves to.
+
+## `deploy-docs.yml`
+
+Publishes `examples/unify-docs` to GitHub Pages at `unify.fwdslsh.dev` on every push to
+`main` touching `docs/`, `src/`, or `examples/**`, or on demand. Its `build` job runs the
+same two gates as `test.yml`'s `unify-docs` step (`build --dry-run --strict`, then
+`audit --strict`) before the real `build --clean --strict` that publishes the site — then,
+in a separate step per example, assembles five more sites (`seed-library`,
+`seed-library-alt`, `seed-library-ondemand`, `htmx-fragments`, `catalog-search-blog`) into
+`dist/examples/<name>/` with the checkout CLI, each addressed at its own `--base-url`
+subpath and gated by its own `--dry-run --strict`. Those five directories are what the
+docs site's `/examples/` gallery links to at runtime; see `examples/unify-docs/README.md`'s
+Deployment section and this workflow's own comments for the full seam.
 
 Required secrets: `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`, both checked with a named error rather than failing obscurely mid-push. npm needs none.
 

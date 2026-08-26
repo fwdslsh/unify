@@ -668,6 +668,12 @@ body.examples main > * { max-width: none; }
 
 .card-links { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; }
 
+/* With JavaScript off, the "View live" anchors never get an href (see the
+   comment in src/examples/index.html) — style that state as inert instead
+   of letting the type selector on `a` (above) paint it the same green as a
+   real link. */
+.card-links a:not([href]) { color: var(--dim); cursor: default; }
+
 /* ----------------------------------------------------------------- footer */
 
 .site-foot {
