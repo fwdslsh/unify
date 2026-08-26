@@ -164,7 +164,7 @@ Two things follow from "only what the page declares", and both surprise people o
 
 ## Feeds (`feed.xml`)
 
-No flag either: a page opts itself into the site's feed the same way it opts into structured data — by declaring `schema: Article` or `schema: BlogPosting` — and the feed exists once **both** that declaration and `--base-url` are present. There is no `posts/` convention, no collection query, and no way to scope a feed to some pages: one declaration, one site feed.
+No flag either: a page opts itself into the site's feed the same way it opts into structured data — by declaring `schema: Article` or `schema: BlogPosting`, or by an authored `<script type="application/ld+json">` whose `@type` is `Article`/`BlogPosting` (any declared type counts, not just the first) — and the feed exists once **both** a qualifying declaration and `--base-url` are present. There is no `posts/` convention, no collection query, and no way to scope a feed to some pages: one declaration, one site feed.
 
 The document is [Atom](https://www.rfc-editor.org/rfc/rfc4287) at `feed.xml`, never RSS — RSS's date is a different calendar vocabulary, and Atom's is the one an ISO instant already conforms to without reformatting. An entry needs `datePublished` on the page (`date:` in frontmatter, or `<meta name="date">`/`article:published_time`), it must be `indexable` and self-canonical — the identical membership the sitemap uses — and, crucially, it needs a **time**, not just a day:
 

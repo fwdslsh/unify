@@ -6,14 +6,16 @@ built instead from `--catalog`/`--search-corpus` and a script you own. unify com
 neither list nor index at request time; both files are written once, at build time, and
 everything below runs entirely in the browser against the finished JSON. Read
 [`../authoring-rules.md`](../authoring-rules.md) and the catalog/search-corpus section of
-[`../getting-started.md`](../getting-started.md) first. Every snippet on this page was run
-against a small three-post scratch site built with `--catalog --search-corpus --base-url
-https://example.com/blog/ --pretty-urls` — the paths and values below are its real output,
-not invented ones.
+[`../getting-started.md`](../getting-started.md) first. Every data-manipulation snippet in
+§1–§5 was run against a small three-post scratch site built with `--catalog
+--search-corpus --base-url https://example.com/blog/ --pretty-urls` — the paths and
+values below are its real output, not invented ones. §3's DOM-rendering block and §6's
+MiniSearch sketch are illustrative rather than executed (a `document`/DOM and an added
+dependency, respectively, neither of which the test suite provides).
 
 ## 1. What the two files hand you
 
-`catalog.json`: one entry per public page, in build order — `path`, `url`, `html`
+`catalog.json`: one entry per public page, in the build's own output-path order (nothing in the file is sorted for you — §3 does the sorting) — `path`, `url`, `html`
 (root-element attributes), `head` (`title`, `meta`, `link`, `base`), and `body`
 (attributes and a flat heading list). No body text. A post that declared:
 
@@ -57,11 +59,14 @@ lands in `catalog.json` as:
 ```
 
 Every frontmatter key that isn't `title`/`layout`/`class`/`lang`/`dir`/`schema` becomes a
-`<meta name="…">` entry, in declaration order, repeated as many times as you wrote it —
-`tags` above is two entries, not an array, because that is what the built page's own
-`<head>` contains. `series` is not special to unify; it is exactly as unknown to the build
-as `tags` is, which is the point: any frontmatter key you invent shows up here the same
-way, with no unify-side registration.
+`<meta>` entry, in declaration order, repeated as many times as you wrote it — `tags`
+above is two entries, not an array, because that is what the built page's own `<head>`
+contains. A key namespaced `og:…` (`og:image`, say) emits `property="og:image"` rather
+than `name=`, exactly as an author's own `<meta property="og:image">` would (conformance-
+spec §10.2); every other key, including `series` above, emits `name=`. `series` is not
+special to unify; it is exactly as unknown to the build as `tags` is, which is the point:
+any frontmatter key you invent shows up here the same way, with no unify-side
+registration — under `name=` unless you spell it `og:`.
 
 `search-corpus.json` is deliberately smaller: `path` and `text`, nothing else, for the
 same set of pages —
@@ -77,7 +82,7 @@ hit's `path` looks up everything else about that page in the catalog.
 
 The catalog's `meta` array is a flat list, not an object — because a page can repeat a
 name (`tags`) and because `name` and `property` are different fields that must not
-collide. Two small helpers cover everything below:
+collide. Three small helpers cover everything below:
 
 ```js
 function metaValue(page, name) {
@@ -87,28 +92,50 @@ function metaValue(page, name) {
 function metaValues(page, name) {
   return page.head.meta.filter((m) => m.name === name).map((m) => m.content);
 }
+function metaProperty(page, property) {
+  const hit = page.head.meta.find((m) => m.property === property);
+  return hit ? hit.content : undefined;
+}
 ```
 
 `metaValue(post, "date")` reads a single-valued key; `metaValues(post, "tags")` reads a
-repeated one. Nothing here is catalog-specific — `page.head.meta` has the same shape
-`unify audit --format json`'s own `document.head.meta` does, because both are the same
-`DocumentSnapshot`, so the same two helpers work against either.
+repeated one; `metaProperty(post, "og:image")` reads the `og:`-namespaced field §1
+described — `metaValue` alone returns `undefined` for it, since an `og:image` entry has
+no `name` key at all. Nothing here is catalog-specific — `page.head.meta` has the same
+shape `unify audit --format json`'s own `document.head.meta` does, because both are the
+same `DocumentSnapshot`, so the same three helpers work against either.
 
 ## 3. A static blog list: kind, sort, tags
 
 Select the posts (declaring `schema: BlogPosting` or `Article`, the "kind" facet), newest
-first by their own `date`:
+first by their own `date`. This facet reads `<meta name="schema">` only — the catalog
+carries no JSON-LD script bodies, ever (§1), so a page whose type lives only in an
+authored `<script type="application/ld+json">` block is invisible to this filter even
+though it counts toward feed membership, which reads both sources (conformance-spec
+§29.4). Markdown's `schema:` frontmatter key writes the meta for you; an HTML post
+declaring its type only in JSON-LD needs `<meta name="schema" content="BlogPosting">`
+alongside it to be selectable here:
 
 ```js
+const ts = (p) => {
+  const t = Date.parse(metaValue(p, "date") ?? "");
+  return Number.isNaN(t) ? -Infinity : t;
+};
 const posts = catalog.pages
   .filter((p) => ["BlogPosting", "Article"].includes(metaValue(p, "schema")))
-  .sort((a, b) => new Date(metaValue(b, "date")) - new Date(metaValue(a, "date")));
+  .sort((a, b) => ts(b) - ts(a));
 ```
 
-Sort by `new Date(...)`, not by comparing the date strings directly — two authors can
+Sort by `Date.parse(...)`, not by comparing the date strings directly — two authors can
 write the same instant with different UTC offsets (`...T09:00:00-05:00` sorts *before*
-`...T09:00:00Z` as plain text, despite naming a later moment), and `Date` parses the
-offset instead of comparing bytes.
+`...T09:00:00Z` as plain text, despite naming a later moment), and `Date.parse` parses
+the offset instead of comparing bytes. The `ts` wrapper matters as much as the parse:
+nothing requires a `schema:` post to also carry `date:`, and `new Date(undefined) -
+new Date(...)` is `NaN` — a comparator that returns `NaN` is not merely wrong about
+one post's position, it makes the whole sort unpredictable, since `Array.prototype.sort`
+assumes a comparator that always returns a number. Mapping a missing or unparsable date
+to `-Infinity` keeps the comparator total, so an undated post sinks to the end instead
+of scrambling the posts around it.
 
 A tag facet, and filtering by any other key exactly the same way — `series` here, though
 it could be any frontmatter key at all:
@@ -139,6 +166,12 @@ framework:
 const list = document.querySelector("#posts");
 for (const post of posts) {
   const li = document.createElement("li");
+  const thumb = metaProperty(post, "og:image"); // property=, not name= — see §2
+  if (thumb) {
+    const img = document.createElement("img");
+    img.src = thumb;
+    li.append(img);
+  }
   const a = document.createElement("a");
   a.href = post.path;
   a.textContent = post.head.title;
@@ -182,7 +215,7 @@ Loaded from `https://example.com/assets/js/blog.js`, `catalogUrl` resolves to
 from `https://example.com/blog/assets/js/blog.js` (this site, under `--base-url
 https://example.com/blog/`), it resolves to `https://example.com/blog/assets/unify/catalog.json`.
 The relative path (`../unify/...`) only has to describe where `assets/js/` sits next to
-`assets/unify/`; unify's own script-tag rewriting (§4.1) already put the module at the
+`assets/unify/`; unify's own script-tag rewriting (conformance-spec §11.1/§11.3) already put the module at the
 right absolute address, so the module never has to know the site's prefix itself. Put your
 own script at a different depth and adjust the number of `../` segments to match — the
 pattern is "relative to the module," not this exact path.
@@ -220,10 +253,11 @@ and typo tolerance are still yours to add.
 
 Past plain substring matching, a small indexing library reads `search-corpus.json`
 exactly as written — it needs no unify-specific adapter, because the file is just
-`{schemaVersion, pages: [{path, text}]}`. This sketch (tested against the same scratch
-fixture, using [MiniSearch](https://github.com/lucaong/minisearch); FlexSearch's index/add/search
-shape is the same idea) is illustrative — unify ships no search runtime and adds no such
-dependency itself, so pick a library and pin a version the way you would for any other
+`{schemaVersion, pages: [{path, text}]}`. This sketch (untested — [MiniSearch](https://github.com/lucaong/minisearch)
+is not a unify dependency, so it never runs against the scratch fixture the way §1–§5's
+snippets do; FlexSearch's index/add/search shape is the same idea) is illustrative —
+unify ships no search runtime and adds no such dependency itself, so pick a library and
+pin a version the way you would for any other
 client-side code:
 
 ```js
