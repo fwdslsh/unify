@@ -850,6 +850,23 @@ export function applyPrettyLinks(html, { pageOutputPath, emittedHtmlPaths, shift
       const rewritten = rewriteSrcsetValue(srcset.value, rewriteOne);
       if (rewritten !== srcset.value) edits.push({ start: srcset.valueStart, end: srcset.valueEnd, replacement: rewritten });
     }
+    // §11.2 — a URL-valued og:/twitter: meta's `content` is rewritten exactly
+    // like an `href` to the same target: one list (URL_VALUED_META/
+    // isUrlValuedMeta), one reader, shared with §11.1/§11.3. `rewriteOne`
+    // already draws the page-vs-asset line for hrefs via `pageForLinkPath` —
+    // a page-targeting og:url/og:image/twitter:image comes out in the
+    // directory spelling, an asset-targeting one (a real file, not a page)
+    // is left exactly as written, same as an asset `href`. Left out, a page
+    // authoring `og:url` beside a matching `<a href>` had the anchor rewritten
+    // and the meta failed the reference check on the very spelling the anchor
+    // had just been rewritten away from.
+    if (isUrlValuedMeta(el)) {
+      const content = getAttrNode(el, "content");
+      if (content && content.value) {
+        const next = rewriteOne(content.value);
+        if (next !== null) edits.push({ start: content.valueStart, end: content.valueEnd, replacement: next });
+      }
+    }
     // §11.2 — a refresh URL is transformed like a link because it is one: a
     // redirect to /about.html in a build that emits about/index.html names a
     // file this build never wrote, and §12 would then block the publish over a
