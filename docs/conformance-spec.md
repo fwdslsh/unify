@@ -1261,7 +1261,7 @@ A crawler-specific meta (`<meta name="googlebot">`) is **not** read: unify does 
 
 ### 20.7 Visible main text
 
-`analysis.visibleText` is the text content (§20.3) of the emitted document's first `<main>` element, or of `<body>` when the document has none, or of the whole document when it has neither — the identical scope §20.3 gives `body.headings`, computed in the same pass over the same resolved subtree. It is the text a reader sees, computed once, so that duplicate-content detection and any excerpt read the same characters.
+`analysis.visibleText` is the text content (§20.3) of the emitted document's first `<main>` element, or of `<body>` when the document has none, or of the whole document outside `<head>` when it has neither — the identical scope §20.3 gives `body.headings`, computed in the same pass over the same resolved subtree. The `<head>` exclusion on that last fallback matters because HTML5 makes the `<body>` start tag omissible: a document with no `<main>` and no explicit `<body>` element is still legal authored markup, and without the exclusion its `<title>` and other head-only text would count as page body text. It is the text a reader sees, computed once, so that duplicate-content detection and any excerpt read the same characters.
 
 ### 20.8 Structured data
 

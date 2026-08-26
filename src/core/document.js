@@ -39,8 +39,16 @@ import { decodeEntities } from "./entities.js";
 import { findAll, findFirst, getAttr, innerText, isElement, isInside, isJsonLdScript, parse } from "./html.js";
 import { parseRefreshMeta } from "./urls.js";
 
-/** Subtrees whose characters are not visible page text (§20.3). */
-const INVISIBLE = new Set(["script", "style", "template", "noscript"]);
+/**
+ * Subtrees whose characters are not visible page text (§20.3). `head` is
+ * included so the whole-document fallback (§20.7, no `<main>` and no
+ * `<body>` — legal under HTML5's omissible `<body>` start tag) never counts
+ * `<title>`/other head text as body text; `head.title` is captured
+ * separately via `innerText`, never through `textContent`, so excluding the
+ * subtree here changes nothing about what the snapshot's own `head.title`
+ * reports.
+ */
+const INVISIBLE = new Set(["script", "style", "template", "noscript", "head"]);
 
 /**
  * §20.3's closed inline set: leaving one of these contributes no separator;

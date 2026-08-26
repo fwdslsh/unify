@@ -347,6 +347,16 @@ describe("visibleText", () => {
     expect(a.visibleText).toBe("Inside main");
     expect(a.visibleText).not.toContain("Outside main");
   });
+
+  test("whole-document fallback (no <main>, no <body>) excludes <head> text", () => {
+    // HTML5 makes the <body> start tag omissible, so this is legal authored
+    // markup, not malformed input — the root fallback must not count the
+    // page's own <title> (or other head-only text) as body text.
+    const html = "<html><head><title>NoBody</title></head><h1>Loose</h1><p>text</p>";
+    const a = analysis(html);
+    expect(a.visibleText).toBe("Loose text");
+    expect(a.visibleText).not.toContain("NoBody");
+  });
 });
 
 // ----------------------------------------------------------------- jsonLd

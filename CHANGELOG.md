@@ -11,22 +11,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.9.0] - 2026-08-26
 
 The five primitives — `<include>`, layouts, slots, the underscore exclusion,
-the `.fragment.html` opt-out — are unchanged, and a 0.8 site's *output* is
-unchanged: no built page looks different. What changes is the model behind
-production and discovery (§20–§31): the per-page record every built-in
-consumer read from, and the two machine-readable artifacts (`unify audit
---format json`, and the removal of `search-index.json` in favor of two
-narrower files) built on top of it. If you only author HTML/Markdown pages
-and never touch `--search-index`, a generator, or `audit --format json`'s
-`pages` shape, this release changes nothing you will notice. If you do any of
-those three, read **Removed** below before upgrading.
+the `.fragment.html` opt-out — are unchanged, and no built HTML page looks
+different: a 0.8 page's composed markup is byte-for-byte what 0.9 produces
+from it. What changes is the model behind production and discovery
+(§20–§31): the per-page record every built-in consumer read from, and the
+machine-readable artifacts built on top of it. That change has four visible
+edges — a site built with `--base-url` can gain `feed.xml` entries it should
+have had all along (**Changed**); `unify audit`, including under `--strict`,
+reads headings from a narrower scope and can report differently on the same
+tree (**Changed**); `audit --format json`'s `pages` shape is a breaking
+rewrite (**Changed**); and `--search-index` is gone, replaced by `--catalog`/
+`--search-corpus` (**Removed**). If you only author HTML/Markdown pages,
+never build with `--base-url`, never run `audit`, never parse `audit
+--format json`'s page shape, and never passed `--search-index`, this release
+changes nothing you will notice. If you do any of those, read **Changed**
+and **Removed** below before upgrading.
 
 ### Added
 
 - **`--catalog`**, which writes `assets/unify/catalog.json`: one entry per
-  public page — its path, URL, and the same head/body snapshot `audit
-  --format json` already serializes (title, meta, links, headings) — for a
-  browse/filter/TOC/metadata-driven UI. No body text.
+  public page — its path, URL, root attributes, and the same head/body
+  snapshot `audit --format json` serializes (title, meta, links, headings) —
+  for a browse/filter/TOC/metadata-driven UI. No body text.
 - **`--search-corpus`**, which writes `assets/unify/search-corpus.json`: one
   `{path, text}` entry per public page, `text` being the page's visible main
   content with Unicode space separators folded to an ordinary space. Nothing
@@ -42,9 +48,9 @@ those three, read **Removed** below before upgrading.
   canonical}, outputs: {catalog, searchCorpus}}`. It sits beside (never
   inside) the generated directory `argv[3]` already names, is deleted with
   the rest of the build's generator state, and is never published.
-  `argv[2]`/`argv[3]` are unchanged, so an 0.8 generator that reads neither
-  keeps working unmodified; one that wants the new facts reads a fourth
-  argument that was not there before.
+  `argv[2]`/`argv[3]` are unchanged, so an 0.8 generator keeps working
+  unmodified — it simply never reads the fourth argument; one that wants the
+  new facts reads a fourth argument that was not there before.
 
 ### Changed
 
@@ -63,11 +69,32 @@ those three, read **Removed** below before upgrading.
   `schemaVersion` stays `1`: 0.9 is a declared, incompatible break with the
   0.8 machine schema rather than a migration, so there is no `2` to reach
   for. **If you parse `audit --format json`, rewrite the reader against the
-  new `pages[].document` shape** — `title`/`description`/`canonical` now
-  read from `document.head`, `headings` from `document.body.headings`, and
-  `linksOut`/`conflicts`/`taxonomyKeys` have no replacement field (the first
-  two are private build data now, never serialized; the third is removed,
-  see below). Findings, `summary`, and `fingerprint` are unchanged.
+  new `pages[].document` shape.** The 0.8 page had 28 top-level fields
+  (`sourcePath, generated, layout, outputPath, path, url, title,
+  description, lang, canonical, robots, h1, headings, text, image, author,
+  datePublished, dateModified, schemaType, taxonomyKeys, jsonLd, ids,
+  strayMetadata, linksOut, linksIn, fragmentLinks, conflicts, refresh`); the
+  0.9 page has four (`source, generated, outputPath, document`). One is a
+  silent rename: `sourcePath` is now `source` — a reader of `page.sourcePath`
+  gets `undefined`, not an error. Some are still there, recomputed from the
+  snapshot rather than stored: `title`/`description`/`canonical`/`lang` read
+  from `document.head`, `headings` from `document.body.headings`, and
+  `robots`/`image`/`author`/`datePublished`/`dateModified`/`h1` are each one
+  small reduction over `document.head.meta`/`document.body.headings` away
+  (`h1` is `document.body.headings.filter(h => h.level === 1)`). One moved to
+  a different artifact: `text` is gone from this shape entirely — only
+  `--search-corpus`'s `search-corpus.json` carries page text now, joined by
+  `path`. The rest have no replacement anywhere: `layout` (deliberately kept
+  out of this object; it stays internal to audit's own fix lines),
+  `schemaType` (superseded by `declaredTypes`, which nothing serializes),
+  `taxonomyKeys` (the feature is removed, see below), `jsonLd`, `ids`,
+  `strayMetadata`, `linksOut`, `linksIn`, `fragmentLinks`, and `refresh` are
+  all private build data with no public field. `conflicts` is the one
+  exception worth naming on its own: it was never a stored field even in
+  0.9's model — `metadataConflicts(doc)` computes it on demand — but it does
+  still reach this JSON, as the `metadata-conflict` finding for each
+  contradiction found; only the standalone `page.conflicts` array is gone.
+  Findings, `summary`, and `fingerprint` are unchanged.
 - **Breaking: heading scope is now the first `<main>`, else `<body>`, else
   the document — no longer document-wide.** A layout's own chrome routinely
   carries an `<h1>` (a site name in the header, a "skip to content" link),
