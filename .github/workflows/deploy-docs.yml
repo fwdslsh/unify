@@ -17,7 +17,11 @@ on:
       - main
     paths:
       - "docs/**"
-      - "examples/unify-docs/**"
+      # Covers examples/unify-docs/** (the site itself) too: the deploy
+      # assembles five other examples' own trees into the published gallery
+      # (see the "Assemble example galleries" steps below), so an edit
+      # anywhere under examples/ can change what ships and must redeploy it.
+      - "examples/**"
       - ".github/workflows/deploy-docs.yml"
       # The site is rendered BY src/ as much as FROM docs/: an engine change
       # can alter every emitted page with no docs/ edit at all. v0.8.3 proved
@@ -80,6 +84,104 @@ jobs:
           bun src/cli.js build -s examples/unify-docs/src -o examples/unify-docs/dist \
             --generate _scripts/gen.mjs --pretty-urls --clean \
             --base-url "$SITE_BASE_URL" --canonical auto --catalog --search-corpus --strict
+
+      # --- Assemble example galleries -----------------------------------
+      #
+      # The seam: the docs site above owns examples/unify-docs/dist/ end to
+      # end (it wrote --clean, so this always starts from that site's own
+      # fresh publish); each step below owns exactly one subdirectory under
+      # examples/unify-docs/dist/examples/, built as a wholly separate unify
+      # project with the CHECKOUT'S OWN CLI (bun src/cli.js), not the docs
+      # site's build. Nothing here edits an already-emitted page — each
+      # example is unify's ordinary transactional publish, just addressed at
+      # a --base-url subpath and aimed at a directory nested inside the
+      # artifact this job uploads. Order matters: this runs after the docs
+      # site's own --clean (above), so that build never deletes what we
+      # assemble here, and before the Pages artifact upload (below).
+      #
+      # Why the gallery page never gets a plain href="/examples/<name>/":
+      # a link like that would be checked by this build's own §12 reference
+      # check, which has no way to see a tree assembled here, after the
+      # site's own publish — so it would be a located problem (P13) on every
+      # build. examples/unify-docs/src/examples/index.html resolves each
+      # "View live" address in a small inline script instead (the client-
+      # side URL seam _notes/batches/b10-contract.md's Part 1 implements),
+      # which is why five plain directories appearing here, with no page in
+      # examples/unify-docs/src/ ever linking to them, is correct rather
+      # than an oversight.
+      #
+      # Each example's flags are its own README/AUTHORS-NOTES-documented
+      # build command (examples/<name>/README.md or AUTHORS-NOTES.md),
+      # translated from "cd examples/<name> && unify build ..." to run from
+      # the repo root against the checkout CLI, with -s/-o pointed at this
+      # assembly's paths and --base-url overridden to this deploy's real
+      # subpath. htmx-fragments documents no build flags anywhere (it is
+      # hand-maintained, not sandbox-authored like the others) and its
+      # hx-get targets are deliberately page-relative — a flat, non-pretty
+      # layout is what makes that addressing scheme work at any deploy
+      # depth (see examples/README.md's "patterns worth copying") — so it
+      # gets no --pretty-urls here, matching what it actually documents:
+      # nothing beyond a plain build.
+      - name: Assemble example — seed-library
+        run: |
+          node examples/seed-library/src/_scripts/gen.mjs
+          bun src/cli.js build -s examples/seed-library/src \
+            -o examples/unify-docs/dist/examples/seed-library \
+            --pretty-urls --base-url "$SITE_BASE_URL"examples/seed-library/ --clean \
+            --dry-run --strict
+          bun src/cli.js build -s examples/seed-library/src \
+            -o examples/unify-docs/dist/examples/seed-library \
+            --pretty-urls --base-url "$SITE_BASE_URL"examples/seed-library/ --clean
+
+      - name: Assemble example — seed-library-alt
+        run: |
+          # gen.mjs resolves its paths (./varieties.json, ./src/catalogue)
+          # relative to the CURRENT DIRECTORY, not to the script's own
+          # location — unlike the other two seed-library generators — so it
+          # must run with the example's own root as the working directory.
+          (cd examples/seed-library-alt && node src/_scripts/gen.mjs)
+          bun src/cli.js build -s examples/seed-library-alt/src \
+            -o examples/unify-docs/dist/examples/seed-library-alt \
+            --pretty-urls --base-url "$SITE_BASE_URL"examples/seed-library-alt/ --exclude '_*' \
+            --dry-run --strict
+          bun src/cli.js build -s examples/seed-library-alt/src \
+            -o examples/unify-docs/dist/examples/seed-library-alt \
+            --pretty-urls --base-url "$SITE_BASE_URL"examples/seed-library-alt/ --exclude '_*'
+
+      - name: Assemble example — seed-library-ondemand
+        run: |
+          node examples/seed-library-ondemand/src/_scripts/gen.mjs
+          bun src/cli.js build -s examples/seed-library-ondemand/src \
+            -o examples/unify-docs/dist/examples/seed-library-ondemand \
+            --pretty-urls --base-url "$SITE_BASE_URL"examples/seed-library-ondemand/ --clean \
+            --dry-run --strict
+          bun src/cli.js build -s examples/seed-library-ondemand/src \
+            -o examples/unify-docs/dist/examples/seed-library-ondemand \
+            --pretty-urls --base-url "$SITE_BASE_URL"examples/seed-library-ondemand/ --clean
+
+      - name: Assemble example — htmx-fragments
+        run: |
+          bun src/cli.js build -s examples/htmx-fragments/src \
+            -o examples/unify-docs/dist/examples/htmx-fragments \
+            --base-url "$SITE_BASE_URL"examples/htmx-fragments/ \
+            --dry-run --strict
+          bun src/cli.js build -s examples/htmx-fragments/src \
+            -o examples/unify-docs/dist/examples/htmx-fragments \
+            --base-url "$SITE_BASE_URL"examples/htmx-fragments/
+
+      - name: Assemble example — catalog-search-blog
+        run: |
+          bun src/cli.js build -s examples/catalog-search-blog/src \
+            -o examples/unify-docs/dist/examples/catalog-search-blog \
+            --generate _scripts/gen.mjs --pretty-urls \
+            --base-url "$SITE_BASE_URL"examples/catalog-search-blog/ \
+            --catalog --search-corpus \
+            --dry-run --strict
+          bun src/cli.js build -s examples/catalog-search-blog/src \
+            -o examples/unify-docs/dist/examples/catalog-search-blog \
+            --generate _scripts/gen.mjs --pretty-urls \
+            --base-url "$SITE_BASE_URL"examples/catalog-search-blog/ \
+            --catalog --search-corpus
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
