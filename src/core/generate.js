@@ -15,8 +15,11 @@
  *
  *     process.argv[2] = the absolute path of the source root
  *     process.argv[3] = the absolute path of the generated directory
+ *     process.argv[4] = the absolute path of a read-only generator-context.json
  *
- * No module to import, no object passed in, no return value read, no
+ * argv[4] is additive: it was added after argv[2]/argv[3] shipped, and a
+ * generator that ignores it keeps working exactly as it did before it
+ * existed. No module to import, no object passed in, no return value read, no
  * callback. The working directory is the source root, so `./_data/x.json` in
  * a generator means what an author reading the source tree would expect.
  *
@@ -77,11 +80,17 @@
  */
 
 import { spawn } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { serializeJson } from "./report.js";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { constants, tmpdir } from "node:os";
-import { basename, isAbsolute, join, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { contains, toRelative } from "./paths.js";
 import { UsageError } from "./diagnostics.js";
+// The version is *imported*, not read from disk — same reason cli.js's own
+// `version()` gives: `bun build --compile` bundles by tracing imports, so
+// there is no package.json beside the script inside a compiled binary, and an
+// fs read of it there is ENOENT on the install path the product leads with.
+import pkg from "../../package.json" with { type: "json" };
 
 /**
  * §33.1 — resolve the flag's value to an absolute path inside the source root.
@@ -107,17 +116,89 @@ export function resolveGeneratorPath(spec, sourceRoot) {
 
 /**
  * §33.3 — a fresh, empty directory outside the source tree, for one build.
+ *
+ * The returned path is a CHILD of the real temp root (`<root>/overlay`),
+ * never the root itself, so that `generator-context.json` (`writeGeneratorContext`
+ * below) can live beside it — in the same root, outside this directory — without
+ * being scanned into the overlay namespace. `scanSourceTree` (build.js) walks
+ * exactly this returned path, so anything written into the ROOT instead never
+ * becomes a generated file, an asset, or a page.
  * @returns {string}
  */
 export function makeOverlayDir() {
-  return mkdtempSync(join(tmpdir(), "unify-generated-"));
+  const root = mkdtempSync(join(tmpdir(), "unify-generated-"));
+  const overlay = join(root, "overlay");
+  mkdirSync(overlay);
+  return overlay;
 }
 
-/** Remove an overlay directory; best effort, since a leak costs only disk. */
+/**
+ * Remove the whole per-build temp root an overlay directory lives in — the
+ * scanned `overlay/` subdirectory AND, beside it, any `generator-context.json`
+ * `writeGeneratorContext` wrote for this same build. One lifecycle, one
+ * removal; best effort, since a leak costs only disk.
+ *
+ * `dir` must be a `makeOverlayDir()` return (its basename is always
+ * `"overlay"`) — this deletes `dirname(dir)`, i.e. the whole temp root, so a
+ * caller passing anything else risks deleting an unrelated parent directory.
+ * The guard below makes a wrong argument a no-op instead of that.
+ * @param {string} dir
+ */
 export function removeOverlayDir(dir) {
+  if (basename(dir) !== "overlay") return; // not a makeOverlayDir() return — refuse
   try {
-    rmSync(dir, { recursive: true, force: true });
+    rmSync(dirname(dir), { recursive: true, force: true });
   } catch { /* best effort */ }
+}
+
+/**
+ * §33.2 — write the versioned generator context beside the overlay
+ * directory (never inside it — see `makeOverlayDir`'s comment) and return its
+ * absolute path, ready to become `process.argv[4]`.
+ *
+ * Every parameter here is a value §33.2's boundary is willing to publish as
+ * a stable machine contract; there is no `settings` object anywhere in this
+ * function's signature on purpose — a generator reads exactly this shape, and
+ * nothing about unify's internal option names can leak through by accident.
+ *
+ * @param {object} args
+ * @param {string} args.overlayDir - this build's overlay directory (`makeOverlayDir`'s return)
+ * @param {string} args.sourceRoot
+ * @param {string} args.output - the output directory (absolute or cwd-relative; resolved here)
+ * @param {"build"|"dev"|"watch"|"audit"} args.command - the actual subcommand running this build
+ * @param {string|null} args.baseUrl - `${base.origin}${base.pathPrefix}`, or `null` without `--base-url` — the identical construction catalog.json and `audit --format json` use, never the raw flag string
+ * @param {boolean} args.prettyUrls
+ * @param {"auto"|null} args.canonical
+ * @param {string|null} args.catalogPath - output-root-relative `assets/unify/catalog.json`, or `null` without `--catalog`
+ * @param {string|null} args.searchCorpusPath - output-root-relative `assets/unify/search-corpus.json`, or `null` without `--search-corpus`
+ * @returns {string} the absolute path written
+ */
+export function writeGeneratorContext({
+  overlayDir, sourceRoot, output, command,
+  baseUrl, prettyUrls, canonical, catalogPath, searchCorpusPath,
+}) {
+  const contextPath = join(dirname(overlayDir), "generator-context.json");
+  const context = {
+    schemaVersion: 1,
+    unifyVersion: pkg.version,
+    command,
+    paths: {
+      sourceRoot: resolve(sourceRoot),
+      generatedRoot: resolve(overlayDir),
+      outputRoot: resolve(output),
+    },
+    site: {
+      baseUrl: baseUrl ?? null,
+      prettyUrls: prettyUrls === true,
+      canonical: canonical ?? null,
+    },
+    outputs: {
+      catalog: catalogPath ?? null,
+      searchCorpus: searchCorpusPath ?? null,
+    },
+  };
+  writeFileSync(contextPath, serializeJson(context));
+  return contextPath;
 }
 
 /**
@@ -249,6 +330,7 @@ function collect(proc) {
  * @param {string} args.generatorAbs - absolute path, already contained (`resolveGeneratorPath`)
  * @param {string} args.sourceRoot
  * @param {string} args.overlayDir - absolute path of the generated directory
+ * @param {string} args.contextPath - absolute path of `generator-context.json` (`writeGeneratorContext`'s return); becomes `process.argv[4]`
  * @param {import('./diagnostics.js').Reporter} args.reporter
  * @returns {Promise<boolean>} false when the generator failed (P29 reported)
  */
@@ -264,7 +346,7 @@ function reproduceWith() {
   return name === "node" || name === "bun" ? name : `BUN_BE_BUN=1 ${process.execPath}`;
 }
 
-export async function runGenerator({ generatorAbs, sourceRoot, overlayDir, reporter }) {
+export async function runGenerator({ generatorAbs, sourceRoot, overlayDir, contextPath, reporter }) {
   const root = resolve(sourceRoot);
   const rel = toRelative(root, generatorAbs);
 
@@ -309,7 +391,10 @@ export async function runGenerator({ generatorAbs, sourceRoot, overlayDir, repor
   // author cannot opt into this themselves — the generator is a fresh
   // subprocess, so nothing they export reaches it.
   const args = process.versions.bun ? ["--no-install"] : [];
-  const proc = spawn(process.execPath, [...args, generatorAbs, root, overlayDir], {
+  // argv[4] — §33.2's generator context, additive: argv[2]/argv[3] keep their
+  // positions exactly as before, so a generator that ignores this fourth
+  // argument works exactly as it did before this contract existed.
+  const proc = spawn(process.execPath, [...args, generatorAbs, root, overlayDir, contextPath], {
     cwd: root, // §33.2 — `./_data/x.json` means what an author expects
     env: { ...process.env, BUN_BE_BUN: "1" },
     stdio: ["ignore", "pipe", "pipe"],

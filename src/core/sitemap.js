@@ -24,8 +24,9 @@
  */
 
 import { decodeXmlEntities } from "./entities.js";
+import { canonicalOf, classifyCanonical, isPublicDestination, publicationDatesOf } from "./document-selectors.js";
 import { findAll, innerText, parse } from "./html.js";
-import { isSkippedUrl, splitUrl } from "./urls.js";
+import { effectiveBaseUrl, isSkippedUrl, splitUrl } from "./urls.js";
 import { stripBaseUrl, resolveReference } from "./references.js";
 import { CHECK_SPELLING } from "./diagnostics.js";
 
@@ -66,90 +67,6 @@ function xmlEscape(s) {
  */
 const xmlUnescape = decodeXmlEntities;
 
-/**
- * "Does this page's canonical name this page?" — §21.2's second clause, and
- * §24.4's own test for two findings that are *about* that question rather than
- * about membership.
- *
- * Exported for the same reason `isCompletablePage` is: a lookalike drifts. The
- * evaluator first asked it by way of `!isCompletablePage(...)`, which is a
- * different question with the same answer on most pages and the wrong answer on
- * a `noindex` page that names itself — membership fails there for the robots
- * reason, and reading that as "the canonical disagrees" produced a finding
- * whose evidence quoted the page's own URL back at it.
- *
- * A canonical unify cannot resolve — another origin, `mailto:`, empty — is not
- * self-canonical. It names something this build cannot confirm is this page,
- * and the conservative reading is the one that does not claim agreement.
- *
- * @param {import('./manifest.js').PageRecord} record
- * @param {import('./urls.js').BaseUrlConfig|null} base
- * @returns {boolean}
- */
-export function isSelfCanonical(record, base) {
-  const kind = classifyCanonical(record, base);
-  return kind === "none" || kind === "self";
-}
-
-/**
- * §21.2/§24.4 — what does this page's canonical name? Four answers, and the
- * fourth is why this is not a boolean.
- *
- *   `none`      — the page declares no canonical.
- *   `self`      — it resolves to this page's own output path.
- *   `elsewhere` — it names a different page, demonstrably. Either it resolved
- *                 to another emitted path, or — with `--base-url` supplied —
- *                 it is an `http(s):`/protocol-relative URL that `stripBaseUrl`
- *                 did not strip, which places it on another origin.
- *   `unknown`   — this build cannot say: a `mailto:`, an empty value, or an
- *                 absolute URL with no `--base-url` to compare it against.
- *
- * Each caller needs a different conservative direction, which is exactly what
- * a boolean could not carry, and both wrong foldings have shipped:
- *
- *   - *Membership* treats anything but `self`/`none` as excluded — do not list
- *     a page in a sitemap unless its canonical demonstrably names it.
- *   - *Findings* fire only on `elsewhere` — do not accuse. Folding `unknown`
- *     in reported a page whose canonical named itself, quoting the page's own
- *     URL as the evidence, on the default golden path where no `--base-url` is
- *     set and every absolute canonical is therefore unresolvable.
- *   - But folding `elsewhere` OUT of the `unknown` case lost the case that
- *     matters most: with the site's address known, a canonical pointing at a
- *     syndication partner is visibly not this page, and product-spec §6.3.2
- *     names exactly that pairing — `noindex` plus an off-site canonical, and a
- *     sitemap advertising a URL whose canonical points away from it.
- *
- * @param {import('./manifest.js').PageRecord} record
- * @param {import('./urls.js').BaseUrlConfig|null} base
- * @returns {'none'|'self'|'elsewhere'|'unknown'}
- */
-export function classifyCanonical(record, base) {
-  if (record.canonical === null) return "none";
-
-  // ONE owner for "is this URL on this site?" — `stripBaseUrl`, which parses.
-  // It returns a path for this site, in every spelling of the address
-  // (`HTTPS://EXAMPLE.COM/x`, `https://EXAMPLE.com/x`, `//example.com/x`,
-  // `http://example.com/x`, `https://example.com:443/x` are all this page by
-  // RFC 3986 §6.2.2.1 and §6.2.3), and the URL untouched for any other host.
-  // So a value still carrying an authority HERE is, by that function's own
-  // answer, another site.
-  //
-  // This block used to parse the URL a second time and compare hosts itself.
-  // That was written before §12's own comparison was fixed, and mutation
-  // testing then showed the two agreeing on every input — a second
-  // interpretation of a question §12 already answers, which is the defect
-  // product-spec §6.1 exists to forbid rather than a safety net. What is
-  // load-bearing is the *classification*: without this line an off-origin
-  // canonical reads as `unknown`, and neither finding fires.
-  const stripped = base ? stripBaseUrl(record.canonical, base) : record.canonical;
-  if (base && /^([a-z][a-z0-9+.-]*:)?\/\//i.test(stripped)) return "elsewhere";
-
-  if (isSkippedUrl(stripped)) return "unknown";
-  const target = resolveReference(stripped, record.outputPath);
-  if (target === null) return "unknown";
-  return target === record.outputPath ? "self" : "elsewhere";
-}
-
 /** The two schemes a page is served under. Nothing else is comparable. */
 const WEB_SCHEMES = new Set(["http:", "https:"]);
 
@@ -180,14 +97,23 @@ const WEB_SCHEMES = new Set(["http:", "https:"]);
  * and sitemap-canonical-disagree share the `elsewhere` branch and a page can
  * collect both.
  *
- * @param {import('./manifest.js').PageRecord} record
+ * Unlike `classifyCanonical`, this function's own body stays here rather
+ * than being split into a value-level core in `document-selectors.js`: it is
+ * not one of that module's doc-level selectors, and extracting a
+ * `canonicalSchemeMismatchValue(canonical, outputPath, base)` today would
+ * need to drag `WEB_SCHEMES`/`schemeOf` — both sitemap-local — along with it,
+ * for a core no other consumer would call. It already delegates its host
+ * question to `classifyCanonical` (document-selectors.js), which is backed by the
+ * relocated core, so it is not a second reading of that question either.
+ *
+ * @param {import('./manifest.js').BuildDocument} doc
  * @param {import('./urls.js').BaseUrlConfig|null} base
  * @returns {boolean}
  */
-export function canonicalSchemeMismatch(record, base) {
+export function canonicalSchemeMismatch(doc, base) {
   if (!base) return false; // no address, no scheme to compare against (§24.4)
-  if (classifyCanonical(record, base) !== "self") return false;
-  const declared = schemeOf(record.canonical);
+  if (classifyCanonical(doc, base) !== "self") return false;
+  const declared = schemeOf(canonicalOf(doc));
   // Both sides must be the web's two. `--base-url` accepts any scheme that has
   // a host (cli.js rejects only an origin-less one), so an `ftp:` base reaches
   // here, and under one unify has no basis for calling either side wrong.
@@ -213,42 +139,23 @@ function schemeOf(url) {
 
 /**
  * §21.2/§21.3 — the sitemap entries for a manifest, in manifest order.
- * @param {import('./manifest.js').PageRecord[]} records
+ *
+ * Membership is `document-selectors.js`'s shared `isPublicDestination`
+ * (0.9's replacement for this file's own `isCompletablePage`) so a page
+ * cannot be in the sitemap but absent from another projection that asks the
+ * identical question through the same function.
+ * @param {import('./manifest.js').BuildDocument[]} documents
  * @param {import('./urls.js').BaseUrlConfig|null} base
  * @returns {{loc: string, lastmod: string|null}[]}
  */
-export function entriesFor(records, base) {
+export function entriesFor(documents, base) {
   const out = [];
-  for (const record of records) {
-    if (!isCompletablePage(record, base)) continue;
-    if (record.url === null) continue; // unreachable while §21.1 gates on --base-url; stated, not assumed
-    out.push({ loc: record.url, lastmod: record.dateModified?.iso ?? null });
+  for (const doc of documents) {
+    if (!isPublicDestination(doc, base)) continue;
+    if (doc.document.url === null) continue; // unreachable while §21.1 gates on --base-url; stated, not assumed
+    out.push({ loc: doc.document.url, lastmod: publicationDatesOf(doc).modified?.iso ?? null });
   }
   return out;
-}
-
-/**
- * §21.2's membership predicate, exported because §22.4 uses it **unchanged**
- * rather than a lookalike.
- *
- * Sharing it is not tidiness. §22 stamps a canonical onto the pages this
- * returns true for, and the two exclusions carry their weight in that direction
- * too: a `noindex` page must not be stamped, because a canonical on a page the
- * author told crawlers to drop manufactures the exact contradiction
- * product-spec §6.3.2 asks unify to report; and a page consolidated onto
- * another already has the canonical it wants, which is why it left the sitemap.
- *
- * The name says "completable" rather than "indexable" because that is the
- * question both callers ask: is this page one the site presents as a
- * destination in its own right?
- * @param {import('./manifest.js').PageRecord} record
- * @param {import('./urls.js').BaseUrlConfig|null} base
- * @returns {boolean}
- */
-export function isCompletablePage(record, base) {
-  if (!record.robots.indexable) return false;
-  if (record.outputPath === "404.html") return false;
-  return isSelfCanonical(record, base);
 }
 
 /** One `<url>` line, newline included. The single place an entry becomes bytes. */
@@ -317,7 +224,7 @@ export function splitEntries(entries) {
  * §21 — generate the site's sitemap, or explain why it did not.
  *
  * @param {object} args
- * @param {import('./manifest.js').PageRecord[]} args.records - the §20 manifest
+ * @param {import('./manifest.js').BuildDocument[]} args.documents - the §20 manifest
  * @param {import('./urls.js').BaseUrlConfig|null} args.base - null suppresses generation (§21.1)
  * @param {Map<string,string>} args.emittedFromSource - output path -> the
  *   source path it came from, for every file the site emits from its own tree.
@@ -327,7 +234,7 @@ export function splitEntries(entries) {
  * @returns {Map<string,string>} generated output path -> text; empty when
  *   generation was suppressed for any reason
  */
-export function generateSitemap({ records, base, emittedFromSource, reporter }) {
+export function generateSitemap({ documents, base, emittedFromSource, reporter }) {
   const generated = new Map();
   if (!base) return generated; // §21.1 — no public address, no sitemap, no report
 
@@ -335,7 +242,7 @@ export function generateSitemap({ records, base, emittedFromSource, reporter }) 
   // before any path is claimed, so this is not a collision and raises nothing.
   if (emittedFromSource.has(SITEMAP_PATH)) return generated;
 
-  const parts = splitEntries(entriesFor(records, base));
+  const parts = splitEntries(entriesFor(documents, base));
 
   if (parts.length === 1) {
     generated.set(SITEMAP_PATH, serializeUrlset(parts[0]));
@@ -363,7 +270,7 @@ export function generateSitemap({ records, base, emittedFromSource, reporter }) 
   }
 
   for (const [i, part] of parts.entries()) generated.set(claimed[i], serializeUrlset(part));
-  generated.set(SITEMAP_PATH, serializeIndex(claimed.map((p) => base.origin + base.pathPrefix + p)));
+  generated.set(SITEMAP_PATH, serializeIndex(claimed.map((p) => effectiveBaseUrl(base) + p)));
   return generated;
 }
 

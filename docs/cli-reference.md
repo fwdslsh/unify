@@ -20,7 +20,8 @@ Options:
       --canonical auto     add a canonical link to pages that author none, from the site address
       --base-url <url>     the site's whole address (https://site.example/repo/): prefix root-relative links, make og:/canonical absolute for share crawlers, and generate sitemap.xml
       --feed-full          include each entry's full rendered content in feed.xml (needs --base-url)
-      --search-index       write search-index.json for a client-side search library
+      --catalog            write assets/unify/catalog.json — a browse/filter/TOC projection of every public page
+      --search-corpus      write assets/unify/search-corpus.json — normalized page text for client-side search
       --generate <path>    run one JavaScript file from your source tree before the build
       --dry-run            run the full build and every check, print the report, write nothing
       --strict             advisories count as problems for the exit code (with `audit`, findings too)
@@ -46,7 +47,7 @@ A finding is not a problem or an advisory. It answers a different question — *
 | | means |
 |---|---|
 | `broken` | the output contradicts itself, or the standard it claims to follow: a link to `#section` where no element has that id, an id declared twice, JSON-LD that does not parse, a page in the sitemap that tells crawlers not to index it. Wrong whatever was intended. |
-| `incomplete` | something is absent or inconsistent that you may have chosen: no description, no `lang`, two pages sharing a title, a page nothing links to, a `tags:` or `categories:` key that built no collection. |
+| `incomplete` | something is absent or inconsistent that you may have chosen: no description, no `lang`, two pages sharing a title, a page nothing links to. |
 
 ```
 $ unify audit
@@ -65,7 +66,7 @@ Worth knowing before you wire it up: **every `init` template passes `unify audit
 
 A finding is also never raised for something the build already refuses to publish. A canonical or an `og:image` naming a file the site does not emit is a *problem* — it blocks the publish outright, which is stronger than reporting it.
 
-One finding is about a key rather than a gap. `tags:` and `categories:` are allowed and become ordinary `<meta>` tags, but unify builds nothing from them — no index page, no archive, no feed of any term, no route — so a page declaring one collects `taxonomy-inert`, naming the keys and what did not happen. Nothing about the page is wrong, which is why it is `incomplete` rather than `broken`; write the index yourself with a script that runs before the build, or drop the key. The keys that are *not* allowed do not reach this command at all: `draft`, `permalink`, and `slug` in Markdown frontmatter are build problems (`unify build --dry-run` reports them), because each one, believed, publishes or addresses the wrong page.
+`tags:` and `categories:` are allowed and become ordinary `<meta>` tags, but unify builds nothing from them — no index page, no archive, no feed of any term, no route — and `audit` reports nothing about them either: they are inert by design, meaningful only to a consumer that chooses to interpret them (a catalog consumer included), and unify never reserves an ordinary metadata name without cause. The keys that are *not* allowed do not reach this command at all: `draft`, `permalink`, and `slug` in Markdown frontmatter are build problems (`unify build --dry-run` reports them), because each one, believed, publishes or addresses the wrong page.
 
 **`--format json` / `--format sarif`.** Replace the finding list above with one JSON document instead — `{schemaVersion, baseUrl, summary, pages, findings}`, where `pages` is the same per-page record every other feature reads and `findings` is the same list in the same order, machine-readable rather than printed. `--format sarif` is the identical findings, mapped field for field into SARIF 2.1.0 for editors and CI systems that already read it. Neither format changes what is checked or the exit code; `--format human` (the default) is unchanged. `problem`/`advisory` diagnostics still print to stderr as prose either way — a JSON consumer gets their counts in `summary`, never their text, so there is one diagnostic channel rather than two. Each finding carries a `fingerprint`: a stable hash of its id, its file, and the one detail that tells it apart from a sibling finding on the same page (which id repeated, which field conflicted) — deliberately *not* its line number or wording, so a CI suppression survives an unrelated edit above it and a reworded fix line.
 
@@ -111,7 +112,7 @@ unify build --exclude '_*.html' --exclude '_*.md' --exclude '_includes' --exclud
 
 ### `--pretty-urls`
 
-Moves every page `X.html` to `X/index.html` — except `index.html` files (already pretty) and the root `404.html` (hosts require that exact path) — and rewrites every internal link to match (`/about.html` → `/about/`, queries and fragments preserved; links to assets and external URLs untouched). Relative asset references inside moved pages are re-emitted root-relative so they keep working. Author pages always link the real file (`about.html`); this flag owns the pretty form.
+Moves every page `X.html` to `X/index.html` — except `index.html` files (already pretty) and the root `404.html` (hosts require that exact path) — and rewrites every internal link to match (`/about.html` → `/about/`, queries and fragments preserved; links to assets and external URLs untouched), including a page-targeting `og:`/`twitter:` meta value and a `<meta http-equiv="refresh">` URL, exactly like the matching `href`. Relative asset references inside moved pages are re-emitted root-relative so they keep working. Author pages always link the real file (`about.html`); this flag owns the pretty form.
 
 ### `--base-url <url>`
 
@@ -163,7 +164,7 @@ Two things follow from "only what the page declares", and both surprise people o
 
 ## Feeds (`feed.xml`)
 
-No flag either: a page opts itself into the site's feed the same way it opts into structured data — by declaring `schema: Article` or `schema: BlogPosting` — and the feed exists once **both** that declaration and `--base-url` are present. There is no `posts/` convention, no collection query, and no way to scope a feed to some pages: one declaration, one site feed.
+No flag either: a page opts itself into the site's feed the same way it opts into structured data — by declaring `schema: Article` or `schema: BlogPosting`, or by an authored `<script type="application/ld+json">` whose `@type` is `Article`/`BlogPosting` (any declared type counts, not just the first) — and the feed exists once **both** a qualifying declaration and `--base-url` are present. There is no `posts/` convention, no collection query, and no way to scope a feed to some pages: one declaration, one site feed.
 
 The document is [Atom](https://www.rfc-editor.org/rfc/rfc4287) at `feed.xml`, never RSS — RSS's date is a different calendar vocabulary, and Atom's is the one an ISO instant already conforms to without reformatting. An entry needs `datePublished` on the page (`date:` in frontmatter, or `<meta name="date">`/`article:published_time`), it must be `indexable` and self-canonical — the identical membership the sitemap uses — and, crucially, it needs a **time**, not just a day:
 
@@ -178,20 +179,64 @@ Each entry's `<id>` and `<link>` are the page's own canonical (authored, or comp
 
 If your source tree already contains a `feed.xml`, that file **is** the site's feed: unify ships it untouched and generates nothing, exactly as it treats an authored `sitemap.xml`. The `blog` template's own generator writes one for this reason.
 
-## Search manifest (`search-index.json`)
+## Catalog (`catalog.json`)
 
-`--search-index` writes `search-index.json` at the output root — a flat, standard document a client-side search library (or an external indexer) can read instead of re-parsing your site. Unlike the sitemap or the feed, this is a plain flag: nothing about a page declares "index me", so it runs with or without `--base-url` (URLs are root-relative without one, absolute with).
+`--catalog` writes `assets/unify/catalog.json` — a compact, HTML-shaped projection of every public page, meant for browse/filter/TOC/metadata-driven UI: blog listings, tag facets, a command palette, a page chooser. It is a plain flag, independent of `--search-corpus` and of the sitemap and the feed: it runs with or without `--base-url` (`path` is root-relative without one, `url` is absolute with).
+
+```json
+{
+  "schemaVersion": 1,
+  "baseUrl": "https://example.com/",
+  "pages": [
+    {
+      "path": "/posts/unify-and-htmx/",
+      "url": "https://example.com/posts/unify-and-htmx/",
+      "html": { "attributes": { "lang": "en" } },
+      "head": {
+        "title": "Unify and HTMX",
+        "meta": [
+          { "name": "description", "content": "A practical static-site architecture." },
+          { "name": "tags", "content": "unify" },
+          { "name": "tags", "content": "htmx" }
+        ],
+        "link": [{ "rel": "canonical", "href": "https://example.com/posts/unify-and-htmx/" }],
+        "base": []
+      },
+      "body": {
+        "attributes": { "class": "post" },
+        "headings": [{ "level": 1, "id": "unify-and-htmx", "text": "Unify and HTMX" }]
+      }
+    }
+  ]
+}
+```
+
+`head.meta`/`head.link`/`head.base` are every element of that kind, in document order, attributes preserved whole — arbitrary `tags:`/`series:`/`audience:` frontmatter shows up here exactly as the equivalent hand-written `<meta>` would, repeats and all. There is no body text and no JSON-LD in this file: a long article grows the corpus below, not this one, and a JSON-LD block can itself be as large as an article, so neither belongs in a record meant to stay bounded per page.
+
+Membership is the sitemap's own rule: `noindex`/`none` pages, `404.html`, and pages consolidated elsewhere by their own canonical are left out — the identical set `search-corpus.json` uses, so the two files always describe the same pages.
+
+If your source tree already contains `assets/unify/catalog.json`, that file is the site's catalog: unify ships it untouched and generates nothing.
+
+## Search corpus (`search-corpus.json`)
+
+`--search-corpus` writes `assets/unify/search-corpus.json` — the normalized text a client-side search implementation indexes however it likes. It does **not** imply `--catalog`; pass both for a full search UI:
+
+```bash
+unify dev --catalog --search-corpus
+```
 
 ```json
 {
   "schemaVersion": 1,
   "pages": [
-    { "url": "/about.html", "title": "About — Example", "description": "Who we are.", "headings": [{ "level": 1, "text": "About", "id": "about" }], "text": "About Who we are and what we do." }
+    { "path": "/posts/unify-and-htmx/", "text": "Unify and HTMX A practical static-site architecture…" }
   ]
 }
 ```
 
-Membership is the same rule as the sitemap and `--canonical auto`: `noindex`/`none` pages, `404.html`, and pages consolidated elsewhere by their own canonical are left out. `text` is the page's visible main content, with every Unicode space character (`&nbsp;` included) folded to an ordinary space so a search box comparing a typed query against it can actually match — nothing else is touched: no case folding, no stemming, no stop-word removal, no truncation, no character count. An authored `search-index.json` in your source tree ships untouched, the same rule feeds and sitemaps follow.
+Deliberately minimal: no `url`, `title`, `headings`, or metadata — those already live in `catalog.json`, keyed by the same `path`, so a result joins back with `catalogByPath.get(hit.path)`. `text` is the page's visible main content, with every Unicode space character (`&nbsp;` included) folded to an ordinary space so a search box comparing a typed query against it can actually match — nothing else is touched: no case folding, no stemming, no stop-word removal, no truncation, no character count.
+
+Same membership as the catalog, same author-wins rule: a `src/assets/unify/search-corpus.json` you wrote ships untouched.
 
 ### `--generate <path>`
 
@@ -199,13 +244,46 @@ Runs one JavaScript file from your source tree before the build scans anything. 
 
 It names a **file**, never a command. There is no shell, no argument list, and no way to say "and then run this other thing" — a path is something you wrote and can read. The path resolves against the source root and must stay inside it.
 
-The whole interface is two positional arguments:
+The whole interface is three positional arguments:
 
 ```js
-const [, , sourceRoot, generatedDir] = process.argv;
+const [, , sourceRoot, generatedDir, contextPath] = process.argv;
 ```
 
 `sourceRoot` is your source tree; `generatedDir` is an empty directory that exists only for this build. Files written into `generatedDir` join the build as an overlay — scanned, composed, checked, published, and colliding with a same-named source file exactly like any other page. Files written anywhere else are your own business. There is no unify module to import, no object passed in, and no return value read.
+
+`contextPath` is new in 0.9 and additive: a generator written before it existed, reading only `sourceRoot`/`generatedDir`, keeps working exactly as it did. It names a JSON file — read-only, yours to consult or ignore — that tells you the handful of build facts unify is willing to promise as a stable contract:
+
+```json
+{
+  "schemaVersion": 1,
+  "unifyVersion": "0.9.0",
+  "command": "build",
+  "paths": {
+    "sourceRoot": "/project/src",
+    "generatedRoot": "/tmp/unify-generated-abc123/overlay",
+    "outputRoot": "/project/dist"
+  },
+  "site": {
+    "baseUrl": "https://example.com/docs/",
+    "prettyUrls": true,
+    "canonical": "auto"
+  },
+  "outputs": {
+    "catalog": "assets/unify/catalog.json",
+    "searchCorpus": null
+  }
+}
+```
+
+```js
+const context = JSON.parse(readFileSync(process.argv[4], "utf8"));
+if (context.site.baseUrl) {
+  // build absolute URLs the same way the rest of the site does
+}
+```
+
+`schemaVersion` starts at `1` and only bumps when a field's meaning changes in a way an existing reader would misread — a new field showing up is not a bump, so pinning to `schemaVersion === 1` is safe across 0.9 releases. `command` is the subcommand actually running (`build`/`dev`/`watch`/`audit` — `audit` runs generators too). `site.baseUrl` is `--base-url`'s effective, fully-resolved value (or `null` without the flag) — never the raw string you passed. `outputs.catalog`/`outputs.searchCorpus` are the paths those files will land at, output-root-relative, or `null` when the matching flag is off — the paths only, since neither file's *content* exists yet at this point in the build. There's nothing else in it: no settings dump, no environment, no manifest (the build hasn't scanned anything yet, so there's nothing to report). The file is temporary — gone by the time the build finishes, success or failure — so read it during the generator's own run and don't expect it to still be there afterward.
 
 **Your generated files and your source files share one set of paths.** A file is known by its path inside whichever directory it was written to, so `docs/api.md` means the same page whether you typed it into `src/docs/` or your script wrote it into `generatedDir`. Everything follows from that:
 

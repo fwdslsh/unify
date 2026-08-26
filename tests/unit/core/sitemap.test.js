@@ -31,17 +31,51 @@ import { parseBaseUrl } from "../../../src/core/urls.js";
 const synth = (n, pad = "") =>
   Array.from({ length: n }, (_, i) => ({ loc: `https://example.com/p${i}${pad}.html`, lastmod: null }));
 
-/** The record shape §21 consumes, with §20's defaults for everything unstated. */
-const rec = (over = {}) => ({
-  sourcePath: "p.html",
-  outputPath: "p.html",
-  path: "/p.html",
-  url: "https://example.com/p.html",
-  canonical: null,
-  robots: { raw: null, directives: [], indexable: true, followable: true },
-  dateModified: null,
-  ...over,
-});
+/**
+ * The BuildDocument shape §21 consumes, with §20's defaults for everything
+ * unstated. `robots`/`lastmod` are the meta CONTENT string a page would
+ * declare (or null for "declared nothing"); `canonical` is the
+ * `rel=canonical` href.
+ */
+const doc = (over = {}) => {
+  const {
+    sourcePath = "p.html",
+    outputPath = "p.html",
+    path = "/p.html",
+    url = "https://example.com/p.html",
+    canonical = null,
+    robots = null,
+    lastmod = null,
+  } = over;
+  const meta = [];
+  if (robots !== null) meta.push({ name: "robots", content: robots });
+  if (lastmod !== null) meta.push({ name: "lastmod", content: lastmod });
+  const link = [];
+  if (canonical !== null) link.push({ rel: "canonical", href: canonical });
+  return {
+    source: { path: sourcePath, generated: false, layout: null },
+    outputPath,
+    document: {
+      path,
+      url,
+      html: { attributes: {} },
+      head: { title: null, meta, link, base: [] },
+      body: { attributes: {}, headings: [] },
+    },
+    analysis: {
+      visibleText: "",
+      ids: [],
+      titleTexts: [],
+      langTexts: [],
+      jsonLd: [],
+      strayMetadata: [],
+      linksOut: [],
+      linksIn: [],
+      fragmentLinks: [],
+      refresh: null,
+    },
+  };
+};
 
 describe("§21.4 protocol limits", () => {
   test("the caps are the Sitemaps protocol's own", () => {
@@ -122,47 +156,40 @@ describe("§21.2 membership predicates", () => {
   const base = parseBaseUrl("https://example.com/");
 
   test("a page with no canonical and no robots meta is included", () => {
-    expect(entriesFor([rec()], base)).toEqual([{ loc: "https://example.com/p.html", lastmod: null }]);
+    expect(entriesFor([doc()], base)).toEqual([{ loc: "https://example.com/p.html", lastmod: null }]);
   });
 
   test("noindex and none exclude; nofollow does not", () => {
-    const robots = (directives) => ({
-      raw: directives.join(","),
-      directives,
-      indexable: !directives.includes("noindex") && !directives.includes("none"),
-      followable: !directives.includes("nofollow") && !directives.includes("none"),
-    });
-    expect(entriesFor([rec({ robots: robots(["noindex"]) })], base)).toEqual([]);
-    expect(entriesFor([rec({ robots: robots(["none"]) })], base)).toEqual([]);
-    expect(entriesFor([rec({ robots: robots(["nofollow"]) })], base)).toHaveLength(1);
+    expect(entriesFor([doc({ robots: "noindex" })], base)).toEqual([]);
+    expect(entriesFor([doc({ robots: "none" })], base)).toEqual([]);
+    expect(entriesFor([doc({ robots: "nofollow" })], base)).toHaveLength(1);
   });
 
   test("404.html is excluded by output path, not by title or content", () => {
-    expect(entriesFor([rec({ outputPath: "404.html", url: "https://example.com/404.html" })], base)).toEqual([]);
+    expect(entriesFor([doc({ outputPath: "404.html", url: "https://example.com/404.html" })], base)).toEqual([]);
     // A page merely *named* like one elsewhere in the tree is not the error document.
-    expect(entriesFor([rec({ outputPath: "docs/404.html", url: "https://example.com/docs/404.html" })], base))
+    expect(entriesFor([doc({ outputPath: "docs/404.html", url: "https://example.com/docs/404.html" })], base))
       .toHaveLength(1);
   });
 
   test("a canonical resolving to another page consolidates this one away", () => {
-    expect(entriesFor([rec({ canonical: "https://example.com/other.html" })], base)).toEqual([]);
+    expect(entriesFor([doc({ canonical: "https://example.com/other.html" })], base)).toEqual([]);
   });
 
   test("a canonical on another origin is not this page", () => {
-    expect(entriesFor([rec({ canonical: "https://elsewhere.example/p.html" })], base)).toEqual([]);
+    expect(entriesFor([doc({ canonical: "https://elsewhere.example/p.html" })], base)).toEqual([]);
   });
 
   test("a self-canonical written in any equivalent spelling is still self", () => {
     for (const canonical of ["https://example.com/p.html", "/p.html", "p.html"]) {
-      expect(entriesFor([rec({ canonical })], base)).toHaveLength(1);
+      expect(entriesFor([doc({ canonical })], base)).toHaveLength(1);
     }
   });
 
   test("lastmod is emitted only from a well-formed authored date", () => {
-    expect(entriesFor([rec({ dateModified: { raw: "2026-01-02", iso: "2026-01-02" } })], base)[0].lastmod)
-      .toBe("2026-01-02");
-    expect(entriesFor([rec({ dateModified: { raw: "soon", iso: null } })], base)[0].lastmod).toBeNull();
-    expect(entriesFor([rec({ dateModified: null })], base)[0].lastmod).toBeNull();
+    expect(entriesFor([doc({ lastmod: "2026-01-02" })], base)[0].lastmod).toBe("2026-01-02");
+    expect(entriesFor([doc({ lastmod: "soon" })], base)[0].lastmod).toBeNull();
+    expect(entriesFor([doc()], base)[0].lastmod).toBeNull();
   });
 });
 
@@ -174,17 +201,10 @@ describe("§21.5 generated-path collisions under a real split (P22)", () => {
   // 790-test suite, because nothing anywhere executed this branch.
   const base = parseBaseUrl("https://example.com/");
 
-  /** Enough records to force a split, in manifest order. */
-  const splitRecords = () =>
-    Array.from({ length: MAX_URLS_PER_FILE + 1 }, (_, i) => ({
-      sourcePath: `p${i}.html`,
-      outputPath: `p${i}.html`,
-      path: `/p${i}.html`,
-      url: `https://example.com/p${i}.html`,
-      canonical: null,
-      robots: { raw: null, directives: [], indexable: true, followable: true },
-      dateModified: null,
-    }));
+  /** Enough documents to force a split, in manifest order. */
+  const splitDocuments = () =>
+    Array.from({ length: MAX_URLS_PER_FILE + 1 }, (_, i) =>
+      doc({ sourcePath: `p${i}.html`, outputPath: `p${i}.html`, path: `/p${i}.html`, url: `https://example.com/p${i}.html` }));
 
   function collect() {
     const problems = [];
@@ -201,7 +221,7 @@ describe("§21.5 generated-path collisions under a real split (P22)", () => {
   test("a split with no occupied path emits an index plus its parts", () => {
     const { reporter, problems } = collect();
     const generated = generateSitemap({
-      records: splitRecords(), base, emittedFromSource: new Map(), reporter,
+      documents: splitDocuments(), base, emittedFromSource: new Map(), reporter,
     });
     expect([...generated.keys()].sort()).toEqual(["sitemap-1.xml", "sitemap-2.xml", "sitemap.xml"]);
     expect(generated.get("sitemap.xml")).toContain("<sitemapindex");
@@ -214,7 +234,7 @@ describe("§21.5 generated-path collisions under a real split (P22)", () => {
   test("an occupied split path raises P22 at the occupying source file and suppresses generation", () => {
     const { reporter, problems } = collect();
     const generated = generateSitemap({
-      records: splitRecords(),
+      documents: splitDocuments(),
       base,
       emittedFromSource: new Map([["sitemap-1.xml", "sitemap-1.xml"]]),
       reporter,
@@ -229,7 +249,7 @@ describe("§21.5 generated-path collisions under a real split (P22)", () => {
   test("several occupied paths each report, in path order", () => {
     const { reporter, problems } = collect();
     const generated = generateSitemap({
-      records: splitRecords(),
+      documents: splitDocuments(),
       base,
       emittedFromSource: new Map([
         ["sitemap-2.xml", "extra/two.xml"],
@@ -244,7 +264,7 @@ describe("§21.5 generated-path collisions under a real split (P22)", () => {
   test("an authored sitemap.xml suppresses generation before any path is claimed, raising nothing", () => {
     const { reporter, problems } = collect();
     const generated = generateSitemap({
-      records: splitRecords(),
+      documents: splitDocuments(),
       base,
       emittedFromSource: new Map([["sitemap.xml", "sitemap.xml"], ["sitemap-1.xml", "sitemap-1.xml"]]),
       reporter,
@@ -256,7 +276,7 @@ describe("§21.5 generated-path collisions under a real split (P22)", () => {
   test("no --base-url generates nothing and reports nothing", () => {
     const { reporter, problems } = collect();
     const generated = generateSitemap({
-      records: splitRecords(), base: null, emittedFromSource: new Map(), reporter,
+      documents: splitDocuments(), base: null, emittedFromSource: new Map(), reporter,
     });
     expect(generated.size).toBe(0);
     expect(problems).toEqual([]);

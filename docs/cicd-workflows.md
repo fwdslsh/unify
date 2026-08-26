@@ -1,8 +1,11 @@
 # CI/CD workflows
 
-What actually runs, and what each job is allowed to mean. Two workflow files exist: `.github/workflows/test.yml` (every push and PR) and `.github/workflows/release.yml` (releases and prereleases).
+What actually runs, and what each job is allowed to mean. Three workflow files exist:
+`.github/workflows/test.yml` (every push and PR), `.github/workflows/release.yml`
+(releases and prereleases), and `.github/workflows/deploy-docs.yml` (publishes the live
+`unify-docs` site — see below).
 
-## `test.yml` — five jobs
+## `test.yml` — seven jobs
 
 ### `release-signal` — runtime coverage against the phase baseline
 
@@ -20,9 +23,7 @@ This job checked the *release* condition directly (no `--baseline`, so any gap f
 
 The failure mode to guard against is not this job failing; it is someone making it pass. Do not weaken the harness, the comparator, or the checker to turn it green. Progress is the covered count it prints, and the baseline shrinking.
 
-### `release-gate` — the release condition itself
-
-The same commands with **release semantics** — no `--baseline`, so *any* uncovered rule fails:
+**The release condition itself is this same job's final step, not a separate one.** With **release semantics** — no `--baseline`, so *any* uncovered rule fails — it runs:
 
 ```bash
 rm -f .conformance-ledger.jsonl
@@ -30,7 +31,7 @@ bun test
 bun tests/conformance/check-traceability.mjs --runtime .conformance-ledger.jsonl
 ```
 
-**This check going green is the release condition**, and it no longer lives in a separate job: an earlier design used a `continue-on-error` twin, which GitHub reports as SUCCESS either way — green in the checks list, its only signal a log nobody opens. The release semantics are now the `release-signal` job's own final step: while the baseline file is non-empty that step *asserts the unbaselined check fails* (a declared phase, mechanically enforced), and the moment the file empties it runs the same check blocking. The baseline was emptied when §31.1 made the last seven §20 rows observable, so this is a blocking push-time gate again — the state a release requires. `release.yml` runs the identical check blocking at tag time either way.
+**This check going green is the release condition.** It used to live in a separate job: an earlier design used a `continue-on-error` twin, which GitHub reports as SUCCESS either way — green in the checks list, its only signal a log nobody opens. The release semantics are now `release-signal`'s own final step: while the baseline file is non-empty that step *asserts the unbaselined check fails* (a declared phase, mechanically enforced), and the moment the file empties it runs the same check blocking. The baseline was emptied when §31.1 made the last seven §20 rows observable, so this is a blocking push-time gate again — the state a release requires. `release.yml` runs the identical check blocking at tag time either way.
 
 ### `module-graph` — gate G8
 
@@ -57,6 +58,33 @@ bun tests/conformance/check-traceability.mjs --static --baseline tests/conforman
 Compares the computed gap set against the committed baseline and fails on **any** difference. A new gap fails; so does a gap that closed, until the baseline shrinks in the same commit. While non-empty, `baseline.txt` holds the manifest rows that no CLI surface can yet observe (`docs/conformance-spec.md` §20); each is closed by the consumer that makes its field observable, and the file is empty again before a release ships.
 
 The static check also enforces spec↔inventory sync: if `docs/conformance-spec.md` gains or loses an enumerable rule (a splice rule, a problem, an advisory, a head-merge row) without `rules.tsv` being updated in the same commit, it exits 1.
+
+### `examples` — gate G13 (dependency-free examples)
+
+```bash
+bun src/cli.js build -s examples/<name>/src -o /tmp/<name> --dry-run --strict
+```
+
+Builds every example that needs no `npm install` — `seed-library`, `seed-library-alt`, `seed-library-ondemand`, `htmx-fragments`, `unify-docs`, and `catalog-search-blog` — with `--dry-run --strict`, plus an `audit --strict` pass for `unify-docs` and `catalog-search-blog`. `examples/README.md` cites several of these as the evidence that `docs/authoring-rules.md` is sufficient to author from, and evidence that silently stops building is worse than none, because it is still being cited. `build --dry-run --strict` is the gate for all of them; `audit --strict` only for the two that already meet it — the other four (`seed-library`, `seed-library-alt`, `seed-library-ondemand` sandbox-authored, plus `htmx-fragments`, hand-maintained) carry 385 `incomplete` findings between them (41 / 80 / 259 / 5) and always have — `seed-library`'s dominated by `image-missing-dimensions`, `seed-library-alt`'s by `description-missing`, `seed-library-ondemand`'s by `page-orphan` — so demanding audit cleanliness there would be a new requirement wearing a regression gate's clothes.
+
+### `examples-npm` — gate G13, the half that needs a package install
+
+```bash
+cd examples/forge-svelte && npm install && npm run build:calculator && npm run build:notes
+cd examples/eleventy-htmx && npm ci
+node src/cli.js build …   # node, deliberately — see below
+node src/cli.js audit --strict …   # eleventy-htmx only
+```
+
+Builds `forge-svelte` and `eleventy-htmx`, the two examples with an npm dependency step before unify can build them, plus an `audit --strict` pass for `eleventy-htmx` — the third example (with `unify-docs` and `catalog-search-blog` in the `examples` job above) that already meets audit cleanliness. The unify build itself runs under **node**, not bun: bun auto-installs an import it cannot resolve, so a missing dependency would be silently fetched from npm mid-build and this gate would pass on a tree that fails for an `npx @fwdslsh/unify` user (issue #75). Running the generator seam under node is what makes this gate mean anything.
+
+### `release-notes` — gate G14
+
+```bash
+bun .github/workflows/extract-release-notes.mjs > /dev/null
+```
+
+Fails unless `CHANGELOG.md` has a section for the version currently in `package.json`. The release body *is* that section — `release.yml` composes it with this same script — so this job goes red between bumping the version and writing its changelog section: they are two halves of one change, and the failure message says which half is missing.
 
 ## Coverage is reported, and gates nothing
 
@@ -87,6 +115,19 @@ Two ways in, and two jobs, all defined in this repo:
    No npm token is involved. The job publishes with **trusted publishing**: npm mints a short-lived credential from the workflow's OIDC identity, so there is nothing to store or rotate, and provenance is attached automatically. It needs three things, and fails plainly without them: `id-token: write` on the workflow (set), npm >= 11.5.1 (the step upgrades npm first — GitHub runners still ship 10.x), and the package configured on npmjs.com under **Settings → Trusted Publisher** with this repository and `release.yml` as the workflow filename. That last one is a one-time setup on npm's side; until it exists, publishing fails with an authorization error rather than falling back to anything.
 
 **`docker`** needs `release`, builds `docker/Dockerfile`, and pushes `fwdslsh/unify:<tag>` — plus `:latest` for a stable release only, so a prerelease never moves the tag `docker pull fwdslsh/unify` resolves to.
+
+## `deploy-docs.yml`
+
+Publishes `examples/unify-docs` to GitHub Pages at `unify.fwdslsh.dev` on every push to
+`main` touching `docs/`, `src/`, or `examples/**`, or on demand. Its `build` job runs the
+same two gates as `test.yml`'s `unify-docs` step (`build --dry-run --strict`, then
+`audit --strict`) before the real `build --clean --strict` that publishes the site — then,
+in a separate step per example, assembles five more sites (`seed-library`,
+`seed-library-alt`, `seed-library-ondemand`, `htmx-fragments`, `catalog-search-blog`) into
+`dist/examples/<name>/` with the checkout CLI, each addressed at its own `--base-url`
+subpath and gated by its own `--dry-run --strict`. Those five directories are what the
+docs site's `/examples/` gallery links to at runtime; see `examples/unify-docs/README.md`'s
+Deployment section and this workflow's own comments for the full seam.
 
 Required secrets: `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`, both checked with a named error rather than failing obscurely mid-push. npm needs none.
 

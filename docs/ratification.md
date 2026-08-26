@@ -154,7 +154,7 @@ The pre-registered round (`_notes/ratification-round-27-preregistration.md`, out
 
 **The 0.8 rules teach.** Per criterion, Haiku scored: strict build 5/5, feed 5/5 — four entries each, every `<updated>` carrying a time, zero A17 in any final build — JSON-LD 5/5, `og:` on posts 4/5, extensionless addresses 4/5. The registered bar (four of five samples clean on *all* criteria) was missed at 3/5, by two single-sample, single-criterion misses: one sample put its `og:` block on the HTML pages and none of its Markdown posts; one never engaged `--pretty-urls`. Both are outliers under the convergence rule — no rules.md amendment. Both samples also **reported the missed thing as verified** ("og: tags present" over posts with none; "No `.html` extensions" twenty lines below its own `/workshop/visit.html`) — round 18's confident-false-report pattern, twice in one round, caught by judging fresh rebuilds instead of reports.
 
-**The convergent finding pointed at a diagnostic.** Two of five linked `/feed.xml` from their chrome before the feed's conditions were met and got P13's standing fix line — *check the path spelling and casing* — wrong on both counts: the spelling was right, and no source file was missing. One "fixed" it by shipping `../feed.xml`; the other invented a build-twice model in its report. §12 now adds a second fix line when the unresolved target is exactly one of the three generated root names, stating the condition this build did not meet (`--base-url`; `--search-index`; for the feed, whichever of address/declaration/dated-time actually failed). Two-sided tests pin all three names, including that the line never fires on a build that emitted the file.
+**The convergent finding pointed at a diagnostic.** Two of five linked `/feed.xml` from their chrome before the feed's conditions were met and got P13's standing fix line — *check the path spelling and casing* — wrong on both counts: the spelling was right, and no source file was missing. One "fixed" it by shipping `../feed.xml`; the other invented a build-twice model in its report. §12 now adds a second fix line when the unresolved target is exactly one of the generated paths, stating the condition this build did not meet (`--base-url`; for the feed, whichever of address/declaration/dated-time actually failed). Two-sided tests pinned this at the time for the three generated root names then in play (`sitemap.xml`, `feed.xml`, the retired `search-index.json`), including that the line never fires on a build that emitted the file; release 0.9 (§30, REF-04) widened the same rule to four generated paths, adding `assets/unify/catalog.json` (`--catalog`) and `assets/unify/search-corpus.json` (`--search-corpus`) in place of the retired manifest.
 
 **The date rule's error contract works.** One sample wrote day-only dates, met A17 mid-iteration, and repaired to full timestamps — the pre-registered success path, observed rather than assumed.
 
@@ -179,6 +179,49 @@ The round §7d promised: a brief that compels evaluation — every check the too
 The rest of the registered card: strict builds 6/6, audit-clean on fresh rebuilds 6/6, and — re-measuring round 27's one miss — `og:image` with real dimensions, absolute, on every post, 6/6. The line-53 clause written after round 27 held universally on first exposure.
 
 What the round surfaced instead, recorded as unregistered and exploratory: three of five shipped `.html`-visible addresses against the brief, and the transcripts turn this from a doc question into a sharper one. One sample quoted the pretty-urls sentence verbatim, explained it correctly in its own reflection — *"an output transformation, not a source-level concern"* — and then left the flag out of its final command. The sentence teaches; the flag does not survive into the command line; and nothing in the tool can push back, because extensionless addresses are a per-site deployment requirement no generic check can own. Round 29's registered question, with one design note carried forward: none of the four samples that missed it, across both rounds, wrote a `unify.yaml` — the mechanism that exists precisely to make a site's flag decisions durable.
+
+### 7f. Round 29: the 0.9 engine under the ratified surface
+
+Release 0.9.0 rebuilt the engine beneath the rules — `PageRecord` became the
+final-document model, feed membership widened, heading scope narrowed to
+`<main>`, the search manifest became the catalog/corpus pair — while
+`docs/authoring-rules.md` changed by one sentence. Round 29 pointed the
+fitted→tested check at the implementation: round 27's brief byte-unchanged,
+the same five registered criteria, the same bar, on a CLI no earlier round
+ever ran (`_notes/ratification-round-29-preregistration.md`; archive and
+verdicts in `_notes/rounds/`, mirrored on the `ratify-round-29-archive`
+branch).
+
+**The bar is met: 4/5 Haiku clean on all five criteria, the control clean on
+all five.** Per criterion: strict build 6/6 with zero diagnostics, feed 6/6
+(four entries each, every `<updated>` timestamped), JSON-LD 6/6,
+extensionless addresses 6/6, share image 5/6. The one miss is a single-sample
+outlier — h4 shipped its `og:image` as `data:`-URI SVGs, reading the brief's
+"write a small placeholder SVG" as *inline*; functional for a build, dead to
+a social crawler, and the round-13 family's shape to watch. Neither of round
+27's miss shapes recurred, and — bearing on round 28's open question without
+closing it, since this is a different brief — every sample engaged
+`--pretty-urls` unprompted.
+
+The round's sharpest result is the one it was designed to collect: **round
+27's own repair is now tested, not fitted.** Two samples hit the identical
+premature-`/feed.xml` P13 mid-iteration that produced two wrong mental models
+in round 27; both received §12's second fix line naming the generation
+condition — one sample in both its variants — and both repaired correctly on
+the next build. A17 likewise taught two samples from day-only dates to full
+timestamps, one crediting the dry-run error over the doc in its own report.
+
+Two records for the ledger rather than the doc. The isolation probe caught
+the published 0.8.2 package's full source sitting in the bun install cache —
+masked before launch; enumerating leak paths by hand stays wrong. And the
+experimenter's ad-hoc address sweep initially flagged two CSS attribute
+selectors inside `<style>` as `.html` links — the exact false-positive class
+round 27's instrument notes documented — corrected by context classification
+before any verdict was fixed. The improvised-judging ledger gains one more
+entry, again from the experimenter and not a sample; folding the V-criteria
+into `judge-round.mjs` is round 30's instrument note. The amended
+tags/categories sentence went unexercised by this brief and is recorded as
+untested, not as passing.
 
 ## 8. Running it again, and what is still untested
 

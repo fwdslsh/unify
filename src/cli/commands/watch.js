@@ -33,7 +33,7 @@ import { build } from "./build.js";
  * @returns {Promise<number>}
  */
 export async function watch(context, opts = {}) {
-  const { sourceRoot, output, settings, reporter: topReporter, sourceDefaulted } = context;
+  const { sourceRoot, output, settings, reporter: topReporter, sourceDefaulted, command = "watch" } = context;
   const { signal, onRebuild, debounceMs, testDelayMs = 0 } = opts;
 
   const ownedController = signal ? null : new AbortController();
@@ -63,7 +63,7 @@ export async function watch(context, opts = {}) {
     const runSourceDefaulted = isFirst && sourceDefaulted;
 
     try {
-      await build({ sourceRoot, output, settings: runSettings, reporter, sourceDefaulted: runSourceDefaulted });
+      await build({ sourceRoot, output, settings: runSettings, reporter, sourceDefaulted: runSourceDefaulted, command });
     } catch (err) {
       // An unexpected exception (as opposed to a normal diagnosed problem)
       // must still count as a failed rebuild below — recorded as a problem,

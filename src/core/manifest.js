@@ -1,166 +1,78 @@
 /**
- * `manifest.js` — conformance-spec §20, the final-output page manifest.
+ * `manifest.js` — conformance-spec §20, the final-output document manifest.
  *
- * One record per composed page, derived from the bytes §15 is about to
- * publish. This module is the build's single semantic reading of the site:
- * sitemap generation, canonical completion, robots consistency,
+ * One `BuildDocument` per composed page, derived from the bytes §15 is about
+ * to publish. This module is the build's single semantic reading of the
+ * site: sitemap generation, canonical completion, robots consistency,
  * structured-data checks, feeds, search output, and every audit finding read
- * these records and none of them re-parses a page. Product-spec §6.2 states
- * the architectural law this file exists to enforce — "there is one shared
- * interpretation of a page's URL and metadata, not separate sitemap, feed,
- * and audit implementations that can disagree" — so a consumer that wants a
- * fact about a page adds a field here rather than a second extractor there.
+ * these documents and none of them re-parses a page. Product-spec §6.2
+ * states the architectural law this file exists to enforce — "there is one
+ * shared interpretation of a page's URL and metadata, not separate sitemap,
+ * feed, and audit implementations that can disagree" — so a consumer that
+ * wants a fact about a page reads it off the document through a shared
+ * selector (`document-selectors.js`) rather than adding a field here.
+ *
+ * `BuildDocument` is deliberately a THIN ENVELOPE, not a semantic page
+ * schema (release-brief §7): the extraction and interpretation work lives in
+ * `document.js` (one document-order pass over the final emitted HTML,
+ * producing a bounded `DocumentSnapshot` plus a private `DocumentAnalysis`)
+ * and `document-selectors.js` (the one interpretation layer every built-in
+ * consumer reads through). This module's own job is narrow: call
+ * `extractDocument` once per page, attach the provenance facts that do not
+ * exist in HTML at all (source path, generated-source status, layout
+ * provenance, output file path), and run the one second pass that needs
+ * every document to exist first — the link graph (§20.9) and the resolved
+ * redirect target (§20.11), both relations over the WHOLE manifest rather
+ * than facts about one document.
  *
  * Two properties are load-bearing and easy to lose in a later edit:
  *
  *  1. **It reads emitted text, never source.** Frontmatter, layouts, and
  *     include targets are all already spent by the time this runs (§20.2).
  *     That is what makes HTML and Markdown equal citizens: a Markdown page's
- *     `title` is visible here only because §10.2 put it in the emitted
+ *     title is visible here only because §10.2 put it in the emitted
  *     `<head>`, exactly as an HTML author would have written it. Reaching
  *     back to a source file for a value would reintroduce the two-readings
  *     bug this module exists to prevent.
  *
  *  2. **It observes; it never reports.** Deriving the manifest emits no
  *     diagnostic, writes no file, and cannot change an exit code (§20.2).
- *     Conflicting declarations are recorded as *data* on the record
- *     (§20.4) because §14.2's problem list and §14.3's advisory catalogue
- *     are both closed and ordinary `build` is not where content quality is
- *     judged (product-spec §6.1). The evaluation command renders them.
+ *     A page's several differing declarations of one field are not recorded
+ *     as stored data here (the 0.9 model removed the `conflicts` array): a
+ *     consumer that needs to know asks `document-selectors.js`'s
+ *     `metadataConflicts(doc)`, which computes the answer from the snapshot
+ *     it is given rather than reading it off a field this module wrote.
  *
  * `path`/`url` deliberately delegate to `publish.js`'s `urlForOutputPath` —
  * the function §17's dry-run report already prints with — so a URL a
  * consumer emits and a URL the report shows cannot drift apart (§20.5).
  */
 
+import { extractDocument } from "./document.js";
 import { decodeEntities } from "./entities.js";
-import { findAll, findFirst, getAttr, innerText, isElement, isInside, isJsonLdScript, parse } from "./html.js";
 import { urlForOutputPath } from "./publish.js";
-import { isSkippedUrl, parseRefreshMeta, splitUrl } from "./urls.js";
+import { isSkippedUrl, splitUrl } from "./urls.js";
 import { stripBaseUrl, resolveReference } from "./references.js";
 
 /**
- * @typedef {object} DateValue
- * @property {string} raw - the declared value, exactly as emitted
- * @property {string|null} iso - the same value when it is a W3C date/date-time, else null
- *
- * @typedef {object} ImageValue
- * @property {string} url
- * @property {number|null} width
- * @property {number|null} height
- * @property {boolean} fromOg - true when og:image supplied the url, false when
- *   twitter:image did; §20.3 reads the dimensions only in the first case, so a
- *   consumer reporting their absence needs to know which page it is looking at
- *
- * @typedef {object} RobotsValue
- * @property {string|null} raw
- * @property {string[]} directives
- * @property {boolean} indexable
- * @property {boolean} followable
- *
- * @typedef {object} RefreshValue
- * @property {string} raw - the `content` value exactly as emitted
- * @property {number} seconds - the declared delay; 0 is no delay at all (§24.4)
- * @property {string|null} url - §12's grammar's URL part, null when it reads none
- * @property {string|null} target - the output path this redirect names, when it
- *   names a page in this manifest; null for external, unresolvable, and for a
- *   second part §12's grammar does not read (§20.11 — never folded into "self")
- *
- * @typedef {object} JsonLdEntry
- * @property {string} raw - the script's text content, verbatim
- * @property {any} data - the parsed value, or null when parsing failed
- * @property {string|null} error - the parser's message when parsing failed
- *
- * @typedef {object} Conflict
- * @property {string} field
- * @property {string} kept
- * @property {string[]} discarded
- *
- * @typedef {object} PageRecord
- * @property {string} sourcePath
- * @property {boolean} generated - §33.4 — true when the page came from the
- *   `--generate` overlay rather than the source tree
- * @property {string|null} layout - §20.3 — the source-root-relative path of
- *   the layout this page composed with, `null` when it composed with none
+ * @typedef {object} BuildDocument
+ * @property {object} source - provenance facts that do not exist in the
+ *   emitted bytes at all
+ * @property {string} source.path - source-root-relative path
+ * @property {boolean} source.generated - §33.4 — true when the page came
+ *   from the `--generate` overlay rather than the source tree
+ * @property {string|null} source.layout - §20.3 — the source-root-relative
+ *   path of the layout this page composed with, `null` when it composed
+ *   with none
  * @property {string} outputPath
- * @property {string} path
- * @property {string|null} url
- * @property {string|null} title
- * @property {string|null} description
- * @property {string|null} lang
- * @property {string|null} canonical
- * @property {RobotsValue} robots
- * @property {RefreshValue|null} refresh
- * @property {string|null} h1
- * @property {{level:number, text:string, id:string|null}[]} headings
- * @property {string} text
- * @property {ImageValue|null} image
- * @property {string|null} author
- * @property {DateValue|null} datePublished
- * @property {DateValue|null} dateModified
- * @property {string|null} schemaType
- * @property {string[]} taxonomyKeys - §20.3/§28.2 — the sorted subset of the
- *   closed set {tags, categories} the emitted head declares as `<meta name>`;
- *   `[]` for a page declaring neither
- * @property {JsonLdEntry[]} jsonLd
- * @property {string[]} linksOut
- * @property {string[]} linksIn
- * @property {{tag: string, key: string|null}[]} strayMetadata - one entry per
- *   document-metadata element emitted outside <head> on a page that has one (§20.3)
- * @property {string[]} ids - every id the page declares, document order, repeats kept
- * @property {{target:string, id:string}[]} fragmentLinks - one entry per distinct
- *   internal link carrying a fragment: the output path it names and the id it asks for
- * @property {Conflict[]} conflicts
+ * @property {import('./document.js').DocumentSnapshot} document
+ * @property {object} analysis - `extractDocument`'s own `DocumentAnalysis`,
+ *   minus `rawHrefs` (consumed below, never surviving on the final envelope
+ *   — the same rule that deleted `_hrefs` in the 0.8 model), plus this
+ *   module's own second pass: `linksOut`/`linksIn`/`fragmentLinks` (§20.9,
+ *   resolved against the whole manifest) and `refresh` resolved to
+ *   `{raw, seconds, url, target}` (§20.11).
  */
-
-/** Subtrees whose characters are not visible page text (§20.3). */
-const INVISIBLE = new Set(["script", "style", "template", "noscript"]);
-
-/**
- * §20.3's closed inline set: leaving one of these contributes no separator;
- * leaving any other element contributes one space. Without the separator
- * `<p>a</p><p>b</p>` reads as `ab`; with an unconditional one `a <em>b</em>!`
- * reads as `a b !`. `<br>` is absent on purpose — it separates lines, so it
- * separates words.
- */
-const INLINE = new Set([
-  "a", "abbr", "b", "bdi", "bdo", "cite", "code", "data", "dfn", "em", "i", "img",
-  "kbd", "mark", "q", "rp", "rt", "ruby", "s", "samp", "small", "span", "strong",
-  "sub", "sup", "time", "u", "var", "wbr",
-]);
-
-/**
- * §20.3's text-content rule: the character data of `el` and its descendants
- * with `INVISIBLE` subtrees omitted, whitespace runs collapsed to one space,
- * and the result trimmed. Comments contribute nothing.
- *
- * Implemented over the parser's node tree rather than by stripping tags from
- * a raw slice, because the raw slice would keep the contents of a `<script>`
- * — which is exactly the "visible text" mistake that makes duplicate-content
- * detection report two pages as identical when only their inline analytics
- * snippet is.
- * @param {import('./html.js').Node} el
- * @returns {string}
- */
-function textContent(el) {
-  let out = "";
-  const visit = (node) => {
-    if (node.type === "text") { out += node.data; return; }
-    if (node.type !== "element" && node.type !== "root") return;
-    const tag = node.type === "element" ? node.tag.toLowerCase() : "";
-    if (INVISIBLE.has(tag)) return;
-    // Entering AND leaving: leaving alone fuses a parent's own text with a
-    // block child's ("<div>Intro<p>Para</p></div>" -> "IntroPara"). The
-    // doubled separator between two adjacent blocks costs nothing, because
-    // `collapse` runs over the result.
-    const separates = node.type === "element" && !INLINE.has(tag);
-    if (separates) out += " ";
-    for (const child of node.children ?? []) visit(child);
-    if (separates) out += " ";
-  };
-  for (const child of el.children ?? []) visit(child);
-  return readText(out);
-}
 
 /** A fragment is percent-encoded like any URL part; an undecodable one stays verbatim. */
 function decodeURIComponentSafe(s) {
@@ -171,447 +83,80 @@ function decodeURIComponentSafe(s) {
   }
 }
 
-/** Collapse every run of ASCII whitespace to one space and trim (§20.3). */
-function collapse(s) {
-  return s.replace(/[ \t\n\r\f]+/g, " ").trim();
-}
-
 /**
- * §20.3's reading of one raw slice of emitted markup: resolve character
- * references, then collapse.
+ * Extract one page's own envelope — everything except `analysis.linksIn`,
+ * which is a relation over the whole manifest and so is filled by
+ * `buildManifest` once every document exists (§20.9), and
+ * `analysis.refresh.target`, resolved in that same second pass (§20.11).
  *
- * The order is not interchangeable and this helper exists so no call site can
- * pick the wrong one. Collapsing first leaves whitespace a reference
- * INTRODUCES uncollapsed — `a&#32;&#32;b` keeps two spaces, `a&#10;b` keeps a
- * raw newline in a field the spec says is collapsed — so two fields reading
- * the same characters disagree. Every text-bearing field goes through here or
- * through `textContent`, which applies the same order, and nothing decodes a
- * value either of them has already returned.
- * @param {string} raw
- * @returns {string}
- */
-function readText(raw) {
-  return collapse(decodeEntities(raw));
-}
-
-/** Trim-only emptiness, for a value already read by `readText`/`textContent`. */
-function orNull(s) {
-  return typeof s === "string" && s.trim() !== "" ? s.trim() : null;
-}
-
-/**
- * `""` and whitespace-only both mean "declared nothing" (§20.3). Character
- * references resolve here too: an attribute carries them exactly as element
- * text does, so `content="Tea &amp; Coffee"` is `Tea & Coffee` in the record.
- *
- * For RAW slices only — an attribute value, straight from the parser. A value
- * `readText` or `textContent` already returned must use `orNull` instead, or it
- * decodes twice and reports text no page displays.
- */
-function nonEmpty(s) {
-  if (typeof s !== "string") return null;
-  const trimmed = decodeEntities(s).trim();
-  return trimmed === "" ? null : trimmed;
-}
-
-/**
- * §6.3.6's date rule, isolated so no consumer re-implements it: a value is a
- * date only when it is written as a W3C/ISO 8601 date or date-time AND names
- * a real calendar day. Everything else is `null` — the build clock, the
- * filesystem, the filename, and Git history are not fallbacks and are never
- * consulted anywhere in this module.
- * @param {unknown} raw
- * @returns {string|null} the trimmed value when valid, else null
- */
-export function isoDate(raw) {
-  if (typeof raw !== "string") return null;
-  const s = raw.trim();
-  // W3C-DTF exactly (§20.10): the literal `T`, and a time-zone designator
-  // whenever a time is present. A space separator and a bare local time are
-  // the two forms other tools accept and this one must not — each is invalid
-  // wherever unify would emit it (a sitemap <lastmod>, a JSON-LD dateModified).
-  const m = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(Z|[+-]\d{2}:\d{2}))?$/.exec(s);
-  if (!m) return null;
-  const [, y, mo, d, hh, mm, ss, tzd] = m;
-  const year = Number(y), month = Number(mo), day = Number(d);
-  if (month < 1 || month > 12 || day < 1) return null;
-  // Real calendar day, leap years included: Date.UTC normalizes an overflow
-  // (2026-02-30 → March 2), so comparing the parts back is the check.
-  const dt = new Date(Date.UTC(year, month - 1, day));
-  if (dt.getUTCFullYear() !== year || dt.getUTCMonth() !== month - 1 || dt.getUTCDate() !== day) return null;
-  if (hh !== undefined) {
-    if (Number(hh) > 23 || Number(mm) > 59) return null;
-    if (ss !== undefined && Number(ss) > 59) return null;
-    if (tzd !== "Z") {
-      const offsetHours = Number(tzd.slice(1, 3));
-      const offsetMinutes = Number(tzd.slice(4, 6));
-      if (offsetMinutes > 59 || offsetHours * 60 + offsetMinutes > 14 * 60) return null;
-    }
-  }
-  return s; // verbatim, never normalized — reformatting is an edit to content
-}
-
-/** A `{raw, iso}` date value, or null when nothing was declared (§20.3). */
-function dateValue(raw) {
-  const value = nonEmpty(raw);
-  return value === null ? null : { raw: value, iso: isoDate(value) };
-}
-
-/**
- * An integer-valued dimension, or null — never a coercion (§20.3). Bounded at
- * the safe-integer ceiling: a twenty-digit `content` is not a pixel count, and
- * emitting the float it silently becomes would be a value the page never
- * declared.
- */
-function intOrNull(raw) {
-  const v = nonEmpty(raw);
-  if (v === null || !/^\d+$/.test(v)) return null;
-  const n = Number(v);
-  return Number.isSafeInteger(n) ? n : null;
-}
-
-/**
- * §20.4's single-valued-field collector. Push every accepted declaration in
- * document order; `resolve()` keeps the first and reports the differing
- * discards. Identical repeats lose nothing, so they are not conflicts.
- */
-class Field {
-  constructor() { /** @type {string[]} */ this.values = []; }
-  /** @param {string|null} v */
-  add(v) { if (v !== null && v !== undefined) this.values.push(v); }
-  get kept() { return this.values.length ? this.values[0] : null; }
-  /** @returns {Conflict|null} */
-  conflict(field) {
-    if (this.values.length < 2) return null;
-    const kept = this.values[0];
-    const discarded = this.values.slice(1).filter((v) => v !== kept);
-    return discarded.length ? { field, kept, discarded } : null;
-  }
-}
-
-/**
- * §20.6 — parse `<meta name="robots">` and nothing else. `robots.txt` is
- * never read here: a disallowed path is not a `noindex` page, and product-spec
- * §6.7 names conflating the two as the SEO folklore this specification most
- * deliberately refuses. A crawler-specific meta (`googlebot`) is likewise not
- * page policy.
- * @param {string|null} raw
- * @returns {RobotsValue}
- */
-function parseRobots(values) {
-  // §20.6 — the union across every `<meta name="robots">` the page emits.
-  // `raw` keeps all of them, comma-joined in document order, because the
-  // report has to quote what the page actually says; the directives and the
-  // two booleans are computed from the whole set.
-  const raw = values.length === 0 ? null : values.join(", ");
-  return parseRobotsValue(raw);
-}
-
-function parseRobotsValue(raw) {
-  if (raw === null) return { raw: null, directives: [], indexable: true, followable: true };
-  const directives = raw.split(",").map((t) => t.trim().toLowerCase()).filter(Boolean);
-  return {
-    raw,
-    directives,
-    indexable: !directives.includes("noindex") && !directives.includes("none"),
-    followable: !directives.includes("nofollow") && !directives.includes("none"),
-  };
-}
-
-/**
- * §20.8 — `schemaType` reads a *single object's string* `@type` and nothing
- * else. An array, a `@graph`, a missing `@type`, or a non-string `@type`
- * declares nothing: bounded reading, because guessing which entity of a graph
- * "is" the page is exactly the invented-fact class product-spec §6.1 forbids.
- * @param {any} data
- * @returns {string|null}
- */
-function declaredType(data) {
-  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
-  const t = data["@type"];
-  return typeof t === "string" && t.trim() !== "" ? t.trim() : null;
-}
-
-/**
- * Extract one record's own fields — everything except `linksIn`, which is a
- * relation over the whole manifest and so is filled by `buildManifest` once
- * every record exists (§20.9).
+ * `analysis.rawHrefs` and the unresolved `refresh` reading travel BESIDE the
+ * envelope, not on it — `extract` returns `{doc, rawHrefs, refreshRaw}` and
+ * `buildManifest`'s second pass consumes the two extras — so the envelope
+ * never carries a transient shape and nothing has to remember to delete a
+ * staging field (the 0.8 `_hrefs`/`_refresh` arrangement this replaces).
  * @param {{sourcePath: string, outputPath: string, html: string, generated?: boolean, layout?: string|null}} page
  * @param {import('./urls.js').BaseUrlConfig|null} base
- * @returns {PageRecord & {_hrefs: string[]}}
+ * @returns {{doc: BuildDocument, rawHrefs: string[], refreshRaw: import('./document.js').RefreshReading|null}}
  */
 function extract(page, base) {
-  const { html } = page;
-  const { root } = parse(html);
-
-  const title = new Field();
-  const description = new Field();
-  const lang = new Field();
-  const canonical = new Field();
-  /** @type {(string|null)[]} every `<meta name="robots">` value, in document order (§20.6). */
-  const robotsAll = [];
-  const author = new Field();
-  const published = new Field();
-  const modified = new Field();
-  const schemaType = new Field();
-  /**
-   * §20.3/§28.2 — the closed set {tags, categories}, as a SET of key names
-   * rather than a `Field` of values: what this records is which of the two the
-   * page declares, never what they say. The set is closed because a growable
-   * list of "names other generators use" is the unbounded reservation
-   * product-spec §6.3.9 refuses.
-   *
-   * A declaration with empty `content` counts, and that is the same rule §28.1
-   * states for its own half of the section: the key is the declaration, and no
-   * value is parsed. `tags:` with nothing after it emits `<meta name="tags"
-   * content="">`, and the author who wrote it believed just as firmly in a
-   * collection as the one who listed three terms.
-   */
-  const taxonomyKeys = new Set();
-  const ogImage = new Field();
-  const twitterImage = new Field();
-  const ogWidth = new Field();
-  const ogHeight = new Field();
-  const refreshRaw = new Field();
-  /** @type {ReturnType<typeof parseRefreshMeta>} the first declaration (§20.4). */
-  let refreshFirst = null;
-
-  /** @type {JsonLdEntry[]} */
-  const jsonLd = [];
-  /** @type {{level:number, text:string, id:string|null}[]} */
-  const headings = [];
-  /** @type {string[]} */
-  const hrefs = [];
-  /** @type {string[]} */
-  const ids = [];
-
-  // §20.3 — document metadata is read from `<head>`, because that is where a
-  // consumer reads it. A page with NO head element is read whole: a browser
-  // synthesises one and moves leading metadata into it, and this parser does
-  // not implement HTML tree construction, so it cannot place that boundary —
-  // reporting every field missing on a document a browser reads fine would be
-  // the worse error of the two.
-  const hasHead = findFirst(root, (n) => isElement(n, "head")) !== null;
-  /** @type {{tag: string, key: string|null}[]} */
-  const strayMetadata = [];
-
-  // One document-order pass. `findAll` already refuses to descend into
-  // `<template>` (§20.2), which is why every collector below can trust that
-  // what it sees is markup the shipped page actually declares.
-  for (const node of findAll(root, (n) => n.type === "element")) {
-    const tag = node.tag.toLowerCase();
-    const inHead = !hasHead || isInside(node, "head");
-    // Every id, in document order, repeats kept — §20.3. Repeats are the point:
-    // "this page declares one id twice" is only answerable if they survive.
-    const idAttr = nonEmpty(getAttr(node, "id"));
-    if (idAttr !== null) ids.push(idAttr);
-    if (tag === "html") {
-      lang.add(nonEmpty(getAttr(node, "lang")));
-    } else if (tag === "title") {
-      if (inHead) title.add(orNull(readText(innerText(html, node))));
-      else strayMetadata.push({ tag: "title", key: null });
-    } else if (tag === "base") {
-      if (!inHead) strayMetadata.push({ tag: "base", key: null });
-    } else if (tag === "meta") {
-      const name = (getAttr(node, "name") ?? "").trim().toLowerCase();
-      const property = (getAttr(node, "property") ?? "").trim().toLowerCase();
-      const content = getAttr(node, "content");
-      // §20.11 — read document-wide, and this placement is the whole decision:
-      // head-scoped, a redirect written outside the head is invisible to §24,
-      // and a redirect nobody checks is the silent failure §12 and §24 exist to
-      // remove. It therefore has to be read BEFORE the head early-return below.
-      const refresh = parseRefreshMeta(node);
-      if (refresh !== null) {
-        refreshRaw.add(nonEmpty(getAttr(node, "content")));
-        if (refreshFirst === null) refreshFirst = refresh;
-      }
-      if (!inHead) {
-        // §24.4's closed set: the metas whose only valid position is the head.
-        // `itemprop` and every other spelling does its job in the body and is
-        // not reported — this is a list of what is *inert* there, not of what
-        // unify happens to read.
-        //
-        // `schema` is unify's own key (§26.4) and belongs here for the same
-        // reason spelled one register in: it is read with the head (§20.3), so
-        // in the body it reaches neither a consumer nor §26.6's generator. Left
-        // out, the one key whose whole purpose is to switch generation on was
-        // also the only head-only meta whose misplacement nothing reported —
-        // no block, no problem, no finding — which is exactly the silence
-        // §26.4 argues its own closed value list from.
-        const key = getAttr(node, "charset") !== null ? "charset"
-          : name === "description" || name === "robots" || name === "schema" || name.startsWith("twitter:") ? name
-          : property.startsWith("og:") ? property
-          : null;
-        if (key !== null) strayMetadata.push({ tag: "meta", key });
-        continue;
-      }
-      if (name === "description") description.add(nonEmpty(content));
-      else if (name === "author") author.add(nonEmpty(content));
-      // Every robots meta, not the first: a crawler reads the union of the
-      // directives across all of them, and splitting `noindex, nofollow`
-      // across two tags is a documented spelling of one policy.
-      else if (name === "robots") robotsAll.push(nonEmpty(content));
-      else if (name === "schema") schemaType.add(nonEmpty(content));
-      // Head-scoped by sitting below the `!inHead` return above, like every
-      // other document-metadata reading here (§20.3): a `<meta name="tags">` in
-      // the body declares nothing to anybody, so it implies no collection
-      // either. `name` is already trimmed and lowercased, which is how HTML
-      // defines metadata names and how every other row of this chain reads one.
-      else if (name === "tags" || name === "categories") taxonomyKeys.add(name);
-      else if (name === "date") published.add(nonEmpty(content));
-      else if (name === "lastmod") modified.add(nonEmpty(content));
-      else if (name === "twitter:image") twitterImage.add(nonEmpty(content));
-      else if (property === "article:published_time") published.add(nonEmpty(content));
-      else if (property === "article:modified_time") modified.add(nonEmpty(content));
-      else if (property === "og:image") ogImage.add(nonEmpty(content));
-      else if (property === "og:image:width") ogWidth.add(nonEmpty(content));
-      else if (property === "og:image:height") ogHeight.add(nonEmpty(content));
-    } else if (tag === "link") {
-      const rel = (getAttr(node, "rel") ?? "").trim().toLowerCase().split(/\s+/);
-      if (!rel.includes("canonical")) {
-        // Every other rel — stylesheet, preload, icon — is legal in the body
-        // and does its job there. Only canonical is inert outside the head.
-      } else if (inHead) {
-        canonical.add(nonEmpty(getAttr(node, "href")));
-      } else {
-        strayMetadata.push({ tag: "link", key: "canonical" });
-      }
-    } else if (tag === "script" && isJsonLdScript(node)) {
-      const raw = innerText(html, node);
-      let data = null;
-      let error = null;
-      try {
-        data = JSON.parse(raw);
-      } catch (err) {
-        error = err.message;
-      }
-      jsonLd.push({ raw, data, error });
-      const declared = declaredType(data);
-      if (declared !== null) schemaType.add(declared);
-    } else if (/^h[1-6]$/.test(tag)) {
-      headings.push({
-        level: Number(tag.slice(1)),
-        text: textContent(node),
-        id: nonEmpty(getAttr(node, "id")),
-      });
-    } else if (tag === "a") {
-      const href = getAttr(node, "href");
-      if (typeof href === "string") hrefs.push(href);
-    }
-  }
-
-  // §20.7 — the first <main>, else <body>, else the whole document.
-  const main = findFirst(root, (n) => isElement(n, "main"));
-  const body = main ?? findFirst(root, (n) => isElement(n, "body"));
-  const textHost = body ?? root;
-
-  // §20.3/§20.4 — og:image wins over twitter:image whichever came first in the
-  // document; the fallback is between *spellings*, not a document-order race.
-  // Dimensions are read only when og:image supplied the url: og:image:width
-  // describes the og image, and attaching it to a twitter:image would report a
-  // size the page never claimed for that file.
-  const fromOg = ogImage.kept !== null;
-  const imageUrl = ogImage.kept ?? twitterImage.kept;
-
-  const conflicts = [
-    author.conflict("author"),
-    canonical.conflict("canonical"),
-    modified.conflict("dateModified"),
-    published.conflict("datePublished"),
-    description.conflict("description"),
-    (ogImage.values.length ? ogImage : twitterImage).conflict("image"),
-    lang.conflict("lang"),
-    // §20.4 calls itself total, so a new single-valued field is listed here as
-    // DATA. §24.4's metadata-conflict deliberately does not render it: that
-    // subset's criterion is a spec-stated at-most-one rule, and unify asserts
-    // only that the manifest reads the first.
-    refreshRaw.conflict("refresh"),
-    schemaType.conflict("schemaType"),
-    title.conflict("title"),
-  ].filter(Boolean).sort((a, b) => (a.field < b.field ? -1 : a.field > b.field ? 1 : 0));
-
-  const prefix = base ? base.pathPrefix : "/";
   // §20.5's percent-encoding happens inside `urlForOutputPath` — the one
   // function the dry-run report shares — so this cannot drift from what the
   // report prints or from what a projection emits.
+  const prefix = base ? base.pathPrefix : "/";
   const path = urlForOutputPath(page.outputPath, prefix);
+  const url = base ? base.origin + path : null;
 
-  return {
-    sourcePath: page.sourcePath,
+  const { document, analysis } = extractDocument(page.html, { path, url });
+  const { rawHrefs, refresh: refreshRaw, ...analysisRest } = analysis;
+
+  const doc = {
     // §33.4 — true when this page came from the --generate overlay rather
-    // than the source tree. §20.3: present on every record, boolean always.
-    generated: page.generated === true,
-    // §20.3 — the layout this page composed with, or `null` when it composed
-    // with none. The one other field, with `generated`, that is PROVENANCE
-    // rather than a reading of the emitted text: composition consumed
-    // `data-layout` (§6.4), so the emitted bytes carry no trace of which
-    // layout produced them, or of whether one did. §20.3 states the carve-out
-    // and why a consumer needs the fact — the short version is that advice
-    // naming "the layout" is unactionable on a page that has none.
-    layout: page.layout ?? null,
+    // than the source tree. §20.3: present on every document, boolean always.
+    source: {
+      path: page.sourcePath,
+      generated: page.generated === true,
+      // §20.3 — the layout this page composed with, or `null` when it
+      // composed with none. The one other field, with `generated`, that is
+      // PROVENANCE rather than a reading of the emitted text: composition
+      // consumed `data-layout` (§6.4), so the emitted bytes carry no trace
+      // of which layout produced them, or of whether one did.
+      layout: page.layout ?? null,
+    },
     outputPath: page.outputPath,
-    path,
-    url: base ? base.origin + path : null,
-    title: title.kept,
-    description: description.kept,
-    lang: lang.kept,
-    canonical: canonical.kept,
-    robots: parseRobots(robotsAll.filter((v) => v !== null)),
-    // `orNull`, never `nonEmpty`: this text came from `textContent`, which
-    // already resolved references. Decoding it again reports a string the page
-    // does not contain and makes `h1` disagree with `headings[0].text`.
-    h1: orNull(headings.find((h) => h.level === 1)?.text ?? null),
-    headings,
-    text: textContent(textHost),
-    image: imageUrl === null
-      ? null
-      : {
-          url: imageUrl,
-          fromOg,
-          width: fromOg ? intOrNull(ogWidth.kept) : null,
-          height: fromOg ? intOrNull(ogHeight.kept) : null,
-        },
-    author: author.kept,
-    datePublished: dateValue(published.kept),
-    dateModified: dateValue(modified.kept),
-    schemaType: schemaType.kept,
-    // Sorted here, once, so §28.2's "in sorted order" is a property of the
-    // record every consumer reads rather than something each one re-derives.
-    taxonomyKeys: [...taxonomyKeys].sort(),
-    jsonLd,
-    ids,
-    strayMetadata,
-    linksOut: [],
-    linksIn: [],
-    fragmentLinks: [],
-    conflicts,
-    // §20.11's `target` is a lookup in a manifest that does not exist yet, so
-    // the raw reading rides on the draft the way `_hrefs` does and is resolved
-    // in `buildManifest`'s second pass.
-    refresh: null,
-    _refresh: refreshFirst,
-    _hrefs: hrefs,
+    document,
+    analysis: {
+      ...analysisRest,
+      // §20.11's `target` is a lookup in a manifest that does not exist yet,
+      // so the raw reading travels beside the envelope and is resolved in
+      // `buildManifest`'s second pass, exactly as `linksOut`/`linksIn`/
+      // `fragmentLinks` are.
+      linksOut: [],
+      linksIn: [],
+      fragmentLinks: [],
+      refresh: null,
+    },
   };
+  return { doc, rawHrefs, refreshRaw };
 }
 
 /**
- * §20.11 — turn one draft's raw refresh reading into the record's field.
- * @param {PageRecord & {_refresh: any}} rec
+ * §20.11 — turn one draft's raw refresh reading into the envelope's field.
+ * @param {import('./document.js').RefreshReading|null} raw
+ * @param {string} outputPath
  * @param {import('./urls.js').BaseUrlConfig|null} base
- * @param {Map<string, PageRecord>} byOutputPath
- * @returns {RefreshValue|null}
+ * @param {Map<string, BuildDocument>} byOutputPath
+ * @returns {{raw:string, seconds:number, url:string|null, target:string|null}|null}
  */
-function resolveRefresh(rec, base, byOutputPath) {
-  const raw = rec._refresh;
+function resolveRefresh(raw, outputPath, base, byOutputPath) {
   if (!raw) return null;
   let target = null;
   if (!raw.hasSecondPart) {
     // `content="5"` names THIS page — the same loop written shorter (§24.4).
-    target = rec.outputPath;
+    target = outputPath;
   } else if (raw.url !== null) {
     const url = decodeEntities(raw.url);
     const stripped = base ? stripBaseUrl(url, base) : url;
-    const resolved = resolveReference(stripped, rec.outputPath);
+    const resolved = resolveReference(stripped, outputPath);
     if (resolved !== null && byOutputPath.has(resolved)) target = resolved;
   }
   // Everything else stays null, including a second part §12 declined to read:
@@ -621,41 +166,43 @@ function resolveRefresh(rec, base, byOutputPath) {
 }
 
 /**
- * §20 — derive the final-output page manifest.
+ * §20 — derive the final-output document manifest.
  *
  * @param {object} args
  * @param {{sourcePath: string, outputPath: string, html: string}[]} args.pages
  *   every composed page and its emitted text — exactly the set §12 checks and
  *   §15 publishes as HTML (§20.1). Assets, fragments, excluded sources, and
- *   pages that failed to compose are not passed and get no record.
+ *   pages that failed to compose are not passed and get no document.
  * @param {import('./urls.js').BaseUrlConfig|null} [args.base]
- * @returns {{records: PageRecord[], byOutputPath: Map<string, PageRecord>}}
+ * @returns {{documents: BuildDocument[], byOutputPath: Map<string, BuildDocument>, byPublicPath: Map<string, BuildDocument>}}
  */
 export function buildManifest({ pages, base = null }) {
   const ordered = [...pages].sort((a, b) =>
     a.outputPath < b.outputPath ? -1 : a.outputPath > b.outputPath ? 1 : 0);
   const drafts = ordered.map((p) => extract(p, base));
-  // First record wins a duplicated output path. Two sources resolving to one
-  // path is P12 and blocks publish, so this branch only ever feeds a build
-  // that is already failing — but "which record" must still be a function of
-  // the input rather than of iteration order, or a diagnostic could differ
-  // between runs of the same tree.
+  const documents = drafts.map((d) => d.doc);
+  // First document wins a duplicated output path. Two sources resolving to
+  // one path is P12 and blocks publish, so this branch only ever feeds a
+  // build that is already failing — but "which document" must still be a
+  // function of the input rather than of iteration order, or a diagnostic
+  // could differ between runs of the same tree.
   const byOutputPath = new Map();
-  for (const rec of drafts) if (!byOutputPath.has(rec.outputPath)) byOutputPath.set(rec.outputPath, rec);
+  for (const doc of documents) if (!byOutputPath.has(doc.outputPath)) byOutputPath.set(doc.outputPath, doc);
 
   // §20.9 — the link graph, second pass: a link participates only when it
-  // names a page that HAS a record, which is knowable only now.
-  for (const rec of drafts) {
+  // names a page that HAS a document, which is knowable only now.
+  for (const { doc, rawHrefs, refreshRaw } of drafts) {
     const out = new Set();
     /** @type {Map<string, {target: string, id: string}>} deduplicated by target#id */
     const fragments = new Map();
-    for (const raw of rec._hrefs) {
+    for (const raw of rawHrefs) {
       // REF-08: a reference is the attribute's VALUE, so character references
       // resolve before anything reads it. `#caf&eacute;` is the correct HTML
       // spelling of `#café` and must match an element whose `id` is `café` —
-      // and `ids` above already decodes, via `nonEmpty`. Reading the bytes here
-      // while decoding there made the two halves of one comparison disagree,
-      // and `fragment-missing` reported a link that works in every browser.
+      // and `document.js`'s `ids` reading already decodes, via `nonEmpty`.
+      // Reading the bytes here while decoding there made the two halves of
+      // one comparison disagree, and `fragment-missing` reported a link that
+      // works in every browser.
       const href = decodeEntities(raw);
       const stripped = base ? stripBaseUrl(href, base) : href;
       const { path, fragment } = splitUrl(stripped);
@@ -665,7 +212,7 @@ export function buildManifest({ pages, base = null }) {
       // whose question is "does this reach an id".
       if (path === "" && fragment.length > 1 && !/^[a-z][a-z0-9+.-]*:/i.test(stripped)) {
         const id = decodeURIComponentSafe(fragment.slice(1));
-        fragments.set(`${rec.outputPath}#${id}`, { target: rec.outputPath, id });
+        fragments.set(`${doc.outputPath}#${id}`, { target: doc.outputPath, id });
         continue;
       }
       if (isSkippedUrl(stripped)) continue;
@@ -674,7 +221,7 @@ export function buildManifest({ pages, base = null }) {
       // spelling §20.5 publishes — `/two%20words.html` — joins the graph like
       // the raw form. Both name the same page; the graph must not depend on
       // which one the author typed.
-      const resolved = resolveReference(stripped, rec.outputPath);
+      const resolved = resolveReference(stripped, doc.outputPath);
       if (resolved !== null && byOutputPath.has(resolved)) {
         out.add(resolved);
         if (fragment.length > 1) {
@@ -685,18 +232,22 @@ export function buildManifest({ pages, base = null }) {
     }
     // §20.11 — the redirect's target, resolved exactly the way `linksOut`
     // resolves a link: the same `stripBaseUrl` + `resolveReference` pair, so a
-    // redirect and an <a href> to one page can never name two different records.
-    rec.refresh = resolveRefresh(rec, base, byOutputPath);
-    delete rec._refresh;
-    rec.linksOut = [...out].sort();
-    rec.fragmentLinks = [...fragments.values()].sort((a, b) =>
+    // redirect and an <a href> to one page can never name two different documents.
+    doc.analysis.refresh = resolveRefresh(refreshRaw, doc.outputPath, base, byOutputPath);
+    doc.analysis.linksOut = [...out].sort();
+    doc.analysis.fragmentLinks = [...fragments.values()].sort((a, b) =>
       a.target === b.target ? (a.id < b.id ? -1 : a.id > b.id ? 1 : 0) : a.target < b.target ? -1 : 1);
-    delete rec._hrefs;
   }
-  for (const rec of drafts) {
-    for (const target of rec.linksOut) byOutputPath.get(target).linksIn.push(rec.outputPath);
+  for (const doc of documents) {
+    for (const target of doc.analysis.linksOut) byOutputPath.get(target).analysis.linksIn.push(doc.outputPath);
   }
-  for (const rec of drafts) rec.linksIn = [...new Set(rec.linksIn)].sort();
+  for (const doc of documents) doc.analysis.linksIn = [...new Set(doc.analysis.linksIn)].sort();
 
-  return { records: drafts, byOutputPath };
+  // `byPublicPath` keys on `document.path` — the final public root-relative
+  // path (§20.5), unlike `byOutputPath`'s filesystem-shaped key. First
+  // document wins a collision here too, for the same reason as above.
+  const byPublicPath = new Map();
+  for (const doc of documents) if (!byPublicPath.has(doc.document.path)) byPublicPath.set(doc.document.path, doc);
+
+  return { documents, byOutputPath, byPublicPath };
 }

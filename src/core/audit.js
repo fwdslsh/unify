@@ -33,8 +33,13 @@
  */
 
 import { jsonLdReferences, resolveReference, stripBaseUrl } from "./references.js";
-import { canonicalSchemeMismatch, classifyCanonical } from "./sitemap.js";
+import { canonicalSchemeMismatch } from "./sitemap.js";
+import { classifyCanonical } from "./document-selectors.js";
 import { stringProperty, subjectObject } from "./structured-data.js";
+import {
+  canonicalOf, declaredTypes, descriptionOf, langOf, metadataConflicts,
+  preferredImageOf, publicationDatesOf, refreshOf, robotsPolicyOf, titleOf,
+} from "./document-selectors.js";
 
 /**
  * @typedef {object} Finding
@@ -62,8 +67,8 @@ import { stringProperty, subjectObject } from "./structured-data.js";
 /**
  * §31.1's only channel into a *structured* audit result.
  *
- * `unify audit --format json|sarif` needs `records`, `base`, and `findings`
- * together: the JSON document's `pages` field is `records` serialized,
+ * `unify audit --format json|sarif` needs `documents`, `base`, and `findings`
+ * together: the JSON document's `pages` field is `documents` serialized,
  * `baseUrl` comes from `base`, and `findings` is this function's own return
  * value (§31 does not touch `src/cli/commands/build.js`; see that file's own
  * header for why one pipeline has one caller). But `build.js` calls
@@ -80,14 +85,14 @@ import { stringProperty, subjectObject } from "./structured-data.js";
  * `watch`/`dev`'s rebuild loop — which never sets `settings.audit` in the
  * first place and so never reaches the branch that stashes (§24.7: `build`
  * and `watch` never evaluate at all).
- * @type {{records: import('./manifest.js').PageRecord[], base: import('./urls.js').BaseUrlConfig|null, findings: Finding[], htmlFiles: Map<string,string>}|null}
+ * @type {{documents: import('./manifest.js').BuildDocument[], base: import('./urls.js').BaseUrlConfig|null, findings: Finding[], htmlFiles: Map<string,string>}|null}
  */
 let lastAuditRun = null;
 
 /**
  * §31.1 — retrieve and clear the run `auditManifest` most recently stashed;
  * `null` if `auditManifest` has not run in this process. See `lastAuditRun`.
- * @returns {{records: import('./manifest.js').PageRecord[], base: import('./urls.js').BaseUrlConfig|null, findings: Finding[], htmlFiles: Map<string,string>}|null}
+ * @returns {{documents: import('./manifest.js').BuildDocument[], base: import('./urls.js').BaseUrlConfig|null, findings: Finding[], htmlFiles: Map<string,string>}|null}
  */
 export function consumeLastAuditRun() {
   const run = lastAuditRun;
@@ -124,48 +129,8 @@ export function sortFindings(findings) {
 }
 
 /**
- * The fields a page may declare **once**, by the standard that defines them.
- *
- * §20.4's `conflicts` array is a record of which value the manifest kept, not
- * a claim that the markup is wrong, and reading it as one made `audit` report
- * conforming pages as `broken`. Two fields prove it:
- *
- *   - **`image`.** The Open Graph protocol defines arrays by repeating the
- *     tag — "if a tag can have multiple values, just put multiple versions of
- *     the same meta tag on your page; the first is given preference during
- *     conflicts" — and ogp.me's own `og:image` example ships two. A page with
- *     several share images is correct, common, and was being told to delete
- *     valid tags.
- *   - **`schemaType`.** §20.8 reads the first block's `@type` deliberately,
- *     as a bounded read. An `Organization` block beside a `BreadcrumbList` is
- *     routine and recommended, and every consumer parses every block, so the
- *     second is not "ignored".
- *
- * The list is not a judgement about which fields matter. It is exactly the
- * fields whose own specification says **at most one per document**, which is
- * the only line that can be defended to an author whose markup was called
- * broken. Three more were on it and came off:
- *
- *   - **`author`.** The HTML spec defines the `author` metadata name as "the
- *     name of *one of* the page's authors" — plural by construction.
- *   - **`robots`.** Crawlers read the union of the directives across every
- *     `robots` meta, so splitting `noindex, nofollow` across two tags is a
- *     documented spelling of one policy. §20.6 now unions them, which removes
- *     the conflict entirely rather than reclassifying it.
- *   - **`datePublished`/`dateModified`.** `article:published_time` beside
- *     `<meta name="date">` is ordinary belt-and-braces markup naming one
- *     instant at two granularities, and §20.3 maps both spellings to one
- *     field. Telling that author to "keep one" pushes them to drop the
- *     property crawlers read. Two genuinely different dates *are* a
- *     contradiction, but distinguishing them from two spellings of one date
- *     needs a comparison §20.10 does not expose — so the conservative answer
- *     is silence, which is the right default for a `broken` severity.
- */
-const SINGLE_VALUED = new Set(["canonical", "title", "description", "lang"]);
-
-/**
- * §24.4 — the immediate-refresh chain starting at `record`, when it returns to
- * `record`; null when it does not.
+ * §24.4 — the immediate-refresh chain starting at `doc`, when it returns to
+ * `doc`; null when it does not.
  *
  * A page declares at most one `refresh` (§20.11), so out-degree is one and a
  * visited-set walk decides the question — an SCC pass would be machinery for a
@@ -177,24 +142,26 @@ const SINGLE_VALUED = new Set(["canonical", "title", "description", "lang"]);
  * a delayed chain is an ordinary pattern — a kiosk rotating three pages, a page
  * that re-reads itself every thirty seconds — and reporting those would call a
  * feature a fault.
- * @param {import('./manifest.js').PageRecord} record
- * @param {Map<string, import('./manifest.js').PageRecord>} byOutputPath
- * @returns {import('./manifest.js').PageRecord[]|null} the chain, starting and
- *   ending at `record`
+ * @param {import('./manifest.js').BuildDocument} doc
+ * @param {Map<string, import('./manifest.js').BuildDocument>} byOutputPath
+ * @returns {import('./manifest.js').BuildDocument[]|null} the chain, starting
+ *   and ending at `doc`
  */
-function redirectChain(record, byOutputPath) {
-  const immediate = (r) =>
-    (r.refresh !== null && r.refresh.seconds === 0 && r.refresh.target !== null ? r.refresh.target : null);
-  const chain = [record];
-  const seen = new Set([record.outputPath]);
-  let current = record;
+function redirectChain(doc, byOutputPath) {
+  const immediate = (d) => {
+    const refresh = refreshOf(d);
+    return refresh !== null && refresh.seconds === 0 && refresh.target !== null ? refresh.target : null;
+  };
+  const chain = [doc];
+  const seen = new Set([doc.outputPath]);
+  let current = doc;
   for (;;) {
     const next = immediate(current);
     if (next === null) return null;
     const target = byOutputPath.get(next);
     if (target === undefined) return null; // §20.11 already refuses to resolve this
     chain.push(target);
-    if (next === record.outputPath) return chain;
+    if (next === doc.outputPath) return chain;
     // A cycle THIS page merely feeds into is not this page's loop: the pages on
     // it report it themselves, and every one of them prints the chain its own
     // author will follow.
@@ -226,14 +193,14 @@ const norm = (s) => s.toLowerCase().replace(/\s+/g, " ").trim();
  * naming a location this site does not emit is already **P13** through §12's
  * closed property list — the stronger answer, and the one mechanism.
  * @param {string} value
- * @param {import('./manifest.js').PageRecord} record
+ * @param {import('./manifest.js').BuildDocument} doc
  * @param {import('./urls.js').BaseUrlConfig|null} base
- * @param {Map<string, import('./manifest.js').PageRecord>} byOutputPath
+ * @param {Map<string, import('./manifest.js').BuildDocument>} byOutputPath
  * @returns {string|null}
  */
-function outputPathNamedBy(value, record, base, byOutputPath) {
+function outputPathNamedBy(value, doc, base, byOutputPath) {
   const stripped = base ? stripBaseUrl(value, base) : value;
-  const target = resolveReference(stripped, record.outputPath);
+  const target = resolveReference(stripped, doc.outputPath);
   return target !== null && byOutputPath.has(target) ? target : null;
 }
 
@@ -268,8 +235,8 @@ const foldSpaces = (s) => s.replace(/\s+/g, " ").trim();
  * §24 — evaluate a manifest.
  *
  * @param {object} args
- * @param {import('./manifest.js').PageRecord[]} args.records
- * @param {Map<string, import('./manifest.js').PageRecord>} args.byOutputPath
+ * @param {import('./manifest.js').BuildDocument[]} args.documents
+ * @param {Map<string, import('./manifest.js').BuildDocument>} args.byOutputPath
  * @param {import('./urls.js').BaseUrlConfig|null} args.base
  * @param {Map<string, string>} [args.sitemapLocs] - output path -> the sitemap
  *   file that lists it, for the discovery-artifact comparisons
@@ -288,88 +255,101 @@ const foldSpaces = (s) => s.replace(/\s+/g, " ").trim();
  * @returns {Finding[]} ordered by source path, then by finding id
  */
 export function auditManifest({
-  records, byOutputPath, base = null, sitemapLocs = new Map(), exemptedSitemaps = [], htmlFiles = new Map(),
+  documents, byOutputPath, base = null, sitemapLocs = new Map(), exemptedSitemaps = [], htmlFiles = new Map(),
 }) {
   /** @type {Finding[]} */
   const out = [];
-  const add = (record, id, severity, evidence, fix, distinguisher = "") =>
+  const add = (doc, id, severity, evidence, fix, distinguisher = "") =>
     out.push({
-      id, severity, file: record.sourcePath, generated: record.generated === true,
-      outputPath: record.outputPath, url: record.url, distinguisher, evidence, fix,
+      id, severity, file: doc.source.path, generated: doc.source.generated,
+      outputPath: doc.outputPath, url: doc.document.url, distinguisher, evidence, fix,
     });
 
   // ---- cross-page groupings, computed once ---------------------------------
   const group = (pick) => {
     const m = new Map();
-    for (const r of records) {
-      const key = pick(r);
+    for (const d of documents) {
+      const key = pick(d);
       if (key === null || key === "") continue;
       if (!m.has(key)) m.set(key, []);
-      m.get(key).push(r);
+      m.get(key).push(d);
     }
     return m;
   };
-  const byTitle = group((r) => (r.title === null ? null : norm(r.title)));
-  const byDescription = group((r) => (r.description === null ? null : norm(r.description)));
-  const byText = group((r) => (r.text === "" ? null : foldSpaces(r.text)));
+  const byTitle = group((d) => { const t = titleOf(d); return t === null ? null : norm(t); });
+  const byDescription = group((d) => { const desc = descriptionOf(d); return desc === null ? null : norm(desc); });
+  const byText = group((d) => (d.analysis.visibleText === "" ? null : foldSpaces(d.analysis.visibleText)));
 
-  for (const record of records) {
-    const others = (m, key) => (key === null ? [] : (m.get(norm(key)) ?? []).filter((r) => r !== record));
+  for (const doc of documents) {
+    const others = (m, key) => (m.get(norm(key)) ?? []).filter((d) => d !== doc);
+    const title = titleOf(doc);
+    const description = descriptionOf(doc);
+    const lang = langOf(doc);
+    const canonical = canonicalOf(doc);
+    const robots = robotsPolicyOf(doc);
+    const image = preferredImageOf(doc);
+    const dates = publicationDatesOf(doc);
+    const headings = doc.document.body.headings;
 
     // ---- titles ------------------------------------------------------------
-    if (record.title === null) {
-      add(record, "title-missing", "incomplete",
+    if (title === null) {
+      add(doc, "title-missing", "incomplete",
         "the emitted <head> declares no <title>",
         "add a <title> to the page, or to its layout for a site-wide suffix");
     } else {
-      const dupes = others(byTitle, record.title);
+      const dupes = others(byTitle, title);
       if (dupes.length) {
-        add(record, "title-duplicate", "incomplete",
-          `the title ${JSON.stringify(record.title)} is also used by ${listPaths(dupes)}`,
+        add(doc, "title-duplicate", "incomplete",
+          `the title ${JSON.stringify(title)} is also used by ${listPaths(dupes)}`,
           "give each page a title naming what is on it — the layout's suffix stays shared");
       }
     }
 
     // ---- descriptions ------------------------------------------------------
-    if (record.description === null) {
-      add(record, "description-missing", "incomplete",
+    if (description === null) {
+      add(doc, "description-missing", "incomplete",
         "the emitted <head> declares no <meta name=\"description\">",
         "add a description describing this page; a layout-wide one repeats on every page");
     } else {
-      const dupes = others(byDescription, record.description);
+      const dupes = others(byDescription, description);
       if (dupes.length) {
-        add(record, "description-duplicate", "incomplete",
-          `the description ${JSON.stringify(truncate(record.description))} is also used by ${listPaths(dupes)}`,
+        add(doc, "description-duplicate", "incomplete",
+          `the description ${JSON.stringify(truncate(description))} is also used by ${listPaths(dupes)}`,
           "describe each page separately, or drop the shared one from the layout");
       }
     }
 
-    // ---- headings ----------------------------------------------------------
-    const h1s = record.headings.filter((h) => h.level === 1);
+    // ---- headings ------------------------------------------------------------
+    // §20.3's 0.9 scope change: `headings` is `doc.document.body.headings`,
+    // scoped to the first `<main>`, else `<body>`, else the document root
+    // (`document.js`'s own §20.7 scope, reused here rather than a second
+    // walk) — a chrome `<h1>` outside `<main>` no longer counts as the
+    // page's h1. §20's own rewrite states this as a deliberate 0.9 decision.
+    const h1s = headings.filter((h) => h.level === 1);
     if (h1s.length === 0) {
-      add(record, "h1-missing", "incomplete",
+      add(doc, "h1-missing", "incomplete",
         "the page emits no <h1>",
         "add one <h1> naming the page's subject");
     } else if (h1s.length > 1) {
-      add(record, "h1-multiple", "incomplete",
+      add(doc, "h1-multiple", "incomplete",
         `the page emits ${h1s.length} <h1> elements: ${h1s.map((h) => JSON.stringify(truncate(h.text))).join(", ")}`,
         "keep one <h1> and demote the rest to <h2>");
     }
     // Containment, not similarity: §8 row 2 PREPENDS a page title to the
     // layout's, so "About — Site" legitimately contains the h1 "About". A
     // distance score would be a number nobody could defend.
-    if (record.title !== null && h1s.length === 1) {
-      const t = norm(record.title);
+    if (title !== null && h1s.length === 1) {
+      const t = norm(title);
       const h = norm(h1s[0].text);
       if (h !== "" && !t.includes(h) && !h.includes(t)) {
-        add(record, "title-h1-mismatch", "incomplete",
-          `the title is ${JSON.stringify(record.title)} but the <h1> reads ${JSON.stringify(h1s[0].text)}`,
+        add(doc, "title-h1-mismatch", "incomplete",
+          `the title is ${JSON.stringify(title)} but the <h1> reads ${JSON.stringify(h1s[0].text)}`,
           "make one of them contain the other, so a search result and the page agree");
       }
     }
 
     // ---- language ----------------------------------------------------------
-    if (record.lang === null) {
+    if (lang === null) {
       // §20.3's `layout` — the same shape as `generated` below. A page that
       // composed with NO layout (`data-layout="none"`, `layout: none`, no
       // `_layout.html` above it) has no layout to set anything on, and the
@@ -379,11 +359,11 @@ export function auditManifest({
       // page — in the spelling that page can actually take: frontmatter for
       // Markdown (§10.2's `lang` key), the `<html>` element for HTML.
       // The layout case is unchanged, byte for byte.
-      add(record, "lang-missing", "incomplete",
+      add(doc, "lang-missing", "incomplete",
         "the emitted <html> has no lang attribute",
-        record.layout != null
+        doc.source.layout != null
           ? 'set it on the layout: <html lang="en">'
-          : record.sourcePath.endsWith(".md")
+          : doc.source.path.endsWith(".md")
             ? "add lang: en to this page's frontmatter — it composed with no layout"
             : 'set it on the page: <html lang="en"> — this page composed with no layout');
     }
@@ -396,14 +376,14 @@ export function auditManifest({
     // "back to top" href to the page's own URL), and counting it made a page
     // nothing else links to unreportable — contradicting this finding's own
     // evidence line, which has always said "no OTHER page links to this one".
-    const linksInFromElsewhere = record.linksIn.filter((p) => p !== record.outputPath);
-    if (linksInFromElsewhere.length === 0 && record.outputPath !== "index.html" && record.outputPath !== "404.html") {
-      add(record, "page-orphan", "incomplete",
+    const linksInFromElsewhere = doc.analysis.linksIn.filter((p) => p !== doc.outputPath);
+    if (linksInFromElsewhere.length === 0 && doc.outputPath !== "index.html" && doc.outputPath !== "404.html") {
+      add(doc, "page-orphan", "incomplete",
         "no other page links to this one",
         // §33.4 — the source-tree advice is wrong for a generated page: there
         // is no file to rename and no underscore to add. The generator is
         // where it comes from and where it stops coming from.
-        record.generated === true
+        doc.source.generated
           ? "link to it from a page that is reachable, or stop writing it in your --generate script"
           : "link to it from a page that is reachable, or exclude it with a leading underscore");
     }
@@ -411,31 +391,64 @@ export function auditManifest({
     // ---- ids and fragments -------------------------------------------------
     const seen = new Set();
     const repeated = new Set();
-    for (const id of record.ids) (seen.has(id) ? repeated : seen).add(id);
+    for (const id of doc.analysis.ids) (seen.has(id) ? repeated : seen).add(id);
     for (const id of [...repeated].sort()) {
-      add(record, "id-duplicate", "broken",
+      add(doc, "id-duplicate", "broken",
         `the id ${JSON.stringify(id)} is declared more than once`,
         "make each id unique — a duplicate makes every link to it ambiguous",
         id); // §31.2 names this one: "the repeated id for id-duplicate"
     }
-    for (const link of record.fragmentLinks) {
+    for (const link of doc.analysis.fragmentLinks) {
       const target = byOutputPath.get(link.target);
-      if (!target || target.ids.includes(link.id)) continue;
-      add(record, "fragment-missing", "broken",
-        `${JSON.stringify(`#${link.id}`)} in ${link.target === record.outputPath ? "this page" : link.target} names no element`,
+      if (!target || target.analysis.ids.includes(link.id)) continue;
+      add(doc, "fragment-missing", "broken",
+        `${JSON.stringify(`#${link.id}`)} in ${link.target === doc.outputPath ? "this page" : link.target} names no element`,
         `add the id ${JSON.stringify(link.id)} to the element it should reach, or correct the link`,
         `${link.target}#${link.id}`); // two distinct missing fragments on one page are two distinct faults
     }
 
     // ---- contradictory declarations ----------------------------------------
-    // §20.4 keeps the first of two differing values and records the loser;
-    // §22.5 assigns the reporting of that to this command by name. Without
-    // this loop the record carried the data and nothing read it, so a page
-    // declaring two different canonicals — the case product-spec §6.3.2 asks
-    // to have reported — was silent in `build` AND in `audit`.
-    for (const conflict of record.conflicts) {
-      if (!SINGLE_VALUED.has(conflict.field)) continue;
-      add(record, "metadata-conflict", "broken",
+    // §20.4 keeps the first of two differing values and reports the loser;
+    // §22.5 assigns the reporting of that to this command by name.
+    // `metadataConflicts(doc)` is the 0.9 replacement for a stored
+    // `conflicts` array: it computes conflicts, on demand, for exactly the
+    // four fields whose defining standard says a page may declare once
+    // (`canonical`, `title`, `description`, `lang`). Five more fields were
+    // on this list in the 0.8 model and came off before the selector was
+    // written — the reasoning stays here because it is why the set is
+    // exactly these four and not a larger one:
+    //
+    //   - `image`. The Open Graph protocol defines arrays by repeating the
+    //     tag — "if a tag can have multiple values, just put multiple
+    //     versions of the same meta tag on your page; the first is given
+    //     preference during conflicts" — and ogp.me's own `og:image`
+    //     example ships two. A page with several share images is correct,
+    //     common, and was being told to delete valid tags.
+    //   - the declared structured-data type. §20.8 reads a bounded set of
+    //     declarations deliberately. An `Organization` block beside a
+    //     `BreadcrumbList` is routine and recommended, and every consumer
+    //     parses every block, so a second declaration is not "ignored".
+    //   - `author`. The HTML spec defines the `author` metadata name as
+    //     "the name of *one of* the page's authors" — plural by
+    //     construction.
+    //   - `robots`. Crawlers read the union of the directives across every
+    //     `robots` meta, so splitting `noindex, nofollow` across two tags
+    //     is a documented spelling of one policy. §20.6 unions them, which
+    //     removes the conflict entirely rather than reclassifying it.
+    //   - `datePublished`/`dateModified`. `article:published_time` beside
+    //     `<meta name="date">` is ordinary belt-and-braces markup naming
+    //     one instant at two granularities, and §20.3 maps both spellings
+    //     to one field. Telling that author to "keep one" pushes them to
+    //     drop the property crawlers read. Two genuinely different dates
+    //     *are* a contradiction, but distinguishing them from two
+    //     spellings of one date needs a comparison §20.10 does not
+    //     expose — so the conservative answer is silence, which is the
+    //     right default for a `broken` severity.
+    //
+    // So every conflict `metadataConflicts` returns is already one
+    // `metadata-conflict` renders; there is no second filter here.
+    for (const conflict of metadataConflicts(doc)) {
+      add(doc, "metadata-conflict", "broken",
         `the page declares ${conflict.discarded.length + 1} different values for ${conflict.field}: ` +
         `${JSON.stringify(truncate(conflict.kept))} is used, ` +
         `${conflict.discarded.map((d) => JSON.stringify(truncate(d))).join(", ")} ignored`,
@@ -446,7 +459,7 @@ export function auditManifest({
     // ---- metadata placement ------------------------------------------------
     // §20.3 already declined to READ these; this says so out loud, because a
     // silently-dropped <title> is indistinguishable from one never written.
-    for (const el of record.strayMetadata) {
+    for (const el of doc.analysis.strayMetadata) {
       const shown = el.key === null ? `<${el.tag}>`
         : el.tag === "link" ? `<link rel="${el.key}">`
         : el.key === "charset" ? "<meta charset>"
@@ -455,7 +468,7 @@ export function auditManifest({
       // ANYWHERE: it is unify's own key (§26.4), read with the head (§20.3),
       // and what a body-placed one loses is unify's own generator. Quoting the
       // consumer sentence at it would be evidence that is not true.
-      add(record, "metadata-in-body", "broken",
+      add(doc, "metadata-in-body", "broken",
         el.key === "schema"
           ? `${shown} is emitted outside <head>, where unify does not read it — the page generates no structured data`
           : `${shown} is emitted outside <head>, where no browser or crawler reads it`,
@@ -463,45 +476,34 @@ export function auditManifest({
         `${el.tag}:${el.key ?? ""}`); // which stray element, when a page has more than one
     }
 
-    // ---- taxonomy keys that build nothing (§28.2) ---------------------------
-    // The finding is a predicate over `record.taxonomyKeys` and reads no
-    // document: §20.3 already decided which of {tags, categories} the emitted
-    // HEAD declares, and asking the page again here would be the second reading
-    // of the site product-spec §6.2 forbids.
-    //
-    // `incomplete`, not `broken`: nothing about the page is wrong. A site may
-    // legitimately emit these for a consumer unify knows nothing about, so the
-    // evidence says what did NOT happen rather than accusing the markup — the
-    // absent thing is a mechanism the author may have been expecting, which is
-    // §24.3's own line for this severity. One finding per page, naming every
-    // key it declares, because "this page's taxonomy builds nothing" is one
-    // fact however many keys spell it.
-    if (record.taxonomyKeys.length) {
-      const declared = record.taxonomyKeys.map((k) => `<meta name="${k}">`).join(" and ");
-      add(record, "taxonomy-inert", "incomplete",
-        `the page declares ${declared}, and unify built nothing from ${record.taxonomyKeys.length > 1 ? "them" : "it"}: ` +
-        "no index page, no archive, no feed of any term, and no route",
-        "write the index yourself — a script that emits the page before the build — or drop the keys if nothing reads them");
-    }
+    // §28.2 (0.9) — `tags`/`categories` are ordinary metadata, inert BY
+    // DESIGN: unify never claimed to build an index, archive, or feed from
+    // them, so there is no finding here at all — the retired
+    // `taxonomy-inert` finding (and the `taxonomyKeys` field it read) is
+    // deleted, not renamed. The metas emit normally and `audit` reports
+    // nothing about them; §28.2's own rewrite states why the earlier
+    // reservation reasoning now cuts the other way (CPR-02).
 
     // ---- structured data ---------------------------------------------------
-    for (const entry of record.jsonLd) {
+    for (const entry of doc.analysis.jsonLd) {
       if (entry.error === null) continue;
-      add(record, "jsonld-invalid", "broken",
+      add(doc, "jsonld-invalid", "broken",
         `a <script type="application/ld+json"> does not parse: ${entry.error}`,
         "correct the JSON — a block that does not parse is ignored entirely",
         entry.raw); // the block's own bytes — stable across an edit elsewhere; an array index is not
     }
-    if (record.schemaType === "Article" || record.schemaType === "BlogPosting") {
+    const feedType = declaredTypes(doc).find((t) => t === "Article" || t === "BlogPosting");
+    if (feedType !== undefined) {
       // Objective because product-spec §6.3.6 names exactly the fields bounded
       // generation may use: a declared Article with no title or no authored
       // date cannot produce valid structured data from them.
+      const published = dates.published;
       const missing = [];
-      if (record.title === null) missing.push("a title");
-      if (record.datePublished === null || record.datePublished.iso === null) missing.push("an authored ISO 8601 date");
+      if (title === null) missing.push("a title");
+      if (published === null || published.iso === null) missing.push("an authored ISO 8601 date");
       if (missing.length) {
-        add(record, "schema-incomplete", "incomplete",
-          `the page declares ${record.schemaType} but supplies ${missing.join(" and ")} — the fields structured data is built from`,
+        add(doc, "schema-incomplete", "incomplete",
+          `the page declares ${feedType} but supplies ${missing.join(" and ")} — the fields structured data is built from`,
           "supply them, or drop the declared type rather than publish a partial claim");
       }
     }
@@ -517,7 +519,7 @@ export function auditManifest({
     // one more question, and the cost is stated rather than hidden: on the
     // `@graph` shape several widely-deployed CMS plugins emit, all four are
     // silent. A claim about the wrong node of a graph is worse than no claim.
-    const subjects = record.jsonLd.map(subjectObject).filter((s) => s !== null);
+    const subjects = doc.analysis.jsonLd.map(subjectObject).filter((s) => s !== null);
     for (const subject of subjects) {
       const type = stringProperty(subject, "@type");
 
@@ -530,7 +532,7 @@ export function auditManifest({
         const a = norm(headline);
         const b = norm(h1s[0].text);
         if (b !== "" && !a.includes(b) && !b.includes(a)) {
-          add(record, "jsonld-headline-mismatch", "incomplete",
+          add(doc, "jsonld-headline-mismatch", "incomplete",
             `the structured data headline is ${JSON.stringify(headline)} but the <h1> reads ${JSON.stringify(h1s[0].text)}`,
             "make one of them contain the other, so a rich result and the page agree",
             headline); // which block, when a page carries more than one
@@ -543,21 +545,21 @@ export function auditManifest({
       // a page this manifest holds: anything else is another site's business
       // or P13's, never a second opinion here.
       const declared = stringProperty(subject, "url");
-      if (declared !== null && record.canonical !== null) {
-        const named = outputPathNamedBy(declared, record, base, byOutputPath);
-        const canonical = outputPathNamedBy(record.canonical, record, base, byOutputPath);
-        if (named !== null && canonical !== null && named !== canonical) {
-          add(record, "jsonld-url-mismatch", "broken",
-            `the structured data url is ${JSON.stringify(declared)}, which names ${named}, but the canonical names ${canonical}`,
+      if (declared !== null && canonical !== null) {
+        const named = outputPathNamedBy(declared, doc, base, byOutputPath);
+        const canonicalTarget = outputPathNamedBy(canonical, doc, base, byOutputPath);
+        if (named !== null && canonicalTarget !== null && named !== canonicalTarget) {
+          add(doc, "jsonld-url-mismatch", "broken",
+            `the structured data url is ${JSON.stringify(declared)}, which names ${named}, but the canonical names ${canonicalTarget}`,
             "give both the same address — a page that names two of its own URLs has told consumers neither",
             declared); // which block's url, when a page carries more than one
         }
       }
 
       const inLanguage = stringProperty(subject, "inLanguage");
-      if (inLanguage !== null && record.lang !== null && primarySubtag(inLanguage) !== primarySubtag(record.lang)) {
-        add(record, "jsonld-lang-mismatch", "broken",
-          `the structured data says inLanguage ${JSON.stringify(inLanguage)} and the document declares lang ${JSON.stringify(record.lang)}`,
+      if (inLanguage !== null && lang !== null && primarySubtag(inLanguage) !== primarySubtag(lang)) {
+        add(doc, "jsonld-lang-mismatch", "broken",
+          `the structured data says inLanguage ${JSON.stringify(inLanguage)} and the document declares lang ${JSON.stringify(lang)}`,
           "name one language in both — a document that answers that question twice has answered it for nobody",
           inLanguage); // which block, when a page carries more than one
       }
@@ -580,7 +582,7 @@ export function auditManifest({
     for (const id of [...typesById.keys()].sort()) {
       const types = typesById.get(id);
       if (types.length < 2) continue;
-      add(record, "jsonld-entity-conflict", "broken",
+      add(doc, "jsonld-entity-conflict", "broken",
         `the structured data gives @id ${JSON.stringify(id)} more than one type: ${types.map((t) => JSON.stringify(t)).join(", ")}`,
         "give one @id one @type, or give the other entity an @id of its own",
         id); // §31.2's own precedent, "one finding per @id"
@@ -597,21 +599,20 @@ export function auditManifest({
     //
     // The evidence quotes `raw`: the author's own bytes, and the only string
     // they can grep for, since §20.10 emits `raw` nowhere else.
-    for (const field of ["datePublished", "dateModified"]) {
-      const value = record[field];
+    for (const [field, value] of [["datePublished", dates.published], ["dateModified", dates.modified]]) {
       if (value === null || value.iso !== null) continue;
-      add(record, "date-unusable", "broken",
+      add(doc, "date-unusable", "broken",
         `${field} is ${JSON.stringify(value.raw)}, which is not a W3C date — nothing this build emits can use it`,
         `write it as YYYY-MM-DD, or YYYY-MM-DDThh:mm:ssTZD with a time zone — the format ${field} is defined in`,
         field); // one finding per field, datePublished first (§26.3)
     }
 
     // ---- redirect chains ---------------------------------------------------
-    const chain = redirectChain(record, byOutputPath);
+    const chain = redirectChain(doc, byOutputPath);
     if (chain !== null) {
-      add(record, "redirect-loop", "broken",
-        `the page declares content=${JSON.stringify(record.refresh.raw)} and the chain returns to it: ` +
-        `${chain.map((r) => r.sourcePath).join(" → ")}`,
+      add(doc, "redirect-loop", "broken",
+        `the page declares content=${JSON.stringify(refreshOf(doc).raw)} and the chain returns to it: ` +
+        `${chain.map((d) => d.source.path).join(" → ")}`,
         "point one redirect on that chain at a page that stays, or remove it — a reader who follows it never arrives");
     }
 
@@ -632,7 +633,7 @@ export function auditManifest({
     // with it, so the loop says nothing without being told to.
     const prefix = base === null ? "/" : base.pathPrefix;
     const unprefixed = new Set();
-    for (const entry of record.jsonLd) {
+    for (const entry of doc.analysis.jsonLd) {
       if (entry.error !== null) continue; // §24.4's jsonld-invalid owns that page
       for (const v of jsonLdReferences(entry.data)) {
         // An author who wrote /repo/img/logo.png did by hand what §11.3 does
@@ -644,7 +645,7 @@ export function auditManifest({
       // `base` is non-null here by construction: a value can only fail the test
       // above under a prefix other than "/", which only --base-url produces.
       const published = prefix + v.slice(1);
-      add(record, "jsonld-url-unprefixed", "broken",
+      add(doc, "jsonld-url-unprefixed", "broken",
         `the structured data names ${JSON.stringify(v)}, which this site publishes at ${JSON.stringify(published)}`,
         `write the full URL ${base.origin}${published}, or a value relative to the page` +
         ` — a root-relative one resolves at the origin, above this site's own root`,
@@ -657,19 +658,19 @@ export function auditManifest({
     // — so a finding here would answer one question with two mechanisms, and
     // answer it worse: P13 blocks the publish, a finding only reports. §24.4
     // records the reasoning; this is where it would otherwise have been added.
-    if (record.image !== null) {
-      if (record.image.width === null || record.image.height === null) {
+    if (image !== null) {
+      if (image.width === null || image.height === null) {
         // §20.3 reads the dimensions only when og:image supplied the url, so a
         // twitter:image-only page reaches here with og:image:width and
         // og:image:height BOTH declared. Saying "declares no og:image:width"
         // there is a false statement about the page, under a fix that changes
         // nothing (§24.5). The action that clears it is the one named.
-        const [evidence, fix] = record.image.fromOg
+        const [evidence, fix] = image.fromOg
           ? ["the share image declares no og:image:width and og:image:height",
              "declare both — some crawlers skip an image whose size they cannot know in advance"]
           : ["the share image comes from twitter:image, which carries no dimensions",
              "add an og:image with og:image:width and og:image:height — og:image is what dimensions attach to"];
-        add(record, "image-missing-dimensions", "incomplete", evidence, fix);
+        add(doc, "image-missing-dimensions", "incomplete", evidence, fix);
       }
     }
 
@@ -679,7 +680,7 @@ export function auditManifest({
     //
     // Two readings of that question have already produced a finding whose
     // evidence quoted the page's own URL back at it, and both are excluded
-    // here by construction. It may not be asked through `isCompletablePage`,
+    // here by construction. It may not be asked through `isPublicDestination`,
     // which answers a broader question (membership) that a `noindex` page
     // fails for an unrelated reason. And an *unresolvable* canonical is not
     // "somewhere else": with no --base-url every absolute canonical is
@@ -687,49 +688,49 @@ export function auditManifest({
     // narrower without the site's address — a root-relative canonical still
     // resolves, an absolute one cannot — and saying nothing is the only
     // honest answer when unify does not know where the site lives.
-    const elsewhere = classifyCanonical(record, base) === "elsewhere";
+    const elsewhere = classifyCanonical(doc, base) === "elsewhere";
 
     // The cross-canonical shape, which is the contradiction: a page telling
     // crawlers not to index it while consolidating onto something else. A
     // canonical naming the page itself is redundant there, not contradictory —
     // §22.4 declines to complete one on a noindex page for the same reason.
-    if (!record.robots.indexable && elsewhere) {
-      add(record, "canonical-noindex", "broken",
-        `the page is ${JSON.stringify(foldSpaces(record.robots.raw))} and its canonical points at ${JSON.stringify(record.canonical)}`,
+    if (!robots.indexable && elsewhere) {
+      add(doc, "canonical-noindex", "broken",
+        `the page is ${JSON.stringify(foldSpaces(robots.raw))} and its canonical points at ${JSON.stringify(canonical)}`,
         "drop one of them — a page cannot both refuse indexing and nominate a replacement");
     }
-    const listedBy = sitemapLocs.get(record.outputPath);
-    if (listedBy !== undefined && !record.robots.indexable) {
-      add(record, "sitemap-noindex", "broken",
-        `${listedBy} lists this page, but the page is ${JSON.stringify(foldSpaces(record.robots.raw))}`,
+    const listedBy = sitemapLocs.get(doc.outputPath);
+    if (listedBy !== undefined && !robots.indexable) {
+      add(doc, "sitemap-noindex", "broken",
+        `${listedBy} lists this page, but the page is ${JSON.stringify(foldSpaces(robots.raw))}`,
         `remove it from ${listedBy}, or remove the robots meta`);
     }
     if (listedBy !== undefined && elsewhere) {
-      add(record, "sitemap-canonical-disagree", "broken",
-        `${listedBy} lists this page, but its canonical names ${JSON.stringify(record.canonical)}`,
+      add(doc, "sitemap-canonical-disagree", "broken",
+        `${listedBy} lists this page, but its canonical names ${JSON.stringify(canonical)}`,
         `list the canonical URL instead, or remove this page from ${listedBy}`);
     }
 
     // §24.4 — the scheme `classifyCanonical` excludes from its host comparison.
     // The `self` inside it is what makes this a different fault from the two
     // findings above rather than a second complaint about one line: this build
-    // publishes the page at record.url while the page nominates another address
-    // for itself. That contradiction is the whole severity, so it holds where
-    // no sitemap entry does — a noindex page and 404.html fire it and §21.2
-    // lists neither.
-    if (canonicalSchemeMismatch(record, base)) {
-      add(record, "canonical-scheme-mismatch", "broken",
-        `the canonical is ${JSON.stringify(record.canonical)} but this page's URL is ${JSON.stringify(record.url)}`,
-        `write the canonical as ${JSON.stringify(record.url)} — a canonical asks crawlers to consolidate on exactly the URL it names`);
+    // publishes the page at doc.document.url while the page nominates another
+    // address for itself. That contradiction is the whole severity, so it
+    // holds where no sitemap entry does — a noindex page and 404.html fire it
+    // and §21.2 lists neither.
+    if (canonicalSchemeMismatch(doc, base)) {
+      add(doc, "canonical-scheme-mismatch", "broken",
+        `the canonical is ${JSON.stringify(canonical)} but this page's URL is ${JSON.stringify(doc.document.url)}`,
+        `write the canonical as ${JSON.stringify(doc.document.url)} — a canonical asks crawlers to consolidate on exactly the URL it names`);
     }
 
     // ---- duplicated visible text -------------------------------------------
     // IDENTICAL, not "substantially similar". A similarity threshold is a
     // number nobody can justify, so unify does not have one.
-    if (record.text !== "") {
-      const dupes = (byText.get(foldSpaces(record.text)) ?? []).filter((r) => r !== record);
+    if (doc.analysis.visibleText !== "") {
+      const dupes = (byText.get(foldSpaces(doc.analysis.visibleText)) ?? []).filter((d) => d !== doc);
       if (dupes.length) {
-        add(record, "text-duplicate", "incomplete",
+        add(doc, "text-duplicate", "incomplete",
           `the visible text is identical to ${listPaths(dupes)}`,
           "give the pages different content, or keep one and redirect the rest");
       }
@@ -770,12 +771,12 @@ export function auditManifest({
   const findings = sortFindings(out);
   // §31.1's only channel out — see `lastAuditRun`'s own comment for why this
   // exists and why it is safe.
-  lastAuditRun = { records, base, findings, htmlFiles };
+  lastAuditRun = { documents, base, findings, htmlFiles };
   return findings;
 }
 
-function listPaths(records) {
-  const names = records.map((r) => r.sourcePath).sort();
+function listPaths(documents) {
+  const names = documents.map((d) => d.source.path).sort();
   return names.length <= 3 ? names.join(", ") : `${names.slice(0, 3).join(", ")} and ${names.length - 3} more`;
 }
 
@@ -840,8 +841,8 @@ export function formatFindings(findings, problemCount = 0) {
  * `collectExternalReferences`) — the same "first in document/manifest order
  * wins" rule §20.4 and §21.2 already use for locating a shared fault.
  * @param {Map<string, import('./external.js').ProbeResult>} results
- * @param {Map<string, import('./manifest.js').PageRecord>} owners - url -> the
- *   first referencing record, from `external.js`'s `collectExternalReferences`
+ * @param {Map<string, import('./manifest.js').BuildDocument>} owners - url -> the
+ *   first referencing document, from `external.js`'s `collectExternalReferences`
  * @returns {Finding[]} §24.5's order
  */
 export function externalUnreachableFindings(results, owners) {
@@ -856,14 +857,14 @@ export function externalUnreachableFindings(results, owners) {
   // `sortFindings`'s third key makes the output total regardless of input.
   for (const [url, result] of [...results].sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))) {
     if (result.ok) continue;
-    const record = owners.get(url);
-    if (!record) continue; // defensive: every key of `results` came from `owners`' own keys
+    const doc = owners.get(url);
+    if (!doc) continue; // defensive: every key of `results` came from `owners`' own keys
     out.push({
       id: "external-unreachable",
       severity: "incomplete",
-      file: record.sourcePath,
-      outputPath: record.outputPath,
-      url: record.url,
+      file: doc.source.path,
+      outputPath: doc.outputPath,
+      url: doc.document.url,
       distinguisher: url, // §31.3: "one finding per distinct URL"
       evidence: `${JSON.stringify(url)} ${result.error}`,
       fix: "confirm the URL is correct, or remove the reference — the failure may be on the other server rather than this one, not in this site's output",

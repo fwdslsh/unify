@@ -668,7 +668,7 @@ YAML between `---` fences at the very start of the file.
 
 **A key's name decides its output; the YAML shape used to spell it does not.** A nested block is sugar for prefixed keys — `og:` with `image:` indented under it names the key `og:image`, identical in every respect to writing `og:image:` flat, and both emit `property="og:image"`. The same holds for any other prefix (`twitter:` written either way names `twitter:card`, which is not `og:` and so emits `name=`). Both spellings are valid YAML and both are supported deliberately: `og:image: /card.png` is what most authors and every frontmatter ecosystem write, and a spec that accepted it as a key while silently emitting `name=` would produce a meta tag that looks right, builds clean, and is ignored by every scraper — the failure class §14 exists to prevent.
 
-Synthesized elements merge by §8 exactly as if the page had written them; their serialization is fixed: double-quoted attributes, `name`/`property` first, then `content` (`<meta name="description" content="…">`), and `<title>TEXT</title>`. Two consequences of "as if the page had written them", stated because implementations otherwise diverge: a present-but-empty `title:` counts as absent, so §10.3's `<h1>` fallback applies to it exactly as §8 row 2 treats an empty page `<title>`; and `class` takes a string — any other value is treated as absent rather than coerced. A `.md` file included as a fragment has its frontmatter stripped and **never validated** (§5.1 step 4): the data is provably unused, and a shared fragment must not make an unrelated page's build depend on the shape of metadata nobody reads. One further key is reserved, and only for the value it may take: `schema` becomes `<meta name="schema">` exactly as this table says, and §26.4 restricts its value to the three types unify generates. `date` and `lastmod` become plain metas that §20.3 then reads (§28.3). `tags` and `categories` become plain metas that create no collection, and `unify audit` says so (§28.2). `draft`, `permalink`, and `slug` are **P24** (§28.1): each is another generator's key, and a `<meta>` that looks like it worked is the failure §14 exists to forbid — a leading underscore is how a page is held back, and a source path is how a page is addressed. A `date` a consumer can use is `date`'s own doing rather than this table's: §20.10 reads the emitted meta and accepts it only as W3C-DTF. The honest gap, stated: frontmatter cannot express `rel="canonical"`, `rel="preload"`, or JSON-LD. Preloads and JSON-LD are layout material; a canonical is not — it names one page's own address, a layout-supplied value stamps every page with the same URL (silently wrong on every page but one, and consequential: share crawlers consolidate by canonical), and a Markdown page cannot override it, because §8's replace rule needs an HTML head to carry the page's own tag. A page that needs a canonical is written in HTML, or does without.
+Synthesized elements merge by §8 exactly as if the page had written them; their serialization is fixed: double-quoted attributes, `name`/`property` first, then `content` (`<meta name="description" content="…">`), and `<title>TEXT</title>`. Two consequences of "as if the page had written them", stated because implementations otherwise diverge: a present-but-empty `title:` counts as absent, so §10.3's `<h1>` fallback applies to it exactly as §8 row 2 treats an empty page `<title>`; and `class` takes a string — any other value is treated as absent rather than coerced. A `.md` file included as a fragment has its frontmatter stripped and **never validated** (§5.1 step 4): the data is provably unused, and a shared fragment must not make an unrelated page's build depend on the shape of metadata nobody reads. One further key is reserved, and only for the value it may take: `schema` becomes `<meta name="schema">` exactly as this table says, and §26.4 restricts its value to the three types unify generates. `date` and `lastmod` become plain metas that §20.3 then reads (§28.3). `tags` and `categories` become plain metas that create no collection, and unify reports nothing about them (§28.2). `draft`, `permalink`, and `slug` are **P24** (§28.1): each is another generator's key, and a `<meta>` that looks like it worked is the failure §14 exists to forbid — a leading underscore is how a page is held back, and a source path is how a page is addressed. A `date` a consumer can use is `date`'s own doing rather than this table's: §20.10 reads the emitted meta and accepts it only as W3C-DTF. The honest gap, stated: frontmatter cannot express `rel="canonical"`, `rel="preload"`, or JSON-LD. Preloads and JSON-LD are layout material; a canonical is not — it names one page's own address, a layout-supplied value stamps every page with the same URL (silently wrong on every page but one, and consequential: share crawlers consolidate by canonical), and a Markdown page cannot override it, because §8's replace rule needs an HTML head to carry the page's own tag. A page that needs a canonical is written in HTML, or does without.
 
 **Value serialization.** VALUE is the value's text, by YAML form. A **plain scalar** serializes as its source text, exactly as written — `featured: true` → `content="true"`, `date: 2026-01-01` → `content="2026-01-01"`, `weight: 0.50` → `content="0.50"`: no type coercion ever rewrites a value (booleans don't normalize, dates don't reformat, numbers keep their zeros — the author's bytes, not YAML's data model). A **quoted scalar** serializes as its content with the quotes gone (`note: "Colons: fine"` → `content="Colons: fine"`); a **block scalar** (`|`, `>`) as the string YAML defines; an **empty value** as the empty string. The list rule composes with blocks: a list under `og:image` emits one `property="og:image"` meta per item, in order. What has no text form is a problem, located at the key (**P17**): a mapping nested below a key that already names one, or a list item that is itself a mapping or list. Because the two spellings name the same key, **eligibility is decided by the key's name, not by nesting depth**: a block under `og:image:` is P17 exactly as `og:` → `image:` → `url:` is, since the effective key `og:image` already carries its prefix and there is nothing left to flatten into. Counting recursion levels instead would let the flat spelling through and reject the block one, which would break the equivalence above. Inventing a serialization or dropping the value would each be a silent lie:
 
@@ -802,7 +802,7 @@ Fixture: `src/_includes/nav.html` contains `<img src="logo.png">` and `<a href="
 
 **Files**: every page output `X.html` moves to `X/index.html`, except any `index.html` (already pretty) and the root `404.html` (hosts require that exact path). `about.md` → `about.html` → `about/index.html`.
 
-**Links**: after §11.1, every internal URL that resolves to an emitted page's `.html` output is rewritten to the page's pretty URL — resolve first (against provenance), then transform, emit root-relative:
+**Links**: after §11.1, every internal URL in `href`/`src`/`srcset`/`poster`, the `content` of the **URL-valued `og:`/`twitter:` metas** §11.1/§12 name, and a `<meta http-equiv="refresh">` URL — one closed list, the same one §11.1 and §12 already read (§11.3 additionally prefixes every `og:*`/`twitter:*` meta, a wider set — see §11.3) — that resolves to an emitted page's `.html` output is rewritten to the page's pretty URL — resolve first (against provenance), then transform, emit root-relative:
 
 | Written (in a root-level page) | Emitted |
 |---|---|
@@ -821,7 +821,7 @@ Fixture: `src/_includes/nav.html` contains `<img src="logo.png">` and `<a href="
 
 This was not so until 2026-08-24: the rewrite was keyed on the `.html` output alone, so `/about` reached §12 unrewritten and failed as an unresolvable reference. The cost was measured on a real site — 198 problems across 39 files on fwdslsh.dev, every one of them a link spelled the way `--pretty-urls` advertises — and the inconsistency ran inside unify itself, because `unify dev` already served `/about` by falling through a directory request to its `index.html`, as every static host does. The flag rejected at build time the spelling its own server answered.
 
-Preserved untouched: external URLs, `mailto:`/`tel:`/`data:`, fragment-only links, and URLs to non-page files (`/assets/doc.pdf`, `/style.css`). Query and fragment always survive transformation. In a **moved** page, every remaining relative URL (to assets etc.) is emitted root-relative per §11.1, so `![diagram](diagram.png)` beside a Markdown page keeps working. A `<meta http-equiv="refresh">` URL is transformed like a link, because it is one: a redirect to `/about.html` in a build that emits `about/index.html` names nothing.
+Preserved untouched: external URLs, `mailto:`/`tel:`/`data:`, fragment-only links, and URLs to non-page files (`/assets/doc.pdf`, `/style.css`) — the same test that leaves an asset `href` alone leaves an asset-targeting `og:image`/`twitter:image` alone too, since both are decided by the one page-vs-asset lookup stated above (the extensionless-resolution paragraph). Query and fragment always survive transformation. In a **moved** page, every remaining relative URL (to assets etc.) is emitted root-relative per §11.1, so `![diagram](diagram.png)` beside a Markdown page keeps working. A `<meta http-equiv="refresh">` URL is transformed like a link, because it is one: a redirect to `/about.html` in a build that emits `about/index.html` names nothing. A page-targeting `og:url`/`og:image`/`twitter:image` naming an emitted page in its plain `.html` spelling comes out in the directory spelling exactly as an `href` to the same target does — until 2026-08-26 this meta list was read by §11.1/§12 but not §11.2, so a page authoring `og:url` beside a matching `<a href>` had its anchor rewritten while the meta, naming the identical `.html` spelling, failed §12's reference check.
 
 ### 11.3 `--base-url`
 
@@ -881,7 +881,7 @@ A URL is internal when, after stripping the `--base-url` prefix — the path pre
 
 A `url(...)` in any CSS unify emits is a reference, and so is an `@import` naming its target as a bare string — `@import "/base.css"`. The two spellings of one at-rule were not treated alike: `@import url("…")` was already a `url()` and checked, while the bare form, which is the commoner one in hand-written CSS, was not, so a stylesheet importing a stylesheet that does not exist published green while the identical mistake in a `url()` one line down blocked the build.
 
-One unresolved target earns a second fix line: a reference to exactly `feed.xml`, `sitemap.xml`, or `search-index.json` at the output root, in a build that did not emit it. For that author the standing fix line is wrong on both counts — the spelling is right, and no source file is missing — because the name belongs to a file *this build generates under other conditions*, and the second line states the condition: `--base-url` for the sitemap; `--search-index` for the search manifest; and for the feed, whichever actually failed — no `--base-url`, no page declaring `schema: Article`/`BlogPosting`, or no declared date carrying a time of day (each day-only date already reported as A17). Ratification round 27 is the evidence: two of five authors hit this exact P13 mid-iteration and, told to check a spelling that was correct, one shipped `../feed.xml` and the other invented a build-twice model. The line names only the three root names §21/§29/§30 own, appears only when the file was not emitted, and changes nothing about what resolves — an authored or generated file at that name has always satisfied the check. `#fragment` targets are not validated against ids — that is a reader's judgment, not a build gate.
+One unresolved target earns a second fix line: a reference to exactly `feed.xml`, `sitemap.xml`, `assets/unify/catalog.json`, or `assets/unify/search-corpus.json`, in a build that did not emit it. For that author the standing fix line is wrong on both counts — the spelling is right, and no source file is missing — because the name belongs to a file *this build generates under other conditions*, and the second line states the condition: `--base-url` for the sitemap; `--catalog`/`--search-corpus` for the catalog and the search corpus, each stating its own flag independently of the other (§30.1); and for the feed, whichever actually failed — no `--base-url`, no page declaring `schema: Article`/`BlogPosting`, or no declared date carrying a time of day (each day-only date already reported as A17). Ratification round 27 is the evidence: two of five authors hit this exact P13 mid-iteration and, told to check a spelling that was correct, one shipped `../feed.xml` and the other invented a build-twice model. The line names only the four generated paths §21/§29/§30 own, appears only when the file was not emitted, and changes nothing about what resolves — an authored or generated file at that path has always satisfied the check. `#fragment` targets are not validated against ids — that is a reader's judgment, not a build gate.
 
 One absence is **not** reported: a URL that resolves to the output path of a **source page that exists but failed to compose**. That page emitted no file because of a problem of its own — already reported, and already blocking the publish — so a second diagnostic located at the *link* sends the author to a correctly-spelled path in the wrong file, and, diagnostics being path-ordered, usually prints above the one problem that matters. Measured on a twenty-page site with one page failing to compose: twenty-one problems printed, one of them real, the real one last. A reference to a target with no source file at all, and a reference to a source file that exists but is *excluded* (the stranded underscore asset above), are not this case and still fail here, loudly.
 
@@ -1054,7 +1054,7 @@ Keeping the list and naming the outcome are both required: suppressing the list 
 
 ## 18. `unify.yaml`
 
-Optional, at the source root; never emitted. Keys are the long option names with the same meanings: `source`, `output`, `clean`, `exclude` (a list, replacing the default like the flag), `pretty-urls`, `base-url`, `canonical`, `feed-full`, `search-index`, `strict`, `port`, `generate`. CLI flags win on conflict. No behavior exists that only the file can express.
+Optional, at the source root; never emitted. Keys are the long option names with the same meanings: `source`, `output`, `clean`, `exclude` (a list, replacing the default like the flag), `pretty-urls`, `base-url`, `canonical`, `feed-full`, `catalog`, `search-corpus`, `strict`, `port`, `generate`. CLI flags win on conflict. No behavior exists that only the file can express.
 
 **On the command line, a single-value option may be given once.** `exclude` is the one list — repeating it accumulates, which is what it is for — and repeating a boolean flag asks for the same thing twice and is fine. Repeating anything that carries a value (`-o dist -o other`, two `--generate` paths) is a **usage error** (exit 2). It used to keep the last one and discard the rest in silence, which published to a directory the author did not name and ran a generator instead of the one they asked for, both at exit 0: an instruction dropped without a word, which is the failure §7.6 refuses everywhere the author's content is concerned and the CLI boundary had no equivalent of.
 
@@ -1134,67 +1134,53 @@ The blog template additionally ships the generator seam worked end-to-end, becau
 
 ---
 
-## 20. The final-output page manifest
+## 20. The final document model
 
-Between §11's URL phases and §12's reference check, unify derives exactly one **page record** for every page that composed. The manifest is the build's single semantic reading of the site it is about to publish: sitemap generation, canonical completion, robots consistency, structured-data checks, feeds, search output, and every audit finding read it, and none of them re-parses a page or re-decides a value. Adding a second extractor, or letting one consumer pick a different winner than another, is a defect in this section rather than in the consumer.
+Between §11's URL phases and §12's reference check, unify derives exactly one **`BuildDocument`** for every page that composed. The model is a thin envelope around a **structural projection of the emitted HTML**, split into three parts that stay three modules rather than one: a bounded, publishable `DocumentSnapshot`; a heavier, build-only `DocumentAnalysis`; and a shared **selector layer** that every built-in consumer reads through instead of inventing its own second reading. The manifest — `documents`, plus `byOutputPath` and `byPublicPath` lookups over them — is the build's single semantic reading of the site it is about to publish: sitemap generation, canonical completion, robots consistency, structured-data checks, feeds, and every audit finding read it, and none of them re-parses a page or re-decides a value. Adding a second extractor, or letting one consumer pick a different winner than another, is a defect in this section rather than in the consumer.
 
-The manifest is an **implementation boundary**. No command writes it, no authoring rule mentions it, and product-spec §6.2 states plainly that it is not a new file format authors must learn. Nothing in this section changes what a build emits, reports, or exits with: deriving the manifest is pure observation.
+The manifest is an **implementation boundary**. No command writes it, no authoring rule mentions it, and product-spec §6.2 states plainly that it is not a new file format authors must learn. Nothing in this section changes what a build emits, reports, or exits with: deriving it is pure observation.
+
+**The rule that governs every module in this section, stated once:** extract the document once, interpret it centrally, project it many times. `document.js` extracts; `document-selectors.js` interprets; `manifest.js`, `sitemap.js`, `feed.js`, `canonical.js`, `structured-data.js`, `audit.js`, and the rest project. A fact about a page is computed by a selector on demand from the snapshot/analysis it is given, never re-derived by a consumer and never written back onto the envelope as a new stored field — doing the latter would simply rebuild the 0.8 model's denormalization under a new name (release-brief §14.1).
 
 ### 20.1 Membership
 
-One record per **composed page** — exactly the set §12 checks and §15 publishes as HTML. Assets, `.fragment.html` files (§4.4/EXC-12), excluded sources, and pages that failed to compose have no record. Membership is decided before any field is read, so a page carrying no metadata at all still has a complete record. Records are ordered by output path, and that order is the manifest's iteration order for every consumer.
+One `BuildDocument` per **composed page** — exactly the set §12 checks and §15 publishes as HTML. Assets, `.fragment.html` files (§4.4/EXC-12), excluded sources, and pages that failed to compose have no document. Membership is decided before any field is read, so a page carrying no metadata at all still has a complete document. `documents` is ordered by output path, and that order is the manifest's iteration order for every consumer.
 
 ### 20.2 Extraction source
 
-Every field is read from the page's **emitted text**: the exact bytes §15 would publish, after includes (§5), Markdown conversion (§10), composition (§7–§9), and all three URL phases (§11). The exception is named and closed at two fields — `generated` and `layout`, which are provenance and are argued in §20.3. Frontmatter, layout files, and include sources are never consulted again. A Markdown page's `title` reaches the manifest only because §10.2 put it in the emitted `<head>`; a layout-supplied `<meta name="description">` is read from each page that shipped it, once per page. That is what makes HTML and Markdown equal citizens here and keeps the manifest honest about what a crawler will actually see.
+Every field is read from the page's **emitted text**: the exact bytes §15 would publish, after includes (§5), Markdown conversion (§10), composition (§7–§9), and all three URL phases (§11). The exception is named and closed at two fields — `source.generated` and `source.layout`, which are provenance and are argued in §20.4. Frontmatter, layout files, and include sources are never consulted again. A Markdown page's title reaches the model only because §10.2 put it in the emitted `<head>`; a layout-supplied `<meta name="description">` is read from each page that shipped it, once per page. That is what makes HTML and Markdown equal citizens here and keeps the model honest about what a crawler will actually see.
 
 `<template>` contents are not scanned, matching §7.1's rule for slots: markup inside a template is inert in the shipped page, so it declares nothing.
 
-Extraction never fails a build and never publishes anything. A page whose emitted text carries no title, no headings, and no links produces a complete record whose fields are `null` or empty. §14's two severities and the exit-code contract are untouched by this section.
+Extraction never fails a build and never publishes anything. A page whose emitted text carries no title, no headings, and no links produces a complete document whose fields are `null` or empty. §14's two severities and the exit-code contract are untouched by this section.
 
-### 20.3 Fields
+### 20.3 The `DocumentSnapshot`: shape and normalization
 
-Every record carries every field. A field with nothing to read is `null` (scalars) or `[]` (lists).
+`extractDocument(html, {path, url})` (`src/core/document.js`) makes one document-order pass over the parsed tree and returns `{document, analysis}`. `document` is the `DocumentSnapshot` — small, bounded, and safe to publish as-is (it is what `unify audit --format json` serializes whole, §31.1):
 
-| Field | Type | Read from the emitted document |
+| Field | Type | Content |
 |---|---|---|
-| `sourcePath` | string | the source-root-relative path of the page that composed |
-| `generated` | boolean | §33.4 — `true` when the page came from the `--generate` overlay rather than the source tree. **Provenance, not a reading of the emitted text** (below) |
-| `layout` | string\|null | the source-root-relative path of the layout §6 resolved for this page, `null` when it composed with none. **Provenance, not a reading of the emitted text** (below) |
-| `outputPath` | string | the output-root-relative path §13 resolved |
-| `path` | string | §20.5 — the site-root-relative address this output path answers to |
-| `url` | string\|null | §20.5 — the absolute public URL, or `null` with no `--base-url` |
-| `title` | string\|null | `<title>` text content, whitespace-collapsed and trimmed; empty is `null` |
-| `description` | string\|null | `<meta name="description">` `content`, trimmed; empty is `null` |
-| `lang` | string\|null | the `lang` attribute of `<html>`, trimmed; empty is `null` |
-| `canonical` | string\|null | `<link rel="canonical">` `href`, with character references resolved and nothing else changed — no normalization, no re-encoding |
-| `robots` | object | §20.6 — `{raw, directives, indexable, followable}` |
-| `refresh` | object\|null | §20.11 — `{raw, seconds, url, target}` from the first `<meta http-equiv="refresh">` that declares a refresh, read document-wide |
-| `h1` | string\|null | text content of the first `<h1>`, whitespace-collapsed and trimmed; empty is `null` |
-| `headings` | array | every `h1`–`h6` in document order: `{level, text, id}`; `id` is `null` when unset |
-| `text` | string | §20.7 — the page's visible main text |
-| `image` | object\|null | `{url, width, height}` from `og:image`, else `twitter:image`; `width`/`height` come from `og:image:width`/`og:image:height` and are read **only when the url came from `og:image`**, `null` otherwise or when the value is not an integer |
-| `author` | string\|null | `<meta name="author">` `content`, trimmed |
-| `datePublished` | object\|null | §20.10 — `{raw, iso}` from `<meta property="article:published_time">` or `<meta name="date">` |
-| `dateModified` | object\|null | §20.10 — `{raw, iso}` from `<meta property="article:modified_time">` or `<meta name="lastmod">` |
-| `schemaType` | string\|null | §20.8 — the declared structured-data type |
-| `taxonomyKeys` | string[] | §28.2 — the sorted subset of the closed set `{tags, categories}` the emitted **head** declares as `<meta name>`; `[]` for a page declaring neither |
-| `jsonLd` | array | §20.8 — one entry per `<script type="application/ld+json">`, in document order |
-| `ids` | string[] | every `id` attribute in the emitted document, in document order, repeats included |
-| `linksOut` | string[] | §20.9 — output paths of internal pages this page links to, deduplicated, sorted |
-| `fragmentLinks` | array | §20.9 — `{target, id}` for each internal link carrying a fragment; `target` is the output path, `id` the fragment without `#` |
-| `linksIn` | string[] | §20.9 — output paths of internal pages that link to this one, deduplicated, sorted |
-| `conflicts` | array | §20.4 — `{field, kept, discarded}`, ordered by field name |
+| `path` | string\|null | passthrough — the site-root-relative address §20.5 computes for this page, supplied by the caller |
+| `url` | string\|null | passthrough — the absolute public URL §20.5 computes, or `null` with no `--base-url` |
+| `html.attributes` | object | the first `<html>` element's attributes (§20.3's attribute-reading rule, below); `{}` when the document has none |
+| `head.title` | string\|null | the first accepted `<title>` element's text content, whitespace-collapsed and trimmed; empty is `null` |
+| `head.meta` | object[] | every head-scoped `<meta>`'s attributes, in document order |
+| `head.link` | object[] | every head-scoped `<link>`'s attributes, in document order |
+| `head.base` | object[] | every head-scoped `<base>`'s attributes, in document order |
+| `body.attributes` | object | the first `<body>` element's attributes; `{}` when the document has none |
+| `body.headings` | `{level, id, text}[]` | every `h1`–`h6` **inside the heading scope** (below), in document order; `id` is `null` when unset |
 
-**Two fields are provenance rather than a reading of the emitted text**, and they are the whole of §20.2's exception: `generated`, which names the tree the page came from, and `layout`, which names the layout it composed with. Neither is recoverable from the bytes §20.2 reads — composition consumes `data-layout` (§6.4) and a layout leaves no marker of its own in what it produced, while the `--generate` overlay is scanned exactly as the source tree is (§33.3) — so a consumer that needs either fact has only two alternatives, and both have shipped and been wrong. It can re-derive the fact, which is a second reading of a question the build already answered and free to disagree with the first; or it can reason without it and state something untrue. `generated` was added when `unify audit` located a generated page at a source path the author could not open, under a fix line telling them to rename a file they never wrote. `layout` was added when `lang-missing` told an author to set `lang` on the layout — on a page that had resolved **no layout at all**, so the advice named either a file that was already correct or no file at all. §24 is where both facts are spent: a fix line is a sentence about what the author should edit next, and it cannot name a file that the reader can open — nor decline to name one that does not exist — without them.
+**Attribute reading.** One element's attributes become a plain object: names lowercased, values with character references decoded and **nothing else changed — no trimming, no coercion**. A bare attribute (`disabled`, no `=`) reads as `""`. When a name repeats on one element, the first occurrence wins, HTML's own rule for a duplicated attribute. A selector that needs an emptiness test — "did this page declare a title", "is this href non-blank" — trims and tests for `""` itself, at the point it interprets the value (§20.4); the snapshot never does this trimming on the consumer's behalf, because a stored `""` and a stored `"  "` are not the same fact and only the reader knows whether the difference matters to the question being asked.
 
-These are the only two, and the boundary is deliberate. Provenance is admitted here when a **finding cannot be phrased truthfully without it**, never as a general record of how a page was built: the source of each field, the includes it inlined, the frontmatter it declared, and the layout's own text all stay out, because §20.2's rule — that the manifest is a reading of what a consumer receives — is what keeps every other field honest about what a crawler will actually see. §17's report prints these same two facts (`← page + layout`, `← page (no layout)`, `← generated`) from the same values, so the record and the report cannot drift.
+**Head scoping keeps this section's own rule**: metadata elements (`<title>`, `<meta>`, `<link>`, `<base>`) are read from `<head>`; a document with no `<head>` element is read whole, because unify's parser does not implement HTML tree construction and cannot say where a browser's implied head boundary would fall. The rule exists because a page whose `<head>` held only `<meta charset>`, with its title and description written into the body instead, used to report both fields present under a document-wide reading — so `title-missing`/`description-missing` stayed silent while `title-h1-mismatch` fired on the inert title. A `<title>` or `<meta name="description">` in `<body>` is inert — no browser shows it, no crawler indexes it — and §8 never put it there; the author did. An element of these four kinds emitted outside the head — on a document that HAS a head — declares nothing to the snapshot; the subset §24.4's `metadata-in-body` names (`<title>`, `<base>`, `<meta charset>`, `<link rel="canonical">`, and a `<meta>` carrying one of the same closed set of `name`/`property` values §24.4 lists) is additionally recorded in `analysis.strayMetadata`, and everything else outside the head is simply not read.
 
-**Text content** everywhere in this table means the concatenated character data of the element and its descendants, with `<script>`, `<style>`, `<template>`, and `<noscript>` subtrees omitted, each run of ASCII whitespace collapsed to one space, and the result trimmed. Comments contribute nothing.
+**Heading scope is the first `<main>` element, else `<body>`, else the whole document outside `<head>`** (§20.7 reuses the identical scope for `analysis.visibleText`, computed in the same pass, and states why the last fallback excludes the head). **This is a 0.9 decision, changed from 0.8's document-wide reading**, and the reason is what document-wide cost: a layout's chrome routinely carries its own `<h1>` — a site name in a `<header>`, a "Skip to content" landmark — and reading headings document-wide made that chrome's heading indistinguishable from the page's own. `main`-scoping headings is the same bound §20.7 already draws for visible text, applied to the one field §24.4's `h1-missing`/`h1-multiple`/`title-h1-mismatch` inherit their scope from: a chrome `<h1>` outside `<main>` no longer counts as the page's own heading, stated here because §24.4 changes no rule of its own to inherit it — the change is entirely in what this snapshot collects.
 
-**Character references are resolved.** "Character data" means the text a reader sees, not the markup that encodes it: `C++ &amp; Rust!` in the emitted document is `C++ & Rust!` in the record. This is not an edge case — §10.1's Markdown converter escapes `&`, `<`, `>`, and `"` on every page it writes, so an unresolved field would make the *default* authoring path produce text no reader ever sees, no search index could match, and any consumer that escapes on output would double-escape into `&amp;amp;`. Resolution covers the numeric forms (`&#8212;`, `&#x2014;`) and the named references of HTML 4.01's three entity sets — Latin-1, symbols/mathematical/Greek, and special — which is a closed, citable list rather than an implementation's habit. A reference outside that set, or malformed, is left exactly as written: unrecognised markup is not silently deleted. The same resolution applies to values read from attributes (`description`, `author`, `canonical`, `image`, the dates), because an attribute carries character references too.
+**Text content** everywhere in this section means the concatenated character data of an element and its descendants, with `<script>`, `<style>`, `<template>`, and `<noscript>` subtrees omitted, each run of ASCII whitespace collapsed to one space, and the result trimmed. Comments contribute nothing.
 
-Resolution happens **only here**. §3's splice engine and every module it feeds must keep treating source bytes as bytes — the manifest is a reading of the output, not another pass over it.
+**Character references are resolved.** "Character data" means the text a reader sees, not the markup that encodes it: `C++ &amp; Rust!` in the emitted document is `C++ & Rust!` in the snapshot. This is not an edge case — §10.1's Markdown converter escapes `&`, `<`, `>`, and `"` on every page it writes, so an unresolved field would make the *default* authoring path produce text no reader ever sees, no search consumer could match, and any consumer that escapes on output would double-escape into `&amp;amp;`. Resolution covers the numeric forms (`&#8212;`, `&#x2014;`) and the named references of HTML 4.01's three entity sets — Latin-1, symbols/mathematical/Greek, and special — a closed, citable list rather than an implementation's habit. A reference outside that set, or malformed, is left exactly as written: unrecognised markup is not silently deleted. The same resolution applies to values read from attributes, because an attribute carries character references too.
+
+Resolution happens **only here**. §3's splice engine and every module it feeds must keep treating source bytes as bytes — extraction is a reading of the output, not another pass over it.
 
 Element boundaries participate: **entering and leaving** an element each contribute one space unless it is one of the closed set of **inline** elements below, whose boundaries contribute nothing. Both halves are needed. Leaving alone leaves `<div>Intro<p>Para</p></div>` reading as `IntroPara`; without the rule at all `<p>Kept</p><p>Also kept</p>` reads as `KeptAlso kept`; and with an unconditional space `Hello <em>world</em>!` reads as `Hello world !`. Since runs of whitespace collapse and the result is trimmed, the doubled separator between two adjacent blocks costs nothing. The list is closed and stated rather than derived, so two consumers cannot tokenize the same page differently:
 
@@ -1205,77 +1191,99 @@ s samp small span strong sub sup time u var wbr
 
 `<br>` is deliberately *not* inline here: it separates lines, so it separates words.
 
-Collapsing covers **ASCII** whitespace only. A decoded `&nbsp;` is U+00A0, a character the author chose because it forbids a line break, and rewriting it to U+0020 would be an edit to their content — the same verbatim discipline `iso` and `canonical` follow. This pushes a real cost onto consumers that tokenize: a client-side search comparing a typed `New York` against an indexed `New\u00A0York` misses, and duplicate-content detection reads two otherwise identical pages as different. Any projection of this field that is searched or compared must fold U+00A0 and the other Unicode space separators **at index time**, and say so where it is specified. Folding them here instead would put one consumer's normalization into the shared record, where every other consumer inherits it silently.
+Collapsing covers **ASCII** whitespace only. A decoded `&nbsp;` is U+00A0, a character the author chose because it forbids a line break, and rewriting it to U+0020 would be an edit to their content — the same verbatim discipline `iso` and `canonical` follow. This pushes a real cost onto consumers that tokenize: a client-side search comparing a typed `New York` against an indexed `New York` misses, and duplicate-content detection reads two otherwise identical pages as different. Any projection of this field that is searched or compared must fold U+00A0 and the other Unicode space separators **at index time**, and say so where it is specified. Folding them here instead would put one consumer's normalization into the shared snapshot, where every other consumer inherits it silently.
 
-**Document metadata is read from `<head>`.** `title`, `description`, `author`, `robots`, `datePublished`/`dateModified`, the `og:`/`twitter:` metas behind `image`, `taxonomyKeys`, and `canonical` are declarations *to a consumer*, and a consumer reads them in the head. A `<title>` or `<meta name="description">` in `<body>` is inert — no browser shows it, no crawler indexes it — and §8 never put it there; the author did.
+**`DocumentAnalysis`** is the other half of `extractDocument`'s return value: heavier, build-only, and never serialized into a public artifact by default (§31.1 states the audit-JSON exception explicitly does not apply to it).
 
-Reading them document-wide was wrong in the direction that matters, because it made the manifest describe a page nobody receives. A page whose head held only `<meta charset>`, with its title and description written into the body, reported both fields as present: `title-missing` and `description-missing` stayed silent, and §24.4's `title-h1-mismatch` then fired on the inert title and told the author to reconcile it with their heading. The one real fault — that this page has no title at all — was the only thing not reported.
+| Field | Type | Content |
+|---|---|---|
+| `visibleText` | string | §20.7 — the page's visible main text |
+| `ids` | string[] | every `id` attribute in the emitted document, document order, repeats included |
+| `titleTexts` | string[] | every accepted `<title>` element's text, in document order — carries the repeats `head.title` collapses to a first-wins scalar, so `metadataConflicts` (§20.4) can still compute a `title` conflict |
+| `langTexts` | string[] | every `<html>` element's non-empty `lang`, document-wide, in document order — carries the same repeats one layer down, for `langOf` and `metadataConflicts` (§20.4) |
+| `jsonLd` | `{raw, data, error}[]` | §20.8 — one entry per `<script type="application/ld+json">`, in document order |
+| `strayMetadata` | `{tag, key}[]` | §24.4's `metadata-in-body` closed set of elements found outside `<head>` on a document that has one |
+| `linksOut` | string[] | §20.9 — deduplicated, sorted output paths of internal pages this page links to |
+| `linksIn` | string[] | §20.9 — the exact reverse relation, deduplicated and sorted |
+| `fragmentLinks` | `{target, id}[]` | §20.9 |
+| `refresh` | `{raw, seconds, url, target}`\|null | §20.11 |
 
-**Several fields are deliberately not head-scoped**, each because the head is not where it lives — except the last, whose reason is different and is argued in §20.11:
+`extractDocument` itself returns the *per-document* half of this table — `visibleText`, `ids`, `titleTexts`, `langTexts`, `jsonLd`, `strayMetadata`, plus an unresolved `rawHrefs` (every `<a href>` value, document order) and an unresolved `refresh` reading. `linksOut`, `linksIn`, and `fragmentLinks` do not exist yet at that point — they are relations over the *whole manifest*, resolvable only once every document does — so `manifest.js`'s own second pass consumes `rawHrefs` into them and resolves `refresh.target`, exactly as `_hrefs`/`_refresh` were consumed and deleted in the 0.8 model. `rawHrefs` never survives onto the final envelope.
 
-- `lang` is an attribute of `<html>`, which *contains* the head.
-- `headings`, `ids`, `text`, `linksOut`, and `fragmentLinks` describe the body by definition.
-- `jsonLd` is valid **and read** inside `<body>`: the HTML spec permits `<script type="application/ld+json">` there and structured-data consumers do parse it, so head-scoping it would drop entities a crawler acts on — the same defect pointing the other way. `schemaType` follows `jsonLd` wherever it was declared, and its `<meta name="schema">` spelling with the head.
-- `conflicts` follows whatever field it is about.
-- `refresh` is read from the whole document. It is the one placement in this section decided by consequence rather than by definition; §20.11 states the argument.
+### 20.4 The `BuildDocument` envelope and the selector layer
 
-**A document with no `<head>` element is read whole.** A browser's parser synthesises a head and moves leading metadata into it; unify's parser does not implement HTML tree construction and cannot say where that boundary would fall. Reporting every field missing on a document a browser *does* read them from would be the worse error, so the bounded reading is to accept the whole document — and §24.4's `metadata-in-body` correspondingly says nothing about a page that has no head to be outside of.
+```js
+BuildDocument = {
+  source: { path, generated, layout },
+  outputPath,
+  document,   // DocumentSnapshot
+  analysis,   // DocumentAnalysis
+}
+```
 
-### 20.4 Determinism and conflicts
+**Two fields are provenance rather than a reading of the emitted text**, and they are the whole of §20.2's exception: `source.generated`, which names the tree the page came from, and `source.layout`, which names the layout it composed with. Neither is recoverable from the bytes §20.2 reads — composition consumes `data-layout` (§6.4) and a layout leaves no marker of its own in what it produced, while the `--generate` overlay is scanned exactly as the source tree is (§33.3) — so a consumer that needs either fact has only two alternatives, and both have shipped and been wrong. It can re-derive the fact, which is a second reading of a question the build already answered and free to disagree with the first; or it can reason without it and state something untrue. `source.generated` was added when `unify audit` located a generated page at a source path the author could not open, under a fix line telling them to rename a file they never wrote. `source.layout` was added when `lang-missing` told an author to set `lang` on the layout — on a page that had resolved **no layout at all**, so the advice named either a file that was already correct or no file at all. §24 is where both facts are spent: a fix line is a sentence about what the author should edit next, and it cannot name a file that the reader can open — nor decline to name one that does not exist — without them.
 
-Several fields are single-valued while the emitted document may declare them more than once. For each such field the manifest keeps **the first accepted declaration in document order** and records nothing further when the repeats agree.
+These are the only two, and the boundary is deliberate. Provenance is admitted here when a **finding cannot be phrased truthfully without it**, never as a general record of how a page was built: the source of each field, the includes it inlined, the frontmatter it declared, and the layout's own text all stay out, because §20.2's rule — that the model is a reading of what a consumer receives — is what keeps every other field honest about what a crawler will actually see. §17's report prints these same two facts (`← page + layout`, `← page (no layout)`, `← generated`) from the same values, so the envelope and the report cannot drift.
 
-When two or more accepted declarations exist and their values **differ**, the manifest keeps the first and appends one `conflicts` entry naming the field, the kept value, and every discarded value in document order. Identical repeats lose nothing and so are not conflicts. A conflict entry is **data on the record, not a diagnostic**: §14.2's problem list and §14.3's advisory catalogue are both closed, ordinary `build` is not the place to reject content quality (product-spec §6.1), and the evaluation command of product-spec §6.3.4 is what renders these to a human. The rule is total — the fields subject to it are `title`, `description`, `lang`, `canonical`, `refresh`, `image`, `author`, `datePublished`, `dateModified`, and `schemaType` — and no consumer may re-decide a winner.
+**The selector layer** (`src/core/document-selectors.js`) is the one interpretation of a `{document, analysis, outputPath?}` envelope every built-in consumer reads through: `titleOf`, `langOf`, `metaValues`, `linksWithRel`, `descriptionOf`, `authorOf`, `canonicalOf`, `robotsPolicyOf`, `refreshOf`, `publicationDatesOf`, `preferredImageOf`, `declaredTypes`, `metadataConflicts`, `isPublicDestination`, and the four-state `classifyCanonicalValue`/`classifyCanonical` (§21.2). (`propertyValues` — the `property`-axis counterpart of `metaValues` — is exported from the same module for a future built-in that needs an unranked list of one `property`'s repeats, but has no built-in caller yet; it is exercised only by this module's own unit tests.) A selector *computes* an answer; it never persists that answer back onto the envelope as a new stored field — doing so would recreate the 0.8 `PageRecord` under a new name (release-brief §14.1). Where §20.3's table stores a value once (`head.title`, `body.headings`), a selector reads it as-is; where a field would otherwise need to exist only for one consumer's convenience, the selector computes it on demand instead.
 
-`headings`, `jsonLd`, `linksOut`, and `linksIn` are multi-valued by definition and never produce conflicts.
+**First-wins, everywhere but two.** Several facts are single-valued while the emitted document may declare them more than once — a title, a description, a canonical, a declared date. For each, the reading selector keeps **the first accepted declaration in document order** and the model records nothing further when the repeats agree. Two named exceptions replace that document-order race: `robots` (§20.6), where a crawler applies the *union* of every `<meta name="robots">` a page emits, so `robotsPolicyOf` reads all of them rather than the first; and the image, argued next.
 
-**A conflict entry records which value this manifest kept. It is not a claim that the markup is wrong**, and reading it as one is a mistake with a name: §24.4's `metadata-conflict` was briefly rendered from every field of this array and reported conforming pages as `broken`. Two fields settle it. The Open Graph protocol defines arrays *by repeating the tag* — "if a tag can have multiple values, just put multiple versions of the same `<meta>` tag on your page", first preferred — so several `og:image` declarations are correct and ordinary; and a page carrying an `Organization` block beside a `BreadcrumbList` is recommended practice, with every consumer parsing every block, so §20.8's first-block read is a *bounded read* rather than a verdict on the second. §24.4 names the fields a page may declare only once and renders only those.
+**One meta plays one role** (the `metaRole` chain). `publicationDatesOf` and `preferredImageOf` both read across two spellings of one fact — `name="date"`/`property="article:published_time"` for a published date, `property="og:image"`/`name="twitter:image"` for an image — and a `<meta>` that could match more than one spelling by accident (a contrived `<meta name="description" property="og:image" content="…">`) is assigned to exactly one role by one fixed, exclusive chain: every `name` branch (`description`, `author`, `robots`, `schema`, `date`, `lastmod`, `twitter:image`) is checked before every `property` branch (`article:published_time`, `article:modified_time`, `og:image`, `og:image:width`, `og:image:height`), first match wins, in that order. A tag that carries both a matched `name` and a matched `property` therefore plays only its `name` role. This is `manifest.js`'s own single-pass extraction, ported rather than re-derived, and it is stated here because it is the rule that keeps two selectors reading one meta from silently disagreeing about which fact it declares.
 
-`image` is the one field whose accepted declarations are **ranked rather than ordered**: `og:image` is the representative image whenever the document declares one, and `twitter:image` is consulted only in its absence (§20.3). The conflict rule applies within the winning spelling — two differing `og:image` values conflict, as do two differing `twitter:image` values on a page with no `og:image` — and a `twitter:image` that merely differs from a present `og:image` is not a conflict, because it is not a competing answer to the same question. Stated here because §20.4 calls itself total, and a rule that is total needs its one exception named rather than inferred.
+**`og:image` and `twitter:image` are RANKED spellings, not a document-order race, and this is the image's second exception to first-wins.** `preferredImageOf` prefers `og:image` over `twitter:image` regardless of which appears first in the document — a `twitter:image` earlier in the head does not win against a later `og:image` — with first-wins applied *within* whichever spelling supplied the url (`fromOg` records which). Dimensions (`og:image:width`/`og:image:height`) are read only when the url came from `og:image`: they describe that image, and attaching them to a `twitter:image` would report a size the page never claimed for that file, so `preferredImageOf` on a twitter-only image always returns `width: null, height: null`.
+
+**Conflicts are computed, not stored.** The 0.8 model kept a `conflicts` array on the record; 0.9 has no such field. `metadataConflicts(doc)` computes `[{field, kept, discarded}]` on demand, for exactly the four fields whose own defining standard says a page may declare **at most once**: `canonical` (from `head.link`), `description` (from `head.meta`), `title` (from `analysis.titleTexts`), `lang` (from `analysis.langTexts` — not `langOf`, because a snapshot's `html.attributes` keeps only the *first* `<html>` element while `langTexts` keeps every one, document-wide; a second `<html>` element, reachable through a textual `<include>` of a full document, is invisible to `langOf` but not to a conflict check). For each field the first accepted declaration is kept; when two or more differ, one entry names the field, the value kept, and every discarded value in document order; identical repeats lose nothing and are not a conflict. Ordered by field name. §24.4's `metadata-conflict` renders exactly this list — the reasoning for why it is these four fields and no others, and not `image`, the declared structured-data type, `author`, `robots`, or the two dates, is unchanged from 0.8 and stated at that finding's own definition.
+
+`langOf(doc)` itself reads `analysis.langTexts[0]` — the first *non-empty* `lang` across every `<html>` element, document-wide — rather than `document.html.attributes.lang`. The two usually agree, because `html.attributes` already comes from the first `<html>` element found. They diverge only on the same degenerate multi-`<html>` document `metadataConflicts` above accounts for: reading `langTexts[0]` reproduces the 0.8 record's exact `lang` behavior on that shape rather than a lookalike that answers a narrower question.
+
+**Attribute-value comparisons are on the decoded value.** Because §20.3's attribute reading decodes character references before a selector ever sees a value, `metaValues(doc, "description")` matches a literal `name="descri&#112;tion"` the same way it matches `name="description"` — the comparison happens after decoding, on the value an author would recognise, never on the raw bytes.
 
 ### 20.5 Public URLs
 
 `path` is the address the output path answers to, computed by the **same function §17's dry-run report already uses** to print it — one interpretation, so a URL a consumer emits and a URL the report shows can never disagree. A trailing `index.html` segment is dropped: `about.html` → `/about.html`, `about/index.html` → `/about/`, `index.html` → `/`. With `--base-url https://example.com/repo/` the path prefix is applied: `/repo/about/`.
 
-Each segment derived from an output path is **percent-encoded**, because a filesystem name is not a URI and the manifest's job is to say what a page answers to: `two words.html` → `/two%20words.html`, `a&b.html` → `/a%26b.html`, `caf%C3%A9.html` for a UTF-8 `café.html`. A literal `%` encodes to `%25`, so the transform is total and never double-encodes. The path prefix supplied by `--base-url` is **not** re-encoded — the author wrote it as a URL already, and re-encoding it would corrupt a prefix that legitimately contains an escape.
+Each segment derived from an output path is **percent-encoded**, because a filesystem name is not a URI and the model's job is to say what a page answers to: `two words.html` → `/two%20words.html`, `a&b.html` → `/a%26b.html`, `caf%C3%A9.html` for a UTF-8 `café.html`. A literal `%` encodes to `%25`, so the transform is total and never double-encodes. The path prefix supplied by `--base-url` is **not** re-encoded — the author wrote it as a URL already, and re-encoding it would corrupt a prefix that legitimately contains an escape.
 
-The line this draws, once, for the whole build: **a URL unify constructs is percent-encoded; a URL the author wrote is preserved.** `urlForOutputPath`, the `--dry-run` address, §11.1's re-rooted URLs, §11.2's directory form, and every projection of this manifest are constructions and are encoded. A URL the author wrote in the page that ships it, on a page that did not move, is preserved untouched (§11.1's URL-06 branch). §11.2 is the stated exception: it *replaces* an authored URL with a constructed one by design, which is what `--pretty-urls` is, so its output is encoded like any other construction. §12 percent-decodes before matching, so both spellings of the same file resolve and neither is rewritten into the other.
+The line this draws, once, for the whole build: **a URL unify constructs is percent-encoded; a URL the author wrote is preserved.** `urlForOutputPath`, the `--dry-run` address, §11.1's re-rooted URLs, §11.2's directory form, and every projection of this model are constructions and are encoded. A URL the author wrote in the page that ships it, on a page that did not move, is preserved untouched (§11.1's URL-06 branch). §11.2 is the stated exception: it *replaces* an authored URL with a constructed one by design, which is what `--pretty-urls` is, so its output is encoded like any other construction. §12 percent-decodes before matching, so both spellings of the same file resolve and neither is rewritten into the other.
 
 One visible consequence, stated so it is not later read as drift: in a build without `--pretty-urls` an emitted page can carry `href="/two words.html"` — the author's own bytes, preserved — while the sitemap and the `--dry-run` report say `/two%20words.html` for that same target. Both name the file, both resolve, and neither is wrong. The difference is the line above doing exactly what it says, not two components disagreeing.
 
-`url` is `base.origin + path` when `--base-url` was supplied, and `null` otherwise. unify does not know a site's public address unless it is told, and a feature that needs an absolute URL must therefore say so rather than invent an origin. Because §11.3 makes a bare-path `--base-url` a usage error, `url` is either a complete absolute URL or `null` — never a half-built one.
+`document.url` is `base.origin + document.path` when `--base-url` was supplied, and `null` otherwise. unify does not know a site's public address unless it is told, and a feature that needs an absolute URL must therefore say so rather than invent an origin. Because §11.3 makes a bare-path `--base-url` a usage error, `document.url` is either a complete absolute URL or `null` — never a half-built one.
 
 ### 20.6 Robots directives
 
-**Every `<meta name="robots">` the page emits is read, not the first.** A crawler applies the union of the directives it finds, and splitting `noindex, nofollow` across two tags is a documented spelling of one policy — so this is the one field §20.4's first-wins rule must not govern. Keeping the first left `indexable` true on a page whose second tag said `noindex`, and §21.2's noindex clause — the clause that exists to stop exactly this — never fired: the generated sitemap advertised a page telling crawlers not to index it. `robots` is correspondingly absent from §20.4's conflict set and from §24.4's `metadata-conflict`, because there is no contradiction to record.
+`robotsPolicyOf(doc)` reads **every `<meta name="robots">` the page emits, not the first.** A crawler applies the union of the directives it finds, and splitting `noindex, nofollow` across two tags is a documented spelling of one policy — so this is the one field §20.4's first-wins rule must not govern. Keeping only the first left `indexable` true on a page whose second tag said `noindex`, and §21.2's noindex clause — the clause that exists to stop exactly this — never fired: the generated sitemap advertised a page telling crawlers not to index it. `robots` is correspondingly absent from `metadataConflicts` (§20.4) and from §24.4's `metadata-conflict`, because there is no contradiction to record.
 
-`robots.raw` is the `content` of every such meta, each trimmed, joined with `", "` in document order, or `null` when the page emits none — the report has to be able to quote what the page actually says. `robots.directives` is that value split on commas, each token trimmed and lowercased, empty tokens dropped. `indexable` is `false` when the directives contain `noindex` or `none`, `true` otherwise; `followable` is `false` when they contain `nofollow` or `none`, `true` otherwise. Unknown directives are preserved in `directives` and change nothing else.
+The result is `{raw, directives, indexable, followable}`: `raw` is the `content` of every such meta, each trimmed, joined with `", "` in document order, or `null` when the page emits none — the report has to be able to quote what the page actually says. `directives` is that value split on commas, each token trimmed and lowercased, empty tokens dropped. `indexable` is `false` when the directives contain `noindex` or `none`, `true` otherwise; `followable` is `false` when they contain `nofollow` or `none`, `true` otherwise. Unknown directives are preserved in `directives` and change nothing else.
 
-A crawler-specific meta (`<meta name="googlebot">`) is **not** read: unify does not model one search engine's policy. `robots.txt` is **never** read into a page record — a disallowed path is not a `noindex` page, and conflating the two is the single most common piece of SEO folklore this specification refuses (product-spec §6.7).
+A crawler-specific meta (`<meta name="googlebot">`) is **not** read: unify does not model one search engine's policy. `robots.txt` is **never** read into a document's reading — a disallowed path is not a `noindex` page, and conflating the two is the single most common piece of SEO folklore this specification refuses (product-spec §6.7).
 
 ### 20.7 Visible main text
 
-`text` is the text content (§20.3) of the emitted document's first `<main>` element, or of `<body>` when the document has none, or of the whole document when it has neither. It is the text a reader sees, computed once, so that duplicate-content detection, the search projection, and any excerpt read the same characters.
+`analysis.visibleText` is the text content (§20.3) of the emitted document's first `<main>` element, or of `<body>` when the document has none, or of the whole document outside `<head>` when it has neither — the identical scope §20.3 gives `body.headings`, computed in the same pass over the same resolved subtree. The `<head>` exclusion on that last fallback matters because HTML5 makes the `<body>` start tag omissible: a document with no `<main>` and no explicit `<body>` element is still legal authored markup, and without the exclusion its `<title>` and other head-only text would count as page body text. It is the text a reader sees, computed once, so that duplicate-content detection and any excerpt read the same characters.
 
 ### 20.8 Structured data
 
-`jsonLd` holds one entry per `<script type="application/ld+json">` in the emitted document, in document order: `{raw, data, error}`. `raw` is the script's text content verbatim. `data` is the parsed JSON value, or `null` when parsing failed; `error` is the parser's message in that case, `null` otherwise. Parsing never throws and never fails a build — §20.2's rule holds and product-spec §6.3.6 owns what is done with an invalid block.
+`analysis.jsonLd` holds one entry per `<script type="application/ld+json">` in the emitted document, in document order: `{raw, data, error}`. `raw` is the script's text content verbatim. `data` is the parsed JSON value, or `null` when parsing failed; `error` is the parser's message in that case, `null` otherwise. Parsing never throws and never fails a build — §20.2's rule holds and product-spec §6.3.6 owns what is done with an invalid block.
 
-`schemaType` is the first accepted declaration in document order among: a `<meta name="schema">` `content` value, and the `@type` of a parsed JSON-LD entry whose `data` is a single object with a string `@type`. An array, a `@graph`, a missing `@type`, or a non-string `@type` declares nothing here — bounded reading rather than a guess.
+`declaredTypes(doc)` is the 0.9 replacement for the 0.8 model's single scalar `schemaType`. It returns **every** accepted structured-data declaration, in this order: non-empty `<meta name="schema">` contents in head order, **then** the `@type` of every `analysis.jsonLd` entry (document order) whose `data` is a single object with a string `@type` — bounded reading, unchanged: an array, a `@graph`, a missing `@type`, or a non-string `@type` declares nothing.
+
+**Ordering note (0.9 decision).** The retired `schemaType` interleaved the two sources by document position and kept only the first declaration overall; `declaredTypes` lists every meta declaration before every JSON-LD one, and returns the whole list rather than one winner. No 0.9 consumer depends on a single winner: feed membership and `schema-incomplete` (§24.4) test **inclusion** — `declaredTypes(doc).some(t => t === "Article" || t === "BlogPosting")` — so a page whose JSON-LD declares `WebPage` first and `Article` second is a candidate under 0.9 where it was not under 0.8 (§29 states this widening at feed membership, its own consumer). The one place that does read a single entry is §26.5's generation activation, which reads `declaredTypes(doc)[0]` only after confirming `analysis.jsonLd` is empty — at that point the list is meta-only by construction, so "first" and "only surviving source" coincide and there is still no second reading of "which declaration is the type".
 
 ### 20.9 The internal link graph
 
-`linksOut` holds the output paths of the pages this page links to. A link participates when it is an `<a href>` in the emitted document whose value, after `--base-url` stripping (§12's own rule, reused), resolves to an output path that has a page record. Fragment-only, external, `mailto:`, `tel:`, and `data:` URLs never participate, and a link to a non-page asset never participates; the query and fragment of a participating URL are discarded before matching. A page linking to itself records itself. Values are deduplicated and sorted.
+`analysis.linksOut` holds the output paths of the pages this page links to. A link participates when it is an `<a href>` in the emitted document whose value, after `--base-url` stripping (§12's own rule, reused), resolves to an output path that has a document. Fragment-only, external, `mailto:`, `tel:`, and `data:` URLs never participate, and a link to a non-page asset never participates; the query and fragment of a participating URL are discarded before matching. A page linking to itself records itself. Values are deduplicated and sorted.
 
-`fragmentLinks` records the same links again, keeping the fragment §12 discards: `{target, id}` per internal link that carries one. §12 deliberately does not validate fragments (REF-06) because a missing one is a reader's judgement rather than a build gate — but it is a *checkable* judgement, so the manifest carries the pairs and the evaluation command decides. `ids` is the other half: every `id` in the emitted document, in document order and with repeats kept, so that both "this fragment names nothing" and "this page declares one id twice" are answerable from the record rather than by re-parsing.
+`analysis.fragmentLinks` records the same links again, keeping the fragment §12 discards: `{target, id}` per internal link that carries one. §12 deliberately does not validate fragments (REF-06) because a missing one is a reader's judgement rather than a build gate — but it is a *checkable* judgement, so the model carries the pairs and the evaluation command decides. `analysis.ids` is the other half: every `id` in the emitted document, in document order and with repeats kept, so that both "this fragment names nothing" and "this page declares one id twice" are answerable without re-parsing.
 
-A `<noscript>` link participates even though `<noscript>` text does not reach `text` (§20.3). The two sections are asking different questions: `text` is what a reader sees, and a `noscript` block is by definition what they do not; `linksOut` is which pages this page can be reached from, and a `noscript` link is a real navigation for the readers it is written for. Named here so the asymmetry reads as a decision rather than an oversight.
+A `<noscript>` link participates even though `<noscript>` text does not reach `visibleText` (§20.3). The two sections are asking different questions: `visibleText` is what a reader sees, and a `noscript` block is by definition what they do not; `linksOut` is which pages this page can be reached from, and a `noscript` link is a real navigation for the readers it is written for. Named here so the asymmetry reads as a decision rather than an oversight.
 
-`linksIn` is the exact reverse relation, computed after every record exists: `B` is in `A.linksIn` if and only if `A` is in `B.linksOut`. Deduplicated and sorted. Orphan detection (product-spec §6.3.4) is `linksIn.length === 0`, which is why the relation is built here once rather than by the consumer.
+`analysis.linksIn` is the exact reverse relation, computed after every document exists: `B` is in `A.analysis.linksIn` if and only if `A` is in `B.analysis.linksOut`. Deduplicated and sorted. Orphan detection (product-spec §6.3.4) is `linksIn.length === 0`, which is why the relation is built once in `manifest.js`'s second pass rather than by the consumer.
 
 ### 20.10 Dates: `raw` and `iso`
 
-A date field is `{raw, iso}` precisely so the two questions never collapse into one. `raw` is the value exactly as the document declared it, so nothing an author wrote is lost. `iso` is that value **only when it is a well-formed [W3C-DTF](https://www.w3.org/TR/NOTE-datetime) date or date-time**, and `null` otherwise; it is the field every consumer that emits a date must read, and `raw` is never emitted anywhere.
+`publicationDatesOf(doc)` returns `{published, modified}`, each `{raw, iso}` or `null`, precisely so the two questions never collapse into one: `raw` is the value exactly as the document declared it, so nothing an author wrote is lost, and `iso` is that value **only when it is a well-formed [W3C-DTF](https://www.w3.org/TR/NOTE-datetime) date or date-time**, `null` otherwise. `iso` is the field every consumer that emits a date reads, and `raw` is never emitted anywhere. `published` reads `<meta name="date">` and `<meta property="article:published_time">`; `modified` reads `<meta name="lastmod">` and `<meta property="article:modified_time">` — first accepted declaration across both spellings, per §20.4's `metaRole` chain.
 
 The accepted grammar is W3C-DTF's, no more:
 
@@ -1292,25 +1300,27 @@ No date is ever derived. The build clock, the filesystem's mtime, the filename, 
 
 ### 20.11 Meta refresh
 
-`refresh` is `{raw, seconds, url, target}` read from the **first** `<meta http-equiv="refresh">` the document emits whose `content` declares a refresh at all (§20.4's first-wins rule, unchanged), or `null` when it emits none. `raw` is the `content` value exactly as emitted, so the report can quote what the page says. `seconds` and `url` are **§12's grammar, unread here a second time** — the same reading, so a redirect the build checked and a redirect the evaluator reports can never be two different URLs. `url` is `null` when the value carries no readable URL part, and a `content` with no leading digits declares no refresh, so it is not this field's first declaration either.
+`analysis.refresh` is `{raw, seconds, url, target}` read from the **first** `<meta http-equiv="refresh">` the document emits whose `content` declares a refresh at all (§20.4's first-wins rule, unchanged), or `null` when it emits none. `raw` is the `content` value exactly as emitted, so the report can quote what the page says. `seconds` and `url` are **§12's grammar, unread here a second time** — the same reading, so a redirect the build checked and a redirect the evaluator reports can never be two different URLs. `url` is `null` when the value carries no readable URL part, and a `content` with no leading digits declares no refresh, so it is not this field's first declaration either.
 
 `target` is the output path of the page the redirect names, when it names one in this manifest, and `null` otherwise:
 
-- **no second part at all** (`content="5"`) — the value names *this page*, so `target` is the record's own output path;
-- **a URL that resolves** — §12's own resolution, after `--base-url` stripping — to a record in this manifest: that record's output path;
-- **everything else** — `null`: an external URL, a URL naming an asset or a file with no record, and a second part §12's grammar does not read. The last is deliberately **not** folded into "this page": `content="0; /gone.html"` declares a redirect *somewhere*, and calling it a self-redirect would make §24.4 report a loop the page does not contain.
+- **no second part at all** (`content="5"`) — the value names *this page*, so `target` is the document's own output path;
+- **a URL that resolves** — §12's own resolution, after `--base-url` stripping — to a document in this manifest: that document's output path;
+- **everything else** — `null`: an external URL, a URL naming an asset or a file with no document, and a second part §12's grammar does not read. The last is deliberately **not** folded into "this page": `content="0; /gone.html"` declares a redirect *somewhere*, and calling it a self-redirect would make §24.4 report a loop the page does not contain.
 
-**`refresh` is not head-scoped**, and this is the one field in §20 whose placement is a judgement rather than a definition. The other unscoped fields are unscoped because the head is not where they live; this one is unscoped because of what each direction loses. Head-scoped, a redirect written outside the head is invisible to §24 — no loop found, nothing said, and a redirect nobody checked is the silent failure §12 and §24 exist to remove. Document-wide, the cost is bounded in a way the other direction's is not: the manifest records a directive the page declares, and if some consumer ignores it where it sits, §24 still reports a fault whose repair — correct the target, or delete the redirect — is the right edit either way. §20.3 already takes that side once, in the no-`<head>` rule: where the two errors are not symmetric, the bounded reading is the one that reports rather than hides.
+**`refresh` is not head-scoped**, and this is the one field in §20 whose placement is a judgement rather than a definition. The other unscoped fields are unscoped because the head is not where they live; this one is unscoped because of what each direction loses. Head-scoped, a redirect written outside the head is invisible to §24 — no loop found, nothing said, and a redirect nobody checked is the silent failure §12 and §24 exist to remove. Document-wide, the cost is bounded in a way the other direction's is not: the model records a directive the page declares, and if some consumer ignores it where it sits, §24 still reports a fault whose repair — correct the target, or delete the redirect — is the right edit either way. §20.3 already takes that side once, in the no-`<head>` rule: where the two errors are not symmetric, the bounded reading is the one that reports rather than hides.
+
+`refresh` is `DocumentAnalysis`'s own field rather than a selector's computation, unlike every other §20.10/§20.6-style reading, because `target` needs the whole manifest to resolve (§20.9's own second-pass reason) and cannot be computed lazily per call the way `publicationDatesOf` or `robotsPolicyOf` can. `refreshOf(doc)` exists in the selector layer as a one-line accessor (`doc.analysis.refresh`) purely so a consumer never has to know which half of the model a fact lives in.
 
 ---
 
 ## 21. Sitemap generation
 
-The first projection of §20. Everything here reads page records; nothing here re-reads a page.
+The first projection of §20. Everything here reads `BuildDocument`s through the shared selectors; nothing here re-reads a page.
 
 ### 21.1 Activation
 
-A sitemap is generated when, and only when, `--base-url` supplied the site's public address. Without it the manifest's `url` is `null` (§20.5) and unify does not know what to write in a `<loc>` — a sitemap of root-relative paths is invalid per the Sitemaps protocol, and inventing an origin is the class of guess product-spec §6.1 forbids. A build with no `--base-url` therefore emits no sitemap and reports nothing about it; this is the golden path, unchanged.
+A sitemap is generated when, and only when, `--base-url` supplied the site's public address. Without it every document's `url` is `null` (§20.5) and unify does not know what to write in a `<loc>` — a sitemap of root-relative paths is invalid per the Sitemaps protocol, and inventing an origin is the class of guess product-spec §6.1 forbids. A build with no `--base-url` therefore emits no sitemap and reports nothing about it; this is the golden path, unchanged.
 
 Generation is additive: it writes one new file (or, at protocol scale, a small set), changes no authored content, appears in `--dry-run` like any other write, and participates in §15's transactional publish. `--base-url` is the whole opt-in — there is no separate flag, because a site that has told unify its public address has told it everything the sitemap needs.
 
@@ -1318,21 +1328,21 @@ Generation is additive: it writes one new file (or, at protocol scale, a small s
 
 ### 21.2 Membership
 
-A page record is included when **all** of the following hold. The list is closed; nothing else affects membership.
+A document is included exactly when the shared **`isPublicDestination(doc, base)`** selector (§20.4) answers `true`. That selector is **all** of the following, and this is where the closed list it computes still lives — this subsection owns the definition even though `sitemap.js` and §30's catalog and search corpus both call the one function directly, and `feed.js` builds its own membership (§29.4) from the same underlying selectors rather than a second reading of any one of these four conditions:
 
-1. It has a record at all (§20.1) — so assets, `.fragment.html` files, excluded sources, and pages that failed to compose are already out.
-2. `robots.indexable` is `true` (§20.6). A `noindex` or `none` page is excluded: listing a page the author told crawlers to drop is a contradiction the sitemap should not publish.
+1. It has a document at all (§20.1) — so assets, `.fragment.html` files, excluded sources, and pages that failed to compose are already out.
+2. `robotsPolicyOf(doc).indexable` is `true` (§20.6). A `noindex` or `none` page is excluded: listing a page the author told crawlers to drop is a contradiction the sitemap should not publish.
 3. Its output path is not `404.html`. An error document is not a destination.
-4. It is **self-canonical**: it either declares no canonical, or declares one that resolves to its own output path. A canonical naming another page means the author consolidated this URL into that one, and a sitemap entry would ask crawlers to undo that. Resolution reuses §12's own rule (base-URL stripping, then relative/root-relative resolution, then directory URLs to `index.html`) so "which page does this URL name" has one answer across the build. A canonical that resolves to nothing internal — an external URL, or a path the site does not emit — is likewise not this page, so the page is excluded.
+4. It is **self-canonical**: `classifyCanonicalValue(canonicalOf(doc), doc.outputPath, base)` (§20.4) answers `none` or `self`. A canonical naming another page means the author consolidated this URL into that one, and a sitemap entry would ask crawlers to undo that. Resolution reuses §12's own rule (base-URL stripping, then relative/root-relative resolution, then directory URLs to `index.html`) so "which page does this URL name" has one answer across the build. A canonical that resolves to nothing internal — an external URL, or a path the site does not emit — is likewise not this page, so the page is excluded.
 
-Membership is evaluated per record in manifest order (§20.1), and that order is the order entries appear in the file. No sorting, shuffling, or grouping: two builds of the same tree produce byte-identical sitemaps.
+Membership is evaluated per document in manifest order (§20.1), and that order is the order entries appear in the file. No sorting, shuffling, or grouping: two builds of the same tree produce byte-identical sitemaps.
 
 ### 21.3 Entry contents
 
-Each included record contributes one `<url>` element:
+Each included document contributes one `<url>` element:
 
-- `<loc>` is `record.url` — the absolute public URL §20.5 already computed, so a URL in the sitemap and a URL in the `--dry-run` report are the same string by construction. Two escapings apply and neither substitutes for the other: §20.5 has already **percent-encoded** the path so the value is a legal URI (a source file named `two words.html` answers to `/two%20words.html`, never to a URL with a raw space in it), and the value is then **XML-escaped** (`&`, `<`, `>`, `"`, `'`) so the document is well-formed. The Sitemaps protocol requires both.
-- `<lastmod>` is emitted **only** when `record.dateModified.iso` is non-null — an authored, well-formed W3C date. A page with no authored modification date gets no `<lastmod>`. The build clock, the filesystem's mtime, the filename, and Git history are not fallbacks: a fabricated `lastmod` is a claim about the world, and it is the specific fabrication crawler guidance punishes. `datePublished` is not a fallback either; the element is named for the last modification and reads the value authored under that name.
+- `<loc>` is `document.url` — the absolute public URL §20.5 already computed, so a URL in the sitemap and a URL in the `--dry-run` report are the same string by construction. Two escapings apply and neither substitutes for the other: §20.5 has already **percent-encoded** the path so the value is a legal URI (a source file named `two words.html` answers to `/two%20words.html`, never to a URL with a raw space in it), and the value is then **XML-escaped** (`&`, `<`, `>`, `"`, `'`) so the document is well-formed. The Sitemaps protocol requires both.
+- `<lastmod>` is emitted **only** when `publicationDatesOf(doc).modified.iso` is non-null — an authored, well-formed W3C date. A page with no authored modification date gets no `<lastmod>`. The build clock, the filesystem's mtime, the filename, and Git history are not fallbacks: a fabricated `lastmod` is a claim about the world, and it is the specific fabrication crawler guidance punishes. `datePublished` is not a fallback either; the element is named for the last modification and reads the value authored under that name.
 
 No `<changefreq>` and no `<priority>`. Both are author guesses that unify cannot derive from the page, and current primary crawler guidance ignores them; emitting a constant for every page would be noise with the shape of information.
 
@@ -1360,7 +1370,7 @@ Every `<loc>` in an emitted sitemap — generated or authored — whose value na
 
 Scope is the output-root `sitemap.xml` plus any part `sitemap-N.xml` generation produced. A sitemap elsewhere in the tree (`blog/sitemap.xml`) is an ordinary asset — §21.5 scopes the whole feature to the output root, and a file unify would never generate is a file it does not interpret.
 
-For generated sitemaps this check can only pass — every `<loc>` came from a record whose output path exists. It runs anyway, and that is the point: it is the executable form of the claim that the sitemap and the published tree agree, so a future change that lets the two drift fails here instead of at a crawler.
+For generated sitemaps this check can only pass — every `<loc>` came from a document whose output path exists. It runs anyway, and that is the point: it is the executable form of the claim that the sitemap and the published tree agree, so a future change that lets the two drift fails here instead of at a crawler.
 
 ---
 
@@ -1372,19 +1382,19 @@ The second projection of §20, and the first that writes into a page rather than
 
 `--canonical auto`, or the identical `canonical: auto` in `unify.yaml`. `auto` is the only accepted value; anything else is a usage error naming it, so a future mode cannot be silently misspelled into today's behaviour. Without the option nothing in this section runs, no page changes, and nothing is reported — the golden path.
 
-**`--canonical auto` requires `--base-url`**, and the combination is checked as a usage error (exit 2) rather than degrading. A canonical must be an absolute URL: that is why §11.3 absolutizes authored ones, and why a path-only base URL is itself a usage error. Without a public address §20.5 makes `url` null, so there is nothing truthful to write — and writing a root-relative canonical, or writing nothing while the flag says otherwise, are both worse than saying so.
+**`--canonical auto` requires `--base-url`**, and the combination is checked as a usage error (exit 2) rather than degrading. A canonical must be an absolute URL: that is why §11.3 absolutizes authored ones, and why a path-only base URL is itself a usage error. Without a public address §20.5 makes `document.url` null, so there is nothing truthful to write — and writing a root-relative canonical, or writing nothing while the flag says otherwise, are both worse than saying so.
 
 ### 22.2 What is added, and where
 
-For every page record that §22.4 includes, a canonical link is inserted **at the end of the emitted `<head>`**, immediately before `</head>`:
+For every document that §22.4 includes, a canonical link is inserted **at the end of the emitted `<head>`**, immediately before `</head>`:
 
 ```html
 <link rel="canonical" href="https://example.com/about.html">
 ```
 
-`href` is `record.url` — the same absolute URL §20.5 computes, the `--dry-run` report prints, and §21.3 writes into `<loc>`. Serialization is fixed, matching §10.2's rule for synthesized elements: double-quoted attributes, `rel` before `href`. The insertion reuses the whitespace immediately preceding `</head>`, so the element lands at that tag's own indentation and the rest of the document is byte-identical (§3's preservation rule).
+`href` is `document.url` — the same absolute URL §20.5 computes, the `--dry-run` report prints, and §21.3 writes into `<loc>`. Serialization is fixed, matching §10.2's rule for synthesized elements: double-quoted attributes, `rel` before `href`. The insertion reuses the whitespace immediately preceding `</head>`, so the element lands at that tag's own indentation and the rest of the document is byte-identical (§3's preservation rule).
 
-`href` is HTML-escaped. §20.5 deliberately leaves the `--base-url` path prefix un-re-encoded, so `record.url` may legitimately contain `&` — and an unescaped `&copy;` in an attribute is a character reference, which §20.3 says the manifest resolves. Emitted raw, the page came back declaring a canonical of a *different* URL, §21.2's self-canonical test then failed, and the page vanished from the sitemap of the very build whose flag exists to help crawlers find it. §21.3 XML-escapes for exactly this reason; this is the same obligation one document type over, and §12's decode-on-read is its other half.
+`href` is HTML-escaped. §20.5 deliberately leaves the `--base-url` path prefix un-re-encoded, so `document.url` may legitimately contain `&` — and an unescaped `&copy;` in an attribute is a character reference, which §20.3 says the snapshot resolves. Emitted raw, the page came back declaring a canonical of a *different* URL, §21.2's self-canonical test then failed, and the page vanished from the sitemap of the very build whose flag exists to help crawlers find it. §21.3 XML-escapes for exactly this reason; this is the same obligation one document type over, and §12's decode-on-read is its other half.
 
 A page whose emitted document has no `<head>`, or whose `<head>` is left unclosed, gets nothing — there is no insertion point, and synthesizing one would be a structural change this section does not make.
 
@@ -1392,11 +1402,11 @@ A page whose emitted document has no `<head>`, or whose `<head>` is left unclose
 
 "Declares a canonical" is a question about the **head**, for §20.3's reason: a `<link rel="canonical">` in `<body>` is not a declaration, because nothing reads it there. Treating one as a declaration suppressed completion on a page that then shipped with no effective canonical at all — the flag's whole job, silently not done. A canonical inside a `<template>` was never a declaration either, and still is not (§7: template contents are never touched).
 
-A page that declares any `rel="canonical"` **in its head** is left exactly as written. That holds when it declares several (§20.4 keeps the first and records the conflict), when its canonical names another page, and when its canonical names nothing this site emits. Completion means *filling a gap*, never adjudicating a value the author chose.
+A page that declares any `rel="canonical"` **in its head** is left exactly as written. That holds when it declares several (`canonicalOf` keeps the first, and `metadataConflicts`, §20.4, computes the conflict on demand), when its canonical names another page, and when its canonical names nothing this site emits. Completion means *filling a gap*, never adjudicating a value the author chose.
 
 ### 22.4 Membership is §21.2's, unchanged
 
-A page is completed when §21.2's sitemap membership holds — it has a record, is `indexable`, is not `404.html`, and is self-canonical — and it authors no canonical. The predicate is shared, not merely similar, for two reasons beyond tidiness:
+A page is completed when §21.2's sitemap membership holds — `isPublicDestination(doc, base)` is `true` — and it authors no canonical. The predicate is shared, not merely similar, for two reasons beyond tidiness:
 
 - **`404.html`** is excluded for a stronger reason here than in §21.2. An error document is served *at whatever URL was missing*, so a canonical naming `/404.html` is not merely useless — it is an actively false claim about every address it appears at.
 - **A `noindex` page** is excluded as the conservative default: write less where the author has said less. Note precisely what this is not — a completed canonical always names the page's **own** URL, so on a `noindex` page it would be redundant rather than contradictory. The contradiction product-spec §6.3.2 names is the *cross*-canonical shape, a page marked `noindex` whose canonical points elsewhere, and completion cannot produce that. §22.3 leaves the author's own escape hatch open: write the canonical and it is kept.
@@ -1406,7 +1416,7 @@ A page is completed when §21.2's sitemap membership holds — it has a record, 
 
 A canonical — authored or completed — that names a location this site does not emit is already **P13**. §12 checks `link href` for every `rel`, so no new rule is needed and none is added; the case is pinned two-sided.
 
-Multiple canonicals, a canonical on a `noindex` page, and disagreement between a canonical and the sitemap are content-quality judgements. Product-spec §6.3.4 assigns them to `unify audit`, and §6.1 states that ordinary `build` does not reject subjective findings. §20.4 already records the multiple-canonical case as data on the record, which is what the evaluation command will read. Adding any of them here would put a judgement in the publish path that the product contract puts outside it.
+Multiple canonicals, a canonical on a `noindex` page, and disagreement between a canonical and the sitemap are content-quality judgements. Product-spec §6.3.4 assigns them to `unify audit`, and §6.1 states that ordinary `build` does not reject subjective findings. `metadataConflicts` (§20.4) already computes the multiple-canonical case on demand, which is what the evaluation command will read. Adding any of them here would put a judgement in the publish path that the product contract puts outside it.
 
 ---
 
@@ -1462,7 +1472,7 @@ Running the real pipeline rather than a cheaper approximation is the point. Ever
 
 ### 24.2 Read-only
 
-`audit` writes nothing, anywhere. It never creates, cleans, or touches the output directory, and it never consults it: §17's delete plan is the one pipeline step that reads `dist/`, and it belongs to `--dry-run`, not here.
+`audit` writes nothing into the source tree or the output directory. It never creates, cleans, or touches the output directory, and it never consults it: §17's delete plan is the one pipeline step that reads `dist/`, and it belongs to `--dry-run`, not here. (With `--generate`, the seam's own temporary state — the overlay directory and `generator-context.json`, §33.2/§33.3 — is written under the OS temp directory and removed with the rest of the build's generator state; that is outside both trees this guarantee is about, not an exception to it.)
 
 Two flags describe writing, so `audit` refuses them rather than accepting them inertly: `--clean` and `--dry-run` are usage errors (exit 2) naming the reason. An accepted flag that does nothing is the silent failure §14 exists to forbid — `--clean` especially, where a reader could reasonably believe output was emptied.
 
@@ -1479,38 +1489,40 @@ Neither severity ever blocks a publish, because `audit` never publishes and `bui
 
 ### 24.4 The catalogue
 
-Every finding but the last is a predicate over the §20 manifest. `record` is the page being evaluated; "another page" always means another record in the same manifest. `robots-sitemap-missing` is the one finding about a file that is not a page: it is located at the source `robots.txt`, carries no `url`, and reads no record.
+Every finding but the last is a predicate over the §20 model — the snapshot, the analysis, and the selectors read over both. `doc` is the document being evaluated; "another page" always means another document in the same manifest. `robots-sitemap-missing` is the one finding about a file that is not a page: it is located at the source `robots.txt`, carries no `url`, and reads no document.
 
 | id | severity | fires when |
 |---|---|---|
-| `title-missing` | incomplete | `title` is null |
-| `title-duplicate` | incomplete | another page's `title` is identical after case folding and whitespace collapse |
-| `description-missing` | incomplete | `description` is null |
-| `description-duplicate` | incomplete | another page's `description` is identical after case folding and whitespace collapse |
-| `h1-missing` | incomplete | the page emits no `h1` |
-| `h1-multiple` | incomplete | the page emits more than one `h1` |
-| `title-h1-mismatch` | incomplete | the page has a `title` and exactly one `h1`, and neither string contains the other after case folding and whitespace collapse |
-| `lang-missing` | incomplete | `lang` is null |
-| `page-orphan` | incomplete | `linksIn` is empty and the output path is neither `index.html` nor `404.html` |
-| `id-duplicate` | broken | an id appears more than once in `ids`; one finding per repeated id, in sorted order |
-| `fragment-missing` | broken | a `fragmentLinks` entry names a page in this manifest whose `ids` does not contain the id |
-| `jsonld-invalid` | broken | a `jsonLd` entry has a non-null `error` |
-| `schema-incomplete` | incomplete | `schemaType` is `Article` or `BlogPosting` and `title` is null, or `datePublished` is null or has a null `iso` |
-| `image-missing-dimensions` | incomplete | `image` is present and either `width` or `height` is null |
-| `canonical-noindex` | broken | the page is not `indexable` and its canonical **resolves to** a different page |
-| `sitemap-noindex` | broken | a sitemap emitted by this build lists the page and the page is not `indexable` |
-| `sitemap-canonical-disagree` | broken | a sitemap lists the page and its canonical **resolves to** a different page |
-| `canonical-scheme-mismatch` | broken | `--base-url` is set, the canonical **resolves to this page**, and the canonical's scheme and the site address's scheme are both `http`/`https` and differ |
-| `text-duplicate` | incomplete | another page's `text` is identical, after folding Unicode space separators, and non-empty |
-| `metadata-in-body` | broken | the page has a `<head>`, and a document-metadata element is emitted outside it |
-| `metadata-conflict` | broken | the page declares two or more differing values for a field that may be declared **once** — one finding per such field in `conflicts` |
-| `redirect-loop` | broken | the page's `refresh` names a target, every redirect on the chain from it is immediate (`seconds` is `0`), and the chain returns to this page |
+| `title-missing` | incomplete | `titleOf(doc)` is null |
+| `title-duplicate` | incomplete | another page's `titleOf` is identical after case folding and whitespace collapse |
+| `description-missing` | incomplete | `descriptionOf(doc)` is null |
+| `description-duplicate` | incomplete | another page's `descriptionOf` is identical after case folding and whitespace collapse |
+| `h1-missing` | incomplete | the page's `document.body.headings` (§20.3's heading scope) contains no level-1 entry |
+| `h1-multiple` | incomplete | `document.body.headings` contains more than one level-1 entry |
+| `title-h1-mismatch` | incomplete | the page has a title and exactly one level-1 heading, and neither string contains the other after case folding and whitespace collapse |
+| `lang-missing` | incomplete | `langOf(doc)` is null |
+| `page-orphan` | incomplete | `analysis.linksIn` is empty and the output path is neither `index.html` nor `404.html` |
+| `id-duplicate` | broken | an id appears more than once in `analysis.ids`; one finding per repeated id, in sorted order |
+| `fragment-missing` | broken | an `analysis.fragmentLinks` entry names a page in this manifest whose `analysis.ids` does not contain the id |
+| `jsonld-invalid` | broken | an `analysis.jsonLd` entry has a non-null `error` |
+| `schema-incomplete` | incomplete | `declaredTypes(doc)` includes `Article` or `BlogPosting`, and `titleOf(doc)` is null, or `publicationDatesOf(doc).published` is null or has a null `iso` |
+| `image-missing-dimensions` | incomplete | `preferredImageOf(doc)` is present and either `width` or `height` is null |
+| `canonical-noindex` | broken | `robotsPolicyOf(doc).indexable` is false and `classifyCanonical(doc, base)` answers `elsewhere` |
+| `sitemap-noindex` | broken | a sitemap emitted by this build lists the page and `robotsPolicyOf(doc).indexable` is false |
+| `sitemap-canonical-disagree` | broken | a sitemap lists the page and `classifyCanonical(doc, base)` answers `elsewhere` |
+| `canonical-scheme-mismatch` | broken | `--base-url` is set, `classifyCanonical(doc, base)` answers `self`, and the canonical's scheme and the site address's scheme are both `http`/`https` and differ |
+| `text-duplicate` | incomplete | another page's `analysis.visibleText` is identical, after folding Unicode space separators, and non-empty |
+| `metadata-in-body` | broken | the page has a `<head>`, and a document-metadata element is emitted outside it (`analysis.strayMetadata`) |
+| `metadata-conflict` | broken | `metadataConflicts(doc)` (§20.4) is non-empty — the page declares two or more differing values for a field that may be declared **once**; one finding per entry |
+| `redirect-loop` | broken | `analysis.refresh` names a target, every redirect on the chain from it is immediate (`seconds` is `0`), and the chain returns to this page |
 | `jsonld-url-unprefixed` | broken | `--base-url` supplies a path prefix other than `/`, and a §12 JSON-LD reference on the page — the root-relative value of a URL-valued property, read by §12's own reader — does not already begin with that prefix — one finding per distinct value, in sorted order |
 | `robots-sitemap-missing` | incomplete | §23.3 exempted a `Sitemap:` value in the emitted `robots.txt` — it names `sitemap.xml`, or a `sitemap-N.xml`, that this build, having no `--base-url`, did not write. One finding per exempted line, in the file's own line order |
 
-`metadata-conflict` is what §20.4 and §22.5 both promise this command will render. §20.4 keeps the first of two differing declarations and records the loser precisely so that a human can be told; §22.5 assigns "multiple canonicals" here by name, and product-spec §6.3.2 requires them reported. Until it existed the record carried the data and nothing read it, so a page shipping two contradictory canonicals and two contradictory descriptions was silent in `build` *and* in `audit` — the one shape where both commands agreed to say nothing about a page that contradicts itself. It is `broken` because a page declaring two answers to one question has given consumers no answer.
+`h1-missing`, `h1-multiple`, and `title-h1-mismatch` inherit **§20.3's 0.9 heading scope** — the first `<main>`, else `<body>`, else the document — without a rule of their own: they read `document.body.headings` as extracted, so a chrome `<h1>` a layout writes outside `<main>` no longer counts as the page's own heading, and no longer masks a page that has none of its own. §20.3 states the change and its rationale; this is the row it was written for.
 
-  It renders a **closed subset** of §20.4's array: `canonical`, `title`, `description`, `lang` — exactly the fields whose own specification says *at most one per document*. That line, and not a judgement about which fields matter, is what can be defended to an author whose markup was called broken. `author` is excluded because the HTML spec defines the name as "one of the page's authors"; `robots` because crawlers read the union across every such meta (§20.6), so there is no conflict left to report; and the two dates because `article:published_time` beside `<meta name="date">` names one instant at two granularities, and telling that author to keep one drops the property crawlers read. Rendering the array whole reported correct markup: several `og:image` declarations are how the Open Graph protocol spells an array, and a second `<script type="application/ld+json">` with a different `@type` is recommended practice rather than a contradiction, so both were told to delete valid tags. §20.4 states the general form of the mistake.
+`metadata-conflict` is what §20.4 and §22.5 both promise this command will render. `metadataConflicts(doc)` keeps the first of two differing declarations and computes the loser precisely so that a human can be told; §22.5 assigns "multiple canonicals" here by name, and product-spec §6.3.2 requires them reported. Before that selector existed the data was nowhere at all, so a page shipping two contradictory canonicals and two contradictory descriptions was silent in `build` *and* in `audit` — the one shape where both commands agreed to say nothing about a page that contradicts itself. It is `broken` because a page declaring two answers to one question has given consumers no answer.
+
+  It renders a **closed subset** of the fields a selector could compute a conflict for: `canonical`, `title`, `description`, `lang` — exactly the fields whose own specification says *at most one per document*, and exactly the four `metadataConflicts` (§20.4) computes. That line, and not a judgement about which fields matter, is what can be defended to an author whose markup was called broken. `author` is excluded because the HTML spec defines the name as "one of the page's authors"; `robots` because crawlers read the union across every such meta (§20.6), so there is no conflict left to report; the declared structured-data type because §20.8's `declaredTypes` is a membership list with no single winner to contradict; and the two dates because `article:published_time` beside `<meta name="date">` names one instant at two granularities, and telling that author to keep one drops the property crawlers read. A field whose own repeats are how a standard spells a plural — several `og:image` declarations are how the Open Graph protocol spells an array, and a second `<script type="application/ld+json">` with a different `@type` is recommended practice rather than a contradiction — is correct markup, and reporting it as `broken` told an author to delete valid tags.
 
 `metadata-in-body` names a closed set of elements — `<title>`, `<base>`, `<meta charset>`, `<link rel="canonical">`, and `<meta>` carrying `name="description"`, `name="robots"`, `name="schema"`, `property="og:*"`, or `name="twitter:*"` — because those are exactly the elements whose only valid position is the head and whose presence elsewhere therefore says nothing to anyone. `name="schema"` joins them from §26.4 with its own reading of "says nothing to anyone": it is unify's own key rather than a standard one, read with the head by §20.3, so a body-placed declaration reaches neither a consumer nor §26.6's generator — and its evidence says that rather than quoting a browser and a crawler that never read the key anywhere. It is `broken` rather than `incomplete` for the reason §24.3 gives: the document declares something at a position where the standard defines it to have no effect, which is wrong whatever the author intended. Elements that are legal in the body are never reported: `<link rel="stylesheet">`, `<link rel="preload">`, `<meta itemprop>`, and `<script type="application/ld+json">` all do their job there. Neither is anything inside a `<template>`, which §7 never touches.
 
@@ -1565,9 +1577,9 @@ The two schemes are **parsed, never matched as text**, for §12's own reason one
 
 The direction is **disagreement, not preference**. An `https:` canonical under an `http:` `--base-url` is the same finding: unify does not decide which scheme a site should be served over, it observes that the page and the address the author supplied name different ones. Deciding would be the judgement product-spec §6.1 keeps out of this command as firmly as out of `build`.
 
-It is `broken` rather than `incomplete` because the contradiction is in the emitted bytes, and it needs no second artifact to show it: this build publishes the page at `https://example.com/about.html` — `record.url`, the address the evidence quotes — while the document served there nominates `http://example.com/about.html` as the URL to consolidate on. One build, two addresses for one page, and no intent makes both right. The generated sitemap makes the same disagreement visible for the pages it lists, but the finding does not rest on being listed: a `noindex` page and `404.html` fire it too, and §21.2's membership excludes both. That is `sitemap-canonical-disagree`'s contradiction one component over — the page against its own address rather than against a sitemap entry.
+It is `broken` rather than `incomplete` because the contradiction is in the emitted bytes, and it needs no second artifact to show it: this build publishes the page at `https://example.com/about.html` — `document.url`, the address the evidence quotes — while the document served there nominates `http://example.com/about.html` as the URL to consolidate on. One build, two addresses for one page, and no intent makes both right. The generated sitemap makes the same disagreement visible for the pages it lists, but the finding does not rest on being listed: a `noindex` page and `404.html` fire it too, and §21.2's membership excludes both. That is `sitemap-canonical-disagree`'s contradiction one component over — the page against its own address rather than against a sitemap entry.
 
-The evidence quotes both URLs, and the fix names `url` (§20.5) — the address this build gives the page, and exactly what §22 would have written had the page authored no canonical. `--canonical auto` is deliberately not offered as the fix: §22.3 leaves an authored canonical exactly as written, so the flag would change nothing (§24.5).
+The evidence quotes both URLs, and the fix names `document.url` (§20.5) — the address this build gives the page, and exactly what §22 would have written had the page authored no canonical. `--canonical auto` is deliberately not offered as the fix: §22.3 leaves an authored canonical exactly as written, so the flag would change nothing (§24.5).
 
 ### 24.5 The report
 
@@ -1617,7 +1629,7 @@ This section decides almost nothing of its own. It is a **map**: one row per §6
 
 | §6.3.5 part | Decided in | As what |
 |---|---|---|
-| Fragment identifiers | §24.4 `fragment-missing` | A `broken` **finding**. §12 strips the fragment before matching (REF-06) and never validates it; §20.9 carries the `fragmentLinks` pairs beside `ids` so the finding is answerable from the record. A link whose **path** is broken is still P13, fragment or no fragment (§25.2). |
+| Fragment identifiers | §24.4 `fragment-missing` | A `broken` **finding**. §12 strips the fragment before matching (REF-06) and never validates it; §20.9 carries the `fragmentLinks` pairs beside `ids` so the finding is answerable from the manifest. A link whose **path** is broken is still P13, fragment or no fragment (§25.2). |
 | Duplicate IDs | §24.4 `id-duplicate` | A `broken` **finding**, one per repeated id in sorted order, located at the page that declares them — never at a page that links to them. §20.3's `ids` keeps repeats for exactly this. Not a §13 collision (that section is about output paths) and not a §12 reference. |
 | Normalized public-URL collisions | §13 | **P12** for one output path from two sources, **A11** for a case-only difference, **A16** for a Unicode-normalization-form difference. §13 carries the argument that those three close the set. A reference written in the other form stays P13 (§25.3). |
 | Metadata placement | §20.3 and §24.4 `metadata-in-body` | Two decisions in two registers, deliberately. §20.3 declines to **read** document metadata outside `<head>`, so the fields it would have supplied are correctly reported missing; §24.4 **reports** each element it declined to read, as `broken`. `build` reports nothing about it, and unify never moves the element — the emitted bytes are the author's. |
@@ -1632,7 +1644,7 @@ This section decides almost nothing of its own. It is a **map**: one row per §6
 
 **A broken fragment is not a 404.** The page loads, the reader arrives, and the only thing that failed is the scroll position the link promised. §12 exists to stop the build publishing an address that fetches nothing; a fragment that names no id fetches the page perfectly well. Making it publish-blocking would mean a site that has always built clean stops publishing over a link that still works — the exact shape of failure §14.1's severity split exists to prevent, and the reason `--strict` moves the exit code without withholding the site. §12 has said so in one clause all along: "`#fragment` targets are not validated against ids — that is a reader's judgment, not a build gate" (REF-06).
 
-But it is a *checkable* judgment, and §20.9 says so in the same breath: the manifest carries `fragmentLinks` beside `ids` precisely so the question is answerable from the record rather than by re-parsing. That is what a finding is for — §24.3's `broken` means "the output contradicts itself, wrong regardless of what the author intended", which is exactly right for a link naming an id that is not there, and it blocks nothing.
+But it is a *checkable* judgment, and §20.9 says so in the same breath: the manifest carries `fragmentLinks` beside `ids` precisely so the question is answerable from the manifest itself rather than by re-parsing. That is what a finding is for — §24.3's `broken` means "the output contradicts itself, wrong regardless of what the author intended", which is exactly right for a link naming an id that is not there, and it blocks nothing.
 
 **A duplicate id is the same shape one layer in.** The document is wrong — HTML requires an id to be unique, and every link to a repeated one is ambiguous — but nothing 404s and no address is unreachable. It is not a §13 collision either: §13 ranges over output paths, and two ids inside one page produce one file at one address.
 
@@ -1664,10 +1676,10 @@ Nothing in this section re-reads a page. Four rules were in place before it exis
 
 | question | owner |
 |---|---|
-| does an authored block parse? | §20.8 records `{raw, data, error}`; §24.4's `jsonld-invalid` reports the failure |
+| does an authored block parse? | §20.8's `analysis.jsonLd` holds `{raw, data, error}`; §24.4's `jsonld-invalid` reports the failure |
 | do its URLs name files this site emits? | §12's closed property list; **P13**, publish-blocking |
 | are those URLs right at the deploy address? | §24.4's `jsonld-url-unprefixed` |
-| what type does the page declare? | §20.8's `schemaType` |
+| what type(s) does the page declare? | §20.8's `declaredTypes(doc)` |
 
 What this section adds is findings that compare a block against **the page it is on** (§26.3, read as §26.2 bounds it), and one bounded generator (§26.4–§26.8).
 
@@ -1675,7 +1687,7 @@ What this section adds is findings that compare a block against **the page it is
 
 Every comparison below reads the **subject object** of a JSON-LD entry: its `data`, when `data` is a single object — not an array, not a `{"@graph": […]}` wrapper — and only that object's own **string-valued** properties. This is §20.8's bounded reading, unchanged, applied to one more question, and the reason is the same: an array and a `@graph` are several entities, and deciding which of them is *this page* is a judgement, not a reading.
 
-The cost is stated rather than hidden. `@graph` is how several widely-deployed CMS plugins emit structured data, so on those pages every **comparison** in §26.3 is silent — the four findings that read a block. The fifth, `date-unusable`, reads no JSON-LD at all (§26.3): it compares the record's own `datePublished`/`dateModified` against nothing, so a `@graph` page whose `date:` is malformed is reported exactly as any other page is. The sentence is narrowed to the comparisons deliberately, because the wider claim contradicts §26.3's own catalogue row and a reader has to be able to tell which one the build implements: it is the row. That is the conservative direction — §24.3's severities are claims about a document, and a claim about the wrong node of a graph is worse than no claim. A later revision that wants those pages must first say **which** node is the page, in this section, with the rule written down; until then it says nothing and this paragraph records why.
+The cost is stated rather than hidden. `@graph` is how several widely-deployed CMS plugins emit structured data, so on those pages every **comparison** in §26.3 is silent — the four findings that read a block. The fifth, `date-unusable`, reads no JSON-LD at all (§26.3): it compares `publicationDatesOf(doc)`'s own `published`/`modified` against nothing, so a `@graph` page whose `date:` is malformed is reported exactly as any other page is. The sentence is narrowed to the comparisons deliberately, because the wider claim contradicts §26.3's own catalogue row and a reader has to be able to tell which one the build implements: it is the row. That is the conservative direction — §24.3's severities are claims about a document, and a claim about the wrong node of a graph is worse than no claim. A later revision that wants those pages must first say **which** node is the page, in this section, with the rule written down; until then it says nothing and this paragraph records why.
 
 ### 26.3 Validation findings
 
@@ -1689,7 +1701,7 @@ These join §24.4's catalogue and obey every rule of it: they are predicates ove
 | `jsonld-entity-conflict` | broken | two subject objects on one page declare the same string `@id` and different string `@type` values; one finding per `@id`, in sorted order |
 | `date-unusable` | broken | `datePublished` or `dateModified` has a non-null `raw` and a null `iso`; one finding per field, `datePublished` first |
 
-`jsonld-headline-mismatch` is product-spec §6.3.6's "compare factual fields with visible content where the relationship is unambiguous", and the `h1` is the visible content — the one string on the page that is *definitionally* the same fact a `headline` states. The comparison is **containment in either direction**, for §24.4's own reason: §8 row 2 prepends a page title to the layout's, so the strings a correct site produces are routinely nested rather than equal, and anything looser is a similarity threshold nobody can defend to the author whose two strings fell either side of it. It requires **exactly one** `h1` for the reason `title-h1-mismatch` does: with none there is nothing visible to compare, and with several there is no answer to *which* one, only a choice. It is `incomplete` rather than `broken` because a headline that restates the heading differently is a decision an author may have made; `title-h1-mismatch` is the same shape and the same severity. The row has **no exception for a block §26.6 generated**, and §26.7 records why: a generated `headline` is `record.title`, so such a page collects this finding beside `title-h1-mismatch`, and the alternative — a finding that reads which bytes this build wrote rather than what the document says — is what §24.4's own "predicate over the §20 manifest" rules out.
+`jsonld-headline-mismatch` is product-spec §6.3.6's "compare factual fields with visible content where the relationship is unambiguous", and the `h1` is the visible content — the one string on the page that is *definitionally* the same fact a `headline` states. The comparison is **containment in either direction**, for §24.4's own reason: §8 row 2 prepends a page title to the layout's, so the strings a correct site produces are routinely nested rather than equal, and anything looser is a similarity threshold nobody can defend to the author whose two strings fell either side of it. It requires **exactly one** `h1` for the reason `title-h1-mismatch` does: with none there is nothing visible to compare, and with several there is no answer to *which* one, only a choice. It is `incomplete` rather than `broken` because a headline that restates the heading differently is a decision an author may have made; `title-h1-mismatch` is the same shape and the same severity. The row has **no exception for a block §26.6 generated**, and §26.7 records why: a generated `headline` is `titleOf(doc)`, so such a page collects this finding beside `title-h1-mismatch`, and the alternative — a finding that reads which bytes this build wrote rather than what the document says — is what §24.4's own "predicate over the §20 manifest" rules out.
 
 `jsonld-url-mismatch` is the page telling a consumer two different things about its own address: `<link rel="canonical">` names one page and the structured data names another. Both are read through **one** resolver — §12's base stripping, then §12's resolution, then directory URLs to `index.html` — which is the same rule §21.2, §22.4, and `canonical-scheme-mismatch` read, so "which page does this URL name" keeps one answer across the whole build. It fires only when **both** resolve: a `url` naming another origin is that site's business, and one naming a location this site does not emit is already **P13** through §12's closed property list, which is the stronger answer and the one mechanism (§24.4's own precedent for the share image). `broken`, because two addresses for one page in bytes one build emitted is §24.3's definition.
 
@@ -1697,7 +1709,7 @@ These join §24.4's catalogue and obey every rule of it: they are predicates ove
 
 `jsonld-entity-conflict` is product-spec §6.3.6's "contradictory entities", at the one shape where the contradiction is unarguable: two blocks naming **one** entity by `@id` and classing it two ways. §24.4 already records that a second `ld+json` block with a *different* `@type` is recommended practice rather than a fault — a `WebPage` beside an `Organization` is two entities — so the `@id` is exactly what separates the two cases, and this finding fires on nothing that lacks one.
 
-`date-unusable` is the one finding here that reads no JSON-LD. §20.10 splits a date into `{raw, iso}` so that "what did the author write" and "what can anything emit" never collapse; a record where `raw` is present and `iso` is null is a page that declared a date **no consumer can use** — not §21.3's `<lastmod>`, not §26.6's `datePublished`, not a crawler. Before this finding existed that value was dropped in silence by every one of them, which is the failure class §14 exists to forbid, moved one register over. It is `broken` because a value that does not conform to the format its field is defined in is wrong regardless of intent (§24.3), and the evidence quotes `raw` — the author's own bytes, the only string they can grep for. Product-spec §6.7 names "inferred or malformed dates" among the cases a diagnostic must cover; this is the malformed half, and the inferred half is §20.10's rule that no date is ever derived.
+`date-unusable` is the one finding here that reads no JSON-LD. §20.10 splits a date into `{raw, iso}` so that "what did the author write" and "what can anything emit" never collapse; a `publicationDatesOf(doc)` field where `raw` is present and `iso` is null is a page that declared a date **no consumer can use** — not §21.3's `<lastmod>`, not §26.6's `datePublished`, not a crawler. Before this finding existed that value was dropped in silence by every one of them, which is the failure class §14 exists to forbid, moved one register over. It is `broken` because a value that does not conform to the format its field is defined in is wrong regardless of intent (§24.3), and the evidence quotes `raw` — the author's own bytes, the only string they can grep for. Product-spec §6.7 names "inferred or malformed dates" among the cases a diagnostic must cover; this is the malformed half, and the inferred half is §20.10's rule that no date is ever derived.
 
 **One comparison is deliberately not made.** A JSON-LD `datePublished` beside the page's own `<meta property="article:published_time">` is *not* compared, and the reason is §24.4's, verbatim in another costume: the two name one instant at two granularities. `2026-01-02` and `2026-01-02T09:30:00Z` are not a contradiction, and separating the pairs that are from the pairs that are not needs a rule about time zones and about how much of a day a bare date covers — a judgement, in a section whose whole discipline is that it makes none. §24.4 excluded the same pair from `metadata-conflict` for the same reason, and excluding it here keeps one answer rather than two.
 
@@ -1711,7 +1723,7 @@ A page asks for a generated block by declaring a type unify generates:
 <meta name="schema" content="Article">
 ```
 
-or, from Markdown frontmatter, `schema: Article` — §10.2's ordinary meta synthesis, no new key mechanism. The two spellings are the same declaration and produce identical output, and a layout may carry it for a whole section. There is one extraction path (§20.8's `schemaType`) and one generator.
+or, from Markdown frontmatter, `schema: Article` — §10.2's ordinary meta synthesis, no new key mechanism. The two spellings are the same declaration and produce identical output, and a layout may carry it for a whole section. There is one extraction path (§20.8's `declaredTypes`) and one generator.
 
 The accepted values are exactly **`WebPage`**, **`Article`**, **`BlogPosting`**, **case-sensitively**. Anything else is **P23**, located at the declaration — the frontmatter key for a Markdown page, the element for an HTML one, at its line in that file when §14.1 can name one:
 
@@ -1724,7 +1736,7 @@ Case-sensitivity is not fussiness: `article` is not a schema.org type, and a dec
 
 `name="schema"` is **unify's own key**, introduced by §20.8 and defined by no standard, so constraining its values constrains unify's vocabulary rather than the author's HTML.
 
-**It also ships**, and that is worth stating outright because three documents claimed it could not. "Built output contains no tool vocabulary at all" was true of the composition core alone — `<slot>`, `slot=`, `data-layout` and `<include>` are all consumed by composition — and this key is the first exception. It is not an oversight and it is not removable: unify does not edit an author's markup, so an HTML page's `<meta name="schema">` is theirs and stays; and §20.8 reads the declaration *from the emitted document*, which is the whole reason a Markdown page and an HTML page declare a type the same way. Consuming the frontmatter key the way §10.2 consumes `title` or `lang` would give Markdown its own extraction path and break that equality — one more spelling for one more reader to learn, which §20.2's equal-citizen rule exists to prevent. So the honest statement, and the one those documents now carry, is that built pages contain no `<slot>`, no `data-layout` and no injected script, and that the one token which survives is this meta, on a page that asked for a block. §20.8's `schemaType` stays as general as it was: it also reads a JSON-LD `@type`, which is unrestricted, so a page declaring `Product` in a block it wrote itself still has `schemaType` `Product`, and `schema-incomplete` still reads it.
+**It also ships**, and that is worth stating outright because three documents claimed it could not. "Built output contains no tool vocabulary at all" was true of the composition core alone — `<slot>`, `slot=`, `data-layout` and `<include>` are all consumed by composition — and this key is the first exception. It is not an oversight and it is not removable: unify does not edit an author's markup, so an HTML page's `<meta name="schema">` is theirs and stays; and §20.8 reads the declaration *from the emitted document*, which is the whole reason a Markdown page and an HTML page declare a type the same way. Consuming the frontmatter key the way §10.2 consumes `title` or `lang` would give Markdown its own extraction path and break that equality — one more spelling for one more reader to learn, which §20.2's equal-citizen rule exists to prevent. So the honest statement, and the one those documents now carry, is that built pages contain no `<slot>`, no `data-layout` and no injected script, and that the one token which survives is this meta, on a page that asked for a block. §20.8's `declaredTypes` stays as general as it was: it also reads a JSON-LD `@type`, which is unrestricted, so a page declaring `Product` in a block it wrote itself has `Product` among its declared types, and `schema-incomplete` still reads it there.
 
 **The declaration is read with the head**, exactly as §20.3 reads it, and P23's scope is that scope — a `<meta name="schema">` emitted in `<body>` declares no type, generates nothing, and is not P23, because diagnosing a declaration §20.8 never accepted would be a problem raised against markup that changes nothing. What it *is* instead is §24.4's `metadata-in-body`, whose closed set names `schema` for this reason: unify's own key, read with the head, so outside it the declaration reaches neither a consumer nor this section's generator. Without that row the one key whose whole purpose is to switch generation on would be the only head-only meta whose misplacement nothing reports — no block, no problem, no finding — which is the silence the case-sensitivity argument above refuses one line earlier.
 
@@ -1732,13 +1744,13 @@ Case-sensitivity is not fussiness: `article` is not a schema.org type, and a dec
 
 A block is generated for a page when **all three** hold:
 
-1. `record.schemaType` is one of the three accepted values.
-2. `record.jsonLd` is **empty** — the page emits no `<script type="application/ld+json">` anywhere in the document.
+1. `declaredTypes(doc)[0]` is one of the three accepted values.
+2. `analysis.jsonLd` is **empty** — the page emits no `<script type="application/ld+json">` anywhere in the document.
 3. The emitted document has a `<head>` with a closing tag.
 
 Condition 2 is **authored JSON-LD always wins**, §22.3's rule one artifact over: generation fills a gap and never adjudicates a value the author chose. It is deliberately not head-scoped, because §20.8 is not and §24.4's `metadata-in-body` says outright that `ld+json` does its job in the body — a page that wrote its block after its content wrote a block. Contents of a `<template>` are not a declaration, here as everywhere (§7, §20.2).
 
-Conditions 1 and 2 together mean the declaration that reaches the generator is always the **meta**: under (2) no JSON-LD survives for §20.8 to read a `@type` from, so the two sources of `schemaType` cannot disagree about which one activated this.
+Conditions 1 and 2 together mean the declaration that reaches the generator is always a **meta**: under (2) no JSON-LD entry survives to contribute a declaration, so `declaredTypes(doc)` reduces to the meta-declared types alone (§20.8's own ordering — every meta before every JSON-LD entry), and its first entry is unambiguous.
 
 Condition 3 is §22.2's rule: with no closing `</head>` there is no insertion point, and synthesizing one would be a structural change this section does not make.
 
@@ -1754,24 +1766,24 @@ The object's properties, in this order, every one of them omitted when its sourc
 |---|---|---|
 | `@context` | the string `https://schema.org` | never |
 | `@type` | the declared value | never |
-| `name` (`WebPage`) / `headline` (`Article`, `BlogPosting`) | `record.title` | `title` is null |
-| `description` | `record.description` | `description` is null |
-| `url` | `record.canonical`, else `record.url` | both are null |
-| `image` | `record.image.url` | `image` is null |
-| `author` | `record.author` — **a string** | `author` is null |
-| `datePublished` | `record.datePublished.iso` | the field is null, or its `iso` is |
-| `dateModified` | `record.dateModified.iso` | the field is null, or its `iso` is |
-| `inLanguage` | `record.lang` | `lang` is null |
+| `name` (`WebPage`) / `headline` (`Article`, `BlogPosting`) | `titleOf(doc)` | `title` is null |
+| `description` | `descriptionOf(doc)` | `description` is null |
+| `url` | `canonicalOf(doc)`, else `document.url` | both are null |
+| `image` | `preferredImageOf(doc).url` | `image` is null |
+| `author` | `authorOf(doc)` — **a string** | `author` is null |
+| `datePublished` | `publicationDatesOf(doc).published.iso` | the field is null, or its `iso` is |
+| `dateModified` | `publicationDatesOf(doc).modified.iso` | the field is null, or its `iso` is |
+| `inLanguage` | `langOf(doc)` | `lang` is null |
 
-Product-spec §6.3.6 names the two date sources as the frontmatter keys `date` and `lastmod`, and the chain that connects them to this table runs entirely through rules that already exist: §10.2 emits `<meta name="date">` and `<meta name="lastmod">`, §20.3 reads those into `datePublished` and `dateModified` (alongside `article:published_time`/`article:modified_time`, which an HTML page is likelier to write), and §20.10 decides whether either has an `iso`. This section adds no mapping of its own, which is why an HTML page needs no frontmatter to generate the same block.
+Product-spec §6.3.6 names the two date sources as the frontmatter keys `date` and `lastmod`, and the chain that connects them to this table runs entirely through rules that already exist: §10.2 emits `<meta name="date">` and `<meta name="lastmod">`, `publicationDatesOf` reads those into `published`/`modified` (alongside `article:published_time`/`article:modified_time`, which an HTML page is likelier to write, per §20.4's `metaRole` chain), and §20.10 decides whether either has an `iso`. This section adds no mapping of its own, which is why an HTML page needs no frontmatter to generate the same block.
 
-Every value is a **record field** (§20), never frontmatter. That is §20.2's equal-citizen rule doing its work: a layout-supplied description is used, an HTML page generates exactly what a Markdown page with the same emitted head generates, and character references are already resolved (§20.3) so the JSON carries the text a reader sees.
+Every value comes from a **selector over the final document** (§20), never frontmatter. That is §20.2's equal-citizen rule doing its work: a layout-supplied description is used, an HTML page generates exactly what a Markdown page with the same emitted head generates, and character references are already resolved (§20.3) so the JSON carries the text a reader sees.
 
 Four of these choices are not arbitrary and are argued rather than asserted:
 
 - **`headline` for an article, `name` for a page.** schema.org gives `Article` and `BlogPosting` a `headline`, and it is the property Google's own Article documentation reads; `WebPage` has no `headline`, and `name` is the property it does have. Emitting `name` on an article would be valid and unread; emitting `headline` on a `WebPage` would be a property its type does not define.
 
-  Either one carries the **merged** title, suffix and all — §8 row 2 prepends the page's own `<title>` to the layout's, so a page titled `Shipping in public` under a layout titled `— Example` generates `"headline": "Shipping in public — Example"`. That reads as a defect and is not one, for a reason worth stating where a reader meets the output: the separator lives in the layout (§8), unify never learns which bytes of a title are the site's name, and cutting at the first `—`, `|`, or `·` would be a guess about the author's punctuation that is wrong the first time a headline contains one. `record.title` is what the document declares to every other consumer — the browser tab, the search snippet, the `og:title` a page derives from it — so the block declares the same string rather than a private second reading of it. §26.3's containment test is chosen to make that harmless: a merged title contains its own `h1` by construction, so the generated block never draws `jsonld-headline-mismatch` for the suffix alone. A page that wants a bare headline writes its own block, which is §26.5's condition 2.
+  Either one carries the **merged** title, suffix and all — §8 row 2 prepends the page's own `<title>` to the layout's, so a page titled `Shipping in public` under a layout titled `— Example` generates `"headline": "Shipping in public — Example"`. That reads as a defect and is not one, for a reason worth stating where a reader meets the output: the separator lives in the layout (§8), unify never learns which bytes of a title are the site's name, and cutting at the first `—`, `|`, or `·` would be a guess about the author's punctuation that is wrong the first time a headline contains one. `titleOf(doc)` is what the document declares to every other consumer — the browser tab, the search snippet, the `og:title` a page derives from it — so the block declares the same string rather than a private second reading of it. §26.3's containment test is chosen to make that harmless: a merged title contains its own `h1` by construction, so the generated block never draws `jsonld-headline-mismatch` for the suffix alone. A page that wants a bare headline writes its own block, which is §26.5's condition 2.
 - **`author` is a plain string, not a `Person`.** `<meta name="author">` declares, in the HTML specification's own words, the name of one of the page's authors — a name, and nothing about what kind of thing bears it. Writing `{"@type": "Person", "name": …}` would assert that the author is a person, which is an invented claim and which product-spec §6.1 forbids in exactly these words. A publication whose author is an organization would be misdescribed by a build that never asked. A page that needs a typed author writes its own block (§26.5's condition 2), which is the escape hatch §22.3 has for the same class of decision.
 - **`url` is the final canonical**, which is why §26.7 orders this after §22: a page whose canonical `--canonical auto` supplied must generate *that* URL, not a second opinion about its address. Where the page declares no canonical and no address is known, both sources are null and the property is omitted rather than guessed.
 - **A date is emitted only from `iso`.** `raw` is never emitted anywhere (§20.10), so a page whose `date:` is not W3C-DTF generates no `datePublished` — and says so, through `date-unusable` (§26.3), rather than emitting a value that is invalid where it lands.
@@ -1794,21 +1806,21 @@ structured data: 3 pages would gain a JSON-LD block
 
 The block participates in §15's transactional publish because it is part of a page's bytes: a problem anywhere leaves the previous output untouched, generated block and all.
 
-`unify audit` runs this exactly as `build` does — §26 has no flag to be set, so §24.1's "the whole pipeline" includes it — and then evaluates the result. A generated block is therefore visible to §26.3's own findings, and **two of the comparisons it can reach are silent by construction**: `jsonld-url-mismatch` compares the block's `url` against `record.canonical`, which is where §26.6 took it from, and `jsonld-lang-mismatch` compares its `inLanguage` against `record.lang`, likewise. `jsonld-entity-conflict` needs an `@id`, which §26.8 never emits, and there is one block by §26.5's condition 2.
+`unify audit` runs this exactly as `build` does — §26 has no flag to be set, so §24.1's "the whole pipeline" includes it — and then evaluates the result. A generated block is therefore visible to §26.3's own findings, and **two of the comparisons it can reach are silent by construction**: `jsonld-url-mismatch` compares the block's `url` against `canonicalOf(doc)`, which is where §26.6 took it from, and `jsonld-lang-mismatch` compares its `inLanguage` against `langOf(doc)`, likewise. `jsonld-entity-conflict` needs an `@id`, which §26.8 never emits, and there is one block by §26.5's condition 2.
 
-`jsonld-headline-mismatch` is the one that is **not**, and the exception is written down rather than papered over: §26.6 takes `headline` from `record.title`, while §26.3 compares it against the page's single `h1`. A page whose title and heading disagree therefore collects that finding beside `title-h1-mismatch` — two true sentences about one disagreement, in two vocabularies, with one repair, which is the shape §24.4 already accepts where two findings share a cause. Teaching the finding to skip a block *this build generated* is the alternative, and it is refused for §24.4's own reason: every finding is a predicate over the §20 manifest, the manifest is a reading of the emitted bytes (§20.2), and those bytes carry no record of who wrote them — a page that authored by hand exactly the block unify would have generated must audit identically, or `audit` is reporting on provenance rather than on the document a consumer receives.
+`jsonld-headline-mismatch` is the one that is **not**, and the exception is written down rather than papered over: §26.6 takes `headline` from `titleOf(doc)`, while §26.3 compares it against the page's single `h1`. A page whose title and heading disagree therefore collects that finding beside `title-h1-mismatch` — two true sentences about one disagreement, in two vocabularies, with one repair, which is the shape §24.4 already accepts where two findings share a cause. Teaching the finding to skip a block *this build generated* is the alternative, and it is refused for §24.4's own reason: every finding is a predicate over the §20 manifest, the manifest is a reading of the emitted bytes (§20.2), and those bytes carry no record of who wrote them — a page that authored by hand exactly the block unify would have generated must audit identically, or `audit` is reporting on provenance rather than on the document a consumer receives.
 
 ### 26.8 What is never generated
 
 The list is closed, and each absence is the same rule: unify emits what the page declared and nothing it would have to decide.
 
-No `publisher` — it names an entity the page did not declare. No `mainEntityOfPage` and no `@id` — both are identity, and §12's own property list excludes them for that reason. No `articleBody`, `wordCount`, or `keywords` derived from `record.text` — that is generated prose and a keyword count, two things product-spec §6.1 forbids by name. No `isPartOf`, `breadcrumb`, or `speakable` — each needs a structure of the site that unify has as links, not as claims. No image `width`/`height` inside the block, even when `record.image` carries them: they belong to the `og:image` declaration that supplied the URL, and `image-missing-dimensions` already reports their absence there. And no date from any source but an authored, well-formed one — not the build clock, not the filesystem, not the filename, not Git (§20.10).
+No `publisher` — it names an entity the page did not declare. No `mainEntityOfPage` and no `@id` — both are identity, and §12's own property list excludes them for that reason. No `articleBody`, `wordCount`, or `keywords` derived from `analysis.visibleText` — that is generated prose and a keyword count, two things product-spec §6.1 forbids by name. No `isPartOf`, `breadcrumb`, or `speakable` — each needs a structure of the site that unify has as links, not as claims. No image `width`/`height` inside the block, even when `preferredImageOf(doc)` carries them: they belong to the `og:image` declaration that supplied the URL, and `image-missing-dimensions` already reports their absence there. And no date from any source but an authored, well-formed one — not the build clock, not the filesystem, not the filename, not Git (§20.10).
 
 ---
 
 ## 27. The local audit view (`/_unify/`)
 
-Product-spec §6.3.8. `unify dev` serves one extra page: a report of what §20 read and what §24 found, for the site currently in the output directory. It exists because `unify audit`'s stdout is a list and a site is a graph — the same findings, arranged by page, with the page's own record beside them, answer "what is wrong with *this* page" in one look.
+Product-spec §6.3.8. `unify dev` serves one extra page: a report of what §20 read and what §24 found, for the site currently in the output directory. It exists because `unify audit`'s stdout is a list and a site is a graph — the same findings, arranged by page, with the page's own document beside them, answer "what is wrong with *this* page" in one look.
 
 ### 27.1 It is served, never published
 
@@ -1833,8 +1845,8 @@ The report is assembled from the **same two sources the command line uses, and n
 It carries, in this order:
 
 1. **A summary line** — the counts `unify audit` prints, and the address the build assumed (§17's first line), so a report read at a glance says which build it describes.
-2. **The findings, grouped by page**, each with its severity, its evidence, its fix, and its stable id — §24.5's four fields, rearranged rather than reworded. Grouping is by the finding's own location, which is a page for every finding but one: §24.4's `robots-sitemap-missing` is located at the source `robots.txt` and reads no record, so it groups under that file with no record beside it. Walking the records and collecting each one's findings would drop it, and §27.5 forbids exactly that — a finding `unify audit` prints and this view does not is the disagreement that section calls a defect, in its most literal form.
-3. **Every page's record**, including pages with no findings: output path, public URL, title, description, language, canonical, the heading outline, `linksIn`/`linksOut` counts, and whether it is indexable. A page nothing is wrong with is the useful half of the answer to "did my metadata land".
+2. **The findings, grouped by page**, each with its severity, its evidence, its fix, and its stable id — §24.5's four fields, rearranged rather than reworded. Grouping is by the finding's own location, which is a page for every finding but one: §24.4's `robots-sitemap-missing` is located at the source `robots.txt` and reads no document, so it groups under that file with no document beside it. Walking the documents and collecting each one's findings would drop it, and §27.5 forbids exactly that — a finding `unify audit` prints and this view does not is the disagreement that section calls a defect, in its most literal form.
+3. **Every page's own document**, including pages with no findings: output path, public URL, title, description, language, canonical, the heading outline, `linksIn`/`linksOut` counts, and whether it is indexable. A page nothing is wrong with is the useful half of the answer to "did my metadata land".
 4. **The build's diagnostics** — §14's problems and advisories for the current build, verbatim. A rebuild that failed leaves the previous `dist/` in place (§15), so without this the report would describe a site the browser is no longer being served.
 
 There is no score, no grade, no percentage, and no character count, for §24.5's reason: that rule is about the *output*, and a page is output.
@@ -1887,19 +1899,15 @@ They are **problems rather than advisories** because each one, believed, publish
 
 A `.md` file included as a fragment has its frontmatter stripped and never validated (§5.1 step 4), here as everywhere: the data is provably unused, and a shared fragment must not make an unrelated page's build depend on metadata nobody reads.
 
-### 28.2 The two that are findings
+### 28.2 `tags` and `categories`: ordinary metadata, not a reservation
 
-`tags` and `categories` are not addressed to the build at all — they describe content, and a site may legitimately emit them for a consumer unify knows nothing about. What they must not do is *imply* a collection. `unify audit` reports them:
+`tags` and `categories` are not addressed to the build at all — they describe content, and a site may legitimately emit them for a consumer unify knows nothing about. **0.9 reports nothing about them, by design.** The 0.8 model gave them a closed-set field of their own (`taxonomyKeys`) purely so an `audit` finding (`taxonomy-inert`) could tell an author that a `tags:` key builds no index, archive, feed, or route. That finding, its stored field, and the extraction path that fed it are gone in 0.9, and the removal is a considered decision rather than an oversight: product-spec §6.3.9 already states that these diagnostics exist "to prevent confident cross-generator assumptions from publishing or addressing the wrong page, not to reserve ordinary metadata names without cause," and `tags`/`categories` never carried the cross-generator failure mode §28.1's three keys do. Nothing in unify's own vocabulary claims `tags`, no fix line ever told an author to rename or move anything, and the finding's entire content was "this key does less than some other tool's key of the same name might" — the unbounded-reservation posture product-spec §6.3.9 itself refuses, applied by the finding to the one pair of keys where it had nothing else to say.
 
-| id | severity | fires when |
-|---|---|---|
-| `taxonomy-inert` | incomplete | the emitted **head** declares `<meta name="tags">` or `<meta name="categories">`; one finding per page, naming the keys it declares in sorted order |
+So `tags:` and `categories:` synthesize to `<meta name="tags" content="…">`/`<meta name="categories" content="…">` exactly as any other scalar or list frontmatter key does (§10.2), an HTML author may write the identical metas by hand, and **`unify audit` says nothing about either, in the head or the body.** Not `metadata-in-body` either: that closed set exists for elements whose misplacement *changes an outcome* — `schema` switches §26.6's generator off in silence, `description` and the rest are declarations a consumer reads only in the head — and a body-placed `tags` changes nothing anywhere, so there is no outcome to protect and no second position for a belief to fail in. `date`/`lastmod` are §28.3's counterexample that keeps this section honest by being read; `tags`/`categories` are the counterexample that keeps it honest by staying inert on purpose, in both positions, with no diagnostic marking either one.
 
-The evidence names the keys and says what did not happen: no index page, no archive, no feed of that term, no route. `incomplete` rather than `broken` because nothing about the page is wrong — what is absent is a mechanism the author may have been expecting, which is §24.3's own line.
+This subsection's own inventory row (**CPR-02**) pins the absence rather than a rule: a page declaring `tags:`/`categories:`, or writing the equivalent `<meta>` by hand, builds and audits identically to one that declares neither.
 
-It is a **predicate over the manifest** like every other finding, so §20 gains one field for it (§20.3): `taxonomyKeys`, the sorted subset of the closed set `{tags, categories}` the emitted head declares. Closed because a growable list of "names other generators use" would be exactly the unbounded reservation product-spec §6.3.9 refuses, and read from the emitted document because that is where §20 reads everything — so an HTML page writing `<meta name="tags">` by hand collects the same finding, and the sentence stays true of it.
-
-**The key declares it whatever its value**, as in §28.1 and for §28.1's reason: §10.2 emits `<meta name="tags" content="">` for a bare `tags:`, and the author who wrote that expected a collection as firmly as the one who listed three terms. This is the one place where a `taxonomyKeys` entry parts company with the neighbouring fields in §20.3's table, which read a *value* and record `null` when it is empty — stated because the analogy is the obvious one to draw and it is the wrong one. And the head scope is the field's, not a second rule of this section's: a `<meta name="tags">` in `<body>` declares nothing to any consumer (§20.3), so it implies no collection to report the absence of. One consequence is worth stating outright, because it is this section's only silence: `tags` and `categories` are no part of §24.4's `metadata-in-body` closed set either, so a body-placed taxonomy meta is reported by neither finding. That is not an oversight, and the comparison that makes it look like one is `schema` — unify's own key, admitted to that closed set by §26.4 although no standard defines it, precisely because a body-placed `schema` *changes an outcome*: it switches §26.6's generator off in silence. A body-placed `tags` changes nothing. It builds no collection in the head and none in the body, so there is no mechanism the author could have been expecting and no second position for the same belief to fail in. `taxonomy-inert` reports a declaration a consumer will read that unify built nothing from; a meta no consumer reads is not that declaration.
+**Product-spec §6.3.9 and §4 state the same 0.9 reading.** §6.3.9's own closing sentence, quoted above, is what licenses the removal — it is not a second normative source this section must satisfy, and product-spec's frontmatter paragraph (§4) and its counter-prior-diagnostics list (§6.3.9) both now say the same thing this section does: ordinary metadata, reported by nothing.
 
 ### 28.3 What stays exactly as it was
 
@@ -1919,7 +1927,7 @@ Product-spec §6.5.1. The manifest's third projection, and the first whose membe
 
 A feed is written when **`--base-url` is set** and **at least one page is an entry** by §29.4. Those two conditions are the whole opt-in.
 
-The second is deliberately membership rather than declaration, and the difference is not pedantry. An earlier draft activated on any page whose `schemaType` was `Article` or `BlogPosting`, which made a feed with **zero entries** reachable — a lone candidate excluded by §29.3's date rule is exactly that shape, and it is A17's own worked example. Such a document cannot be valid: [RFC 4287](https://www.rfc-editor.org/rfc/rfc4287) §4.1.1 requires `atom:updated` on every feed, §29.5 defines it as the newest entry's, and there is no newest entry. The only two ways out were to emit an invalid feed or to invent an instant, and §6.1 forbids the second. Writing no file is the third, and it is the honest one: a site whose only article is dated wrong gets A17 telling it so, and no feed until a real entry exists. `--base-url` for §21.1's reason — an entry carries absolute URLs and a stable id, and inventing an origin is the guess product-spec §6.1 forbids — and the type declaration because that is what product-spec §6.5.1 means by *explicitly declaring*: the page says what it is, and the feed is a consequence.
+The second is deliberately membership rather than declaration, and the difference is not pedantry. An earlier draft activated on any page whose declared type was `Article` or `BlogPosting`, which made a feed with **zero entries** reachable — a lone candidate excluded by §29.3's date rule is exactly that shape, and it is A17's own worked example. Such a document cannot be valid: [RFC 4287](https://www.rfc-editor.org/rfc/rfc4287) §4.1.1 requires `atom:updated` on every feed, §29.5 defines it as the newest entry's, and there is no newest entry. The only two ways out were to emit an invalid feed or to invent an instant, and §6.1 forbids the second. Writing no file is the third, and it is the honest one: a site whose only article is dated wrong gets A17 telling it so, and no feed until a real entry exists. `--base-url` for §21.1's reason — an entry carries absolute URLs and a stable id, and inventing an origin is the guess product-spec §6.1 forbids — and the type declaration because that is what product-spec §6.5.1 means by *explicitly declaring*: the page says what it is, and the feed is a consequence.
 
 That is deliberately **not a collection**. There is no query, no directory convention, no `posts/` folder, no ordering key, and no way to ask for a feed of some pages and not others. §6.6 rejects a collections DSL by name, and this section is what the rejection costs and what it buys: it costs scoped feeds, and it buys a membership rule an author can check by reading one page. Scoped feeds wait for demonstrated demand (§6.5.1); until then, a site that needs two feeds writes the second one with a generator (§19.6) and unify ships it byte-for-byte.
 
@@ -1949,10 +1957,12 @@ A page with **no `datePublished` at all** draws nothing here — `schema-incompl
 
 A page is an entry when all of:
 
-1. It has a record and its `schemaType` is `Article` or `BlogPosting`.
+1. It has a document and `declaredTypes(doc)` (§20.8) **includes** `Article` or `BlogPosting` — any declared type qualifies, not only the first.
 2. It is `indexable` (§20.6). A page telling crawlers to drop it does not belong in a syndication feed either.
 3. It is **self-canonical**, by §21.2's own `classifyCanonical` — the shared reader, so "which page does this URL name" keeps one answer.
-4. Its `datePublished` has a non-null `iso` **carrying a time** (§29.3).
+4. `publicationDatesOf(doc).published` has a non-null `iso` **carrying a time** (§29.3).
+
+**Condition 1 is a 0.9 widening.** The retired `schemaType` field was a single scalar — the first accepted declaration a page made, meta-before-JSON-LD (§20.8's ordering) — so a page whose JSON-LD declared `WebPage` first and `Article` second was never a candidate; the second, correct declaration was simply invisible to membership. `declaredTypes(doc)` returns every accepted declaration, and condition 1 tests inclusion over the whole list: a page carrying an `Organization` block alongside separate `Article` JSON-LD, or one whose blocks declare `WebPage` before `Article`, is a candidate under 0.9. The reasoning is stated once, at the selector that makes it possible (§20.8), and repeated here because this is the consumer it changes the observable behavior of — carrying `Organization` and `Article` JSON-LD together is routine (a page is both a piece of content and part of a publisher's organization graph), and the 0.8 reading silently dropped such a page from its own feed whenever the `Organization` block happened to come first.
 
 Entries are ordered by `datePublished` **descending**, ties broken by output path ascending, so two builds of one tree produce byte-identical bytes. That is the one ordering this document invents, and it is the one every feed reader assumes; the tie-break exists so the assumption never costs determinism.
 
@@ -1966,13 +1976,13 @@ Entries are ordered by `datePublished` **descending**, ties broken by output pat
 | `<updated>` (feed) | the newest entry's `<updated>` — which always exists, because §29.1 writes no feed without one |
 | `<link rel="self">` | the feed's own absolute URL |
 | `<link rel="alternate">` | the site's own address |
-| `<entry><id>` | the entry's **canonical** URL — `record.canonical` if the page declares one, else `record.url` |
-| `<entry><title>` | `record.title` |
+| `<entry><id>` | the entry's **canonical** URL — `canonicalOf(doc)` if the page declares one, else `document.url` |
+| `<entry><title>` | `titleOf(doc)` |
 | `<entry><link rel="alternate">` | the same URL as `<id>` |
-| `<entry><updated>` | `dateModified.iso` when it carries a time, else `datePublished.iso` |
-| `<entry><published>` | `datePublished.iso` |
-| `<entry><summary type="text">` | `record.description`, omitted when null |
-| `<entry><author><name>` | `record.author`, omitted when null |
+| `<entry><updated>` | `modified.iso` when it carries a time, else `published.iso` (`publicationDatesOf(doc)`) |
+| `<entry><published>` | `published.iso` |
+| `<entry><summary type="text">` | `descriptionOf(doc)`, omitted when null |
+| `<entry><author><name>` | `authorOf(doc)`, omitted when null |
 | `<entry><content type="html">` | only under `--feed-full` (§29.6) |
 
 `<id>` is the canonical because an id must be **stable** (RFC 4287 §4.2.6) and a canonical is the author's own statement of this page's permanent address; deriving one from a path would change the moment a file moved, which is precisely what a canonical exists to prevent. Every URL is percent-encoded by §20.5 and then XML-escaped, both, for §21.3's reason.
@@ -2007,48 +2017,109 @@ An authored `feed.xml` **suppresses generation entirely** (§21.5's rule, unchan
 
 ---
 
-## 30. The search manifest
+## 30. The catalog and the search corpus
 
-Product-spec §6.5.2. One JSON file a client-side search library or an external indexer can read instead of re-parsing the site.
+Product-spec §6.5.2 names both artifacts; this section is the normative reference for their shapes. Two independent JSON artifacts under `assets/unify/`: a compact, HTML-shaped structural projection of every public page (`catalog.json`) for browse/filter/TOC/metadata-driven UI, and a minimal full-text projection (`search-corpus.json`) that a client-side search implementation indexes however it chooses. Both are projections of §20's `BuildDocument` and nothing here reads a page — the rule §20 states once, applied twice.
 
-### 30.1 Activation and shape
+### 30.1 Activation, output paths, and independence
 
-`--search-index` writes `search-index.json` at the output root. It is a flag rather than a consequence because, unlike a sitemap or a feed, nothing about a site declares that it wants one — there is no page-level statement meaning "I am searchable", and inventing one would be the unify-only content schema product-spec §6.3.7 forbids templates from teaching.
+`--catalog` writes `assets/unify/catalog.json`; `--search-corpus` writes `assets/unify/search-corpus.json`. Each is a flag rather than a consequence, for the same reason the retired `--search-index` was one: nothing about a page declares "catalog me" or "index me", and inventing such a declaration would be the unify-only content schema product-spec §6.3.7 forbids templates from teaching. **Neither flag implies the other** — a consumer that wants only full-text search data is never forced to also ship the catalog, and a browse/filter UI that never searches body text never pays for the corpus it does not read. A site wanting a full client-side search UI passes both.
+
+Both paths sit under `assets/unify/` rather than the output root, a location decision stated once for both files: this directory groups unify-generated, machine-consumed runtime assets away from navigable site pages, keeps the output root free of files a browsing reader would stumble into, and needs no dot-directory or `/.well-known/` behavior a host might not serve. **Only the two exact paths above are reserved — `assets/unify/` itself is not**, and a source tree is free to keep its own files anywhere else under that name.
+
+Neither flag is gated on `--base-url`. `document.path`/`document.url` already answer correctly with no base URL — root-relative and `null` respectively (§20.5) — so requiring `--base-url` would make either flag useless for the local-preview case it is most used in.
+
+### 30.2 The catalog schema
 
 ```json
 {
   "schemaVersion": 1,
+  "baseUrl": "https://example.com/",
   "pages": [
     {
-      "url": "https://example.com/about.html",
-      "title": "About — Example",
-      "description": "Who we are.",
-      "headings": [{ "level": 1, "text": "About", "id": "about" }],
-      "text": "About Who we are and what we do."
+      "path": "/posts/unify-and-htmx/",
+      "url": "https://example.com/posts/unify-and-htmx/",
+      "html": { "attributes": { "lang": "en" } },
+      "head": {
+        "title": "Unify and HTMX",
+        "meta": [
+          { "name": "description", "content": "A practical static-site architecture." },
+          { "name": "tags", "content": "unify" },
+          { "name": "tags", "content": "htmx" },
+          { "property": "article:published_time", "content": "2026-08-25T09:00:00-05:00" }
+        ],
+        "link": [{ "rel": "canonical", "href": "https://example.com/posts/unify-and-htmx/" }],
+        "base": []
+      },
+      "body": {
+        "attributes": { "class": "post" },
+        "headings": [{ "level": 1, "id": "unify-and-htmx", "text": "Unify and HTMX" }]
+      }
     }
   ]
 }
 ```
 
-Top-level keys are `schemaVersion` and `pages`, and a page's keys are `url`, `title`, `description`, `headings`, `text` — the names product-spec §6.5.2 fixes, in that order, with no others. `title` and `description` are `null` when the page declares none; `headings` is `[]`; `text` is `""`. Serialization is two-space-indented JSON with a trailing newline, and `pages` is in manifest order (§20.1), so two builds of one tree are byte-identical.
+Top-level keys are `schemaVersion`, `baseUrl`, `pages`, in that order. `baseUrl` is `${base.origin}${base.pathPrefix}` — `null` without the flag — the identical construction `unify audit --format json`'s own `baseUrl` field uses (§31.1, `buildReport`). This is deliberate, not an oversight: every `url` in this same document is built from that same normalized value (§20.5), so a consumer resolving `new URL(page.path, catalog.baseUrl)` recovers the site's real address, path prefix included, and the two machine surfaces answer "what address is this site built for" identically for one build. `pages` is filtered to §30.4's shared membership and left in manifest order (§20.1); nothing here sorts.
 
-`schemaVersion` is `1`. It exists so a consumer can refuse a document it does not understand rather than mis-read one, and it changes only when a field's **meaning** changes; adding a field does not.
+A page's keys, in order, are `path`, `url`, `html`, `head`, `body` — and this is not a shape invented for the catalog. It is `document` itself, the `DocumentSnapshot` §20.3 already defines and §31.1 already serializes whole inside `unify audit --format json`'s own `document` field: `catalogEntry` spreads `doc.document` into a fresh object rather than hand-copying named fields, so nothing is extracted, filtered, or promoted — a field `document.js` adds to the snapshot later reaches both surfaces without either one being edited. That is deliberate — an audit page's `document` and one catalog entry cannot drift into two readings of one page, because the entry is a shallow copy of the very same object, produced by the same single extraction pass (§20.2).
 
-### 30.2 It is a projection, not an extractor
+The bound this buys is stated once, entirely in §20.3's own terms:
 
-Every value comes from a §20 record and nothing here reads a page. `url` is `record.url`, and `record.path` when no `--base-url` was given — a root-relative reference is still an address a page on this site can link to, and refusing to emit the file without an address would make the flag useless for the local case it is most used in. `title`, `description` and `headings` are the record's own; `text` is §20.7's.
+- `html.attributes` — the emitted `<html>`'s attributes, arbitrary `data-*` included.
+- `head.title`, `head.meta`, `head.link`, `head.base` — bounded head data only. No `<style>` contents, no script bodies, no raw head HTML. Arbitrary metadata vocabulary, repeated values, declaration order, and the `name`/`property` distinction all survive untouched (release-brief §12, replacing the retired taxonomy concepts): a page with `tags:` written twice in frontmatter keeps two `meta` entries here, in the order the author wrote them.
+- `body.attributes`, `body.headings` — body attributes, and the flat, main-scoped heading sequence §20.3 already defines. No hierarchy is constructed; a consumer building a nested table of contents does so from `level` itself.
 
-Membership is **§21.2's predicate**, unchanged and shared: a record, `indexable`, not `404.html`, and self-canonical. `noindex` means *do not show this page in search results*, and a site search is search results; a page consolidated onto another would return the reader to a URL its own author retired.
+**No body text, ever, in this file.** `analysis.visibleText` lives on `DocumentAnalysis`, the private half of extraction, and `catalogEntry` never reads it — that is `search-corpus.json`'s field, not this one's, so a long article's body grows the corpus and leaves the catalog entry's size unchanged beyond its own head data and headings. **No JSON-LD script bodies either.** `analysis.jsonLd` stays private for the same reason: a structured-data block can itself carry an entire article body or a product dataset, and copying it into a file meant to stay one bounded record per page would defeat the reason the catalog exists. `declaredTypes(doc)` (§20.8) remains the selector a consumer of `analysis` builds a structured-data reading from; the catalog does not attempt to save that consumer the trouble.
 
-### 30.3 `text` is folded here, and §20.3 says it must be
+`schemaVersion` is `1` — a consumer's refusal signal rather than a build number, independent of the corpus's own (§30.3, versioning rule stated once at §30.7). Within version 1, only additive optional fields may be added; a change to an existing field's meaning is what earns a `2`.
 
-§20.3 keeps U+00A0 in `text` because the author chose a character that forbids a line break, and states the obligation this section discharges: *any projection of this field that is searched or compared must fold U+00A0 and the other Unicode space separators at index time, and say so where it is specified*. This is that place. Every Unicode space separator — U+00A0, U+2000–U+200A, U+202F, U+205F, U+3000 — becomes U+0020, runs collapse, and the result is trimmed. A reader typing `New York` with an ordinary space finds a page that wrote it with U+00A0, which they could not do against the unfolded field.
+### 30.3 The search corpus schema
 
-Nothing else is folded. No case folding, no stemming, no stop-word removal, no truncation, and no character count: those are a search engine's decisions, and unify does not ship a search runtime (§6.5.2).
+```json
+{
+  "schemaVersion": 1,
+  "pages": [
+    { "path": "/posts/unify-and-htmx/", "text": "Unify and HTMX A practical static-site architecture…" }
+  ]
+}
+```
 
-### 30.4 Collisions and checks
+Top-level keys are `schemaVersion`, `pages`. A page's keys are `path`, `text`, and **nothing else** — no `url`, no `title`, no `description`, no `headings`, no metadata, no canonical. Every one of those already lives in `catalog.json`, and duplicating any here would give a consumer two answers to the same question about one page. `path` is the join key, and it is the join key deliberately — the one field the two files share verbatim: a consumer builds `new Map(catalog.pages.map(p => [p.path, p]))` once and looks a search hit's `path` up in it to recover everything else about that page.
 
-An authored `search-index.json` suppresses generation entirely and ships byte-for-byte (§21.5's rule). A generated path already occupied is **P22**. The file is listed in `--dry-run` and published transactionally like every other write. Its `url` values are not re-checked, and the reason is that there is nothing to check: `record.url` and `record.path` are **computed from an output path that exists by construction** (§20.5), not authored, so unlike a sitemap's `<loc>` or a feed's `<id>` there is no author-supplied value here that could name something the site does not emit. §21.6 exists because an authored sitemap can carry one; this file cannot.
+`text` is `analysis.visibleText` (§20.7), folded by §30.5 below. `pages` is filtered to the identical §30.4 membership predicate `catalog.json` uses and left in manifest order — a client zipping the two files by `path` never has to reconcile two membership answers, because there is only one.
+
+`schemaVersion` is `1`, independent of the catalog's own (release-brief §27): a change to one file's meaning never forces the other to bump.
+
+### 30.4 Shared membership
+
+Both files use the identical **`isPublicDestination(doc, base)`** selector §21.2 defines and owns: the document exists, is indexable (`robotsPolicyOf(doc).indexable`), its output path is not `404.html`, and it is self-canonical. A page the author marked `noindex`, or consolidated onto another page by its own canonical, is absent from both files for the reason §21.2 already states for the sitemap — a `noindex` page returning through a site-search box is the same contradiction as one returning through a crawler's index.
+
+Reusing the sitemap's own predicate, rather than a second reading of "which pages does this site publish", is why the catalog and the corpus cannot describe two different page sets from one build: `sitemap.js`, `catalog.js`, and `search-corpus.js` all call the one function, and none of them reimplements it.
+
+### 30.5 Text folding
+
+`search-corpus.json`'s `text` is where §20.3's own deferred obligation is discharged for the *indexing* consumer it names: §20.3 keeps a decoded U+00A0 in `analysis.visibleText` because the author chose a character that forbids a line break, and states that *any projection of this field that is searched or compared must fold U+00A0 and the other Unicode space separators at index time, and say so where it is specified*. This is that place for the corpus — the catalog carries no free text, so it has no obligation to discharge. It is not the only consumer §20.3 names: §24.4's `text-duplicate` finding *compares* `analysis.visibleText` between pages rather than indexing it, and folds separately for that comparison (`audit.js`'s own `foldSpaces`, stated at its call site) — a second, independent discharge of the same obligation, for a different reader, that this section does not restate.
+
+Every Unicode space separator — U+00A0, U+2000–U+200A, U+202F, U+205F, U+3000 — becomes U+0020, the runs folding can create collapse, and the result is trimmed. A reader typing `New York` with an ordinary space finds a page that wrote it with U+00A0, which they could not match against the unfolded field. (`text-duplicate`'s own fold is wider — collapsing every character JavaScript's `\s` treats as whitespace, not just this closed set — because its job is deciding whether two pages read as the same text, not indexing one for a search box; the two folds are not required to agree, and neither is a normative reading of the other.)
+
+Nothing else is folded: no case folding, no stemming, no stop-word removal, no truncation, no character count. Those are a search engine's decisions, and unify ships no search runtime (product-spec §6.5.2).
+
+### 30.6 Authored files, collisions, and publish
+
+An authored file at exactly `assets/unify/catalog.json` or `assets/unify/search-corpus.json` **suppresses generation of that file entirely**, the same author-wins rule an authored `sitemap.xml`/`feed.xml` follow (§21.5): the author's file is the site's catalog or corpus, ships byte-for-byte, and unify neither overwrites it nor merges into it. Suppression is checked before either projection is computed, so an authored file costs nothing to detect. `--dry-run` shows it as an ordinary copy from source, with no generated row for the path it occupies.
+
+**Neither file can raise P22.** P22 exists for a generated path a *split* can still produce after its own primary file is suppressed — `sitemap.xml`'s numbered parts are that case (§21.5). `catalog.json` and `search-corpus.json` each fix exactly one location, unconditionally, with no size cap and no split: by the time either generator runs, the suppression check above has already proven its one path absent from the tree's own emitted files, so there is no second path left for either to collide on. This corrects, rather than restates, the retired search manifest's own §30.4, which claimed a P22 that this path shape could never actually produce.
+
+Unlike every earlier generated file, both paths sit under a directory rather than the output root — the one new failure shape this introduces is an authored file occupying `assets` or `assets/unify` itself (an ordinary asset with no extension, say), which the generated file needs as a directory. That is a located problem, named at the occupying source file and the generated path it blocks, checked before either generator runs — never a raw filesystem error surfacing during publish.
+
+Once generated, both files join the temporary tree exactly like any other write, and need **no special-casing** to do so. They become checkable reference *targets* for free: §12's `emittedPaths` is built from every file the finished temp tree holds, generated and authored alike, so a page's own `<a href="/assets/unify/catalog.json">` resolves the same way a link to any other emitted file does. Neither file is itself scanned as a *source* of references — §12 scans `.html` and `.css` output, and JSON carries no `href`/`url()` syntax for it to find, so there is nothing inside either file for a reference checker to look for. And neither gets a dedicated internal-value check the way an authored `sitemap.xml`/`feed.xml` does (§21.6/§29.7): a *generated* file's `path`/`url` values are already correct by construction (§20.5), so such a check would find nothing, and an *authored* file is held to no such guarantee — unify makes no built-in use of a catalog or corpus's own contents the way §21.6 consumes a sitemap's `<loc>` to verify crawler-facing correctness, so there is no reader inside unify for a wrong value to mislead. Both files participate in §15's transactional publish and a watch rebuild's full-rebuild rule (§16) exactly as any other generated write does.
+
+### 30.7 Determinism and versioning
+
+Both files are two-space-indented JSON with a trailing newline. `pages` is manifest order (§20.1) in both — the build's own output-path order, not a sort either file introduces. Head arrays (`meta`, `link`, `base`) and heading arrays keep the document order §20.3 already fixed. No timestamp, build id, random value, or filesystem/Git-derived data ever reaches either file (product-spec §6.1). The result: the same final page bytes and the same build settings produce byte-identical `catalog.json` and `search-corpus.json` across repeated builds of one tree.
+
+`schemaVersion: 1` is an independent contract per file (§30.2/§30.3), and the versioning rule itself is stated once here: within version 1, only additive optional fields may be added to either file; a change to an existing field's meaning, or its removal, requires that file's own version to increment. A version bump to one file never requires or implies one to the other, and neither is tied to unify's own package version.
 
 ---
 
@@ -2065,7 +2136,20 @@ Product-spec §6.5.3. Two flags on `unify audit`, and the rule that keeps them f
   "schemaVersion": 1,
   "baseUrl": "https://example.com/",
   "summary": { "broken": 1, "incomplete": 3, "problems": 0, "advisories": 2 },
-  "pages": [ ],
+  "pages": [
+    {
+      "source": "about.html",
+      "generated": false,
+      "outputPath": "about.html",
+      "document": {
+        "path": "/about.html",
+        "url": "https://example.com/about.html",
+        "html": { "attributes": { "lang": "en" } },
+        "head": { "title": null, "meta": [], "link": [], "base": [] },
+        "body": { "attributes": {}, "headings": [] }
+      }
+    }
+  ],
   "findings": [
     {
       "id": "title-missing",
@@ -2082,9 +2166,11 @@ Product-spec §6.5.3. Two flags on `unify audit`, and the rule that keeps them f
 }
 ```
 
-`pages` holds the §20 records in manifest order — the same record every other feature reads, serialized, which is what product-spec §6.5.3 asks for by name rather than a summary of it. `findings` is §24.5's order — source path, then finding id, then evidence — so the two formats list the same things in the same sequence. `baseUrl` is the address the build assumed, `null` without the flag.
+`pages` holds one entry per `BuildDocument` (§20) in manifest order, each reduced to this section's own **audit page shape** — `{source, generated, outputPath, document}` — rather than the whole envelope: `source` is `doc.source.path`, `generated` is `doc.source.generated`, `outputPath` is `doc.outputPath`, and `document` is the `DocumentSnapshot` (§20.3) **serialized whole**, in its own key order (`path`, `url`, `html`, `head`, `body`). `doc.source.layout` stays internal to audit's own fix lines and is **not** in this object — layout provenance is spent, not reported. The private `analysis` half (visible text, ids, JSON-LD, the link graph, `strayMetadata`, `refresh`) is **never serialized here**: §22 of the release brief states the rule outright — findings already carry the diagnostic facts external automation normally needs, so this is a build artifact's page shape, not a mirror of the internal envelope. `findings` is §24.5's order — source path, then finding id, then evidence — so the two formats list the same things in the same sequence. `baseUrl` is the address the build assumed, `null` without the flag.
 
-`generated` is `true` when the page came from the `--generate` overlay rather than the source tree (§33.4). It travels as its own key because `file` must stay a plain path for the consumers that resolve it, while a consumer rendering its own report needs the same fact the human report shows: a generated page's `file` names no file the author can open, so a report that did not say so would send a reader looking through `src/` for something that was never there.
+**This is a declared, incompatible break with the 0.8 machine schema**, and `schemaVersion` stays `1` deliberately — 0.9 is a clean break rather than a migration, so there is no `2` to reach for and no compatibility shim translating one page shape into the other. A consumer built against the 0.8 `pages` shape (a flat object with `title`, `description`, `canonical`, `headings`, `text`, `linksOut`, `conflicts`, `taxonomyKeys`, and the rest as top-level page fields) must be rewritten against this one; nothing in this release reads the old shape or accepts it as an input.
+
+`generated` is `true` when the page came from the `--generate` overlay rather than the source tree (§33.4). It travels as its own key on the finding, exactly as on the page object, because `file`/`source` must stay a plain path for the consumers that resolve it, while a consumer rendering its own report needs the same fact the human report shows: a generated page's `file` names no file the author can open, so a report that did not say so would send a reader looking through `src/` for something that was never there.
 
 §14's problems and advisories still print to **stderr** as prose (§24.5), and `summary` counts them so a JSON consumer knows they happened. Putting them in the document would make this a second diagnostic channel, and §14.1's contract is that there is one.
 
@@ -2218,9 +2304,12 @@ The path is resolved against the source root and must stay inside it (§4.3's co
 ```
 process.argv[2] = the absolute path of the source root
 process.argv[3] = the absolute path of the generated directory
+process.argv[4] = the absolute path of generator-context.json
 ```
 
-That is the interface. There is no unify module to import, no object passed in, no return value read, and no callback. The generator writes files into `process.argv[3]` and returns; anything it writes anywhere else is its own business and unify neither collects nor notices it (§33.6).
+`argv[4]` is additive. It was not part of the original two-argument contract, and it does not change what `argv[2]`/`argv[3]` are or where they sit: a generator written against the two-argument contract — one that reads only those two positions and never looks past them — keeps working exactly as it did before this argument existed. Nothing about the seam becomes mandatory ceremony by its addition.
+
+Otherwise the interface is unchanged. There is no unify module to import, no object passed in, no return value read, and no callback. The generator writes files into `process.argv[3]`, may read `process.argv[4]`, and returns; anything it writes anywhere else is its own business and unify neither collects nor notices it (§33.6).
 
 The working directory is the **source root**, so `./_data/authors.json` in a generator means what an author reading the source tree would expect.
 
@@ -2233,6 +2322,50 @@ The working directory is the **source root**, so `./_data/authors.json` in a gen
 - **Every rebuild re-runs it.** Watch mode is full rebuilds only (§16), and a module cache that returned the first build's copy would make every rebuild after the first silently skip the generator — the site would go stale while the build reported success. A new process has no module cache to consult, so the requirement holds structurally. It cannot be met by loading the generator in-process behind a cache-busting query string: a runtime is free to ignore the query when caching a file URL, and Bun does, which makes that spelling a no-op that reports success.
 
 The subprocess is therefore part of the contract and not an implementation detail. An implementation that loads the generator in-process satisfies none of the three: it hands `process.exit()` the build's own exit code, it has no separate stderr to locate P29 from, and it must invent a cache defeat that the runtime is entitled to ignore.
+
+**`generator-context.json`, the file `process.argv[4]` names, is a versioned, read-only snapshot of the handful of build facts unify is willing to publish as a stable machine contract.** unify writes it once per generator run — before invoking the generator, alongside (never inside) the generated directory `argv[3]` names — and it is exactly this shape, key order included, serialized the same way `catalog.json`/`search-corpus.json` are (§30.7): two-space-indented JSON with a trailing newline:
+
+```json
+{
+  "schemaVersion": 1,
+  "unifyVersion": "0.9.0",
+  "command": "build",
+  "paths": {
+    "sourceRoot": "/project/src",
+    "generatedRoot": "/tmp/unify-generated-abc123/overlay",
+    "outputRoot": "/project/dist"
+  },
+  "site": {
+    "baseUrl": "https://example.com/docs/",
+    "prettyUrls": true,
+    "canonical": "auto"
+  },
+  "outputs": {
+    "catalog": "assets/unify/catalog.json",
+    "searchCorpus": null
+  }
+}
+```
+
+| Field | Type | Content |
+|---|---|---|
+| `schemaVersion` | number | `1`. See the versioning rule below |
+| `unifyVersion` | string | the running unify's own version (`package.json`'s `version`, the same source `--version` reads) — accurate under `bun`, `node`, and the compiled binary alike |
+| `command` | `"build"` \| `"dev"` \| `"watch"` \| `"audit"` | the subcommand actually running this build or rebuild — `audit` runs generators too (§24.2) |
+| `paths.sourceRoot` | string | absolute path, identical to `argv[2]` |
+| `paths.generatedRoot` | string | absolute path, identical to `argv[3]` |
+| `paths.outputRoot` | string | absolute path of this build's output directory |
+| `site.baseUrl` | string \| null | `--base-url`'s effective value, `${base.origin}${base.pathPrefix}` (§11.3) — the identical construction `catalog.json` (§30) and `audit --format json` (§31.1) already use — or `null` when the flag was not given. Never the raw flag string |
+| `site.prettyUrls` | boolean | whether `--pretty-urls` (§11.2) is in effect |
+| `site.canonical` | `"auto"` \| null | `--canonical auto`'s value, or `null` |
+| `outputs.catalog` | string \| null | `assets/unify/catalog.json`, output-root-relative, when `--catalog` is set; `null` otherwise |
+| `outputs.searchCorpus` | string \| null | `assets/unify/search-corpus.json`, output-root-relative, when `--search-corpus` is set; `null` otherwise |
+
+**Versioning.** The context carries its own `schemaVersion`, independent of `unifyVersion`, starting at `1`, and the rule is the same one §30.7 states for `catalog.json`/`search-corpus.json`: within version 1, only additive optional fields may be added; a change to an existing field's meaning or shape — including widening `command`'s closed set with a new value, or changing `site.baseUrl` from a string to an object — requires `schemaVersion` to increment. A generator reading `schemaVersion 1` today keeps reading a valid `schemaVersion 1` document as this contract grows only by new fields, the same guarantee `argv[2]`/`argv[3]` already make for a generator that predates `argv[4]` entirely.
+
+**Lifecycle.** The context file is temporary build state, not a build artifact: it lives in the same per-build temporary location as the generated directory, is a read-only input as far as the generator is concerned (unify never reads it back), and is deleted with the rest of the build's generator state — on a successful run, on a P29 failure, and on every path in between — never surviving to be published, never appearing in `dist/` or in a `--dry-run` row (it is written *beside* the generated directory, never inside it — §33.3's scan, and therefore its origin marking, only ever sees what `argv[3]` names; a non-page file written *inside* the overlay, by contrast, would mirror-copy into `dist/` and get a `← generated` row like any other generated asset). §16's full-rebuilds-only rule gives a fresh context, matching a fresh overlay, on every rebuild for free — the same file at the same relative position, its `paths.generatedRoot` and effective `site`/`outputs` values current as of that rebuild's own settings, never a stale copy from an earlier one.
+
+**The boundary is the same one §33.6 restates for the seam as a whole, sharpened for this one file: stable machine-contract fields only.** The table above is the complete set unify is willing to promise; nothing else about a running build is exposed through it. No environment variables, no secrets, no reporter or parser object, no internal callback, no mutable build state, no intermediate page collection, and no internal option name that isn't one of these fields' own — the context is built from exactly the parameters above, never from a serialized `settings` object, so nothing about unify's own internals can leak through by accident as the CLI's option surface grows. Most pointedly, **no manifest field appears here, because at the point this file is written the manifest does not exist yet**: §33.5's ordering is unchanged by this file's addition — the generator, and therefore the context it reads, still runs before §2 step 1, the scan, so there is no composed page, no `BuildDocument`, no catalog or search-corpus *content* (only the two output-root-relative *paths* those artifacts will land at, which are computable from flags alone) for this file to describe.
 
 ### 33.3 The overlay
 

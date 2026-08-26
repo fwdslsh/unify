@@ -61,7 +61,8 @@ import { buildManifest } from "../../core/manifest.js";
 import { auditManifest, formatFindings } from "../../core/audit.js";
 import * as sitemap from "../../core/sitemap.js";
 import * as feed from "../../core/feed.js";
-import * as searchIndex from "../../core/search-index.js";
+import * as catalog from "../../core/catalog.js";
+import * as searchCorpus from "../../core/search-corpus.js";
 import { completeCanonical } from "../../core/canonical.js";
 import { checkSchemaDeclarations, generateStructuredData } from "../../core/structured-data.js";
 import * as robots from "../../core/robots.js";
@@ -75,6 +76,12 @@ import * as generate from "../../core/generate.js";
  * @param {import('../../core/diagnostics.js').Reporter} context.reporter
  * @param {boolean} [context.sourceDefaulted] - §4.4 EXC-11: true only when
  *   nothing chose the source root (no --source, no unify.yaml key, no src/)
+ * @param {"build"|"dev"|"watch"|"audit"} [context.command] - the actual
+ *   subcommand running this build (cli.js's own `resolveSettings` names it);
+ *   defaulted to "build" only for the handful of unit tests that call this
+ *   function directly with no command at all — every real caller supplies one.
+ *   Read solely to fill §33.2's generator-context `command` field (below); it
+ *   changes nothing else about the pipeline.
  * @returns {Promise<number>}
  *
  * Two keys on `settings` are set by a command rather than by a flag, and both
@@ -89,36 +96,63 @@ import * as generate from "../../core/generate.js";
  * and `unify dev` IS `unify watch` plus a server — there is no other seam
  * between the two that reaches a rebuild.
  */
-export async function build({ sourceRoot, output, settings, reporter, sourceDefaulted = false }) {
+export async function build({ sourceRoot, output, settings, reporter, sourceDefaulted = false, command = "build" }) {
   // ---- §33 — the generator seam, BEFORE §2 step 1 --------------------------
   // It runs before the scan on purpose (§33.5): it sees the source tree as it
   // is on disk and nothing else — no manifest, no composed pages, no output —
   // which is the boundary that keeps this a seam rather than a plugin API. A
   // generator cannot observe unify's intermediate state, so no future change
   // to that state can break one.
+  // Everything the generator seam creates — the overlay dir, the context
+  // file, the generator's own run — lives inside this one try so the single
+  // `finally` below covers it on every exit: success, a P29 failure, and a
+  // throw out of `makeOverlayDir`/`writeGeneratorContext`/`runGenerator`
+  // alike. That is what makes §33.2's lifecycle promise ("deleted on a
+  // successful run, on a P29 failure, and on every path in between") true
+  // rather than true-for-two-of-three-paths.
   let overlayDir = null;
-  if (settings.generate) {
-    const generatorAbs = generate.resolveGeneratorPath(settings.generate, sourceRoot);
-    overlayDir = generate.makeOverlayDir();
-    const ok = await generate.runGenerator({ generatorAbs, sourceRoot, overlayDir, reporter });
-    if (!ok) {
-      // P29 stops the build BEFORE the scan: a partial overlay is a site
-      // nobody described, and §15's transaction leaves the previous dist/
-      // untouched exactly as any other problem would.
-      //
-      // The two lines before the return are not optional. Returning straight
-      // out skipped them and the build exited 1 having printed NOTHING —
-      // a silent failure, which is worse than the fault it was reporting and
-      // exactly what §14 exists to forbid. Every other exit from this
-      // function passes through the same pair; this one had to as well.
-      relocateDiagnosticsToCwd(reporter, sourceRoot);
-      reporter.flush();
-      generate.removeOverlayDir(overlayDir);
-      return 1;
-    }
-  }
-
   try {
+    if (settings.generate) {
+      const generatorAbs = generate.resolveGeneratorPath(settings.generate, sourceRoot);
+      overlayDir = generate.makeOverlayDir();
+      // §33.2 — the generator context is derived from the SAME settings the rest
+      // of this file reads, computed here rather than reused from `runBuild`'s
+      // own `baseConfig` because the context has to exist BEFORE the scan
+      // (§33.5), and `runBuild` (and its `baseConfig`) hasn't run yet. Parsing
+      // is pure and deterministic, so a second call here and `runBuild`'s own
+      // below produce the identical `{origin, pathPrefix}` for the same flag.
+      const baseConfig = settings.baseUrl ? urls.parseBaseUrl(settings.baseUrl) : null;
+      const contextPath = generate.writeGeneratorContext({
+        overlayDir,
+        sourceRoot,
+        output,
+        command,
+        baseUrl: urls.effectiveBaseUrl(baseConfig),
+        // `resolveSettings` already produced exact booleans and cli.js already
+        // validated `canonical` to "auto"-or-absent; the published contract's
+        // own coercion lives in `writeGeneratorContext`, the one owner.
+        prettyUrls: settings.prettyUrls,
+        canonical: settings.canonical ?? null,
+        catalogPath: settings.catalog ? catalog.CATALOG_PATH : null,
+        searchCorpusPath: settings.searchCorpus ? searchCorpus.SEARCH_CORPUS_PATH : null,
+      });
+      const ok = await generate.runGenerator({ generatorAbs, sourceRoot, overlayDir, contextPath, reporter });
+      if (!ok) {
+        // P29 stops the build BEFORE the scan: a partial overlay is a site
+        // nobody described, and §15's transaction leaves the previous dist/
+        // untouched exactly as any other problem would.
+        //
+        // The two lines before the return are not optional. Returning straight
+        // out skipped them and the build exited 1 having printed NOTHING —
+        // a silent failure, which is worse than the fault it was reporting and
+        // exactly what §14 exists to forbid. Every other exit from this
+        // function passes through the same pair; this one had to as well.
+        relocateDiagnosticsToCwd(reporter, sourceRoot);
+        reporter.flush();
+        return 1;
+      }
+    }
+
     return await runBuild({ sourceRoot, output, settings, reporter, sourceDefaulted, overlayDir });
   } finally {
     if (overlayDir !== null) generate.removeOverlayDir(overlayDir);
@@ -374,9 +408,9 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
   if (settings.canonical === "auto") {
     const preliminary = buildManifest({ pages: manifestPages, base: baseConfig });
     for (const page of manifestPages) {
-      const record = preliminary.byOutputPath.get(page.outputPath);
-      if (!record) continue;
-      const completed = completeCanonical(page.html, record, baseConfig);
+      const doc = preliminary.byOutputPath.get(page.outputPath);
+      if (!doc) continue;
+      const completed = completeCanonical(page.html, doc, baseConfig);
       if (completed.text === page.html) continue;
       noteInsertions(page, completed.insertions);
       page.html = completed.text;
@@ -418,7 +452,7 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
   // POST-completion text, exactly as §22's is derived from the pre-completion
   // one. Skipped when no page declared a generable type: that return value is a
   // superset of the pages that can generate (§26.5's conditions 1 and 2 leave
-  // the meta as the only surviving source of `schemaType`), so skipping it can
+  // the meta as the only surviving source of a declared type), so skipping it can
   // never suppress a block — it only spares a site that opted into nothing the
   // derivation, which is what "a site that writes none is the golden path,
   // unchanged" costs to mean.
@@ -426,9 +460,9 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
   if (anyDeclaration) {
     const preliminary = buildManifest({ pages: manifestPages, base: baseConfig });
     for (const page of manifestPages) {
-      const record = preliminary.byOutputPath.get(page.outputPath);
-      if (!record) continue;
-      const block = generateStructuredData(page.html, record);
+      const doc = preliminary.byOutputPath.get(page.outputPath);
+      if (!doc) continue;
+      const block = generateStructuredData(page.html, doc);
       if (block.text === page.html) continue;
       // Prepended, not appended: §26 wrote into the text §22 had already
       // lengthened, so it is the one the locator must undo first (`noteInsertions`).
@@ -468,16 +502,16 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
     ...assetFiles.map((a) => [outputPathOf.get(a.relPath), a.relPath]),
   ]);
   const generated = sitemap.generateSitemap({
-    records: manifest.records, base: baseConfig, emittedFromSource, reporter,
+    documents: manifest.documents, base: baseConfig, emittedFromSource, reporter,
   });
   for (const [outPath, text] of generated) tempFiles.set(outPath, text);
 
   // ---- §29 — feed generation, the manifest's second projection. -----------
   // Same shape as §21 immediately above, one document type over: reads
-  // `manifest.records` and nothing else about the page (`pageHtml` is the one
-  // exception, and only under --feed-full — see feed.js's own module comment
-  // for why that still isn't a second interpretation of the site). No
-  // ordering dependency against sitemap generation either direction; wired
+  // `manifest.documents` and nothing else about the page (`pageHtml` is the
+  // one exception, and only under --feed-full — see feed.js's own module
+  // comment for why that still isn't a second interpretation of the site).
+  // No ordering dependency against sitemap generation either direction; wired
   // beside it because both are manifest projections that join `tempFiles`
   // before §12's reference check and §15's transactional publish. Reuses
   // `emittedFromSource` — built once, immediately above, for exactly this
@@ -488,27 +522,53 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
   // generation above (`page.html = completed.text` / `page.html =
   // block.text`), and it is the exact text `buildManifest` just read to
   // produce `manifest` itself — so `pageHtml` never disagrees with what
-  // `record.title`/`record.canonical`/etc. say about the same page.
+  // `titleOf(doc)`/`canonicalOf(doc)`/etc. say about the same page.
   const pageHtml = settings.feedFull
     ? new Map(manifestPages.map((p) => [p.outputPath, p.html]))
     : null;
   const generatedFeed = feed.generateFeed({
-    records: manifest.records, base: baseConfig, feedFull: settings.feedFull,
+    documents: manifest.documents, base: baseConfig, feedFull: settings.feedFull,
     pageHtml, emittedFromSource, reporter,
   });
   for (const [outPath, text] of generatedFeed) tempFiles.set(outPath, text);
 
-  // ---- §30 — the search manifest, the manifest's third projection. --------
-  // Unlike sitemap/feed, activation is the flag ALONE (§30.1) — nothing about
-  // a page declares "index me", so there is no record-derived condition to
-  // check the way `generateSitemap`/`generateFeed` check `base`/`schemaType`.
-  // Unconditional on `baseConfig`: `searchIndexEntry` already falls back to
-  // `record.path` with no --base-url (§30.2), so gating this on `base` would
-  // make the flag useless for the local-preview case it exists for.
-  const generatedSearchIndex = settings.searchIndex
-    ? searchIndex.generateSearchIndex({ records: manifest.records, base: baseConfig, emittedFromSource })
-    : new Map();
-  for (const [outPath, text] of generatedSearchIndex) tempFiles.set(outPath, text);
+  // ---- §30 — the catalog and the search corpus, the manifest's third and
+  // fourth projections. ------------------------------------------------------
+  // Unlike sitemap/feed, activation is each flag ALONE (§30.1) — nothing
+  // about a page declares "catalog me" or "index me", so there is no
+  // document-derived condition to check the way `generateSitemap`/
+  // `generateFeed` check `base`/declared type. Unconditional on `baseConfig`:
+  // both projections read `doc.document.path`/`.url`, which already fall
+  // back correctly with no --base-url, so gating either on `base` would make
+  // the flag useless for the local-preview case it exists for. Independent
+  // of each other too — `--search-corpus` does not imply `--catalog`.
+  // One row per projection: the conflict check, the generate step, the
+  // would-generate fix line, and the dry-run row all read this table, so a
+  // message edit or a future third projection is one row, not four hand-kept
+  // sites.
+  const PROJECTIONS = [
+    { on: settings.catalog, flag: "--catalog", path: catalog.CATALOG_PATH, generate: catalog.generateCatalog },
+    { on: settings.searchCorpus, flag: "--search-corpus", path: searchCorpus.SEARCH_CORPUS_PATH, generate: searchCorpus.generateSearchCorpus },
+  ];
+  /** @type {Map<string, string>} generated output path -> the flag that produced it */
+  const generatedProjections = new Map();
+  for (const { on, flag, path, generate } of PROJECTIONS) {
+    const conflict = on ? generatedPathAncestorConflict(path, emittedFromSource) : null;
+    if (conflict) {
+      reporter.problem({
+        file: conflict.source,
+        message: `${conflict.source} occupies ${conflict.ancestor}, which ${path} needs as a directory`,
+        fixes: [`rename or move this file so the assets/unify/ path is free to be a directory, or drop ${flag}`],
+      });
+    }
+    const generated = on && !conflict
+      ? generate({ documents: manifest.documents, base: baseConfig, emittedFromSource })
+      : new Map();
+    for (const [outPath, text] of generated) {
+      tempFiles.set(outPath, text);
+      generatedProjections.set(outPath, flag);
+    }
+  }
 
   // ---- §12 — the reference check, against the completed temp tree. --------
   const htmlFiles = new Map();
@@ -601,13 +661,13 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
     });
   }
 
-  // §12's second fix line for the three generated root names. Computed here,
-  // not in references.js, because only this loop knows WHY a file was not
-  // generated this run — and only for names absent from the output, so a
-  // build that emitted (or shipped an authored) file never consults it.
+  // §12's second fix line for the four generated paths (REF-04). Computed
+  // here, not in references.js, because only this loop knows WHY a file was
+  // not generated this run — and only for paths absent from the output, so
+  // a build that emitted (or shipped an authored) file never consults it.
   const wouldGenerate = new Map();
   if (!tempFiles.has(feed.FEED_PATH)) {
-    const candidates = manifest.records.some((rec) => feed.isFeedCandidate(rec));
+    const candidates = manifest.documents.some((doc) => feed.isFeedCandidate(doc));
     wouldGenerate.set(feed.FEED_PATH,
       baseConfig === null
         ? "feed.xml is generated, not authored: this build generates it only under --base-url, from pages declaring schema: Article or BlogPosting with a dated time"
@@ -619,9 +679,10 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
     wouldGenerate.set(sitemap.SITEMAP_PATH,
       "sitemap.xml is generated, not authored: this build generates it only under --base-url");
   }
-  if (!tempFiles.has(searchIndex.SEARCH_INDEX_PATH) && settings.searchIndex !== true) {
-    wouldGenerate.set(searchIndex.SEARCH_INDEX_PATH,
-      "search-index.json is generated, not authored: this build generates it only under --search-index");
+  for (const { on, flag, path } of PROJECTIONS) {
+    if (!tempFiles.has(path) && on !== true) {
+      wouldGenerate.set(path, `${path} is generated, not authored: this build generates it only under ${flag}`);
+    }
   }
 
   references.checkReferences({
@@ -678,7 +739,7 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
   // interesting one, unobserved, inside a development server.
   const findings = settings.audit || settings.onEvaluation
     ? auditManifest({
-      records: manifest.records,
+      documents: manifest.documents,
       byOutputPath: manifest.byOutputPath,
       base: baseConfig,
       sitemapLocs,
@@ -776,14 +837,14 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
         url: publishModule.urlForOutputPath(outPath, prefix),
         from: "generated (--base-url)",
       })),
-      // §30.4 — likewise, named for the flag that actually produced it rather
-      // than --base-url: §30.1/§30.2 activate on --search-index alone, with
-      // or without a site address.
-      ...[...generatedSearchIndex.keys()].map((outPath) => ({
+      // §30.6 — likewise, named for the flag that actually produced each one
+      // rather than --base-url: activation is `--catalog`/`--search-corpus`
+      // alone, with or without a site address.
+      ...[...generatedProjections].map(([outPath, flag]) => ({
         action: "write",
         outputPath: `${displayOutput}/${outPath}`,
         url: publishModule.urlForOutputPath(outPath, prefix),
-        from: "generated (--search-index)",
+        from: `generated (${flag})`,
       })),
       ...plan.delete.map((rel) => ({ action: "delete", outputPath: `${displayOutput}/${rel}` })),
     ];
@@ -852,7 +913,7 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
   // reaches this line at all, which is exactly the signal `dev.js` reads to say
   // so rather than leave a stale report looking current.
   settings.onEvaluation?.({
-    records: manifest.records,
+    documents: manifest.documents,
     findings,
     address: addressLine(baseConfig),
     diagnostics: reporter.sorted(),
@@ -871,7 +932,7 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
  */
 function addressLine(baseConfig) {
   return baseConfig
-    ? `serving from ${baseConfig.origin}${baseConfig.pathPrefix}`
+    ? `serving from ${urls.effectiveBaseUrl(baseConfig)}`
     : "serving from / — the domain root (no --base-url)";
 }
 
@@ -1053,6 +1114,30 @@ function makeReferenceLocator(
  */
 function shouldPublish(reporter) {
   return reporter.canPublish;
+}
+
+/**
+ * §30.6/§13 — a generated path that sits under a directory (only
+ * `assets/unify/catalog.json`/`search-corpus.json` do; every earlier
+ * generated file sat at the output root, where the directory always
+ * exists) can have one of its own ancestor segments already occupied by an
+ * ordinary authored file — `mkdir`ing over it during publish would throw a
+ * raw, unlocated errno. Checked against `emittedFromSource`, which already
+ * holds every authored file's own output path before either generator
+ * runs, so an authored `assets/unify` (no extension) or `assets` blocks
+ * `assets/unify/catalog.json` here, located at the source file that holds
+ * the path.
+ * @param {string} generatedPath
+ * @param {Map<string,string>} emittedFromSource
+ * @returns {{ancestor: string, source: string}|null}
+ */
+function generatedPathAncestorConflict(generatedPath, emittedFromSource) {
+  const segments = generatedPath.split("/");
+  for (let i = 1; i < segments.length; i++) {
+    const ancestor = segments.slice(0, i).join("/");
+    if (emittedFromSource.has(ancestor)) return { ancestor, source: emittedFromSource.get(ancestor) };
+  }
+  return null;
 }
 
 // ------------------------------------------------------------- per-page build

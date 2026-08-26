@@ -5,7 +5,8 @@
  * whose membership an author states in the page rather than in a flag": a
  * page opts itself in by declaring `schema: Article` or `schema:
  * BlogPosting` (§20.8), and `generateFeed` reads that declaration off
- * `records` the same way every other consumer reads a field. No query, no
+ * `documents` (through the shared `declaredTypes` selector) the same way
+ * every other consumer reads it. No query, no
  * `posts/` convention, no ordering key, no way to scope a feed to some pages
  * — product-spec §6.6 rejects a collections DSL by name, and this file is
  * what the rejection buys: a membership rule an author can check by reading
@@ -14,10 +15,10 @@
  * Membership reuses `classifyCanonical`/`isSelfCanonical` from sitemap.js
  * rather than re-deciding "which page does this URL name" a third time —
  * the one-interpretation law product-spec §6.1 states for URLs. What it does
- * NOT reuse is `isCompletablePage`: §21.2's sitemap predicate excludes
- * `404.html` and carries no schemaType condition; §29.4's list is the
+ * NOT reuse is `isPublicDestination`: §21.2's sitemap predicate excludes
+ * `404.html` and carries no declared-type condition; §29.4's list is the
  * opposite on both counts (no 404 exclusion — the list is closed at four
- * conditions and does not name one — but a firm schemaType gate). Sharing
+ * conditions and does not name one — but a firm declared-type gate). Sharing
  * the whole predicate would have imported an exclusion §29.4 never asked for
  * and dropped one it requires, silently, the moment the two lists diverged.
  *
@@ -36,7 +37,7 @@
  *     here, as advisory A17 — the one exclusion in this file that draws a
  *     diagnostic, because it is the one an author is likely to read as a bug
  *     rather than a choice (§29.3). The other three membership conditions
- *     (schemaType, indexable, self-canonical) are the author's own
+ *     (declared type, indexable, self-canonical) are the author's own
  *     deliberate signal and stay silent, exactly as they do in sitemap.js —
  *     there is no "this page is noindex, so it is not in the feed" advisory,
  *     because a noindex page not appearing in a syndication feed is not a
@@ -61,22 +62,24 @@
  *     the identical subtree §20.7 reads `text` from, with no rewriting
  *     applied (§29.6): "URLs left exactly as they were emitted."
  *
- * `<entry><id>` is `record.canonical` when the page declares one, else
- * `record.url` (§29.5) — an author's own bytes, preserved exactly as §20.5
- * preserves them everywhere else, XML-escaped for well-formedness and NOT
- * additionally percent-re-encoded: `record.url` is unify-CONSTRUCTED and
- * already carries §20.5's percent-encoding by the time it reaches this file,
- * and re-encoding `record.canonical` would edit bytes that are the author's,
- * not unify's — the same "a URL unify constructs is percent-encoded; a URL
- * the author wrote is preserved" law §20.5 states once for the whole build.
+ * `<entry><id>` is `canonicalOf(doc)` when the page declares one, else
+ * `doc.document.url` (§29.5) — an author's own bytes, preserved exactly as
+ * §20.5 preserves them everywhere else, XML-escaped for well-formedness and
+ * NOT additionally percent-re-encoded: `doc.document.url` is
+ * unify-CONSTRUCTED and already carries §20.5's percent-encoding by the time
+ * it reaches this file, and re-encoding `canonicalOf(doc)` would edit bytes
+ * that are the author's, not unify's — the same "a URL unify constructs is
+ * percent-encoded; a URL the author wrote is preserved" law §20.5 states
+ * once for the whole build.
  */
 
 import { findAll, findFirst, getAttr, innerText, isElement, parse } from "./html.js";
-import { isSkippedUrl, splitUrl } from "./urls.js";
+import { effectiveBaseUrl, isSkippedUrl, splitUrl } from "./urls.js";
 import { stripBaseUrl, resolveReference } from "./references.js";
 import { CHECK_SPELLING } from "./diagnostics.js";
 import { decodeXmlEntities } from "./entities.js";
-import { isSelfCanonical } from "./sitemap.js";
+import { isSelfCanonical } from "./document-selectors.js";
+import { authorOf, canonicalOf, declaredTypes, descriptionOf, publicationDatesOf, robotsPolicyOf, titleOf } from "./document-selectors.js";
 
 /** The output path of the site's feed (§29.2). Atom, never RSS — see the module comment. */
 export const FEED_PATH = "feed.xml";
@@ -122,7 +125,7 @@ function unwrapCdata(inner) {
 /**
  * §29.3 — does this W3C-DTF value carry a time? The grammar has exactly one
  * form that does not (`YYYY-MM-DD`), so "not that form" is "has a time" for
- * any value that has already passed `isoDate` (manifest.js) — which every
+ * any value that has already passed `isoDate` (document-selectors.js) — which every
  * `.iso` this module reads has, by construction.
  * @param {string} iso
  * @returns {boolean}
@@ -135,14 +138,23 @@ function hasTime(iso) {
  * §29.1's second activation clause / §29.4 condition 1 — a page that DECLARES
  * the right type, independent of every other question (indexable,
  * self-canonical, dated). Exported because it is also the whole test §29.1
- * asks of the SITE ("at least one page's schemaType is Article or
- * BlogPosting") — `records.some(isFeedCandidate)` — so the activation
- * question and the per-page question are answered by one function, never two.
- * @param {import('./manifest.js').PageRecord} record
+ * asks of the SITE ("at least one page declares Article or BlogPosting") —
+ * `documents.some(isFeedCandidate)` — so the activation question and the
+ * per-page question are answered by one function, never two.
+ *
+ * **0.9 widening (release-brief §21.3/§13):** the retired `schemaType` was a
+ * single scalar — the FIRST accepted declaration a page made, meta-before-
+ * JSON-LD (§20.8's old rule) — so a page whose JSON-LD declared `WebPage`
+ * first and `Article` second was never a candidate. `declaredTypes(doc)`
+ * returns every accepted declaration, and membership is now *any* of them
+ * matching: a page carrying `Organization` alongside `Article` JSON-LD, or
+ * `WebPage` before `Article`, is an article. §29's own spec section states
+ * this widening and why.
+ * @param {import('./manifest.js').BuildDocument} doc
  * @returns {boolean}
  */
-export function isFeedCandidate(record) {
-  return FEED_TYPES.has(record.schemaType);
+export function isFeedCandidate(doc) {
+  return declaredTypes(doc).some((t) => FEED_TYPES.has(t));
 }
 
 /**
@@ -152,23 +164,23 @@ export function isFeedCandidate(record) {
  * `noindex` or off-canonical page must never draw the date advisory, because
  * indexability and canonicalization are the author's own deliberate signal
  * and only the date condition gets a diagnostic (see the module comment).
- * @param {import('./manifest.js').PageRecord} record
+ * @param {import('./manifest.js').BuildDocument} doc
  * @param {import('./urls.js').BaseUrlConfig|null} base
  * @returns {boolean}
  */
-function passesNonDateConditions(record, base) {
-  return isFeedCandidate(record) && record.robots.indexable && isSelfCanonical(record, base);
+function passesNonDateConditions(doc, base) {
+  return isFeedCandidate(doc) && robotsPolicyOf(doc).indexable && isSelfCanonical(doc, base);
 }
 
 /**
  * §29.4 in full — every page that belongs in the feed.
- * @param {import('./manifest.js').PageRecord} record
+ * @param {import('./manifest.js').BuildDocument} doc
  * @param {import('./urls.js').BaseUrlConfig|null} base
  * @returns {boolean}
  */
-export function isFeedEntry(record, base) {
-  if (!passesNonDateConditions(record, base)) return false;
-  const dp = record.datePublished;
+export function isFeedEntry(doc, base) {
+  if (!passesNonDateConditions(doc, base)) return false;
+  const dp = publicationDatesOf(doc).published;
   return dp !== null && dp.iso !== null && hasTime(dp.iso);
 }
 
@@ -180,13 +192,13 @@ export function isFeedEntry(record, base) {
  * `schema-incomplete`'s question (§24.4) and the second is `date-unusable`'s
  * (§26.3), and "one question keeps one owner" (§29.3's own words) means this
  * module says nothing about either.
- * @param {import('./manifest.js').PageRecord} record
+ * @param {import('./manifest.js').BuildDocument} doc
  * @param {import('./urls.js').BaseUrlConfig|null} base
  * @returns {boolean}
  */
-function isDateOnlyCandidate(record, base) {
-  if (!passesNonDateConditions(record, base)) return false;
-  const dp = record.datePublished;
+function isDateOnlyCandidate(doc, base) {
+  if (!passesNonDateConditions(doc, base)) return false;
+  const dp = publicationDatesOf(doc).published;
   return dp !== null && dp.iso !== null && !hasTime(dp.iso);
 }
 
@@ -197,27 +209,30 @@ function isDateOnlyCandidate(record, base) {
  * same reason sitemap.js keeps its P22 reporting out of its own `entriesFor`
  * — membership is one question, and "does the build need to say something
  * about this" is another.
- * @param {import('./manifest.js').PageRecord[]} records
+ * @param {import('./manifest.js').BuildDocument[]} documents
  * @param {import('./urls.js').BaseUrlConfig|null} base
- * @returns {import('./manifest.js').PageRecord[]}
+ * @returns {import('./manifest.js').BuildDocument[]}
  */
-export function entriesFor(records, base) {
-  const out = records.filter((r) => isFeedEntry(r, base));
+export function entriesFor(documents, base) {
   // §29.4 — datePublished DESCENDING. Every entry's `iso` carries a time by
-  // construction (the membership test above), so it names one real instant;
+  // construction (the membership test below), so it names one real instant;
   // comparing the STRINGS would be wrong the moment two entries disagree on
   // offset (`...T23:00:00-05:00` sorts before `...T01:00:00Z` as text even
-  // though it names a LATER instant, 04:00 UTC against 01:00 UTC) — so this
-  // parses each into a timestamp and compares those. Ties (the same instant,
-  // not merely the same string) break on output path ascending, so two
-  // builds of the same tree produce byte-identical feeds.
-  out.sort((a, b) => {
-    const ta = Date.parse(a.datePublished.iso);
-    const tb = Date.parse(b.datePublished.iso);
-    if (ta !== tb) return tb - ta;
-    return a.outputPath < b.outputPath ? -1 : 1;
-  });
-  return out;
+  // though it names a LATER instant, 04:00 UTC against 01:00 UTC) — so each
+  // entry's timestamp is parsed and compared. Decorate-sort-undecorate,
+  // because `publicationDatesOf` walks the head metas on every call: computed
+  // in the comparator it runs O(n log n) times per feed for a value that is
+  // fixed per document. Ties (the same instant, not merely the same string)
+  // break on output path ascending, so two builds of the same tree produce
+  // byte-identical feeds.
+  return documents
+    .filter((d) => isFeedEntry(d, base))
+    .map((d) => ({ d, t: Date.parse(publicationDatesOf(d).published.iso) }))
+    .sort((a, b) => {
+      if (a.t !== b.t) return b.t - a.t;
+      return a.d.outputPath < b.d.outputPath ? -1 : 1;
+    })
+    .map(({ d }) => d);
 }
 
 /**
@@ -226,17 +241,18 @@ export function entriesFor(records, base) {
  * (see its own comment): the message says "this page is not in feed.xml",
  * which is a claim about a file this build is producing, not a hypothetical
  * about one it might have.
- * @param {import('./manifest.js').PageRecord[]} records
+ * @param {import('./manifest.js').BuildDocument[]} documents
  * @param {import('./urls.js').BaseUrlConfig|null} base
  * @param {import('./diagnostics.js').Reporter} reporter
  */
-export function reportDateOnlyEntries(records, base, reporter) {
-  for (const record of records) {
-    if (!isDateOnlyCandidate(record, base)) continue;
+export function reportDateOnlyEntries(documents, base, reporter) {
+  for (const doc of documents) {
+    if (!isDateOnlyCandidate(doc, base)) continue;
+    const published = publicationDatesOf(doc).published;
     reporter.advisory({
-      file: record.sourcePath,
-      message: `date is "${record.datePublished.raw}", which names a day rather than an instant — this page is not in ${FEED_PATH}`,
-      fixes: [dateOnlyFix(record)],
+      file: doc.source.path,
+      message: `date is "${published.raw}", which names a day rather than an instant — this page is not in ${FEED_PATH}`,
+      fixes: [dateOnlyFix(published)],
     });
   }
 }
@@ -247,10 +263,10 @@ export function reportDateOnlyEntries(records, base, reporter) {
  * frontmatter, an HTML page's in a `<meta>`. The sample value reuses the
  * page's own date rather than inventing an unrelated one, so the diagnostic
  * reads as "add a time to what you wrote" and not "here is a new date".
- * @param {import('./manifest.js').PageRecord} record
+ * @param {{raw: string, iso: string}} published - `publicationDatesOf(doc).published`
  * @returns {string}
  */
-function dateOnlyFix(record) {
+function dateOnlyFix(published) {
   // Names the VALUE to change rather than an element to add, because adding
   // one does not work. §20.3 reads `datePublished` from EITHER
   // `article:published_time` or `<meta name="date">`, and §20.4 keeps the
@@ -259,22 +275,21 @@ function dateOnlyFix(record) {
   // watched the advisory fire again. The author's own string is the one thing
   // guaranteed to be present and greppable, whichever spelling carries it and
   // whether it came from frontmatter or from markup.
-  const sample = `${record.datePublished.iso}T09:00:00Z`;
-  return `give the date a time and a time zone — "${record.datePublished.raw}" becomes "${sample}"`;
+  const sample = `${published.iso}T09:00:00Z`;
+  return `give the date a time and a time zone — "${published.raw}" becomes "${sample}"`;
 }
 
 /**
  * §29.5 — `<entry><updated>`: `dateModified.iso` when it carries a time,
- * else `datePublished.iso`. Safe to read unconditionally for any record
+ * else `datePublished.iso`. Safe to read unconditionally for any document
  * `entriesFor` returned: membership guarantees `datePublished.iso` is
  * non-null and carries a time, so the fallback always has somewhere to land.
- * @param {import('./manifest.js').PageRecord} record
+ * @param {import('./manifest.js').BuildDocument} doc
  * @returns {string}
  */
-function entryUpdated(record) {
-  const dm = record.dateModified;
-  if (dm !== null && dm.iso !== null && hasTime(dm.iso)) return dm.iso;
-  return record.datePublished.iso;
+function entryUpdated({ published, modified }) {
+  if (modified !== null && modified.iso !== null && hasTime(modified.iso)) return modified.iso;
+  return published.iso;
 }
 
 /**
@@ -303,7 +318,7 @@ function mainMarkup(html) {
  * serialization format is spec-mandated here the way §21.4 mandates
  * sitemap.js's; this file picks one and holds it, so two builds of one tree
  * still produce byte-identical bytes).
- * @param {import('./manifest.js').PageRecord} record
+ * @param {import('./manifest.js').BuildDocument} doc
  * @param {{feedFull: boolean, pageHtml: Map<string,string>|null}} opts
  * @returns {string[]} lines, unindented at the caller's level
  */
@@ -367,7 +382,7 @@ function xmlEscapeAttr(value, quote) {
 
 /**
  * §29.5 — an entry's own absolute address: the canonical when the page
- * declares one, else `record.url`, resolved so the result is always absolute.
+ * declares one, else `doc.document.url`, resolved so the result is always absolute.
  *
  * The resolution is required rather than tidy. RFC 4287 §4.2.6 makes
  * `atom:id` a permanent, universally unique IRI, and a RELATIVE canonical is
@@ -385,17 +400,18 @@ function xmlEscapeAttr(value, quote) {
  * would edit bytes that are theirs. Only a value that is not yet an absolute
  * URL is resolved, and it is resolved against the page's own absolute address
  * — which is §11's rule applied once more, not a new reading of a URL.
- * @param {import('./manifest.js').PageRecord} record
+ * @param {import('./manifest.js').BuildDocument} doc
  * @returns {string}
  */
-function entryAddress(record) {
-  // `record.url` is never null here: generateFeed only reaches serializeEntry
-  // once `base` is confirmed non-null (§20.5 makes `url` null ONLY without
-  // --base-url), so there is always an absolute base to resolve against.
-  const canonical = record.canonical;
-  if (canonical === null) return record.url;
+function entryAddress(doc) {
+  // `doc.document.url` is never null here: generateFeed only reaches
+  // serializeEntry once `base` is confirmed non-null (§20.5 makes `url` null
+  // ONLY without --base-url), so there is always an absolute base to resolve
+  // against.
+  const canonical = canonicalOf(doc);
+  if (canonical === null) return doc.document.url;
   try {
-    return new URL(canonical, record.url).href;
+    return new URL(canonical, doc.document.url).href;
   } catch {
     // Unparseable even against an absolute base — a `mailto:` with no path, a
     // value no URL parser accepts. §29.5 names the canonical, so the author's
@@ -404,11 +420,11 @@ function entryAddress(record) {
   }
 }
 
-function serializeEntry(record, { feedFull, pageHtml }) {
-  // §29.5 — record.url is never null here: generateFeed only reaches this
-  // function once `base` is confirmed non-null (§20.5 makes `url` null ONLY
-  // without --base-url), so the fallback always has a real string to use.
-  const id = entryAddress(record);
+function serializeEntry(doc, { feedFull, pageHtml }) {
+  // §29.5 — doc.document.url is never null here: generateFeed only reaches
+  // this function once `base` is confirmed non-null (§20.5 makes `url` null
+  // ONLY without --base-url), so the fallback always has a real string to use.
+  const id = entryAddress(doc);
   const lines = ["  <entry>"];
   lines.push(`    <id>${xmlEscape(id)}</id>`);
   // §29.5's table gives `<summary>`/`<author>` an explicit "omitted when
@@ -418,19 +434,22 @@ function serializeEntry(record, { feedFull, pageHtml }) {
   // §29.4's four conditions requires one) therefore emits an EMPTY element
   // rather than none at all, the same choice a required-but-unauthored
   // element gets nowhere else in this table.
-  lines.push(`    <title>${xmlEscape(record.title ?? "")}</title>`);
+  lines.push(`    <title>${xmlEscape(titleOf(doc) ?? "")}</title>`);
   lines.push(`    <link rel="alternate" href="${xmlEscape(id)}"/>`);
-  lines.push(`    <updated>${xmlEscape(entryUpdated(record))}</updated>`);
-  lines.push(`    <published>${xmlEscape(record.datePublished.iso)}</published>`);
-  if (record.description !== null) lines.push(`    <summary type="text">${xmlEscape(record.description)}</summary>`);
-  if (record.author !== null) lines.push(`    <author><name>${xmlEscape(record.author)}</name></author>`);
+  const dates = publicationDatesOf(doc);
+  lines.push(`    <updated>${xmlEscape(entryUpdated(dates))}</updated>`);
+  lines.push(`    <published>${xmlEscape(dates.published.iso)}</published>`);
+  const description = descriptionOf(doc);
+  const author = authorOf(doc);
+  if (description !== null) lines.push(`    <summary type="text">${xmlEscape(description)}</summary>`);
+  if (author !== null) lines.push(`    <author><name>${xmlEscape(author)}</name></author>`);
   if (feedFull) {
     // RFC 4287 §4.1.3.3: an html-type Content construct is TEXT — child
     // markup must be entity-escaped, never embedded as live XML elements —
     // so the extracted markup is XML-escaped like any other string here,
     // never wrapped in CDATA (see the module comment's percent/XML-escaping
     // discussion for why this file escapes rather than shields throughout).
-    const markup = absolutizeMarkupUrls(mainMarkup(pageHtml?.get(record.outputPath) ?? ""), id);
+    const markup = absolutizeMarkupUrls(mainMarkup(pageHtml?.get(doc.outputPath) ?? ""), id);
     lines.push(`    <content type="html">${xmlEscape(markup)}</content>`);
   }
   lines.push("  </entry>");
@@ -440,17 +459,18 @@ function serializeEntry(record, { feedFull, pageHtml }) {
 /**
  * §29.5 — the whole document.
  * @param {object} args
- * @param {import('./manifest.js').PageRecord[]} args.records
+ * @param {import('./manifest.js').BuildDocument[]} args.documents
  * @param {import('./urls.js').BaseUrlConfig} args.base
- * @param {import('./manifest.js').PageRecord[]} args.entries - `entriesFor`'s result
+ * @param {import('./manifest.js').BuildDocument[]} args.entries - `entriesFor`'s result
  * @param {boolean} args.feedFull
  * @param {Map<string,string>|null} args.pageHtml
  * @returns {string}
  */
-function serializeFeed({ records, base, entries, feedFull, pageHtml }) {
-  const address = base.origin + base.pathPrefix; // "the site's own address" (§29.5), reused for <id> and rel=alternate
+function serializeFeed({ documents, base, entries, feedFull, pageHtml }) {
+  const address = effectiveBaseUrl(base); // "the site's own address" (§29.5), reused for <id> and rel=alternate
   const selfUrl = address + FEED_PATH;
-  const rootTitle = records.find((r) => r.outputPath === "index.html")?.title;
+  const root = documents.find((d) => d.outputPath === "index.html");
+  const rootTitle = root ? titleOf(root) : null;
   const title = rootTitle ?? new URL(base.origin).host;
 
   const lines = [`<feed xmlns="${ATOM_XMLNS}">`];
@@ -475,10 +495,10 @@ function serializeFeed({ records, base, entries, feedFull, pageHtml }) {
   // Unconditional, and safely so: §29.1 writes no feed at all when there are
   // no entries, precisely so this element always has a newest one to read
   // (RFC 4287 §4.1.1 requires it, and nothing here may invent an instant).
-  lines.push(`  <updated>${xmlEscape(entryUpdated(entries[0]))}</updated>`);
+  lines.push(`  <updated>${xmlEscape(entryUpdated(publicationDatesOf(entries[0])))}</updated>`);
   lines.push(`  <link rel="self" href="${xmlEscape(selfUrl)}"/>`);
   lines.push(`  <link rel="alternate" href="${xmlEscape(address)}"/>`);
-  for (const record of entries) lines.push(...serializeEntry(record, { feedFull, pageHtml }));
+  for (const doc of entries) lines.push(...serializeEntry(doc, { feedFull, pageHtml }));
   lines.push("</feed>");
   return `${DECLARATION}${lines.join("\n")}\n`;
 }
@@ -493,7 +513,7 @@ function serializeFeed({ records, base, entries, feedFull, pageHtml }) {
  * wiring must add, mirroring cli.js's existing `--canonical auto` check.
  *
  * @param {object} args
- * @param {import('./manifest.js').PageRecord[]} args.records - the §20 manifest
+ * @param {import('./manifest.js').BuildDocument[]} args.documents - the §20 manifest
  * @param {import('./urls.js').BaseUrlConfig|null} args.base - null suppresses generation (§29.1)
  * @param {boolean} [args.feedFull] - §29.6 — include each entry's rendered body
  * @param {Map<string,string>|null} [args.pageHtml] - output path -> the page's
@@ -508,18 +528,18 @@ function serializeFeed({ records, base, entries, feedFull, pageHtml }) {
  * @returns {Map<string,string>} generated output path -> text; empty when
  *   generation did not activate or was suppressed
  */
-export function generateFeed({ records, base, feedFull = false, pageHtml = null, emittedFromSource, reporter }) {
+export function generateFeed({ documents, base, feedFull = false, pageHtml = null, emittedFromSource, reporter }) {
   const generated = new Map();
   if (!base) return generated; // §29.1 — no public address, no feed, no report
-  if (!records.some(isFeedCandidate)) return generated; // §29.1 — nothing on the site opted in anywhere
+  if (!documents.some(isFeedCandidate)) return generated; // §29.1 — nothing on the site opted in anywhere
   // §29.7, reusing §21.5's rule verbatim: the author's file IS the feed.
   if (emittedFromSource.has(FEED_PATH)) return generated;
 
   // Only now that a feed is actually being written — see this function's own
   // "this page is not in feed.xml" wording, which is false the moment
   // nothing is generated.
-  reportDateOnlyEntries(records, base, reporter);
-  const entries = entriesFor(records, base);
+  reportDateOnlyEntries(documents, base, reporter);
+  const entries = entriesFor(documents, base);
   // §29.1 — activation is MEMBERSHIP, not declaration. A page can declare
   // Article and still not be an entry (§29.4), and the commonest way is
   // §29.3's date rule, which is A17's own worked example. A feed with zero
@@ -528,7 +548,7 @@ export function generateFeed({ records, base, feedFull = false, pageHtml = null,
   // invalid document or an invented instant, and §6.1 forbids the second.
   // Writing no file is the third: A17 already told the author why.
   if (entries.length === 0) return generated;
-  generated.set(FEED_PATH, serializeFeed({ records, base, entries, feedFull, pageHtml }));
+  generated.set(FEED_PATH, serializeFeed({ documents, base, entries, feedFull, pageHtml }));
   return generated;
 }
 
@@ -538,7 +558,7 @@ export function generateFeed({ records, base, feedFull = false, pageHtml = null,
  * a file the site emits, exactly as §21.6 checks a sitemap's `<loc>`.
  *
  * For a GENERATED feed this can only pass: every entry's `<id>` is
- * `record.canonical` or `record.url`, and §29.4's third condition
+ * `canonicalOf(doc)` or `doc.document.url`, and §29.4's third condition
  * (self-canonical) already guarantees whichever one was used resolves to
  * the entry's own output path. It runs anyway, for §21.6's reason — the
  * executable form of the claim that the feed and the published tree agree,

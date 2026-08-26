@@ -613,7 +613,8 @@ published** and the previous \`dist/\` is untouched — never report success on 
   **errors** for the same reason: a page's address is its source path, and a key that quietly
   changed nothing would look like it worked.
 - \`tags:\` and \`categories:\` are allowed and become ordinary \`<meta>\` tags, but they build
-  nothing — there are no collections and no taxonomies, and \`unify audit\` says so out loud.
+  nothing — there are no collections and no taxonomies, and unify reports nothing about them —
+  they are inert by design, meaningful only to a consumer that chooses to interpret them.
 - Link the real file: \`/about.html\`, never \`/about/\`. A directory link resolves only if you wrote
   \`about/index.html\`. A leading \`/\` means the source root, in any path you write.
 - Derived files — a post index — come from a script you write and run yourself. From this

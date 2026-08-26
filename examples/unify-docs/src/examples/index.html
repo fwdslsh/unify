@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>Examples</title>
+    <meta name="description" content="Eight example sites built with unify's five primitives, five of them running live in this deployment.">
+    <meta name="schema" content="WebPage">
+  </head>
+  <body class="examples">
+    <main>
+      <section class="examples-head">
+        <h1>Examples</h1>
+        <p class="lede">Eight sites, built from nothing but <code>&lt;include&gt;</code>,
+        layouts, slots, the underscore, and the <code>.fragment.html</code> opt-out. Four
+        were built by an agent that had never seen unify before, given only
+        <a href="https://github.com/fwdslsh/unify/blob/main/docs/authoring-rules.md">the
+        sixty-line authoring rules</a> and a client brief. Five build with no dependencies
+        at all and run live below; two need an npm toolchain and link to their source for
+        now; the eighth is this site.</p>
+        <noscript>
+          <p class="note">JavaScript is off, so the "View live" links below are inactive —
+          each example's source is one click away on GitHub instead.</p>
+        </noscript>
+      </section>
+
+      <section class="examples-section">
+        <h2>Live in this deployment</h2>
+        <p>Dependency-free: each one builds with nothing but <code>unify build</code>, so
+        the deploy workflow renders a real copy alongside this site.</p>
+        <div class="card-grid">
+          <div class="card">
+            <h3>seed-library</h3>
+            <p>Fernhollow Seed Library: a community seed-library site — 41 pages built from
+            a 27-variety catalogue, three growing guides, and a seasonal-notes section with
+            its own layout. The catalogue page renders every variety at build time and
+            filters client-side with a small inline script, so there is no fetch to 404 on
+            a subpath deploy.</p>
+            <div class="card-links">
+              <a class="more" href="https://github.com/fwdslsh/unify/tree/main/examples/seed-library">Source on GitHub →</a>
+              <a class="more" data-example="seed-library">View live →</a>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>seed-library-alt</h3>
+            <p>The same Fernhollow Seed Library brief, solved by a second, independent
+            author: 42 pages from the same 27-variety catalogue, composed with a different
+            mix of layouts and includes. Built side by side with <code>seed-library</code>
+            to see how differently two authors can compose the same five primitives from
+            one brief — and, deliberately kept, one privacy mistake the other two avoid:
+            it publishes the catalogue's private seed-keeper field on every variety page.
+            See <a href="https://github.com/fwdslsh/unify/tree/main/examples#what-these-examples-do-not-show">"What
+            these examples do not show"</a> in the repo README.</p>
+            <div class="card-links">
+              <a class="more" href="https://github.com/fwdslsh/unify/tree/main/examples/seed-library-alt">Source on GitHub →</a>
+              <a class="more" data-example="seed-library-alt">View live →</a>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>seed-library-ondemand</h3>
+            <p>A later, larger Fernhollow brief at real scale: 225 varieties across 12
+            families, 232 pages. Rather than shipping the whole catalogue into the page,
+            the browse UI fetches one family's JSON at a time through real anchors carrying
+            the fetch URL, so the deploy address never has to be hardcoded in JavaScript.</p>
+            <div class="card-links">
+              <a class="more" href="https://github.com/fwdslsh/unify/tree/main/examples/seed-library-ondemand">Source on GitHub →</a>
+              <a class="more" data-example="seed-library-ondemand">View live →</a>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>htmx-fragments</h3>
+            <p>Hand-maintained to document the <code>.fragment.html</code> opt-out working
+            with htmx: month lists are bare fragments a button swaps in with
+            <code>hx-get</code>, and an opening-hours panel is one file consumed twice —
+            spliced into the Visit page by <code>&lt;include&gt;</code> at build time, and
+            fetched raw by htmx at runtime. htmx itself is vendored, so nothing loads from
+            another origin.</p>
+            <div class="card-links">
+              <a class="more" href="https://github.com/fwdslsh/unify/tree/main/examples/htmx-fragments">Source on GitHub →</a>
+              <a class="more" data-example="htmx-fragments">View live →</a>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>catalog-search-blog</h3>
+            <p>The runnable companion to the catalog-and-search guide: Fieldnotes, a
+            five-post blog whose entire listing page — post list, tag facet, series facet,
+            and search box — renders client-side from <code>catalog.json</code> and
+            <code>search-corpus.json</code>, the two files <code>--catalog</code>/
+            <code>--search-corpus</code> write once at build time. No framework, no server,
+            no dependency at all.</p>
+            <div class="card-links">
+              <a class="more" href="https://github.com/fwdslsh/unify/tree/main/examples/catalog-search-blog">Source on GitHub →</a>
+              <a class="more" data-example="catalog-search-blog">View live →</a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="examples-section">
+        <h2>Also in this repository</h2>
+        <p>Two more examples need an npm toolchain to build, so they are not part of this
+        deployment yet — that is a follow-up after 0.9.0 publishes. And the eighth is the
+        site you are reading now.</p>
+        <div class="card-grid">
+          <div class="card">
+            <h3>eleventy-htmx</h3>
+            <p>Ashgrove Instruments: a product front page, documentation pages, and a
+            release-notes stream filtered by topic — rendered by Eleventy running inside
+            unify's <code>--generate</code> seam, then composed into unify's layout,
+            reference-checked and published exactly like a hand-written page. Needs
+            <code>npm install &amp;&amp; npm run build</code>, so it isn't live here yet.</p>
+            <div class="card-links">
+              <a class="more" href="https://github.com/fwdslsh/unify/tree/main/examples/eleventy-htmx">Source on GitHub →</a>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>forge-svelte</h3>
+            <p>Thistleknap Forge: a fee-estimator widget authored as a Svelte component,
+            compiled by a small <code>_scripts/</code> build into one plain JS bundle that
+            unify ships as an ordinary asset — unify needs to know nothing about Svelte.
+            Needs an npm toolchain to build, so it isn't live here yet.</p>
+            <div class="card-links">
+              <a class="more" href="https://github.com/fwdslsh/unify/tree/main/examples/forge-svelte">Source on GitHub →</a>
+            </div>
+          </div>
+
+          <div class="card featured">
+            <h3>unify-docs</h3>
+            <p>unify's own documentation site — you are looking at it. Built by unify from
+            the repository's real <code>docs/</code> directory through
+            <code>--generate</code>, so it cannot drift from the docs it renders, and it
+            exercises the full production layer: pretty URLs, a base URL, completed
+            canonicals, a sitemap, a catalog, and a search corpus.</p>
+            <div class="card-links">
+              <a class="more" href="https://github.com/fwdslsh/unify/tree/main/examples/unify-docs">Source on GitHub →</a>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!--
+      Why the five "View live" anchors above carry no href of their own,
+      only data-example="<name>":
+
+      Those five live copies are supplied by the deploy workflow's assembly
+      step (.github/workflows/deploy-docs.yml), which builds each example
+      AFTER this site's own unify build and drops the output at
+      dist/examples/<name>/. This page is composed by THIS site's build,
+      which never emits those files — so a plain href="/examples/<name>/"
+      here would name a location this build does not produce, and section
+      12's reference check would correctly refuse it as a broken internal
+      reference (P13). Editing an unify-emitted page after the fact to patch
+      the href in is off the table too: it contradicts the whole point of a
+      transactional, checked publish.
+
+      The fix is the client-side URL seam docs/ratification.md rounds 19-20
+      ratified for seed-library-ondemand's on-demand fetch links: never write
+      the address in markup or in a script literal, only assemble it in the
+      browser from a name the page already knows. The script below sets
+      href/target/rel on each anchor once the DOM is ready, from
+      new URL('./' + name + '/', location.href) — section 12 never looks at
+      an href that isn't there, so it never has an opinion about a file a
+      different build step produces. See _notes/batches/b10-contract.md for
+      the reasoning in full. Do NOT "fix" these into plain hrefs.
+    -->
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        document.querySelectorAll("a[data-example]").forEach((a) => {
+          const name = a.getAttribute("data-example");
+          a.href = new URL("./" + name + "/", location.href).href;
+          a.target = "_blank";
+          a.rel = "noopener";
+        });
+      });
+    </script>
+  </body>
+</html>

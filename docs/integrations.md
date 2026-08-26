@@ -112,10 +112,10 @@ the common variations, and the first of them is the only place unify reaches out
 ## 1. The generator context: what `--generate` hands you
 
 `unify build --generate _scripts/gen.mjs` runs one file you wrote, before it scans
-anything. The whole interface is two positional arguments:
+anything. The whole interface is three positional arguments:
 
 ```js
-const [, , sourceRoot, generatedDir] = process.argv;
+const [, , sourceRoot, generatedDir, contextPath] = process.argv;
 ```
 
 `sourceRoot` is the absolute path of your source tree; `generatedDir` is an absolute path
@@ -124,26 +124,62 @@ to an empty directory that exists only for this build. Files you write into
 exactly like files in `src/`. Files you write anywhere else are your own business, and
 unify neither collects them nor notices them.
 
+`contextPath` is the absolute path of `generator-context.json`, a small versioned snapshot
+unify writes fresh for this one build and deletes when the build finishes, success or
+failure:
+
+```json
+{
+  "schemaVersion": 1,
+  "unifyVersion": "0.9.0",
+  "command": "build",
+  "paths": {
+    "sourceRoot": "/project/src",
+    "generatedRoot": "/tmp/unify-generated-abc123/overlay",
+    "outputRoot": "/project/dist"
+  },
+  "site": {
+    "baseUrl": "https://example.com/",
+    "prettyUrls": true,
+    "canonical": "auto"
+  },
+  "outputs": {
+    "catalog": "assets/unify/catalog.json",
+    "searchCorpus": null
+  }
+}
+```
+
+`site` and `outputs` are the flags that change what a generator would otherwise have to
+duplicate: the effective `--base-url`/`--pretty-urls`/`--canonical`, and the output-relative
+paths `--catalog`/`--search-corpus` will write, each `null` when its flag is off. There is
+nothing else in it — no settings dump, no environment, no internal option names, and no
+manifest, because the generator runs before unify has composed a single page. Reading it is
+optional: `sourceRoot` and `generatedDir` are the same two arguments the flag has always
+passed, unchanged, so a generator that never looks at `contextPath` keeps working exactly as
+it did before this third argument existed.
+
 There is nothing to import. A complete generator is this:
 
 ```js
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-const [, , sourceRoot, generatedDir] = process.argv;
+const [, , sourceRoot, generatedDir, contextPath] = process.argv;
+const { site } = JSON.parse(readFileSync(contextPath, "utf8"));
 mkdirSync(generatedDir, { recursive: true });
 writeFileSync(
   join(generatedDir, "credits.html"),
   `<!doctype html>
 <html lang="en">
 <head><meta charset="utf-8"><title>Credits</title><meta name="description" content="Who built this."></head>
-<body><h1>Credits</h1><p>Built from ${sourceRoot}.</p></body>
+<body><h1>Credits</h1><p>Built from ${sourceRoot}, published at ${site.baseUrl ?? "no --base-url"}.</p></body>
 </html>
 `,
 );
 ```
 
-Four properties are worth knowing before you write a longer one:
+Five properties are worth knowing before you write a longer one:
 
 - **The working directory is the source root**, so `readFileSync("_data/authors.json")`
   means what you would expect from reading the source tree.
@@ -152,9 +188,13 @@ Four properties are worth knowing before you write a longer one:
 - **It runs on every build**, including every rebuild under `unify watch` and `unify dev`.
   That is deliberate — a generator that ran once would leave watch output stale while the
   build reported success — but it means an expensive generator makes every keystroke
-  expensive. See recipe 3 for the fix.
+  expensive. See recipe 3 for the fix. `generator-context.json` is written fresh for every
+  one of those runs too, so it never reflects a stale build.
 - **Its failure is a build failure.** A non-zero exit is a located problem, nothing
   publishes, and the previous `dist/` is untouched.
+- **`command` names the real subcommand** — `build`, `dev`, `watch`, or `audit` — so a
+  generator that only makes sense during development can check it and skip itself rather
+  than guessing from a flag.
 
 The `blog` template ships this worked: `unify init blog` writes a `_scripts/gen.mjs` that
 reads `posts/*.md` and `_data/authors.json` and regenerates the index and the feed.

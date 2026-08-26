@@ -42,7 +42,8 @@ Options:
       --canonical auto     add a canonical link to pages that author none, from the site address
       --base-url <url>     the site's whole address (https://site.example/repo/): prefix root-relative links, make og:/canonical absolute for share crawlers, and generate sitemap.xml
       --feed-full          include each entry's full rendered content in feed.xml (needs --base-url)
-      --search-index       write search-index.json for a client-side search library
+      --catalog            write assets/unify/catalog.json — a browse/filter/TOC projection of every public page
+      --search-corpus      write assets/unify/search-corpus.json — normalized page text for client-side search
       --generate <path>    run one JavaScript file from your source tree before the build
       --dry-run            run the full build and every check, print the report, write nothing
       --strict             advisories count as problems for the exit code (with \`audit\`, findings too)
@@ -90,13 +91,16 @@ function resolveSettings(flags) {
       prettyUrls: settings["pretty-urls"] === true,
       baseUrl: settings["base-url"],
       canonical: settings.canonical,
-      // §29.6 — full-content feed entries; §30.1 — the search manifest. Both
-      // boolean, both read only by build.js (audit reaches them too, since
-      // `unify audit` runs the same pipeline). `feed-full`'s "requires
-      // --base-url" usage error is cross-cutting validation, checked below
-      // beside `--canonical auto`'s identical shape.
+      // §29.6 — full-content feed entries; §30.1 — the catalog and search
+      // corpus. All boolean, all read only by build.js (audit reaches them
+      // too, since `unify audit` runs the same pipeline). `feed-full`'s
+      // "requires --base-url" usage error is cross-cutting validation,
+      // checked below beside `--canonical auto`'s identical shape.
+      // `--catalog`/`--search-corpus` are independent flags — neither
+      // implies the other.
       feedFull: settings["feed-full"] === true,
-      searchIndex: settings["search-index"] === true,
+      catalog: settings.catalog === true,
+      searchCorpus: settings["search-corpus"] === true,
       // §33.1 — a PATH in the source tree, never a command. Read by
       // build.js before the scan (§33.5), so `watch`, `dev` and `audit`
       // get it too: all four scan the source tree.
@@ -245,7 +249,12 @@ export async function run(argv) {
   }
 
   const reporter = new Reporter({ strict: settings.strict });
-  const context = { sourceRoot, output, settings, reporter, template, sourceDefaulted };
+  // §33.2 — the actual subcommand, carried alongside `settings` rather than
+  // folded into it: it is not a saved-flag concept (unify.yaml has nothing
+  // named `command`), only the generator context's `command` field reads it,
+  // and every command handler below (build/audit/dev/watch) already receives
+  // and forwards this whole context object.
+  const context = { sourceRoot, output, settings, reporter, template, sourceDefaulted, command };
 
   switch (command) {
     case "build":

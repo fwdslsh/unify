@@ -103,7 +103,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - run: bun tests/conformance/check-traceability.mjs --static --baseline tests/conformance/phase-gaps/baseline.txt
 
-  # Always-on gate G13: every example still builds. `examples/` holds seven
+  # Always-on gate G13: every example still builds. `examples/` holds eight
   # sites and CI used to build one, so an example could stop working and
   # nothing would notice — which is not hypothetical: a deploy workflow
   # carried `--copy` for three releases after that flag was cut, and the
@@ -117,11 +117,15 @@ jobs:
   # than none, because it is still being cited.
   #
   # `build --dry-run --strict` is the gate for ALL of them; `audit --strict`
-  # only for the two that already meet it. The four sandbox-authored sites
-  # carry 41 `incomplete` findings between them (share images with no
-  # declared dimensions, mostly), and they always have — demanding audit
-  # cleanliness here would be a new requirement wearing a regression gate's
-  # clothes, and it would land this job red on the day it merged.
+  # only for the three that already meet it. The other four —
+  # seed-library, seed-library-alt, seed-library-ondemand (sandbox-authored),
+  # and htmx-fragments (hand-maintained) — carry 385 `incomplete` findings
+  # between them (41 / 80 / 259 / 5: image-missing-dimensions dominates only
+  # seed-library; seed-library-alt is dominated by description-missing and
+  # seed-library-ondemand by page-orphan), and they always have —
+  # demanding audit cleanliness here would be a new requirement wearing a
+  # regression gate's clothes, and it would land this job red on the day it
+  # merged.
   examples:
     name: Examples build (G13)
     runs-on: ubuntu-latest
@@ -136,17 +140,70 @@ jobs:
             echo "── $ex"
             bun src/cli.js build -s "examples/$ex/src" -o "/tmp/$ex" --dry-run --strict
           done
+      # The five live examples deploy-docs.yml assembles into the /examples/
+      # gallery run with a DIFFERENT flag set than the loop above — pretty
+      # URLs and a subpath --base-url, which is exactly the axis that turns
+      # on sitemap/canonical/advisory machinery the plain build above never
+      # exercises. Mirror deploy-docs.yml's exact assembly commands here
+      # (minus the real build — --dry-run --strict is the gate) so a
+      # --base-url-sensitive regression fails on the PR, not on the deploy.
+      # Keep this in sync with the "Assemble example —" steps in
+      # .github/workflows/deploy-docs.yml; the base URL differs (this repo's
+      # own domain is a stand-in) but every flag after it must match.
+      - name: Dependency-free examples at deploy subpath (matches deploy-docs.yml)
+        env:
+          SITE_BASE_URL: https://unify.fwdslsh.dev/
+        run: |
+          set -euo pipefail
+          node examples/seed-library/src/_scripts/gen.mjs
+          bun src/cli.js build -s examples/seed-library/src \
+            -o /tmp/deploy-seed-library \
+            --pretty-urls --base-url "$SITE_BASE_URL"examples/seed-library/ \
+            --clean --dry-run --strict
+
+          (cd examples/seed-library-alt && node src/_scripts/gen.mjs)
+          bun src/cli.js build -s examples/seed-library-alt/src \
+            -o /tmp/deploy-seed-library-alt \
+            --pretty-urls --base-url "$SITE_BASE_URL"examples/seed-library-alt/ \
+            --exclude '_*' --dry-run --strict
+
+          node examples/seed-library-ondemand/src/_scripts/gen.mjs
+          bun src/cli.js build -s examples/seed-library-ondemand/src \
+            -o /tmp/deploy-seed-library-ondemand \
+            --pretty-urls --base-url "$SITE_BASE_URL"examples/seed-library-ondemand/ \
+            --clean --dry-run --strict
+
+          bun src/cli.js build -s examples/htmx-fragments/src \
+            -o /tmp/deploy-htmx-fragments \
+            --base-url "$SITE_BASE_URL"examples/htmx-fragments/ \
+            --dry-run --strict
+
+          bun src/cli.js build -s examples/catalog-search-blog/src \
+            -o /tmp/deploy-catalog-search-blog \
+            --generate _scripts/gen.mjs --pretty-urls \
+            --base-url "$SITE_BASE_URL"examples/catalog-search-blog/ \
+            --catalog --search-corpus --dry-run --strict
       - name: unify-docs (build and audit, as deploy-docs.yml gates it)
         run: |
           set -euo pipefail
           bun src/cli.js build -s examples/unify-docs/src -o /tmp/unify-docs \
             --generate _scripts/gen.mjs --pretty-urls \
-            --base-url https://unify.fwdslsh.dev/ --canonical auto --search-index \
+            --base-url https://unify.fwdslsh.dev/ --canonical auto --catalog --search-corpus \
             --dry-run --strict
           bun src/cli.js audit -s examples/unify-docs/src \
             --generate _scripts/gen.mjs --pretty-urls \
-            --base-url https://unify.fwdslsh.dev/ --canonical auto --search-index \
+            --base-url https://unify.fwdslsh.dev/ --canonical auto --catalog --search-corpus \
             --strict
+      - name: catalog-search-blog (build and audit; dependency-free)
+        run: |
+          set -euo pipefail
+          bun src/cli.js build -s examples/catalog-search-blog/src -o /tmp/catalog-search-blog \
+            --generate _scripts/gen.mjs --pretty-urls \
+            --base-url https://example.com/blog/ --catalog --search-corpus \
+            --dry-run --strict
+          bun src/cli.js audit -s examples/catalog-search-blog/src \
+            --generate _scripts/gen.mjs --pretty-urls \
+            --base-url https://example.com/blog/ --catalog --search-corpus --strict
 
   # G13, the half that needs a package install. Deliberately run on NODE:
   # bun auto-installs an import it cannot resolve, so a missing dependency

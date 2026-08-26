@@ -39,6 +39,9 @@
 
 import { Reporter } from "./diagnostics.js";
 import { formatFindings } from "./audit.js";
+import {
+  canonicalOf, descriptionOf, langOf, robotsPolicyOf, titleOf,
+} from "./document-selectors.js";
 
 /**
  * Escape for HTML text and double-quoted attribute values alike. Every value
@@ -143,10 +146,10 @@ terminal running <code>unify dev</code>. This page reloads when a rebuild comple
  *
  * @param {object} evaluation - exactly what `build.js` hands over; nothing
  *   here reads anything else
- * @param {import('./manifest.js').PageRecord[]} evaluation.records - §20's
+ * @param {import('./manifest.js').BuildDocument[]} evaluation.documents - §20's
  *   manifest, in its own order (output path)
  * @param {import('./audit.js').Finding[]} evaluation.findings - §24's findings
- *   over those records, in §24.5's order (source path, then id)
+ *   over those documents, in §24.5's order (source path, then id)
  * @param {string} evaluation.address - §17's first line, verbatim
  * @param {import('./diagnostics.js').Diagnostic[]} evaluation.diagnostics -
  *   §14's diagnostics for this build, already deduplicated, already sorted,
@@ -155,11 +158,11 @@ terminal running <code>unify dev</code>. This page reloads when a rebuild comple
  *   output directory
  * @returns {string}
  */
-export function renderReport({ records, findings, address, diagnostics, published }) {
+export function renderReport({ documents, findings, address, diagnostics, published }) {
   return page([
     summarySection({ findings, address, diagnostics, published }),
-    findingsSection(findings, records),
-    recordsSection(records),
+    findingsSection(findings, documents),
+    documentsSection(documents),
     diagnosticsSection(diagnostics),
   ].join("\n"));
 }
@@ -202,17 +205,18 @@ function summarySection({ findings, address, diagnostics, published }) {
  * evidence, its fix, and its stable id: §24.5's four fields rearranged rather
  * than reworded.
  *
- * Grouped by the finding's own `file`, not by walking the records, because one
- * finding in this catalogue is not about a page at all: `robots-sitemap-missing`
- * is located at the source `robots.txt` and reads no record (§24.4). Grouping
- * the other way would have dropped it from the view while `unify audit` still
- * printed it, which is §27.5's disagreement in its most literal form.
+ * Grouped by the finding's own `file`, not by walking the documents, because
+ * one finding in this catalogue is not about a page at all:
+ * `robots-sitemap-missing` is located at the source `robots.txt` and reads
+ * no document (§24.4). Grouping the other way would have dropped it from the
+ * view while `unify audit` still printed it, which is §27.5's disagreement
+ * in its most literal form.
  */
-function findingsSection(findings, records) {
+function findingsSection(findings, documents) {
   if (findings.length === 0) {
     return `<section><h2>Findings</h2><p>Nothing to report.</p></section>`;
   }
-  const anchors = new Map(records.map((r, i) => [r.sourcePath, `page-${i}`]));
+  const anchors = new Map(documents.map((d, i) => [d.source.path, `page-${i}`]));
   /** @type {Map<string, object[]>} insertion order is §24.5's order */
   const groups = new Map();
   for (const f of findings) {
@@ -237,31 +241,39 @@ function findingsSection(findings, records) {
 }
 
 /**
- * §27.3 (3) — every page's record, including pages with no findings: "a page
- * nothing is wrong with is the useful half of the answer to 'did my metadata
- * land'". Every field named in §27.3 is here, read straight off the record.
+ * §27.3 (3) — every page's document, including pages with no findings: "a
+ * page nothing is wrong with is the useful half of the answer to 'did my
+ * metadata land'". Every field named in §27.3 is here, read straight off the
+ * envelope through the shared selectors — the same reading `unify audit`
+ * itself uses (§27.5's "no second reading").
  */
-function recordsSection(records) {
-  if (records.length === 0) {
+function documentsSection(documents) {
+  if (documents.length === 0) {
     return `<section><h2>Pages</h2><p>This build composed no pages.</p></section>`;
   }
   const parts = [`<section><h2>Pages</h2>`];
-  for (const [i, r] of records.entries()) {
-    const outline = r.headings.length === 0
+  for (const [i, doc] of documents.entries()) {
+    const headings = doc.document.body.headings;
+    const outline = headings.length === 0
       ? ABSENT
-      : `<ul>${r.headings.map((h) => `<li>h${esc(h.level)}: ${esc(h.text)}</li>`).join("")}</ul>`;
+      : `<ul>${headings.map((h) => `<li>h${esc(h.level)}: ${esc(h.text)}</li>`).join("")}</ul>`;
+    const title = titleOf(doc);
+    const description = descriptionOf(doc);
+    const canonical = canonicalOf(doc);
+    const robots = robotsPolicyOf(doc);
+  const lang = langOf(doc);
     parts.push(`<article id="page-${i}">
-<h3>${esc(r.sourcePath)}</h3>
+<h3>${esc(doc.source.path)}</h3>
 <dl>
-<dt>output path</dt><dd>${esc(r.outputPath)}</dd>
-<dt>address</dt><dd>${esc(r.path)}</dd>
-<dt>public URL</dt><dd>${r.url === null ? NO_BASE_URL : esc(r.url)}</dd>
-<dt>title</dt><dd>${r.title === null ? ABSENT : esc(r.title)}</dd>
-<dt>description</dt><dd>${r.description === null ? ABSENT : esc(r.description)}</dd>
-<dt>language</dt><dd>${r.lang === null ? ABSENT : esc(r.lang)}</dd>
-<dt>canonical</dt><dd>${r.canonical === null ? ABSENT : esc(r.canonical)}</dd>
-<dt>indexable</dt><dd>${r.robots.indexable ? "yes" : "no"}</dd>
-<dt>links in / out</dt><dd>${esc(r.linksIn.length)} / ${esc(r.linksOut.length)}</dd>
+<dt>output path</dt><dd>${esc(doc.outputPath)}</dd>
+<dt>address</dt><dd>${esc(doc.document.path)}</dd>
+<dt>public URL</dt><dd>${doc.document.url === null ? NO_BASE_URL : esc(doc.document.url)}</dd>
+<dt>title</dt><dd>${title === null ? ABSENT : esc(title)}</dd>
+<dt>description</dt><dd>${description === null ? ABSENT : esc(description)}</dd>
+<dt>language</dt><dd>${lang === null ? ABSENT : esc(lang)}</dd>
+<dt>canonical</dt><dd>${canonical === null ? ABSENT : esc(canonical)}</dd>
+<dt>indexable</dt><dd>${robots.indexable ? "yes" : "no"}</dd>
+<dt>links in / out</dt><dd>${esc(doc.analysis.linksIn.length)} / ${esc(doc.analysis.linksOut.length)}</dd>
 <dt>headings</dt><dd>${outline}</dd>
 </dl>
 </article>`);

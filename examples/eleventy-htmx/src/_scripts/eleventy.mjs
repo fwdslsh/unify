@@ -2,11 +2,12 @@
 //
 //     unify build -s src -o dist --generate _scripts/eleventy.mjs
 //
-// unify runs this file itself, once, before it scans the source tree. The contract is two
-// arguments and a working directory (conformance-spec §33.2) — argv[2] is the absolute
-// source root, argv[3] is the absolute overlay directory unify made for this one build,
-// and cwd is the source root. There is nothing to import from unify, no object passed in,
-// and no return value read.
+// unify runs this file itself, once, before it scans the source tree. The contract is
+// three arguments and a working directory (conformance-spec §33.2) — argv[2] is the
+// absolute source root, argv[3] is the absolute overlay directory unify made for this one
+// build, argv[4] is the absolute path to a read-only generator-context.json snapshot of
+// unify's own effective settings, and cwd is the source root. There is nothing to import
+// from unify, no object passed in, and no return value read.
 //
 // Everything written into the overlay joins the build as ordinary source: composed into
 // src/_layout.html by the normal discovery walk, reference-checked, collision-checked
@@ -32,6 +33,14 @@ import { join } from "node:path";
 const sourceRoot = process.argv[2] ?? process.cwd();
 const generatedDir = process.argv[3] ?? mkdtempSync(join(tmpdir(), "eleventy-preview-"));
 if (!process.argv[3]) console.log(`standalone run: writing a preview overlay into ${generatedDir}`);
+
+// argv[4] is generator-context.json — a versioned snapshot of the same effective settings
+// unify's own build is about to apply, read once, straight off disk, with no import from
+// unify. The `?.` guards any run with no fourth argument: the standalone run above, and
+// unify releases before 0.9.0 (this example's package.json pins one until 0.9.0 is
+// published), which predate the context file. Under unify 0.9.0+ argv[4] is always
+// supplied and the guard never fires.
+const context = process.argv[4] ? JSON.parse(readFileSync(process.argv[4], "utf8")) : null;
 
 // cwd is the source root (§33.2), so this is the same file Eleventy's data
 // cascade reads as `site`.
@@ -74,6 +83,10 @@ const eleventy = new Eleventy(".", generatedDir, {
     // writes none of them. The three templates opt back in with their own permalink.
     cfg.addGlobalData("permalink", false);
     cfg.addGlobalData("views", views);
+    // The site's own base URL, exactly as unify is about to publish it — null when
+    // --base-url is absent. view-page.11ty.js uses it to render an absolute og:url; with
+    // no --base-url the meta tag is omitted rather than pointing at a relative address.
+    cfg.addGlobalData("baseUrl", context?.site.baseUrl ?? null);
     // One collection, newest first. notes/*.md is the only data source in the example.
     cfg.addCollection("releases", (api) =>
       [...api.getFilteredByGlob("notes/*.md")].sort((a, b) => b.date - a.date));

@@ -48,6 +48,30 @@ function expectContains(haystack, needle, what) {
   if (!haystack.includes(needle)) throw new Error(`${what}: expected ${JSON.stringify(needle)} in:\n${haystack}`);
 }
 
+/**
+ * A generator that copies its own argv[3] (the overlay directory) and argv[4]
+ * (the generator-context.json path) and content out to `probeAbsPath` — a
+ * location OUTSIDE both the source tree and the overlay, chosen by the test —
+ * before doing anything else. `audit` publishes nothing and a throwing
+ * generator's overlay is discarded, so this is the only way these tests can
+ * inspect the context after the CLI process has exited and §33's cleanup has
+ * already run.
+ * @param {string} probeAbsPath
+ * @param {"succeed"|"throw"} [then]
+ */
+function contextProbeGenerator(probeAbsPath, then = "succeed") {
+  return `import { readFileSync, writeFileSync } from "node:fs";
+import { isAbsolute } from "node:path";
+const [, , , overlayDir, contextPath] = process.argv;
+writeFileSync(${JSON.stringify(probeAbsPath)}, JSON.stringify({
+  overlayDir,
+  contextPath,
+  isAbsolute: isAbsolute(contextPath ?? ""),
+  raw: contextPath ? readFileSync(contextPath, "utf8") : null,
+}));
+${then === "throw" ? 'throw new Error("boom after capturing the context");\n' : ""}`;
+}
+
 // ------------------------------------------------------------------- GEN-01
 
 test("GEN-01 — the flag names a file inside the source root, and a path escaping it is a usage error", async () => {
@@ -95,6 +119,33 @@ writeFileSync(join(outDir, "report.html"),
   // unmutated and the watcher unable to see it.
   expectContains(out, '<p id="d">outside</p>', "the overlay directory is outside the source root");
   covers("GEN-02", "GEN-06");
+}, TEST_MS);
+
+test("GEN-12 — argv[2]/argv[3] are unchanged and argv[4] names readable, versioned JSON", async () => {
+  // §33.2: the context is additive. argv[2]/argv[3] keep their exact positions
+  // and meaning, and argv[4] is a NEW fourth argument, not a replacement.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": doc("Home", '<h1>Home</h1><a href="/report.html">r</a>'),
+    "_scripts/gen.mjs": `import { writeFileSync, mkdirSync, readFileSync, existsSync } from "node:fs";
+import { join, isAbsolute } from "node:path";
+const [, , sourceRoot, outDir, contextPath] = process.argv;
+mkdirSync(outDir, { recursive: true });
+const raw = readFileSync(contextPath, "utf8");
+const ctx = JSON.parse(raw);
+writeFileSync(join(outDir, "report.html"),
+  \`<!doctype html>\\n<html lang="en"><head><meta charset="utf-8"><title>Report</title><meta name="description" content="What the generator received."></head><body><h1>Report</h1><p id="a">\${isAbsolute(sourceRoot)}</p><p id="b">\${isAbsolute(outDir)}</p><p id="e">\${isAbsolute(contextPath)}</p><p id="f">\${raw.endsWith("\\n")}</p><p id="g">\${ctx.schemaVersion}</p></body></html>\\n\`);
+`,
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--generate", "_scripts/gen.mjs"], tmp);
+  expectExit(r, 0, "a generator that reads all three arguments");
+  const out = readFileSync(join(tmp, "dist", "report.html"), "utf8");
+  expectContains(out, '<p id="a">true</p>', "argv[2] is still an ABSOLUTE source root");
+  expectContains(out, '<p id="b">true</p>', "argv[3] is still an ABSOLUTE overlay directory");
+  expectContains(out, '<p id="e">true</p>', "argv[4] is an ABSOLUTE path");
+  expectContains(out, '<p id="f">true</p>', "argv[4] names a file (readable, trailing newline)");
+  expectContains(out, '<p id="g">1</p>', "the context starts at schemaVersion 1");
+  covers("GEN-12");
 }, TEST_MS);
 
 // ------------------------------------------------------------------- GEN-03
@@ -369,6 +420,7 @@ test("GEN-11 — the generator subprocess never network-installs, and argv is un
       "  execArgv: process.execArgv,\n" +
       "  argv2: process.argv[2],\n" +
       "  argv3: process.argv[3],\n" +
+      "  argv4: process.argv[4],\n" +
       "}));\n",
   });
   const r = await runCli(["build", "-s", "src", "-o", "dist", "--generate", "_scripts/gen.mjs"], tmp);
@@ -394,5 +446,213 @@ test("GEN-11 — the generator subprocess never network-installs, and argv is un
   if (!probe.argv3 || probe.argv3 === probe.argv2) {
     throw new Error(`argv[3] must still be the generated directory, got ${probe.argv3}`);
   }
-  covers("GEN-11", "GEN-02");
+  // GEN-11's "does not shift argv" claim now covers argv[4] too: the
+  // --no-install flag rides in FRONT of the generator path, so the fourth
+  // positional argument the generator sees is still the context path, not
+  // shifted off the end.
+  if (!probe.argv4 || !probe.argv4.startsWith("/") || probe.argv4 === probe.argv3) {
+    throw new Error(`argv[4] must still be the context path, got ${JSON.stringify(probe.argv4)}`);
+  }
+  covers("GEN-11", "GEN-02", "GEN-12");
+}, TEST_MS);
+
+// ------------------------------------------------------------------- GEN-12
+
+test("GEN-12 — effective site/outputs values reflect the flags, and command names the build", async () => {
+  const tmp = mkTmp();
+  const probe = join(tmp, "ctx-probe.json");
+  writeTree(join(tmp, "src"), {
+    "index.html": doc("Home", "<h1>Home</h1>"),
+    "_scripts/gen.mjs": contextProbeGenerator(probe),
+  });
+  const r = await runCli(
+    ["build", "-s", "src", "-o", "dist", "--generate", "_scripts/gen.mjs",
+      // No trailing slash on the flag, so a normalized site.baseUrl
+      // ("…/docs/") is distinguishable from the raw flag string
+      // ("…/docs") — an implementation that forwarded the flag unparsed
+      // would fail this assertion instead of passing it by coincidence.
+      "--base-url", "https://example.com/docs", "--pretty-urls", "--canonical", "auto",
+      "--catalog", "--search-corpus"],
+    tmp,
+  );
+  expectExit(r, 0, "a build with every context-bearing flag set");
+  const probed = JSON.parse(readFileSync(probe, "utf8"));
+  const ctx = JSON.parse(probed.raw);
+
+  if (ctx.command !== "build") throw new Error(`command must be "build", got ${JSON.stringify(ctx.command)}`);
+  // The identical origin+pathPrefix construction catalog.json and
+  // `audit --format json` use (B4's addendum) — never the raw flag string.
+  // parseBaseUrl always appends the trailing slash the raw flag omitted, so
+  // this can only pass if the context carries the NORMALIZED value.
+  if (ctx.site.baseUrl !== "https://example.com/docs/") {
+    throw new Error(`site.baseUrl must be the normalized origin+pathPrefix, got ${JSON.stringify(ctx.site.baseUrl)}`);
+  }
+  if (ctx.site.prettyUrls !== true) throw new Error(`site.prettyUrls must be true, got ${ctx.site.prettyUrls}`);
+  if (ctx.site.canonical !== "auto") throw new Error(`site.canonical must be "auto", got ${JSON.stringify(ctx.site.canonical)}`);
+  if (ctx.outputs.catalog !== "assets/unify/catalog.json") {
+    throw new Error(`outputs.catalog must reflect --catalog, got ${JSON.stringify(ctx.outputs.catalog)}`);
+  }
+  if (ctx.outputs.searchCorpus !== "assets/unify/search-corpus.json") {
+    throw new Error(`outputs.searchCorpus must reflect --search-corpus, got ${JSON.stringify(ctx.outputs.searchCorpus)}`);
+  }
+
+  // unifyVersion/paths.* — promised by GEN-12 and the §33.2 field table, and
+  // otherwise never read by any test in the suite.
+  const version = await runCli(["--version"], tmp);
+  expectExit(version, 0, "--version");
+  if (ctx.unifyVersion !== version.stdout.trim()) {
+    throw new Error(`unifyVersion must equal what --version prints, got ${JSON.stringify(ctx.unifyVersion)} vs ${JSON.stringify(version.stdout.trim())}`);
+  }
+  if (ctx.paths.sourceRoot !== join(tmp, "src")) {
+    throw new Error(`paths.sourceRoot must equal argv[2], got ${JSON.stringify(ctx.paths.sourceRoot)}`);
+  }
+  if (ctx.paths.outputRoot !== join(tmp, "dist")) {
+    throw new Error(`paths.outputRoot must be the absolute output directory, got ${JSON.stringify(ctx.paths.outputRoot)}`);
+  }
+  if (ctx.paths.generatedRoot !== probed.overlayDir) {
+    throw new Error(`paths.generatedRoot must equal argv[3], got ${JSON.stringify(ctx.paths.generatedRoot)} vs ${JSON.stringify(probed.overlayDir)}`);
+  }
+  covers("GEN-12");
+}, TEST_MS);
+
+test("GEN-12 — site/outputs fields are the closed default (false/null) without their flags", async () => {
+  const tmp = mkTmp();
+  const probe = join(tmp, "ctx-probe.json");
+  writeTree(join(tmp, "src"), {
+    "index.html": doc("Home", "<h1>Home</h1>"),
+    "_scripts/gen.mjs": contextProbeGenerator(probe),
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--generate", "_scripts/gen.mjs"], tmp);
+  expectExit(r, 0, "a plain build with no site/output flags");
+  const ctx = JSON.parse(JSON.parse(readFileSync(probe, "utf8")).raw);
+
+  if (ctx.site.baseUrl !== null) throw new Error(`site.baseUrl must be null without --base-url, got ${JSON.stringify(ctx.site.baseUrl)}`);
+  if (ctx.site.prettyUrls !== false) throw new Error(`site.prettyUrls must be false without --pretty-urls, got ${ctx.site.prettyUrls}`);
+  if (ctx.site.canonical !== null) throw new Error(`site.canonical must be null without --canonical, got ${JSON.stringify(ctx.site.canonical)}`);
+  if (ctx.outputs.catalog !== null) throw new Error(`outputs.catalog must be null without --catalog, got ${JSON.stringify(ctx.outputs.catalog)}`);
+  if (ctx.outputs.searchCorpus !== null) {
+    throw new Error(`outputs.searchCorpus must be null without --search-corpus, got ${JSON.stringify(ctx.outputs.searchCorpus)}`);
+  }
+  covers("GEN-12");
+}, TEST_MS);
+
+test("GEN-12 — command names \"audit\", which runs the generator and still writes nothing", async () => {
+  const tmp = mkTmp();
+  const probe = join(tmp, "ctx-probe.json");
+  writeTree(join(tmp, "src"), {
+    "index.html": doc("Home", "<h1>Home</h1>"),
+    "_scripts/gen.mjs": contextProbeGenerator(probe),
+  });
+  const r = await runCli(["audit", "-s", "src", "-o", "dist", "--generate", "_scripts/gen.mjs"], tmp);
+  expectExit(r, 0, "audit with a generator");
+  if (existsSync(join(tmp, "dist"))) throw new Error("§24.2: audit writes nothing, generator or no generator");
+  const ctx = JSON.parse(JSON.parse(readFileSync(probe, "utf8")).raw);
+  if (ctx.command !== "audit") throw new Error(`command must be "audit", got ${JSON.stringify(ctx.command)}`);
+  covers("GEN-12");
+}, TEST_MS);
+
+test("GEN-12 — the context file is deleted with the build's generator state, success or failure", async () => {
+  const tmp = mkTmp();
+  const okProbe = join(tmp, "ok-probe.json");
+  writeTree(join(tmp, "src"), {
+    "index.html": doc("Home", "<h1>Home</h1>"),
+    "_scripts/gen.mjs": contextProbeGenerator(okProbe),
+  });
+  const ok = await runCli(["build", "-s", "src", "-o", "dist", "--generate", "_scripts/gen.mjs"], tmp);
+  expectExit(ok, 0, "a successful build");
+  const okCtx = JSON.parse(readFileSync(okProbe, "utf8"));
+  if (existsSync(okCtx.contextPath)) {
+    throw new Error(`generator-context.json must not survive a successful build: ${okCtx.contextPath}`);
+  }
+
+  const failTmp = mkTmp();
+  const failProbe = join(failTmp, "fail-probe.json");
+  writeTree(join(failTmp, "src"), {
+    "index.html": doc("Home", "<h1>Home</h1>"),
+    "_scripts/gen.mjs": contextProbeGenerator(failProbe, "throw"),
+  });
+  const failed = await runCli(["build", "-s", "src", "-o", "dist", "--generate", "_scripts/gen.mjs"], failTmp);
+  expectExit(failed, 1, "a throwing generator");
+  const failCtx = JSON.parse(readFileSync(failProbe, "utf8"));
+  if (existsSync(failCtx.contextPath)) {
+    throw new Error(`generator-context.json must not survive a P29 failure either: ${failCtx.contextPath}`);
+  }
+  covers("GEN-12");
+}, TEST_MS);
+
+test("GEN-12 — the context path sits outside the source root, and never appears in dist/ or a --dry-run row", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": doc("Home", "<h1>Home</h1>"),
+    // Ignores argv[4] entirely — the "unchanged for a generator that doesn't
+    // read it" half of the contract, exercised here rather than asserted
+    // separately, since every other test in this file already makes the
+    // same point for argv[2]/argv[3].
+    "_scripts/gen.mjs": writesOnePage,
+  });
+
+  const dry = await runCli(["build", "-s", "src", "-o", "dist", "--generate", "_scripts/gen.mjs", "--dry-run"], tmp);
+  expectExit(dry, 0, "a dry run with a generator");
+  if (/generator-context\.json/.test(dry.stdout)) {
+    throw new Error(`--dry-run must not list the context file as a row:\n${dry.stdout}`);
+  }
+
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--generate", "_scripts/gen.mjs"], tmp);
+  expectExit(r, 0, "the real build");
+  const walk = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+    e.isDirectory() ? walk(join(dir, e.name)) : [join(dir, e.name)]);
+  const shipped = walk(join(tmp, "dist"));
+  if (shipped.some((p) => p.endsWith("generator-context.json"))) {
+    throw new Error(`dist/ must never contain generator-context.json:\n${shipped.join("\n")}`);
+  }
+
+  // The title's first clause — the containment claim itself — needs a
+  // generator that actually reads argv[4], since `writesOnePage` above
+  // ignores it and never learns the path.
+  const probe = join(tmp, "ctx-probe.json");
+  const containment = mkTmp();
+  writeTree(join(containment, "src"), {
+    "index.html": doc("Home", "<h1>Home</h1>"),
+    "_scripts/gen.mjs": contextProbeGenerator(probe),
+  });
+  const c = await runCli(["build", "-s", "src", "-o", "dist", "--generate", "_scripts/gen.mjs"], containment);
+  expectExit(c, 0, "a build whose generator captures the context path");
+  const { contextPath } = JSON.parse(readFileSync(probe, "utf8"));
+  if (contextPath.startsWith(join(containment, "src"))) {
+    throw new Error(`the context path must sit outside the source root, got ${contextPath}`);
+  }
+  covers("GEN-12");
+}, TEST_MS);
+
+// -------------------------------------------------------------------- B9
+
+test("GEN-04/URL-08: a generator's own og:url stamping builds clean under --pretty-urls + --base-url", async () => {
+  // The B9 defect end to end, through the seam it was actually found on: a
+  // generated page — scanned exactly like an authored one per GEN-04 — stamps
+  // og:url the way a generator naturally computes a page's own output
+  // address: root-relative, in the plain .html spelling it just wrote,
+  // knowing nothing about --pretty-urls or --base-url. It relies entirely on
+  // unify's own §11.2/§11.3 pipeline to make that address right, which is
+  // exactly the reliance the B9 fix restores.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "_scripts/gen.mjs": `import { writeFileSync, mkdirSync } from "node:fs";
+import { join } from "node:path";
+const [, , , outDir] = process.argv;
+mkdirSync(outDir, { recursive: true });
+writeFileSync(join(outDir, "about.html"),
+  '<!doctype html>\\n<html lang="en"><head><meta charset="utf-8"><title>About</title><meta name="description" content="About page."></head><body><h1>About</h1></body></html>\\n');
+writeFileSync(join(outDir, "index.html"),
+  '<!doctype html>\\n<html lang="en"><head><meta charset="utf-8"><title>Home</title><meta name="description" content="Home page."><meta property="og:url" content="/about.html"></head><body><h1>Home</h1><a href="/about.html">About</a></body></html>\\n');
+`,
+  });
+  const r = await runCli(
+    ["build", "-s", "src", "-o", "dist", "--generate", "_scripts/gen.mjs", "--pretty-urls", "--base-url", "https://example.com/"],
+    tmp,
+  );
+  expectExit(r, 0, "a generator's own og:url must survive --pretty-urls + --base-url");
+  const home = readFileSync(join(tmp, "dist", "index.html"), "utf8");
+  expectContains(home, 'property="og:url" content="https://example.com/about/"', "the generated og:url must be pretty-rewritten then absolutized");
+  expectContains(home, 'href="/about/"', "the generated href beside it stays root-relative, pretty-rewritten");
+  covers("GEN-04", "URL-08");
 }, TEST_MS);

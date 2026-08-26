@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>All posts</title>
+    <meta name="description" content="A small blog whose list, filters, and search box are all driven by catalog.json and search-corpus.json.">
+    <script type="module" src="/assets/js/blog.js"></script>
+  </head>
+  <body>
+    <main>
+      <h1>Fieldnotes</h1>
+      <p>Every post below, its tag and series facets, and the search box are
+      rendered entirely from <code>assets/unify/catalog.json</code> and
+      <code>assets/unify/search-corpus.json</code> — two files unify writes once
+      at build time. Nothing here is queried on the server; this page fetches
+      both files and does the rest in the browser.</p>
+
+      <div class="controls">
+        <input type="search" id="search" placeholder="Search posts…" aria-label="Search posts">
+        <div id="tag-filter" class="facet" role="group" aria-label="Filter by tag"></div>
+        <div id="series-filter" class="facet" role="group" aria-label="Filter by series"></div>
+      </div>
+
+      <p id="count" aria-live="polite"></p>
+
+      <ul id="posts" class="post-list"><include src="/_includes/post-list.html"></include></ul>
+      <p id="no-results" hidden>No posts match that search and filter combination.</p>
+    </main>
+  </body>
+</html>

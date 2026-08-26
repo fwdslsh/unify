@@ -181,11 +181,11 @@ test("CFG-03: no behavior exists that only the file can express — flags-only a
   covers("CFG-03");
 }, TEST_MS);
 
-test("CFG-01: canonical, feed-full, search-index, and generate are saved flags with real effect", async () => {
+test("CFG-01: canonical, feed-full, catalog, search-corpus, and generate are saved flags with real effect", async () => {
   // The release review found §18's key list contradicting itself: §22.1
   // and §33.1 each said their flag is saved in unify.yaml while §18's list
   // omitted both, and the two site-level booleans were saveable nowhere.
-  // One tree, one flagless build, all four keys observed by their effects —
+  // One tree, one flagless build, all five keys observed by their effects —
   // each assertion names the section whose promise it keeps.
   const tmp = mkTmp();
   writeTree(tmp, {
@@ -196,7 +196,8 @@ test("CFG-01: canonical, feed-full, search-index, and generate are saved flags w
       "base-url: https://example.com/site/",
       "canonical: auto",
       "feed-full: true",
-      "search-index: true",
+      "catalog: true",
+      "search-corpus: true",
       "generate: _scripts/gen.mjs",
     ].join("\n") + "\n",
     "src/index.html": `<!doctype html>
@@ -234,9 +235,12 @@ writeFileSync(join(outDir, "made.html"),
   if (!/<content type="html">/.test(feed)) {
     throw new Error(`feed-full: true in unify.yaml must produce <content type="html">:\n${feed}`);
   }
-  // §30.1 — `search-index: true` writes the manifest.
-  if (!existsSync(join(tmp, "dist", "search-index.json"))) {
-    throw new Error("search-index: true in unify.yaml must write search-index.json");
+  // §30.1 — `catalog: true` / `search-corpus: true` write the two artifacts.
+  if (!existsSync(join(tmp, "dist", "assets", "unify", "catalog.json"))) {
+    throw new Error("catalog: true in unify.yaml must write assets/unify/catalog.json");
+  }
+  if (!existsSync(join(tmp, "dist", "assets", "unify", "search-corpus.json"))) {
+    throw new Error("search-corpus: true in unify.yaml must write assets/unify/search-corpus.json");
   }
   // §33.1 — `generate:` runs the generator before the scan.
   if (!existsSync(join(tmp, "dist", "made.html"))) {
