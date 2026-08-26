@@ -117,9 +117,12 @@ jobs:
   # than none, because it is still being cited.
   #
   # `build --dry-run --strict` is the gate for ALL of them; `audit --strict`
-  # only for the three that already meet it. The four
-  # sandbox-authored sites carry 41 `incomplete` findings between them (share
-  # images with no declared dimensions, mostly), and they always have —
+  # only for the three that already meet it. The other four —
+  # seed-library, seed-library-alt, seed-library-ondemand (sandbox-authored),
+  # and htmx-fragments (hand-maintained) — carry 385 `incomplete` findings
+  # between them (41 / 80 / 259 / 5: image-missing-dimensions dominates only
+  # seed-library; seed-library-alt is dominated by description-missing and
+  # seed-library-ondemand by page-orphan), and they always have —
   # demanding audit cleanliness here would be a new requirement wearing a
   # regression gate's clothes, and it would land this job red on the day it
   # merged.

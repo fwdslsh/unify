@@ -792,13 +792,15 @@ function pageForLinkPath(resolved, emittedHtmlPaths) {
 }
 
 /**
- * §11.2 links: rewrite every internal `href`/`src`/`srcset`/`poster` URL in
- * `html` (already §11.1-rewritten) that resolves to an emitted page's plain
- * `.html` output to that page's pretty URL instead. "Resolve first (against
- * provenance), then transform" (§11.2) — for a URL §11.1 left relative
- * (only possible for page-self content on an unmoved page), resolution here
- * uses the CURRENT page's own directory, exactly like §11.1's layout/include
- * branch would.
+ * §11.2 links: rewrite every internal `href`/`src`/`srcset`/`poster` URL, the
+ * `content` of the URL-valued og:/twitter: metas (URL_VALUED_META — the
+ * closed list §11.1/§12 read), and the URL part of a
+ * `<meta http-equiv="refresh">` `content` in `html` (already
+ * §11.1-rewritten) that resolves to an emitted page's plain `.html` output
+ * to that page's pretty URL instead. "Resolve first (against provenance),
+ * then transform" (§11.2) — for a URL §11.1 left relative (only possible for
+ * page-self content on an unmoved page), resolution here uses the CURRENT
+ * page's own directory, exactly like §11.1's layout/include branch would.
  *
  * @param {string} html
  * @param {object} args
@@ -851,9 +853,11 @@ export function applyPrettyLinks(html, { pageOutputPath, emittedHtmlPaths, shift
       if (rewritten !== srcset.value) edits.push({ start: srcset.valueStart, end: srcset.valueEnd, replacement: rewritten });
     }
     // §11.2 — a URL-valued og:/twitter: meta's `content` is rewritten exactly
-    // like an `href` to the same target: one list (URL_VALUED_META/
-    // isUrlValuedMeta), one reader, shared with §11.1/§11.3. `rewriteOne`
-    // already draws the page-vs-asset line for hrefs via `pageForLinkPath` —
+    // like an `href` to the same target: one closed list (URL_VALUED_META/
+    // isUrlValuedMeta), one reader, shared with §11.1/§12 (§11.3 additionally
+    // prefixes every og:*/twitter:* meta — a wider set — via
+    // `isOgOrTwitterMeta`, since a non-URL value is never root-relative).
+    // `rewriteOne` already draws the page-vs-asset line for hrefs via `pageForLinkPath` —
     // a page-targeting og:url/og:image/twitter:image comes out in the
     // directory spelling, an asset-targeting one (a real file, not a page)
     // is left exactly as written, same as an asset `href`. Left out, a page
