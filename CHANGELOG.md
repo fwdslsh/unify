@@ -8,6 +8,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-08-26
+
+A dependency-security release. unify itself is unchanged — no command, flag,
+or composition rule differs from 0.9.0, and unify's own two runtime
+dependencies (`js-yaml`, `markdown-it`) carry no advisories. What changes is
+the one manifest in this repository that did: the `examples/forge-svelte`
+worked example pinned Svelte 4, and the GitHub Advisory Database flags every
+Svelte release up to 5.55.6 (GHSA-crpf-4hrx-3jrp, GHSA-m56q-vw4c-c2cp,
+GHSA-f7gr-6p89-r883, GHSA-phwv-c562-gvmh, GHSA-rcqx-6q8c-2c42,
+GHSA-pr6f-5x2q-rwfp), so Dependabot and `npm audit` reported the example's
+committed lockfile. If you install `@fwdslsh/unify` from npm, none of this
+ever reached you: the published package ships `src/` only, examples excluded.
+
+### Security
+
+- **`examples/forge-svelte` moves to Svelte 5** — `svelte` `^4.2.20` →
+  `^5.56.10`, the first advisory-free release. The flagged code paths (SSR
+  rendering, spread attributes, `<svelte:element>`, `contenteditable`
+  bindings) never appear in the example's one component, but the repository's
+  answer to a flagged lockfile is to clear it, not to argue scope. `npm audit`
+  now reports zero vulnerabilities across all three manifests in the
+  repository — the root and both examples.
+
+### Changed
+
+- The example's entry file mounts with Svelte 5's
+  `mount(Component, { target })` in place of Svelte 4's
+  `new Component({ target })` — the call `docs/integrations.md`'s recipe
+  already showed — and the recipe's note that the worked example lagged on
+  Svelte 4 is gone, because it no longer does. The component itself,
+  `FeeCalculator.svelte`, is untouched: its classic syntax (`export let`,
+  `$:`) compiles unchanged under Svelte 5.
+- The example's committed browser bundle
+  (`src/assets/js/fee-calculator.js`) is rebuilt with the Svelte 5 compiler
+  and its build script now passes `minify: true`, matching the recipe's own
+  build flags — 54 kB minified, where Svelte 4's unminified bundle was 23 kB,
+  Svelte 5's runtime being simply larger.
+
 ## [0.9.0] - 2026-08-26
 
 The five primitives — `<include>`, layouts, slots, the underscore exclusion,
@@ -492,7 +530,8 @@ with generated compare-link notes only. Their diffs are on the
 [releases page](https://github.com/fwdslsh/unify/releases). Nothing here
 retroactively reconstructs detail those notes never carried.
 
-[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/fwdslsh/unify/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/fwdslsh/unify/compare/v0.8.3...v0.9.0
 [0.8.3]: https://github.com/fwdslsh/unify/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/fwdslsh/unify/compare/v0.8.1...v0.8.2

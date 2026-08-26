@@ -7,6 +7,7 @@ import esbuildSvelte from "esbuild-svelte";
 await build({
   entryPoints: ["_scripts/fee-calculator-entry.js"],
   bundle: true,
+  minify: true,
   format: "iife",
   target: "es2018",
   outfile: "src/assets/js/fee-calculator.js",

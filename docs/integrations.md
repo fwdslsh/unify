@@ -5,9 +5,8 @@ same for anything with a compiler — on a unify site, without adopting a framew
 site. unify needs to know nothing about the framework, and that is the design: you compile
 the component to an ordinary JavaScript file *before* `unify build`, and unify ships it
 like any other asset. Every literal in this document is tested; the worked example is
-`examples/forge-svelte`. (That example pins Svelte 4 and uses its component API —
-`new Component({ target })` — while the recipe below targets Svelte 5's `mount()`;
-the three-file shape is identical in both.)
+`examples/forge-svelte`. (That example pins Svelte 5 and uses the recipe's own
+`mount()` call; the three-file shape is identical.)
 
 ## The contract, in four lines
 
