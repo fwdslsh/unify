@@ -2,7 +2,7 @@
 
 What actually runs, and what each job is allowed to mean. Two workflow files exist: `.github/workflows/test.yml` (every push and PR) and `.github/workflows/release.yml` (releases and prereleases).
 
-## `test.yml` — five jobs
+## `test.yml` — seven jobs
 
 ### `release-signal` — runtime coverage against the phase baseline
 
@@ -57,6 +57,32 @@ bun tests/conformance/check-traceability.mjs --static --baseline tests/conforman
 Compares the computed gap set against the committed baseline and fails on **any** difference. A new gap fails; so does a gap that closed, until the baseline shrinks in the same commit. While non-empty, `baseline.txt` holds the manifest rows that no CLI surface can yet observe (`docs/conformance-spec.md` §20); each is closed by the consumer that makes its field observable, and the file is empty again before a release ships.
 
 The static check also enforces spec↔inventory sync: if `docs/conformance-spec.md` gains or loses an enumerable rule (a splice rule, a problem, an advisory, a head-merge row) without `rules.tsv` being updated in the same commit, it exits 1.
+
+### `examples` — gate G13 (dependency-free examples)
+
+```bash
+bun src/cli.js build -s examples/<name>/src -o /tmp/<name> --dry-run --strict
+```
+
+Builds every example that needs no `npm install` — `seed-library`, `seed-library-alt`, `seed-library-ondemand`, `htmx-fragments`, `unify-docs`, and `catalog-search-blog` — with `--dry-run --strict`, plus an `audit --strict` pass for `unify-docs` and `catalog-search-blog`. `examples/README.md` cites several of these as the evidence that `docs/authoring-rules.md` is sufficient to author from, and evidence that silently stops building is worse than none, because it is still being cited. `build --dry-run --strict` is the gate for all of them; `audit --strict` only for the two that already meet it — the sandbox-authored sites carry 41 `incomplete` findings between them (share images with no declared dimensions, mostly) and always have, so demanding audit cleanliness there would be a new requirement wearing a regression gate's clothes.
+
+### `examples-npm` — gate G13, the half that needs a package install
+
+```bash
+cd examples/forge-svelte && npm install && npm run build:calculator && npm run build:notes
+cd examples/eleventy-htmx && npm ci
+node src/cli.js build …   # node, deliberately — see below
+```
+
+Builds `forge-svelte` and `eleventy-htmx`, the two examples with an npm dependency step before unify can build them. The unify build itself runs under **node**, not bun: bun auto-installs an import it cannot resolve, so a missing dependency would be silently fetched from npm mid-build and this gate would pass on a tree that fails for an `npx @fwdslsh/unify` user (issue #75). Running the generator seam under node is what makes this gate mean anything.
+
+### `release-notes` — gate G14
+
+```bash
+bun .github/workflows/extract-release-notes.mjs > /dev/null
+```
+
+Fails unless `CHANGELOG.md` has a section for the version currently in `package.json`. The release body *is* that section — `release.yml` composes it with this same script — so this job goes red between bumping the version and writing its changelog section: they are two halves of one change, and the failure message says which half is missing.
 
 ## Coverage is reported, and gates nothing
 
