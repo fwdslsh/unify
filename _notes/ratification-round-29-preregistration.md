@@ -76,3 +76,40 @@ the sandbox. Verify isolation empirically before launch (probe answers NO and
 a whole-filesystem search for the tool's docs is empty). Archive the round —
 judge-results.json, every REPORT.md, a source tarball — into `_notes/rounds/`
 BEFORE judging; this machine's /tmp does not survive resets.
+
+---
+
+# Outcome addendum (written after judging; the registration above is unedited)
+
+**Verdicts** (all exits 0; fresh in-place rebuilds of each sample's own
+command preceded criteria checks): V1 6/6 with zero problems and zero
+advisories · V2 6/6 (4 entries each, every `<updated>` timestamped) · V3 6/6
+· V4 5/6 (h4: `data:`-URI SVG og:image on all four posts — its report reads
+the brief's "write a small placeholder SVG" as inline; single sample →
+outlier under the registered convergence rule; noted as the round-13 family,
+functionally dead on social crawlers at exit 0) · V5 6/6 — h4's two flagged
+hrefs were CSS attribute selectors inside `<style>`, the r27 instrument
+note's false-positive class, classified by context before any verdict.
+**All-five-clean Haiku: 4/5 — the registered bar is met.** Control clean on
+all five.
+
+**The fitted→tested result this round was designed for:** h1 and s1 both hit
+the premature-`/feed.xml` P13 mid-iteration; both received §12's second fix
+line (h1 in both its no-base-url and day-only-dates variants) and repaired
+correctly. Round 27's two wrong mental models did not recur. A17 taught h1
+and h4 to full timestamps; h4's report credits the dry-run error, not the
+doc.
+
+**0.9 observations:** zero contamination — and the isolation probe's first
+run caught the published 0.8.2 npm package's full source in the bun install
+cache (masked; the protocol's never-enumerate rule vindicated again). No
+sample used `tags:`/`categories:` (the amended sentence is untested by this
+round, recorded as such). No sample reached for `--catalog`/`--search-corpus`
+(the rules do not name them; valid).
+
+**Instrument notes for round 30:** fold the V-criteria into
+`judge-round.mjs` (this round's ad-hoc V5 sweep briefly false-positived on
+the documented CSS-selector class; the improvised-judging ledger gains
+another experimenter entry); entry-scope the feed alternate-link extraction
+(the feed-level link initially miscounted as a fifth post). Round 28's
+pretty-urls execution question remains round 30's registered question.
