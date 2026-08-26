@@ -130,7 +130,11 @@ script intercepts the click and reads `link.href` — already absolute, already 
 and fetches that. The deploy address appears nowhere in the JavaScript, and the page still
 works with JavaScript off, because the anchors are real links. Writing the fetch path
 relative to the page (`../data/allium.json`) is also correct and simpler; hardcoding
-`/library/` works until the day the site moves.
+`/library/` works until the day the site moves. That day came: `seed-library-alt`'s
+client-rendered catalogue cards hardcoded `/library/catalogue/…`, and when these examples
+went live on unify's own docs site under `/examples/seed-library-alt/` every card 404'd.
+Its template was edited after authoring to the page-relative `${v.slug}/` — the one change
+ever made to a sandbox-authored tree, recorded here because these sites are evidence.
 
 **A section that looks different but shares chrome.** `seasonal-notes/_layout.html` (in `seed-library`) is a complete
 standalone document with its own styling, and pulls the same header and footer fragments the

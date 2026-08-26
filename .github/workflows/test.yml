@@ -159,7 +159,7 @@ jobs:
           bun src/cli.js build -s examples/seed-library/src \
             -o /tmp/deploy-seed-library \
             --pretty-urls --base-url "$SITE_BASE_URL"examples/seed-library/ \
-            --dry-run --strict
+            --clean --dry-run --strict
 
           (cd examples/seed-library-alt && node src/_scripts/gen.mjs)
           bun src/cli.js build -s examples/seed-library-alt/src \
@@ -171,7 +171,7 @@ jobs:
           bun src/cli.js build -s examples/seed-library-ondemand/src \
             -o /tmp/deploy-seed-library-ondemand \
             --pretty-urls --base-url "$SITE_BASE_URL"examples/seed-library-ondemand/ \
-            --dry-run --strict
+            --clean --dry-run --strict
 
           bun src/cli.js build -s examples/htmx-fragments/src \
             -o /tmp/deploy-htmx-fragments \
