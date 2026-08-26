@@ -103,7 +103,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - run: bun tests/conformance/check-traceability.mjs --static --baseline tests/conformance/phase-gaps/baseline.txt
 
-  # Always-on gate G13: every example still builds. `examples/` holds seven
+  # Always-on gate G13: every example still builds. `examples/` holds eight
   # sites and CI used to build one, so an example could stop working and
   # nothing would notice — which is not hypothetical: a deploy workflow
   # carried `--copy` for three releases after that flag was cut, and the
@@ -116,12 +116,13 @@ jobs:
   # sufficient to author from. Evidence that silently stops building is worse
   # than none, because it is still being cited.
   #
-  # `build --dry-run --strict` is the gate for ALL of them; `audit --strict`
-  # only for the two that already meet it. The four sandbox-authored sites
-  # carry 41 `incomplete` findings between them (share images with no
-  # declared dimensions, mostly), and they always have — demanding audit
-  # cleanliness here would be a new requirement wearing a regression gate's
-  # clothes, and it would land this job red on the day it merged.
+  # `build --dry-run --strict` is the gate for ALL of them; `audit` (`--strict`
+  # where noted) only for the three that already meet it. The four
+  # sandbox-authored sites carry 41 `incomplete` findings between them (share
+  # images with no declared dimensions, mostly), and they always have —
+  # demanding audit cleanliness here would be a new requirement wearing a
+  # regression gate's clothes, and it would land this job red on the day it
+  # merged.
   examples:
     name: Examples build (G13)
     runs-on: ubuntu-latest
@@ -147,6 +148,16 @@ jobs:
             --generate _scripts/gen.mjs --pretty-urls \
             --base-url https://unify.fwdslsh.dev/ --canonical auto --catalog --search-corpus \
             --strict
+      - name: catalog-search-blog (build and audit; dependency-free)
+        run: |
+          set -euo pipefail
+          bun src/cli.js build -s examples/catalog-search-blog/src -o /tmp/catalog-search-blog \
+            --generate _scripts/gen.mjs --pretty-urls \
+            --base-url https://example.com/blog/ --catalog --search-corpus \
+            --dry-run --strict
+          bun src/cli.js audit -s examples/catalog-search-blog/src \
+            --generate _scripts/gen.mjs --pretty-urls \
+            --base-url https://example.com/blog/ --catalog --search-corpus
 
   # G13, the half that needs a package install. Deliberately run on NODE:
   # bun auto-installs an import it cannot resolve, so a missing dependency

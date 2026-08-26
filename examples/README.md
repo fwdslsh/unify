@@ -1,11 +1,11 @@
 # Advanced examples
 
-Seven sites. Four were built by an agent that had never seen unify before — it was given
+Eight sites. Four were built by an agent that had never seen unify before — it was given
 `docs/authoring-rules.md`, a client brief, and the compiled CLI, in a sandbox with no other
 documentation. They are kept because they passed review, not because they were written to
 be examples: what they show is what the 60 lines actually lead someone to build.
 
-The first two are one brief solved two ways; the third is a later, larger brief; the fourth integrates a Svelte component (its extra steps: `npm install`, then `npm run build:calculator && npm run build:notes` — the build scripts live in `_scripts/` at the example root). The fifth, `htmx-fragments`, is hand-maintained: no sandboxed agent could download htmx, so it is written and tested by the maintainers to document the fragment + htmx pattern. The sixth and seventh are hand-maintained too, and have sections of their own below. All build clean:
+The first two are one brief solved two ways; the third is a later, larger brief; the fourth integrates a Svelte component (its extra steps: `npm install`, then `npm run build:calculator && npm run build:notes` — the build scripts live in `_scripts/` at the example root). The fifth, `htmx-fragments`, is hand-maintained: no sandboxed agent could download htmx, so it is written and tested by the maintainers to document the fragment + htmx pattern. The sixth, seventh, and eighth are hand-maintained too, and have sections of their own below. All build clean:
 
 ```bash
 cd seed-library
@@ -67,6 +67,31 @@ division-of-responsibilities table, the measured watch behaviour edit case by ed
 (including what the watcher cannot see, because it lives outside the source root), what a
 thousand-note input does to build time, and a plain account of what this stack cannot
 deploy and should not attempt.
+
+## `catalog-search-blog` — a blog list, filters, and search from two JSON files
+
+The eighth is the runnable companion to `docs/guides/catalog-and-search.md`: a five-post
+blog, Fieldnotes, whose entire listing page — post list, tag facet, series facet, and
+search box — is rendered client-side from `assets/unify/catalog.json` and
+`assets/unify/search-corpus.json`, the two files `--catalog`/`--search-corpus` write once
+at build time. No framework, no server, and (unlike `eleventy-htmx`) no dependency at all —
+it belongs to the dependency-free half of gate G13.
+
+```bash
+cd catalog-search-blog
+unify build -s src -o dist --generate _scripts/gen.mjs --pretty-urls \
+  --base-url https://example.com/blog/ --catalog --search-corpus
+```
+
+12 source files, 14 built. Both gates pass — `build --dry-run --strict` and `audit`, the
+latter with nothing to report, not merely nothing blocking. `_scripts/gen.mjs` is the
+`--generate` seam demonstrated with no other generator in the loop: it reads
+`generator-context.json` (`process.argv[4]`, new in 0.9) to decide whether a `<link
+rel="canonical">` on each of its generated per-series archive pages can be made absolute,
+and it writes the plain-link fallback list `assets/js/blog.js` overwrites once its fetch
+resolves — the JavaScript-off path that also keeps every post reachable by a static crawl.
+[`catalog-search-blog/README.md`](catalog-search-blog/README.md) has the rest, including
+what each generated JSON file actually contains.
 
 ## The patterns worth copying
 
