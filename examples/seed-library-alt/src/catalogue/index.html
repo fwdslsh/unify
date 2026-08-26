@@ -151,7 +151,7 @@
       resultCount.innerHTML = `<p><strong>${filtered.length}</strong> varieties found</p>`;
 
       container.innerHTML = filtered.map(v => `
-        <a href="/library/catalogue/${v.slug}/" class="variety-card">
+        <a href="${v.slug}/" class="variety-card">
           <h3>${v.name}</h3>
           <p>${v.packets} packets available</p>
           <span class="family-tag">${v.family}</span>

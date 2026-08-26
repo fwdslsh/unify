@@ -138,10 +138,6 @@ a:focus-visible, .skip:focus { outline: 2px solid var(--green); outline-offset: 
 }
 
 .head-links a:hover { color: var(--green); }
-.head-links a[aria-current="true"] {
-  color: var(--green);
-  box-shadow: inset 0 -2px 0 var(--green);
-}
 
 /* The mobile shortcut row: the sidebar sits after the article on small
    screens, so these two anchors are how a phone reaches it. */
@@ -634,6 +630,45 @@ img { max-width: 100%; height: auto; }
   font-weight: 600;
   text-decoration: none;
 }
+
+/* --------------------------------------------------------- examples page */
+
+/* Same opt-out the front page uses (body.home, above): a landing-style page
+   with no doc to browse alongside it, so the sidebar shell adds nothing. */
+body.examples .shell { display: block; max-width: none; padding: 0; }
+body.examples .docnav, body.examples .subnav { display: none; }
+body.examples main > * { max-width: none; }
+
+.examples-head {
+  max-width: 72.5rem;
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem 0.5rem;
+}
+.examples-head h1 { margin-top: 0; }
+.examples-head .lede { max-width: 42rem; }
+
+.note {
+  margin: 1rem 0 0;
+  max-width: 42rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-card);
+  font-size: 0.8125rem;
+  color: var(--dim);
+}
+
+.examples-section { padding: 1.5rem 1.5rem 2.5rem; max-width: 72.5rem; margin: 0 auto; }
+.examples-section h2 { margin: 0 0 0.5rem; padding: 0; border: 0; font-size: 1.375rem; }
+.examples-section > p { margin: 0 0 1.5rem; color: var(--dim); font-size: 0.9375rem; max-width: 42rem; }
+
+.card-links { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; }
+
+/* With JavaScript off, the "View live" anchors never get an href (see the
+   comment in src/examples/index.html) — style that state as inert instead
+   of letting the type selector on `a` (above) paint it the same green as a
+   real link. */
+.card-links a:not([href]) { color: var(--dim); cursor: default; }
 
 /* ----------------------------------------------------------------- footer */
 
