@@ -47,7 +47,7 @@ A finding is not a problem or an advisory. It answers a different question — *
 | | means |
 |---|---|
 | `broken` | the output contradicts itself, or the standard it claims to follow: a link to `#section` where no element has that id, an id declared twice, JSON-LD that does not parse, a page in the sitemap that tells crawlers not to index it. Wrong whatever was intended. |
-| `incomplete` | something is absent or inconsistent that you may have chosen: no description, no `lang`, two pages sharing a title, a page nothing links to, a `tags:` or `categories:` key that built no collection. |
+| `incomplete` | something is absent or inconsistent that you may have chosen: no description, no `lang`, two pages sharing a title, a page nothing links to. |
 
 ```
 $ unify audit

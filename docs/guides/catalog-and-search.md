@@ -58,7 +58,7 @@ lands in `catalog.json` as:
 }
 ```
 
-Every frontmatter key that isn't `title`/`layout`/`class`/`lang`/`dir`/`schema` becomes a
+Every frontmatter key that isn't `title`/`layout`/`class`/`lang`/`dir` becomes a
 `<meta>` entry, in declaration order, repeated as many times as you wrote it — `tags`
 above is two entries, not an array, because that is what the built page's own `<head>`
 contains. A key namespaced `og:…` (`og:image`, say) emits `property="og:image"` rather
