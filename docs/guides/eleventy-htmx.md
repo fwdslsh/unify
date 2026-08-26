@@ -18,9 +18,7 @@ means the CLI that step puts in `node_modules/.bin/` — the example lists `@fwd
 in `devDependencies` beside Eleventy, so the four npm scripts resolve with no global
 install. To exercise *this* checkout rather than the pinned published release, substitute
 `bun ../../src/cli.js` or `node ../../src/cli.js` — same flags, same output, same exit
-codes. One caveat until 0.9.0 is published: the pin resolves to a 0.8.x release, which
-passes the generator no `generator-context.json` (§9 item 3) — the context-driven
-behavior below needs the checkout spelling, or the pin bumped once 0.9.0 ships.
+codes.
 
 ## 1. Why combine these tools
 
@@ -211,8 +209,8 @@ get the result the guide predicted:
    unify itself will publish that page under, with no second `--base-url` to keep in sync by
    hand. This is not defensive: remove the line and every release-notes page loses its
    `og:url` tag whenever `--base-url` is set. The `?.` guards a run with no fourth argument
-   at all — a standalone invocation (see the "run it directly" fix line below), or the
-   pinned 0.8.x release the intro paragraph names, which predates the context file. Under
+   at all — a standalone invocation (see the "run it directly" fix line below), or a
+   pre-0.9 unify release, which predates the context file. Under
    unify 0.9.0 and later, argv[4] is always supplied, so the guard never fires there.
 4. **An absolute `configPath`.** Two settings exist only in a config *file*, and Eleventy's
    auto-discovery would look in the working directory — the source root, where an

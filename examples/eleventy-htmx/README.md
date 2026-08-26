@@ -36,14 +36,10 @@ Eleventy, and the `unify` binary the four scripts call (`node_modules/.bin/unify
 resolved from the pinned `@fwdslsh/unify` devDependency). Use `npm ci` if you want the
 committed `package-lock.json` enforced exactly.
 
-**The pinned devDependency stays `^0.8.2` until 0.9.0 is published to npm** — a lockfile
-cannot resolve a version the registry doesn't have. The generator-context file
-(`_scripts/eleventy.mjs`'s `process.argv[4]`, conformance-spec §33.2) is a 0.9-only
-feature, so running the four npm scripts against this pin reads `context` as `null` and
-omits the `og:url` tag the guide describes in its `--generate` walkthrough. To see that
-behavior before the pin moves, use `bun ../../src/cli.js` / `node ../../src/cli.js` (below)
-instead of the bare `unify` the npm scripts resolve — that always runs this checkout, not
-the pinned release.
+The pin is `^0.9.0`, so the four npm scripts exercise the generator-context file
+(`_scripts/eleventy.mjs`'s `process.argv[4]`, conformance-spec §33.2) against the
+published release — including the context-driven `og:url` behavior the guide walks
+through under `--generate`.
 
 **On Bun, a missing `node_modules/` is not an error.** Bun's default `--install=auto`
 network-installs `@11ty/eleventy` into its global cache when no `node_modules/` exists, so
@@ -53,8 +49,8 @@ therefore not evidence that the tested Eleventy ran. Node fails loudly in the sa
 (`ERR_MODULE_NOT_FOUND` inside P29), so run the Node build, or `npm ci`, when you want the
 lockfile to be what proves it.
 
-From a checkout of this repository you can also run the CLI in `src/` directly, which is
-the only way to exercise *this* checkout rather than the pinned published release:
+From a checkout of this repository you can also run the CLI in `src/` directly, which
+exercises *this* checkout rather than the pinned published release:
 
 ```bash
 bun ../../src/cli.js build -s src -o dist --generate _scripts/eleventy.mjs --pretty-urls
