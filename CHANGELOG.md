@@ -77,11 +77,12 @@ and **Removed** below before upgrading.
   0.9 page has four (`source, generated, outputPath, document`). One is a
   silent rename: `sourcePath` is now `source` — a reader of `page.sourcePath`
   gets `undefined`, not an error. Some are still there, recomputed from the
-  snapshot rather than stored: `title`/`description`/`canonical`/`lang` read
-  from `document.head`, `headings` from `document.body.headings`, and
-  `robots`/`image`/`author`/`datePublished`/`dateModified`/`h1` are each one
-  small reduction over `document.head.meta`/`document.body.headings` away
-  (`h1` is `document.body.headings.filter(h => h.level === 1)`). One moved to
+  snapshot rather than stored: `title`/`description`/`canonical` read from
+  `document.head`, `lang` from `document.html.attributes`, `headings` from
+  `document.body.headings`, and `robots`/`image`/`author`/`datePublished`/
+  `dateModified`/`h1` are each one small reduction over
+  `document.head.meta`/`document.body.headings` away (`h1` is
+  `document.body.headings.find(h => h.level === 1)?.text ?? null`). One moved to
   a different artifact: `text` is gone from this shape entirely — only
   `--search-corpus`'s `search-corpus.json` carries page text now, joined by
   `path`. The rest have no replacement anywhere: `layout` (deliberately kept

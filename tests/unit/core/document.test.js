@@ -357,6 +357,20 @@ describe("visibleText", () => {
     expect(a.visibleText).toBe("Loose text");
     expect(a.visibleText).not.toContain("NoBody");
   });
+
+  test("a <head> nested inside <main>/<body> (not the fallback case) still contributes its text", () => {
+    // The <head> exclusion is scoped to the §20.7 whole-document fallback
+    // only. A textually-included second document can leave a <head> nested
+    // inside the page's own <main>/<body> — that <head> is not the page's
+    // own head (the page HAS a <body>/<main>, so `scope` never falls back
+    // to root), and its text must still count as visible body text.
+    const html = doc(
+      "",
+      "<main><p>Body text</p><head><title>Inner</title></head><p>after</p></main>",
+    );
+    const a = analysis(html);
+    expect(a.visibleText).toBe("Body text Inner after");
+  });
 });
 
 // ----------------------------------------------------------------- jsonLd

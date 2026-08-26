@@ -212,7 +212,13 @@ listed under "Changed" but easy to mistake for cosmetic) both change what
 the plan's batch summaries never called out as upgrade-relevant — they read
 as internal model changes with audit-JSON as the only public face, when in
 fact they are two more public faces. The eleventy-htmx example's
-`package.json` still pinned `@fwdslsh/unify: ^0.8.2` at B7 despite B5 having
-made the example's own generator read the 0.9-only `argv[4]` context file;
-B7 bumped the pin to `^0.9.0` (package.json and package-lock.json) since no
-batch before it had.
+`package.json` still pins `@fwdslsh/unify: ^0.8.2` despite B5 having made
+the example's own generator read the 0.9-only `argv[4]` context file. B7
+tried bumping the pin to `^0.9.0`, but only in `package.json` and the
+manifest half of `package-lock.json` — the lock's resolved
+`node_modules/@fwdslsh/unify` entry stayed `0.8.2` because 0.9.0 isn't on
+npm yet, so `npm ci` (CI gate G13) started failing with `ETARGET`. The pin
+stays `^0.8.2` until 0.9.0 is actually published and the lock can be
+regenerated for real; the README now says so and points readers who want
+argv[4] behavior at running this checkout directly (`bun`/`node
+../../src/cli.js`) instead of the npm-resolved binary.

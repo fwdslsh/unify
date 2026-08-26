@@ -40,15 +40,24 @@ import { findAll, findFirst, getAttr, innerText, isElement, isInside, isJsonLdSc
 import { parseRefreshMeta } from "./urls.js";
 
 /**
- * Subtrees whose characters are not visible page text (§20.3). `head` is
- * included so the whole-document fallback (§20.7, no `<main>` and no
- * `<body>` — legal under HTML5's omissible `<body>` start tag) never counts
- * `<title>`/other head text as body text; `head.title` is captured
- * separately via `innerText`, never through `textContent`, so excluding the
- * subtree here changes nothing about what the snapshot's own `head.title`
- * reports.
+ * Subtrees whose characters are never visible page text (§20.3), regardless
+ * of which scope `textContent` is walking.
  */
-const INVISIBLE = new Set(["script", "style", "template", "noscript", "head"]);
+const INVISIBLE = new Set(["script", "style", "template", "noscript"]);
+
+/**
+ * §20.7's whole-document fallback (no `<main>` and no `<body>` element —
+ * legal under HTML5's omissible `<body>` start tag) additionally omits
+ * `<head>`, so a page with neither doesn't count its own `<title>`/other
+ * head text as body text. This is scoped to that one fallback, not to
+ * `textContent` generally: §20.3's own definition omits only the four tags
+ * above, and a `<head>` legitimately reachable inside `<main>`/`<body>` (a
+ * textual `<include>` of a full second document) must still contribute —
+ * `head.title` is captured separately via `innerText`, never through
+ * `textContent`, so this exclusion changes nothing about what the
+ * snapshot's own `head.title` reports.
+ */
+const FALLBACK_EXTRA_INVISIBLE = new Set(["head"]);
 
 /**
  * §20.3's closed inline set: leaving one of these contributes no separator;
@@ -74,15 +83,18 @@ const INLINE = new Set([
  * detection report two pages as identical when only their inline analytics
  * snippet is.
  * @param {import('./html.js').Node} el
+ * @param {Set<string>} [extraInvisible] additional tags to omit for this
+ *   call only — used by the §20.7 whole-document fallback to add `<head>`
+ *   without widening §20.3's own definition for every other caller.
  * @returns {string}
  */
-function textContent(el) {
+function textContent(el, extraInvisible) {
   let out = "";
   const visit = (node) => {
     if (node.type === "text") { out += node.data; return; }
     if (node.type !== "element" && node.type !== "root") return;
     const tag = node.type === "element" ? node.tag.toLowerCase() : "";
-    if (INVISIBLE.has(tag)) return;
+    if (INVISIBLE.has(tag) || extraInvisible?.has(tag)) return;
     // Entering AND leaving: leaving alone fuses a parent's own text with a
     // block child's ("<div>Intro<p>Para</p></div>" -> "IntroPara"). The
     // doubled separator between two adjacent blocks costs nothing, because
@@ -361,8 +373,15 @@ export function extractDocument(html, { path = null, url = null } = {}) {
     body: { attributes: attributesOf(bodyEl), headings },
   };
 
+  // The <head> exclusion applies only to the whole-document fallback
+  // (§20.7) — when a <main> or <body> element was found, `scope` cannot
+  // legitimately contain the page's OWN <head> (siblings of <body> under
+  // <html>), but a textually-included second document can still nest one
+  // inside <main>/<body>, and that content must keep contributing.
+  const usingWholeDocumentFallback = !main && !bodyEl;
+
   const analysis = {
-    visibleText: textContent(scope),
+    visibleText: textContent(scope, usingWholeDocumentFallback ? FALLBACK_EXTRA_INVISIBLE : undefined),
     ids,
     titleTexts,
     langTexts,

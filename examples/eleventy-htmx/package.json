@@ -10,6 +10,6 @@
   },
   "devDependencies": {
     "@11ty/eleventy": "^3.1.6",
-    "@fwdslsh/unify": "^0.9.0"
+    "@fwdslsh/unify": "^0.8.2"
   }
 }

@@ -36,6 +36,15 @@ Eleventy, and the `unify` binary the four scripts call (`node_modules/.bin/unify
 resolved from the pinned `@fwdslsh/unify` devDependency). Use `npm ci` if you want the
 committed `package-lock.json` enforced exactly.
 
+**The pinned devDependency stays `^0.8.2` until 0.9.0 is published to npm** — a lockfile
+cannot resolve a version the registry doesn't have. The generator-context file
+(`_scripts/eleventy.mjs`'s `process.argv[4]`, conformance-spec §33.2) is a 0.9-only
+feature, so running the four npm scripts against this pin reads `context` as `null` and
+omits the `og:url` tag the guide describes in its `--generate` walkthrough. To see that
+behavior before the pin moves, use `bun ../../src/cli.js` / `node ../../src/cli.js` (below)
+instead of the bare `unify` the npm scripts resolve — that always runs this checkout, not
+the pinned release.
+
 **On Bun, a missing `node_modules/` is not an error.** Bun's default `--install=auto`
 network-installs `@11ty/eleventy` into its global cache when no `node_modules/` exists, so
 `bun ../../src/cli.js build …` exits 0 in a tree where `npm install` was never run —
