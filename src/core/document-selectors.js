@@ -45,7 +45,7 @@
  * value, trimmed and lowercased.
  */
 
-import { nonEmpty } from "./document.js";
+import { nonEmpty, orNull } from "./document.js";
 import { stripBaseUrl, resolveReference } from "./references.js";
 import { isSkippedUrl } from "./urls.js";
 
@@ -134,7 +134,7 @@ export function declaredType(data) {
  * already-decoded snapshot value — this is deliberately retained rather
  * than fixed by this batch. `manifest.js` no longer calls this at all; its
  * only caller now is `preferredImageOf` below, which hands it a value
- * `trimmedOrNull`/`firstMetaMatch` already decoded once, so `nonEmpty`'s own
+ * `orNull`/`firstMetaMatch` already decoded once, so `nonEmpty`'s own
  * decode inside `intOrNull` is a second pass. On an ordinary `content` this
  * is a no-op (decoding is idempotent once no entities remain); it changes
  * behavior only on a double-encoded value (`content="&amp;#54;00"`), which
@@ -204,12 +204,73 @@ export function classifyCanonicalValue(canonical, outputPath, base) {
 // Doc-level selectors — over a `{document, analysis, outputPath?}` envelope.
 // ======================================================================
 
-/** Trim a value that is already decoded; empty means "declared nothing". */
-function trimmedOrNull(s) {
-  if (typeof s !== "string") return null;
-  const t = s.trim();
-  return t === "" ? null : t;
+/**
+ * §21.2/§24.4 — what does this page's canonical name? Four answers, and the
+ * fourth is why this is not a boolean.
+ *
+ *   `none`      — the page declares no canonical.
+ *   `self`      — it resolves to this page's own output path.
+ *   `elsewhere` — it names a different page, demonstrably. Either it resolved
+ *                 to another emitted path, or — with `--base-url` supplied —
+ *                 it is an `http(s):`/protocol-relative URL that `stripBaseUrl`
+ *                 did not strip, which places it on another origin.
+ *   `unknown`   — this build cannot say: a `mailto:`, an empty value, or an
+ *                 absolute URL with no `--base-url` to compare it against.
+ *
+ * Each caller needs a different conservative direction, which is exactly what
+ * a boolean could not carry, and both wrong foldings have shipped:
+ *
+ *   - *Membership* treats anything but `self`/`none` as excluded — do not list
+ *     a page in a sitemap unless its canonical demonstrably names it.
+ *   - *Findings* fire only on `elsewhere` — do not accuse. Folding `unknown`
+ *     in reported a page whose canonical named itself, quoting the page's own
+ *     URL as the evidence, on the default golden path where no `--base-url` is
+ *     set and every absolute canonical is therefore unresolvable.
+ *   - But folding `elsewhere` OUT of the `unknown` case lost the case that
+ *     matters most: with the site's address known, a canonical pointing at a
+ *     syndication partner is visibly not this page, and product-spec §6.3.2
+ *     names exactly that pairing — `noindex` plus an off-site canonical, and a
+ *     sitemap advertising a URL whose canonical points away from it.
+ *
+ * The four-state core this delegates to, `classifyCanonicalValue(canonical,
+ * outputPath, base)`, sits above so a caller holding just a value and an
+ * output path (no `BuildDocument` needed) can ask the same question. This
+ * wrapper is a one-line adapter over `canonicalOf(doc)` for every
+ * `BuildDocument`-shaped caller; the classification logic itself, and the
+ * history behind it, lives in `classifyCanonicalValue`'s own docstring.
+ * @param {import('./manifest.js').BuildDocument} doc
+ * @param {import('./urls.js').BaseUrlConfig|null} base
+ * @returns {'none'|'self'|'elsewhere'|'unknown'}
+ */
+export function classifyCanonical(doc, base) {
+  return classifyCanonicalValue(canonicalOf(doc), doc.outputPath, base);
 }
+
+/**
+ * "Does this page's canonical name this page?" — §21.2's second clause, and
+ * §24.4's own test for two findings that are *about* that question rather than
+ * about membership.
+ *
+ * Exported for the same reason `isPublicDestination` is: a lookalike drifts. The
+ * evaluator first asked it by way of `!isPublicDestination(...)`, which is a
+ * different question with the same answer on most pages and the wrong answer on
+ * a `noindex` page that names itself — membership fails there for the robots
+ * reason, and reading that as "the canonical disagrees" produced a finding
+ * whose evidence quoted the page's own URL back at it.
+ *
+ * A canonical unify cannot resolve — another origin, `mailto:`, empty — is not
+ * self-canonical. It names something this build cannot confirm is this page,
+ * and the conservative reading is the one that does not claim agreement.
+ *
+ * @param {import('./manifest.js').BuildDocument} doc
+ * @param {import('./urls.js').BaseUrlConfig|null} base
+ * @returns {boolean}
+ */
+export function isSelfCanonical(doc, base) {
+  const kind = classifyCanonical(doc, base);
+  return kind === "none" || kind === "self";
+}
+
 
 /** `""` for a missing/non-string value, else the value untouched (untrimmed). */
 function rawOr(s) {
@@ -237,8 +298,7 @@ export function titleOf(doc) {
  * declare first".
  */
 export function langOf(doc) {
-  const first = doc.analysis.langTexts[0];
-  return typeof first === "string" ? first : null;
+  return doc.analysis.langTexts[0] ?? null;
 }
 
 /**
@@ -251,20 +311,20 @@ export function langOf(doc) {
  * @returns {string[]}
  */
 export function metaValues(doc, name) {
-  const target = name.trim().toLowerCase();
-  const out = [];
-  for (const m of doc.document.head.meta) {
-    if ((m.name ?? "").trim().toLowerCase() === target) out.push(rawOr(m.content));
-  }
-  return out;
+  return metaValuesBy(doc, "name", name);
 }
 
 /** Same as `metaValues`, matched on `property=` instead of `name=`. */
 export function propertyValues(doc, property) {
-  const target = property.trim().toLowerCase();
+  return metaValuesBy(doc, "property", property);
+}
+
+/** The one matching loop behind both spellings above. */
+function metaValuesBy(doc, attr, want) {
+  const target = want.trim().toLowerCase();
   const out = [];
   for (const m of doc.document.head.meta) {
-    if ((m.property ?? "").trim().toLowerCase() === target) out.push(rawOr(m.content));
+    if ((m[attr] ?? "").trim().toLowerCase() === target) out.push(rawOr(m.content));
   }
   return out;
 }
@@ -279,31 +339,28 @@ export function linksWithRel(doc, rel) {
     rawOr(l.rel).trim().toLowerCase().split(/\s+/).includes(target));
 }
 
-/** First non-empty (trimmed) `<meta name="description">` content, else null. */
-export function descriptionOf(doc) {
-  for (const v of metaValues(doc, "description")) {
-    const t = trimmedOrNull(v);
+/** The first value in `values` that is non-empty after trimming, else null. */
+function firstNonEmpty(values) {
+  for (const v of values) {
+    const t = orNull(v);
     if (t !== null) return t;
   }
   return null;
+}
+
+/** First non-empty (trimmed) `<meta name="description">` content, else null. */
+export function descriptionOf(doc) {
+  return firstNonEmpty(metaValues(doc, "description"));
 }
 
 /** First non-empty (trimmed) `<meta name="author">` content, else null. */
 export function authorOf(doc) {
-  for (const v of metaValues(doc, "author")) {
-    const t = trimmedOrNull(v);
-    if (t !== null) return t;
-  }
-  return null;
+  return firstNonEmpty(metaValues(doc, "author"));
 }
 
 /** First `rel~=canonical` link with a non-empty trimmed `href`, else null. */
 export function canonicalOf(doc) {
-  for (const link of linksWithRel(doc, "canonical")) {
-    const t = trimmedOrNull(link.href);
-    if (t !== null) return t;
-  }
-  return null;
+  return firstNonEmpty(linksWithRel(doc, "canonical").map((l) => l.href));
 }
 
 /**
@@ -313,7 +370,7 @@ export function canonicalOf(doc) {
  * today's `record.robots`.
  */
 export function robotsPolicyOf(doc) {
-  const values = metaValues(doc, "robots").map(trimmedOrNull).filter((v) => v !== null);
+  const values = metaValues(doc, "robots").map(orNull).filter((v) => v !== null);
   return parseRobotsValue(values.length === 0 ? null : values.join(", "));
 }
 
@@ -330,7 +387,7 @@ export function refreshOf(doc) {
 function firstMetaMatch(doc, predicate) {
   for (const m of doc.document.head.meta) {
     if (!predicate(m)) continue;
-    const t = trimmedOrNull(m.content);
+    const t = orNull(m.content);
     if (t !== null) return t;
   }
   return null;
@@ -361,27 +418,25 @@ function firstMetaMatch(doc, predicate) {
 // early in the chain. (`tags`/`categories` branches do not exist in 0.9 —
 // arbitrary metadata is inert by design, per §12 of the release brief.)
 const META_ROLE_ORDER = [
-  "description", "author", "robots", "schema", "date", "lastmod", "twitter:image",
-  "article:published_time", "article:modified_time",
-  "og:image", "og:image:width", "og:image:height",
+  ["name", "description"], ["name", "author"], ["name", "robots"], ["name", "schema"],
+  ["name", "date"], ["name", "lastmod"], ["name", "twitter:image"],
+  ["property", "article:published_time"], ["property", "article:modified_time"],
+  ["property", "og:image"], ["property", "og:image:width"], ["property", "og:image:height"],
 ];
 
-/** This meta's one role among `META_ROLE_ORDER`, by manifest.js's own precedence, or null. */
+/**
+ * This meta's one role, by manifest.js's own precedence, or null. The loop
+ * IS `META_ROLE_ORDER` — the table is executed, not merely documented, so
+ * the name-before-property guarantee the comment above argues (and four
+ * selectors bypass `metaRole` on the strength of) cannot drift from a second
+ * hand-written spelling of the same order.
+ */
 function metaRole(m) {
   const name = (m.name ?? "").trim().toLowerCase();
   const property = (m.property ?? "").trim().toLowerCase();
-  if (name === "description") return "description";
-  if (name === "author") return "author";
-  if (name === "robots") return "robots";
-  if (name === "schema") return "schema";
-  if (name === "date") return "date";
-  if (name === "lastmod") return "lastmod";
-  if (name === "twitter:image") return "twitter:image";
-  if (property === "article:published_time") return "article:published_time";
-  if (property === "article:modified_time") return "article:modified_time";
-  if (property === "og:image") return "og:image";
-  if (property === "og:image:width") return "og:image:width";
-  if (property === "og:image:height") return "og:image:height";
+  for (const [axis, role] of META_ROLE_ORDER) {
+    if ((axis === "name" ? name : property) === role) return role;
+  }
   return null;
 }
 
@@ -444,7 +499,7 @@ export function preferredImageOf(doc) {
  * and the spec rewrite states this order as the new rule.
  */
 export function declaredTypes(doc) {
-  const metaTypes = metaValues(doc, "schema").map(trimmedOrNull).filter((v) => v !== null);
+  const metaTypes = metaValues(doc, "schema").map(orNull).filter((v) => v !== null);
   const jsonLdTypes = doc.analysis.jsonLd.map((entry) => declaredType(entry.data)).filter((t) => t !== null);
   return [...metaTypes, ...jsonLdTypes];
 }
@@ -471,8 +526,8 @@ function conflictFor(field, values) {
  * from there rather than from `langOf`. Ordered by field name.
  */
 export function metadataConflicts(doc) {
-  const canonicalValues = linksWithRel(doc, "canonical").map((l) => trimmedOrNull(l.href)).filter((v) => v !== null);
-  const descriptionValues = metaValues(doc, "description").map(trimmedOrNull).filter((v) => v !== null);
+  const canonicalValues = linksWithRel(doc, "canonical").map((l) => orNull(l.href)).filter((v) => v !== null);
+  const descriptionValues = metaValues(doc, "description").map(orNull).filter((v) => v !== null);
   const titleValues = doc.analysis.titleTexts;
   const langValues = doc.analysis.langTexts;
   return [

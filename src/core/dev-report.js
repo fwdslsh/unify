@@ -261,6 +261,7 @@ function documentsSection(documents) {
     const description = descriptionOf(doc);
     const canonical = canonicalOf(doc);
     const robots = robotsPolicyOf(doc);
+  const lang = langOf(doc);
     parts.push(`<article id="page-${i}">
 <h3>${esc(doc.source.path)}</h3>
 <dl>
@@ -269,7 +270,7 @@ function documentsSection(documents) {
 <dt>public URL</dt><dd>${doc.document.url === null ? NO_BASE_URL : esc(doc.document.url)}</dd>
 <dt>title</dt><dd>${title === null ? ABSENT : esc(title)}</dd>
 <dt>description</dt><dd>${description === null ? ABSENT : esc(description)}</dd>
-<dt>language</dt><dd>${langOf(doc) === null ? ABSENT : esc(langOf(doc))}</dd>
+<dt>language</dt><dd>${lang === null ? ABSENT : esc(lang)}</dd>
 <dt>canonical</dt><dd>${canonical === null ? ABSENT : esc(canonical)}</dd>
 <dt>indexable</dt><dd>${robots.indexable ? "yes" : "no"}</dd>
 <dt>links in / out</dt><dd>${esc(doc.analysis.linksIn.length)} / ${esc(doc.analysis.linksOut.length)}</dd>

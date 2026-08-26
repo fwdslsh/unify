@@ -36,6 +36,7 @@
  */
 
 import { isPublicDestination } from "./document-selectors.js";
+import { serializeJson } from "./report.js";
 
 /** The output path of the site's search corpus (brief §4.2). */
 export const SEARCH_CORPUS_PATH = "assets/unify/search-corpus.json";
@@ -114,7 +115,7 @@ export function corpusDocument(documents, base) {
  * @returns {string}
  */
 export function serializeCorpus(doc) {
-  return `${JSON.stringify(doc, null, 2)}\n`;
+  return serializeJson(doc);
 }
 
 /**

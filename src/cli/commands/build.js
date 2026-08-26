@@ -128,10 +128,13 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
         output,
         command,
         baseUrl: urls.effectiveBaseUrl(baseConfig),
-        prettyUrls: settings.prettyUrls === true,
-        canonical: settings.canonical === "auto" ? "auto" : null,
-        catalogPath: settings.catalog === true ? catalog.CATALOG_PATH : null,
-        searchCorpusPath: settings.searchCorpus === true ? searchCorpus.SEARCH_CORPUS_PATH : null,
+        // `resolveSettings` already produced exact booleans and cli.js already
+        // validated `canonical` to "auto"-or-absent; the published contract's
+        // own coercion lives in `writeGeneratorContext`, the one owner.
+        prettyUrls: settings.prettyUrls,
+        canonical: settings.canonical ?? null,
+        catalogPath: settings.catalog ? catalog.CATALOG_PATH : null,
+        searchCorpusPath: settings.searchCorpus ? searchCorpus.SEARCH_CORPUS_PATH : null,
       });
       const ok = await generate.runGenerator({ generatorAbs, sourceRoot, overlayDir, contextPath, reporter });
       if (!ok) {
@@ -539,35 +542,33 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
   // back correctly with no --base-url, so gating either on `base` would make
   // the flag useless for the local-preview case it exists for. Independent
   // of each other too — `--search-corpus` does not imply `--catalog`.
-  const catalogAncestorConflict = settings.catalog
-    ? generatedPathAncestorConflict(catalog.CATALOG_PATH, emittedFromSource)
-    : null;
-  if (catalogAncestorConflict) {
-    reporter.problem({
-      file: catalogAncestorConflict.source,
-      message: `${catalogAncestorConflict.source} occupies ${catalogAncestorConflict.ancestor}, which ${catalog.CATALOG_PATH} needs as a directory`,
-      fixes: ["rename or move this file so the assets/unify/ path is free to be a directory, or drop --catalog"],
-    });
+  // One row per projection: the conflict check, the generate step, the
+  // would-generate fix line, and the dry-run row all read this table, so a
+  // message edit or a future third projection is one row, not four hand-kept
+  // sites.
+  const PROJECTIONS = [
+    { on: settings.catalog, flag: "--catalog", path: catalog.CATALOG_PATH, generate: catalog.generateCatalog },
+    { on: settings.searchCorpus, flag: "--search-corpus", path: searchCorpus.SEARCH_CORPUS_PATH, generate: searchCorpus.generateSearchCorpus },
+  ];
+  /** @type {Map<string, string>} generated output path -> the flag that produced it */
+  const generatedProjections = new Map();
+  for (const { on, flag, path, generate } of PROJECTIONS) {
+    const conflict = on ? generatedPathAncestorConflict(path, emittedFromSource) : null;
+    if (conflict) {
+      reporter.problem({
+        file: conflict.source,
+        message: `${conflict.source} occupies ${conflict.ancestor}, which ${path} needs as a directory`,
+        fixes: [`rename or move this file so the assets/unify/ path is free to be a directory, or drop ${flag}`],
+      });
+    }
+    const generated = on && !conflict
+      ? generate({ documents: manifest.documents, base: baseConfig, emittedFromSource })
+      : new Map();
+    for (const [outPath, text] of generated) {
+      tempFiles.set(outPath, text);
+      generatedProjections.set(outPath, flag);
+    }
   }
-  const generatedCatalog = settings.catalog && !catalogAncestorConflict
-    ? catalog.generateCatalog({ documents: manifest.documents, base: baseConfig, emittedFromSource })
-    : new Map();
-  for (const [outPath, text] of generatedCatalog) tempFiles.set(outPath, text);
-
-  const corpusAncestorConflict = settings.searchCorpus
-    ? generatedPathAncestorConflict(searchCorpus.SEARCH_CORPUS_PATH, emittedFromSource)
-    : null;
-  if (corpusAncestorConflict) {
-    reporter.problem({
-      file: corpusAncestorConflict.source,
-      message: `${corpusAncestorConflict.source} occupies ${corpusAncestorConflict.ancestor}, which ${searchCorpus.SEARCH_CORPUS_PATH} needs as a directory`,
-      fixes: ["rename or move this file so the assets/unify/ path is free to be a directory, or drop --search-corpus"],
-    });
-  }
-  const generatedSearchCorpus = settings.searchCorpus && !corpusAncestorConflict
-    ? searchCorpus.generateSearchCorpus({ documents: manifest.documents, base: baseConfig, emittedFromSource })
-    : new Map();
-  for (const [outPath, text] of generatedSearchCorpus) tempFiles.set(outPath, text);
 
   // ---- §12 — the reference check, against the completed temp tree. --------
   const htmlFiles = new Map();
@@ -678,13 +679,10 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
     wouldGenerate.set(sitemap.SITEMAP_PATH,
       "sitemap.xml is generated, not authored: this build generates it only under --base-url");
   }
-  if (!tempFiles.has(catalog.CATALOG_PATH) && settings.catalog !== true) {
-    wouldGenerate.set(catalog.CATALOG_PATH,
-      "assets/unify/catalog.json is generated, not authored: this build generates it only under --catalog");
-  }
-  if (!tempFiles.has(searchCorpus.SEARCH_CORPUS_PATH) && settings.searchCorpus !== true) {
-    wouldGenerate.set(searchCorpus.SEARCH_CORPUS_PATH,
-      "assets/unify/search-corpus.json is generated, not authored: this build generates it only under --search-corpus");
+  for (const { on, flag, path } of PROJECTIONS) {
+    if (!tempFiles.has(path) && on !== true) {
+      wouldGenerate.set(path, `${path} is generated, not authored: this build generates it only under ${flag}`);
+    }
   }
 
   references.checkReferences({
@@ -842,17 +840,11 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
       // §30.6 — likewise, named for the flag that actually produced each one
       // rather than --base-url: activation is `--catalog`/`--search-corpus`
       // alone, with or without a site address.
-      ...[...generatedCatalog.keys()].map((outPath) => ({
+      ...[...generatedProjections].map(([outPath, flag]) => ({
         action: "write",
         outputPath: `${displayOutput}/${outPath}`,
         url: publishModule.urlForOutputPath(outPath, prefix),
-        from: "generated (--catalog)",
-      })),
-      ...[...generatedSearchCorpus.keys()].map((outPath) => ({
-        action: "write",
-        outputPath: `${displayOutput}/${outPath}`,
-        url: publishModule.urlForOutputPath(outPath, prefix),
-        from: "generated (--search-corpus)",
+        from: `generated (${flag})`,
       })),
       ...plan.delete.map((rel) => ({ action: "delete", outputPath: `${displayOutput}/${rel}` })),
     ];
@@ -940,7 +932,7 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
  */
 function addressLine(baseConfig) {
   return baseConfig
-    ? `serving from ${baseConfig.origin}${baseConfig.pathPrefix}`
+    ? `serving from ${urls.effectiveBaseUrl(baseConfig)}`
     : "serving from / — the domain root (no --base-url)";
 }
 

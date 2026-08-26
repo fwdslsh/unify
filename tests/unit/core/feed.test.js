@@ -174,6 +174,27 @@ describe("§29.7 which locators are checked (unit twin of conformance FEED-06)",
   });
 });
 
+describe("§29.4 membership needs a canonical that names THIS page", () => {
+  test("an UNRESOLVABLE canonical (mailto:) is not self-canonical, so the page is no entry", () => {
+    // classifyCanonicalValue answers `unknown` for a value it cannot resolve,
+    // and §21.2's conservative reading — reused by §29.4 condition 3 — is
+    // that unknown is NOT membership: unify cannot confirm the canonical
+    // names this page, so it does not claim agreement. A second, resolvable
+    // article rides along so the feed itself still exists and the assertion
+    // cannot pass vacuously through §29.1's no-entries-no-feed rule.
+    const excluded = doc({ canonical: "mailto:editor@example.com" });
+    const kept = doc({
+      sourcePath: "other.html", outputPath: "other.html",
+      path: "/blog/other.html", url: "https://example.com/blog/other.html",
+      title: "Other",
+    });
+    const xml = gen([excluded, kept]).get(FEED_PATH);
+    expect(entries(xml)).toHaveLength(1);
+    expect(xml).not.toContain("<id>https://example.com/blog/post.html</id>");
+    expect(xml).toContain("<id>https://example.com/blog/other.html</id>");
+  });
+});
+
 describe("§29.1 activation is membership, not declaration", () => {
   test("a candidate that fails the date condition yields NO feed — a zero-entry feed cannot be valid Atom", () => {
     expect(gen([doc({ date: "2026-08-02" })]).size).toBe(0);

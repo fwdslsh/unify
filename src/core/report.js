@@ -138,7 +138,7 @@ export function fingerprint(finding) {
 function serializePage(doc) {
   return {
     source: doc.source.path,
-    generated: doc.source.generated === true,
+    generated: doc.source.generated,
     outputPath: doc.outputPath,
     document: doc.document,
   };
@@ -277,5 +277,5 @@ export function serializeSarif(report) {
       },
     ],
   };
-  return `${JSON.stringify(doc, null, 2)}\n`;
+  return serializeJson(doc);
 }

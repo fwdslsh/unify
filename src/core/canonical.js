@@ -66,6 +66,7 @@ function escapeAttr(s) {
 export function completeCanonical(html, doc, base) {
   const unchanged = { text: html, insertions: [] };
   if (!isPublicDestination(doc, base)) return unchanged;
+  const { root } = parse(html); // one parse serves the declaration test and the insertion point below
   // §22.3 — "declares ANY rel=canonical", which is a question about the
   // DOCUMENT, not about the manifest's value. `canonicalOf(doc)` reads null
   // for `<link rel="canonical" href="">` and for one with no href at all, so
@@ -73,10 +74,9 @@ export function completeCanonical(html, doc, base) {
   // — manufacturing the multiple-canonical fault, and manufacturing it
   // invisibly, since the manifest then reads only the completed value and
   // computes no conflict for `unify audit` to find.
-  if (declaresCanonical(html)) return unchanged;
+  if (headDeclaresCanonical(root)) return unchanged;
   if (doc.document.url === null) return unchanged; // unreachable while §22.1 requires --base-url
 
-  const { root } = parse(html);
   const head = findFirst(root, (n) => isElement(n, "head"));
   // §22.2 — no head, or a head left unclosed, means no insertion point.
   // Synthesizing either would be a structural change this section does not
@@ -99,13 +99,11 @@ export function completeCanonical(html, doc, base) {
 }
 
 /**
- * True when the emitted document declares any `rel="canonical"`. Exported for
- * the same reason §21.2's predicate is: one answer to one question.
- * @param {string} html
+ * True when the emitted document declares any `rel="canonical"`.
+ * @param {import('./html.js').RootNode} root - the parsed emitted document
  * @returns {boolean}
  */
-export function declaresCanonical(html) {
-  const { root } = parse(html);
+function headDeclaresCanonical(root) {
   // §22.3 — the question is about the HEAD. A <link rel="canonical"> in the
   // body is not a declaration, because nothing reads it there; treating one as
   // a declaration suppressed completion on a page that then shipped with no

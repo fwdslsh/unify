@@ -74,11 +74,11 @@
  */
 
 import { findAll, findFirst, getAttr, innerText, isElement, parse } from "./html.js";
-import { isSkippedUrl, splitUrl } from "./urls.js";
+import { effectiveBaseUrl, isSkippedUrl, splitUrl } from "./urls.js";
 import { stripBaseUrl, resolveReference } from "./references.js";
 import { CHECK_SPELLING } from "./diagnostics.js";
 import { decodeXmlEntities } from "./entities.js";
-import { isSelfCanonical } from "./sitemap.js";
+import { isSelfCanonical } from "./document-selectors.js";
 import { authorOf, canonicalOf, declaredTypes, descriptionOf, publicationDatesOf, robotsPolicyOf, titleOf } from "./document-selectors.js";
 
 /** The output path of the site's feed (§29.2). Atom, never RSS — see the module comment. */
@@ -214,22 +214,25 @@ function isDateOnlyCandidate(doc, base) {
  * @returns {import('./manifest.js').BuildDocument[]}
  */
 export function entriesFor(documents, base) {
-  const out = documents.filter((d) => isFeedEntry(d, base));
   // §29.4 — datePublished DESCENDING. Every entry's `iso` carries a time by
-  // construction (the membership test above), so it names one real instant;
+  // construction (the membership test below), so it names one real instant;
   // comparing the STRINGS would be wrong the moment two entries disagree on
   // offset (`...T23:00:00-05:00` sorts before `...T01:00:00Z` as text even
-  // though it names a LATER instant, 04:00 UTC against 01:00 UTC) — so this
-  // parses each into a timestamp and compares those. Ties (the same instant,
-  // not merely the same string) break on output path ascending, so two
-  // builds of the same tree produce byte-identical feeds.
-  out.sort((a, b) => {
-    const ta = Date.parse(publicationDatesOf(a).published.iso);
-    const tb = Date.parse(publicationDatesOf(b).published.iso);
-    if (ta !== tb) return tb - ta;
-    return a.outputPath < b.outputPath ? -1 : 1;
-  });
-  return out;
+  // though it names a LATER instant, 04:00 UTC against 01:00 UTC) — so each
+  // entry's timestamp is parsed and compared. Decorate-sort-undecorate,
+  // because `publicationDatesOf` walks the head metas on every call: computed
+  // in the comparator it runs O(n log n) times per feed for a value that is
+  // fixed per document. Ties (the same instant, not merely the same string)
+  // break on output path ascending, so two builds of the same tree produce
+  // byte-identical feeds.
+  return documents
+    .filter((d) => isFeedEntry(d, base))
+    .map((d) => ({ d, t: Date.parse(publicationDatesOf(d).published.iso) }))
+    .sort((a, b) => {
+      if (a.t !== b.t) return b.t - a.t;
+      return a.d.outputPath < b.d.outputPath ? -1 : 1;
+    })
+    .map(({ d }) => d);
 }
 
 /**
@@ -284,8 +287,7 @@ function dateOnlyFix(published) {
  * @param {import('./manifest.js').BuildDocument} doc
  * @returns {string}
  */
-function entryUpdated(doc) {
-  const { published, modified } = publicationDatesOf(doc);
+function entryUpdated({ published, modified }) {
   if (modified !== null && modified.iso !== null && hasTime(modified.iso)) return modified.iso;
   return published.iso;
 }
@@ -434,8 +436,9 @@ function serializeEntry(doc, { feedFull, pageHtml }) {
   // element gets nowhere else in this table.
   lines.push(`    <title>${xmlEscape(titleOf(doc) ?? "")}</title>`);
   lines.push(`    <link rel="alternate" href="${xmlEscape(id)}"/>`);
-  lines.push(`    <updated>${xmlEscape(entryUpdated(doc))}</updated>`);
-  lines.push(`    <published>${xmlEscape(publicationDatesOf(doc).published.iso)}</published>`);
+  const dates = publicationDatesOf(doc);
+  lines.push(`    <updated>${xmlEscape(entryUpdated(dates))}</updated>`);
+  lines.push(`    <published>${xmlEscape(dates.published.iso)}</published>`);
   const description = descriptionOf(doc);
   const author = authorOf(doc);
   if (description !== null) lines.push(`    <summary type="text">${xmlEscape(description)}</summary>`);
@@ -464,7 +467,7 @@ function serializeEntry(doc, { feedFull, pageHtml }) {
  * @returns {string}
  */
 function serializeFeed({ documents, base, entries, feedFull, pageHtml }) {
-  const address = base.origin + base.pathPrefix; // "the site's own address" (§29.5), reused for <id> and rel=alternate
+  const address = effectiveBaseUrl(base); // "the site's own address" (§29.5), reused for <id> and rel=alternate
   const selfUrl = address + FEED_PATH;
   const root = documents.find((d) => d.outputPath === "index.html");
   const rootTitle = root ? titleOf(root) : null;
@@ -492,7 +495,7 @@ function serializeFeed({ documents, base, entries, feedFull, pageHtml }) {
   // Unconditional, and safely so: §29.1 writes no feed at all when there are
   // no entries, precisely so this element always has a newest one to read
   // (RFC 4287 §4.1.1 requires it, and nothing here may invent an instant).
-  lines.push(`  <updated>${xmlEscape(entryUpdated(entries[0]))}</updated>`);
+  lines.push(`  <updated>${xmlEscape(entryUpdated(publicationDatesOf(entries[0])))}</updated>`);
   lines.push(`  <link rel="self" href="${xmlEscape(selfUrl)}"/>`);
   lines.push(`  <link rel="alternate" href="${xmlEscape(address)}"/>`);
   for (const doc of entries) lines.push(...serializeEntry(doc, { feedFull, pageHtml }));

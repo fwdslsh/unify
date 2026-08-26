@@ -89,13 +89,14 @@ function decodeURIComponentSafe(s) {
  * `buildManifest` once every document exists (§20.9), and
  * `analysis.refresh.target`, resolved in that same second pass (§20.11).
  *
- * `analysis.rawHrefs` and the unresolved `refresh` reading ride along as
- * underscore-prefixed fields on the draft — exactly as `_hrefs`/`_refresh`
- * did on the 0.8 `PageRecord` — and are deleted once `buildManifest`'s
- * second pass consumes them, so neither survives onto the final envelope.
+ * `analysis.rawHrefs` and the unresolved `refresh` reading travel BESIDE the
+ * envelope, not on it — `extract` returns `{doc, rawHrefs, refreshRaw}` and
+ * `buildManifest`'s second pass consumes the two extras — so the envelope
+ * never carries a transient shape and nothing has to remember to delete a
+ * staging field (the 0.8 `_hrefs`/`_refresh` arrangement this replaces).
  * @param {{sourcePath: string, outputPath: string, html: string, generated?: boolean, layout?: string|null}} page
  * @param {import('./urls.js').BaseUrlConfig|null} base
- * @returns {BuildDocument & {_rawHrefs: string[], _refreshRaw: import('./document.js').RefreshReading|null}}
+ * @returns {{doc: BuildDocument, rawHrefs: string[], refreshRaw: import('./document.js').RefreshReading|null}}
  */
 function extract(page, base) {
   // §20.5's percent-encoding happens inside `urlForOutputPath` — the one
@@ -108,7 +109,7 @@ function extract(page, base) {
   const { document, analysis } = extractDocument(page.html, { path, url });
   const { rawHrefs, refresh: refreshRaw, ...analysisRest } = analysis;
 
-  return {
+  const doc = {
     // §33.4 — true when this page came from the --generate overlay rather
     // than the source tree. §20.3: present on every document, boolean always.
     source: {
@@ -126,37 +127,36 @@ function extract(page, base) {
     analysis: {
       ...analysisRest,
       // §20.11's `target` is a lookup in a manifest that does not exist yet,
-      // so the raw reading rides on the draft (`_refreshRaw`) and is
-      // resolved in `buildManifest`'s second pass, exactly as `linksOut`/
-      // `linksIn`/`fragmentLinks` are.
+      // so the raw reading travels beside the envelope and is resolved in
+      // `buildManifest`'s second pass, exactly as `linksOut`/`linksIn`/
+      // `fragmentLinks` are.
       linksOut: [],
       linksIn: [],
       fragmentLinks: [],
       refresh: null,
     },
-    _rawHrefs: rawHrefs,
-    _refreshRaw: refreshRaw,
   };
+  return { doc, rawHrefs, refreshRaw };
 }
 
 /**
  * §20.11 — turn one draft's raw refresh reading into the envelope's field.
- * @param {BuildDocument & {_refreshRaw: import('./document.js').RefreshReading|null}} doc
+ * @param {import('./document.js').RefreshReading|null} raw
+ * @param {string} outputPath
  * @param {import('./urls.js').BaseUrlConfig|null} base
  * @param {Map<string, BuildDocument>} byOutputPath
  * @returns {{raw:string, seconds:number, url:string|null, target:string|null}|null}
  */
-function resolveRefresh(doc, base, byOutputPath) {
-  const raw = doc._refreshRaw;
+function resolveRefresh(raw, outputPath, base, byOutputPath) {
   if (!raw) return null;
   let target = null;
   if (!raw.hasSecondPart) {
     // `content="5"` names THIS page — the same loop written shorter (§24.4).
-    target = doc.outputPath;
+    target = outputPath;
   } else if (raw.url !== null) {
     const url = decodeEntities(raw.url);
     const stripped = base ? stripBaseUrl(url, base) : url;
-    const resolved = resolveReference(stripped, doc.outputPath);
+    const resolved = resolveReference(stripped, outputPath);
     if (resolved !== null && byOutputPath.has(resolved)) target = resolved;
   }
   // Everything else stays null, including a second part §12 declined to read:
@@ -180,21 +180,22 @@ export function buildManifest({ pages, base = null }) {
   const ordered = [...pages].sort((a, b) =>
     a.outputPath < b.outputPath ? -1 : a.outputPath > b.outputPath ? 1 : 0);
   const drafts = ordered.map((p) => extract(p, base));
+  const documents = drafts.map((d) => d.doc);
   // First document wins a duplicated output path. Two sources resolving to
   // one path is P12 and blocks publish, so this branch only ever feeds a
   // build that is already failing — but "which document" must still be a
   // function of the input rather than of iteration order, or a diagnostic
   // could differ between runs of the same tree.
   const byOutputPath = new Map();
-  for (const doc of drafts) if (!byOutputPath.has(doc.outputPath)) byOutputPath.set(doc.outputPath, doc);
+  for (const doc of documents) if (!byOutputPath.has(doc.outputPath)) byOutputPath.set(doc.outputPath, doc);
 
   // §20.9 — the link graph, second pass: a link participates only when it
   // names a page that HAS a document, which is knowable only now.
-  for (const doc of drafts) {
+  for (const { doc, rawHrefs, refreshRaw } of drafts) {
     const out = new Set();
     /** @type {Map<string, {target: string, id: string}>} deduplicated by target#id */
     const fragments = new Map();
-    for (const raw of doc._rawHrefs) {
+    for (const raw of rawHrefs) {
       // REF-08: a reference is the attribute's VALUE, so character references
       // resolve before anything reads it. `#caf&eacute;` is the correct HTML
       // spelling of `#café` and must match an element whose `id` is `café` —
@@ -232,23 +233,21 @@ export function buildManifest({ pages, base = null }) {
     // §20.11 — the redirect's target, resolved exactly the way `linksOut`
     // resolves a link: the same `stripBaseUrl` + `resolveReference` pair, so a
     // redirect and an <a href> to one page can never name two different documents.
-    doc.analysis.refresh = resolveRefresh(doc, base, byOutputPath);
-    delete doc._refreshRaw;
+    doc.analysis.refresh = resolveRefresh(refreshRaw, doc.outputPath, base, byOutputPath);
     doc.analysis.linksOut = [...out].sort();
     doc.analysis.fragmentLinks = [...fragments.values()].sort((a, b) =>
       a.target === b.target ? (a.id < b.id ? -1 : a.id > b.id ? 1 : 0) : a.target < b.target ? -1 : 1);
-    delete doc._rawHrefs;
   }
-  for (const doc of drafts) {
+  for (const doc of documents) {
     for (const target of doc.analysis.linksOut) byOutputPath.get(target).analysis.linksIn.push(doc.outputPath);
   }
-  for (const doc of drafts) doc.analysis.linksIn = [...new Set(doc.analysis.linksIn)].sort();
+  for (const doc of documents) doc.analysis.linksIn = [...new Set(doc.analysis.linksIn)].sort();
 
   // `byPublicPath` keys on `document.path` — the final public root-relative
   // path (§20.5), unlike `byOutputPath`'s filesystem-shaped key. First
   // document wins a collision here too, for the same reason as above.
   const byPublicPath = new Map();
-  for (const doc of drafts) if (!byPublicPath.has(doc.document.path)) byPublicPath.set(doc.document.path, doc);
+  for (const doc of documents) if (!byPublicPath.has(doc.document.path)) byPublicPath.set(doc.document.path, doc);
 
-  return { documents: drafts, byOutputPath, byPublicPath };
+  return { documents, byOutputPath, byPublicPath };
 }

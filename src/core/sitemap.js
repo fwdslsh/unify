@@ -24,9 +24,9 @@
  */
 
 import { decodeXmlEntities } from "./entities.js";
-import { canonicalOf, classifyCanonicalValue, isPublicDestination, publicationDatesOf } from "./document-selectors.js";
+import { canonicalOf, classifyCanonical, isPublicDestination, publicationDatesOf } from "./document-selectors.js";
 import { findAll, innerText, parse } from "./html.js";
-import { isSkippedUrl, splitUrl } from "./urls.js";
+import { effectiveBaseUrl, isSkippedUrl, splitUrl } from "./urls.js";
 import { stripBaseUrl, resolveReference } from "./references.js";
 import { CHECK_SPELLING } from "./diagnostics.js";
 
@@ -67,74 +67,6 @@ function xmlEscape(s) {
  */
 const xmlUnescape = decodeXmlEntities;
 
-/**
- * "Does this page's canonical name this page?" — §21.2's second clause, and
- * §24.4's own test for two findings that are *about* that question rather than
- * about membership.
- *
- * Exported for the same reason `isPublicDestination` is: a lookalike drifts. The
- * evaluator first asked it by way of `!isPublicDestination(...)`, which is a
- * different question with the same answer on most pages and the wrong answer on
- * a `noindex` page that names itself — membership fails there for the robots
- * reason, and reading that as "the canonical disagrees" produced a finding
- * whose evidence quoted the page's own URL back at it.
- *
- * A canonical unify cannot resolve — another origin, `mailto:`, empty — is not
- * self-canonical. It names something this build cannot confirm is this page,
- * and the conservative reading is the one that does not claim agreement.
- *
- * @param {import('./manifest.js').BuildDocument} doc
- * @param {import('./urls.js').BaseUrlConfig|null} base
- * @returns {boolean}
- */
-export function isSelfCanonical(doc, base) {
-  const kind = classifyCanonical(doc, base);
-  return kind === "none" || kind === "self";
-}
-
-/**
- * §21.2/§24.4 — what does this page's canonical name? Four answers, and the
- * fourth is why this is not a boolean.
- *
- *   `none`      — the page declares no canonical.
- *   `self`      — it resolves to this page's own output path.
- *   `elsewhere` — it names a different page, demonstrably. Either it resolved
- *                 to another emitted path, or — with `--base-url` supplied —
- *                 it is an `http(s):`/protocol-relative URL that `stripBaseUrl`
- *                 did not strip, which places it on another origin.
- *   `unknown`   — this build cannot say: a `mailto:`, an empty value, or an
- *                 absolute URL with no `--base-url` to compare it against.
- *
- * Each caller needs a different conservative direction, which is exactly what
- * a boolean could not carry, and both wrong foldings have shipped:
- *
- *   - *Membership* treats anything but `self`/`none` as excluded — do not list
- *     a page in a sitemap unless its canonical demonstrably names it.
- *   - *Findings* fire only on `elsewhere` — do not accuse. Folding `unknown`
- *     in reported a page whose canonical named itself, quoting the page's own
- *     URL as the evidence, on the default golden path where no `--base-url` is
- *     set and every absolute canonical is therefore unresolvable.
- *   - But folding `elsewhere` OUT of the `unknown` case lost the case that
- *     matters most: with the site's address known, a canonical pointing at a
- *     syndication partner is visibly not this page, and product-spec §6.3.2
- *     names exactly that pairing — `noindex` plus an off-site canonical, and a
- *     sitemap advertising a URL whose canonical points away from it.
- *
- * The four-state core this delegates to, `classifyCanonicalValue(canonical,
- * outputPath, base)`, lives in `document-selectors.js` so a caller holding
- * just a value and an output path (no `BuildDocument` needed) can ask the
- * same question. This wrapper is a one-line adapter over `canonicalOf(doc)`
- * kept for every existing `BuildDocument`-shaped caller; the classification
- * logic itself, and the history behind it, moved with it — see
- * `classifyCanonicalValue`'s own docstring there.
- * @param {import('./manifest.js').BuildDocument} doc
- * @param {import('./urls.js').BaseUrlConfig|null} base
- * @returns {'none'|'self'|'elsewhere'|'unknown'}
- */
-export function classifyCanonical(doc, base) {
-  return classifyCanonicalValue(canonicalOf(doc), doc.outputPath, base);
-}
-
 /** The two schemes a page is served under. Nothing else is comparable. */
 const WEB_SCHEMES = new Set(["http:", "https:"]);
 
@@ -171,7 +103,7 @@ const WEB_SCHEMES = new Set(["http:", "https:"]);
  * `canonicalSchemeMismatchValue(canonical, outputPath, base)` today would
  * need to drag `WEB_SCHEMES`/`schemeOf` — both sitemap-local — along with it,
  * for a core no other consumer would call. It already delegates its host
- * question to `classifyCanonical` above, which *is* now backed by the
+ * question to `classifyCanonical` (document-selectors.js), which is backed by the
  * relocated core, so it is not a second reading of that question either.
  *
  * @param {import('./manifest.js').BuildDocument} doc
@@ -338,7 +270,7 @@ export function generateSitemap({ documents, base, emittedFromSource, reporter }
   }
 
   for (const [i, part] of parts.entries()) generated.set(claimed[i], serializeUrlset(part));
-  generated.set(SITEMAP_PATH, serializeIndex(claimed.map((p) => base.origin + base.pathPrefix + p)));
+  generated.set(SITEMAP_PATH, serializeIndex(claimed.map((p) => effectiveBaseUrl(base) + p)));
   return generated;
 }
 

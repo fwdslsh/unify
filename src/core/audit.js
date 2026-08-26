@@ -33,7 +33,8 @@
  */
 
 import { jsonLdReferences, resolveReference, stripBaseUrl } from "./references.js";
-import { canonicalSchemeMismatch, classifyCanonical } from "./sitemap.js";
+import { canonicalSchemeMismatch } from "./sitemap.js";
+import { classifyCanonical } from "./document-selectors.js";
 import { stringProperty, subjectObject } from "./structured-data.js";
 import {
   canonicalOf, declaredTypes, descriptionOf, langOf, metadataConflicts,
@@ -260,7 +261,7 @@ export function auditManifest({
   const out = [];
   const add = (doc, id, severity, evidence, fix, distinguisher = "") =>
     out.push({
-      id, severity, file: doc.source.path, generated: doc.source.generated === true,
+      id, severity, file: doc.source.path, generated: doc.source.generated,
       outputPath: doc.outputPath, url: doc.document.url, distinguisher, evidence, fix,
     });
 
@@ -280,13 +281,14 @@ export function auditManifest({
   const byText = group((d) => (d.analysis.visibleText === "" ? null : foldSpaces(d.analysis.visibleText)));
 
   for (const doc of documents) {
-    const others = (m, key) => (key === null ? [] : (m.get(norm(key)) ?? []).filter((d) => d !== doc));
+    const others = (m, key) => (m.get(norm(key)) ?? []).filter((d) => d !== doc);
     const title = titleOf(doc);
     const description = descriptionOf(doc);
     const lang = langOf(doc);
     const canonical = canonicalOf(doc);
     const robots = robotsPolicyOf(doc);
     const image = preferredImageOf(doc);
+    const dates = publicationDatesOf(doc);
     const headings = doc.document.body.headings;
 
     // ---- titles ------------------------------------------------------------
@@ -381,7 +383,7 @@ export function auditManifest({
         // §33.4 — the source-tree advice is wrong for a generated page: there
         // is no file to rename and no underscore to add. The generator is
         // where it comes from and where it stops coming from.
-        doc.source.generated === true
+        doc.source.generated
           ? "link to it from a page that is reachable, or stop writing it in your --generate script"
           : "link to it from a page that is reachable, or exclude it with a leading underscore");
     }
@@ -495,7 +497,7 @@ export function auditManifest({
       // Objective because product-spec §6.3.6 names exactly the fields bounded
       // generation may use: a declared Article with no title or no authored
       // date cannot produce valid structured data from them.
-      const published = publicationDatesOf(doc).published;
+      const published = dates.published;
       const missing = [];
       if (title === null) missing.push("a title");
       if (published === null || published.iso === null) missing.push("an authored ISO 8601 date");
@@ -597,7 +599,6 @@ export function auditManifest({
     //
     // The evidence quotes `raw`: the author's own bytes, and the only string
     // they can grep for, since §20.10 emits `raw` nowhere else.
-    const dates = publicationDatesOf(doc);
     for (const [field, value] of [["datePublished", dates.published], ["dateModified", dates.modified]]) {
       if (value === null || value.iso !== null) continue;
       add(doc, "date-unusable", "broken",

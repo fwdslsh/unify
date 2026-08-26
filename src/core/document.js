@@ -31,8 +31,9 @@
  * double-decode), `findAll`'s default `template` skip, and `INVISIBLE`
  * subtree omission with enter/leave separators for non-`INLINE` elements
  * (`<br>` deliberately not inline — it separates lines, so it separates
- * words). `nonEmpty` is the one of the five with an outside consumer
- * (`document-selectors.js`); the rest are `extractDocument`'s own internals.
+ * words). `nonEmpty` and `orNull` are the two of the five with an outside
+ * consumer (`document-selectors.js`); the rest are `extractDocument`'s own
+ * internals.
  */
 
 import { decodeEntities } from "./entities.js";
@@ -132,7 +133,7 @@ function readText(raw) {
 }
 
 /** Trim-only emptiness, for a value already read by `readText`/`textContent`. */
-function orNull(s) {
+export function orNull(s) {
   return typeof s === "string" && s.trim() !== "" ? s.trim() : null;
 }
 

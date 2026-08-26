@@ -40,6 +40,7 @@
  */
 
 import { isPublicDestination } from "./document-selectors.js";
+import { serializeJson } from "./report.js";
 import { effectiveBaseUrl } from "./urls.js";
 
 /** The output path of the site's catalog (brief §4.1). */
@@ -109,7 +110,7 @@ export function catalogDocument(documents, base) {
  * @returns {string}
  */
 export function serializeCatalog(doc) {
-  return `${JSON.stringify(doc, null, 2)}\n`;
+  return serializeJson(doc);
 }
 
 /**

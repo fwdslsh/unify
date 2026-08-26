@@ -80,6 +80,7 @@
  */
 
 import { spawn } from "node:child_process";
+import { serializeJson } from "./report.js";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { constants, tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
@@ -196,7 +197,7 @@ export function writeGeneratorContext({
       searchCorpus: searchCorpusPath ?? null,
     },
   };
-  writeFileSync(contextPath, `${JSON.stringify(context, null, 2)}\n`);
+  writeFileSync(contextPath, serializeJson(context));
   return contextPath;
 }
 
