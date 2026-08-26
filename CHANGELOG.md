@@ -11,21 +11,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.9.0] - 2026-08-26
 
 The five primitives — `<include>`, layouts, slots, the underscore exclusion,
-the `.fragment.html` opt-out — are unchanged, and no built HTML page looks
-different: a 0.8 page's composed markup is byte-for-byte what 0.9 produces
-from it. What changes is the model behind production and discovery
-(§20–§31): the per-page record every built-in consumer read from, and the
-machine-readable artifacts built on top of it. That change has four visible
-edges — a site built with `--base-url` can gain `feed.xml` entries it should
-have had all along (**Changed**); `unify audit`, including under `--strict`,
-reads headings from a narrower scope and can report differently on the same
-tree (**Changed**); `audit --format json`'s `pages` shape is a breaking
-rewrite (**Changed**); and `--search-index` is gone, replaced by `--catalog`/
-`--search-corpus` (**Removed**). If you only author HTML/Markdown pages,
-never build with `--base-url`, never run `audit`, never parse `audit
---format json`'s page shape, and never passed `--search-index`, this release
-changes nothing you will notice. If you do any of those, read **Changed**
-and **Removed** below before upgrading.
+the `.fragment.html` opt-out — are unchanged, and composition itself is
+byte-for-byte what 0.8 produced. What changes is the model behind production
+and discovery (§20–§31): the per-page record every built-in consumer read
+from, and the machine-readable artifacts built on top of it, plus one fix to
+`--pretty-urls` reached through that same model. That change has five
+visible edges — a site built with `--base-url` can gain `feed.xml` entries it
+should have had all along (**Changed**); `unify audit`, including under
+`--strict`, reads headings from a narrower scope and can report differently
+on the same tree (**Changed**); `audit --format json`'s `pages` shape is a
+breaking rewrite (**Changed**); `--search-index` is gone, replaced by
+`--catalog`/`--search-corpus` (**Removed**); and `--pretty-urls` now rewrites
+a page-targeting `og:`/`twitter:` meta the way it already rewrote the
+matching `href`, so a page authoring `<meta property="og:url"
+content="/index.html">` under `--pretty-urls` now emits `content="/"` where
+0.8 (and 0.9 before this fix) emitted the unrewritten `.html` spelling
+(**Fixed**). If you only author HTML/Markdown pages, never build with
+`--base-url`, never run `audit`, never parse `audit --format json`'s page
+shape, never passed `--search-index`, and never author a URL-valued
+`og:`/`twitter:` meta under `--pretty-urls`, this release changes nothing you
+will notice. If you do any of those, read **Changed**, **Fixed**, and
+**Removed** below before upgrading.
 
 ### Added
 
@@ -149,6 +155,24 @@ and **Removed** below before upgrading.
   `taxonomy-inert` finding (in the human report, `--format json`, or
   `--format sarif`), remove that handling — the finding no longer exists to
   suppress.** No frontmatter or markup change is needed.
+
+### Fixed
+
+- **`--pretty-urls` (§11.2/URL-08) now rewrites the URL-valued `og:`/
+  `twitter:` meta `content`** — `og:url`, `og:image`, `og:audio`, `og:video`,
+  `twitter:image`, `twitter:player`, and their `:url`/`:secure_url`/`:src`/
+  `:stream` forms (the same closed list §11.1 and §12 read) — the same way it
+  already rewrote the matching `<a href>`. Previously only §11.1 (provenance)
+  and §11.3 (`--base-url`) touched these metas; `--pretty-urls` left them in
+  the plain `.html` spelling, so a page authoring `<meta property="og:url"
+  content="/about.html">` beside `<a href="/about.html">` had its anchor
+  rewritten to `/about/` while the meta, naming the identical target, failed
+  the reference check. A page whose target does not move under
+  `--pretty-urls` (an already-pretty `index.html`) built clean either way but
+  changes what it emits: `content="/index.html"` now comes out as
+  `content="/"`, matching the `href` beside it. Asset-targeting values (a
+  real image file, not a page) are left byte-unchanged, exactly like an
+  asset `href`.
 
 ## [0.8.3] - 2026-08-25
 

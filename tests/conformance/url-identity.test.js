@@ -377,6 +377,115 @@ test("REF-08/URL-08: an ENCODED authored link is pretty-rewritten like a raw one
   covers("REF-08");
 }, TEST_MS);
 
+// -------------------------------------------------------- B9: og:/twitter: metas under §11.2
+
+test("URL-08: a page-targeting og:url/twitter:image is pretty-rewritten under --pretty-urls alone", async () => {
+  // Without --base-url: an og:url naming an emitted page in its plain .html
+  // spelling, beside a matching <a href> to the same target. Before the fix,
+  // applyPrettyLinks walked href/src/poster/srcset and the refresh URL but
+  // never a meta's `content` — --pretty-urls moves about.html to
+  // about/index.html regardless of --base-url, so the unrewritten meta named
+  // a file that no longer existed and this build failed the reference check
+  // exactly as the --base-url variant below did, on the meta alone while the
+  // anchor beside it (rewritten by the same flag) passed.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": page(
+      "Home",
+      '<a href="/about.html">About</a>',
+      '<meta property="og:url" content="/about.html">\n<meta name="twitter:image" content="/about.html">',
+    ),
+    "about.html": page("About"),
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--pretty-urls"], tmp);
+  expectExit(r, 0, "page-targeting og:url/twitter:image under --pretty-urls alone");
+  const out = read(tmp, "dist", "index.html");
+  if (!out.includes('property="og:url" content="/about/"')) {
+    throw new Error(`§11.2: a page-targeting og:url must reach the same pretty target the href beside it does:\n${out}`);
+  }
+  if (!out.includes('name="twitter:image" content="/about/"')) {
+    throw new Error(`§11.2: the same rule applies to every URL-valued og:/twitter: key, not just og:url:\n${out}`);
+  }
+  if (!out.includes('href="/about/"')) {
+    throw new Error(`the anchor to the same target must also be pretty-rewritten:\n${out}`);
+  }
+  covers("URL-08");
+}, TEST_MS);
+
+test("URL-08: the B9 repro — og:url beside a matching href builds clean under --pretty-urls + --base-url", async () => {
+  // The exact failure named in the B9 contract: this build used to exit 1
+  // with "/about.html does not resolve to any emitted file" reported against
+  // the meta only, while the anchor beside it — rewritten by the same
+  // --pretty-urls flag — passed. §11.2 now reads the meta content through the
+  // same list §11.1/§11.3 already own, so the pretty rewrite happens before
+  // §11.3's absolutization, and both metas resolve like the anchor.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": page(
+      "Home",
+      '<a href="/about.html">About</a>',
+      '<meta property="og:url" content="/about.html">',
+    ),
+    "about.html": page("About"),
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--pretty-urls", "--base-url", BASE], tmp);
+  expectExit(r, 0, "og:url beside a matching href under --pretty-urls + --base-url (B9 repro)");
+  const out = read(tmp, "dist", "index.html");
+  // §11.2 pretty-rewrites the .html spelling first; §11.3 then absolutizes
+  // the og:/twitter: value with origin + path prefix — the same treatment a
+  // canonical link gets, and a treatment an <a href> never gets (hrefs stay
+  // root-relative).
+  if (!out.includes(`property="og:url" content="${BASE}about/"`)) {
+    throw new Error(`§11.2 then §11.3: og:url must be pretty-rewritten and then absolutized:\n${out}`);
+  }
+  if (!out.includes('href="/about/"')) {
+    throw new Error(`the href beside it stays root-relative, only pretty-rewritten:\n${out}`);
+  }
+  covers("URL-08");
+}, TEST_MS);
+
+test("URL-09: an asset-targeting og:image ships byte-unchanged by §11.2 under --pretty-urls alone", async () => {
+  // The other half of the rule: a real file, not a page. §11.2's page-vs-asset
+  // decision for a meta's content must be the identical lookup an href uses —
+  // an asset og:image must never be treated as though it named a page.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": page("Home", "<p>x</p>", '<meta property="og:image" content="/assets/card.png">'),
+    "assets/card.png": "PNGDATA",
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--pretty-urls"], tmp);
+  expectExit(r, 0, "asset-targeting og:image under --pretty-urls alone");
+  const out = read(tmp, "dist", "index.html");
+  if (!out.includes('property="og:image" content="/assets/card.png"')) {
+    throw new Error(`§11.2: an asset-targeting og:image must ship byte-unchanged, like an asset href:\n${out}`);
+  }
+  covers("URL-09");
+}, TEST_MS);
+
+test("URL-09: an asset-targeting og:image gets only §11.3's path prefix under --pretty-urls + --base-url", async () => {
+  // Same asset, both flags together. A base-url WITH a path prefix (rather
+  // than a bare origin) makes the two phases distinguishable: if §11.2 mistook
+  // the asset for a page it would try to re-root it as a directory URL before
+  // §11.3 ever saw it, rather than leaving the plain asset path for §11.3 to
+  // prefix — exactly like the non-page href case the og-note in the
+  // kitchen-sink fixture already pins.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": page("Home", "<p>x</p>", '<meta property="og:image" content="/assets/card.png">'),
+    "assets/card.png": "PNGDATA",
+  });
+  const r = await runCli(
+    ["build", "-s", "src", "-o", "dist", "--pretty-urls", "--base-url", "https://example.com/blog/"],
+    tmp,
+  );
+  expectExit(r, 0, "asset-targeting og:image under --pretty-urls + --base-url");
+  const out = read(tmp, "dist", "index.html");
+  if (!out.includes('property="og:image" content="https://example.com/blog/assets/card.png"')) {
+    throw new Error(`§11.2 must leave the asset path alone for §11.3 to prefix, not rewrite it like a page:\n${out}`);
+  }
+  covers("URL-09");
+}, TEST_MS);
+
 test("URL-14: an extensionless link is pretty-rewritten, and a typo still fails", async () => {
   // The spelling --pretty-urls exists to produce was the one spelling the
   // rewrite ignored: /about reached §12 unrewritten and failed as an
