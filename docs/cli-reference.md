@@ -47,7 +47,7 @@ A finding is not a problem or an advisory. It answers a different question — *
 | | means |
 |---|---|
 | `broken` | the output contradicts itself, or the standard it claims to follow: a link to `#section` where no element has that id, an id declared twice, JSON-LD that does not parse, a page in the sitemap that tells crawlers not to index it. Wrong whatever was intended. |
-| `incomplete` | something is absent or inconsistent that you may have chosen: no description, no `lang`, two pages sharing a title, a page nothing links to, a `tags:` or `categories:` key that built no collection. |
+| `incomplete` | something is absent or inconsistent that you may have chosen: no description, no `lang`, two pages sharing a title, a page nothing links to. |
 
 ```
 $ unify audit
@@ -66,7 +66,7 @@ Worth knowing before you wire it up: **every `init` template passes `unify audit
 
 A finding is also never raised for something the build already refuses to publish. A canonical or an `og:image` naming a file the site does not emit is a *problem* — it blocks the publish outright, which is stronger than reporting it.
 
-One finding is about a key rather than a gap. `tags:` and `categories:` are allowed and become ordinary `<meta>` tags, but unify builds nothing from them — no index page, no archive, no feed of any term, no route — so a page declaring one collects `taxonomy-inert`, naming the keys and what did not happen. Nothing about the page is wrong, which is why it is `incomplete` rather than `broken`; write the index yourself with a script that runs before the build, or drop the key. The keys that are *not* allowed do not reach this command at all: `draft`, `permalink`, and `slug` in Markdown frontmatter are build problems (`unify build --dry-run` reports them), because each one, believed, publishes or addresses the wrong page.
+`tags:` and `categories:` are allowed and become ordinary `<meta>` tags, but unify builds nothing from them — no index page, no archive, no feed of any term, no route — and `audit` reports nothing about them either: they are inert by design, meaningful only to a consumer that chooses to interpret them (a catalog consumer included), and unify never reserves an ordinary metadata name without cause. The keys that are *not* allowed do not reach this command at all: `draft`, `permalink`, and `slug` in Markdown frontmatter are build problems (`unify build --dry-run` reports them), because each one, believed, publishes or addresses the wrong page.
 
 **`--format json` / `--format sarif`.** Replace the finding list above with one JSON document instead — `{schemaVersion, baseUrl, summary, pages, findings}`, where `pages` is the same per-page record every other feature reads and `findings` is the same list in the same order, machine-readable rather than printed. `--format sarif` is the identical findings, mapped field for field into SARIF 2.1.0 for editors and CI systems that already read it. Neither format changes what is checked or the exit code; `--format human` (the default) is unchanged. `problem`/`advisory` diagnostics still print to stderr as prose either way — a JSON consumer gets their counts in `summary`, never their text, so there is one diagnostic channel rather than two. Each finding carries a `fingerprint`: a stable hash of its id, its file, and the one detail that tells it apart from a sibling finding on the same page (which id repeated, which field conflicted) — deliberately *not* its line number or wording, so a CI suppression survives an unrelated edit above it and a reworded fix line.
 
@@ -164,7 +164,7 @@ Two things follow from "only what the page declares", and both surprise people o
 
 ## Feeds (`feed.xml`)
 
-No flag either: a page opts itself into the site's feed the same way it opts into structured data — by declaring `schema: Article` or `schema: BlogPosting` — and the feed exists once **both** that declaration and `--base-url` are present. There is no `posts/` convention, no collection query, and no way to scope a feed to some pages: one declaration, one site feed.
+No flag either: a page opts itself into the site's feed the same way it opts into structured data — by declaring `schema: Article` or `schema: BlogPosting`, or by an authored `<script type="application/ld+json">` whose `@type` is `Article`/`BlogPosting` (any declared type counts, not just the first) — and the feed exists once **both** a qualifying declaration and `--base-url` are present. There is no `posts/` convention, no collection query, and no way to scope a feed to some pages: one declaration, one site feed.
 
 The document is [Atom](https://www.rfc-editor.org/rfc/rfc4287) at `feed.xml`, never RSS — RSS's date is a different calendar vocabulary, and Atom's is the one an ISO instant already conforms to without reformatting. An entry needs `datePublished` on the page (`date:` in frontmatter, or `<meta name="date">`/`article:published_time`), it must be `indexable` and self-canonical — the identical membership the sitemap uses — and, crucially, it needs a **time**, not just a day:
 
