@@ -623,3 +623,36 @@ test("GEN-12 — the context path sits outside the source root, and never appear
   }
   covers("GEN-12");
 }, TEST_MS);
+
+// -------------------------------------------------------------------- B9
+
+test("GEN-04/URL-08: a generator's own og:url stamping builds clean under --pretty-urls + --base-url", async () => {
+  // The B9 defect end to end, through the seam it was actually found on: a
+  // generated page — scanned exactly like an authored one per GEN-04 — stamps
+  // og:url the way a generator naturally computes a page's own output
+  // address: root-relative, in the plain .html spelling it just wrote,
+  // knowing nothing about --pretty-urls or --base-url. It relies entirely on
+  // unify's own §11.2/§11.3 pipeline to make that address right, which is
+  // exactly the reliance the B9 fix restores.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "_scripts/gen.mjs": `import { writeFileSync, mkdirSync } from "node:fs";
+import { join } from "node:path";
+const [, , , outDir] = process.argv;
+mkdirSync(outDir, { recursive: true });
+writeFileSync(join(outDir, "about.html"),
+  '<!doctype html>\\n<html lang="en"><head><meta charset="utf-8"><title>About</title><meta name="description" content="About page."></head><body><h1>About</h1></body></html>\\n');
+writeFileSync(join(outDir, "index.html"),
+  '<!doctype html>\\n<html lang="en"><head><meta charset="utf-8"><title>Home</title><meta name="description" content="Home page."><meta property="og:url" content="/about.html"></head><body><h1>Home</h1><a href="/about.html">About</a></body></html>\\n');
+`,
+  });
+  const r = await runCli(
+    ["build", "-s", "src", "-o", "dist", "--generate", "_scripts/gen.mjs", "--pretty-urls", "--base-url", "https://example.com/"],
+    tmp,
+  );
+  expectExit(r, 0, "a generator's own og:url must survive --pretty-urls + --base-url");
+  const home = readFileSync(join(tmp, "dist", "index.html"), "utf8");
+  expectContains(home, 'property="og:url" content="https://example.com/about/"', "the generated og:url must be pretty-rewritten then absolutized");
+  expectContains(home, 'href="/about/"', "the generated href beside it stays root-relative, pretty-rewritten");
+  covers("GEN-04", "URL-08");
+}, TEST_MS);
