@@ -103,7 +103,7 @@ unify watch              build + rebuild on change, no server
 unify init [template]    scaffold a starter site
 ```
 
-`unify --help` lists every option — among them `--pretty-urls`, `--base-url` (which also generates `sitemap.xml`, and `feed.xml` once a page declares `schema: Article`/`BlogPosting`), `--canonical auto`, `--search-index`, `--dry-run`, and `--strict`. The **[CLI Reference](docs/cli-reference.md)** documents every command, option, and exit code — there are no others. An optional `unify.yaml` at the source root holds saved flags and nothing more.
+`unify --help` lists every option — among them `--pretty-urls`, `--base-url` (which also generates `sitemap.xml`, and `feed.xml` once a page declares `schema: Article`/`BlogPosting`), `--canonical auto`, `--catalog`, `--search-corpus`, `--dry-run`, and `--strict`. The **[CLI Reference](docs/cli-reference.md)** documents every command, option, and exit code — there are no others. An optional `unify.yaml` at the source root holds saved flags and nothing more.
 
 ## Examples
 

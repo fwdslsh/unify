@@ -347,6 +347,51 @@ describe("visibleText", () => {
     expect(a.visibleText).toBe("Inside main");
     expect(a.visibleText).not.toContain("Outside main");
   });
+
+  test("whole-document fallback (no <main>, no <body>) excludes <head> text", () => {
+    // HTML5 makes the <body> start tag omissible, so this is legal authored
+    // markup, not malformed input — the root fallback must not count the
+    // page's own <title> (or other head-only text) as body text.
+    const html = "<html><head><title>NoBody</title></head><h1>Loose</h1><p>text</p>";
+    const a = analysis(html);
+    expect(a.visibleText).toBe("Loose text");
+    expect(a.visibleText).not.toContain("NoBody");
+  });
+
+  test("the fallback's <head> exclusion covers headings too — the two scopes stay one scope", () => {
+    // §20.3/§20.7 state body.headings and visibleText share one scope. A
+    // heading inside the page's own <head> on a body-less document must not
+    // reach the snapshot: otherwise the model reports an h1 whose text it
+    // simultaneously says no reader sees, and h1-missing stays silent on a
+    // page whose only <h1> is invisible.
+    const html = "<html><head><title>T</title><h1>ChromeHead</h1></head><h2 id=\"real\">Real</h2><p>text</p>";
+    const { document, analysis: a } = extractDocument(html);
+    expect(document.body.headings).toEqual([{ level: 2, id: "real", text: "Real" }]);
+    expect(a.visibleText).toBe("Real text");
+  });
+
+  test("a heading in a <head> nested inside <main> (not the fallback case) still counts", () => {
+    const html = doc(
+      "",
+      "<main><head><h1>IncludedDoc</h1></head><p>after</p></main>",
+    );
+    const { document } = extractDocument(html);
+    expect(document.body.headings).toEqual([{ level: 1, id: null, text: "IncludedDoc" }]);
+  });
+
+  test("a <head> nested inside <main>/<body> (not the fallback case) still contributes its text", () => {
+    // The <head> exclusion is scoped to the §20.7 whole-document fallback
+    // only. A textually-included second document can leave a <head> nested
+    // inside the page's own <main>/<body> — that <head> is not the page's
+    // own head (the page HAS a <body>/<main>, so `scope` never falls back
+    // to root), and its text must still count as visible body text.
+    const html = doc(
+      "",
+      "<main><p>Body text</p><head><title>Inner</title></head><p>after</p></main>",
+    );
+    const a = analysis(html);
+    expect(a.visibleText).toBe("Body text Inner after");
+  });
 });
 
 // ----------------------------------------------------------------- jsonLd

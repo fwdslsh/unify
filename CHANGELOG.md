@@ -8,6 +8,148 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-08-26
+
+The five primitives — `<include>`, layouts, slots, the underscore exclusion,
+the `.fragment.html` opt-out — are unchanged, and no built HTML page looks
+different: a 0.8 page's composed markup is byte-for-byte what 0.9 produces
+from it. What changes is the model behind production and discovery
+(§20–§31): the per-page record every built-in consumer read from, and the
+machine-readable artifacts built on top of it. That change has four visible
+edges — a site built with `--base-url` can gain `feed.xml` entries it should
+have had all along (**Changed**); `unify audit`, including under `--strict`,
+reads headings from a narrower scope and can report differently on the same
+tree (**Changed**); `audit --format json`'s `pages` shape is a breaking
+rewrite (**Changed**); and `--search-index` is gone, replaced by `--catalog`/
+`--search-corpus` (**Removed**). If you only author HTML/Markdown pages,
+never build with `--base-url`, never run `audit`, never parse `audit
+--format json`'s page shape, and never passed `--search-index`, this release
+changes nothing you will notice. If you do any of those, read **Changed**
+and **Removed** below before upgrading.
+
+### Added
+
+- **`--catalog`**, which writes `assets/unify/catalog.json`: one entry per
+  public page — its path, URL, root attributes, and the same head/body
+  snapshot `audit --format json` serializes (title, meta, links, headings) —
+  for a browse/filter/TOC/metadata-driven UI. No body text.
+- **`--search-corpus`**, which writes `assets/unify/search-corpus.json`: one
+  `{path, text}` entry per public page, `text` being the page's visible main
+  content with Unicode space separators folded to an ordinary space. Nothing
+  else is touched — no stemming, no stop-word removal, no truncation.
+  `--catalog` and `--search-corpus` are independent flags; pass both for a
+  full client-side search UI, and each carries its own `unify.yaml` key. Both
+  join the temp tree before the reference check, appear in `--dry-run`, and
+  an authored file at either exact path suppresses generation, exactly like
+  an authored `sitemap.xml`/`feed.xml`.
+- **`generator-context.json`**, written once per generator run and passed as
+  `process.argv[4]`: `{schemaVersion, unifyVersion, command, paths:
+  {sourceRoot, generatedRoot, outputRoot}, site: {baseUrl, prettyUrls,
+  canonical}, outputs: {catalog, searchCorpus}}`. It sits beside (never
+  inside) the generated directory `argv[3]` already names, is deleted with
+  the rest of the build's generator state, and is never published.
+  `argv[2]`/`argv[3]` are unchanged, so an 0.8 generator keeps working
+  unmodified — it simply never reads the fourth argument; one that wants the
+  new facts reads a fourth argument that was not there before.
+
+### Changed
+
+- **Breaking: the per-page record is `BuildDocument`, not `PageRecord`**
+  (§20). Every built-in consumer — sitemap, `--canonical auto`, the feed,
+  structured-data generation, `audit`, the dev report — now reads through
+  `{source: {path, generated, layout}, outputPath, document, analysis}`,
+  where `document` is a small, bounded `DocumentSnapshot` (root attributes,
+  head title/meta/link/base, body attributes and headings) and `analysis` is
+  private build data. This is an internal model change with one public
+  face: **`unify audit --format json`'s page shape is now `{source,
+  generated, outputPath, document}`**, `document` being the snapshot above,
+  serialized whole. The 0.8 shape — a flat object with `title`,
+  `description`, `canonical`, `headings`, `text`, `linksOut`, `conflicts`,
+  `taxonomyKeys`, and the rest as top-level page fields — is gone outright.
+  `schemaVersion` stays `1`: 0.9 is a declared, incompatible break with the
+  0.8 machine schema rather than a migration, so there is no `2` to reach
+  for. **If you parse `audit --format json`, rewrite the reader against the
+  new `pages[].document` shape.** The 0.8 page had 28 top-level fields
+  (`sourcePath, generated, layout, outputPath, path, url, title,
+  description, lang, canonical, robots, h1, headings, text, image, author,
+  datePublished, dateModified, schemaType, taxonomyKeys, jsonLd, ids,
+  strayMetadata, linksOut, linksIn, fragmentLinks, conflicts, refresh`); the
+  0.9 page has four (`source, generated, outputPath, document`). One is a
+  silent rename: `sourcePath` is now `source` — a reader of `page.sourcePath`
+  gets `undefined`, not an error. Some are still there, recomputed from the
+  snapshot rather than stored: `title`/`description`/`canonical` read from
+  `document.head`, `lang` from `document.html.attributes`, `headings` from
+  `document.body.headings`, and `robots`/`image`/`author`/`datePublished`/
+  `dateModified`/`h1` are each one small reduction over
+  `document.head.meta`/`document.body.headings` away (`h1` is
+  `document.body.headings.find(h => h.level === 1)?.text ?? null`). One moved to
+  a different artifact: `text` is gone from this shape entirely — only
+  `--search-corpus`'s `search-corpus.json` carries page text now, joined by
+  `path`. The rest have no replacement anywhere: `layout` (deliberately kept
+  out of this object; it stays internal to audit's own fix lines),
+  `schemaType` (superseded by `declaredTypes`, which nothing serializes),
+  `taxonomyKeys` (the feature is removed, see below), `jsonLd`, `ids`,
+  `strayMetadata`, `linksOut`, `linksIn`, `fragmentLinks`, and `refresh` are
+  all private build data with no public field. `conflicts` is the one
+  exception worth naming on its own: it was never a stored field even in
+  0.9's model — `metadataConflicts(doc)` computes it on demand — but it does
+  still reach this JSON, as the `metadata-conflict` finding for each
+  contradiction found; only the standalone `page.conflicts` array is gone.
+  Findings, `summary`, and `fingerprint` are unchanged.
+- **Breaking: heading scope is now the first `<main>`, else `<body>`, else
+  the document — no longer document-wide.** A layout's own chrome routinely
+  carries an `<h1>` (a site name in the header, a "skip to content" link),
+  and reading headings document-wide made that chrome's heading
+  indistinguishable from the page's own. `h1-missing`, `h1-multiple`, and
+  `title-h1-mismatch` inherit the new scope without a rule of their own,
+  because they read the snapshot's `body.headings` as extracted. **If a
+  layout's chrome carries its own `<h1>` outside `<main>`, a page that
+  previously satisfied `h1-missing` via that chrome heading now needs an
+  `<h1>` of its own inside `<main>`** — this can turn a clean `audit
+  --strict` run into one reporting `h1-missing` on such pages; add the
+  heading where the content actually is.
+- **Feed membership now tests inclusion, not the first declaration.**
+  `declaredTypes(doc)` (below) replaces the single scalar `schemaType`, and
+  a page joins the feed if `declaredTypes(doc)` **includes** `Article` or
+  `BlogPosting` anywhere in the list, not only when it was the first
+  declaration. A page carrying `Organization` JSON-LD before separate
+  `Article` JSON-LD — routine, since a page is often both a piece of content
+  and part of a publisher's graph — was silently excluded from its own feed
+  under 0.8 and is a candidate under 0.9. `schema-incomplete` (§24.4) uses
+  the same inclusion test. This is a widening: a 0.8 site's feed gains
+  entries it should have had; nothing already in a feed is removed.
+- `declaredTypes(doc)` (§20.8) replaces the retired `schemaType` field.
+  Where `schemaType` interleaved meta and JSON-LD declarations by document
+  position and kept only the first, `declaredTypes` lists every accepted
+  `<meta name="schema">` value before every JSON-LD `@type`, and returns the
+  whole list. Nothing built-in reads a single "the" type anymore except
+  §26.5's generation activation, which only ever sees a meta-only list by
+  construction.
+
+### Removed
+
+- **Breaking: `--search-index` is removed outright**, along with
+  `search-index.json` and the `unify.yaml` `search-index` key. There is no
+  alias and no deprecation shim: passing `--search-index` is now an unknown-
+  flag usage error (exit 2), and a saved `search-index: true` in
+  `unify.yaml` is an unknown-key usage error. **Replace `--search-index`
+  with `--catalog` and/or `--search-corpus`** (§30): a client that indexed
+  `search-index.json`'s url-keyed `{url, title, text, ...}` entries directly
+  now reads `search-corpus.json`'s `{path, text}` entries and, for anything
+  beyond raw text — title, headings, canonical, metadata — joins against
+  `catalog.json` by `path` (`new Map(catalog.pages.map(p => [p.path, p]))`).
+  `path`, not `url`, is the deliberate join key between the two new files.
+- **Breaking: `tags`/`categories` taxonomy tracking is removed** — the
+  `taxonomyKeys` field, its extraction, and the `taxonomy-inert` audit
+  finding are gone. `tags:`/`categories:` frontmatter still synthesizes
+  `<meta name="tags">`/`<meta name="categories">` exactly as before and
+  still builds nothing on their own; `unify audit` simply reports nothing
+  about them now, in either the head or the body, rather than pointing out
+  that they build nothing. **If your CI parsed or suppressed the
+  `taxonomy-inert` finding (in the human report, `--format json`, or
+  `--format sarif`), remove that handling — the finding no longer exists to
+  suppress.** No frontmatter or markup change is needed.
+
 ## [0.8.3] - 2026-08-25
 
 A patch release with no authoring-surface change: the five primitives are
@@ -326,7 +468,8 @@ with generated compare-link notes only. Their diffs are on the
 [releases page](https://github.com/fwdslsh/unify/releases). Nothing here
 retroactively reconstructs detail those notes never carried.
 
-[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.8.3...HEAD
+[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/fwdslsh/unify/compare/v0.8.3...v0.9.0
 [0.8.3]: https://github.com/fwdslsh/unify/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/fwdslsh/unify/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/fwdslsh/unify/compare/v0.8.0...v0.8.1

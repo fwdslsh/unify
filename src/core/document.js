@@ -24,22 +24,40 @@
  * live in a module of their own so every consumer reads one interpretation
  * rather than growing a second.
  *
- * `manifest.js` (conformance-spec §20) imports its low-level text machinery
- * from here rather than keeping a second copy: `textContent`, `readText`,
- * `collapse`, `nonEmpty`, `orNull` all port §20.3's exact discipline —
- * decode-then-collapse order, `nonEmpty` for a raw attribute slice vs
- * `orNull` for text a helper already normalized (never double-decode),
- * `findAll`'s default `template` skip, and `INVISIBLE` subtree omission with
- * enter/leave separators for non-`INLINE` elements (`<br>` deliberately not
- * inline — it separates lines, so it separates words).
+ * The low-level text machinery lives here rather than in a second copy:
+ * `textContent`, `readText`, `collapse`, `nonEmpty`, `orNull` all port
+ * §20.3's exact discipline — decode-then-collapse order, `nonEmpty` for a raw
+ * attribute slice vs `orNull` for text a helper already normalized (never
+ * double-decode), `findAll`'s default `template` skip, and `INVISIBLE`
+ * subtree omission with enter/leave separators for non-`INLINE` elements
+ * (`<br>` deliberately not inline — it separates lines, so it separates
+ * words). `nonEmpty` is the one of the five with an outside consumer
+ * (`document-selectors.js`); the rest are `extractDocument`'s own internals.
  */
 
 import { decodeEntities } from "./entities.js";
 import { findAll, findFirst, getAttr, innerText, isElement, isInside, isJsonLdScript, parse } from "./html.js";
 import { parseRefreshMeta } from "./urls.js";
 
-/** Subtrees whose characters are not visible page text (§20.3). */
+/**
+ * Subtrees whose characters are never visible page text (§20.3), regardless
+ * of which scope `textContent` is walking.
+ */
 const INVISIBLE = new Set(["script", "style", "template", "noscript"]);
+
+/**
+ * §20.7's whole-document fallback (no `<main>` and no `<body>` element —
+ * legal under HTML5's omissible `<body>` start tag) additionally omits
+ * `<head>`, so a page with neither doesn't count its own `<title>`/other
+ * head text as body text. This is scoped to that one fallback, not to
+ * `textContent` generally: §20.3's own definition omits only the four tags
+ * above, and a `<head>` legitimately reachable inside `<main>`/`<body>` (a
+ * textual `<include>` of a full second document) must still contribute —
+ * `head.title` is captured separately via `innerText`, never through
+ * `textContent`, so this exclusion changes nothing about what the
+ * snapshot's own `head.title` reports.
+ */
+const FALLBACK_EXTRA_INVISIBLE = new Set(["head"]);
 
 /**
  * §20.3's closed inline set: leaving one of these contributes no separator;
@@ -65,15 +83,18 @@ const INLINE = new Set([
  * detection report two pages as identical when only their inline analytics
  * snippet is.
  * @param {import('./html.js').Node} el
+ * @param {Set<string>} [extraInvisible] additional tags to omit for this
+ *   call only — used by the §20.7 whole-document fallback to add `<head>`
+ *   without widening §20.3's own definition for every other caller.
  * @returns {string}
  */
-export function textContent(el) {
+function textContent(el, extraInvisible) {
   let out = "";
   const visit = (node) => {
     if (node.type === "text") { out += node.data; return; }
     if (node.type !== "element" && node.type !== "root") return;
     const tag = node.type === "element" ? node.tag.toLowerCase() : "";
-    if (INVISIBLE.has(tag)) return;
+    if (INVISIBLE.has(tag) || extraInvisible?.has(tag)) return;
     // Entering AND leaving: leaving alone fuses a parent's own text with a
     // block child's ("<div>Intro<p>Para</p></div>" -> "IntroPara"). The
     // doubled separator between two adjacent blocks costs nothing, because
@@ -88,7 +109,7 @@ export function textContent(el) {
 }
 
 /** Collapse every run of ASCII whitespace to one space and trim (§20.3). */
-export function collapse(s) {
+function collapse(s) {
   return s.replace(/[ \t\n\r\f]+/g, " ").trim();
 }
 
@@ -106,12 +127,12 @@ export function collapse(s) {
  * @param {string} raw
  * @returns {string}
  */
-export function readText(raw) {
+function readText(raw) {
   return collapse(decodeEntities(raw));
 }
 
 /** Trim-only emptiness, for a value already read by `readText`/`textContent`. */
-export function orNull(s) {
+function orNull(s) {
   return typeof s === "string" && s.trim() !== "" ? s.trim() : null;
 }
 
@@ -337,7 +358,19 @@ export function extractDocument(html, { path = null, url = null } = {}) {
   const main = findFirst(root, (n) => isElement(n, "main"));
   const scope = main ?? bodyEl ?? root;
 
+  // The <head> exclusion below applies only to the whole-document fallback
+  // (§20.7) — when a <main> or <body> element was found, `scope` cannot
+  // legitimately contain the page's OWN <head> (siblings of <body> under
+  // <html>), but a textually-included second document can still nest one
+  // inside <main>/<body>, and that content must keep contributing. It covers
+  // `body.headings` and `analysis.visibleText` alike, because §20.3/§20.7
+  // state the two share one scope: without it here, the snapshot would report
+  // a heading whose text the same model says is invisible, and `h1-missing`
+  // would stay silent on a page whose only <h1> no reader sees.
+  const usingWholeDocumentFallback = !main && !bodyEl;
+
   const headings = findAll(scope, (n) => n.type === "element" && /^h[1-6]$/.test(n.tag.toLowerCase()))
+    .filter((node) => !usingWholeDocumentFallback || !isInside(node, "head"))
     .map((node) => ({
       level: Number(node.tag.toLowerCase().slice(1)),
       id: nonEmpty(getAttr(node, "id")),
@@ -353,7 +386,7 @@ export function extractDocument(html, { path = null, url = null } = {}) {
   };
 
   const analysis = {
-    visibleText: textContent(scope),
+    visibleText: textContent(scope, usingWholeDocumentFallback ? FALLBACK_EXTRA_INVISIBLE : undefined),
     ids,
     titleTexts,
     langTexts,
