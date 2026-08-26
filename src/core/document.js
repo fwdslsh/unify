@@ -358,7 +358,19 @@ export function extractDocument(html, { path = null, url = null } = {}) {
   const main = findFirst(root, (n) => isElement(n, "main"));
   const scope = main ?? bodyEl ?? root;
 
+  // The <head> exclusion below applies only to the whole-document fallback
+  // (§20.7) — when a <main> or <body> element was found, `scope` cannot
+  // legitimately contain the page's OWN <head> (siblings of <body> under
+  // <html>), but a textually-included second document can still nest one
+  // inside <main>/<body>, and that content must keep contributing. It covers
+  // `body.headings` and `analysis.visibleText` alike, because §20.3/§20.7
+  // state the two share one scope: without it here, the snapshot would report
+  // a heading whose text the same model says is invisible, and `h1-missing`
+  // would stay silent on a page whose only <h1> no reader sees.
+  const usingWholeDocumentFallback = !main && !bodyEl;
+
   const headings = findAll(scope, (n) => n.type === "element" && /^h[1-6]$/.test(n.tag.toLowerCase()))
+    .filter((node) => !usingWholeDocumentFallback || !isInside(node, "head"))
     .map((node) => ({
       level: Number(node.tag.toLowerCase().slice(1)),
       id: nonEmpty(getAttr(node, "id")),
@@ -372,13 +384,6 @@ export function extractDocument(html, { path = null, url = null } = {}) {
     head: { title, meta, link, base },
     body: { attributes: attributesOf(bodyEl), headings },
   };
-
-  // The <head> exclusion applies only to the whole-document fallback
-  // (§20.7) — when a <main> or <body> element was found, `scope` cannot
-  // legitimately contain the page's OWN <head> (siblings of <body> under
-  // <html>), but a textually-included second document can still nest one
-  // inside <main>/<body>, and that content must keep contributing.
-  const usingWholeDocumentFallback = !main && !bodyEl;
 
   const analysis = {
     visibleText: textContent(scope, usingWholeDocumentFallback ? FALLBACK_EXTRA_INVISIBLE : undefined),

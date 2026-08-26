@@ -36,9 +36,10 @@ if (!process.argv[3]) console.log(`standalone run: writing a preview overlay int
 
 // argv[4] is generator-context.json — a versioned snapshot of the same effective settings
 // unify's own build is about to apply, read once, straight off disk, with no import from
-// unify. The `?.` guards the same standalone run as sourceRoot/generatedDir above (see the
-// "run it directly" fix line in P29's report, below): under unify argv[4] is always
-// supplied and the guard never fires there.
+// unify. The `?.` guards any run with no fourth argument: the standalone run above, and
+// unify releases before 0.9.0 (this example's package.json pins one until 0.9.0 is
+// published), which predate the context file. Under unify 0.9.0+ argv[4] is always
+// supplied and the guard never fires.
 const context = process.argv[4] ? JSON.parse(readFileSync(process.argv[4], "utf8")) : null;
 
 // cwd is the source root (§33.2), so this is the same file Eleventy's data
