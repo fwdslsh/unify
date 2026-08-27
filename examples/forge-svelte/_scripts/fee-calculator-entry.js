@@ -1,5 +1,6 @@
+import { mount } from "svelte";
 import FeeCalculator from "../components/FeeCalculator.svelte";
 
-new FeeCalculator({
+mount(FeeCalculator, {
   target: document.getElementById("fee-calculator"),
 });
