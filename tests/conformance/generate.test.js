@@ -656,3 +656,38 @@ writeFileSync(join(outDir, "index.html"),
   expectContains(home, 'href="/about/"', "the generated href beside it stays root-relative, pretty-rewritten");
   covers("GEN-04", "URL-08");
 }, TEST_MS);
+
+test("CFG-04 — --generate given twice is a usage error in every spelling; one value, and config plus one value, still work", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": doc("Home", "<h1>Home</h1>"),
+    "_scripts/a.mjs": writesOnePage,
+    "_scripts/b.mjs": writesOnePage.replace("generated.html", "other.html"),
+  });
+  const base = ["build", "-s", "src", "-o", "dist"];
+  const spellings = {
+    separated: ["--generate", "_scripts/a.mjs", "--generate", "_scripts/b.mjs"],
+    equals: ["--generate=_scripts/a.mjs", "--generate=_scripts/b.mjs"],
+    mixed: ["--generate", "_scripts/a.mjs", "--generate=_scripts/b.mjs"],
+  };
+  for (const [kind, args] of Object.entries(spellings)) {
+    const r = await runCli([...base, ...args], tmp);
+    expectExit(r, 2, `${kind} repeat`);
+    expectContains(r.stderr, "--generate given more than once", `${kind} repeat names the option`);
+    expectContains(r.stderr, "unify runs one generator", `${kind} repeat says why`);
+    if (existsSync(join(tmp, "dist"))) throw new Error(`${kind}: a usage error runs no generator and writes nothing`);
+  }
+
+  const one = await runCli([...base, "--generate", "_scripts/a.mjs"], tmp);
+  expectExit(one, 0, "a single --generate");
+  if (!existsSync(join(tmp, "dist", "generated.html"))) throw new Error("the single generator ran");
+
+  // unify.yaml's generate: plus one CLI value is not a repeat; the CLI wins.
+  writeTree(join(tmp, "src"), { "unify.yaml": "generate: _scripts/a.mjs\n" });
+  const both = await runCli([...base, "--clean", "--generate", "_scripts/b.mjs"], tmp);
+  expectExit(both, 0, "config generate plus one CLI --generate");
+  if (!existsSync(join(tmp, "dist", "other.html")) || existsSync(join(tmp, "dist", "generated.html"))) {
+    throw new Error("the command line's generator won over unify.yaml's");
+  }
+  covers("CFG-04");
+}, TEST_MS);
