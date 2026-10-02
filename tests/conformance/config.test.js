@@ -19,7 +19,7 @@
  *     express anything a flag can't.
  */
 import { test } from "bun:test";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { compareTrees } from "./compare.mjs";
 import { covers, mkTmp, runCli, writeTree } from "./support.mjs";
@@ -285,3 +285,82 @@ test("CFG-04 — a repeated single-value option is a usage error; flags and --ex
   covers("CFG-04");
 }, 30_000);
 
+
+// ---- CFG-05: `unify build --save-config` -------------------------------------
+
+const PAGE =
+  '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><title>H</title>' +
+  '<meta name="description" content="A page."></head><body><main><h1>H</h1></main></body></html>\n';
+
+test("CFG-05 — --save-config creates unify.yaml from the flags given, and the loader reads it back", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), { "index.html": PAGE });
+
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--pretty-urls", "--base-url=https://x.example/", "--exclude", "_drafts/**", "--save-config"], tmp);
+  if (r.exit !== 0) throw new Error(`exit ${r.exit}\n${r.stderr}`);
+  const text = readFileSync(join(tmp, "src", "unify.yaml"), "utf8");
+  if (text !== 'output: dist\nexclude:\n  - _drafts/**\npretty-urls: true\nbase-url: https://x.example/\n') {
+    throw new Error(`unexpected file:\n${text}`);
+  }
+  if (/save-config|source|dry-run/.test(text)) throw new Error("must not write save-config, source or dry-run");
+  if (existsSync(join(tmp, "dist", "unify.yaml"))) throw new Error("unify.yaml shipped");
+
+  // Round trip: a build from the file alone matches a build from the flags.
+  rmSync(join(tmp, "dist"), { recursive: true });
+  const again = await runCli(["build", "-s", "src"], tmp);
+  if (again.exit !== 0) throw new Error(again.stderr);
+  const flags = await runCli(["build", "-s", "src", "-o", "dist2", "--pretty-urls", "--base-url", "https://x.example/", "--exclude", "_drafts/**"], tmp);
+  if (flags.exit !== 0) throw new Error(flags.stderr);
+  const cmp = compareTrees(join(tmp, "dist"), join(tmp, "dist2"));
+  if (cmp && cmp.length) throw new Error(`file-only build differs: ${JSON.stringify(cmp)}`);
+  covers("CFG-05");
+}, 30_000);
+
+test("CFG-05 — upsert keeps comments and untouched keys byte-for-byte and replaces an exclude list", async () => {
+  const tmp = mkTmp();
+  const before =
+    "# my settings\nstrict: true\nbase-url: https://old.example/\n# the globs\nexclude:\n  - old-a\n  - old-b\ncatalog: true # keep\n";
+  writeTree(join(tmp, "src"), { "index.html": PAGE, "unify.yaml": before });
+
+  const r = await runCli(["build", "-s", "src", "--base-url", "https://new.example/", "--exclude=_x", "--exclude", "_y", "--save-config"], tmp);
+  if (r.exit !== 0) throw new Error(`exit ${r.exit}\n${r.stderr}`);
+  const want =
+    "# my settings\nstrict: true\nbase-url: https://new.example/\n# the globs\nexclude:\n  - _x\n  - _y\ncatalog: true # keep\n";
+  const got = readFileSync(join(tmp, "src", "unify.yaml"), "utf8");
+  if (got !== want) throw new Error(`got:\n${got}\nwant:\n${want}`);
+
+  // Passing nothing saveable changes nothing.
+  const noop = await runCli(["build", "-s", "src", "--save-config"], tmp);
+  if (noop.exit !== 0) throw new Error(noop.stderr);
+  if (readFileSync(join(tmp, "src", "unify.yaml"), "utf8") !== want) throw new Error("a no-op save changed the file");
+  covers("CFG-05");
+}, 30_000);
+
+test("CFG-05 — usage errors write nothing: --dry-run, a non-build command, an unwritable value", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), { "index.html": PAGE });
+  for (const args of [
+    ["build", "-s", "src", "--dry-run", "--pretty-urls", "--save-config"],
+    ["audit", "-s", "src", "--pretty-urls", "--save-config"],
+    ["build", "-s", "src", "--exclude", "a #b", "--save-config"],
+  ]) {
+    const r = await runCli(args, tmp);
+    if (r.exit !== 2) throw new Error(`${args.join(" ")}: expected exit 2, got ${r.exit}\n${r.stderr}`);
+    if (existsSync(join(tmp, "src", "unify.yaml")) || existsSync(join(tmp, "dist"))) {
+      throw new Error(`${args.join(" ")}: a usage error writes nothing`);
+    }
+  }
+  covers("CFG-05");
+}, 30_000);
+
+test("CFG-05 — a failed build does not save", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": PAGE.replace("<main>", '<main><a href="/missing.html">x</a>'),
+    "unify.yaml": "# keep\n",
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--pretty-urls", "--save-config"], tmp);
+  if (r.exit !== 1) throw new Error(`expected exit 1, got ${r.exit}\n${r.stdout}\n${r.stderr}`);
+  if (readFileSync(join(tmp, "src", "unify.yaml"), "utf8") !== "# keep\n") throw new Error("failed build changed unify.yaml");
+  covers("CFG-05");
+}, 30_000);

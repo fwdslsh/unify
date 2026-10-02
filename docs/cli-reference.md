@@ -24,6 +24,7 @@ Options:
       --search-corpus      write assets/unify/search-corpus.json — normalized page text for client-side search
       --generate <path>    run one JavaScript file from your source tree before the build
       --dry-run            run the full build and every check, print the report, write nothing
+      --save-config        `build` only: write the saveable options given here into unify.yaml (after a good build)
       --strict             advisories count as problems for the exit code (with `audit`, findings too)
       --format <kind>      `audit` report shape: human (default), json, or sarif
       --external           `audit` only: fetch every off-origin URL the site emits and report the ones that don't resolve
@@ -319,6 +320,12 @@ canonical completion: 5 pages would gain a canonical link
 structured data: 3 pages would gain a JSON-LD block
 ```
 
+### `--save-config`
+
+`build` only. Writes the saveable options you passed on this command line into `unify.yaml` in the source root, creating the file if it is not there: `unify build --pretty-urls --base-url https://example.com/ --save-config`. It is an upsert. Keys you did not pass are left alone, and the file is edited line by line, so your comments, ordering and other keys survive untouched; a key you passed replaces its old line (an `exclude` list replaces its old items), and new keys go at the end. It never writes `save-config` itself, `source` (the file lives in the source root, so naming it there would be circular), or `--dry-run`. A flag like `--pretty-urls` writes `pretty-urls: true`; there is no way to write `false`, so to remove a key, edit the file.
+
+The file is written only if the build exits `0`, so it records settings that produced a good build. `--save-config` with `--dry-run`, or on any command but `build`, is a usage error (exit `2`) and writes nothing.
+
 ### `--strict`
 
 Advisories affect the exit code (non-zero) — never what is published. `unify build --dry-run --strict` is the one-line CI lint.
@@ -352,7 +359,7 @@ Cycle and depth errors print the full chain (`_layout.html → _includes/nav.htm
 
 ## `unify.yaml`
 
-Optional, at the source root: saved flags, nothing more. Keys are the long option names (`source`, `output`, `clean`, `exclude` — a list, `pretty-urls`, `base-url`, `strict`, `port`); CLI flags win on conflict. No behavior exists that only the file can express; the file itself never ships.
+Optional, at the source root: saved flags, nothing more. Keys are the long option names (`source`, `output`, `clean`, `exclude` — a list, `pretty-urls`, `base-url`, `strict`, `port`); CLI flags win on conflict. No behavior exists that only the file can express; the file itself never ships. `unify build ... --save-config` writes or updates it for you.
 
 ```yaml
 # unify.yaml — the committed invocation

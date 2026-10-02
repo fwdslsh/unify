@@ -55,13 +55,16 @@ const OPTIONS = {
   // anything a page declares. Boolean; `cli/commands/audit.js` and
   // `core/external.js` do the rest.
   external: { kind: "flag" },
+  // §18 — `build` only: upsert the saveable flags on this command line into
+  // unify.yaml. Not itself saveable; cli.js enforces the rest.
+  "save-config": { kind: "flag" },
   port: { kind: "string", short: "p" },
   version: { kind: "flag", short: "v" },
   help: { kind: "flag", short: "h" },
 };
 
 /** Keys `unify.yaml` may carry — the long option names, minus the ones that make no sense to save. */
-const CONFIG_KEYS = ["source", "output", "clean", "exclude", "pretty-urls", "base-url", "canonical", "feed-full", "catalog", "search-corpus", "strict", "port", "generate"];
+export const CONFIG_KEYS = ["source", "output", "clean", "exclude", "pretty-urls", "base-url", "canonical", "feed-full", "catalog", "search-corpus", "strict", "port", "generate"];
 
 const SHORT = Object.fromEntries(
   Object.entries(OPTIONS)

@@ -24,6 +24,7 @@ import pkg from "../package.json" with { type: "json" };
 import { Reporter, UsageError } from "./core/diagnostics.js";
 import { cleanRefusalReason, resolveSource } from "./core/paths.js";
 import { loadConfig, mergeConfig, parseArgs } from "./cli/options.js";
+import { saveEntries, writeConfig } from "./cli/save-config.js";
 
 const HELP = `unify — HTML-native composition: no expression language, no client runtime.
 
@@ -46,6 +47,7 @@ Options:
       --search-corpus      write assets/unify/search-corpus.json — normalized page text for client-side search
       --generate <path>    run one JavaScript file from your source tree before the build
       --dry-run            run the full build and every check, print the report, write nothing
+      --save-config        \`build\` only: write the saveable options given here into unify.yaml (after a good build)
       --strict             advisories count as problems for the exit code (with \`audit\`, findings too)
       --format <kind>      \`audit\` report shape: human (default), json, or sarif
       --external           \`audit\` only: fetch every off-origin URL the site emits and report the ones that don't resolve
@@ -237,6 +239,22 @@ export async function run(argv) {
     }
   }
 
+  // §18 — `--save-config` is `build`'s alone, and `--dry-run` promises to write nothing.
+  let saving = null;
+  if (options["save-config"]) {
+    if (command !== "build") {
+      throw new UsageError(`--save-config applies only to \`unify build\`, not \`unify ${command}\``, [
+        "run it as: unify build <flags> --save-config",
+      ]);
+    }
+    if (options["dry-run"] === true) {
+      throw new UsageError("--save-config cannot be combined with --dry-run: a dry run writes nothing", [
+        "drop --dry-run to build and save, or drop --save-config",
+      ]);
+    }
+    saving = saveEntries(options);
+  }
+
   const output = resolve(process.cwd(), settings.output);
 
   if (settings.clean) {
@@ -257,8 +275,15 @@ export async function run(argv) {
   const context = { sourceRoot, output, settings, reporter, template, sourceDefaulted, command };
 
   switch (command) {
-    case "build":
-      return (await import("./cli/commands/build.js")).build(context);
+    case "build": {
+      const code = await (await import("./cli/commands/build.js")).build(context);
+      // §18 — only a build that exited 0 records its settings.
+      if (saving && code === 0) {
+        writeConfig(sourceRoot, saving);
+        process.stdout.write(`saved ${[...saving.keys()].join(", ") || "nothing"} to ${resolve(sourceRoot, "unify.yaml")}\n`);
+      }
+      return code;
+    }
     case "audit":
       return (await import("./cli/commands/audit.js")).audit(context);
     case "dev":
