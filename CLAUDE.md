@@ -30,7 +30,7 @@ bun run build:windows                      # Windows x64 binary
 bun src/cli.js build  [-s src] [-o dist] [--clean] [--exclude <glob>]... \
                       [--pretty-urls] [--base-url <url>] [--canonical auto] \
                       [--feed-full] [--catalog] [--search-corpus] [--generate <path>] \
-                      [--dry-run] [--strict] [--save-config]  # --save-config: build only; upserts unify.yaml after an exit-0 build
+                      [--dry-run] [--strict] [--audit] [--save-config]  # --save-config: build only; upserts unify.yaml after an exit-0 build
 bun src/cli.js audit  [-s src] [-o dist] [--exclude <glob>]... [--pretty-urls] \
                       [--base-url <url>] [--canonical auto] [--catalog] [--search-corpus] \
                       [--generate <path>] [--strict] [--format human|json|sarif] \

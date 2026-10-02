@@ -24,6 +24,7 @@ Options:
       --search-corpus      write assets/unify/search-corpus.json — normalized page text for client-side search
       --generate <path>    run one JavaScript file from your source tree before the build
       --dry-run            run the full build and every check, print the report, write nothing
+      --audit              `build` only: audit the composed site before publishing; publish only if `unify audit` would exit 0
       --save-config        `build` only: write the saveable options given here into unify.yaml (after a good build)
       --strict             advisories count as problems for the exit code (with `audit`, findings too)
       --format <kind>      `audit` report shape: human (default), json, or sarif
@@ -59,7 +60,7 @@ notes.html: broken: #install in guide.html names no element [fragment-missing]
 audit: 1 broken, 1 incomplete
 ```
 
-Findings never block a build — `unify build` does not run any of these checks, so a site full of them still publishes. `unify audit --strict` exits `1` on any finding, of either severity: that is the CI gate, and it is opt-in.
+Findings never block a build — `unify build` does not run any of these checks (unless you pass `--audit`), so a site full of them still publishes. `unify audit --strict` exits `1` on any finding, of either severity: that is the CI gate, and it is opt-in.
 
 Worth knowing before you wire it up: **every `init` template passes `unify audit --strict` from the moment it is scaffolded.** `unify init <template> && unify audit --strict` exits `0` for all five, with no `--base-url` and nothing edited, and the conformance suite asserts it per template — so a finding on a fresh scaffold is a regression, and the first finding you see is about something you wrote. It was not always true: each template used to ship between seven and thirteen `incomplete` findings, mostly a missing `lang` or a page without its own description. They were real gaps, and the fix was the templates rather than the gate.
 
@@ -320,6 +321,12 @@ canonical completion: 5 pages would gain a canonical link
 structured data: 3 pages would gain a JSON-LD block
 ```
 
+### `--audit` (build only)
+
+Compose once, audit that result, publish only if it passes. The generator (`--generate`) runs once, the site is composed once, and the same findings `unify audit` would print are evaluated over that exact composition, then printed (human format) after the build's diagnostics. The build publishes iff `unify audit` with the same flags would exit `0`: no problems, and with `--strict` also no advisories and no findings. Without `--strict`, findings are reported but block nothing. A blocked gate exits `1` and leaves the previous output untouched. With `--dry-run` it reports and writes nothing, exiting as the gate would. `--external` and `--format` remain `audit`-only. `audit: true` is saveable in `unify.yaml`.
+
+`unify build --audit --strict` replaces the three-step `build --dry-run --strict && build && audit --strict`.
+
 ### `--save-config`
 
 `build` only. Writes the saveable options you passed on this command line into `unify.yaml` in the source root, creating the file if it is not there: `unify build --pretty-urls --base-url https://example.com/ --save-config`. It is an upsert. Keys you did not pass are left alone, and the file is edited line by line, so your comments, ordering and other keys survive untouched; a key you passed replaces its old line (an `exclude` list replaces its old items), and new keys go at the end. It never writes `save-config` itself, `source` (the file lives in the source root, so naming it there would be circular), or `--dry-run`. A flag like `--pretty-urls` writes `pretty-urls: true`; there is no way to write `false`, so to remove a key, edit the file.
@@ -359,7 +366,7 @@ Cycle and depth errors print the full chain (`_layout.html → _includes/nav.htm
 
 ## `unify.yaml`
 
-Optional, at the source root: saved flags, nothing more. Keys are the long option names (`source`, `output`, `clean`, `exclude` — a list, `pretty-urls`, `base-url`, `strict`, `port`); CLI flags win on conflict. No behavior exists that only the file can express; the file itself never ships. `unify build ... --save-config` writes or updates it for you.
+Optional, at the source root: saved flags, nothing more. Keys are the long option names (`source`, `output`, `clean`, `exclude` — a list, `pretty-urls`, `base-url`, `strict`, `audit`, `port`); CLI flags win on conflict. No behavior exists that only the file can express; the file itself never ships. `unify build ... --save-config` writes or updates it for you.
 
 ```yaml
 # unify.yaml — the committed invocation

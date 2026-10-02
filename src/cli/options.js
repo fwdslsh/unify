@@ -29,6 +29,8 @@ const OPTIONS = {
   "feed-full": { kind: "flag" },
   "dry-run": { kind: "flag" },
   strict: { kind: "flag" },
+  // §24.8 — `build --audit`: gate the publish on the audit's findings. Boolean.
+  audit: { kind: "flag" },
   // §30.1 — flags rather than a consequence: unlike a sitemap or a feed,
   // nothing about a page declares "catalog me" or "index me", so there is no
   // record-derived condition that could activate either the way
@@ -64,7 +66,7 @@ const OPTIONS = {
 };
 
 /** Keys `unify.yaml` may carry — the long option names, minus the ones that make no sense to save. */
-export const CONFIG_KEYS = ["source", "output", "clean", "exclude", "pretty-urls", "base-url", "canonical", "feed-full", "catalog", "search-corpus", "strict", "port", "generate"];
+export const CONFIG_KEYS = ["source", "output", "clean", "exclude", "pretty-urls", "base-url", "canonical", "feed-full", "catalog", "search-corpus", "strict", "audit", "port", "generate"];
 
 const SHORT = Object.fromEntries(
   Object.entries(OPTIONS)

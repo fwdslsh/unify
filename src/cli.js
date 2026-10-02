@@ -47,6 +47,7 @@ Options:
       --search-corpus      write assets/unify/search-corpus.json — normalized page text for client-side search
       --generate <path>    run one JavaScript file from your source tree before the build
       --dry-run            run the full build and every check, print the report, write nothing
+      --audit              \`build\` only: audit the composed site before publishing; publish only if \`unify audit\` would exit 0
       --save-config        \`build\` only: write the saveable options given here into unify.yaml (after a good build)
       --strict             advisories count as problems for the exit code (with \`audit\`, findings too)
       --format <kind>      \`audit\` report shape: human (default), json, or sarif
@@ -108,9 +109,12 @@ function resolveSettings(flags) {
       // get it too: all four scan the source tree.
       generate: settings.generate ?? null,
       dryRun: settings["dry-run"] === true,
-      // §24.1 — set by the audit command itself, never by a flag: there is no
-      // `--audit`, and `build` has no way to reach the evaluator.
+      // §24.1 — set by the audit command itself, never by a flag.
       audit: false,
+      // §24.8 — `build --audit`: the flag (or saved `audit: true`) is the GATE,
+      // a separate setting from `audit` above, which selects the read-only
+      // audit branch. Only `build` reads it.
+      auditGate: flags.command === "build" && settings.audit === true,
       strict: settings.strict === true,
       // §31.1/§31.3 — `unify audit`'s own two flags. `format`'s value is
       // validated by `cli/commands/audit.js` (the closed set and its usage
