@@ -1060,6 +1060,8 @@ Optional, at the source root; never emitted. Keys are the long option names with
 
 The set is the flags that describe the *site*, not one run of the tool: `--dry-run`, `--format`, and `--external` describe what a single invocation should do and are not saveable — a config file that could turn every future `audit` into a network operation, or silently reshape its output, would be behavior only the file expresses in practice, which is what the sentence above exists to prevent.
 
+**`unify build --save-config` writes the file.** It upserts into `<source root>/unify.yaml`, creating it if absent, exactly the saveable options given on that command line and nothing else: keys not passed are left as they are, and the file is edited line by line so comments, ordering and untouched keys survive byte-for-byte (a replaced `exclude` list takes its old items with it; new keys are appended). `--save-config` itself is never written, nor is `source` (the file lives in the source root, so naming it there is circular), nor any non-saveable flag. A boolean flag writes `key: true`; no flag writes `false`, so removing a key means editing the file. It applies to `build` only and is a usage error (exit 2, nothing written) on any other command or together with `--dry-run`, which promises to write nothing. The file is written only after a build that exits 0, so it records settings that produced a good build; a failed build leaves it untouched. It is written after publish and the file never ships, so `dist/` is unaffected. A value the reader cannot round-trip (one containing ` #`, or both quote characters) is a usage error rather than a corrupted file.
+
 ---
 
 ## 19. Scaffold contract (`unify init`)
