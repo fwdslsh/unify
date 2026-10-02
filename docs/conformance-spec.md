@@ -2297,7 +2297,7 @@ Product-spec §6.4.2. One author-owned JavaScript file runs before the scan, and
 
 `--generate _scripts/gen.mjs` names **a file in the source tree**, not a command. It is not `--run "<shell>"`, and the difference is the whole posture of the flag: a path is a thing the author wrote and can read, a shell string is a place arbitrary programs get spelled. There is no shell, no argument list, no environment plumbing, and no way to express "and then run this other thing".
 
-The path is resolved against the source root and must stay inside it (§4.3's containment rule, the same one includes and layouts obey); a path escaping the source root is a usage error. It is saved in `unify.yaml` like any other long option (§18), and it applies to `build`, `watch`, `dev`, and `audit` — the four commands that scan the source tree.
+The path is resolved against the source root and must stay inside it (§4.3's containment rule, the same one includes and layouts obey); a path escaping the source root is a usage error. It is saved in `unify.yaml` like any other long option (§18), and it applies to `build`, `watch`, `dev`, and `audit` — the four commands that scan the source tree. **unify runs one generator:** two or more `--generate` values on the command line, in any spelling, are a usage error (exit 2, §18) before anything runs — the tasks belong inside that one file. A `generate:` in `unify.yaml` plus one `--generate` is not a repeat; the command line wins (§18).
 
 ### 33.2 The contract, entire
 

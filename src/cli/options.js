@@ -144,7 +144,9 @@ export function parseArgs(argv) {
       // and so does a repeated `list` option, which is what --exclude is for.
       if (name in options) {
         throw new UsageError(`--${name} given more than once`, [
-          `pass it once — every value but the last was being discarded`,
+          name === "generate"
+            ? `unify runs one generator: put the tasks inside that one file (have it import and call the others)`
+            : `pass it once — every value but the last was being discarded`,
         ]);
       }
       options[name] = value;

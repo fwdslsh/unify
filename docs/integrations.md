@@ -409,8 +409,8 @@ a CSS file referencing fonts blocks the build until you vendor those too. Nothin
 everything reached from JavaScript is on you.
 
 Four things worth knowing before you run it. **There is one generator per build** —
-`--generate` takes a single path and a second one silently replaces the first, so this code
-goes inside whatever generator you already have. **Delete any hand-vendored copies first**,
+a second `--generate` is a usage error, so this code goes inside whatever generator you
+already have (import it and call it from there). **Delete any hand-vendored copies first**,
 or the same output path from both trees is a collision that stops the build. **Install
 before you build**: on Node a missing `node_modules` fails the build with a resolution
 error, while Bun quietly downloads the package mid-build, so a CI job that skips
