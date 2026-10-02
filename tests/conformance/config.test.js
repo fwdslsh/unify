@@ -336,6 +336,21 @@ test("CFG-05 — upsert keeps comments and untouched keys byte-for-byte and repl
   covers("CFG-05");
 }, 30_000);
 
+test("CFG-05 — nothing saveable creates no file; an exclude list's indented comments go with it", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), { "index.html": PAGE });
+  const bare = await runCli(["build", "-s", "src", "--save-config"], tmp);
+  if (bare.exit !== 0) throw new Error(bare.stderr);
+  if (existsSync(join(tmp, "src", "unify.yaml"))) throw new Error("an empty save created unify.yaml");
+
+  writeTree(join(tmp, "src"), { "unify.yaml": "exclude:\n  - old-a\n  # old note\n  - old-b\n# next\nstrict: true\n" });
+  const r = await runCli(["build", "-s", "src", "--exclude", "_x", "--save-config"], tmp);
+  if (r.exit !== 0) throw new Error(r.stderr);
+  const got = readFileSync(join(tmp, "src", "unify.yaml"), "utf8");
+  if (got !== "exclude:\n  - _x\n# next\nstrict: true\n") throw new Error(`got:\n${got}`);
+  covers("CFG-05");
+}, 30_000);
+
 test("CFG-05 — usage errors write nothing: --dry-run, a non-build command, an unwritable value", async () => {
   const tmp = mkTmp();
   writeTree(join(tmp, "src"), { "index.html": PAGE });

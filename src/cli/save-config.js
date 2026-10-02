@@ -70,8 +70,8 @@ export function writeConfig(sourceRoot, entries) {
     if (key && pending.has(key)) {
       out.push(...pending.get(key));
       pending.delete(key);
-      // A replaced list takes its old items with it.
-      while (i + 1 < lines.length && /^\s*-\s/.test(lines[i + 1])) i++;
+      // A replaced list takes its old items (and comments indented among them) with it.
+      while (i + 1 < lines.length && /^\s*-\s|^\s+#/.test(lines[i + 1])) i++;
     } else {
       out.push(lines[i]);
     }

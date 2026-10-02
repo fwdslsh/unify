@@ -279,8 +279,12 @@ export async function run(argv) {
       const code = await (await import("./cli/commands/build.js")).build(context);
       // §18 — only a build that exited 0 records its settings.
       if (saving && code === 0) {
-        writeConfig(sourceRoot, saving);
-        process.stdout.write(`saved ${[...saving.keys()].join(", ") || "nothing"} to ${resolve(sourceRoot, "unify.yaml")}\n`);
+        if (saving.size === 0) {
+          process.stdout.write("--save-config: no saveable options were given, so unify.yaml was not written\n");
+        } else {
+          writeConfig(sourceRoot, saving);
+          process.stdout.write(`saved ${[...saving.keys()].join(", ")} to ${resolve(sourceRoot, "unify.yaml")}\n`);
+        }
       }
       return code;
     }
