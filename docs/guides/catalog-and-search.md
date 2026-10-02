@@ -283,7 +283,28 @@ field the catalog joins on, so a hit's `id` is a `catalog.json` `path` you can l
 the same `byPath` map §5 built. Everything else — tokenizing, scoring, prefix and fuzzy
 matching — is the library's job, unrelated to what unify wrote.
 
-## 7. Where htmx fits alongside this
+## 7. An "All pages" directory
+
+Every `unify init docs` site ships a ready-made page directory built on `catalog.json`: `src/all-pages.html`, a small `<style>` block, and `src/assets/all-pages.js`. All three are yours to edit. unify only writes the catalog; it injects no script and ships yours byte-for-byte. Build with `--catalog` and open `/all-pages/` (or `/all-pages.html`):
+
+```bash
+unify dev --catalog
+```
+
+What it does:
+
+- Groups pages by the first segment of their address (`/guide/install.html` is in "guide"), with top-level pages first, and sorts each group by title. The title shown is the page's first `<h1>`, else its `<title>`.
+- Has a labelled search box that filters by title and address (every word must match, case-insensitively) and announces "Showing 2 of 9 pages." through an `aria-live` region, with an empty-results message.
+- Shows a visible error if the catalog cannot be fetched, and a `<noscript>` note, since the list is built by JavaScript. Without `--catalog` there is no file to fetch, which is why a fresh scaffold shows the error state: the scaffold still builds and audits clean with no flags.
+- Works under a `--base-url` with a path prefix. It fetches the catalog relative to its own module, as §4 describes (`new URL("unify/catalog.json", import.meta.url)`, because the script sits in `assets/` beside `assets/unify/`), and drops the catalog's `baseUrl` prefix before grouping so `/docs/` is not mistaken for a section. Links use each page's catalog `path`, which already includes the prefix.
+
+The grouping and filtering are plain exported functions (`groupEntries`, `filterEntries`, `countMessage`, and friends) with no DOM in them, so you can unit-test your edits with `bun test` or `node --test` by importing the file; the page wiring only runs when a `document` exists.
+
+To use it in a site that was not scaffolded from `docs`, copy the page and the script (and the `<style>` block) from a `unify init docs` scaffold, keep the script in a directory beside `assets/unify/` or change the relative URL to match, and link the page from your navigation.
+
+The directory lists what the catalog lists: indexable, self-canonical pages (see "Which pages are in the files" above). On a private site where every page is `noindex`, add `--include-noindex` or the directory will be empty. `noindex` is not access control.
+
+## 8. Where htmx fits alongside this
 
 htmx swaps HTML fragments; `catalog.json`/`search-corpus.json` are JSON with no HTML
 rendering of their own, so htmx has no direct role in reading them — the DOM-building

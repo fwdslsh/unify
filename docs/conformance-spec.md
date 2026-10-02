@@ -1132,6 +1132,10 @@ The blog template additionally ships the generator seam worked end-to-end, becau
 - **Never introduce a unify-only content schema.** Templates teach the platform's artifacts — `og:`, JSON-LD, `robots.txt`, `sitemap.xml` — in the platform's own vocabulary. The single unify-specific token a template may carry beyond §19.1's primitives is `schema:`, and §26.4 is where that is argued.
 - **Never ship a file the site does not use**, and never a reference it does not emit. Both are already build problems (A10, P13); stating it here is about the direction a template is written in, not about a check.
 
+### 19.8 The docs template's "All pages" starter
+
+The `docs` template additionally ships `all-pages.html` and `assets/all-pages.js`, linked from its nav: an ordinary page and a plain script the author owns (unify injects nothing; the script ships byte-for-byte) that list the site's pages from `assets/unify/catalog.json`, grouped by the first segment of each page's address, with a labelled filter, an `aria-live` count, an empty-results state, a visible error state and a `<noscript>` note. It fetches the catalog **relative to the module** (`new URL("unify/catalog.json", import.meta.url)`), never as a root-relative string, and strips the catalog's `baseUrl` path prefix before grouping, so it is right under a `--base-url` with a path prefix. §19.3's guarantees hold unchanged because nothing in the page's markup names the catalog: with no `--catalog` the fetch fails at runtime and the page shows its error state. Built with `--catalog` it builds and audits clean at a root and under a prefix.
+
 ---
 
 ## 20. The final document model
