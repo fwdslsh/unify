@@ -62,8 +62,10 @@ export const files = {
   ]),
 
   // The "All pages" starter (issue #91): a page plus a small script the
-  // author owns, reading assets/unify/catalog.json. Without --catalog the
-  // page shows its error state; see src/templates/all-pages.js.
+  // author owns, reading assets/unify/catalog.json. The page needs
+  // --catalog, so the template saves that one flag in unify.yaml (§18,
+  // §19.8); see src/templates/all-pages.js.
+  "unify.yaml": "# Saved unify flags (CLI flags win). all-pages.html reads the catalog this writes.\ncatalog: true\n",
   "all-pages.html": ALL_PAGES_HTML,
   "assets/all-pages.js": ALL_PAGES_JS,
 

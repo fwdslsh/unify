@@ -5,12 +5,11 @@
  * `assets/unify/catalog.json`. unify injects nothing: the script is an
  * authored asset like any other and is mirror-copied byte for byte.
  *
- * Why it fits §19.3. A scaffold is built with no flags, so there is no
- * catalog and the page must say so cleanly: the module's fetch fails, the
- * page shows its error state, and nothing in the page's *markup* names the
- * catalog — the only references §12 checks are the stylesheet, the script,
- * and links to pages that exist. Build with `--catalog` and the same bytes
- * render the directory. The catalog is addressed relative to the module
+ * Why it fits §19.3. The template ships `unify.yaml` with `catalog: true`
+ * (§19.8), so a plain `unify build` writes the catalog, and the page's
+ * `<link rel="preload" … as="fetch">` makes it a reference §12 checks:
+ * drop `catalog: true` and the build says so, rather than shipping a page
+ * that can only show its error state. The catalog is addressed relative to the module
  * (`new URL("unify/catalog.json", import.meta.url)`), never as a
  * root-relative string, so it is also right under a `--base-url` with a
  * path prefix, where unify rewrites the `<script src>` in the HTML and
@@ -172,6 +171,7 @@ export const ALL_PAGES_HTML = pageHtml({
   title: "All pages",
   description: "Every page on the site in one searchable list, grouped by section.",
   head: `${STYLE}
+<link rel="preload" href="/assets/unify/catalog.json" as="fetch" crossorigin>
 <script type="module" src="/assets/all-pages.js"></script>`,
   main: `<h1>All pages</h1>
 <p>A directory of the whole site, read from <code>assets/unify/catalog.json</code> in your browser.

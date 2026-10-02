@@ -31,8 +31,9 @@ when it does, that build was losing content without saying so.
   unchanged. Without `--catalog` or `--search-corpus` it is a usage error.
 - **An "All pages" starter in `unify init docs`** (#91): `all-pages.html` and
   `assets/all-pages.js`, an accessible, filterable directory grouped by section and
-  read from `assets/unify/catalog.json`. It works under a `--base-url` path prefix;
-  built without `--catalog` it shows an error state saying so.
+  read from `assets/unify/catalog.json`. It works under a `--base-url` path prefix.
+  The template also ships a one-line `unify.yaml` (`catalog: true`) so a plain
+  `unify build` fills the page; it is the only template that writes one.
 
 ### Fixed
 

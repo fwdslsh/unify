@@ -48,8 +48,13 @@ describe.each(TEMPLATE_NAMES)('template "%s" — SCF-01/SCF-02 structure (in-mem
   const paths = Object.keys(files);
   const wholeSource = Object.values(files).join("\n");
 
-  test("never includes unify.yaml (§19: init never creates one)", () => {
-    expect(paths).not.toContain("unify.yaml");
+  test("ships unify.yaml only when its own page needs a flag (§19.8: docs saves catalog: true)", () => {
+    if (name === "docs") {
+      expect(files["unify.yaml"]).toMatch(/^catalog: true$/m);
+      expect(files["unify.yaml"].split("\n").filter((l) => /^[a-z]/.test(l))).toEqual(["catalog: true"]);
+    } else {
+      expect(paths).not.toContain("unify.yaml");
+    }
   });
 
   test("exercises the underscore convention: every non-page file lives under an underscore path or is a real asset", () => {
@@ -243,6 +248,8 @@ describe.each(TEMPLATE_NAMES)('template "%s" — full composition (SCF-04: zero 
     const emitted = new Set();
     for (const p of pages) emitted.add(p.replace(/\.md$/i, ".html"));
     for (const p of Object.keys(files).filter((f) => !isPage(f) && !isUnderscored(f))) emitted.add(p);
+    // A saved `catalog: true` (§19.8, the docs template) makes the build write the catalog.
+    if (/^catalog: true$/m.test(files["unify.yaml"] ?? "")) emitted.add("assets/unify/catalog.json");
 
     const broken = [];
     for (const pageRel of pages) {

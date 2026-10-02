@@ -84,7 +84,7 @@ Layouts do not chain: a layout that itself declares `data-layout` is a located p
 
 ## Configuration
 
-`unify.yaml` at the source root is **saved CLI flags, nothing more** (keys = long option names; CLI wins; never shipped; `init` doesn't create one). No behavior may exist that only a config file can express. `unify build --save-config` writes it for you (upsert, build only, after an exit-0 build).
+`unify.yaml` at the source root is **saved CLI flags, nothing more** (keys = long option names; CLI wins; never shipped; `init` writes one only when a template's page needs a flag — `docs` saves `catalog: true`). No behavior may exist that only a config file can express. `unify build --save-config` writes it for you (upsert, build only, after an exit-0 build).
 
 ## Security Posture
 

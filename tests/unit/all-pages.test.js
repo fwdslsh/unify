@@ -14,7 +14,7 @@
  * The repo has no browser runner; the DOM wiring is deliberately thin.
  */
 import { afterAll, describe, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -143,15 +143,21 @@ describe("the starter page in a built site", () => {
     });
   }
 
-  test("with no flags the page ships, links nothing the build would not emit, and the module is plain (error state is runtime)", async () => {
+  test("with no flags the saved catalog: true fills the page; without it the preload reference stops the build", async () => {
     const { root } = await scaffold();
     const built = await runCli(["build", "--strict"], root);
     expect(built.exit, built.stderr).toBe(0);
+    expect(existsSync(join(root, "dist", "assets", "unify", "catalog.json"))).toBe(true);
     const html = readFileSync(join(root, "dist", "all-pages.html"), "utf8");
     expect(html).toContain("<noscript>");
     expect(html).toContain('id="all-pages-error"');
     expect(html).toContain('aria-live="polite"');
     expect(html).toContain('<label for="all-pages-query">');
-    expect(html).not.toContain("catalog.json\"");
+    expect(html).toContain('rel="preload" href="/assets/unify/catalog.json" as="fetch"');
+
+    rmSync(join(root, "src", "unify.yaml"));
+    const bare = await runCli(["build", "--dry-run"], root);
+    expect(bare.exit).toBe(1);
+    expect(bare.stderr).toContain("catalog.json");
   });
 });
