@@ -42,11 +42,7 @@
  *    §19.7 calls publishable by accident.
  *
  * 4. **A heading and a title that name the same thing.** `<h1>Home</h1>`
- *    under `<title>Home</title>`: §24.4's `title-h1-mismatch` is containment
- *    in either direction against the MERGED title ("Home — My Portfolio",
- *    §8 row 2), and the `<h1>Welcome!</h1>` this template used to ship
- *    shared no part of it — a search result and the page named different
- *    things. The title is the half that stays.
+ *    under `<title>Home</title>` (merged to "Home — My Portfolio", §8 row 2).
  *
  * Nothing here declares a canonical (§19.2 item 7): a canonical is one
  * page's own absolute address, which a scaffold cannot know, and a

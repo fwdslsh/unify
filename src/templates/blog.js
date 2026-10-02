@@ -43,15 +43,9 @@
  *   no two repeat (`description-duplicate` folds case and whitespace);
  * - every page has exactly one `<h1>` naming THAT PAGE, spelled the same way
  *   as the page's own `<title>` — `<h1>Home</h1>` under `Home — My Blog`,
- *   each post's `# Title` under `Title — My Blog`. `<h1>My Blog</h1>` on the
- *   home page also satisfies §24.4's containment test, and is what this
- *   template shipped, but it satisfies it through the LAYOUT's half of the
- *   merged title: rename the site in `_layout.html` alone — the first edit
- *   anyone makes — and `Home — Sam's Notes` no longer contains `My Blog`,
- *   so §19.3's second guarantee breaks on a template the author never
- *   touched. The site name belongs in the layout and nowhere else; the four
- *   other templates already pair a heading with its own page's title, and
- *   this one now reads the same way. A Markdown `title:` alone emits no
+ *   each post's `# Title` under `Title — My Blog`. The site name belongs in
+ *   the layout and nowhere else, so renaming the site there is the only edit
+ *   it takes. A Markdown `title:` alone emits no
  *   heading, which is why every post body opens with one;
  * - each post declares `schema: BlogPosting` beside an authored, W3C-DTF
  *   `date:` — §20.10 will not invent one and `schema-incomplete` fires

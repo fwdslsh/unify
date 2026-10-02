@@ -17,21 +17,12 @@
  *    one. Without them a one-second-old scaffold reports
  *    `description-missing` on every page it wrote.
  *
- * 2. **`index.html`'s heading is `<h1>Home</h1>`, not `<h1>Welcome!</h1>`.**
- *    §24.4's `title-h1-mismatch` is containment in either direction, and
- *    the emitted title `Home — My Site` contains no part of `Welcome!` —
- *    a search result and the page would name different things. The title
- *    is the half that stays, so both documents' built-result literal,
- *    `<title>Home — My Site</title>`, is still exactly what this template
- *    emits; only the heading text moved to agree with it. The paragraph
- *    under it is the documented one, unchanged.
- *
- *    This one is no longer a deviation: README.md, product-spec §2 and
- *    getting-started.md now show `<h1>Home</h1>` too. They were reconciled
- *    rather than left drifting because their snippet is introduced as what
- *    `unify init` writes, and the old pairing is *precisely* the input
- *    `title-h1-mismatch` fires on — a reader copying it got a finding from
- *    a command the same page tells them to run.
+ * 2. **`index.html`'s heading is `<h1>Home</h1>`.** The title stays
+ *    `<title>Home — My Site</title>`, both documents' built-result literal,
+ *    and the heading names the page the same way. README.md, product-spec
+ *    §2 and getting-started.md show `<h1>Home</h1>` too, so a snippet
+ *    introduced as what `unify init` writes is what it writes. The
+ *    paragraph under it is the documented one, unchanged.
  *
  * 3. **`about.md` declares `title: About`** — product-spec §2's snippet
  *    does; docs/getting-started.md's omits it to teach that the first
