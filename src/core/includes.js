@@ -48,8 +48,8 @@ function isFragment(absPath) {
 /** Inclusive: ten include files may be on the stack; the eleventh is the problem. */
 const MAX_DEPTH = 10;
 
-/** `<include src="…">` — paired or void — captured with its full span. */
-const INCLUDE_TAG = /<include\b([^>]*)>(?:([\s\S]*?)<\/include\s*>)?/gi;
+/** An `<include …>` open tag, or a `</include>` close tag (see `findIncludes`). */
+const INCLUDE_TAG = /<include\b([^>]*)>|<\/include\s*>/gi;
 /** Apache SSI, supported indefinitely as the legacy alias (§3.1). */
 const SSI_TAG = /<!--#include\s+(virtual|file)\s*=\s*"([^"]*)"\s*-->/gi;
 
@@ -121,17 +121,21 @@ function resolveTarget({ spec, form, fromFile, roots }) {
  *   have opened.
  * @returns {Promise<{text: string, spans: {start:number,end:number,file:string,fileOffset:number}[]}>}
  */
-export async function inlineIncludes({
-  text,
-  file,
-  sourceRoot,
-  roots = resolutionRoots(sourceRoot),
-  reporter,
-  convertMarkdown,
-  stack = [file],
-  origin = null,
-  linesAreSource = true,
-}) {
+export async function inlineIncludes(args) {
+  const roots = args.roots ?? resolutionRoots(args.sourceRoot);
+  return inlineRegion({ stack: [args.file], origin: null, linesAreSource: true, ...args, roots }, 0, args.text.length);
+}
+
+/**
+ * Inline the includes between `from` and `to` of `text`. A slotted include's
+ * content is a region of the same text, so an include written inside a fill
+ * resolves with its own offsets and lines (§32.1).
+ * @param {any} ctx - inlineIncludes' arguments, with `roots` resolved
+ * @param {number} from
+ * @param {number} to
+ */
+async function inlineRegion(ctx, from, to) {
+  const { text, file, sourceRoot, roots, reporter, convertMarkdown, stack, origin, linesAreSource } = ctx;
   // §33.3 — a file is named by its VIRTUAL path, so a diagnostic about a
   // generated fragment says `_includes/nav.html`, the name the author's
   // generator gave it, and never the overlay's temp path.
@@ -139,7 +143,7 @@ export async function inlineIncludes({
   /** @type {{index:number,length:number,text:string,spans:{start:number,end:number,file:string,fileOffset:number}[]}[]} */
   const edits = [];
 
-  for (const { match, spec, form, index, content } of findIncludes(text)) {
+  for (const { match, spec, form, index, content, contentStart } of findIncludes(text, from, to)) {
     // §14.1/DIA-13: a line that cannot be mapped to the named file is
     // omitted, not guessed. For a `.md` host `text` is markdown.js's
     // CONVERTED HTML (§10.1 converts before inlining), so counting newlines
@@ -263,13 +267,13 @@ export async function inlineIncludes({
     // computed against it, so a fill's provenance is this file at its own
     // offset. That is what keeps §14.1's line attribution exact across the
     // interleaving the merge produces.
-    const contentStart = index + match.indexOf(">") + 1;
+    const inner = await inlineRegion(ctx, contentStart, contentStart + content.length);
     const merged = mergeSlottedInclude({
       fragmentText: child.text,
       fragmentSpans: child.spans,
       fragmentFile: fragmentRel,
-      contentText: content,
-      contentSpans: [{ start: 0, end: content.length, file: relFile, fileOffset: contentStart }],
+      contentText: inner.text,
+      contentSpans: inner.spans,
       contentFile: relFile,
       at,
       reporter,
@@ -277,7 +281,7 @@ export async function inlineIncludes({
     edits.push({ index, length: match.length, text: merged.text, spans: merged.spans });
   }
 
-  return spliceWithProvenance(text, edits, relFile);
+  return spliceWithProvenance(text, edits, relFile, from, to);
 }
 
 /** Opening or closing `<pre>`/`<code>` tag, textually (see `inertRanges`). */
@@ -324,27 +328,40 @@ function inertRanges(text) {
  * `<pre>`/`<code>` region (§5.1 item 8), which is content, not a directive.
  * @param {string} text
  */
-function* findIncludes(text) {
+function* findIncludes(text, from = 0, to = text.length) {
   const inert = inertRanges(text);
   const isInert = (/** @type {number} */ i) => inert.some(([s, e]) => i >= s && i < e);
-  /** @type {{match: string, spec: string|null, form: string, index: number, content?: string}[]} */
+  /** @type {{match: string, spec: string|null, form: string, index: number, content?: string, contentStart: number}[]} */
   const found = [];
-  // exec, not matchAll: INCLUDE_TAG's paired form seeks its close LAZILY, so a
-  // match that STARTS inside an inert region can extend past it and swallow a
-  // real directive's `</include>` further down (the fixture's void-sample case).
-  // Skipping such a match must therefore resume right after its OPENING tag,
-  // not after everything the lazy close-seek consumed.
-  INCLUDE_TAG.lastIndex = 0;
-  for (let m; (m = INCLUDE_TAG.exec(text)); ) {
-    if (isInert(m.index)) {
-      INCLUDE_TAG.lastIndex = m.index + m[0].indexOf(">") + 1;
-      continue;
+  // An open tag pairs with the close that BALANCES it, so an include written
+  // inside another's content closes itself and leaves the outer one intact. An
+  // open with no balancing close inside the region is void.
+  const tags = [...text.slice(0, to).matchAll(INCLUDE_TAG)].filter((m) => !isInert(m.index));
+  for (let i = 0; i < tags.length; i++) {
+    const m = tags[i];
+    if (m.index < from || m[0][1] === "/") continue;
+    let depth = 1;
+    let close = null;
+    for (let j = i + 1; j < tags.length && !close; j++) {
+      depth += tags[j][0][1] === "/" ? -1 : 1;
+      if (depth === 0) close = tags[j];
     }
-    found.push({ match: m[0], spec: srcOf(m[1]), form: "src", index: m.index, content: m[2] });
+    const contentStart = m.index + m[0].length;
+    const whole = close ? text.slice(m.index, close.index + close[0].length) : m[0];
+    found.push({
+      match: whole,
+      spec: srcOf(m[1]),
+      form: "src",
+      index: m.index,
+      content: close ? text.slice(contentStart, close.index) : undefined,
+      contentStart,
+    });
+    if (close) while (i + 1 < tags.length && tags[i + 1].index < close.index) i++;
   }
-  for (const m of text.matchAll(SSI_TAG)) {
-    if (isInert(m.index)) continue;
-    found.push({ match: m[0], spec: m[2], form: m[1].toLowerCase(), index: m.index });
+  for (const m of text.slice(0, to).matchAll(SSI_TAG)) {
+    if (m.index < from || isInert(m.index)) continue;
+    if (found.some((f) => f.content !== undefined && m.index > f.index && m.index < f.index + f.match.length)) continue;
+    found.push({ match: m[0], spec: m[2], form: m[1].toLowerCase(), index: m.index, contentStart: m.index });
   }
   yield* found.sort((a, b) => a.index - b.index);
 }
@@ -384,13 +401,14 @@ function lineOf(text, index) {
  * @param {string} relFile
  * @returns {{text: string, spans: {start:number,end:number,file:string,fileOffset:number}[]}}
  */
-function spliceWithProvenance(text, edits, relFile) {
+function spliceWithProvenance(text, edits, relFile, from = 0, to = text.length) {
   if (edits.length === 0) {
-    return { text, spans: text.length > 0 ? [{ start: 0, end: text.length, file: relFile, fileOffset: 0 }] : [] };
+    const t = text.slice(from, to);
+    return { text: t, spans: t.length > 0 ? [{ start: 0, end: t.length, file: relFile, fileOffset: from }] : [] };
   }
   edits.sort((a, b) => a.index - b.index);
   let out = "";
-  let cursor = 0;
+  let cursor = from;
   const spans = [];
   for (const edit of edits) {
     const gapLen = edit.index - cursor;
@@ -403,10 +421,10 @@ function spliceWithProvenance(text, edits, relFile) {
     out += edit.text;
     cursor = edit.index + edit.length;
   }
-  const tailLen = text.length - cursor;
+  const tailLen = to - cursor;
   if (tailLen > 0) {
     spans.push({ start: out.length, end: out.length + tailLen, file: relFile, fileOffset: cursor });
-    out += text.slice(cursor);
+    out += text.slice(cursor, to);
   }
   return { text: out, spans };
 }

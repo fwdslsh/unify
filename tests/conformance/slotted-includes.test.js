@@ -307,6 +307,41 @@ test("SLOT-05 — a cycle through a non-empty include is still P02, with the cha
   covers("SLOT-05");
 }, TEST_MS);
 
+test("SLOT-05 — an include inside a fill resolves, in HTML and in Markdown (#90)", async () => {
+  // The inner include is empty and verbatim; the outer one must not end at the
+  // inner `</include>`. (Lexical scope itself is the test above.)
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "_includes/card.fragment.html":
+      '<article class="card"><h3><slot name="icon"></slot><slot name="title">Untitled</slot></h3><slot></slot></article>\n',
+    "_includes/icons/x.html": "<svg></svg>",
+    "_layout.html": '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>— S</title></head><body><main></main></body></html>\n',
+    "index.html": page(
+      '<h1>Nested</h1>\n<include src="/_includes/card.fragment.html">\n' +
+      '  <span slot="icon"><include src="/_includes/icons/x.html"></include></span>\n' +
+      '  <a slot="title" href="/">rabit</a>\n  <p>Body text.</p>\n</include>\n' +
+      '',
+      { title: "Nested" },
+    ),
+    "post.md":
+      '---\ntitle: Post\ndescription: A post.\n---\n\n# Post\n\n' +
+      '<include src="/_includes/card.fragment.html">\n' +
+      '<span slot="icon"><include src="/_includes/icons/x.html"></include></span>\n' +
+      '<a slot="title" href="/">rabit</a>\n</include>\n',
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--strict"], tmp);
+  expectExit(r, 0, "a nested include inside a fill");
+  for (const f of ["index.html", "post.html"]) {
+    const out = read(tmp, "dist", f);
+    expectContains(out, "<svg></svg>", `${f}: the inner include resolved`);
+    expectContains(out, '<a href="/">rabit</a>', `${f}: the title fill landed in the card`);
+    expectAbsent(out, "Untitled", `${f}: no fallback shows`);
+    expectAbsent(out, "include>", `${f}: no raw include survives`);
+  }
+  expectContains(read(tmp, "dist", "index.html"), "<p>Body text.</p>\n</article>", "default content inside the card");
+  covers("SLOT-05", "SLOT-06");
+}, TEST_MS);
+
 // ------------------------------------------------------------------- SLOT-06
 
 test("SLOT-06 — timing is unchanged: a non-empty include works in Markdown and in a layout", async () => {

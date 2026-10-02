@@ -593,6 +593,34 @@ describe("P21: the merge requires a <body> on both sides (§7/MRG-20)", () => {
     expect(p[0].message).toContain("no <body>");
   });
 
+  test("content outside <head> and <body> is P21 at that content, never dropped (#88)", () => {
+    for (const [where, page] of [
+      ["after </html>", PAGE + "\n<script>console.log(1)</script>\n"],
+      ["between </head> and <body>", '<!doctype html><html><head><title>P</title></head>\n<script>1</script>\n<body><p>x</p></body></html>'],
+      ["stray text", PAGE + "\nstray words"],
+    ]) {
+      const reporter = silentReporter();
+      const out = compose({ pageText: page, pageFile: "index.html", layoutText: LAYOUT, layoutFile: "_layout.html", reporter });
+      expect(out).toBeNull();
+      const p = reporter.diagnostics.filter((d) => d.severity === "problem");
+      expect(p).toHaveLength(1);
+      expect(p[0].file).toBe("index.html");
+      expect(p[0].message).toContain("outside the page's <head> and <body>");
+      expect(p[0].fixes.join(" ")).toContain("inside <body>");
+      expect(p[0].line).toBeGreaterThan(1);
+    }
+  });
+
+  test("whitespace and comments outside <head>/<body> are not content", () => {
+    const reporter = silentReporter();
+    const out = compose({
+      pageText: "<!doctype html>\n<!-- a -->\n" + PAGE + "\n<!-- b -->\n", pageFile: "index.html",
+      layoutText: LAYOUT, layoutFile: "_layout.html", reporter,
+    });
+    expect(out).not.toBeNull();
+    expect(reporter.diagnostics.filter((d) => d.severity === "problem")).toHaveLength(0);
+  });
+
   test("both sides body-less: two problems, one per file", () => {
     const reporter = silentReporter();
     const out = compose({
