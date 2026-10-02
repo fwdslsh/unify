@@ -32,6 +32,7 @@ import {
   publicationDatesOf,
   refreshOf,
   robotsPolicyOf,
+  siteNameOf,
   titleOf,
 } from "../../../src/core/document-selectors.js";
 import { parseBaseUrl } from "../../../src/core/urls.js";
@@ -128,6 +129,14 @@ describe("langOf", () => {
     const e = envelope('<!doctype html><html><head><title>x</title></head><body>'
       + '<html lang="fr"></html></body></html>');
     expect(langOf(e)).toBe("fr");
+  });
+});
+
+describe("siteNameOf", () => {
+  test("first non-empty og:site_name, trimmed; name= spelling is not it; none is null", () => {
+    expect(siteNameOf(envelope(doc('<meta property="og:site_name" content="  "><meta property="og:site_name" content=" Acme ">')))).toBe("Acme");
+    expect(siteNameOf(envelope(doc('<meta name="og:site_name" content="Acme">')))).toBeNull();
+    expect(siteNameOf(envelope(doc()))).toBeNull();
   });
 });
 

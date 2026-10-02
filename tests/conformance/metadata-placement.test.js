@@ -5,10 +5,8 @@
  * One rule with three consequences, and the third is the one that made the
  * first two worth fixing. A page whose `<head>` holds only `<meta charset>`,
  * with its title and description written into the `<body>`, used to report
- * neither `title-missing` nor `description-missing` — and then fired
- * `title-h1-mismatch` against the inert title, advising the author to reconcile
- * a string no consumer ever sees. The page has no title at all; that was the
- * one thing not reported.
+ * neither `title-missing` nor `description-missing`, though the page has no
+ * title at all.
  *
  * Real CLI spawns only (hygiene H3); no mocks (H1).
  */
@@ -60,8 +58,6 @@ test("MAN-11: metadata in <body> is inert, so the fields it would have supplied 
   expectExit(r, 0, "a page whose metadata sits in the body");
   expectFinding(r, "title-missing", "§20.3: nothing reads a <title> in the body, so the page has none");
   expectFinding(r, "description-missing", "§20.3: same for the description");
-  // The finding that used to fire instead, on a title no consumer receives.
-  expectNoFinding(r, "title-h1-mismatch", "§20.3: there is no title to mismatch");
   covers("MAN-11");
 }, TEST_MS);
 

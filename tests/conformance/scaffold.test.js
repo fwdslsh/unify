@@ -621,14 +621,9 @@ for (const name of TEMPLATES) {
       if (descriptions.has(fold(description))) throw new Error(`${where}: its description repeats dist/${descriptions.get(fold(description))}'s — a layout-wide description would do this on every page: ${description}`);
       descriptions.set(fold(description), rel);
 
-      // 3. Exactly one <h1>, and §24.4's containment rule against the title.
+      // 3. Exactly one <h1>.
       const h1s = [...html.matchAll(/<h1\b[^>]*>([\s\S]*?)<\/h1>/gi)].map((m) => textOf(m[1]));
       if (h1s.length !== 1) throw new Error(`${where}: ${h1s.length} <h1> elements, expected exactly one (§19.2 item 3): ${JSON.stringify(h1s)}`);
-      const foldedTitle = fold(titleText);
-      const foldedH1 = fold(h1s[0]);
-      if (!foldedTitle.includes(foldedH1) && !foldedH1.includes(foldedTitle)) {
-        throw new Error(`${where}: neither the title nor the <h1> contains the other (§24.4's title-h1-mismatch) — title ${JSON.stringify(textOf(titleText))}, h1 ${JSON.stringify(h1s[0])}`);
-      }
 
       // 4. The og: set, and the two dimensions against the shipped file.
       for (const property of ["og:title", "og:description", "og:type", "og:image", "og:image:width", "og:image:height"]) {

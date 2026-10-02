@@ -224,20 +224,16 @@ test("AUD-03: severity is objective — wrong output is broken, absent output is
 test("AUD-04: the metadata and heading findings", async () => {
   const tmp = mkTmp();
   writeTree(join(tmp, "src"), {
-    "index.html": page("Home", '<p>Welcome.</p><a href="/a.html">A</a> <a href="/b.html">B</a> <a href="/c.html">C</a> <a href="/d.html">D</a>'),
+    "index.html": page("Home", '<p>Welcome.</p><a href="/a.html">A</a> <a href="/b.html">B</a> <a href="/c.html">C</a>'),
     // Same title and same description as b.html — a duplicate needs a pair.
     "a.html": page("Shared").replace("The Shared page", "One shared description"),
     "b.html": page("Shared").replace("The Shared page", "One shared description"),
     // Two extra h1s beside the one page() already writes.
     "c.html": page("Ledger", "<h1>Alpha</h1><h1>Beta</h1><p>Two headings.</p>"),
-    // Exactly one h1, and a title neither string contains. The page above
-    // cannot also carry this finding: §24.4 runs the check only on a page with
-    // exactly one h1, because with several there is no "the heading" to compare.
-    "d.html": page("Ledger", "<p>One heading.</p>").replace("<h1>Ledger</h1>", "<h1>Contact Us</h1>"),
   });
   const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
   expectExit(r, 0, "metadata findings");
-  for (const id of ["title-duplicate", "description-duplicate", "h1-multiple", "title-h1-mismatch"]) {
+  for (const id of ["title-duplicate", "description-duplicate", "h1-multiple"]) {
     expectFinding(r, id, "§24.4");
   }
   covers("AUD-04");
@@ -388,32 +384,13 @@ test("AUD-05: duplicate means identical — similar titles are not a finding", a
   covers("AUD-05");
 }, TEST_MS);
 
-test("AUD-05: title/heading mismatch is containment, so a layout's title suffix is not one", async () => {
-  const tmp = mkTmp();
-  writeTree(join(tmp, "src"), {
-    "_layout.html": `<!doctype html>
-<html lang="en">
-<head><meta charset="utf-8"><title> — Example Site</title>
-<meta name="description" content="The example site."></head>
-<body><main></main></body>
-</html>
-`,
-    // §8 row 2 PREPENDS, so this emits "About — Example Site" over an h1 of "About".
-    "index.html": "<!doctype html>\n<html>\n<head><title>About</title></head>\n<body>\n<h1>About</h1>\n<p>Words.</p>\n</body>\n</html>\n",
-  });
-  const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
-  expectExit(r, 0, "a prepended title suffix");
-  expectNoFinding(r, "title-h1-mismatch", "§24.4: containment in either direction is the whole test");
-  covers("AUD-05");
-}, TEST_MS);
-
 test("AUD-04/MAN-03 — heading scope is main-first (0.9 change): a layout's <h1> in a <header> outside <main> does not count as the page's own heading", async () => {
   const tmp = mkTmp();
   writeTree(join(tmp, "src"), {
     // The layout's own chrome carries an <h1> OUTSIDE <main> — a site name in
     // the header, a common pattern. Before 0.9, headings were read
     // document-wide, so this <h1> would have satisfied every page's
-    // h1-missing/h1-multiple/title-h1-mismatch check regardless of what the
+    // h1-missing/h1-multiple check regardless of what the
     // page itself wrote. The 0.9 scope is the first <main>, else <body>, else
     // the document (§20.3/§20.7), so a page whose own content has no <h1>
     // must still draw h1-missing even though the layout's <header> has one.

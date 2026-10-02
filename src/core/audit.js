@@ -14,8 +14,6 @@
  *
  *   - Duplicate title/description/text means IDENTICAL, not "similar". Any
  *     similarity threshold is a number nobody can justify, so there is none.
- *   - Title/heading mismatch means neither string contains the other, not a
- *     distance score.
  *   - Nothing anywhere counts characters. A short description is not a finding;
  *     an absent one is.
  *
@@ -335,19 +333,6 @@ export function auditManifest({
         `the page emits ${h1s.length} <h1> elements: ${h1s.map((h) => JSON.stringify(truncate(h.text))).join(", ")}`,
         "keep one <h1> and demote the rest to <h2>");
     }
-    // Containment, not similarity: §8 row 2 PREPENDS a page title to the
-    // layout's, so "About — Site" legitimately contains the h1 "About". A
-    // distance score would be a number nobody could defend.
-    if (title !== null && h1s.length === 1) {
-      const t = norm(title);
-      const h = norm(h1s[0].text);
-      if (h !== "" && !t.includes(h) && !h.includes(t)) {
-        add(doc, "title-h1-mismatch", "incomplete",
-          `the title is ${JSON.stringify(title)} but the <h1> reads ${JSON.stringify(h1s[0].text)}`,
-          "make one of them contain the other, so a search result and the page agree");
-      }
-    }
-
     // ---- language ----------------------------------------------------------
     if (lang === null) {
       // §20.3's `layout` — the same shape as `generated` below. A page that
@@ -523,10 +508,10 @@ export function auditManifest({
     for (const subject of subjects) {
       const type = stringProperty(subject, "@type");
 
-      // Containment, not similarity — `title-h1-mismatch`'s test, on the one
-      // other string that is DEFINITIONALLY the same fact as the visible
-      // heading. Exactly one h1 for that finding's reason too: with none there
-      // is nothing visible to compare, with several no answer to which.
+      // Containment, not similarity: a distance score is a number nobody
+      // could defend. The headline is the one string that is DEFINITIONALLY the
+      // same fact as the visible heading. Exactly one h1: with none there is
+      // nothing visible to compare, with several no answer to which.
       const headline = type === "Article" || type === "BlogPosting" ? stringProperty(subject, "headline") : null;
       if (headline !== null && h1s.length === 1) {
         const a = norm(headline);

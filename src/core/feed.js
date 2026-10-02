@@ -79,7 +79,7 @@ import { stripBaseUrl, resolveReference } from "./references.js";
 import { CHECK_SPELLING } from "./diagnostics.js";
 import { decodeXmlEntities } from "./entities.js";
 import { isSelfCanonical } from "./document-selectors.js";
-import { authorOf, canonicalOf, declaredTypes, descriptionOf, publicationDatesOf, robotsPolicyOf, titleOf } from "./document-selectors.js";
+import { authorOf, canonicalOf, declaredTypes, descriptionOf, publicationDatesOf, robotsPolicyOf, siteNameOf, titleOf } from "./document-selectors.js";
 
 /** The output path of the site's feed (§29.2). Atom, never RSS — see the module comment. */
 export const FEED_PATH = "feed.xml";
@@ -470,8 +470,8 @@ function serializeFeed({ documents, base, entries, feedFull, pageHtml }) {
   const address = effectiveBaseUrl(base); // "the site's own address" (§29.5), reused for <id> and rel=alternate
   const selfUrl = address + FEED_PATH;
   const root = documents.find((d) => d.outputPath === "index.html");
-  const rootTitle = root ? titleOf(root) : null;
-  const title = rootTitle ?? new URL(base.origin).host;
+  // §29.5: the root page's declared site name, else its <title>, else the host.
+  const title = (root ? siteNameOf(root) ?? titleOf(root) : null) ?? new URL(base.origin).host;
 
   const lines = [`<feed xmlns="${ATOM_XMLNS}">`];
   // CONFIRMED BY A REAL BUILD, FLAGGED IN THE IMPLEMENTATION REPORT: `address`

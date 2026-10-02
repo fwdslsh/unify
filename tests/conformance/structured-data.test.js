@@ -1348,7 +1348,7 @@ test("SD-07 — the comparisons §26.3 declines to make: dates at two granularit
         + ld({
           "@context": "https://schema.org",
           "@type": "WebPage",
-          // name against <title>: title-h1-mismatch's question with a third string.
+          // name against <title>: a third string beside the heading.
           name: "Get in touch",
           // a description written for a rich result, beside one for a snippet.
           description: "A different description, written for a rich result.",
@@ -1508,14 +1508,13 @@ test("SD-01 — date-unusable reads no block, so a @graph page with a malformed 
   covers("SD-01", "SD-06");
 }, TEST_MS);
 
-test("SD-13 — a generated block audits as bytes: url and inLanguage silent by construction, headline reported beside title-h1-mismatch", async () => {
+test("SD-13 — a generated block audits as bytes: url and inLanguage silent by construction, headline reported even when generated", async () => {
   // §26.7's claim about what `audit` sees, pinned in both directions. Two of
   // the three comparisons a generated block can reach compare a record field
   // against the same record field §26.6 copied, so they are silent whatever
   // the page says. `headline` is not one of them: §26.6 takes it from
   // `record.title` and §26.3 compares it against the `h1`, so a page whose
-  // title and heading disagree collects the finding beside `title-h1-mismatch`
-  // — one disagreement, two vocabularies, one repair. Excluding a block "this
+  // title and heading are unrelated collects the finding. Excluding a block "this
   // build generated" is refused in the spec: a finding is a predicate over the
   // §20 manifest, and emitted bytes carry no record of who wrote them.
   const tmp = mkTmp();
@@ -1544,8 +1543,6 @@ test("SD-13 — a generated block audits as bytes: url and inLanguage silent by 
   expectExit(r, 0, "audit over a page carrying a generated block");
   expectFires(r, "jsonld-headline-mismatch", "src/index.html", "incomplete",
     "§26.7: a generated headline is the record's TITLE, and §26.3 compares it against the h1");
-  expectFires(r, "title-h1-mismatch", "src/index.html", "incomplete",
-    "§24.4: the same disagreement in the other vocabulary — both are true, and the repair is one");
   for (const id of ["jsonld-url-mismatch", "jsonld-lang-mismatch", "jsonld-entity-conflict"]) {
     expectSilent(r, id, "src/index.html",
       "§26.7: these compare the block against the record fields §26.6 copied — silent by construction");
@@ -1622,14 +1619,12 @@ Words.
     );
   }
 
-  // The whole point: neither page is accused, by §26.3 or by §24.4.
+  // The whole point: neither page is accused by §26.3.
   const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
   expectExit(r, 0, "audit over two pages carrying generated blocks");
   for (const page of ["src/post.md", "src/split.md"]) {
     expectSilent(r, "jsonld-headline-mismatch", page,
       "§26.6: a merged title contains its own h1, which is why §26.3 tests containment");
-    expectSilent(r, "title-h1-mismatch", page,
-      "§24.4's own containment rule, on the same two strings — the two must agree");
   }
 
   covers("SD-11", "SD-02");
