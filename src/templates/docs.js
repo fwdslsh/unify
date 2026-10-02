@@ -46,6 +46,7 @@
  * (`<your package manager>`) rather than an invented package name a reader
  * could mistake for a real one — or publish.
  */
+import { ALL_PAGES_HTML, ALL_PAGES_JS } from "./all-pages.js";
 import { commonFiles, mdFrontmatter, pageHtml } from "./shared.js";
 
 const SITE_NAME = "Project Docs";
@@ -56,8 +57,15 @@ export const files = {
   ...commonFiles(SITE_NAME, [
     ["Home", "/"],
     ["Guide", "/guide/getting-started.html"],
+    ["All pages", "/all-pages.html"],
     ["Contact", "/contact.html"],
   ]),
+
+  // The "All pages" starter (issue #91): a page plus a small script the
+  // author owns, reading assets/unify/catalog.json. Without --catalog the
+  // page shows its error state; see src/templates/all-pages.js.
+  "all-pages.html": ALL_PAGES_HTML,
+  "assets/all-pages.js": ALL_PAGES_JS,
 
   "index.html": pageHtml({
     title: "Overview",

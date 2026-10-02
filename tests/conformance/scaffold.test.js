@@ -1427,3 +1427,31 @@ for (const name of TEMPLATES) {
     covers("SCF-11");
   }, TEST_MS);
 }
+
+// ------------------------------------------------------------------ SCF-12
+
+test("scaffold/docs: SCF-12 the All-pages starter degrades without a catalog and builds clean with --catalog at a root and under a path prefix", async () => {
+  const tmp = mkTmp();
+  const initR = await runCli(["init", "docs"], tmp);
+  if (initR.exit !== 0) throw new Error(`unify init docs exited ${initR.exit}: ${initR.stderr}`);
+  const script = readFileSync(join(tmp, "src", "assets", "all-pages.js"), "utf8");
+  // Fetched relative to the module, never as a root-relative string (the
+  // authoring rules' note on addresses fetched by JavaScript).
+  if (!script.includes('new URL("unify/catalog.json", import.meta.url)') || /fetch\(\s*["'`]\//.test(script)) {
+    throw new Error("assets/all-pages.js must fetch the catalog relative to the module");
+  }
+  const noFlags = await runCli(["audit", "--strict"], tmp);
+  if (noFlags.exit !== 0) throw new Error(`docs scaffold with no --catalog: audit --strict exited ${noFlags.exit}\n${noFlags.stdout}${noFlags.stderr}`);
+  for (const [base, prefix] of [["https://example.com/", "/"], ["https://example.com/sub/dir/", "/sub/dir/"]]) {
+    const args = ["--catalog", "--search-corpus", "--pretty-urls", "--base-url", base];
+    const b = await runCli(["build", "--strict", "--clean", ...args], tmp);
+    if (b.exit !== 0) throw new Error(`docs scaffold, ${base}: build --strict exited ${b.exit}\n${b.stdout}${b.stderr}`);
+    const a = await runCli(["audit", "--strict", ...args], tmp);
+    if (a.exit !== 0) throw new Error(`docs scaffold, ${base}: audit --strict exited ${a.exit}\n${a.stdout}${a.stderr}`);
+    const html = readFileSync(join(tmp, "dist", "all-pages", "index.html"), "utf8");
+    if (!html.includes(`src="${prefix}assets/all-pages.js"`)) throw new Error(`${base}: the starter's script address was not rewritten:\n${html}`);
+    const catalog = JSON.parse(readFileSync(join(tmp, "dist", "assets", "unify", "catalog.json"), "utf8"));
+    if (!catalog.pages.some((p) => p.path === `${prefix}all-pages/`)) throw new Error(`${base}: the catalog does not list the starter page`);
+  }
+  covers("SCF-12");
+}, TEST_MS * 2);

@@ -22,6 +22,7 @@ Options:
       --feed-full          include each entry's full rendered content in feed.xml (needs --base-url)
       --catalog            write assets/unify/catalog.json — a browse/filter/TOC projection of every public page
       --search-corpus      write assets/unify/search-corpus.json — normalized page text for client-side search
+      --include-noindex    list noindex pages in the catalog and search corpus (needs one of them)
       --generate <path>    run one JavaScript file from your source tree before the build
       --dry-run            run the full build and every check, print the report, write nothing
       --audit              `build` only: audit the composed site before publishing; publish only if `unify audit` would exit 0
@@ -90,7 +91,7 @@ The same watch contract as `dev`, no server — for pairing with a server you al
 
 ### `unify init [template]`
 
-Scaffolds a starter site into `src/`. Templates: `default`, `basic`, `blog`, `docs`, `portfolio`. Every template exercises the core primitives once — an include, the automatic `_layout.html`, a named slot with a page that fills it, a `data-layout="none"` page, and the underscore convention. The `blog` template also ships the generator pattern worked: `_scripts/gen.mjs` reads `posts/*.md` and `_data/authors.json` and regenerates `blog.html` and `feed.xml` (`node src/_scripts/gen.mjs && unify build`, from the project root); both ship pre-generated, and the generator names the fields it emits, so the authors file's private `email` never reaches a page. `AGENTS.md` and `DEPLOY.md` are written to the working directory the command ran in — outside the source root, so neither publishes; `init` refuses (exit 2) rather than scaffold when that directory *is*, or is inside, the source root (`--source .`, `--source ..`), because there the two could only publish as pages. `init` never creates `unify.yaml`. Guaranteed: `unify init && unify build --dry-run --strict` and `unify init && unify audit --strict` both exit `0`.
+Scaffolds a starter site into `src/`. Templates: `default`, `basic`, `blog`, `docs`, `portfolio`. Every template exercises the core primitives once — an include, the automatic `_layout.html`, a named slot with a page that fills it, a `data-layout="none"` page, and the underscore convention. The `docs` template also ships an "All pages" starter (`all-pages.html` and `assets/all-pages.js`): a filterable directory of the site read from `catalog.json` — build with `--catalog` to fill it; without that it shows an error state and the scaffold still passes both guarantees below. The `blog` template also ships the generator pattern worked: `_scripts/gen.mjs` reads `posts/*.md` and `_data/authors.json` and regenerates `blog.html` and `feed.xml` (`node src/_scripts/gen.mjs && unify build`, from the project root); both ship pre-generated, and the generator names the fields it emits, so the authors file's private `email` never reaches a page. `AGENTS.md` and `DEPLOY.md` are written to the working directory the command ran in — outside the source root, so neither publishes; `init` refuses (exit 2) rather than scaffold when that directory *is*, or is inside, the source root (`--source .`, `--source ..`), because there the two could only publish as pages. `init` never creates `unify.yaml`. Guaranteed: `unify init && unify build --dry-run --strict` and `unify init && unify audit --strict` both exit `0`.
 
 ## Options
 
@@ -216,6 +217,8 @@ If your source tree already contains a `feed.xml`, that file **is** the site's f
 `head.meta`/`head.link`/`head.base` are every element of that kind, in document order, attributes preserved whole — arbitrary `tags:`/`series:`/`audience:` frontmatter shows up here exactly as the equivalent hand-written `<meta>` would, repeats and all. There is no body text and no JSON-LD in this file: a long article grows the corpus below, not this one, and a JSON-LD block can itself be as large as an article, so neither belongs in a record meant to stay bounded per page.
 
 Membership is the sitemap's own rule: `noindex`/`none` pages, `404.html`, and pages consolidated elsewhere by their own canonical are left out — the identical set `search-corpus.json` uses, so the two files always describe the same pages.
+
+A private site that marks every page `noindex` would get empty files. `--include-noindex` (also `include-noindex: true` in `unify.yaml`) lists pages that are excluded *only* because they are `noindex` in both files, so the site's own "All pages" directory or search box can use them. It changes nothing else: the pages keep their `noindex` robots meta, stay out of `sitemap.xml` and the feed, and `404.html` and pages whose canonical points elsewhere stay out. Crawler indexing and in-site navigation are separate questions, and `noindex` is not access control — anything in these files is a public file. The flag needs `--catalog` or `--search-corpus`; alone it is a usage error.
 
 If your source tree already contains `assets/unify/catalog.json`, that file is the site's catalog: unify ships it untouched and generates nothing.
 

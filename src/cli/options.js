@@ -39,6 +39,9 @@ const OPTIONS = {
   // `assets/unify/search-corpus.json`, and neither implies the other.
   catalog: { kind: "flag" },
   "search-corpus": { kind: "flag" },
+  // §30.4 — catalog/corpus membership only: also list pages that are
+  // excluded solely for being `noindex`. Needs --catalog or --search-corpus.
+  "include-noindex": { kind: "flag" },
   // §33.1 — a PATH in the source tree, never a command. Saved in unify.yaml
   // like any other long option.
   generate: { kind: "value" },
@@ -66,7 +69,7 @@ const OPTIONS = {
 };
 
 /** Keys `unify.yaml` may carry — the long option names, minus the ones that make no sense to save. */
-export const CONFIG_KEYS = ["source", "output", "clean", "exclude", "pretty-urls", "base-url", "canonical", "feed-full", "catalog", "search-corpus", "strict", "audit", "port", "generate"];
+export const CONFIG_KEYS = ["source", "output", "clean", "exclude", "pretty-urls", "base-url", "canonical", "feed-full", "catalog", "search-corpus", "include-noindex", "strict", "audit", "port", "generate"];
 
 const SHORT = Object.fromEntries(
   Object.entries(OPTIONS)

@@ -45,6 +45,7 @@ Options:
       --feed-full          include each entry's full rendered content in feed.xml (needs --base-url)
       --catalog            write assets/unify/catalog.json — a browse/filter/TOC projection of every public page
       --search-corpus      write assets/unify/search-corpus.json — normalized page text for client-side search
+      --include-noindex    list noindex pages in the catalog and search corpus (needs one of them)
       --generate <path>    run one JavaScript file from your source tree before the build
       --dry-run            run the full build and every check, print the report, write nothing
       --audit              \`build\` only: audit the composed site before publishing; publish only if \`unify audit\` would exit 0
@@ -104,6 +105,7 @@ function resolveSettings(flags) {
       feedFull: settings["feed-full"] === true,
       catalog: settings.catalog === true,
       searchCorpus: settings["search-corpus"] === true,
+      includeNoindex: settings["include-noindex"] === true,
       // §33.1 — a PATH in the source tree, never a command. Read by
       // build.js before the scan (§33.5), so `watch`, `dev` and `audit`
       // get it too: all four scan the source tree.
@@ -194,6 +196,14 @@ export async function run(argv) {
     throw new UsageError("--feed-full needs the site's address: --base-url is not set", [
       "add it: --base-url https://your-domain.example/",
       "a feed entry's <content> URLs are only meaningful once they're absolute",
+    ]);
+  }
+  // §30.4 — same shape as --feed-full: it changes what a projection lists,
+  // so with no projection requested it would be a silent no-op.
+  if (settings.includeNoindex === true && !settings.catalog && !settings.searchCorpus) {
+    throw new UsageError("--include-noindex needs --catalog or --search-corpus: neither is set", [
+      "add --catalog and/or --search-corpus, or drop --include-noindex",
+      "it only changes which pages those two files list",
     ]);
   }
   // A scheme with no authority — `file:`, `foo:`, `data:` — parses, but its

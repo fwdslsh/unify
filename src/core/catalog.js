@@ -39,7 +39,7 @@
  * full-text search data is never forced to also ship the catalog.
  */
 
-import { isPublicDestination } from "./document-selectors.js";
+import { isCatalogMember } from "./document-selectors.js";
 import { serializeJson } from "./report.js";
 import { effectiveBaseUrl } from "./urls.js";
 
@@ -91,12 +91,13 @@ export function catalogEntry(doc) {
  * carries; nothing here sorts.
  * @param {import('./manifest.js').BuildDocument[]} documents
  * @param {import('./urls.js').BaseUrlConfig|null} base
+ * @param {boolean} [includeNoindex] - `--include-noindex` (§30.4)
  * @returns {{schemaVersion: number, baseUrl: string|null, pages: ReturnType<typeof catalogEntry>[]}}
  */
-export function catalogDocument(documents, base) {
+export function catalogDocument(documents, base, includeNoindex = false) {
   const pages = [];
   for (const doc of documents) {
-    if (!isPublicDestination(doc, base)) continue;
+    if (!isCatalogMember(doc, base, includeNoindex)) continue;
     pages.push(catalogEntry(doc));
   }
   return { schemaVersion: SCHEMA_VERSION, baseUrl: effectiveBaseUrl(base), pages };
@@ -134,12 +135,12 @@ export function serializeCatalog(doc) {
  *   authored `assets/unify/catalog.json` suppressed generation. Only the
  *   exact path is reserved — `assets/unify/` itself is not.
  */
-export function generateCatalog({ documents, base, emittedFromSource }) {
+export function generateCatalog({ documents, base, emittedFromSource, includeNoindex = false }) {
   const generated = new Map();
   // The author's file is the site's catalog: never overwritten, never
   // merged into. Suppression happens before anything is computed, exactly
   // as an authored sitemap.xml/feed.xml suppress their own generation.
   if (emittedFromSource.has(CATALOG_PATH)) return generated;
-  generated.set(CATALOG_PATH, serializeCatalog(catalogDocument(documents, base)));
+  generated.set(CATALOG_PATH, serializeCatalog(catalogDocument(documents, base, includeNoindex)));
   return generated;
 }
