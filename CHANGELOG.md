@@ -8,6 +8,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-10-02
+
+Four fixes from building a real site with unify, and one finding removed. A site
+that built clean on 0.9.1 can now stop on the first item below; when it does, that
+build was losing content without saying so.
+
+### Fixed
+
+- **Content outside a page's `<head>` and `<body>` is no longer dropped silently**
+  (#88). When a layout applied, an element or text beside them (a `<script>` after
+  `</html>`, or a `<title>` in a page that omits the optional `<head>` tag) was left
+  out of the output at exit 0. It is now a located P21 problem telling you to move it
+  inside `<body>` or `<head>`. Whitespace and comments are not reported. A page with
+  no layout still ships byte-for-byte.
+- **An `<include>` inside a slotted include's content no longer ends the outer
+  include early** (#90). Open and close tags now pair by nesting, so
+  `<span slot="icon"><include src="/icon.html"></include></span>` inside a card
+  include resolves, in HTML and Markdown pages alike.
+- **The generated feed's `<title>` prefers the site's declared name** (#95): the root
+  page's `og:site_name` when it has one, else its `<title>` (as before), else the
+  host. Sites without `og:site_name` get the same feed as before.
+- **A repeated `--generate` says what to do instead** (#94). It was already a usage
+  error (exit 2); the message now says unify runs one generator and to call the
+  other tasks from that file, and the integrations guide no longer claims a second
+  `--generate` silently replaces the first.
+
+### Removed
+
+- **The `title-h1-mismatch` audit finding** (#96). A brand-name `<title>` over a
+  tagline `<h1>` is a correct page, the pairing isn't required by search engines or
+  accessibility guidance, and `audit --strict` made it a hard gate. `h1-missing`,
+  `h1-multiple` and `jsonld-headline-mismatch` are unchanged. The scaffolds' comments
+  and sample prose no longer teach the pairing; no scaffold output changed beyond
+  that prose.
+
 ## [0.9.1] - 2026-08-26
 
 A dependency-security release. unify itself is unchanged — no command, flag,
@@ -530,7 +565,8 @@ with generated compare-link notes only. Their diffs are on the
 [releases page](https://github.com/fwdslsh/unify/releases). Nothing here
 retroactively reconstructs detail those notes never carried.
 
-[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.9.1...HEAD
+[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.9.2...HEAD
+[0.9.2]: https://github.com/fwdslsh/unify/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/fwdslsh/unify/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/fwdslsh/unify/compare/v0.8.3...v0.9.0
 [0.8.3]: https://github.com/fwdslsh/unify/compare/v0.8.2...v0.8.3
