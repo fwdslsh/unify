@@ -45,6 +45,9 @@ const OPTIONS = {
   // §33.1 — a PATH in the source tree, never a command. Saved in unify.yaml
   // like any other long option.
   generate: { kind: "value" },
+  // §33.7 — opt in to `source-pages.json` for the generator. A boolean, saveable;
+  // naming it with no generator is a usage error (cli.js), like --include-noindex.
+  "source-inventory": { kind: "flag" },
   // §31.1 — `unify audit`'s own output shape. This registry stays a
   // syntactic parser like every entry here: the closed set (human/json/sarif)
   // and its usage error are audit.js's own concern, the same split
@@ -69,7 +72,7 @@ const OPTIONS = {
 };
 
 /** Keys `unify.yaml` may carry — the long option names, minus the ones that make no sense to save. */
-export const CONFIG_KEYS = ["source", "output", "clean", "exclude", "pretty-urls", "base-url", "canonical", "feed-full", "catalog", "search-corpus", "include-noindex", "strict", "audit", "port", "generate"];
+export const CONFIG_KEYS = ["source", "output", "clean", "exclude", "pretty-urls", "base-url", "canonical", "feed-full", "catalog", "search-corpus", "include-noindex", "strict", "audit", "port", "generate", "source-inventory"];
 
 const SHORT = Object.fromEntries(
   Object.entries(OPTIONS)

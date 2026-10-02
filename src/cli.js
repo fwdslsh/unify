@@ -47,6 +47,7 @@ Options:
       --search-corpus      write assets/unify/search-corpus.json — normalized page text for client-side search
       --include-noindex    list noindex pages in the catalog and search corpus (needs one of them)
       --generate <path>    run one JavaScript file from your source tree before the build
+      --source-inventory   give that file source-pages.json: every source page's authored title, description and date (needs --generate)
       --dry-run            run the full build and every check, print the report, write nothing
       --audit              \`build\` only: audit the composed site before publishing; publish only if \`unify audit\` would exit 0
       --save-config        \`build\` only: write the saveable options given here into unify.yaml (after a good build)
@@ -110,6 +111,7 @@ function resolveSettings(flags) {
       // build.js before the scan (§33.5), so `watch`, `dev` and `audit`
       // get it too: all four scan the source tree.
       generate: settings.generate ?? null,
+      sourceInventory: settings["source-inventory"] === true,
       dryRun: settings["dry-run"] === true,
       // §24.1 — set by the audit command itself, never by a flag.
       audit: false,
@@ -204,6 +206,14 @@ export async function run(argv) {
     throw new UsageError("--include-noindex needs --catalog or --search-corpus: neither is set", [
       "add --catalog and/or --search-corpus, or drop --include-noindex",
       "it only changes which pages those two files list",
+    ]);
+  }
+  // §33.7 — the inventory is an input to the generator; with none to read it,
+  // the flag would do nothing, so it is reported rather than ignored.
+  if (settings.sourceInventory === true && !settings.generate) {
+    throw new UsageError("--source-inventory needs --generate: no generator is set", [
+      "add --generate <path> (or generate: in unify.yaml), or drop --source-inventory",
+      "it only gives the generator a file to read: source-pages.json",
     ]);
   }
   // A scheme with no authority — `file:`, `foo:`, `data:` — parses, but its

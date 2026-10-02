@@ -30,12 +30,12 @@ bun run build:windows                      # Windows x64 binary
 bun src/cli.js build  [-s src] [-o dist] [--clean] [--exclude <glob>]... \
                       [--pretty-urls] [--base-url <url>] [--canonical auto] \
                       [--feed-full] [--catalog] [--search-corpus] [--include-noindex] \
-                      [--generate <path>] \
+                      [--generate <path>] [--source-inventory] \
                       [--dry-run] [--strict] [--audit] [--save-config]  # --save-config: build only; upserts unify.yaml after an exit-0 build
 bun src/cli.js audit  [-s src] [-o dist] [--exclude <glob>]... [--pretty-urls] \
                       [--base-url <url>] [--canonical auto] [--catalog] [--search-corpus] \
                       [--include-noindex] \
-                      [--generate <path>] [--strict] [--format human|json|sarif] \
+                      [--generate <path>] [--source-inventory] [--strict] [--format human|json|sarif] \
                       [--external]  # evaluate, write nothing
 bun src/cli.js dev    [-p 3000]            # build + watch + serve + reload
 bun src/cli.js watch                       # build + rebuild on change, no server
@@ -72,7 +72,7 @@ Layouts do not chain: a layout that itself declares `data-layout` is a located p
 
 ## Implementation Map
 
-`src/cli.js` (flag parsing + dispatch) → `src/cli/options.js`, `src/cli/commands/{build,dev,watch,init}.js`. Core, one module per §: `includes.js` (§5 inline, SSI comment alias), `layout.js` (§6 discovery walk + data-layout), `compose.js` (§7 slots/merge + §9 root attrs), `head-merge.js` (§8), `markdown.js` (§10), `urls.js` (§11 provenance rewriting, --pretty-urls, --base-url), `references.js` (§12), `collisions.js` (§13), `diagnostics.js` (§14 reporter, dedup), `publish.js` (§15 transactional publish + §17 dry-run report), `watcher.js` + `dev-server.js` (§16), `html.js` (the span-based parser everything shares), `paths.js` (never-shipped list, containment). Templates for `init` live in `src/templates/`. The migration that produced this tree is history, recorded in `docs/migration-plan.md`.
+`src/cli.js` (flag parsing + dispatch) → `src/cli/options.js`, `src/cli/commands/{build,dev,watch,init}.js`. Core, one module per §: `includes.js` (§5 inline, SSI comment alias), `layout.js` (§6 discovery walk + data-layout), `compose.js` (§7 slots/merge + §9 root attrs), `head-merge.js` (§8), `markdown.js` (§10), `urls.js` (§11 provenance rewriting, --pretty-urls, --base-url), `references.js` (§12), `collisions.js` (§13), `diagnostics.js` (§14 reporter, dedup), `publish.js` (§15 transactional publish + §17 dry-run report), `watcher.js` + `dev-server.js` (§16), `html.js` (the span-based parser everything shares), `paths.js` (never-shipped list, containment). Templates for `init` live in `src/templates/`. The migration that produced this tree is history, recorded in `docs/migration-plan.md`. `source-inventory.js` (§33.7: the opt-in `source-pages.json` for `--generate`, built from the build's own source scan and the existing frontmatter and `extractDocument` readers).
 
 ## Testing Strategy
 

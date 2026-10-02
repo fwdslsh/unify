@@ -171,11 +171,12 @@ export function removeOverlayDir(dir) {
  * @param {"auto"|null} args.canonical
  * @param {string|null} args.catalogPath - output-root-relative `assets/unify/catalog.json`, or `null` without `--catalog`
  * @param {string|null} args.searchCorpusPath - output-root-relative `assets/unify/search-corpus.json`, or `null` without `--search-corpus`
+ * @param {string|null} [args.sourcePagesPath] - absolute path of `source-pages.json` (`writeSourceInventory`'s return) under `--source-inventory`, or `null`
  * @returns {string} the absolute path written
  */
 export function writeGeneratorContext({
   overlayDir, sourceRoot, output, command,
-  baseUrl, prettyUrls, canonical, catalogPath, searchCorpusPath,
+  baseUrl, prettyUrls, canonical, catalogPath, searchCorpusPath, sourcePagesPath = null,
 }) {
   const contextPath = join(dirname(overlayDir), "generator-context.json");
   const context = {
@@ -196,9 +197,26 @@ export function writeGeneratorContext({
       catalog: catalogPath ?? null,
       searchCorpus: searchCorpusPath ?? null,
     },
+    inputs: {
+      sourcePages: sourcePagesPath ?? null,
+    },
   };
   writeFileSync(contextPath, serializeJson(context));
   return contextPath;
+}
+
+/**
+ * §33.7 — write `source-pages.json` beside the overlay, in the same per-build
+ * temp root as `generator-context.json` (never inside the overlay, so it is
+ * never scanned or published, and `removeOverlayDir` removes it with the rest).
+ * @param {string} overlayDir - this build's overlay directory (`makeOverlayDir`'s return)
+ * @param {object} inventory - `buildSourceInventory`'s return
+ * @returns {string} the absolute path written
+ */
+export function writeSourceInventory(overlayDir, inventory) {
+  const path = join(dirname(overlayDir), "source-pages.json");
+  writeFileSync(path, serializeJson(inventory));
+  return path;
 }
 
 /**
