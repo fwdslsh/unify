@@ -29,10 +29,12 @@ bun run build:windows                      # Windows x64 binary
 # The CLI (complete — there are no other commands or flags)
 bun src/cli.js build  [-s src] [-o dist] [--clean] [--exclude <glob>]... \
                       [--pretty-urls] [--base-url <url>] [--canonical auto] \
-                      [--feed-full] [--catalog] [--search-corpus] [--generate <path>] \
+                      [--feed-full] [--catalog] [--search-corpus] [--include-noindex] \
+                      [--generate <path>] \
                       [--dry-run] [--strict]
 bun src/cli.js audit  [-s src] [-o dist] [--exclude <glob>]... [--pretty-urls] \
                       [--base-url <url>] [--canonical auto] [--catalog] [--search-corpus] \
+                      [--include-noindex] \
                       [--generate <path>] [--strict] [--format human|json|sarif] \
                       [--external]  # evaluate, write nothing
 bun src/cli.js dev    [-p 3000]            # build + watch + serve + reload

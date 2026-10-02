@@ -562,7 +562,7 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
       });
     }
     const generated = on && !conflict
-      ? generate({ documents: manifest.documents, base: baseConfig, emittedFromSource })
+      ? generate({ documents: manifest.documents, base: baseConfig, emittedFromSource, includeNoindex: settings.includeNoindex })
       : new Map();
     for (const [outPath, text] of generated) {
       tempFiles.set(outPath, text);

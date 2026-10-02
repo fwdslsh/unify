@@ -78,6 +78,14 @@ same set of pages —
 `path` is the join key on purpose — the one field both files share verbatim, so a search
 hit's `path` looks up everything else about that page in the catalog.
 
+### Which pages are in the files, and private sites
+
+Both files list the same pages: the ones a crawler is allowed to index and that name themselves as canonical (no `noindex`, no canonical pointing elsewhere, never `404.html`). That is the same rule the sitemap uses, and for a public site it is what you want.
+
+A private site (an intranet, a staging copy, a client preview) often marks *every* page `noindex`, which would leave both files empty. Build with `--include-noindex` (or save `include-noindex: true` in `unify.yaml`) and a page excluded *only* for being `noindex` is listed in both files. Nothing else changes: the pages keep their `noindex` robots meta, `sitemap.xml` and the feed still leave them out, and `404.html` and pages whose canonical points elsewhere stay out. The flag needs `--catalog` or `--search-corpus`; on its own it is a usage error.
+
+Two audiences are being kept apart here. `noindex` and the sitemap speak to crawlers; the catalog is for your own site's navigation and search. And `noindex` is not access control: a page listed in `catalog.json` has its title, metadata and visible text in a public file at a guessable URL, exactly as the page itself is public. If a page must stay private, protect it on the server.
+
 ## 2. Reading `meta` like a browse UI would
 
 The catalog's `meta` array is a flat list, not an object — because a page can repeat a

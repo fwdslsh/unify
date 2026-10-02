@@ -276,6 +276,7 @@ Options:
       --feed-full          include each entry's full rendered content in feed.xml (needs --base-url)
       --catalog            write assets/unify/catalog.json — a browse/filter/TOC projection of every public page
       --search-corpus      write assets/unify/search-corpus.json — normalized page text for client-side search
+      --include-noindex    list noindex pages in the catalog and search corpus (needs one of them)
       --generate <path>    run one JavaScript file from your source tree before the build
       --dry-run            run the full build and every check, print the report, write nothing
       --strict             advisories count as problems for the exit code (with `audit`, findings too)

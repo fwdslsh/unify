@@ -35,7 +35,7 @@
  * `catalog.js`'s own module comment states from the other side.
  */
 
-import { isPublicDestination } from "./document-selectors.js";
+import { isCatalogMember } from "./document-selectors.js";
 import { serializeJson } from "./report.js";
 
 /** The output path of the site's search corpus (brief §4.2). */
@@ -97,12 +97,13 @@ export function corpusEntry(doc) {
  * nothing here sorts.
  * @param {import('./manifest.js').BuildDocument[]} documents
  * @param {import('./urls.js').BaseUrlConfig|null} base
+ * @param {boolean} [includeNoindex] - `--include-noindex` (§30.4)
  * @returns {{schemaVersion: number, pages: ReturnType<typeof corpusEntry>[]}}
  */
-export function corpusDocument(documents, base) {
+export function corpusDocument(documents, base, includeNoindex = false) {
   const pages = [];
   for (const doc of documents) {
-    if (!isPublicDestination(doc, base)) continue;
+    if (!isCatalogMember(doc, base, includeNoindex)) continue;
     pages.push(corpusEntry(doc));
   }
   return { schemaVersion: SCHEMA_VERSION, pages };
@@ -136,12 +137,12 @@ export function serializeCorpus(doc) {
  *   an authored `assets/unify/search-corpus.json` suppressed generation.
  *   Only the exact path is reserved — `assets/unify/` itself is not.
  */
-export function generateSearchCorpus({ documents, base, emittedFromSource }) {
+export function generateSearchCorpus({ documents, base, emittedFromSource, includeNoindex = false }) {
   const generated = new Map();
   // The author's file is the site's search corpus: never overwritten, never
   // merged into. Suppression happens before anything is computed, exactly
   // as an authored sitemap.xml/feed.xml suppress their own generation.
   if (emittedFromSource.has(SEARCH_CORPUS_PATH)) return generated;
-  generated.set(SEARCH_CORPUS_PATH, serializeCorpus(corpusDocument(documents, base)));
+  generated.set(SEARCH_CORPUS_PATH, serializeCorpus(corpusDocument(documents, base, includeNoindex)));
   return generated;
 }

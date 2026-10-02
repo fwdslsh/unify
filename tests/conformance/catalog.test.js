@@ -370,6 +370,66 @@ test("SRCH-04: membership is shared — noindex, none, 404.html, and a canonical
   covers("SRCH-04");
 }, TEST_MS);
 
+test("SRCH-08: --include-noindex lists a page excluded solely for noindex in BOTH files; the page stays noindex and out of the sitemap; 404.html, a canonical elsewhere and underscore sources stay out; absent the flag the output is unchanged", async () => {
+  const tree = {
+    "index.html": page({ title: "Home" }),
+    "hidden.html": page({ title: "Hidden", robots: "noindex" }),
+    "none.html": page({ title: "None", robots: "none" }),
+    "404.html": page({ title: "Not found", robots: "noindex" }),
+    "dupe.html": page({ title: "Dupe", robots: "noindex", canonical: "/index.html" }), // noindex AND consolidated: stays out
+    "_private.html": page({ title: "Underscore", robots: "noindex" }),
+  };
+  const build = async (extra) => {
+    const tmp = mkTmp();
+    writeTree(join(tmp, "src"), tree);
+    const r = await runCli(["build", "-s", "src", "-o", "dist", "--catalog", "--search-corpus", "--base-url", BASE, ...extra], tmp);
+    expectExit(r, 0, `build ${extra.join(" ")}`);
+    return tmp;
+  };
+  const paths = (tmp) => {
+    const c = parseJsonFile(readCatalogRaw(tmp), "catalog.json").pages.map((p) => p.path);
+    const s = parseJsonFile(readCorpusRaw(tmp), "search-corpus.json").pages.map((p) => p.path);
+    if (JSON.stringify(c) !== JSON.stringify(s)) throw new Error(`§30.4: the two files must list the identical pages.\n  catalog: ${c}\n  corpus:  ${s}`);
+    return c;
+  };
+
+  const off = await build([]);
+  expectBytes(JSON.stringify(paths(off)), JSON.stringify(["/"]), "default membership");
+
+  const on = await build(["--include-noindex"]);
+  expectBytes(JSON.stringify(paths(on)), JSON.stringify(["/hidden.html", "/", "/none.html"]), "membership with --include-noindex");
+  // Still noindex in the page itself, still absent from the sitemap.
+  if (!read(on, "dist", "hidden.html").includes('content="noindex"')) throw new Error("--include-noindex must not touch the page's own robots meta");
+  const sitemap = read(on, "dist", "sitemap.xml");
+  if (sitemap.includes("hidden.html") || sitemap.includes("none.html")) throw new Error(`--include-noindex must not change the sitemap:\n${sitemap}`);
+  expectBytes(sitemap, read(off, "dist", "sitemap.xml"), "sitemap with and without the flag");
+  covers("SRCH-08");
+}, TEST_MS);
+
+test("SRCH-08: include-noindex is saveable in unify.yaml, works with either flag alone, and with neither it is a usage error (exit 2)", async () => {
+  const saved = mkTmp();
+  writeTree(join(saved, "src"), {
+    "unify.yaml": "search-corpus: true\ninclude-noindex: true\n",
+    "index.html": page({ title: "Home" }),
+    "hidden.html": page({ title: "Hidden", robots: "noindex" }),
+  });
+  const a = await runCli(["build", "-s", "src", "-o", "dist"], saved);
+  expectExit(a, 0, "unify.yaml include-noindex");
+  const corpus = parseJsonFile(readCorpusRaw(saved), "search-corpus.json");
+  if (!corpus.pages.some((p) => p.path === "/hidden.html")) throw new Error("include-noindex: true in unify.yaml must list the noindex page in the corpus");
+  if (existsSync(join(saved, "dist", CATALOG_PATH))) throw new Error("include-noindex must not imply --catalog");
+
+  const alone = mkTmp();
+  writeTree(join(alone, "src"), { "index.html": page({ title: "Home" }) });
+  for (const cmd of ["build", "audit"]) {
+    const r = await runCli([cmd, "-s", "src", "-o", "dist", "--include-noindex"], alone);
+    if (r.exit !== 2 || !r.stderr.includes("--include-noindex") || !r.stderr.includes("--catalog")) {
+      throw new Error(`${cmd} --include-noindex with neither projection must be a usage error naming both flags.\n  exit: ${r.exit}\nstderr:\n${r.stderr}`);
+    }
+  }
+  covers("SRCH-08", "CFG-01");
+}, TEST_MS);
+
 // ------------------------------------------------------------------- §30.5
 
 test("SRCH-05: an authored NON-BREAKING SPACE (U+00A0) survives in the emitted page but is folded to an ordinary space in search-corpus.json's text", async () => {

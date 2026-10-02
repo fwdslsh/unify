@@ -1054,7 +1054,7 @@ Keeping the list and naming the outcome are both required: suppressing the list 
 
 ## 18. `unify.yaml`
 
-Optional, at the source root; never emitted. Keys are the long option names with the same meanings: `source`, `output`, `clean`, `exclude` (a list, replacing the default like the flag), `pretty-urls`, `base-url`, `canonical`, `feed-full`, `catalog`, `search-corpus`, `strict`, `port`, `generate`. CLI flags win on conflict. No behavior exists that only the file can express.
+Optional, at the source root; never emitted. Keys are the long option names with the same meanings: `source`, `output`, `clean`, `exclude` (a list, replacing the default like the flag), `pretty-urls`, `base-url`, `canonical`, `feed-full`, `catalog`, `search-corpus`, `include-noindex`, `strict`, `port`, `generate`. CLI flags win on conflict. No behavior exists that only the file can express.
 
 **On the command line, a single-value option may be given once.** `exclude` is the one list — repeating it accumulates, which is what it is for — and repeating a boolean flag asks for the same thing twice and is fine. Repeating anything that carries a value (`-o dist -o other`, two `--generate` paths) is a **usage error** (exit 2). It used to keep the last one and discard the rest in silence, which published to a directory the author did not name and ran a generator instead of the one they asked for, both at exit 0: an instruction dropped without a word, which is the failure §7.6 refuses everywhere the author's content is concerned and the CLI boundary had no equivalent of.
 
@@ -2091,7 +2091,11 @@ Top-level keys are `schemaVersion`, `pages`. A page's keys are `path`, `text`, a
 
 ### 30.4 Shared membership
 
-Both files use the identical **`isPublicDestination(doc, base)`** selector §21.2 defines and owns: the document exists, is indexable (`robotsPolicyOf(doc).indexable`), its output path is not `404.html`, and it is self-canonical. A page the author marked `noindex`, or consolidated onto another page by its own canonical, is absent from both files for the reason §21.2 already states for the sitemap — a `noindex` page returning through a site-search box is the same contradiction as one returning through a crawler's index.
+Both files use one membership predicate, built on the **`isPublicDestination(doc, base)`** selector §21.2 defines and owns: the document exists, is indexable (`robotsPolicyOf(doc).indexable`), its output path is not `404.html`, and it is self-canonical. By default a page the author marked `noindex`, or consolidated onto another page by its own canonical, is absent from both files for the reason §21.2 already states for the sitemap — a `noindex` page returning through a site-search box is the same contradiction as one returning through a crawler's index.
+
+**`--include-noindex`** (saveable as `include-noindex`, §18) is the one opt-in. It waives the indexability condition **for these two files only**: a page excluded solely because it is `noindex` or `none` is then in both files. Nothing else changes — `404.html`, a page whose canonical names another page, and every excluded or underscore source stay out; the sitemap (§21.2), the feed (§29.4), robots handling, canonical completion (§22) and the emitted `<meta name="robots">` are untouched. Without the flag the files are byte-identical to what they were before the flag existed. The flag changes what `--catalog` and `--search-corpus` list, so naming it with neither is a **usage error** (exit 2), the same shape as `--feed-full` without `--base-url`: a flag that would do nothing is reported, not ignored.
+
+Why it exists: crawler indexing (robots, the sitemap) and a site's own navigation are different audiences. A private site that marks every page `noindex` still wants an "All pages" directory or a search box for its own readers. `noindex` is a request to crawlers and is **not access control** — listing a page in `catalog.json` makes its title, metadata and text a public file at a guessable URL, exactly as the page itself is.
 
 Reusing the sitemap's own predicate, rather than a second reading of "which pages does this site publish", is why the catalog and the corpus cannot describe two different page sets from one build: `sitemap.js`, `catalog.js`, and `search-corpus.js` all call the one function, and none of them reimplements it.
 
