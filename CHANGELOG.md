@@ -10,9 +10,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.9.2] - 2026-10-02
 
-Four fixes from building a real site with unify, and one finding removed. A site
-that built clean on 0.9.1 can now stop on the first item below; when it does, that
-build was losing content without saying so.
+Fixes and small additions from building real sites with unify, and one finding
+removed. A site that built clean on 0.9.1 can now stop on the first Fixed item below;
+when it does, that build was losing content without saying so.
+
+### Added
+
+- **`unify build --audit`** (#92): compose once, evaluate the same findings
+  `unify audit` reports over that exact result, and publish only if `unify audit`
+  with the same flags would exit 0 (previous `dist/` untouched otherwise). The
+  generator runs once. `unify build --audit --strict` replaces
+  `build --dry-run --strict && build && audit --strict`. Saveable as `audit: true`.
+- **`unify build --save-config`**: writes the saveable options given on the command
+  line into the source root's `unify.yaml`, creating it if needed. Only the keys you
+  pass change; comments, order and other keys are kept. It writes only after a build
+  that exits 0, and is a usage error with `--dry-run` or on other commands.
+- **`--include-noindex`** (#97): with `--catalog`/`--search-corpus`, pages left out
+  only for being `noindex` are listed too, so a private site gets a usable page
+  directory. Robots meta, sitemap, feed, `404.html` and canonical handling are
+  unchanged. Without `--catalog` or `--search-corpus` it is a usage error.
+- **An "All pages" starter in `unify init docs`** (#91): `all-pages.html` and
+  `assets/all-pages.js`, an accessible, filterable directory grouped by section and
+  read from `assets/unify/catalog.json`. It works under a `--base-url` path prefix;
+  built without `--catalog` it shows an error state saying so.
 
 ### Fixed
 
