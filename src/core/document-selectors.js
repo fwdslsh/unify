@@ -353,6 +353,11 @@ export function descriptionOf(doc) {
   return firstNonEmpty(metaValues(doc, "description"));
 }
 
+/** First non-empty (trimmed) `<meta property="og:site_name">` content, else null. */
+export function siteNameOf(doc) {
+  return firstNonEmpty(propertyValues(doc, "og:site_name"));
+}
+
 /** First non-empty (trimmed) `<meta name="author">` content, else null. */
 export function authorOf(doc) {
   return firstNonEmpty(metaValues(doc, "author"));
