@@ -1054,7 +1054,7 @@ Keeping the list and naming the outcome are both required: suppressing the list 
 
 ## 18. `unify.yaml`
 
-Optional, at the source root; never emitted. Keys are the long option names with the same meanings: `source`, `output`, `clean`, `exclude` (a list, replacing the default like the flag), `pretty-urls`, `base-url`, `canonical`, `feed-full`, `catalog`, `search-corpus`, `include-noindex`, `strict`, `audit`, `port`, `generate`. CLI flags win on conflict. No behavior exists that only the file can express.
+Optional, at the source root; never emitted. Keys are the long option names with the same meanings: `source`, `output`, `clean`, `exclude` (a list, replacing the default like the flag), `pretty-urls`, `base-url`, `canonical`, `feed-full`, `catalog`, `search-corpus`, `include-noindex`, `strict`, `audit`, `port`, `generate`, `source-inventory`. CLI flags win on conflict. No behavior exists that only the file can express.
 
 **On the command line, a single-value option may be given once.** `exclude` is the one list — repeating it accumulates, which is what it is for — and repeating a boolean flag asks for the same thing twice and is fine. Repeating anything that carries a value (`-o dist -o other`, two `--generate` paths) is a **usage error** (exit 2). It used to keep the last one and discard the rest in silence, which published to a directory the author did not name and ran a generator instead of the one they asked for, both at exit 0: an instruction dropped without a word, which is the failure §7.6 refuses everywhere the author's content is concerned and the CLI boundary had no equivalent of.
 
@@ -2363,6 +2363,9 @@ The subprocess is therefore part of the contract and not an implementation detai
   "outputs": {
     "catalog": "assets/unify/catalog.json",
     "searchCorpus": null
+  },
+  "inputs": {
+    "sourcePages": null
   }
 }
 ```
@@ -2380,10 +2383,11 @@ The subprocess is therefore part of the contract and not an implementation detai
 | `site.canonical` | `"auto"` \| null | `--canonical auto`'s value, or `null` |
 | `outputs.catalog` | string \| null | `assets/unify/catalog.json`, output-root-relative, when `--catalog` is set; `null` otherwise |
 | `outputs.searchCorpus` | string \| null | `assets/unify/search-corpus.json`, output-root-relative, when `--search-corpus` is set; `null` otherwise |
+| `inputs.sourcePages` | string \| null | the absolute path of `source-pages.json` (§33.7) when `--source-inventory` is set; `null` otherwise. Added in 0.9.3 as a new optional field, so `schemaVersion` stays `1` |
 
 **Versioning.** The context carries its own `schemaVersion`, independent of `unifyVersion`, starting at `1`, and the rule is the same one §30.7 states for `catalog.json`/`search-corpus.json`: within version 1, only additive optional fields may be added; a change to an existing field's meaning or shape — including widening `command`'s closed set with a new value, or changing `site.baseUrl` from a string to an object — requires `schemaVersion` to increment. A generator reading `schemaVersion 1` today keeps reading a valid `schemaVersion 1` document as this contract grows only by new fields, the same guarantee `argv[2]`/`argv[3]` already make for a generator that predates `argv[4]` entirely.
 
-**Lifecycle.** The context file is temporary build state, not a build artifact: it lives in the same per-build temporary location as the generated directory, is a read-only input as far as the generator is concerned (unify never reads it back), and is deleted with the rest of the build's generator state — on a successful run, on a P29 failure, and on every path in between — never surviving to be published, never appearing in `dist/` or in a `--dry-run` row (it is written *beside* the generated directory, never inside it — §33.3's scan, and therefore its origin marking, only ever sees what `argv[3]` names; a non-page file written *inside* the overlay, by contrast, would mirror-copy into `dist/` and get a `← generated` row like any other generated asset). §16's full-rebuilds-only rule gives a fresh context, matching a fresh overlay, on every rebuild for free — the same file at the same relative position, its `paths.generatedRoot` and effective `site`/`outputs` values current as of that rebuild's own settings, never a stale copy from an earlier one.
+**Lifecycle.** The context file is temporary build state, not a build artifact: it lives in the same per-build temporary location as the generated directory (as does `source-pages.json`, §33.7), is a read-only input as far as the generator is concerned (unify never reads it back), and is deleted with the rest of the build's generator state — on a successful run, on a P29 failure, and on every path in between — never surviving to be published, never appearing in `dist/` or in a `--dry-run` row (it is written *beside* the generated directory, never inside it — §33.3's scan, and therefore its origin marking, only ever sees what `argv[3]` names; a non-page file written *inside* the overlay, by contrast, would mirror-copy into `dist/` and get a `← generated` row like any other generated asset). §16's full-rebuilds-only rule gives a fresh context, matching a fresh overlay, on every rebuild for free — the same file at the same relative position, its `paths.generatedRoot` and effective `site`/`outputs` values current as of that rebuild's own settings, never a stale copy from an earlier one.
 
 **The boundary is the same one §33.6 restates for the seam as a whole, sharpened for this one file: stable machine-contract fields only.** The table above is the complete set unify is willing to promise; nothing else about a running build is exposed through it. No environment variables, no secrets, no reporter or parser object, no internal callback, no mutable build state, no intermediate page collection, and no internal option name that isn't one of these fields' own — the context is built from exactly the parameters above, never from a serialized `settings` object, so nothing about unify's own internals can leak through by accident as the CLI's option surface grows. Most pointedly, **no manifest field appears here, because at the point this file is written the manifest does not exist yet**: §33.5's ordering is unchanged by this file's addition — the generator, and therefore the context it reads, still runs before §2 step 1, the scan, so there is no composed page, no `BuildDocument`, no catalog or search-corpus *content* (only the two output-root-relative *paths* those artifacts will land at, which are computable from flags alone) for this file to describe.
 
@@ -2443,3 +2447,44 @@ The consequence an author must know, and which the recipes state: a generator th
 unify runs the file the author named. It does not sandbox it, does not restrict what it may read or write, and does not audit its output for anything the ordinary build would not audit. A generator that writes outside the supplied directory, deletes files, or reaches the network is doing something unify neither prevents nor endorses — product-spec §6.1 keeps *unify's own* build offline and deterministic, and §6.7 says plainly that unify documents this boundary rather than claiming to police it.
 
 Two things unify does guarantee, and they are what make the seam safe to use rather than safe to trust. **Nothing the generator produces bypasses a check**: a generated page is checked, its references are checked, its output path collides like any other, and it publishes only inside §15's transaction. And **a generator's failure is a build failure**: P29 stops the build before the scan, so a site is never published from a half-written overlay.
+
+### 33.7 The source inventory (`--source-inventory`)
+
+`--source-inventory` (saveable as `source-inventory`, §18) is an opt-in boolean that hands the generator one more read-only file: `source-pages.json`, a list of the site's **source pages and the metadata their authors wrote**. It exists so a generator can write a directory page — a reports index, an archive — in the same build that publishes it, without a preliminary `audit --format json` run. It applies wherever `--generate` applies (`build`, `watch`, `dev`, `audit`). Given with no generator (neither `--generate` nor a saved `generate:`), it is a **usage error** (exit 2), the same shape as `--include-noindex` without `--catalog`: a flag that would do nothing is reported, not ignored. Without the flag nothing about the build changes, no extraction runs, and `inputs.sourcePages` (§33.2) is `null`.
+
+**The file.** unify writes it once per generator run, before invoking the generator, into the same per-build temporary location as `generator-context.json` — beside the generated directory, never inside it — and its path is `inputs.sourcePages`. Its lifecycle is the context's: deleted on a successful run, on a P29 failure and on every path in between, never published, never in a `--dry-run` row. Serialized like the context (§33.2): two-space-indented JSON with a trailing newline.
+
+```json
+{
+  "schemaVersion": 1,
+  "pages": [
+    {
+      "source": "reports/q1.md",
+      "href": "/reports/q1.html",
+      "title": "Q1: the numbers",
+      "description": null,
+      "date": "2026-04-02T09:00:00Z"
+    }
+  ]
+}
+```
+
+Each record has exactly these five keys, in this order, and nothing else — no timestamps, no absolute paths:
+
+| Field | Type | Content |
+|---|---|---|
+| `source` | string | the page's POSIX path relative to the source root |
+| `href` | string | `"/"` plus `source`, a trailing `.md` swapped for `.html`. An ordinary source-route link: written into generated HTML it is rewritten by §11 like any authored link, so `--pretty-urls` and `--base-url` apply to it later. It is not percent-encoded |
+| `title`, `description`, `date` | string \| null | what the author wrote, trimmed; `null` when not authored or empty |
+
+`pages` is sorted by `source`, the order the build's own scan already uses.
+
+**Eligibility is the build's own scan, not a second one.** A record exists for exactly the files the build treats as pages (§4) of the **source tree**: `.html` and `.md` files after the underscore rule (§4.2), `--exclude` (§4.1), the never-shipped list (§4.3) and the `.fragment.html` opt-out (§4.4). So `_layout.html`, `_includes/`, `_`-prefixed pages and files, excluded paths and fragments are absent. A page marked `noindex` is **present**: this is discovery, not publication. Generated files are absent, since the generator has not run.
+
+**Extraction reads authored source only.**
+
+- **`.md`**: the frontmatter keys `title`, `description` and `date`, read by the same frontmatter code the build uses, with §10.2's value serialization (a plain scalar as written, a quoted scalar unquoted, a list's first non-empty item). There is no fallback to the first `# heading` (§10.3 is composition, not authorship), and character references are **not** decoded, because frontmatter text is text, not markup.
+- **`.html`**: from the page file's own `<head>`, as written in the file: the `<title>` text and the `content` of `<meta name="description">` and `<meta name="date">`, character references decoded (§20.3), the first non-empty value winning (§20). **Includes are not resolved**, so a title an `<include>` supplies is not seen, and a page with no `<head>` element reads those elements wherever they stand, exactly as §20 does.
+- A frontmatter fault the build would report (invalid YAML, P17, §28.1's counter-prior keys, §10.5's frontmatter in an HTML page) is reported here the same located way and **stops the build before the generator runs**. No page is silently left out.
+
+**What it is not.** It is source facts, not the final manifest (§20) or the catalog (§30). A `title` here has no layout title suffix and no heading fallback, no generated page appears, nothing is rendered, a layout's own `<meta>` is not merged in, and a page's emitted URL is not computed. unify offers no query language, no field list, no sorting or grouping, and no second pass: a generator wanting the composed truth reads the catalog from a prior build (§30), as before.

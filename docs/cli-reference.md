@@ -24,6 +24,7 @@ Options:
       --search-corpus      write assets/unify/search-corpus.json — normalized page text for client-side search
       --include-noindex    list noindex pages in the catalog and search corpus (needs one of them)
       --generate <path>    run one JavaScript file from your source tree before the build
+      --source-inventory   give that file source-pages.json: every source page's authored title, description and date (needs --generate)
       --dry-run            run the full build and every check, print the report, write nothing
       --audit              `build` only: audit the composed site before publishing; publish only if `unify audit` would exit 0
       --save-config        `build` only: write the saveable options given here into unify.yaml (after a good build)
@@ -277,6 +278,9 @@ const [, , sourceRoot, generatedDir, contextPath] = process.argv;
   "outputs": {
     "catalog": "assets/unify/catalog.json",
     "searchCorpus": null
+  },
+  "inputs": {
+    "sourcePages": null
   }
 }
 ```
@@ -288,7 +292,24 @@ if (context.site.baseUrl) {
 }
 ```
 
-`schemaVersion` starts at `1` and only bumps when a field's meaning changes in a way an existing reader would misread — a new field showing up is not a bump, so pinning to `schemaVersion === 1` is safe across 0.9 releases. `command` is the subcommand actually running (`build`/`dev`/`watch`/`audit` — `audit` runs generators too). `site.baseUrl` is `--base-url`'s effective, fully-resolved value (or `null` without the flag) — never the raw string you passed. `outputs.catalog`/`outputs.searchCorpus` are the paths those files will land at, output-root-relative, or `null` when the matching flag is off — the paths only, since neither file's *content* exists yet at this point in the build. There's nothing else in it: no settings dump, no environment, no manifest (the build hasn't scanned anything yet, so there's nothing to report). The file is temporary — gone by the time the build finishes, success or failure — so read it during the generator's own run and don't expect it to still be there afterward.
+`schemaVersion` starts at `1` and only bumps when a field's meaning changes in a way an existing reader would misread — a new field showing up is not a bump, so pinning to `schemaVersion === 1` is safe across 0.9 releases. `command` is the subcommand actually running (`build`/`dev`/`watch`/`audit` — `audit` runs generators too). `site.baseUrl` is `--base-url`'s effective, fully-resolved value (or `null` without the flag) — never the raw string you passed. `outputs.catalog`/`outputs.searchCorpus` are the paths those files will land at, output-root-relative, or `null` when the matching flag is off — the paths only, since neither file's *content* exists yet at this point in the build. `inputs.sourcePages` is `null` unless you passed `--source-inventory` (below), and was added in 0.9.3 without a version bump, being a new field. There's nothing else in it: no settings dump, no environment, no manifest (the build hasn't scanned anything yet, so there's nothing to report). The file is temporary — gone by the time the build finishes, success or failure — so read it during the generator's own run and don't expect it to still be there afterward.
+
+#### `--source-inventory`
+
+Opt-in, saveable (`source-inventory: true`), and a usage error without a generator. It gives the generator one more file, `source-pages.json`, whose path is `context.inputs.sourcePages`: one record for every **source page**, with the metadata its author wrote, so a script can write a directory page (a reports index, an archive) in the same build that publishes it.
+
+```json
+{
+  "schemaVersion": 1,
+  "pages": [
+    { "source": "reports/q1.md", "href": "/reports/q1.html", "title": "Q1: the numbers", "description": null, "date": "2026-04-02T09:00:00Z" }
+  ]
+}
+```
+
+Every record has those five keys. `source` is the path relative to the source root. `href` is `/` plus `source` with a trailing `.md` turned into `.html`, a link you can write straight into generated HTML: `--pretty-urls` and `--base-url` rewrite it like any link you typed. `title`, `description` and `date` are strings or `null`. The list is sorted by `source`.
+
+The pages are exactly the ones the build would treat as pages in your source tree: `_`-prefixed files, `--exclude` matches, `*.fragment.html` and layouts are not in it, and nor is anything a generator writes. A `noindex` page is in it. Markdown pages give their frontmatter `title`, `description` and `date` as written (no first-heading fallback). HTML pages give their own `<title>` and `<meta name="description">`/`<meta name="date">`, as written in that file's `<head>`: includes are not resolved, so a title an `<include>` supplies is not seen. It is source facts only, not the catalog: no layout title suffix, no generated pages, no rendered headings. Broken frontmatter is reported the way a build reports it and stops the build before your generator runs. A worked generator is in [the integrations guide](integrations.md#an-index-of-your-pages-in-one-build).
 
 **Your generated files and your source files share one set of paths.** A file is known by its path inside whichever directory it was written to, so `docs/api.md` means the same page whether you typed it into `src/docs/` or your script wrote it into `generatedDir`. Everything follows from that:
 

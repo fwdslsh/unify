@@ -145,13 +145,16 @@ failure:
   "outputs": {
     "catalog": "assets/unify/catalog.json",
     "searchCorpus": null
+  },
+  "inputs": {
+    "sourcePages": null
   }
 }
 ```
 
 `site` and `outputs` are the flags that change what a generator would otherwise have to
 duplicate: the effective `--base-url`/`--pretty-urls`/`--canonical`, and the output-relative
-paths `--catalog`/`--search-corpus` will write, each `null` when its flag is off. There is
+paths `--catalog`/`--search-corpus` will write, each `null` when its flag is off. `inputs.sourcePages` is `null` too unless you ask for the source inventory (below). There is
 nothing else in it — no settings dump, no environment, no internal option names, and no
 manifest, because the generator runs before unify has composed a single page. Reading it is
 optional: `sourceRoot` and `generatedDir` are the same two arguments the flag has always
@@ -194,6 +197,58 @@ Five properties are worth knowing before you write a longer one:
 - **`command` names the real subcommand** — `build`, `dev`, `watch`, or `audit` — so a
   generator that only makes sense during development can check it and skip itself rather
   than guessing from a flag.
+
+### An index of your pages, in one build
+
+A generator runs before unify has read a single page, so by default it can only read your
+files itself. `--source-inventory` hands it that reading, done: `inputs.sourcePages` in the
+context names `source-pages.json`, one record per source page with the `title`,
+`description` and `date` its author wrote (`null` where there is none), the page's
+`source` path, and an `href` you can link to. It is the same list of pages the build
+treats as pages: `_`-prefixed files, `--exclude` matches, fragments and layouts are not in
+it, a `noindex` page is. Markdown pages read their frontmatter; HTML pages read their own
+`<head>`, as written, with `<include>`s not resolved. It is source facts only: no layout
+suffix on titles, no generated pages, no rendered headings.
+
+This generator writes a `reports/index.html` listing every page under `reports/`, newest
+first, so the index and the reports it links to come out of one `unify build`:
+
+```js
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+
+const [, , , generatedDir, contextPath] = process.argv;
+const context = JSON.parse(readFileSync(contextPath, "utf8"));
+const { pages } = JSON.parse(readFileSync(context.inputs.sourcePages, "utf8"));
+
+const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+const items = pages
+  .filter((p) => p.source.startsWith("reports/"))
+  .sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""))
+  .map((p) => `<li><a href="${esc(p.href)}">${esc(p.title ?? p.source)}</a>${p.description ? ` — ${esc(p.description)}` : ""}</li>`);
+
+mkdirSync(join(generatedDir, "reports"), { recursive: true });
+writeFileSync(
+  join(generatedDir, "reports", "index.html"),
+  `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Reports</title><meta name="description" content="Every report, newest first."></head>
+<body><h1>Reports</h1><ul>
+${items.join("\n")}
+</ul></body>
+</html>
+`,
+);
+```
+
+```sh
+unify build --generate _scripts/reports.mjs --source-inventory --audit --strict
+```
+
+The `href`s are ordinary links to your source pages, so `--pretty-urls` and a `--base-url`
+path prefix rewrite them like links you typed, and the audit checks every one. Put
+`generate: _scripts/reports.mjs` and `source-inventory: true` in `unify.yaml` and the
+command is just `unify build --audit --strict`.
 
 The `blog` template ships this worked: `unify init blog` writes a `_scripts/gen.mjs` that
 reads `posts/*.md` and `_data/authors.json` and regenerates the index and the feed.

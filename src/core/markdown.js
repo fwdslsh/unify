@@ -647,6 +647,50 @@ function metaElement(key, value) {
 // ----------------------------------------------------------------- exports
 
 /**
+ * §10.2 — one Markdown page's frontmatter, read and validated: split, parsed,
+ * and checked for §28.1's counter-prior keys and for P17's values with no text
+ * form, every one reported through `reporter` at its own file line. Both
+ * `convert` (the page) and `inventoryFields` (§33.7's source inventory) read
+ * frontmatter through this one function, so a page the build would refuse is
+ * refused the same way, with the same located message, by either.
+ *
+ * `metas` is empty without a frontmatter block. A fragment's frontmatter is
+ * never read at all (§5.1 step 4), so `convertFragment` does not come here.
+ * @param {string} source
+ * @param {{file: string, reporter: import('./diagnostics.js').Reporter}} ctx
+ */
+function readFrontmatter(source, { file, reporter }) {
+  const { yamlText, body, bodyStartLine } = splitFrontmatter(source);
+  const data = parseFrontmatterYaml(yamlText, { file, reporter });
+  // §28.1 — page mode only. `convertFragment` never reaches this line, which is
+  // how "a fragment's frontmatter is never validated" (§5.1 step 4) holds here
+  // without a flag: it is not that the check is skipped, it is that a fragment's
+  // frontmatter is never parsed at all.
+  if (yamlText !== null) checkCounterPriorKeys(data, { file, reporter, yamlText });
+  const metas = yamlText === null ? [] : collectMetas(data, { file, reporter, yamlText });
+  return { data, metas, body, bodyStartLine };
+}
+
+/**
+ * §33.7 — the authored `title`, `description` and `date` of a Markdown page,
+ * exactly as its frontmatter wrote them: §10.2's serialization (a plain scalar
+ * as written, a quoted one unquoted, a list's first non-empty item), trimmed,
+ * `null` when absent or empty. No fallback to the first heading (§10.3's
+ * fallback is composition, not authorship). Frontmatter the build would refuse
+ * is reported through `reporter` the way `convert` reports it.
+ * @param {string} source
+ * @param {{path: string, sourceRoot: string, roots?: string[], reporter: import('./diagnostics.js').Reporter}} options
+ * @returns {{title: string|null, description: string|null, date: string|null}}
+ */
+export function inventoryFields(source, { path, sourceRoot, roots = resolutionRoots(sourceRoot), reporter }) {
+  const file = nameOf(roots, path);
+  const { data, metas } = readFrontmatter(source, { file, reporter });
+  const first = (key) => metas.find((m) => m.key === key && m.value.trim() !== "")?.value.trim() ?? null;
+  const title = typeof data.title === "string" && data.title.trim() !== "" ? data.title.trim() : null;
+  return { title, description: first("description"), date: first("date") };
+}
+
+/**
  * Convert a Markdown **page**: parse frontmatter (§10.2, raising P17 for
  * values with no text form), convert the body (§10.1, applying heading ids
  * per §10.4 and raising P11 for a literal `<head>`), and resolve the title
@@ -684,14 +728,7 @@ function metaElement(key, value) {
  */
 export function convert(source, { path, sourceRoot, roots = resolutionRoots(sourceRoot), reporter }) {
   const file = nameOf(roots, path);
-  const { yamlText, body, bodyStartLine } = splitFrontmatter(source);
-  const data = parseFrontmatterYaml(yamlText, { file, reporter });
-  // §28.1 — page mode only. `convertFragment` never reaches this line, which is
-  // how "a fragment's frontmatter is never validated" (§5.1 step 4) holds here
-  // without a flag: it is not that the check is skipped, it is that a fragment's
-  // frontmatter is never parsed at all.
-  if (yamlText !== null) checkCounterPriorKeys(data, { file, reporter, yamlText });
-  const metas = yamlText === null ? [] : collectMetas(data, { file, reporter, yamlText });
+  const { data, metas, body, bodyStartLine } = readFrontmatter(source, { file, reporter });
   const { html, firstH1 } = convertBody(body, bodyStartLine, { file, reporter });
 
   const frontmatterTitle = typeof data.title === "string" && data.title.trim() !== "" ? data.title : undefined;

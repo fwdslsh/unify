@@ -100,6 +100,58 @@ test("recipe 1 — the document's complete generator builds, and its destructuri
   if (!out.includes(join(tmp, "src"))) throw new Error(`argv[2] is not the absolute source root:\n${out}`);
 }, TEST_MS);
 
+test("recipe 1 — the source-inventory generator builds clean in ONE strict audited build, plain, pretty and under a prefix", async () => {
+  const H = "1. The generator context: what `--generate` hands you";
+  const generator = codeBlock(H, "js", 2);
+  const command = codeBlock(H, "sh", 0).trim();
+  // The command literal, run as written: `unify` is the CLI under test, and
+  // the layout flags the test needs are added after it.
+  if (command !== "unify build --generate _scripts/reports.mjs --source-inventory --audit --strict") {
+    throw new Error(`the documented command changed — update the test to run what the document says:\n${command}`);
+  }
+  const flags = command.replace(/^unify build /, "").split(" ");
+
+  const report = (n, title, date) =>
+    `---\ntitle: ${title}\ndescription: Report number ${n}\nlang: en\ndate: ${date}\n---\n# Report ${n}\n\nBody of report ${n}.\n`;
+  const tree = {
+    "index.html": page("Home", '<h1>Home</h1><a href="/reports/index.html">reports</a>'),
+    "_scripts/reports.mjs": generator,
+    "reports/q1.md": report(1, '"Q1: the numbers"', "2026-04-02T09:00:00Z"),
+    "reports/q2.md": report(2, "Q2", "2026-07-02T09:00:00Z"),
+    "reports/undated.html": page("Undated &amp; loose", "<h1>Undated</h1>"),
+    "reports/_draft.md": report(3, "Draft", "2026-08-01T09:00:00Z"),
+  };
+
+  const variants = [
+    { args: [], index: "reports/index.html", link: 'href="/reports/q2.html"' },
+    { args: ["--pretty-urls"], index: "reports/index.html", link: 'href="/reports/q2/"' },
+    { args: ["--pretty-urls", "--base-url", "https://example.com/docs/"], index: "reports/index.html", link: 'href="/docs/reports/q2/"' },
+  ];
+  for (const v of variants) {
+    const tmp = mkTmp();
+    writeTree(join(tmp, "src"), tree);
+    const r = await runCli(["build", "-s", "src", "-o", "dist", ...flags, ...v.args], tmp);
+    expectExit(r, 0, `the document's one-build index with [${v.args.join(" ")}]`);
+    const indexPath = v.args.includes("--pretty-urls") ? "reports/index.html" : v.index;
+    const out = readFileSync(join(tmp, "dist", indexPath), "utf8");
+    if (!out.includes(v.link)) throw new Error(`[${v.args.join(" ")}] the index must link ${v.link}:\n${out}`);
+    // Newest first, the dateless page last, an entity decoded once, and the
+    // underscore draft absent: the inventory is the build's own page list.
+    const order = ["Q2", "Q1: the numbers", "Undated &amp; loose"].map((t) => out.indexOf(t));
+    if (order.some((i) => i < 0) || order[0] > order[1] || order[1] > order[2]) {
+      throw new Error(`[${v.args.join(" ")}] order or titles wrong:\n${out}`);
+    }
+    if (out.includes("Draft")) throw new Error(`an underscore page leaked into the index:\n${out}`);
+  }
+
+  // `generate:` and `source-inventory: true` saved in unify.yaml: the command
+  // the document ends on is then just `unify build --audit --strict`.
+  const saved = mkTmp();
+  writeTree(join(saved, "src"), { ...tree, "unify.yaml": "generate: _scripts/reports.mjs\nsource-inventory: true\n" });
+  expectExit(await runCli(["build", "-s", "src", "-o", "dist", "--audit", "--strict"], saved), 0, "the saved-config command");
+  if (!existsSync(join(saved, "dist", "reports", "index.html"))) throw new Error("saved config did not generate the index");
+}, TEST_MS);
+
 test("recipe 1 — the working directory is the source root, as the bullet claims", async () => {
   const tmp = mkTmp();
   writeTree(join(tmp, "src"), {

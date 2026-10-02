@@ -23,7 +23,7 @@ import {
 import pkg from "../../../package.json" with { type: "json" };
 
 describe("writeGeneratorContext", () => {
-  test("the object's key order is exactly schemaVersion, unifyVersion, command, paths, site, outputs", () => {
+  test("the object's key order is exactly schemaVersion, unifyVersion, command, paths, site, outputs, inputs", () => {
     const overlayDir = makeOverlayDir();
     try {
       const contextPath = writeGeneratorContext({
@@ -39,8 +39,10 @@ describe("writeGeneratorContext", () => {
       });
       const ctx = JSON.parse(readFileSync(contextPath, "utf8"));
       expect(Object.keys(ctx)).toEqual([
-        "schemaVersion", "unifyVersion", "command", "paths", "site", "outputs",
+        "schemaVersion", "unifyVersion", "command", "paths", "site", "outputs", "inputs",
       ]);
+      expect(Object.keys(ctx.inputs)).toEqual(["sourcePages"]);
+      expect(ctx.inputs).toEqual({ sourcePages: null });
       expect(Object.keys(ctx.paths)).toEqual(["sourceRoot", "generatedRoot", "outputRoot"]);
       expect(Object.keys(ctx.site)).toEqual(["baseUrl", "prettyUrls", "canonical"]);
       expect(Object.keys(ctx.outputs)).toEqual(["catalog", "searchCorpus"]);
@@ -62,6 +64,7 @@ describe("writeGeneratorContext", () => {
         canonical: "auto",
         catalogPath: "assets/unify/catalog.json",
         searchCorpusPath: "assets/unify/search-corpus.json",
+        sourcePagesPath: "/tmp/x/source-pages.json",
       });
       const ctx = JSON.parse(readFileSync(contextPath, "utf8"));
       expect(ctx).toEqual({
@@ -82,6 +85,7 @@ describe("writeGeneratorContext", () => {
           catalog: "assets/unify/catalog.json",
           searchCorpus: "assets/unify/search-corpus.json",
         },
+        inputs: { sourcePages: "/tmp/x/source-pages.json" },
       });
     } finally {
       removeOverlayDir(overlayDir);

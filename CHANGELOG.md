@@ -8,6 +8,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.3] - 2026-10-03
+
+One addition, for sites whose generator builds index pages from their own content.
+
+### Added
+
+- **`--source-inventory`** (#100, saveable as `source-inventory: true`): before the
+  `--generate` script runs, unify writes `source-pages.json`, one record per source page
+  (`source`, `href`, and the authored `title`, `description` and `date`, or `null`), and
+  passes its path as `inputs.sourcePages` in `generator-context.json` (`schemaVersion`
+  stays 1; old generators are unaffected). A generator can now write a static index of
+  the site's pages in a single `build --audit --strict`, without a preliminary
+  `audit --format json` pass. Pages are the build's own scan (underscore, `--exclude`,
+  never-shipped, `.fragment.html`); Markdown fields come from frontmatter, HTML fields from
+  the page's own `<title>`/`<meta>`, with no rendering, layouts or includes. It is not the
+  catalog: no generated pages, no layout title suffix, and `noindex` pages are listed.
+  Without a generator it is a usage error. Spec §33.7; a tested recipe is in
+  `docs/integrations.md`.
+
 ## [0.9.2] - 2026-10-02
 
 Fixes and small additions from building real sites with unify, and one finding
@@ -586,7 +605,8 @@ with generated compare-link notes only. Their diffs are on the
 [releases page](https://github.com/fwdslsh/unify/releases). Nothing here
 retroactively reconstructs detail those notes never carried.
 
-[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.9.2...HEAD
+[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.9.3...HEAD
+[0.9.3]: https://github.com/fwdslsh/unify/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/fwdslsh/unify/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/fwdslsh/unify/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/fwdslsh/unify/compare/v0.8.3...v0.9.0
