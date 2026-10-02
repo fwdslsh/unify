@@ -136,8 +136,8 @@ const [, , sourceRoot, generatedDir, contextPath] = process.argv;
 an empty directory that exists only for this build, and `contextPath` the absolute path of
 `generator-context.json` — a versioned, read-only snapshot unify wrote for this one build:
 `schemaVersion`, `unifyVersion`, the running `command`, the same three paths, the effective
-site settings (`baseUrl`, `prettyUrls`, `canonical`), and where `--catalog`/`--search-corpus`
-will land. The working directory is the source root. There is nothing to import. All three
+site settings (`baseUrl`, `prettyUrls`, `canonical`), where `--catalog`/`--search-corpus`
+will land, and (`inputs.sourcePages`) the source page list `--source-inventory` writes, or `null`. The working directory is the source root. There is nothing to import. All three
 arguments are always supplied — a generator that reads only the first two keeps working
 exactly as it did before `contextPath` existed.
 
