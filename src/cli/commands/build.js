@@ -737,7 +737,7 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
   // implementations agreeing, which is the only way it can be held: a second
   // predicate set would agree on every simple site and diverge on the first
   // interesting one, unobserved, inside a development server.
-  const findings = settings.audit || settings.onEvaluation
+  const findings = settings.audit || settings.onEvaluation || settings.auditGate
     ? auditManifest({
       documents: manifest.documents,
       byOutputPath: manifest.byOutputPath,
@@ -764,12 +764,23 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
     return settings.strict && findings.length > 0 ? 1 : 0;
   }
 
+  // ---- §24.8 — `build --audit`: the gate. -----------------------------------
+  // The findings above were evaluated over THIS run's manifest — the exact
+  // bytes about to be published — so the gate is audit's own §24.6 rule, read
+  // once: publish iff `unify audit` with these flags would exit 0. A pipeline
+  // problem (or, under --strict, an advisory) is `reporter.exitCode !== 0`;
+  // under --strict any finding also blocks. Without --strict findings are
+  // reported and block nothing, exactly as `unify audit` exits 0 on them.
+  const gated = settings.auditGate === true;
+  const gateBlocks = gated && (reporter.exitCode !== 0 || (settings.strict === true && findings.length > 0));
+  if (gated) reporter.summary(formatFindings(findings, reporter.problemCount));
+
   // ---- §15 — transactional publish. ----------------------------------------
   // Named rather than inlined so the §27 sink at the end of this function can
   // state whether this build reached the output directory without asking the
   // question a second way. `publish()` records no diagnostic (its own PUB-01
   // gate only declines), so the value cannot go stale between here and there.
-  const published = shouldPublish(reporter) && !settings.dryRun;
+  const published = shouldPublish(reporter) && !settings.dryRun && !gateBlocks;
   if (published) {
     if (settings.clean) await publishModule.performClean({ output, source: sourceRoot });
     await publishModule.publish({ tempFiles, outputDir: output, reporter });
@@ -920,7 +931,7 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
     published,
   });
 
-  return reporter.exitCode;
+  return gateBlocks ? 1 : reporter.exitCode;
 }
 
 /**

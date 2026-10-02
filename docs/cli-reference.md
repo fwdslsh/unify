@@ -24,6 +24,7 @@ Options:
       --search-corpus      write assets/unify/search-corpus.json — normalized page text for client-side search
       --generate <path>    run one JavaScript file from your source tree before the build
       --dry-run            run the full build and every check, print the report, write nothing
+      --audit              `build` only: audit the composed site before publishing; publish only if `unify audit` would exit 0
       --strict             advisories count as problems for the exit code (with `audit`, findings too)
       --format <kind>      `audit` report shape: human (default), json, or sarif
       --external           `audit` only: fetch every off-origin URL the site emits and report the ones that don't resolve
@@ -58,7 +59,7 @@ notes.html: broken: #install in guide.html names no element [fragment-missing]
 audit: 1 broken, 1 incomplete
 ```
 
-Findings never block a build — `unify build` does not run any of these checks, so a site full of them still publishes. `unify audit --strict` exits `1` on any finding, of either severity: that is the CI gate, and it is opt-in.
+Findings never block a build — `unify build` does not run any of these checks (unless you pass `--audit`), so a site full of them still publishes. `unify audit --strict` exits `1` on any finding, of either severity: that is the CI gate, and it is opt-in.
 
 Worth knowing before you wire it up: **every `init` template passes `unify audit --strict` from the moment it is scaffolded.** `unify init <template> && unify audit --strict` exits `0` for all five, with no `--base-url` and nothing edited, and the conformance suite asserts it per template — so a finding on a fresh scaffold is a regression, and the first finding you see is about something you wrote. It was not always true: each template used to ship between seven and thirteen `incomplete` findings, mostly a missing `lang` or a page without its own description. They were real gaps, and the fix was the templates rather than the gate.
 
@@ -319,6 +320,12 @@ canonical completion: 5 pages would gain a canonical link
 structured data: 3 pages would gain a JSON-LD block
 ```
 
+### `--audit` (build only)
+
+Compose once, audit that result, publish only if it passes. The generator (`--generate`) runs once, the site is composed once, and the same findings `unify audit` would print are evaluated over that exact composition, then printed (human format) after the build's diagnostics. The build publishes iff `unify audit` with the same flags would exit `0`: no problems, and with `--strict` also no advisories and no findings. Without `--strict`, findings are reported but block nothing. A blocked gate exits `1` and leaves the previous output untouched. With `--dry-run` it reports and writes nothing, exiting as the gate would. `--external` and `--format` remain `audit`-only. `audit: true` is saveable in `unify.yaml`.
+
+`unify build --audit --strict` replaces the three-step `build --dry-run --strict && build && audit --strict`.
+
 ### `--strict`
 
 Advisories affect the exit code (non-zero) — never what is published. `unify build --dry-run --strict` is the one-line CI lint.
@@ -352,7 +359,7 @@ Cycle and depth errors print the full chain (`_layout.html → _includes/nav.htm
 
 ## `unify.yaml`
 
-Optional, at the source root: saved flags, nothing more. Keys are the long option names (`source`, `output`, `clean`, `exclude` — a list, `pretty-urls`, `base-url`, `strict`, `port`); CLI flags win on conflict. No behavior exists that only the file can express; the file itself never ships.
+Optional, at the source root: saved flags, nothing more. Keys are the long option names (`source`, `output`, `clean`, `exclude` — a list, `pretty-urls`, `base-url`, `strict`, `audit`, `port`); CLI flags win on conflict. No behavior exists that only the file can express; the file itself never ships.
 
 ```yaml
 # unify.yaml — the committed invocation

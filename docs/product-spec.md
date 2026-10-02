@@ -278,6 +278,7 @@ Options:
       --search-corpus      write assets/unify/search-corpus.json — normalized page text for client-side search
       --generate <path>    run one JavaScript file from your source tree before the build
       --dry-run            run the full build and every check, print the report, write nothing
+      --audit              `build` only: audit the composed site before publishing; publish only if `unify audit` would exit 0
       --strict             advisories count as problems for the exit code (with `audit`, findings too)
       --format <kind>      `audit` report shape: human (default), json, or sarif
       --external           `audit` only: fetch every off-origin URL the site emits and report the ones that don't resolve
