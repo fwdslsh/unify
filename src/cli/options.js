@@ -29,6 +29,8 @@ const OPTIONS = {
   "feed-full": { kind: "flag" },
   "dry-run": { kind: "flag" },
   strict: { kind: "flag" },
+  // §24.8 — `build --audit`: gate the publish on the audit's findings. Boolean.
+  audit: { kind: "flag" },
   // §30.1 — flags rather than a consequence: unlike a sitemap or a feed,
   // nothing about a page declares "catalog me" or "index me", so there is no
   // record-derived condition that could activate either the way
@@ -37,6 +39,9 @@ const OPTIONS = {
   // `assets/unify/search-corpus.json`, and neither implies the other.
   catalog: { kind: "flag" },
   "search-corpus": { kind: "flag" },
+  // §30.4 — catalog/corpus membership only: also list pages that are
+  // excluded solely for being `noindex`. Needs --catalog or --search-corpus.
+  "include-noindex": { kind: "flag" },
   // §33.1 — a PATH in the source tree, never a command. Saved in unify.yaml
   // like any other long option.
   generate: { kind: "value" },
@@ -55,13 +60,16 @@ const OPTIONS = {
   // anything a page declares. Boolean; `cli/commands/audit.js` and
   // `core/external.js` do the rest.
   external: { kind: "flag" },
+  // §18 — `build` only: upsert the saveable flags on this command line into
+  // unify.yaml. Not itself saveable; cli.js enforces the rest.
+  "save-config": { kind: "flag" },
   port: { kind: "string", short: "p" },
   version: { kind: "flag", short: "v" },
   help: { kind: "flag", short: "h" },
 };
 
 /** Keys `unify.yaml` may carry — the long option names, minus the ones that make no sense to save. */
-const CONFIG_KEYS = ["source", "output", "clean", "exclude", "pretty-urls", "base-url", "canonical", "feed-full", "catalog", "search-corpus", "strict", "port", "generate"];
+export const CONFIG_KEYS = ["source", "output", "clean", "exclude", "pretty-urls", "base-url", "canonical", "feed-full", "catalog", "search-corpus", "include-noindex", "strict", "audit", "port", "generate"];
 
 const SHORT = Object.fromEntries(
   Object.entries(OPTIONS)
@@ -144,7 +152,9 @@ export function parseArgs(argv) {
       // and so does a repeated `list` option, which is what --exclude is for.
       if (name in options) {
         throw new UsageError(`--${name} given more than once`, [
-          `pass it once — every value but the last was being discarded`,
+          name === "generate"
+            ? `unify runs one generator: put the tasks inside that one file (have it import and call the others)`
+            : `pass it once — every value but the last was being discarded`,
         ]);
       }
       options[name] = value;

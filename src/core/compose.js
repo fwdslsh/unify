@@ -452,6 +452,26 @@ function composeWithLayout({ pageText, pageFile, pageSpans, layoutText, layoutFi
     return null;
   }
 
+  // §7.6/P21 — the merge keeps the page's <head> and <body> and nothing else,
+  // so an element or text beside them (a <script> after </html>, one between
+  // </head> and <body>) would be dropped at exit 0. Whitespace and comments are
+  // not content and are not reported.
+  const outside = (/** @type {any} */ parent) => (parent.children ?? []).flatMap((/** @type {any} */ n) =>
+    isElement(n, "html") ? outside(n)
+      : isElement(n, "head") || isElement(n, "body") ? []
+      : (n.type === "element" || (n.type === "text" && !isBlank(n.data))) ? [n] : []);
+  const stray = outside(C.root);
+  const strayAt = spansToDiagnosticLocator(preparedC.spans, pageFile, resolveLine);
+  for (const n of stray) {
+    const what = n.type === "element" ? `<${n.tag}>` : "text";
+    reporter.problem({
+      ...strayAt(n.type === "text" ? n.start + n.data.search(/\S/) : n.start),
+      message: `${what} outside the page's <head> and <body> would be dropped when the layout is applied`,
+      fixes: ["move it inside <body> (or <head>), where composition keeps it"],
+    });
+  }
+  if (stray.length > 0) return null;
+
   const edits = [];
 
   // §7.1 sink detection, including P16 (checked once, fresh, on the stable body).

@@ -29,10 +29,12 @@ bun run build:windows                      # Windows x64 binary
 # The CLI (complete — there are no other commands or flags)
 bun src/cli.js build  [-s src] [-o dist] [--clean] [--exclude <glob>]... \
                       [--pretty-urls] [--base-url <url>] [--canonical auto] \
-                      [--feed-full] [--catalog] [--search-corpus] [--generate <path>] \
-                      [--dry-run] [--strict]
+                      [--feed-full] [--catalog] [--search-corpus] [--include-noindex] \
+                      [--generate <path>] \
+                      [--dry-run] [--strict] [--audit] [--save-config]  # --save-config: build only; upserts unify.yaml after an exit-0 build
 bun src/cli.js audit  [-s src] [-o dist] [--exclude <glob>]... [--pretty-urls] \
                       [--base-url <url>] [--canonical auto] [--catalog] [--search-corpus] \
+                      [--include-noindex] \
                       [--generate <path>] [--strict] [--format human|json|sarif] \
                       [--external]  # evaluate, write nothing
 bun src/cli.js dev    [-p 3000]            # build + watch + serve + reload
@@ -82,7 +84,7 @@ Layouts do not chain: a layout that itself declares `data-layout` is a located p
 
 ## Configuration
 
-`unify.yaml` at the source root is **saved CLI flags, nothing more** (keys = long option names; CLI wins; never shipped; `init` doesn't create one). No behavior may exist that only a config file can express.
+`unify.yaml` at the source root is **saved CLI flags, nothing more** (keys = long option names; CLI wins; never shipped; `init` writes one only when a template's page needs a flag — `docs` saves `catalog: true`). No behavior may exist that only a config file can express. `unify build --save-config` writes it for you (upsert, build only, after an exit-0 build).
 
 ## Security Posture
 

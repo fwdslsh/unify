@@ -22,8 +22,11 @@ Options:
       --feed-full          include each entry's full rendered content in feed.xml (needs --base-url)
       --catalog            write assets/unify/catalog.json — a browse/filter/TOC projection of every public page
       --search-corpus      write assets/unify/search-corpus.json — normalized page text for client-side search
+      --include-noindex    list noindex pages in the catalog and search corpus (needs one of them)
       --generate <path>    run one JavaScript file from your source tree before the build
       --dry-run            run the full build and every check, print the report, write nothing
+      --audit              `build` only: audit the composed site before publishing; publish only if `unify audit` would exit 0
+      --save-config        `build` only: write the saveable options given here into unify.yaml (after a good build)
       --strict             advisories count as problems for the exit code (with `audit`, findings too)
       --format <kind>      `audit` report shape: human (default), json, or sarif
       --external           `audit` only: fetch every off-origin URL the site emits and report the ones that don't resolve
@@ -58,7 +61,7 @@ notes.html: broken: #install in guide.html names no element [fragment-missing]
 audit: 1 broken, 1 incomplete
 ```
 
-Findings never block a build — `unify build` does not run any of these checks, so a site full of them still publishes. `unify audit --strict` exits `1` on any finding, of either severity: that is the CI gate, and it is opt-in.
+Findings never block a build — `unify build` does not run any of these checks (unless you pass `--audit`), so a site full of them still publishes. `unify audit --strict` exits `1` on any finding, of either severity: that is the CI gate, and it is opt-in.
 
 Worth knowing before you wire it up: **every `init` template passes `unify audit --strict` from the moment it is scaffolded.** `unify init <template> && unify audit --strict` exits `0` for all five, with no `--base-url` and nothing edited, and the conformance suite asserts it per template — so a finding on a fresh scaffold is a regression, and the first finding you see is about something you wrote. It was not always true: each template used to ship between seven and thirteen `incomplete` findings, mostly a missing `lang` or a page without its own description. They were real gaps, and the fix was the templates rather than the gate.
 
@@ -88,7 +91,7 @@ The same watch contract as `dev`, no server — for pairing with a server you al
 
 ### `unify init [template]`
 
-Scaffolds a starter site into `src/`. Templates: `default`, `basic`, `blog`, `docs`, `portfolio`. Every template exercises the core primitives once — an include, the automatic `_layout.html`, a named slot with a page that fills it, a `data-layout="none"` page, and the underscore convention. The `blog` template also ships the generator pattern worked: `_scripts/gen.mjs` reads `posts/*.md` and `_data/authors.json` and regenerates `blog.html` and `feed.xml` (`node src/_scripts/gen.mjs && unify build`, from the project root); both ship pre-generated, and the generator names the fields it emits, so the authors file's private `email` never reaches a page. `AGENTS.md` and `DEPLOY.md` are written to the working directory the command ran in — outside the source root, so neither publishes; `init` refuses (exit 2) rather than scaffold when that directory *is*, or is inside, the source root (`--source .`, `--source ..`), because there the two could only publish as pages. `init` never creates `unify.yaml`. Guaranteed: `unify init && unify build --dry-run --strict` and `unify init && unify audit --strict` both exit `0`.
+Scaffolds a starter site into `src/`. Templates: `default`, `basic`, `blog`, `docs`, `portfolio`. Every template exercises the core primitives once — an include, the automatic `_layout.html`, a named slot with a page that fills it, a `data-layout="none"` page, and the underscore convention. The `docs` template also ships an "All pages" starter (`all-pages.html` and `assets/all-pages.js`): a filterable directory of the site read from `catalog.json`, plus a `unify.yaml` saving `catalog: true` so a plain `unify build` fills it. The `blog` template also ships the generator pattern worked: `_scripts/gen.mjs` reads `posts/*.md` and `_data/authors.json` and regenerates `blog.html` and `feed.xml` (`node src/_scripts/gen.mjs && unify build`, from the project root); both ship pre-generated, and the generator names the fields it emits, so the authors file's private `email` never reaches a page. `AGENTS.md` and `DEPLOY.md` are written to the working directory the command ran in — outside the source root, so neither publishes; `init` refuses (exit 2) rather than scaffold when that directory *is*, or is inside, the source root (`--source .`, `--source ..`), because there the two could only publish as pages. `init` writes a `unify.yaml` only when a template's own page needs a flag (today, `docs` saving `catalog: true`). Guaranteed: `unify init && unify build --dry-run --strict` and `unify init && unify audit --strict` both exit `0`.
 
 ## Options
 
@@ -215,6 +218,8 @@ If your source tree already contains a `feed.xml`, that file **is** the site's f
 
 Membership is the sitemap's own rule: `noindex`/`none` pages, `404.html`, and pages consolidated elsewhere by their own canonical are left out — the identical set `search-corpus.json` uses, so the two files always describe the same pages.
 
+A private site that marks every page `noindex` would get empty files. `--include-noindex` (also `include-noindex: true` in `unify.yaml`) lists pages that are excluded *only* because they are `noindex` in both files, so the site's own "All pages" directory or search box can use them. It changes nothing else: the pages keep their `noindex` robots meta, stay out of `sitemap.xml` and the feed, and `404.html` and pages whose canonical points elsewhere stay out. Crawler indexing and in-site navigation are separate questions, and `noindex` is not access control — anything in these files is a public file. The flag needs `--catalog` or `--search-corpus`; alone it is a usage error.
+
 If your source tree already contains `assets/unify/catalog.json`, that file is the site's catalog: unify ships it untouched and generates nothing.
 
 ## Search corpus (`search-corpus.json`)
@@ -242,7 +247,7 @@ Same membership as the catalog, same author-wins rule: a `src/assets/unify/searc
 
 Runs one JavaScript file from your source tree before the build scans anything. `build`, `watch`, `dev`, and `audit` all take it, because all four scan the source tree.
 
-It names a **file**, never a command. There is no shell, no argument list, and no way to say "and then run this other thing" — a path is something you wrote and can read. The path resolves against the source root and must stay inside it.
+It names a **file**, never a command. There is no shell, no argument list, and no way to say "and then run this other thing" — a path is something you wrote and can read. The path resolves against the source root and must stay inside it. There is one generator per build: giving `--generate` twice on the command line is a usage error (exit 2), so put several tasks inside the one file and have it import and call the others. A `generate:` saved in `unify.yaml` plus one `--generate` is fine; the command line wins.
 
 The whole interface is three positional arguments:
 
@@ -319,6 +324,18 @@ canonical completion: 5 pages would gain a canonical link
 structured data: 3 pages would gain a JSON-LD block
 ```
 
+### `--audit` (build only)
+
+Compose once, audit that result, publish only if it passes. The generator (`--generate`) runs once, the site is composed once, and the same findings `unify audit` would print are evaluated over that exact composition, then printed (human format) after the build's diagnostics. The build publishes iff `unify audit` with the same flags would exit `0`: no problems, and with `--strict` also no advisories and no findings. Without `--strict`, findings are reported but block nothing. A blocked gate exits `1` and leaves the previous output untouched. With `--dry-run` it reports and writes nothing, exiting as the gate would. `--external` and `--format` remain `audit`-only. `audit: true` is saveable in `unify.yaml`.
+
+`unify build --audit --strict` replaces the three-step `build --dry-run --strict && build && audit --strict`.
+
+### `--save-config`
+
+`build` only. Writes the saveable options you passed on this command line into `unify.yaml` in the source root, creating the file if it is not there: `unify build --pretty-urls --base-url https://example.com/ --save-config`. It is an upsert. Keys you did not pass are left alone, and the file is edited line by line, so your comments, ordering and other keys survive untouched; a key you passed replaces its old line (an `exclude` list replaces its old items), and new keys go at the end. It never writes `save-config` itself, `source` (the file lives in the source root, so naming it there would be circular), or `--dry-run`. A flag like `--pretty-urls` writes `pretty-urls: true`; there is no way to write `false`, so to remove a key, edit the file.
+
+The file is written only if the build exits `0`, so it records settings that produced a good build. `--save-config` with `--dry-run`, or on any command but `build`, is a usage error (exit `2`) and writes nothing.
+
 ### `--strict`
 
 Advisories affect the exit code (non-zero) — never what is published. `unify build --dry-run --strict` is the one-line CI lint.
@@ -352,7 +369,7 @@ Cycle and depth errors print the full chain (`_layout.html → _includes/nav.htm
 
 ## `unify.yaml`
 
-Optional, at the source root: saved flags, nothing more. Keys are the long option names (`source`, `output`, `clean`, `exclude` — a list, `pretty-urls`, `base-url`, `strict`, `port`); CLI flags win on conflict. No behavior exists that only the file can express; the file itself never ships.
+Optional, at the source root: saved flags, nothing more. Keys are the long option names (`source`, `output`, `clean`, `exclude` — a list, `pretty-urls`, `base-url`, `strict`, `audit`, `port`); CLI flags win on conflict. No behavior exists that only the file can express; the file itself never ships. `unify build ... --save-config` writes or updates it for you.
 
 ```yaml
 # unify.yaml — the committed invocation

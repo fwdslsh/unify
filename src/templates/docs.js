@@ -18,12 +18,9 @@
  * exits 0, and `--strict` gates on ANY finding of either severity (§24.6).
  * So each page below carries its own `<title>`, its own one-sentence
  * `<meta name="description">` that no other page repeats, its own
- * `og:title`/`og:description`, and exactly one `<h1>` the emitted title
- * contains — `Installation` under a layout titled `— Project Docs` emits
- * `Installation — Project Docs`, which contains the heading (§24.4's
- * containment test landing on §8 row 2's prepend). This template used to
- * ship `<title>Home</title>` over `<h1>Welcome!</h1>`, which matched
- * neither way round, and no description on any page at all.
+ * `og:title`/`og:description`, and exactly one `<h1>` — `Installation` under a layout titled `— Project Docs`
+ * emits `Installation — Project Docs` over `<h1>Installation</h1>`. This
+ * template used to ship no description on any page at all.
  *
  * Two things it teaches that no other template can:
  *
@@ -49,6 +46,7 @@
  * (`<your package manager>`) rather than an invented package name a reader
  * could mistake for a real one — or publish.
  */
+import { ALL_PAGES_HTML, ALL_PAGES_JS } from "./all-pages.js";
 import { commonFiles, mdFrontmatter, pageHtml } from "./shared.js";
 
 const SITE_NAME = "Project Docs";
@@ -59,8 +57,17 @@ export const files = {
   ...commonFiles(SITE_NAME, [
     ["Home", "/"],
     ["Guide", "/guide/getting-started.html"],
+    ["All pages", "/all-pages.html"],
     ["Contact", "/contact.html"],
   ]),
+
+  // The "All pages" starter (issue #91): a page plus a small script the
+  // author owns, reading assets/unify/catalog.json. The page needs
+  // --catalog, so the template saves that one flag in unify.yaml (§18,
+  // §19.8); see src/templates/all-pages.js.
+  "unify.yaml": "# Saved unify flags (CLI flags win). all-pages.html reads the catalog this writes.\ncatalog: true\n",
+  "all-pages.html": ALL_PAGES_HTML,
+  "assets/all-pages.js": ALL_PAGES_JS,
 
   "index.html": pageHtml({
     title: "Overview",
@@ -121,8 +128,7 @@ keeps everything inside it out of the built site.
 Replace this section with the steps a reader takes the first time, in order, and link to
 [installation](/guide/installation.html) wherever they need to stop and set something up.
 
-Keep one \`#\` heading per page: it becomes the page's \`<h1>\`, and \`unify audit\` checks that it and
-the page's title still name the same thing.
+Keep one \`#\` heading per page: it becomes the page's \`<h1>\`, and \`unify audit\` checks there is exactly one.
 `,
 
   "guide/installation.md": `${mdFrontmatter({

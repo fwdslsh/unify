@@ -24,6 +24,7 @@ import pkg from "../package.json" with { type: "json" };
 import { Reporter, UsageError } from "./core/diagnostics.js";
 import { cleanRefusalReason, resolveSource } from "./core/paths.js";
 import { loadConfig, mergeConfig, parseArgs } from "./cli/options.js";
+import { saveEntries, writeConfig } from "./cli/save-config.js";
 
 const HELP = `unify — HTML-native composition: no expression language, no client runtime.
 
@@ -44,8 +45,11 @@ Options:
       --feed-full          include each entry's full rendered content in feed.xml (needs --base-url)
       --catalog            write assets/unify/catalog.json — a browse/filter/TOC projection of every public page
       --search-corpus      write assets/unify/search-corpus.json — normalized page text for client-side search
+      --include-noindex    list noindex pages in the catalog and search corpus (needs one of them)
       --generate <path>    run one JavaScript file from your source tree before the build
       --dry-run            run the full build and every check, print the report, write nothing
+      --audit              \`build\` only: audit the composed site before publishing; publish only if \`unify audit\` would exit 0
+      --save-config        \`build\` only: write the saveable options given here into unify.yaml (after a good build)
       --strict             advisories count as problems for the exit code (with \`audit\`, findings too)
       --format <kind>      \`audit\` report shape: human (default), json, or sarif
       --external           \`audit\` only: fetch every off-origin URL the site emits and report the ones that don't resolve
@@ -101,14 +105,18 @@ function resolveSettings(flags) {
       feedFull: settings["feed-full"] === true,
       catalog: settings.catalog === true,
       searchCorpus: settings["search-corpus"] === true,
+      includeNoindex: settings["include-noindex"] === true,
       // §33.1 — a PATH in the source tree, never a command. Read by
       // build.js before the scan (§33.5), so `watch`, `dev` and `audit`
       // get it too: all four scan the source tree.
       generate: settings.generate ?? null,
       dryRun: settings["dry-run"] === true,
-      // §24.1 — set by the audit command itself, never by a flag: there is no
-      // `--audit`, and `build` has no way to reach the evaluator.
+      // §24.1 — set by the audit command itself, never by a flag.
       audit: false,
+      // §24.8 — `build --audit`: the flag (or saved `audit: true`) is the GATE,
+      // a separate setting from `audit` above, which selects the read-only
+      // audit branch. Only `build` reads it.
+      auditGate: flags.command === "build" && settings.audit === true,
       strict: settings.strict === true,
       // §31.1/§31.3 — `unify audit`'s own two flags. `format`'s value is
       // validated by `cli/commands/audit.js` (the closed set and its usage
@@ -190,6 +198,14 @@ export async function run(argv) {
       "a feed entry's <content> URLs are only meaningful once they're absolute",
     ]);
   }
+  // §30.4 — same shape as --feed-full: it changes what a projection lists,
+  // so with no projection requested it would be a silent no-op.
+  if (settings.includeNoindex === true && !settings.catalog && !settings.searchCorpus) {
+    throw new UsageError("--include-noindex needs --catalog or --search-corpus: neither is set", [
+      "add --catalog and/or --search-corpus, or drop --include-noindex",
+      "it only changes which pages those two files list",
+    ]);
+  }
   // A scheme with no authority — `file:`, `foo:`, `data:` — parses, but its
   // origin is the *string* "null", and every URL §20.5 builds from it then
   // reads `null/about.html`. That shipped as `<loc>null/</loc>` in a generated
@@ -237,6 +253,22 @@ export async function run(argv) {
     }
   }
 
+  // §18 — `--save-config` is `build`'s alone, and `--dry-run` promises to write nothing.
+  let saving = null;
+  if (options["save-config"]) {
+    if (command !== "build") {
+      throw new UsageError(`--save-config applies only to \`unify build\`, not \`unify ${command}\``, [
+        "run it as: unify build <flags> --save-config",
+      ]);
+    }
+    if (options["dry-run"] === true) {
+      throw new UsageError("--save-config cannot be combined with --dry-run: a dry run writes nothing", [
+        "drop --dry-run to build and save, or drop --save-config",
+      ]);
+    }
+    saving = saveEntries(options);
+  }
+
   const output = resolve(process.cwd(), settings.output);
 
   if (settings.clean) {
@@ -257,8 +289,19 @@ export async function run(argv) {
   const context = { sourceRoot, output, settings, reporter, template, sourceDefaulted, command };
 
   switch (command) {
-    case "build":
-      return (await import("./cli/commands/build.js")).build(context);
+    case "build": {
+      const code = await (await import("./cli/commands/build.js")).build(context);
+      // §18 — only a build that exited 0 records its settings.
+      if (saving && code === 0) {
+        if (saving.size === 0) {
+          process.stdout.write("--save-config: no saveable options were given, so unify.yaml was not written\n");
+        } else {
+          writeConfig(sourceRoot, saving);
+          process.stdout.write(`saved ${[...saving.keys()].join(", ")} to ${resolve(sourceRoot, "unify.yaml")}\n`);
+        }
+      }
+      return code;
+    }
     case "audit":
       return (await import("./cli/commands/audit.js")).audit(context);
     case "dev":

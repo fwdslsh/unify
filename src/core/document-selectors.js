@@ -353,6 +353,11 @@ export function descriptionOf(doc) {
   return firstNonEmpty(metaValues(doc, "description"));
 }
 
+/** First non-empty (trimmed) `<meta property="og:site_name">` content, else null. */
+export function siteNameOf(doc) {
+  return firstNonEmpty(propertyValues(doc, "og:site_name"));
+}
+
 /** First non-empty (trimmed) `<meta name="author">` content, else null. */
 export function authorOf(doc) {
   return firstNonEmpty(metaValues(doc, "author"));
@@ -550,7 +555,23 @@ export function metadataConflicts(doc) {
  * @returns {boolean}
  */
 export function isPublicDestination(doc, base) {
-  if (!robotsPolicyOf(doc).indexable) return false;
+  return isCatalogMember(doc, base, false);
+}
+
+/**
+ * §30.4's membership: `isPublicDestination`, except that with
+ * `includeNoindex` the robots condition is waived. Every other condition
+ * (404.html, self-canonical) is the same code, so the two cannot drift.
+ * `catalog.js` and `search-corpus.js` call this with the same flag; the
+ * sitemap never does.
+ *
+ * @param {import('./manifest.js').BuildDocument} doc
+ * @param {import('./urls.js').BaseUrlConfig|null} base
+ * @param {boolean} includeNoindex
+ * @returns {boolean}
+ */
+export function isCatalogMember(doc, base, includeNoindex) {
+  if (!includeNoindex && !robotsPolicyOf(doc).indexable) return false;
   if (doc.outputPath === "404.html") return false;
   const kind = classifyCanonicalValue(canonicalOf(doc), doc.outputPath, base);
   return kind === "none" || kind === "self";

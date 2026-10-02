@@ -8,6 +8,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-10-02
+
+Fixes and small additions from building real sites with unify, and one finding
+removed. A site that built clean on 0.9.1 can now stop on the first Fixed item below;
+when it does, that build was losing content without saying so.
+
+### Added
+
+- **`unify build --audit`** (#92): compose once, evaluate the same findings
+  `unify audit` reports over that exact result, and publish only if `unify audit`
+  with the same flags would exit 0 (previous `dist/` untouched otherwise). The
+  generator runs once. `unify build --audit --strict` replaces
+  `build --dry-run --strict && build && audit --strict`. Saveable as `audit: true`.
+- **`unify build --save-config`**: writes the saveable options given on the command
+  line into the source root's `unify.yaml`, creating it if needed. Only the keys you
+  pass change; comments, order and other keys are kept. It writes only after a build
+  that exits 0, and is a usage error with `--dry-run` or on other commands.
+- **`--include-noindex`** (#97): with `--catalog`/`--search-corpus`, pages left out
+  only for being `noindex` are listed too, so a private site gets a usable page
+  directory. Robots meta, sitemap, feed, `404.html` and canonical handling are
+  unchanged. Without `--catalog` or `--search-corpus` it is a usage error.
+- **An "All pages" starter in `unify init docs`** (#91): `all-pages.html` and
+  `assets/all-pages.js`, an accessible, filterable directory grouped by section and
+  read from `assets/unify/catalog.json`. It works under a `--base-url` path prefix.
+  The template also ships a one-line `unify.yaml` (`catalog: true`) so a plain
+  `unify build` fills the page; it is the only template that writes one.
+
+### Fixed
+
+- **Content outside a page's `<head>` and `<body>` is no longer dropped silently**
+  (#88). When a layout applied, an element or text beside them (a `<script>` after
+  `</html>`, or a `<title>` in a page that omits the optional `<head>` tag) was left
+  out of the output at exit 0. It is now a located P21 problem telling you to move it
+  inside `<body>` or `<head>`. Whitespace and comments are not reported. A page with
+  no layout still ships byte-for-byte.
+- **An `<include>` inside a slotted include's content no longer ends the outer
+  include early** (#90). Open and close tags now pair by nesting, so
+  `<span slot="icon"><include src="/icon.html"></include></span>` inside a card
+  include resolves, in HTML and Markdown pages alike.
+- **The generated feed's `<title>` prefers the site's declared name** (#95): the root
+  page's `og:site_name` when it has one, else its `<title>` (as before), else the
+  host. Sites without `og:site_name` get the same feed as before.
+- **A repeated `--generate` says what to do instead** (#94). It was already a usage
+  error (exit 2); the message now says unify runs one generator and to call the
+  other tasks from that file, and the integrations guide no longer claims a second
+  `--generate` silently replaces the first.
+
+### Removed
+
+- **The `title-h1-mismatch` audit finding** (#96). A brand-name `<title>` over a
+  tagline `<h1>` is a correct page, the pairing isn't required by search engines or
+  accessibility guidance, and `audit --strict` made it a hard gate. `h1-missing`,
+  `h1-multiple` and `jsonld-headline-mismatch` are unchanged. The scaffolds' comments
+  and sample prose no longer teach the pairing; no scaffold output changed beyond
+  that prose.
+
 ## [0.9.1] - 2026-08-26
 
 A dependency-security release. unify itself is unchanged — no command, flag,
@@ -530,7 +586,8 @@ with generated compare-link notes only. Their diffs are on the
 [releases page](https://github.com/fwdslsh/unify/releases). Nothing here
 retroactively reconstructs detail those notes never carried.
 
-[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.9.1...HEAD
+[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.9.2...HEAD
+[0.9.2]: https://github.com/fwdslsh/unify/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/fwdslsh/unify/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/fwdslsh/unify/compare/v0.8.3...v0.9.0
 [0.8.3]: https://github.com/fwdslsh/unify/compare/v0.8.2...v0.8.3

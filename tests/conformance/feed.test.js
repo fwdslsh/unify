@@ -353,6 +353,37 @@ test("FEED-03: entries order by datePublished descending, ties break by output p
 
 // ------------------------------------------------------------------- §29.5 (element table)
 
+test("FEED-04: the feed title prefers the root page's og:site_name, then its <title>, then the host", async () => {
+  const entry = post("A Post", { date: "2026-02-01T09:00:00Z" });
+  const titleFor = async (index) => {
+    const tmp = mkTmp();
+    writeTree(join(tmp, "src"), { "index.html": index, "a.html": entry });
+    const r = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", BASE], tmp);
+    expectExit(r, 0, "feed title build");
+    return tagText(feedHeader(read(tmp, "dist", "feed.xml")), "title");
+  };
+  const named = (name) => page("Home — Acme", "<h1>Home</h1>", `<meta property="og:site_name" content="${name}">\n`);
+  const cases = [
+    ["declared", named("Acme"), "Acme"],
+    ["declared with spaces", named("  Acme Labs  "), "Acme Labs"],
+    ["empty falls back to the title", named("   "), "Home — Acme"],
+    ["absent falls back to the title", page("Home — Acme", "<h1>Home</h1>"), "Home — Acme"],
+  ];
+  for (const [what, index, want] of cases) {
+    const got = await titleFor(index);
+    if (got !== want) throw new Error(`§29.5: ${what}: feed <title> expected ${JSON.stringify(want)}, got ${JSON.stringify(got)}`);
+  }
+  // No root page at all: the host.
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), { "a.html": entry.replace("</head>", '<meta property="og:site_name" content="Not Root">\n</head>') });
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", BASE], tmp);
+  expectExit(r, 0, "no root page");
+  if (tagText(feedHeader(read(tmp, "dist", "feed.xml")), "title") !== "example.com") {
+    throw new Error("§29.5: with no index.html the feed title is the host, whatever other pages declare");
+  }
+  covers("FEED-04");
+}, TEST_MS);
+
 test("FEED-04: feed-level id/title/updated/links, and an entry's id is its canonical — authored, or completed by --canonical auto — never a bare url", async () => {
   const tmp = mkTmp();
   writeTree(join(tmp, "src"), {

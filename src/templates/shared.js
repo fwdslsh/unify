@@ -26,11 +26,9 @@
  *   - a `<title>` AND a `<meta name="description">` on every page, both
  *     UNIQUE within the template (`title-duplicate`, `description-duplicate`
  *     compare case-folded, whitespace-collapsed strings across pages);
- *   - exactly one `<h1>`, and the emitted title must contain it or be
- *     contained by it (`title-h1-mismatch`). The emitted title is the merged
- *     one — page `About` under a layout `— My Site` is `About — My Site`,
- *     which contains the `<h1>` `About`. A page titled `Home` with an `<h1>`
- *     reading `Welcome!` is the mismatch this scaffold used to ship;
+ *   - exactly one `<h1>` (`h1-missing`, `h1-multiple`), naming the page
+ *     the way its title does — page `About` under a layout `— My Site` is
+ *     `About — My Site` over `<h1>About</h1>`;
  *   - `og:title` and `og:description` per page (`pageHead`/`mdFrontmatter`
  *     write them from the same two strings; `og:type` and the whole
  *     `og:image` set are site-wide, in the layout);
@@ -649,7 +647,7 @@ published** and the previous \`dist/\` is untouched — never report success on 
 ## Metadata, without inventing anything
 
 - Give every page its own \`<title>\` and \`<meta name="description">\`, different from every other
-  page's, and one \`<h1>\` the title contains (or is contained by). \`unify audit\` reports each of
+  page's, and one \`<h1>\`. \`unify audit\` reports each of
   those gaps, plus pages nothing links to, duplicate ids, and fragment links that name nothing.
 - \`--base-url\` is the site's **whole public address** — \`https://you.example/handbook/\`, never a
   bare path. It prefixes root-relative links, makes \`og:\` and canonical URLs absolute for share
