@@ -340,7 +340,7 @@ export function linksWithRel(doc, rel) {
 }
 
 /** The first value in `values` that is non-empty after trimming, else null. */
-function firstNonEmpty(values) {
+export function firstNonEmpty(values) {
   for (const v of values) {
     const t = orNull(v);
     if (t !== null) return t;
