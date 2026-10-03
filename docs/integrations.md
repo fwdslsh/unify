@@ -250,6 +250,30 @@ path prefix rewrite them like links you typed, and the audit checks every one. P
 `generate: _scripts/reports.mjs` and `source-inventory: true` in `unify.yaml` and the
 command is just `unify build --audit --strict`.
 
+Every record also carries `meta` and `links`: the `<meta>` and `<link>` elements the page
+itself declares, in order, as attribute records (`{"name": "tags", "content": "homelab"}`,
+`{"property": "og:image", …}`, `{"rel": "canonical", "href": …}`). A Markdown page's `meta`
+is what its frontmatter emits (a list becomes one record per item; `title`, `layout`,
+`class`, `lang` and `dir` are not metas), and its `links` is always empty. unify gives none
+of these a meaning: your script does. This one lists articles by series, in `part` order,
+keeps each page's tags, and leaves out pages marked `role: bookmark`:
+
+```js
+const metas = (p, name) => p.meta.filter((m) => m.name === name).map((m) => m.content);
+const one = (p, name) => metas(p, name)[0] ?? null;
+
+const articles = pages.filter((p) => p.source.startsWith("articles/") && one(p, "role") !== "bookmark");
+const bySeries = Map.groupBy(articles, (p) => one(p, "series") ?? "Other");
+const sections = [...bySeries].map(([series, list]) => {
+  list.sort((a, b) => Number(one(a, "part")) - Number(one(b, "part")));
+  const items = list.map((p) => `<li><a href="${esc(p.href)}">${esc(p.title ?? p.source)}</a> ${esc(metas(p, "tags").join(", "))}</li>`);
+  return `<h2>${esc(series)}</h2><ol>\n${items.join("\n")}\n</ol>`;
+});
+```
+
+It slots into the generator above in place of `items`; write `sections.join("\n")` into the
+page instead.
+
 The `blog` template ships this worked: `unify init blog` writes a `_scripts/gen.mjs` that
 reads `posts/*.md` and `_data/authors.json` and regenerates the index and the feed.
 

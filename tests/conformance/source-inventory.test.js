@@ -113,9 +113,11 @@ test("GEN-14 — the inventory lists every source page with its authored fields,
   expectEqual(Object.keys(inventory), ["schemaVersion", "pages"], "top-level keys");
   expectEqual(inventory.schemaVersion, 1, "schemaVersion");
   for (const p of inventory.pages) {
-    expectEqual(Object.keys(p), ["source", "href", "title", "description", "date"], `keys of ${p.source}`);
+    expectEqual(Object.keys(p), ["source", "href", "title", "description", "date", "meta", "links"], `keys of ${p.source}`);
   }
-  expectEqual(inventory.pages, EXPECTED, "the records (_-prefixed, excluded and fragment files absent; noindex present)");
+  // meta/links are GEN-17's subject; here, the five 0.9.3 fields are unchanged.
+  const fields = inventory.pages.map(({ meta, links, ...rest }) => rest);
+  expectEqual(fields, EXPECTED, "the records (_-prefixed, excluded and fragment files absent; noindex present)");
   covers("GEN-14");
 }, TEST_MS);
 
@@ -198,4 +200,42 @@ test("GEN-16 — frontmatter the build would refuse is reported located, and the
   if (existsSync(probe)) throw new Error("the generator must not run after an inventory problem");
   if (existsSync(join(tmp, "dist"))) throw new Error("nothing publishes");
   covers("GEN-16");
+}, TEST_MS);
+
+test("GEN-17 — meta and links: the page's own head records, in order, equivalent for Markdown and HTML, with no meaning added", async () => {
+  const tmp = mkTmp();
+  const probe = join(tmp, "probe.json");
+  writeTree(join(tmp, "src"), {
+    "_layout.html": '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="layout-only" content="x"><title>- S</title></head><body><main></main></body></html>\n',
+    "_includes/extra.html": '<meta name="included" content="no">',
+    "_scripts/gen.mjs": probeGenerator(probe),
+    "dns.png": "png",
+    "fr/b.html": head("FR"),
+    "a.md": "---\ntitle: DNS\ndescription: Moving\ntags:\n  - homelab\n  - networking\nseries: \"Lab: simplification\"\npart: 2\nlayout: /_layout.html\nclass: wide\nog:\n  image: /dns.png\n---\n# DNS\n",
+    "b.html": head("DNS", '<meta name="description" content="Moving"><meta name="tags" content="homelab"><meta name="tags" content="networking">' +
+      '<meta name="series" content="Lab: simplification"><meta name="part" content="2"><meta property="og:image" content="/dns.png">' +
+      '<include src="/_includes/extra.html"></include><link rel="canonical" href="https://example.test/b.html"><link rel="alternate" hreflang="fr" href="/fr/b.html">')
+      .replace("</body>", '<script>var s = \'<meta name="leak" content="1">\';</script></body>'),
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--generate", "_scripts/gen.mjs", "--source-inventory"], tmp);
+  expectExit(r, 0, "a build with meta/links");
+  const pages = Object.fromEntries(JSON.parse(JSON.parse(readFileSync(probe, "utf8")).raw).pages.map((p) => [p.source, p]));
+  const authored = [
+    { name: "description", content: "Moving" },
+    { name: "tags", content: "homelab" },
+    { name: "tags", content: "networking" },
+    { name: "series", content: "Lab: simplification" },
+    { name: "part", content: "2" },
+    { property: "og:image", content: "/dns.png" },
+  ];
+  // Markdown: what its frontmatter emits; title/layout/class are not metas; no <link> syntax.
+  expectEqual(pages["a.md"].meta, authored, "a.md meta");
+  expectEqual(pages["a.md"].links, [], "a.md links");
+  // HTML: the page's own head as written. No layout meta, no included meta, nothing from a script body.
+  expectEqual(pages["b.html"].meta.filter((m) => !("charset" in m)), authored, "b.html meta");
+  expectEqual(pages["b.html"].links, [
+    { rel: "canonical", href: "https://example.test/b.html" },
+    { rel: "alternate", hreflang: "fr", href: "/fr/b.html" },
+  ], "b.html links: kept as written, not resolved");
+  covers("GEN-17");
 }, TEST_MS);

@@ -8,6 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.4] - 2026-10-03
+
+### Added
+
+- **`meta` and `links` in the source inventory** (#102). Every `source-pages.json` record
+  now also carries the page's own `<meta>` and `<link>` elements as attribute records, in
+  source order, the same projection `catalog.json` uses. A Markdown page's `meta` is what
+  its frontmatter emits: one record per list item, `og:…` keys as `property`, and never
+  `title`, `layout`, `class`, `lang` or `dir`. Its `links` is always empty. unify gives
+  these no meaning, so a generator can group by its own `series`, order by `part`, list
+  `tags` or skip `role: bookmark` pages without parsing frontmatter or HTML itself. Values
+  are kept as written: nothing is split, coerced, resolved or deduplicated, and layouts,
+  includes and script bodies never contribute. The five 0.9.3 fields are unchanged, and
+  `schemaVersion` stays 1. The recipe in `docs/integrations.md` gains a tested example.
+
 ## [0.9.3] - 2026-10-03
 
 One addition, for sites whose generator builds index pages from their own content.
@@ -605,7 +620,8 @@ with generated compare-link notes only. Their diffs are on the
 [releases page](https://github.com/fwdslsh/unify/releases). Nothing here
 retroactively reconstructs detail those notes never carried.
 
-[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.9.3...HEAD
+[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.9.4...HEAD
+[0.9.4]: https://github.com/fwdslsh/unify/compare/v0.9.3...v0.9.4
 [0.9.3]: https://github.com/fwdslsh/unify/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/fwdslsh/unify/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/fwdslsh/unify/compare/v0.9.0...v0.9.1
