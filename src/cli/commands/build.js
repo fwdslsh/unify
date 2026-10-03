@@ -182,7 +182,10 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
   // path is resolved or named. The overlay joins the scan (below) and this: a
   // generated page walks for `_layout.html` and an `<include src>` finds a
   // generated fragment because both ask the namespace, not one directory.
-  const roots = resolutionRoots(sourceRoot, overlayDir);
+  // §4.5 — the project root (the working directory) joins the namespace last,
+  // for layouts and includes kept beside package.json; it is never scanned,
+  // so nothing there publishes.
+  const roots = resolutionRoots(sourceRoot, overlayDir, process.cwd());
   const files = scanSourceTree(sourceRoot, output, settings.exclude, reporter, overlayDir);
 
   // §6.3/P08 — every .html/.md source file, excluded or not (§1: a "page" by

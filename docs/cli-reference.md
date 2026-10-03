@@ -23,8 +23,8 @@ Options:
       --catalog            write assets/unify/catalog.json — a browse/filter/TOC projection of every public page
       --search-corpus      write assets/unify/search-corpus.json — normalized page text for client-side search
       --include-noindex    list noindex pages in the catalog and search corpus (needs one of them)
-      --generate <path>    run one JavaScript file from your source tree before the build
-      --source-inventory   give that file source-pages.json: every source page's authored title, description, date, meta and links (needs --generate)
+      --generate <path>    run one JavaScript file before the build (relative to the source root, or absolute)
+      --source-inventory   give that file source-pages.json: every source page's authored title, description, date, meta and links (inert without a generator)
       --dry-run            run the full build and every check, print the report, write nothing
       --audit              `build` only: audit the composed site before publishing; publish only if `unify audit` would exit 0
       --save-config        `build` only: write the saveable options given here into unify.yaml (after a good build)
@@ -248,7 +248,7 @@ Same membership as the catalog, same author-wins rule: a `src/assets/unify/searc
 
 Runs one JavaScript file from your source tree before the build scans anything. `build`, `watch`, `dev`, and `audit` all take it, because all four scan the source tree.
 
-It names a **file**, never a command. There is no shell, no argument list, and no way to say "and then run this other thing" — a path is something you wrote and can read. The path resolves against the source root and must stay inside it. There is one generator per build: giving `--generate` twice on the command line is a usage error (exit 2), so put several tasks inside the one file and have it import and call the others. A `generate:` saved in `unify.yaml` plus one `--generate` is fine; the command line wins.
+It names a **file**, never a command. There is no shell, no argument list, and no way to say "and then run this other thing" — a path is something you wrote and can read. A relative path resolves against the source root and an absolute path is taken as written; the file can live anywhere — `_scripts/gen.mjs` inside `src/`, `../scripts/gen.mjs` beside it at the project root, or an absolute path — and is never published, because only the source tree and the generated directory are scanned. (One thing to know: `unify dev` watches the source tree, so editing a generator that lives outside it does not trigger a rebuild on its own.) There is one generator per build: giving `--generate` twice on the command line is a usage error (exit 2), so put several tasks inside the one file and have it import and call the others. A `generate:` saved in `unify.yaml` plus one `--generate` is fine; the command line wins.
 
 The whole interface is three positional arguments:
 
@@ -318,7 +318,9 @@ The pages are exactly the ones the build would treat as pages in your source tre
 - `<include src="/_includes/nav.html">` in a hand-written layout finds the fragment your generator wrote, and `<include src="./sibling.html">` in a generated page finds the file you wrote. Relative paths count from the page's own place in the tree, which is where you put it in `generatedDir`.
 - Where the same path exists in both, **your file wins** — a generator cannot quietly replace something you wrote. That only comes up for files that never publish, like a fragment under `_includes/`: when a *page* exists in both trees, the build stops and names both (neither one silently wins). Nearest still beats everything in the layout walk, so a `docs/_layout.html` your generator wrote is the layout for `docs/`, including for pages you hand-wrote there.
 
-The working directory is the source root, so `readFileSync("_data/authors.json")` means what you would expect. The runtime is unify's own — whichever one unify is itself running under, and for the standalone binary that is the binary. So `--generate` works on a machine with no Node and no Bun installed, which is why the flag exists rather than `--run "node gen.mjs"`.
+The working directory is the source root, so `readFileSync("_data/authors.json")` means what you would expect.
+
+**Layouts and includes can live beside `package.json` too.** The directory you run `unify` from (the project root) is the last place a written path or the layout walk looks, after the source tree and the generated directory: `<include src="/includes/nav.html">` finds `includes/nav.html` at the project root when `src/` has none, and a `_layout.html` there is the site's root layout. Nothing at the project root is scanned or published; it only answers paths. So a repository can look like `site/` (the content), `includes/`, `scripts/` and `unify.yaml` at the top, with `source: site` in the config. The runtime is unify's own — whichever one unify is itself running under, and for the standalone binary that is the binary. So `--generate` works on a machine with no Node and no Bun installed, which is why the flag exists rather than `--run "node gen.mjs"`.
 
 It runs on **every** build, including every rebuild under `watch` and `dev` — a generator that ran once would leave watch output stale while the build reported success. A non-zero exit is a located problem: nothing publishes, and the previous `dist/` is untouched.
 
@@ -354,9 +356,9 @@ Compose once, audit that result, publish only if it passes. The generator (`--ge
 
 ### `--save-config`
 
-`build` only. Writes the saveable options you passed on this command line into `unify.yaml` in the source root, creating the file if it is not there: `unify build --pretty-urls --base-url https://example.com/ --save-config`. It is an upsert. Keys you did not pass are left alone, and the file is edited line by line, so your comments, ordering and other keys survive untouched; a key you passed replaces its old line (an `exclude` list replaces its old items), and new keys go at the end. It never writes `save-config` itself, `source` (the file lives in the source root, so naming it there would be circular), or `--dry-run`. A flag like `--pretty-urls` writes `pretty-urls: true`; there is no way to write `false`, so to remove a key, edit the file.
+`build` only. Writes the saveable options you passed on this command line into the `unify.yaml` unify read (source root, else project root), creating one in the source root if there is none: `unify build --pretty-urls --base-url https://example.com/ --save-config`. It is an upsert. Keys you did not pass are left alone, and the file is edited line by line, so your comments, ordering and other keys survive untouched; a key you passed replaces its old line (an `exclude` list replaces its old items), and new keys go at the end. It never writes `save-config` itself, `source` (the file lives in the source root, so naming it there would be circular), or `--dry-run`. A flag like `--pretty-urls` writes `pretty-urls: true`; there is no way to write `false`, so to remove a key, edit the file.
 
-The file is written only if the build exits `0`, so it records settings that produced a good build. `--save-config` with `--dry-run`, or on any command but `build`, is a usage error (exit `2`) and writes nothing.
+The file is written only if the build exits `0`, so it records settings that produced a good build. With `--dry-run` it saves after a dry run that exits `0` ("check the flags, then keep them"); `dist/` is still untouched. On any command but `build` it is a usage error (exit `2`) and writes nothing.
 
 ### `--strict`
 
@@ -391,7 +393,7 @@ Cycle and depth errors print the full chain (`_layout.html → _includes/nav.htm
 
 ## `unify.yaml`
 
-Optional, at the source root: saved flags, nothing more. Keys are the long option names (`source`, `output`, `clean`, `exclude` — a list, `pretty-urls`, `base-url`, `strict`, `audit`, `port`); CLI flags win on conflict. No behavior exists that only the file can express; the file itself never ships. `unify build ... --save-config` writes or updates it for you.
+Optional: saved flags, nothing more. It lives in the source root, or else beside `package.json` at the project root (the directory you run `unify` from); the source root's copy wins if both exist. A project-root file can name the source directory itself (`source: site`), so a repository can keep its content in `site/` or `pages/` with the config at the top. Keys are the long option names (`source`, `output`, `clean`, `exclude` — a list, `pretty-urls`, `base-url`, `strict`, `audit`, `port`); CLI flags win on conflict. No behavior exists that only the file can express; the file itself never ships. `unify build ... --save-config` writes or updates it for you.
 
 ```yaml
 # unify.yaml — the committed invocation

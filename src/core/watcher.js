@@ -31,7 +31,7 @@
  *     discipline as a real publish (WCH-03) by reusing publish.js's own
  *     `applyPublishPlan` rather than reimplementing it.
  */
-import { watch as fsWatch } from "node:fs";
+import { readdirSync, watch as fsWatch } from "node:fs";
 import { mkdir, readFile } from "node:fs/promises";
 import { extname, join, resolve, sep } from "node:path";
 import * as collisions from "./collisions.js";
@@ -93,7 +93,7 @@ export function createCoalescer(task) {
  * @param {number} [opts.debounceMs]
  * @returns {{close(): void}}
  */
-export function watchSource(root, { ignoreDirs = [], onChange, debounceMs = 40 }) {
+export function watchSource(root, { ignoreDirs = [], onChange, debounceMs = 40, projectRoot = null }) {
   const absRoot = resolve(root);
   const absIgnores = ignoreDirs.map((d) => resolve(d));
   let timer = null;
@@ -118,11 +118,45 @@ export function watchSource(root, { ignoreDirs = [], onChange, debounceMs = 40 }
     schedule();
   });
 
+  // §4.5 — a layout or include beside the source root resolves for every
+  // page, and a generator there (§33.1) runs on every build, so an edit there
+  // must rebuild too. The project root is watched NON-recursively, plus each
+  // of its top-level directories recursively — except the source root (already
+  // watched), the ignore set (the output directory), dotfiles (`.git/`,
+  // `.github/`) and the never-shipped names (`node_modules/`), whose churn is
+  // not the site's and whose size would make a recursive watch expensive. A
+  // directory created after startup is caught by the non-recursive watch as an
+  // entry, which rebuilds, and is watched from the next `unify dev`.
+  const extra = [];
+  const project = projectRoot === null || projectRoot === undefined ? null : resolve(projectRoot);
+  if (project !== null && project !== absRoot && !contains(absRoot, project)) {
+    const onEntry = (_event, filename) => {
+      if (!filename) return;
+      const name = String(filename).split(sep)[0];
+      if (name.startsWith(".") || isNeverShipped(name)) return;
+      const abs = join(project, name);
+      if (abs === absRoot || absIgnores.some((dir) => contains(dir, abs))) return;
+      schedule();
+    };
+    try {
+      extra.push(fsWatch(project, { recursive: false }, onEntry));
+      for (const entry of readdirSync(project, { withFileTypes: true })) {
+        if (!entry.isDirectory() || entry.name.startsWith(".") || isNeverShipped(entry.name)) continue;
+        const abs = join(project, entry.name);
+        if (abs === absRoot || contains(abs, absRoot) || absIgnores.some((dir) => contains(dir, abs) || contains(abs, dir))) continue;
+        extra.push(fsWatch(abs, { recursive: true }, () => schedule()));
+      }
+    } catch {
+      // an unreadable project root is not the site's problem — the source tree is still watched
+    }
+  }
+
   return {
     close() {
       if (timer) clearTimeout(timer);
       timer = null;
       watcher.close();
+      for (const w of extra) w.close();
     },
   };
 }
@@ -142,9 +176,9 @@ export function watchSource(root, { ignoreDirs = [], onChange, debounceMs = 40 }
  * @param {number} [args.debounceMs]
  * @returns {Promise<void>}
  */
-export function runWatchLoop({ sourceRoot, ignoreDirs = [], rebuild, signal, debounceMs = 40 }) {
+export function runWatchLoop({ sourceRoot, ignoreDirs = [], rebuild, signal, debounceMs = 40, projectRoot = null }) {
   const coalescer = createCoalescer(rebuild);
-  const fsWatcher = watchSource(sourceRoot, { ignoreDirs, debounceMs, onChange: () => coalescer.trigger() });
+  const fsWatcher = watchSource(sourceRoot, { ignoreDirs, debounceMs, projectRoot, onChange: () => coalescer.trigger() });
   coalescer.trigger(); // the initial build
 
   return new Promise((res) => {

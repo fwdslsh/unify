@@ -361,6 +361,35 @@ appendFileSync(${JSON.stringify(log)}, JSON.stringify(JSON.parse(readFileSync(co
     covers("WCH-01", "WCH-02");
   }, 30_000);
 
+  test("WCH-09 — an edit to a layout, include or generator beside the source root rebuilds like a source edit", async () => {
+    const tmp = mkTmp();
+    writeTree(tmp, {
+      "unify.yaml": "source: site\ngenerate: ../scripts/gen.mjs\n",
+      "_layout.html": '<!doctype html>\n<html lang="en">\n<head>\n  <meta charset="utf-8">\n  <title>— Root</title>\n</head>\n<body>\n  <include src="/includes/nav.html"></include>\n  <main><slot></slot></main>\n</body>\n</html>\n',
+      "includes/nav.html": "<nav>nav one</nav>\n",
+      "scripts/gen.mjs": 'import { writeFileSync } from "node:fs"; import { join } from "node:path";\nwriteFileSync(join(process.argv[3], "gen.html"), \'<!doctype html>\\n<html lang="en"><head><meta charset="utf-8"><title>Gen</title></head><body><p>gen one</p></body></html>\\n\');\n',
+      "site/index.html": "<!doctype html>\n<html>\n<head><title>Home</title></head>\n<body>\n  <p>home</p>\n</body>\n</html>\n",
+    });
+    const dist = join(tmp, "dist");
+    const w = start(["watch"], tmp);
+    await w.ready;
+    await waitForContent(join(dist, "index.html"), (t) => t.includes("nav one") && t.includes("— Root"), "the first build, with the project-root layout and include");
+    await waitForContent(join(dist, "gen.html"), (t) => t.includes("gen one"), "the project-root generator's page");
+
+    writeFileSync(join(tmp, "includes/nav.html"), "<nav>nav two</nav>\n");
+    await waitForContent(join(dist, "index.html"), (t) => t.includes("nav two"), "an include edit beside the source root to rebuild");
+
+    writeFileSync(join(tmp, "_layout.html"), readFileSync(join(tmp, "_layout.html"), "utf8").replace("— Root", "— Renamed"));
+    await waitForContent(join(dist, "index.html"), (t) => t.includes("Renamed"), "a layout edit beside the source root to rebuild");
+
+    writeFileSync(join(tmp, "scripts/gen.mjs"), readFileSync(join(tmp, "scripts/gen.mjs"), "utf8").replace("gen one", "gen two"));
+    await waitForContent(join(dist, "gen.html"), (t) => t.includes("gen two"), "a generator edit beside the source root to rebuild");
+
+    w.proc.kill("SIGTERM");
+    await waitForExit(w.proc);
+    covers("WCH-09");
+  }, 30_000);
+
   test("WCH-03 — an unchanged file is not rewritten across rebuilds", async () => {
     const tmp = mkTmp();
     writeTree(tmp, SITE);

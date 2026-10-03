@@ -146,13 +146,9 @@ composed, reference-checked, collision-checked, and published inside the same tr
 the files you wrote by hand.
 
 The runtime is unify's own, spawned as a subprocess, so a generator runs on a machine with
-no Node installation. The flag's value must resolve inside the source root:
-
-```
-$ unify build -s src --generate ../_scripts/eleventy.mjs --dry-run
---generate ../_scripts/eleventy.mjs is outside the source root
-  fix: name a file inside the source tree, e.g. --generate _scripts/gen.mjs
-```
+no Node installation. The flag's value resolves against the source root (`../scripts/x.mjs`
+and absolute paths are fine; this guide keeps its generator inside `src/_scripts/` so that
+`unify dev` sees edits to it; see §10).
 
 `src/_scripts/eleventy.mjs` is 26 lines of code under its comments. Stripped to its
 decisions:
@@ -794,7 +790,9 @@ it are invisible to it, and in this example those are exactly the files npm owns
 So `npm install`, an Eleventy upgrade, or a change to a script's flags requires restarting
 `unify dev` — nothing tells you, and the running session keeps building against the Eleventy
 it started with. This is the only "does not update" case found, and it is a consequence of
-`--generate` naming a file inside the source root while its dependencies live outside it.
+the watcher observing the source root while the generator's dependencies live outside it. The
+same applies to a generator placed outside the source root (`--generate ../scripts/x.mjs`):
+unify runs it on every rebuild, but editing the script itself does not trigger one.
 
 One smaller platform detail: an `mtime`-only touch (`touch src/index.html`) did not fire a
 rebuild in testing on Linux, while every actual content write did. Do not script `touch` to

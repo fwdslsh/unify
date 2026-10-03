@@ -351,11 +351,10 @@ test("CFG-05 — nothing saveable creates no file; an exclude list's indented co
   covers("CFG-05");
 }, 30_000);
 
-test("CFG-05 — usage errors write nothing: --dry-run, a non-build command, an unwritable value", async () => {
+test("CFG-05 — usage errors write nothing: a non-build command, an unwritable value", async () => {
   const tmp = mkTmp();
   writeTree(join(tmp, "src"), { "index.html": PAGE });
   for (const args of [
-    ["build", "-s", "src", "--dry-run", "--pretty-urls", "--save-config"],
     ["audit", "-s", "src", "--pretty-urls", "--save-config"],
     ["build", "-s", "src", "--exclude", "a #b", "--save-config"],
   ]) {
@@ -379,3 +378,62 @@ test("CFG-05 — a failed build does not save", async () => {
   if (readFileSync(join(tmp, "src", "unify.yaml"), "utf8") !== "# keep\n") throw new Error("failed build changed unify.yaml");
   covers("CFG-05");
 }, 30_000);
+
+// ------------------------------------------------------------------- CFG-06
+
+test("CFG-06 — unify.yaml at the project root is read when the source root has none, and may name the source directory", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "site"), { "index.html": PAGE });
+  writeTree(tmp, { "unify.yaml": "source: site\npretty-urls: true\n" });
+  const r = await runCli(["build", "-o", "dist"], tmp);
+  if (r.exit !== 0) throw new Error(`a project-root unify.yaml naming source: site\n${r.stderr}`);
+  if (!existsSync(join(tmp, "dist", "index.html"))) throw new Error("source: site from the project root chose the source root");
+  // pretty-urls from the same file took effect: a second page moves to a directory.
+  writeTree(join(tmp, "site"), { "about.html": PAGE.replace("Home", "About") });
+  const r2 = await runCli(["build", "-o", "dist"], tmp);
+  if (r2.exit !== 0) throw new Error(r2.stderr);
+  if (!existsSync(join(tmp, "dist", "about", "index.html"))) throw new Error("pretty-urls: true from the project-root file must apply");
+  // Never emitted, from either location.
+  if (existsSync(join(tmp, "dist", "unify.yaml"))) throw new Error("unify.yaml never ships");
+  covers("CFG-06");
+}, TEST_MS);
+
+test("CFG-06 — the source root's unify.yaml wins when both exist; --save-config upserts the file that was read", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), { "index.html": PAGE, "unify.yaml": "output: from-source\n" });
+  writeTree(tmp, { "unify.yaml": "output: from-project\n" });
+  const r = await runCli(["build", "-s", "src"], tmp);
+  if (r.exit !== 0) throw new Error(r.stderr);
+  if (!existsSync(join(tmp, "from-source"))) throw new Error("the source root's file must win");
+  if (existsSync(join(tmp, "from-project"))) throw new Error("the project root's file must not be read when the source root has one");
+
+  // With only the project-root file, --save-config writes THERE, not a new src/unify.yaml.
+  rmSync(join(tmp, "src", "unify.yaml"));
+  rmSync(join(tmp, "from-source"), { recursive: true });
+  const saved = await runCli(["build", "-s", "src", "--pretty-urls", "--save-config"], tmp);
+  if (saved.exit !== 0) throw new Error(saved.stderr);
+  const project = readFileSync(join(tmp, "unify.yaml"), "utf8");
+  if (project !== "output: from-project\npretty-urls: true\n") throw new Error(`the project-root file was upserted:\n${project}`);
+  if (existsSync(join(tmp, "src", "unify.yaml"))) throw new Error("no second file in the source root");
+  covers("CFG-06");
+}, TEST_MS);
+
+// ------------------------------------------------------------------- CFG-07
+
+test("CFG-07 — --save-config with --dry-run saves after a dry run that exits 0, and dist/ stays untouched", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), { "index.html": PAGE });
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--dry-run", "--pretty-urls", "--save-config"], tmp);
+  if (r.exit !== 0) throw new Error(`a dry run with --save-config\n${r.stderr}`);
+  if (existsSync(join(tmp, "dist"))) throw new Error("a dry run never writes dist/");
+  const text = readFileSync(join(tmp, "src", "unify.yaml"), "utf8");
+  if (text !== "output: dist\npretty-urls: true\n") throw new Error(`the flags were saved:\n${text}`);
+  if (!r.stdout.includes("saved output, pretty-urls to")) throw new Error(`the save is reported:\n${r.stdout}`);
+
+  // A dry run that fails saves nothing.
+  writeTree(join(tmp, "src"), { "broken.html": PAGE.replace("Home", "Broken").replace("</body>", '<a href="/nope.html">x</a></body>') });
+  const bad = await runCli(["build", "-s", "src", "-o", "dist", "--dry-run", "--base-url", "https://x.example/", "--save-config"], tmp);
+  if (bad.exit !== 1) throw new Error(`a broken link fails the dry run: got ${bad.exit}\n${bad.stderr}`);
+  if (readFileSync(join(tmp, "src", "unify.yaml"), "utf8").includes("base-url")) throw new Error("a failed dry run must not save");
+  covers("CFG-07");
+}, TEST_MS);

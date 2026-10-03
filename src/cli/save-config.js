@@ -5,7 +5,6 @@
  */
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
 import { UsageError } from "../core/diagnostics.js";
 import { CONFIG_KEYS } from "./options.js";
 
@@ -52,12 +51,11 @@ export function saveEntries(flags) {
 }
 
 /**
- * @param {string} sourceRoot
+ * @param {string} path - the unify.yaml to upsert into (`options.js`'s `configPath`)
  * @param {Map<string, string[]>} entries
  * @returns {string} the path written
  */
-export function writeConfig(sourceRoot, entries) {
-  const path = join(sourceRoot, "unify.yaml");
+export function writeConfig(path, entries) {
   const text = existsSync(path) ? readFileSync(path, "utf8") : "";
   const eol = text.includes("\r\n") ? "\r\n" : "\n";
   const lines = text === "" ? [] : text.split(/\r?\n/);

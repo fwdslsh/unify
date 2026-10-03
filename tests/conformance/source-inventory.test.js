@@ -170,13 +170,21 @@ test("GEN-15 — two runs give the same bytes, and the file is gone after a succ
   covers("GEN-15");
 }, TEST_MS);
 
-test("GEN-16 — the flag without a generator is a usage error", async () => {
+test("GEN-16 — the flag without a generator is inert: same output, nothing written, no message", async () => {
   const tmp = mkTmp();
   writeTree(join(tmp, "src"), { "index.html": head("Home", '<meta name="description" content="d">') });
+  const plain = await runCli(["build", "-s", "src", "-o", "plain"], tmp);
+  expectExit(plain, 0, "the build without the flag");
   const r = await runCli(["build", "-s", "src", "-o", "dist", "--source-inventory"], tmp);
-  expectExit(r, 2, "--source-inventory with no --generate");
-  if (!r.stderr.includes("--source-inventory needs --generate")) throw new Error(`message:\n${r.stderr}`);
-  if (existsSync(join(tmp, "dist"))) throw new Error("a usage error writes nothing");
+  expectExit(r, 0, "--source-inventory with no --generate is inert, not an error");
+  if (readFileSync(join(tmp, "dist", "index.html"), "utf8") !== readFileSync(join(tmp, "plain", "index.html"), "utf8")) {
+    throw new Error("the output must be byte-identical with and without the inert flag");
+  }
+  if (readdirSync(join(tmp, "dist")).length !== 1) throw new Error(`nothing extra is written: ${readdirSync(join(tmp, "dist")).join(", ")}`);
+  // A saved source-inventory: true, with the generator supplied per command, is the point.
+  writeTree(join(tmp, "src"), { "unify.yaml": "source-inventory: true\n" });
+  const saved = await runCli(["build", "-s", "src", "-o", "dist"], tmp);
+  expectExit(saved, 0, "a saved source-inventory: true with no generator");
   covers("GEN-16");
 }, TEST_MS);
 
