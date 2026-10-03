@@ -42,8 +42,9 @@ const OPTIONS = {
   // §30.4 — catalog/corpus membership only: also list pages that are
   // excluded solely for being `noindex`. Needs --catalog or --search-corpus.
   "include-noindex": { kind: "flag" },
-  // §33.1 — a PATH in the source tree, never a command. Saved in unify.yaml
-  // like any other long option.
+  // §33.1 — a PATH to a JavaScript file (relative to the source root, or
+  // absolute; anywhere on disk), never a command. Saved in unify.yaml like any
+  // other long option.
   generate: { kind: "value" },
   // §33.7 — opt in to `source-pages.json` for the generator. A boolean, saveable;
   // naming it with no generator is a usage error (cli.js), like --include-noindex.

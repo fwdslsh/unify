@@ -74,18 +74,55 @@ ${then === "throw" ? 'throw new Error("boom after capturing the context");\n' : 
 
 // ------------------------------------------------------------------- GEN-01
 
-test("GEN-01 — the flag names a file inside the source root, and a path escaping it is a usage error", async () => {
+test("GEN-01 — the flag names a file; it may live outside the source root, relative or absolute", async () => {
+  // Issue #104: a generator is build tooling the author named, not content
+  // the build discovered, so §4.3's containment rule has nothing to protect.
+  // `scripts/gen.mjs` at the project root, `src/` as the source root.
   const tmp = mkTmp();
-  writeTree(join(tmp, "src"), { "index.html": doc("Home", "<h1>Home</h1>") });
-  writeTree(tmp, { "outside.mjs": "// never run\n" });
+  writeTree(join(tmp, "src"), { "index.html": doc("Home", '<h1>Home</h1><a href="/generated.html">g</a>') });
+  writeTree(tmp, { "scripts/gen.mjs": writesOnePage });
 
-  const escaped = await runCli(["build", "-s", "src", "-o", "dist", "--generate", "../outside.mjs"], tmp);
-  // A usage error, not a diagnostic: nothing about the SITE is wrong, the
-  // invocation is — §4.3's containment rule, the same one includes and
-  // layouts obey.
-  expectExit(escaped, 2, "a generator outside the source root");
-  expectContains(`${escaped.stdout}${escaped.stderr}`, "outside the source root", "the message says why");
-  if (existsSync(join(tmp, "dist"))) throw new Error("a usage error must not have built anything");
+  // (1) relative to the source root, for build, dry-run and audit
+  const built = await runCli(["build", "-s", "src", "-o", "dist", "--generate", "../scripts/gen.mjs"], tmp);
+  expectExit(built, 0, "a generator beside the source root, by relative path");
+  const dist = readdirSync(join(tmp, "dist"));
+  if (!dist.includes("generated.html")) throw new Error(`the generated page published: ${dist.join(", ")}`);
+  // (5) the script itself is not content: only the source tree and the overlay are scanned
+  if (dist.includes("scripts") || dist.includes("gen.mjs")) throw new Error(`the generator script must not publish: ${dist.join(", ")}`);
+  const dry = await runCli(["build", "-s", "src", "-o", "dist", "--generate", "../scripts/gen.mjs", "--dry-run", "--strict"], tmp);
+  expectExit(dry, 0, "the same generator under --dry-run --strict");
+  expectContains(dry.stdout, "generated.html", "the dry run lists the generated page");
+  const audited = await runCli(["audit", "-s", "src", "--generate", "../scripts/gen.mjs", "--strict"], tmp);
+  expectExit(audited, 0, "the same generator under audit --strict");
+
+  // (2) the same file by absolute path
+  const absolute = await runCli(["build", "-s", "src", "-o", "dist", "--generate", join(tmp, "scripts", "gen.mjs")], tmp);
+  expectExit(absolute, 0, "a generator named by absolute path");
+
+  // (4) a failing external generator still fails the build and preserves dist/
+  writeTree(tmp, { "scripts/bad.mjs": 'throw new Error("boom from outside");\n' });
+  const failed = await runCli(["build", "-s", "src", "-o", "dist", "--generate", "../scripts/bad.mjs"], tmp);
+  expectExit(failed, 1, "a failing generator outside the source root is still P29");
+  expectContains(`${failed.stdout}${failed.stderr}`, "boom from outside", "the generator's own message is reported");
+  if (!existsSync(join(tmp, "dist", "generated.html"))) throw new Error("a failed build must leave the previous dist/ untouched");
+
+  // A missing file is the same failure, located at the path the author gave.
+  const missing = await runCli(["build", "-s", "src", "-o", "dist", "--generate", "../scripts/nope.mjs"], tmp);
+  expectExit(missing, 1, "a generator that does not exist");
+  covers("GEN-01");
+}, TEST_MS);
+
+test("GEN-01 — a generator inside the source root keeps working unchanged", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": doc("Home", '<h1>Home</h1><a href="/generated.html">g</a>'),
+    "_scripts/gen.mjs": writesOnePage,
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--generate", "_scripts/gen.mjs"], tmp);
+  expectExit(r, 0, "the inside-source path from every existing configuration");
+  const dist = readdirSync(join(tmp, "dist"));
+  if (!dist.includes("generated.html")) throw new Error(`the generated page published: ${dist.join(", ")}`);
+  if (dist.includes("_scripts")) throw new Error("the underscore still keeps the script out of dist/");
   covers("GEN-01");
 }, TEST_MS);
 

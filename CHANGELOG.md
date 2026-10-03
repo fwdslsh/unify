@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.5] - 2026-10-03
+
+### Changed
+
+- `--generate` (and `generate:` in `unify.yaml`) may name a file outside the source root
+  ([#104](https://github.com/fwdslsh/unify/issues/104)). A relative path still resolves against
+  the source root, so `generate: ../scripts/gen.mjs` keeps build tooling at the project root
+  while content stays in `src/`; an absolute path is taken as written. Nothing else about the
+  seam changes: same working directory, argv contract, overlay, inventory, diagnostics and
+  transactional publish, and the script is never published. The previous "outside the source
+  root" usage error is gone. Note that `unify dev` watches the source tree, so edits to a
+  generator outside it do not trigger a rebuild by themselves (spec §33.1, rule GEN-01).
+
 ## [0.9.4] - 2026-10-03
 
 ### Added
@@ -620,7 +633,8 @@ with generated compare-link notes only. Their diffs are on the
 [releases page](https://github.com/fwdslsh/unify/releases). Nothing here
 retroactively reconstructs detail those notes never carried.
 
-[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.9.4...HEAD
+[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.9.5...HEAD
+[0.9.5]: https://github.com/fwdslsh/unify/compare/v0.9.4...v0.9.5
 [0.9.4]: https://github.com/fwdslsh/unify/compare/v0.9.3...v0.9.4
 [0.9.3]: https://github.com/fwdslsh/unify/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/fwdslsh/unify/compare/v0.9.1...v0.9.2

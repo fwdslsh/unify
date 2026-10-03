@@ -84,8 +84,7 @@ import { serializeJson } from "./report.js";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { constants, tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
-import { contains, toRelative } from "./paths.js";
-import { UsageError } from "./diagnostics.js";
+import { toRelative } from "./paths.js";
 // The version is *imported*, not read from disk — same reason cli.js's own
 // `version()` gives: `bun build --compile` bundles by tracing imports, so
 // there is no package.json beside the script inside a compiled binary, and an
@@ -93,25 +92,23 @@ import { UsageError } from "./diagnostics.js";
 import pkg from "../../package.json" with { type: "json" };
 
 /**
- * §33.1 — resolve the flag's value to an absolute path inside the source root.
+ * §33.1 — resolve the flag's value to an absolute path.
  *
- * Containment is §4.3's rule, the same one includes and layouts obey, and it
- * is a usage error rather than a diagnostic for the reason every other bad
- * flag value is: nothing about the site is wrong, the invocation is.
+ * A relative value resolves against the source root (so `_scripts/gen.mjs`
+ * and `../scripts/gen.mjs` both mean what an author reading `src/` expects);
+ * an absolute one is taken as written. The file may live anywhere (issue
+ * #104): a generator is build tooling the author explicitly named, not
+ * content the build discovered, so §4.3's containment rule — which exists to
+ * keep a path *written inside a page* from reaching outside the tree — has
+ * nothing to protect here. §33.6 already says the file runs unsandboxed
+ * wherever it sits. Missing-file and failure handling are unchanged: the
+ * subprocess exits non-zero and that is P29.
  * @param {string} spec - the flag's value, as written
  * @param {string} sourceRoot
  * @returns {string} absolute path
- * @throws {UsageError}
  */
 export function resolveGeneratorPath(spec, sourceRoot) {
-  const root = resolve(sourceRoot);
-  const abs = isAbsolute(spec) ? resolve(spec) : resolve(root, spec);
-  if (!contains(root, abs)) {
-    throw new UsageError(`--generate ${spec} is outside the source root`, [
-      "name a file inside the source tree, e.g. --generate _scripts/gen.mjs",
-    ]);
-  }
-  return abs;
+  return isAbsolute(spec) ? resolve(spec) : resolve(resolve(sourceRoot), spec);
 }
 
 /**

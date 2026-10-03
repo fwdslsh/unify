@@ -23,7 +23,7 @@ Options:
       --catalog            write assets/unify/catalog.json — a browse/filter/TOC projection of every public page
       --search-corpus      write assets/unify/search-corpus.json — normalized page text for client-side search
       --include-noindex    list noindex pages in the catalog and search corpus (needs one of them)
-      --generate <path>    run one JavaScript file from your source tree before the build
+      --generate <path>    run one JavaScript file before the build (relative to the source root, or absolute)
       --source-inventory   give that file source-pages.json: every source page's authored title, description, date, meta and links (needs --generate)
       --dry-run            run the full build and every check, print the report, write nothing
       --audit              `build` only: audit the composed site before publishing; publish only if `unify audit` would exit 0
@@ -248,7 +248,7 @@ Same membership as the catalog, same author-wins rule: a `src/assets/unify/searc
 
 Runs one JavaScript file from your source tree before the build scans anything. `build`, `watch`, `dev`, and `audit` all take it, because all four scan the source tree.
 
-It names a **file**, never a command. There is no shell, no argument list, and no way to say "and then run this other thing" — a path is something you wrote and can read. The path resolves against the source root and must stay inside it. There is one generator per build: giving `--generate` twice on the command line is a usage error (exit 2), so put several tasks inside the one file and have it import and call the others. A `generate:` saved in `unify.yaml` plus one `--generate` is fine; the command line wins.
+It names a **file**, never a command. There is no shell, no argument list, and no way to say "and then run this other thing" — a path is something you wrote and can read. A relative path resolves against the source root and an absolute path is taken as written; the file can live anywhere — `_scripts/gen.mjs` inside `src/`, `../scripts/gen.mjs` beside it at the project root, or an absolute path — and is never published, because only the source tree and the generated directory are scanned. (One thing to know: `unify dev` watches the source tree, so editing a generator that lives outside it does not trigger a rebuild on its own.) There is one generator per build: giving `--generate` twice on the command line is a usage error (exit 2), so put several tasks inside the one file and have it import and call the others. A `generate:` saved in `unify.yaml` plus one `--generate` is fine; the command line wins.
 
 The whole interface is three positional arguments:
 
