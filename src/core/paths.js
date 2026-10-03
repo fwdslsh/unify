@@ -122,15 +122,31 @@ export function toRelative(root, absolutePath) {
  * exists to forbid. The overlay fills gaps in the namespace; it never
  * replaces what is already in it.
  *
+ * **The project root is the last root** (§4.5). Layouts and includes are
+ * build material, not content, and an author may keep them beside
+ * `package.json` — `includes/nav.html`, `_layout.html` — rather than inside
+ * the content directory. So the working directory unify runs in joins the
+ * namespace at the lowest precedence: `<include src="/includes/nav.html">`
+ * and the layout walk find a file there when no root ahead of it has one.
+ * Nothing there is ever **scanned**, so nothing there publishes, and the
+ * source tree still wins a tie. It is skipped when it is, or sits inside, the
+ * source root (`unify build` run from inside `src/`), because then it names
+ * nothing the source root does not.
+ *
  * @param {string} sourceRoot
  * @param {string|null} [overlayDir] - §33.3's generated directory, when one exists
+ * @param {string|null} [projectRoot] - §4.5's project root (the working directory), when known
  * @returns {string[]} absolute roots, in precedence order (source root first)
  */
-export function resolutionRoots(sourceRoot, overlayDir = null) {
+export function resolutionRoots(sourceRoot, overlayDir = null, projectRoot = null) {
   const roots = [resolve(sourceRoot)];
   if (overlayDir !== null && overlayDir !== undefined && overlayDir !== "") {
     const overlay = resolve(overlayDir);
     if (overlay !== roots[0]) roots.push(overlay);
+  }
+  if (projectRoot !== null && projectRoot !== undefined && projectRoot !== "") {
+    const project = resolve(projectRoot);
+    if (!contains(roots[0], project) && !roots.includes(project)) roots.push(project);
   }
   return roots;
 }

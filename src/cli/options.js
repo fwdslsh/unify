@@ -188,16 +188,41 @@ function unknownOption(arg) {
 }
 
 /**
+ * §18 — where `unify.yaml` is: in the source root if one is there, else at
+ * the project root (the working directory), else nowhere — in which case the
+ * path returned is the source root's, where `--save-config` would create it.
+ *
+ * The file is build tooling, not content, so it may sit beside `package.json`
+ * rather than inside the content directory; that is also what lets a
+ * project-root `unify.yaml` name the source directory (`source: site`),
+ * which a file inside that directory could not do before the directory was
+ * known. The source root's copy wins when both exist, so no site that already
+ * has one changes.
+ *
+ * @param {string} sourceRoot
+ * @param {string} [projectRoot]
+ * @returns {{path: string, exists: boolean}}
+ */
+export function configPath(sourceRoot, projectRoot = process.cwd()) {
+  const inSource = join(sourceRoot, "unify.yaml");
+  if (existsSync(inSource)) return { path: inSource, exists: true };
+  const inProject = join(projectRoot, "unify.yaml");
+  if (existsSync(inProject)) return { path: inProject, exists: true };
+  return { path: inSource, exists: false };
+}
+
+/**
  * `unify.yaml` is saved flags and nothing more (§18). Parsed with a deliberately
  * tiny reader: scalars and one level of list. Anything richer would be a
  * configuration language, which §5 refuses.
  *
  * @param {string} sourceRoot
+ * @param {string} [projectRoot] - see `configPath`
  * @returns {Record<string, string|boolean|string[]>}
  */
-export function loadConfig(sourceRoot) {
-  const path = join(sourceRoot, "unify.yaml");
-  if (!existsSync(path)) return {};
+export function loadConfig(sourceRoot, projectRoot = process.cwd()) {
+  const { path, exists } = configPath(sourceRoot, projectRoot);
+  if (!exists) return {};
 
   /** @type {Record<string, string|boolean|string[]>} */
   const config = {};

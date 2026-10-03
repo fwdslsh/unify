@@ -10,6 +10,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.9.5] - 2026-10-03
 
+### Added
+
+- **The project root joins the resolution namespace** (spec §4.5, rules INC-14, LAY-17, WCH-09).
+  The directory you run `unify` from is now the last place an include path or the layout walk
+  looks, after the source tree and the generated overlay, so layouts and includes can live beside
+  `package.json`: `<include src="/includes/nav.html">` finds `includes/nav.html` at the project
+  root, and a `_layout.html` there is the site's root layout when `src/` has none. Nothing at the
+  project root is scanned or published; the source tree wins a tie. `watch` and `dev` observe it
+  (non-recursively, plus each top-level directory except the source root, the output directory,
+  dot-directories and never-shipped names).
+- **`unify.yaml` may live at the project root** (rule CFG-06). The source root's copy is read when
+  both exist; otherwise the one beside `package.json`. A project-root file can name the source
+  directory itself (`source: site`), so content can live in `site/`, `pages/` or whatever you
+  like with the config at the top. `--save-config` upserts whichever file was read.
+
 ### Changed
 
 - `--generate` (and `generate:` in `unify.yaml`) may name a file outside the source root
@@ -18,8 +33,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   while content stays in `src/`; an absolute path is taken as written. Nothing else about the
   seam changes: same working directory, argv contract, overlay, inventory, diagnostics and
   transactional publish, and the script is never published. The previous "outside the source
-  root" usage error is gone. Note that `unify dev` watches the source tree, so edits to a
-  generator outside it do not trigger a rebuild by themselves (spec §33.1, rule GEN-01).
+  root" usage error is gone (spec §33.1, rule GEN-01).
+- `--source-inventory` without a generator is inert instead of a usage error (rule GEN-16), so a
+  saved `source-inventory: true` can stay in `unify.yaml` while a generator is added or dropped
+  per command.
+- `--save-config` may be combined with `--dry-run` (rule CFG-07): after a dry run that exits 0
+  the flags are saved, and `dist/` is still untouched.
 
 ## [0.9.4] - 2026-10-03
 

@@ -23,7 +23,7 @@ import { fileURLToPath } from "node:url";
 import pkg from "../package.json" with { type: "json" };
 import { Reporter, UsageError } from "./core/diagnostics.js";
 import { cleanRefusalReason, resolveSource } from "./core/paths.js";
-import { loadConfig, mergeConfig, parseArgs } from "./cli/options.js";
+import { configPath, loadConfig, mergeConfig, parseArgs } from "./cli/options.js";
 import { saveEntries, writeConfig } from "./cli/save-config.js";
 
 const HELP = `unify — HTML-native composition: no expression language, no client runtime.
@@ -77,8 +77,10 @@ function version() {
 
 /**
  * Resolve the full run configuration from flags plus `unify.yaml`.
- * The source root has to be resolved twice: once to find the config file,
- * then again once the file's own `source` key has had its say.
+ * The source root has to be resolved twice: once to find the config file
+ * (in the source root, else at the project root — §18), then again once the
+ * file's own `source` key has had its say. That second pass is what makes a
+ * project-root `unify.yaml` able to say `source: site`.
  *
  * @param {Record<string, any>} flags
  * @returns {{command: string, settings: Record<string, any>, sourceRoot: string, sourceDefaulted: boolean}}
@@ -208,14 +210,9 @@ export async function run(argv) {
       "it only changes which pages those two files list",
     ]);
   }
-  // §33.7 — the inventory is an input to the generator; with none to read it,
-  // the flag would do nothing, so it is reported rather than ignored.
-  if (settings.sourceInventory === true && !settings.generate) {
-    throw new UsageError("--source-inventory needs --generate: no generator is set", [
-      "add --generate <path> (or generate: in unify.yaml), or drop --source-inventory",
-      "it only gives the generator a file to read: source-pages.json",
-    ]);
-  }
+  // §33.7 — `--source-inventory` is an input to the generator and nothing
+  // else, so with no generator it is inert: a saved `source-inventory: true`
+  // may sit in unify.yaml while the generator comes and goes per command.
   // A scheme with no authority — `file:`, `foo:`, `data:` — parses, but its
   // origin is the *string* "null", and every URL §20.5 builds from it then
   // reads `null/about.html`. That shipped as `<loc>null/</loc>` in a generated
@@ -263,17 +260,14 @@ export async function run(argv) {
     }
   }
 
-  // §18 — `--save-config` is `build`'s alone, and `--dry-run` promises to write nothing.
+  // §18 — `--save-config` is `build`'s alone. With `--dry-run` it saves after
+  // a dry run that exited 0: "check the flags, then keep them" — the one
+  // thing a dry run then writes is unify.yaml, never dist/.
   let saving = null;
   if (options["save-config"]) {
     if (command !== "build") {
       throw new UsageError(`--save-config applies only to \`unify build\`, not \`unify ${command}\``, [
         "run it as: unify build <flags> --save-config",
-      ]);
-    }
-    if (options["dry-run"] === true) {
-      throw new UsageError("--save-config cannot be combined with --dry-run: a dry run writes nothing", [
-        "drop --dry-run to build and save, or drop --save-config",
       ]);
     }
     saving = saveEntries(options);
@@ -301,13 +295,16 @@ export async function run(argv) {
   switch (command) {
     case "build": {
       const code = await (await import("./cli/commands/build.js")).build(context);
-      // §18 — only a build that exited 0 records its settings.
+      // §18 — only a build (or dry run) that exited 0 records its settings,
+      // into the unify.yaml that was read (source root, else project root),
+      // or a new one in the source root.
       if (saving && code === 0) {
         if (saving.size === 0) {
           process.stdout.write("--save-config: no saveable options were given, so unify.yaml was not written\n");
         } else {
-          writeConfig(sourceRoot, saving);
-          process.stdout.write(`saved ${[...saving.keys()].join(", ")} to ${resolve(sourceRoot, "unify.yaml")}\n`);
+          const { path } = configPath(sourceRoot);
+          writeConfig(path, saving);
+          process.stdout.write(`saved ${[...saving.keys()].join(", ")} to ${path}\n`);
         }
       }
       return code;

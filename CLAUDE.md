@@ -31,7 +31,7 @@ bun src/cli.js build  [-s src] [-o dist] [--clean] [--exclude <glob>]... \
                       [--pretty-urls] [--base-url <url>] [--canonical auto] \
                       [--feed-full] [--catalog] [--search-corpus] [--include-noindex] \
                       [--generate <path>] [--source-inventory] \
-                      [--dry-run] [--strict] [--audit] [--save-config]  # --save-config: build only; upserts unify.yaml after an exit-0 build
+                      [--dry-run] [--strict] [--audit] [--save-config]  # --save-config: build only; upserts unify.yaml after an exit-0 build or dry run
 bun src/cli.js audit  [-s src] [-o dist] [--exclude <glob>]... [--pretty-urls] \
                       [--base-url <url>] [--canonical auto] [--catalog] [--search-corpus] \
                       [--include-noindex] \
@@ -84,7 +84,7 @@ Layouts do not chain: a layout that itself declares `data-layout` is a located p
 
 ## Configuration
 
-`unify.yaml` at the source root is **saved CLI flags, nothing more** (keys = long option names; CLI wins; never shipped; `init` writes one only when a template's page needs a flag — `docs` saves `catalog: true`). No behavior may exist that only a config file can express. `unify build --save-config` writes it for you (upsert, build only, after an exit-0 build).
+`unify.yaml`, in the source root or else at the project root (the working directory, where it may say `source: site`), is **saved CLI flags, nothing more** (keys = long option names; CLI wins; never shipped; `init` writes one only when a template's page needs a flag — `docs` saves `catalog: true`). No behavior may exist that only a config file can express. `unify build --save-config` writes it for you (upsert into the file that was read, build only, after an exit-0 build or dry run). The project root is also the last root of the resolution namespace (§4.5): layouts and includes may live beside `package.json` (`includes/nav.html`, `_layout.html`); nothing there is scanned or published.
 
 ## Security Posture
 
