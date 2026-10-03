@@ -639,9 +639,13 @@ function titleElement(text) {
   return `<title>${escapeHtml(text)}</title>`;
 }
 
+/** §10.2: a key named `og:…` emits `property=`, every other key `name=`. */
+function metaAttr(key) {
+  return key.startsWith("og:") ? "property" : "name";
+}
+
 function metaElement(key, value) {
-  const attr = key.startsWith("og:") ? "property" : "name";
-  return `<meta ${attr}="${escapeHtml(key)}" content="${escapeHtml(value)}">`;
+  return `<meta ${metaAttr(key)}="${escapeHtml(key)}" content="${escapeHtml(value)}">`;
 }
 
 // ----------------------------------------------------------------- exports
@@ -687,7 +691,10 @@ export function inventoryFields(source, { path, sourceRoot, roots = resolutionRo
   const { data, metas } = readFrontmatter(source, { file, reporter });
   const first = (key) => metas.find((m) => m.key === key && m.value.trim() !== "")?.value.trim() ?? null;
   const title = typeof data.title === "string" && data.title.trim() !== "" ? data.title.trim() : null;
-  return { title, description: first("description"), date: first("date") };
+  // §33.7: the <meta> records this frontmatter synthesizes (§10.2), in source
+  // order, exactly as the page would emit them; Markdown has no <link> syntax.
+  const meta = metas.map(({ key, value }) => ({ [metaAttr(key)]: key, content: value }));
+  return { title, description: first("description"), date: first("date"), meta, links: [] };
 }
 
 /**

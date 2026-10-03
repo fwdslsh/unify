@@ -2463,19 +2463,23 @@ Two things unify does guarantee, and they are what make the seam safe to use rat
       "href": "/reports/q1.html",
       "title": "Q1: the numbers",
       "description": null,
-      "date": "2026-04-02T09:00:00Z"
+      "date": "2026-04-02T09:00:00Z",
+      "meta": [{ "name": "tags", "content": "finance" }],
+      "links": []
     }
   ]
 }
 ```
 
-Each record has exactly these five keys, in this order, and nothing else — no timestamps, no absolute paths:
+Each record has exactly these seven keys, in this order, and nothing else — no timestamps, no absolute paths. `meta` and `links` were added in 0.9.4 as new fields, so `schemaVersion` stays `1`:
 
 | Field | Type | Content |
 |---|---|---|
 | `source` | string | the page's POSIX path relative to the source root |
 | `href` | string | `"/"` plus `source`, a trailing `.md` swapped for `.html`. An ordinary source-route link: written into generated HTML it is rewritten by §11 like any authored link, so `--pretty-urls` and `--base-url` apply to it later. It is not percent-encoded |
 | `title`, `description`, `date` | string \| null | what the author wrote, trimmed; `null` when not authored or empty |
+| `meta` | object[] | the page's own `<meta>` elements as attribute records, in source order, with the projection `catalog.json` uses (§30.2): `{"name": "tags", "content": "homelab"}`, `{"property": "og:image", "content": "…"}`, `{"charset": "utf-8"}`. For a `.md` page, the metas its frontmatter synthesizes (§10.2): one record per list item, a `og:…` key as `property`, and `title`, `layout`, `class`, `lang`, `dir` never present. Repeats, order and empty values are kept; nothing is split, coerced, sorted or deduplicated |
+| `links` | object[] | the page's own `<link>` elements as attribute records, in source order, values as written: not resolved, completed or prefixed, and given no canonical or redirect meaning. Always `[]` for a `.md` page, which has no `<link>` syntax |
 
 `pages` is sorted by `source`, the order the build's own scan already uses.
 

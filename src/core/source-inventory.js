@@ -30,7 +30,7 @@ import { resolutionRoots } from "./paths.js";
  * @param {{absPath: string, relPath: string, isPage: boolean, excluded: boolean}[]} args.files - the SOURCE scan, sorted by relPath
  * @param {string} args.sourceRoot
  * @param {import('./diagnostics.js').Reporter} args.reporter
- * @returns {{schemaVersion: 1, pages: {source: string, href: string, title: string|null, description: string|null, date: string|null}[]}}
+ * @returns {{schemaVersion: 1, pages: {source: string, href: string, title: string|null, description: string|null, date: string|null, meta: Record<string,string>[], links: Record<string,string>[]}[]}}
  */
 export function buildSourceInventory({ files, sourceRoot, reporter }) {
   const roots = resolutionRoots(sourceRoot);
@@ -54,6 +54,10 @@ export function buildSourceInventory({ files, sourceRoot, reporter }) {
         title: titleOf(doc),
         description: descriptionOf(doc),
         date: firstNonEmpty(metaValues(doc, "date")),
+        // The head's own <meta>/<link> attribute records, in document order:
+        // the same projection catalog.json carries (§30.2), read from source.
+        meta: doc.document.head.meta,
+        links: doc.document.head.link,
       };
     }
     pages.push({
@@ -62,6 +66,8 @@ export function buildSourceInventory({ files, sourceRoot, reporter }) {
       title: fields.title,
       description: fields.description,
       date: fields.date,
+      meta: fields.meta,
+      links: fields.links,
     });
   }
   return { schemaVersion: 1, pages };

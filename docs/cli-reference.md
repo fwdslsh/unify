@@ -24,7 +24,7 @@ Options:
       --search-corpus      write assets/unify/search-corpus.json — normalized page text for client-side search
       --include-noindex    list noindex pages in the catalog and search corpus (needs one of them)
       --generate <path>    run one JavaScript file from your source tree before the build
-      --source-inventory   give that file source-pages.json: every source page's authored title, description and date (needs --generate)
+      --source-inventory   give that file source-pages.json: every source page's authored title, description, date, meta and links (needs --generate)
       --dry-run            run the full build and every check, print the report, write nothing
       --audit              `build` only: audit the composed site before publishing; publish only if `unify audit` would exit 0
       --save-config        `build` only: write the saveable options given here into unify.yaml (after a good build)
@@ -302,12 +302,13 @@ Opt-in, saveable (`source-inventory: true`), and a usage error without a generat
 {
   "schemaVersion": 1,
   "pages": [
-    { "source": "reports/q1.md", "href": "/reports/q1.html", "title": "Q1: the numbers", "description": null, "date": "2026-04-02T09:00:00Z" }
+    { "source": "reports/q1.md", "href": "/reports/q1.html", "title": "Q1: the numbers", "description": null, "date": "2026-04-02T09:00:00Z",
+      "meta": [{ "name": "tags", "content": "finance" }], "links": [] }
   ]
 }
 ```
 
-Every record has those five keys. `source` is the path relative to the source root. `href` is `/` plus `source` with a trailing `.md` turned into `.html`, a link you can write straight into generated HTML: `--pretty-urls` and `--base-url` rewrite it like any link you typed. `title`, `description` and `date` are strings or `null`. The list is sorted by `source`.
+Every record has those seven keys. `meta` and `links` are the `<meta>` and `<link>` elements the page itself declares, in order, as attribute records (a Markdown page's `meta` is what its frontmatter emits, one record per list item, and its `links` is empty); unify gives them no meaning, so tags, series, roles and ordering are your script's to interpret. `source` is the path relative to the source root. `href` is `/` plus `source` with a trailing `.md` turned into `.html`, a link you can write straight into generated HTML: `--pretty-urls` and `--base-url` rewrite it like any link you typed. `title`, `description` and `date` are strings or `null`. The list is sorted by `source`.
 
 The pages are exactly the ones the build would treat as pages in your source tree: `_`-prefixed files, `--exclude` matches, `*.fragment.html` and layouts are not in it, and nor is anything a generator writes. A `noindex` page is in it. Markdown pages give their frontmatter `title`, `description` and `date` as written (no first-heading fallback). HTML pages give their own `<title>` and `<meta name="description">`/`<meta name="date">`, as written in that file's `<head>`: includes are not resolved, so a title an `<include>` supplies is not seen. It is source facts only, not the catalog: no layout title suffix, no generated pages, no rendered headings. Broken frontmatter is reported the way a build reports it and stops the build before your generator runs. A worked generator is in [the integrations guide](integrations.md#an-index-of-your-pages-in-one-build).
 

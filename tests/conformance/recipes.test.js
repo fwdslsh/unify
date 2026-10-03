@@ -152,6 +152,40 @@ test("recipe 1 — the source-inventory generator builds clean in ONE strict aud
   if (!existsSync(join(saved, "dist", "reports", "index.html"))) throw new Error("saved config did not generate the index");
 }, TEST_MS);
 
+test("recipe 1 — the meta snippet groups by series, orders by part, keeps tags and drops bookmarks (§33.7 meta/links)", async () => {
+  const H = "1. The generator context: what `--generate` hands you";
+  const base = codeBlock(H, "js", 2);
+  const snippet = codeBlock(H, "js", 3);
+  // Spliced in exactly as the text says: the snippet replaces `items`, and the
+  // page gets `sections.join("\n")` instead.
+  const start = base.indexOf("const items");
+  const end = base.indexOf("mkdirSync(join(");
+  if (start < 0 || end < start || !base.includes('${items.join("\\n")}')) throw new Error("the base generator changed shape");
+  const generator = base.slice(0, start) + snippet + "\n" + base.slice(end).replace('${items.join("\\n")}', '${sections.join("\\n")}');
+
+  const md = (title, fm) => `---\ntitle: ${title}\ndescription: ${title} page\nlang: en\n${fm}---\n# ${title}\n`;
+  const tree = {
+    "index.html": page("Home", '<h1>Home</h1><a href="/reports/index.html">reports</a> <a href="/articles/saved.html">saved</a>'),
+    "_scripts/reports.mjs": generator,
+    "articles/second.md": md("Second", "series: Lab\npart: 2\ntags:\n  - homelab\n  - networking\n"),
+    "articles/first.html": page("First", "<h1>First</h1>").replace("</head>", '<meta name="series" content="Lab"><meta name="part" content="1"><meta name="tags" content="dns"></head>'),
+    "articles/saved.md": md("Saved", "role: bookmark\n"),
+    "articles/loose.md": md("Loose", ""),
+  };
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), tree);
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--generate", "_scripts/reports.mjs", "--source-inventory", "--audit", "--strict"], tmp);
+  expectExit(r, 0, "the meta snippet's one-build index");
+  const out = readFileSync(join(tmp, "dist", "reports", "index.html"), "utf8");
+  const at = (t) => out.indexOf(t);
+  if (!(at("<h2>Lab</h2>") >= 0 && at("First") > at("<h2>Lab</h2>") && at("Second") > at("First"))) {
+    throw new Error(`series grouping or part order wrong:\n${out}`);
+  }
+  if (!out.includes("homelab, networking") || !out.includes("dns")) throw new Error(`tags missing:\n${out}`);
+  if (!out.includes("<h2>Other</h2>") || !out.includes("Loose")) throw new Error(`a page with no series must land in Other:\n${out}`);
+  if (out.includes("Saved")) throw new Error(`a role: bookmark page must be left out:\n${out}`);
+}, TEST_MS);
+
 test("recipe 1 — the working directory is the source root, as the bullet claims", async () => {
   const tmp = mkTmp();
   writeTree(join(tmp, "src"), {
