@@ -36,9 +36,8 @@ Eleventy, and the `unify` binary the four scripts call (`node_modules/.bin/unify
 resolved from the pinned `@fwdslsh/unify` devDependency). Use `npm ci` if you want the
 committed `package-lock.json` enforced exactly.
 
-**The pinned devDependency is `^0.10.0-beta.2`** because the project-root `unify.yaml` and
-the `site/` default are 0.10 features; change it to `^0.10.0` (and re-run `npm install`)
-once 0.10.0 is on npm. The generator-context file (`scripts/eleventy.mjs`'s
+**The pinned devDependency is `^0.10.0`** because the project-root `unify.yaml` and
+the `site/` default are 0.10 features. The generator-context file (`scripts/eleventy.mjs`'s
 `process.argv[4]`, conformance-spec §33.2) needs 0.9 or later; without it `context` is
 `null` and the `og:url` tag is omitted. To run this checkout instead of the pinned release,
 use `bun ../../src/cli.js` / `node ../../src/cli.js` (below).

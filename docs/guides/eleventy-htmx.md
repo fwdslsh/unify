@@ -19,9 +19,8 @@ in `devDependencies` beside Eleventy, so the four npm scripts resolve with no gl
 install. The example root holds a `unify.yaml` (§4) carrying the two flags every command
 shares, so the commands are bare: `unify build`, `unify audit --strict`. To exercise *this*
 checkout rather than the pinned published release, substitute `bun ../../src/cli.js` or
-`node ../../src/cli.js` — same `unify.yaml`, same output, same exit codes. One caveat: the
-pin is `^0.10.0-beta.2` until 0.10.0 ships, because the project-root `unify.yaml` and the
-`site/` default are 0.10 features; bump it to `^0.10.0` once that release is on npm.
+`node ../../src/cli.js` — same `unify.yaml`, same output, same exit codes. The pin is
+`^0.10.0`, because the project-root `unify.yaml` and the `site/` default are 0.10 features.
 
 ## 1. Why combine these tools
 
