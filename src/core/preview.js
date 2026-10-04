@@ -273,14 +273,21 @@ function insertBeforeHeadEnd(html, insertion) {
   return i === -1 ? html : html.slice(0, i) + insertion + html.slice(i);
 }
 
-/** §14's diagnostics for this preview, shown in the document rather than lost. */
+/**
+ * §14's diagnostics for this preview, shown in the document rather than lost.
+ * Collapsed by default and styled inline from a reset, so the site's own CSS
+ * (a dark `pre`, a hidden `details`) cannot make the text unreadable — the
+ * panel is unify's, not the site's.
+ */
 function problems(reporter, rel) {
   if (reporter.diagnostics.length === 0) return "";
-  const items = reporter.sorted().map((d) => `<pre>${esc(Reporter.format(d))}</pre>`).join("\n");
-  return `<section id="unify-preview-problems" style="position:fixed;left:0;right:0;bottom:44px;max-height:40vh;overflow:auto;background:#fff3cd;color:#1b1b1b;border-top:2px solid #e0a800;font:13px/1.4 ui-monospace,monospace;padding:8px 12px;z-index:2147483646">
-<strong>unify: what the build would report for ${esc(rel)}</strong>
+  const reset = "all:initial;display:block;box-sizing:border-box;font:13px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:#1b1b1b;";
+  const items = reporter.sorted().map((d) => `<pre style="${reset}white-space:pre-wrap;margin:6px 0 0;padding:6px 8px;background:#fff;border:1px solid #e0a800;border-radius:4px">${esc(Reporter.format(d))}</pre>`).join("\n");
+  const n = reporter.diagnostics.length;
+  return `<details id="unify-preview-problems" style="${reset}position:fixed;left:8px;right:8px;bottom:48px;max-height:40vh;overflow:auto;background:#fff3cd;border:1px solid #e0a800;border-radius:6px;padding:6px 10px;z-index:2147483646;box-shadow:0 2px 8px rgba(0,0,0,.2)">
+<summary style="${reset}display:list-item;cursor:pointer;font-weight:600">unify: ${n} thing${n === 1 ? "" : "s"} the build would report for ${esc(rel)}</summary>
 ${items}
-</section>`;
+</details>`;
 }
 
 function message(title, body) {

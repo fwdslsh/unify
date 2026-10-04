@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-10-04
+
+### Fixed
+
+- **The source preview's diagnostics panel** (§27.7) is now collapsed by default, with a
+  one-line summary, and styled from a reset so the site's own CSS (a dark `pre`, a hidden
+  `details`) cannot make its text unreadable or let it cover the preview.
+
 ## [0.11.0] - 2026-10-04
 
 ### Added
@@ -783,7 +791,8 @@ with generated compare-link notes only. Their diffs are on the
 [releases page](https://github.com/fwdslsh/unify/releases). Nothing here
 retroactively reconstructs detail those notes never carried.
 
-[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.11.1...HEAD
+[0.11.1]: https://github.com/fwdslsh/unify/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/fwdslsh/unify/compare/v0.10.1...v0.11.0
 [0.10.1]: https://github.com/fwdslsh/unify/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/fwdslsh/unify/compare/v0.9.5...v0.10.0
