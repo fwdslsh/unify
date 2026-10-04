@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-04
+
 ### Added
 
 - **`unify init` takes a template source**, not only a built-in name (spec §19.9, rules SCF-13/14).
@@ -781,7 +783,8 @@ with generated compare-link notes only. Their diffs are on the
 [releases page](https://github.com/fwdslsh/unify/releases). Nothing here
 retroactively reconstructs detail those notes never carried.
 
-[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.10.1...HEAD
+[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/fwdslsh/unify/compare/v0.10.1...v0.11.0
 [0.10.1]: https://github.com/fwdslsh/unify/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/fwdslsh/unify/compare/v0.9.5...v0.10.0
 [0.9.5]: https://github.com/fwdslsh/unify/compare/v0.9.4...v0.9.5
