@@ -127,7 +127,7 @@ The report lists each `update`, `add`, `remove` and `conflict`, then one summary
 
 **Template authors** declare what sites own in a `unify.template.json` at the template's root — `{"owned": ["site/config.json", "site/reports/**"]}`, patterns in the `--exclude` grammar against template-relative paths. The file is packaging, like `package.json`: read, never copied.
 
-**`--adopt <source>`** is the recovery when a project has no record (scaffolded before 0.11.1, or the file was lost): it fetches the template at the version you name (`#ref`, `@version`) and writes the record from it without changing a file; the next `unify update` compares against that baseline. Without a record, `unify update` exits `2` and says so.
+**`--adopt <source>`** is the recovery when a project has no record (scaffolded before 0.11.2, or the file was lost): it fetches the template at the version you name (`#ref`, `@version`) and writes the record from it without changing a file; the next `unify update` compares against that baseline. Without a record, `unify update` exits `2` and says so.
 
 ## Options
 

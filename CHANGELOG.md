@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.11.1] - 2026-10-04
+## [0.11.2] - 2026-10-04
 
 Closes [#109](https://github.com/fwdslsh/unify/issues/109): native template updates that never reset a site's configuration or content.
 
@@ -28,8 +28,16 @@ Closes [#109](https://github.com/fwdslsh/unify/issues/109): native template upda
   A template may ship a file of the same name as its manifest, `{"owned": ["site/config.json", "site/reports/**"]}`,
   naming the files a site owns after scaffolding: `update` adds them once if absent and otherwise never
   touches or reports them.
-- **`unify update --adopt <source>`** records a template for a project scaffolded before 0.11.1, or whose
+- **`unify update --adopt <source>`** records a template for a project scaffolded before 0.11.2, or whose
   record was lost, at the version named, changing no file; a missing record is a usage error naming it.
+
+## [0.11.1] - 2026-10-04
+
+### Fixed
+
+- **The source preview's diagnostics panel** (§27.7) is now collapsed by default, with a
+  one-line summary, and styled from a reset so the site's own CSS (a dark `pre`, a hidden
+  `details`) cannot make its text unreadable or let it cover the preview.
 
 ## [0.11.0] - 2026-10-04
 
@@ -806,7 +814,8 @@ with generated compare-link notes only. Their diffs are on the
 [releases page](https://github.com/fwdslsh/unify/releases). Nothing here
 retroactively reconstructs detail those notes never carried.
 
-[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.11.1...HEAD
+[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.11.2...HEAD
+[0.11.2]: https://github.com/fwdslsh/unify/compare/v0.11.1...v0.11.2
 [0.11.1]: https://github.com/fwdslsh/unify/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/fwdslsh/unify/compare/v0.10.1...v0.11.0
 [0.10.1]: https://github.com/fwdslsh/unify/compare/v0.10.0...v0.10.1

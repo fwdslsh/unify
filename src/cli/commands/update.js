@@ -69,7 +69,7 @@ export async function update({ sourceRoot, settings, template, adopt = false, re
 
   if (record === null) {
     throw new UsageError(`no ${RECORD_FILE} at ${projectRoot}: this project has no recorded template`, [
-      "unify init writes the record (0.11.1 and later); for a project scaffolded earlier, or whose record was removed, adopt the template at the version it was scaffolded from: unify update --adopt <source>",
+      "unify init writes the record (0.11.2 and later); for a project scaffolded earlier, or whose record was removed, adopt the template at the version it was scaffolded from: unify update --adopt <source>",
       "the source is what init was given: a built-in name, a directory, a git URL (with #ref for the version), or an npm package (with @version)",
     ]);
   }
