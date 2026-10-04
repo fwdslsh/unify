@@ -816,4 +816,97 @@ describe("§27 the local audit view", () => {
     expect(existsSync(join(tmp, "dist", "_unify"))).toBe(false);
     covers("DEV-06");
   }, 60_000);
+  test("DEV-07 — /_unify/preview/ renders a layout and an include on their own, with their defaults and the site's assets, and composed with a chosen page", async () => {
+    const tmp = mkTmp();
+    writeTree(tmp, {
+      "src/_layout.html": '<!doctype html>\n<html lang="en-GB">\n<head><meta charset="utf-8"><title> — Zebra Site</title><link rel="stylesheet" href="assets/site.css"></head>\n'
+        + '<body class="zebra"><include src="/_includes/nav.html"></include><main><slot><p>Layout default content.</p></slot></main>'
+        + '<footer><slot name="footer"><p>Default footer.</p></slot></footer></body>\n</html>\n',
+      "src/_includes/nav.html": '<nav><a href="/index.html">Home</a> <img src="../assets/logo.svg" alt=""></nav>\n',
+      "src/_includes/card.fragment.html": '<article class="card"><h2><slot name="title">Untitled card</slot></h2><slot><p>Nothing here yet.</p></slot></article>\n',
+      "src/assets/site.css": "body{color:red}\n",
+      "src/assets/logo.svg": "<svg xmlns='http://www.w3.org/2000/svg'/>\n",
+      "src/index.html": page("Home", "The landing page here", '<p>Alpha.</p><a href="/about.html">about</a>'),
+      "src/about.html": '<!doctype html>\n<html><head><title>About</title><meta name="description" content="About this site here"></head>\n'
+        + '<body><h1>About</h1><include src="/_includes/card.fragment.html"><span slot="title">Opening hours</span><p>Nine to five.</p></include>'
+        + '<p slot="footer">About page footer.</p></body></html>\n',
+    });
+    const port = await freePort();
+    const d = start(["dev", "-p", String(port), "--pretty-urls"], tmp);
+    await d.ready;
+    await waitForStatus(`http://localhost:${port}/about/`, 200);
+    const get = async (path) => {
+      const res = await fetch(`http://localhost:${port}/_unify/preview/${path}`, { redirect: "manual" });
+      return { status: res.status, location: res.headers.get("location"), text: await res.text() };
+    };
+
+    // A layout on its own: includes inlined, slot fallbacks kept, every URL
+    // resolved against the file that wrote it and served from the output root.
+    const layout = await get("_layout.html");
+    expect(layout.status).toBe(200);
+    expect(layout.text).toContain("Layout default content.");
+    expect(layout.text).toContain("Default footer.");
+    expect(layout.text).toContain("<slot>");
+    expect(layout.text).not.toContain("<include");
+    expect(layout.text).toContain('<link rel="stylesheet" href="/assets/site.css">');
+    expect(layout.text).toContain('<img src="/assets/logo.svg"');
+    expect(layout.text).toContain('href="/"'); // the nav's /index.html, pretty
+    expect(layout.text).toContain('id="unify-preview"'); // the selector
+    expect(layout.text).toContain("__unify_reload__"); // follows the rebuild
+
+    // The same layout composed with a page: §7 exactly — the page's content in
+    // the bare slot, its footer fill in the named one, no fallback left.
+    const composed = await get("_layout.html?page=about.html");
+    expect(composed.status).toBe(200);
+    expect(composed.text).toContain("<title>About — Zebra Site</title>");
+    expect(composed.text).toContain("Nine to five.");
+    expect(composed.text).toContain("About page footer.");
+    expect(composed.text).not.toContain("Default footer.");
+    expect(composed.text).not.toContain("Layout default content.");
+    expect(composed.text).not.toContain("<slot");
+
+    // An include on its own: the fragment's own defaults, inside a shell that
+    // carries the default layout's <html>, <head> and <body> start tag but
+    // NONE of the layout's body.
+    const card = await get("_includes/card.fragment.html");
+    expect(card.status).toBe(200);
+    expect(card.text).toContain('<html lang="en-GB">');
+    expect(card.text).toContain('<link rel="stylesheet" href="/assets/site.css">');
+    expect(card.text).toContain('<body class="zebra">');
+    expect(card.text).toContain("Untitled card");
+    expect(card.text).toContain("Nothing here yet.");
+    expect(card.text).not.toContain("<nav>");
+    expect(card.text).not.toContain("<footer>");
+    expect(card.text).toContain('name="layout"'); // an include's selector offers a layout too
+
+    // The same include filled the way a chosen page fills it (§32).
+    const filled = await get("_includes/card.fragment.html?page=about.html");
+    expect(filled.status).toBe(200);
+    expect(filled.text).toContain("Opening hours");
+    expect(filled.text).toContain("Nine to five.");
+    expect(filled.text).not.toContain("Untitled card");
+    expect(filled.text).not.toContain("<nav>");
+
+    // An include with no slots previews too, assets resolved from its own file.
+    const nav = await get("_includes/nav.html");
+    expect(nav.status).toBe(200);
+    expect(nav.text).toContain('<img src="/assets/logo.svg"');
+
+    // A page redirects to the address the page map gives it.
+    const pageRes = await get("about.html");
+    expect(pageRes.status).toBe(302);
+    expect(pageRes.location).toBe("/about/");
+
+    // Not a source file, or outside the tree: 404, like the rest of /_unify/.
+    expect((await get("missing.html")).status).toBe(404);
+    expect((await get("assets/site.css")).status).toBe(404);
+    expect((await get("../package.json")).status).toBe(404);
+
+    // Served, never written (§27.1).
+    d.proc.kill("SIGTERM");
+    await sleep(300);
+    expect(existsSync(join(tmp, "dist", "_unify"))).toBe(false);
+    for (const rel of readdirSync(join(tmp, "dist"))) expect(rel).not.toContain("preview");
+    covers("DEV-07");
+  }, 60_000);
 });

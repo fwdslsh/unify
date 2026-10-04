@@ -78,6 +78,7 @@ import { extname, resolve } from "node:path";
 import { UsageError } from "./diagnostics.js";
 import { renderPending } from "./dev-report.js";
 import { renderPageMap } from "./page-map.js";
+import { PREVIEW_PATH } from "./preview.js";
 import { contains } from "./paths.js";
 
 /** Namespaced so a real site path can never collide with it. */
@@ -334,7 +335,7 @@ function openReloadStream(res, clients) {
  * @param {() => string} report - the current §27 report, read at request time
  *   so a request always gets the latest FINISHED one (§27.4)
  */
-function handleRequest(req, res, outputDir, clients, report, pages) {
+async function handleRequest(req, res, outputDir, clients, report, pages, preview) {
   // `req.url` is a path under `node:http` and was an absolute URL under
   // `Bun.serve`; a base makes both parse, and an absolute-form request line
   // (what a proxy sends) still wins over the base, as it did before.
@@ -354,6 +355,16 @@ function handleRequest(req, res, outputDir, clients, report, pages) {
   // /_unify/ that answers; every other one is the 404 below.
   if (url.pathname === PAGES_PATH) {
     return respond(res, 200, "application/json; charset=utf-8", pages());
+  }
+  // §27.7 — the source preview: composed on request from the source tree,
+  // served with the reload script so an edit re-renders it, written nowhere.
+  if (preview && url.pathname.startsWith(PREVIEW_PATH)) {
+    const result = await preview(decodeURIComponent(url.pathname.slice(PREVIEW_PATH.length)), url.searchParams);
+    if (result.status === 302) {
+      res.writeHead(302, { location: result.location, "content-length": 0 });
+      return res.end();
+    }
+    return respond(res, result.status, "text/html; charset=utf-8", injectReloadScript(result.html));
   }
   // §27.2's directory redirect — "as any directory would" is the web's
   // convention, not a symmetry with the static half below, which does not
@@ -404,18 +415,20 @@ function handleRequest(req, res, outputDir, clients, report, pages) {
  * @param {string} [args.pages] - the §27.6 page map served at `/_unify/pages.json`,
  *   replaced by `setPages` after every completed build; the default answers
  *   before the first build with an empty map that says so (`built: false`).
+ * @param {(relPath: string, params: URLSearchParams) => Promise<{status: number, html?: string, location?: string}>} [args.preview] -
+ *   the §27.7 renderer for `/_unify/preview/<path>`; without one the path is a 404 like the rest of /_unify/.
  * @returns {Promise<{url: string, port: number, notifyReload(): void, setReport(html: string): void, setPages(json: string): void, stop(): void}>}
  * @throws {UsageError} when the port is already in use (§14.1, exit 2)
  */
-export async function createDevServer({ outputDir, port, report = renderPending(), pages = renderPageMap({ sourceRoot: "", documents: [], built: false }) }) {
+export async function createDevServer({ outputDir, port, report = renderPending(), pages = renderPageMap({ sourceRoot: "", documents: [], built: false }), preview = null }) {
   /** @type {Set<() => void>} */
   const clients = new Set();
   let currentReport = report;
   let currentPages = pages;
 
-  const server = createServer((req, res) => {
+  const server = createServer(async (req, res) => {
     try {
-      handleRequest(req, res, outputDir, clients, () => currentReport, () => currentPages);
+      await handleRequest(req, res, outputDir, clients, () => currentReport, () => currentPages, preview);
     } catch {
       // A throw on the request path (a malformed percent-escape reaching
       // `decodeURIComponent` is the realistic one) used to become Bun's own

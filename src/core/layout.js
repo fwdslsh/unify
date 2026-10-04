@@ -479,7 +479,7 @@ function resolveExplicitPath(value, { declaringFile, roots, at, reporter, spelli
  * @param {string[]} roots - the namespace, from `resolutionRoots`
  * @returns {string|null} absolute path of the layout, or null
  */
-function walkForLayout(declaringFile, roots) {
+export function walkForLayout(declaringFile, roots) {
   const from = virtualOf(roots, declaringFile);
   if (from === null) return null;
   let dir = posix.dirname(from);
