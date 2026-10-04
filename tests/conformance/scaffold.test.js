@@ -25,7 +25,7 @@
  * layout or by §8's merge rather than written on the page that ships them.
  */
 import { test } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { join, relative, sep } from "node:path";
 import { CLI, ROOT, covers, mkTmp, runCli } from "./support.mjs";
@@ -1419,6 +1419,11 @@ test("scaffold: SCF-13 a template is a directory, a git repository or an npm pac
   for (const rel of [...expected.keys()]) {
     if (rel === "package.json" || rel === "package-lock.json" || rel.startsWith("node_modules")) expected.delete(rel);
   }
+  // §19.10 — the record init writes names the SOURCE, so it differs per
+  // scaffold by design; in the template it is the manifest (packaging, never
+  // copied). Compared separately in SCF-15; left out of the byte comparisons.
+  expected.delete("unify.template.json");
+  const scaffolded = (dir) => { const t = readTree(dir); t.delete("unify.template.json"); return t; };
 
   // ---- a directory, by relative and by absolute path ---------------------
   for (const [label, arg, cwdOf] of [
@@ -1438,7 +1443,7 @@ test("scaffold: SCF-13 a template is a directory, a git repository or an npm pac
     })();
     const r = await runCli(["init", ...argv], cwdOf(tmp));
     if (r.exit !== 0) throw new Error(`unify init <${label} directory> exited ${r.exit}:\n${r.stderr}`);
-    const got = readTree(tmp);
+    const got = scaffolded(tmp);
     for (const [rel, bytes] of expected) {
       if (!got.has(rel)) throw new Error(`${label}: ${rel} was not scaffolded`);
       if (!got.get(rel).equals(bytes)) throw new Error(`${label}: ${rel} differs from the template`);
@@ -1470,7 +1475,7 @@ test("scaffold: SCF-13 a template is a directory, a git repository or an npm pac
     const tmp = mkTmp();
     const r = await runCli(["init", `file://${bare}/templates/blog#release`], tmp);
     if (r.exit !== 0) throw new Error(`unify init <git url>/<subdirectory>#ref exited ${r.exit}:\n${r.stderr}`);
-    const got = readTree(tmp);
+    const got = scaffolded(tmp);
     if ([...got.keys()].some((k) => k === ".git" || k.startsWith(".git/") || k === "README.md")) throw new Error("the checkout outside the subdirectory leaked into the scaffold");
     for (const [rel, bytes] of expected) {
       if (!got.has(rel) || !got.get(rel).equals(bytes)) throw new Error(`git: ${rel} missing or differs from the template`);
@@ -1600,4 +1605,123 @@ test("scaffold: SCF-14 --audit keeps a scaffold only if it audits clean; a findi
   }
 
   covers("SCF-14");
+}, TEST_MS * 3);
+
+// ------------------------------------------------------- SCF-15 / UPD-01..03
+
+test("scaffold: SCF-15 + UPD-01..03 — init records the template; update brings a git template's next commit in three-way, through the real CLI", async () => {
+  // A template repository at v1: a project laid out as init lays one out,
+  // with a manifest naming the files a site owns.
+  const host = mkTmp();
+  const v1 = {
+    "site/_layout.html": '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><title>Lab</title><meta name="description" content="lab reports"></head><body><main></main></body></html>\n',
+    "site/index.html": "<!doctype html>\n<html><head><title>Home</title><meta name=\"description\" content=\"home\"></head><body><main><h1>v1</h1></main></body></html>\n",
+    "site/config.json": '{"lab": "CHANGE ME"}\n',
+    "AGENTS.md": "# agents v1\n",
+    "unify.template.json": '{"owned": ["site/config.json", "site/reports/**"]}\n',
+  };
+  for (const [rel, text] of Object.entries(v1)) { mkdirSync(join(host, rel, ".."), { recursive: true }); writeFileSync(join(host, rel), text); }
+  git(host, "init", "-q", "-b", "main");
+  git(host, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "add", "-A");
+  git(host, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", "v1");
+  const bare = `${host}.git`;
+  git(host, "clone", "-q", "--bare", host, bare);
+  const url = `file://${bare}`;
+
+  // ---- init records source, revision and hashes; the record never ships (SCF-15)
+  const tmp = mkTmp();
+  const r = await runCli(["init", url], tmp);
+  if (r.exit !== 0) throw new Error(`unify init <git url> exited ${r.exit}:\n${r.stderr}`);
+  if (!r.stdout.includes("recorded the template in unify.template.json")) throw new Error(`init must say it recorded the template:\n${r.stdout}`);
+  const record = JSON.parse(readFileSync(join(tmp, "unify.template.json"), "utf8"));
+  if (record.schemaVersion !== 1 || record.source !== url || record.sourceDir !== "site") throw new Error(`record is wrong: ${JSON.stringify(record)}`);
+  if (!/^[0-9a-f]{40}$/.test(record.revision)) throw new Error(`a git template's revision must be the commit, got ${record.revision}`);
+  if (JSON.stringify(record.owned) !== JSON.stringify(["site/config.json", "site/reports/**"])) throw new Error(`owned must come from the template's manifest: ${JSON.stringify(record.owned)}`);
+  if (Object.keys(record.files).sort().join(",") !== "AGENTS.md,site/_layout.html,site/config.json,site/index.html") throw new Error(`record.files: ${Object.keys(record.files)}`);
+  if (existsSync(join(tmp, "site", "unify.template.json"))) throw new Error("the template's manifest was copied as content");
+  const dry = await runCli(["build", "--dry-run", "--strict"], tmp);
+  if (dry.exit !== 0) throw new Error(`build --dry-run --strict exited ${dry.exit}\n${dry.stdout}${dry.stderr}`);
+  if (/unify\.template\.json/.test(dry.stdout)) throw new Error(`the record must never publish:\n${dry.stdout}`);
+  // The same version is a no-op (UPD-02).
+  const same = await runCli(["update"], tmp);
+  if (same.exit !== 0 || !same.stdout.includes("nothing to do")) throw new Error(`same version must be a no-op: exit ${same.exit}\n${same.stdout}${same.stderr}`);
+
+  // ---- the site configures and authors; the template moves to v2
+  writeFileSync(join(tmp, "site", "config.json"), '{"lab": "Mine"}\n');
+  mkdirSync(join(tmp, "site", "reports"), { recursive: true });
+  writeFileSync(join(tmp, "site", "reports", "2026-01.md"), "---\ntitle: Jan\ndescription: d\n---\n# Jan\n");
+  writeFileSync(join(tmp, "site", "_layout.html"), v1["site/_layout.html"].replace("<main>", "<!-- my theme --><main>"));
+  writeFileSync(join(tmp, ".env"), "SECRET=1\n");
+  writeFileSync(join(host, "site", "index.html"), v1["site/index.html"].replace("v1", "v2"));
+  writeFileSync(join(host, "site", "_layout.html"), v1["site/_layout.html"].replace("Lab", "Lab Reports"));
+  writeFileSync(join(host, "site", "config.json"), '{"lab": "NEW SEED"}\n');
+  mkdirSync(join(host, "site", "reports"), { recursive: true });
+  writeFileSync(join(host, "site", "reports", "seed.md"), "---\ntitle: Seed\ndescription: d\n---\n# Seed\n");
+  rmSync(join(host, "AGENTS.md"));
+  writeFileSync(join(host, "DEPLOY.md"), "# deploy v2\n");
+  git(host, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "add", "-A");
+  git(host, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", "v2");
+  git(host, "push", "-q", bare, "main");
+
+  // ---- preview writes nothing (UPD-02)
+  const preview = await runCli(["update", "--dry-run"], tmp);
+  if (preview.exit !== 1) throw new Error(`a preview with a conflict exits 1, got ${preview.exit}\n${preview.stdout}${preview.stderr}`);
+  for (const line of ["would update site/index.html", "would add site/reports/seed.md", "would add DEPLOY.md", "would remove AGENTS.md", "conflict site/_layout.html: changed locally and in the template"]) {
+    if (!preview.stdout.includes(line)) throw new Error(`preview lacks "${line}":\n${preview.stdout}`);
+  }
+  if (preview.stdout.includes("config.json")) throw new Error(`an owned file is never reported:\n${preview.stdout}`);
+  if (!readFileSync(join(tmp, "site", "index.html"), "utf8").includes("v1") || existsSync(join(tmp, "DEPLOY.md"))) throw new Error("--dry-run wrote");
+  if (JSON.parse(readFileSync(join(tmp, "unify.template.json"), "utf8")).revision !== record.revision) throw new Error("--dry-run rewrote the record");
+
+  // ---- apply (UPD-02): unchanged files update, owned and authored files are byte-identical, the edit is a conflict
+  const applied = await runCli(["update"], tmp);
+  if (applied.exit !== 1) throw new Error(`an update with a conflict exits 1, got ${applied.exit}\n${applied.stdout}${applied.stderr}`);
+  if (!readFileSync(join(tmp, "site", "index.html"), "utf8").includes("v2")) throw new Error("index.html was not updated");
+  if (readFileSync(join(tmp, "DEPLOY.md"), "utf8") !== "# deploy v2\n") throw new Error("DEPLOY.md was not added");
+  if (readFileSync(join(tmp, "site", "reports", "seed.md"), "utf8") !== "---\ntitle: Seed\ndescription: d\n---\n# Seed\n") throw new Error("an owned seed the site lacks is added once");
+  if (existsSync(join(tmp, "AGENTS.md"))) throw new Error("AGENTS.md, untouched locally and gone upstream, must be removed");
+  for (const [rel, text] of [["site/config.json", '{"lab": "Mine"}\n'], ["site/reports/2026-01.md", "---\ntitle: Jan\ndescription: d\n---\n# Jan\n"], [".env", "SECRET=1\n"]]) {
+    if (readFileSync(join(tmp, rel), "utf8") !== text) throw new Error(`${rel} must be byte-identical after an update`);
+  }
+  if (!readFileSync(join(tmp, "site", "_layout.html"), "utf8").includes("my theme")) throw new Error("a conflicting file must keep the site's bytes");
+  const after = JSON.parse(readFileSync(join(tmp, "unify.template.json"), "utf8"));
+  if (after.revision === record.revision || !/^[0-9a-f]{40}$/.test(after.revision)) throw new Error("the record must move to the new commit");
+  if (after.files["site/_layout.html"] !== record.files["site/_layout.html"]) throw new Error("a conflicting file keeps its old baseline hash");
+  if ("AGENTS.md" in after.files || !("DEPLOY.md" in after.files)) throw new Error(`record.files not updated: ${Object.keys(after.files)}`);
+
+  // ---- again: the conflict is still visible, nothing else changes; taking the template's version resolves it
+  const again = await runCli(["update"], tmp);
+  if (again.exit !== 1 || !again.stdout.includes("conflict site/_layout.html") || /^(update|add|remove) /m.test(again.stdout)) throw new Error(`re-running must show only the conflict:\n${again.stdout}`);
+  writeFileSync(join(tmp, "site", "_layout.html"), readFileSync(join(host, "site", "_layout.html")));
+  const resolved = await runCli(["update"], tmp);
+  if (resolved.exit !== 0 || !resolved.stdout.includes("nothing to do")) throw new Error(`taking the template's version resolves the conflict: exit ${resolved.exit}\n${resolved.stdout}`);
+  // The updated project still builds as a site, and the record still never publishes.
+  const rebuilt = await runCli(["build", "--dry-run", "--strict"], tmp);
+  if (rebuilt.exit !== 0 || /unify\.template\.json/.test(rebuilt.stdout)) throw new Error(`the updated site must build clean without publishing the record: exit ${rebuilt.exit}\n${rebuilt.stdout}${rebuilt.stderr}`);
+
+  // ---- safety (UPD-03): a symlink is refused, an unreachable source changes nothing
+  const elsewhere = mkTmp();
+  writeFileSync(join(elsewhere, "target"), "outside\n");
+  rmSync(join(tmp, "site", "index.html"));
+  symlinkSync(join(elsewhere, "target"), join(tmp, "site", "index.html"));
+  writeFileSync(join(host, "site", "index.html"), v1["site/index.html"].replace("v1", "v3"));
+  git(host, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-am", "v3");
+  git(host, "push", "-q", bare, "main");
+  const sym = await runCli(["update"], tmp);
+  if (sym.exit !== 1 || !sym.stdout.includes("conflict site/index.html: it is a symlink")) throw new Error(`a symlink must be a conflict:\n${sym.stdout}${sym.stderr}`);
+  if (readFileSync(join(elsewhere, "target"), "utf8") !== "outside\n") throw new Error("the symlink was followed");
+  const unreachable = await runCli(["update", `file://${mkTmp()}/missing.git`], tmp);
+  if (unreachable.exit !== 2 || !/git clone failed/.test(unreachable.stderr)) throw new Error(`an unreachable source is a usage error: ${unreachable.exit}\n${unreachable.stderr}`);
+
+  // ---- recovery (UPD-01): no record → exit 2 naming --adopt; --adopt at the installed commit restores the baseline
+  rmSync(join(tmp, "unify.template.json"));
+  const missing = await runCli(["update"], tmp);
+  if (missing.exit !== 2 || !missing.stderr.includes("unify update --adopt <source>")) throw new Error(`a missing record is a usage error naming --adopt: ${missing.exit}\n${missing.stderr}`);
+  const adopt = await runCli(["update", "--adopt", `${url}#${after.revision}`], tmp);
+  if (adopt.exit !== 0 || !adopt.stdout.includes("no file was changed")) throw new Error(`--adopt: exit ${adopt.exit}\n${adopt.stdout}${adopt.stderr}`);
+  if (JSON.parse(readFileSync(join(tmp, "unify.template.json"), "utf8")).revision !== after.revision) throw new Error("--adopt must record the commit named");
+  const adoptElsewhere = await runCli(["init", "--adopt", "basic"], mkTmp());
+  if (adoptElsewhere.exit !== 2) throw new Error("--adopt belongs to update alone");
+
+  covers("SCF-15", "UPD-01", "UPD-02", "UPD-03");
 }, TEST_MS * 3);

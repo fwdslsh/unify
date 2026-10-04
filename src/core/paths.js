@@ -10,7 +10,7 @@ import { existsSync, statSync } from "node:fs";
 import { isAbsolute, posix, relative, resolve, sep } from "node:path";
 
 /** Never emitted, independent of --exclude and not replaceable by it (§4.3). */
-const NEVER_SHIPPED = [".git", ".hg", ".svn", "node_modules", ".env", "unify.yaml"];
+const NEVER_SHIPPED = [".git", ".hg", ".svn", "node_modules", ".env", "unify.yaml", "unify.template.json"];
 
 /**
  * Is `candidate` inside `root` (or the root itself)?
@@ -264,4 +264,61 @@ export function nameOf(roots, absolutePath) {
  */
 export function locateVirtual(roots, virtualPath) {
   return locateExisting(roots, virtualPath) ?? resolve(roots[0], virtualPath);
+}
+
+// ------------------------------------------------- §4.1 — the exclusion glob
+
+/**
+ * §4.1: a pattern with no `/` is tested against every path segment (the
+ * `--exclude` matcher; §19.10's `owned` patterns use the same grammar); a
+ * pattern with `/` is tested against the full relative path, with `*`
+ * (within a segment), `**` (across segments), `?`, and `[...]` supported.
+ */
+export function isExcluded(relPath, patterns) {
+  const segments = relPath.split("/");
+  for (const pattern of patterns) {
+    if (pattern.includes("/")) {
+      if (globToRegExp(pattern, { multiSegment: true }).test(relPath)) return true;
+    } else {
+      const re = globToRegExp(pattern, { multiSegment: false });
+      if (segments.some((seg) => re.test(seg))) return true;
+    }
+  }
+  return false;
+}
+
+const GLOB_CACHE = new Map();
+
+function globToRegExp(pattern, { multiSegment }) {
+  const cacheKey = `${multiSegment} ${pattern}`;
+  const cached = GLOB_CACHE.get(cacheKey);
+  if (cached) return cached;
+
+  let src = "";
+  for (let i = 0; i < pattern.length; i++) {
+    if (multiSegment && pattern.startsWith("**", i)) {
+      src += ".*";
+      i++;
+      continue;
+    }
+    const c = pattern[i];
+    if (c === "*") {
+      src += "[^/]*";
+    } else if (c === "?") {
+      src += "[^/]";
+    } else if (c === "[") {
+      const close = pattern.indexOf("]", i + 1);
+      if (close === -1) {
+        src += "\\[";
+      } else {
+        src += pattern.slice(i, close + 1);
+        i = close;
+      }
+    } else {
+      src += c.replace(/[.+^${}()|\\]/g, "\\$&");
+    }
+  }
+  const re = new RegExp(`^${src}$`);
+  GLOB_CACHE.set(cacheKey, re);
+  return re;
 }

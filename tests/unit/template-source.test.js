@@ -12,7 +12,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { classifyTemplateSource, loadTemplate } from "../../src/cli/template-source.js";
+import { classifyTemplateSource, fetchTemplate } from "../../src/cli/template-source.js";
 import { UsageError } from "../../src/core/diagnostics.js";
 
 const BUILT_INS = ["default", "basic", "blog"];
@@ -90,7 +90,7 @@ describe("classifyTemplateSource()", () => {
   });
 });
 
-describe("loadTemplate() — the npm path", () => {
+describe("fetchTemplate() — the npm path", () => {
   test("npm pack's tarball is unpacked whole: its package/ prefix dropped, its own package.json left behind, long paths read from pax headers", async () => {
     // A folder is the one spec `npm pack` resolves with no registry, so this
     // runs the real tool and reads a real npm tarball, offline.
@@ -104,7 +104,10 @@ describe("loadTemplate() — the npm path", () => {
     const long = `${"deeply-".repeat(12)}nested`;
     mkdirSync(join(pkg, "site", long), { recursive: true });
     writeFileSync(join(pkg, "site", long, "página.md"), "---\ntitle: ñ\n---\n# ñ\n");
-    const { files, rootFiles } = await loadTemplate({ kind: "npm", spec: pkg });
+    const { files, rootFiles, revision, sourceDir } = await fetchTemplate({ kind: "npm", spec: pkg }, pkg);
+    // §19.10 — the version npm resolved is the revision the record keeps.
+    expect(revision).toBe("0.0.1");
+    expect(sourceDir).toBe("site");
     expect(Object.keys(files).sort()).toEqual(["_includes/nav.html", `${long}/página.md`, "index.html"].sort());
     expect(Buffer.from(files["index.html"]).toString()).toBe("<!doctype html>\n<title>P</title>\n");
     expect(Buffer.from(files[`${long}/página.md`]).toString()).toBe("---\ntitle: ñ\n---\n# ñ\n");

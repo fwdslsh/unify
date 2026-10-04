@@ -57,11 +57,14 @@ import { dirname, join, resolve } from "node:path";
 import { gunzipSync } from "node:zlib";
 import { UsageError } from "../core/diagnostics.js";
 import { resolveSource, toRelative } from "../core/paths.js";
+import { RECORD_FILE, readOwned } from "./template-record.js";
+import { TEMPLATES, TEMPLATE_ROOT_FILES } from "../templates/index.js";
+import pkg from "../../package.json" with { type: "json" };
 
 /** Never copied out of a template, at any depth: version control and installed dependencies. */
 const SKIPPED_DIRS = new Set([".git", "node_modules"]);
 /** Never copied from a template's root: the template's own packaging. */
-const SKIPPED_ROOT_FILES = new Set(["package.json", "package-lock.json", "npm-shrinkwrap.json", "bun.lock", "bun.lockb", "yarn.lock", "pnpm-lock.yaml"]);
+const SKIPPED_ROOT_FILES = new Set(["package.json", "package-lock.json", "npm-shrinkwrap.json", "bun.lock", "bun.lockb", "yarn.lock", "pnpm-lock.yaml", RECORD_FILE]);
 
 /**
  * @typedef {{kind: "builtin", name: string}
@@ -111,7 +114,7 @@ export const NPM_TEMPLATE = /^(@[a-z0-9][a-z0-9._-]*\/)?unify-[a-z0-9][a-z0-9._-
  * Three spellings name a repository: a URL with a scheme (`https://`, `ssh://`,
  * `git://`, `file://`), the scp-like address git itself accepts
  * (`git@host:owner/repo`), and any path with a segment ending in `.git`. A
- * trailing `#ref` names a branch or tag. The segments after the repository
+ * trailing `#ref` names a branch, a tag, or a commit (7 to 40 hex digits). The segments after the repository
  * are a subdirectory inside it: after the `.git` segment where there is one,
  * else after `host/owner/repo` (never for `file://`, whose path is a
  * filesystem path with no owner/repo shape — there, `.git` is the only
@@ -166,19 +169,36 @@ export function parseGitSource(arg) {
 }
 
 /**
- * Fetch (where needed) and read a non-built-in template into the two maps
- * `init` writes: the source tree, and the files beside it.
- *
- * @param {TemplateSource} source - never `builtin`; the registry handles that
- * @returns {Promise<{files: Record<string, Uint8Array>, rootFiles: Record<string, Uint8Array>}>}
+ * @typedef {object} Template
+ * @property {Record<string, Uint8Array|string>} files - source-root-relative path → content
+ * @property {Record<string, Uint8Array|string>} rootFiles - project-root-relative path → content
+ * @property {string|null} sourceDir - the template's own source directory (`site`, `src`), null for a bare source tree
+ * @property {string[]} owned - §19.10: the template's site-owned patterns, from its `unify.template.json`
+ * @property {string|null} revision - what was fetched: a git commit, an npm version, unify's own version for a built-in, null for a directory
+ * @property {string} label - the source as the author wrote it
  */
-export async function loadTemplate(source) {
-  if (source.kind === "dir") return readTemplateTree(source.path, source.path);
+
+/**
+ * Fetch (where needed) and read a template into the two maps `init` writes
+ * (and `update` compares), plus the revision that was fetched.
+ *
+ * @param {TemplateSource} source
+ * @param {string} label - the positional as written
+ * @returns {Promise<Template>}
+ */
+export async function fetchTemplate(source, label) {
+  if (source.kind === "builtin") {
+    // §19.9/§19.5 — the embedded copy of templates/<name>/; its revision is
+    // the unify that carries it, which is what `unify update` compares after
+    // an upgrade.
+    return { files: TEMPLATES[source.name], rootFiles: TEMPLATE_ROOT_FILES[source.name] ?? {}, sourceDir: "site", owned: [], revision: pkg.version, label };
+  }
+  if (source.kind === "dir") return { ...readTemplateTree(source.path, label), revision: null, label };
 
   const scratch = mkdtempSync(join(tmpdir(), "unify-init-"));
   try {
-    const root = source.kind === "git" ? await cloneGit(source, scratch) : await packNpm(source, scratch);
-    return readTemplateTree(root, source.kind === "git" ? `${source.url}${source.subdir ? `/${source.subdir}` : ""}` : source.spec);
+    const { dir, revision } = source.kind === "git" ? await cloneGit(source, scratch) : await packNpm(source, scratch);
+    return { ...readTemplateTree(dir, label), revision, label };
   } finally {
     rmSync(scratch, { recursive: true, force: true });
   }
@@ -190,7 +210,7 @@ export async function loadTemplate(source) {
  *
  * @param {string} root - the template's directory
  * @param {string} label - how the author named it, for the empty-template error
- * @returns {{files: Record<string, Uint8Array>, rootFiles: Record<string, Uint8Array>}}
+ * @returns {{files: Record<string, Uint8Array>, rootFiles: Record<string, Uint8Array>, sourceDir: string|null, owned: string[]}}
  */
 export function readTemplateTree(root, label) {
   const { root: sourceDir, defaulted } = resolveSource(undefined, root);
@@ -209,7 +229,9 @@ export function readTemplateTree(root, label) {
       "a directory with neither site/ nor src/ is read as a bare source tree, so it must hold at least one file",
     ]);
   }
-  return { files, rootFiles };
+  // §19.10 — the template's own manifest names the files a site owns after
+  // init; it is packaging (never copied), read here and recorded by init.
+  return { files, rootFiles, sourceDir: defaulted ? null : toRelative(root, sourceDir), owned: readOwned(join(root, RECORD_FILE)) };
 }
 
 /** @param {string} dir @param {string} abs */
@@ -244,18 +266,21 @@ function walk(dir) {
  * @param {string} tool
  * @param {string[]} args
  * @param {Record<string, string>} [env]
- * @returns {Promise<{code: number, stderr: string}>}
+ * @param {boolean} [captureStdout] - keep stdout too (a `git rev-parse` answer); otherwise it is discarded
+ * @returns {Promise<{code: number, stdout: string, stderr: string}>}
  */
-function runTool(tool, args, env = {}) {
+function runTool(tool, args, env = {}, captureStdout = false) {
   return new Promise((done, fail) => {
     // On Windows `npm` is `npm.cmd`, which node can only run through a shell;
     // `git` is a real executable everywhere. Every argument that reaches the
     // shell is unify's own or matched NPM_TEMPLATE (letters, digits, `.`,
     // `_`, `-`, `@`, `/`), so nothing in it can break out of the command.
     const shell = tool === "npm" && process.platform === "win32";
-    const proc = spawn(tool, args, { env: { ...process.env, ...env }, stdio: ["ignore", "ignore", "pipe"], shell });
+    const proc = spawn(tool, args, { env: { ...process.env, ...env }, stdio: ["ignore", captureStdout ? "pipe" : "ignore", "pipe"], shell });
     const chunks = [];
+    const out = [];
     proc.stderr.on("data", (chunk) => chunks.push(chunk));
+    if (captureStdout) proc.stdout.on("data", (chunk) => out.push(chunk));
     proc.on("error", (err) => {
       if (err.code === "ENOENT") {
         fail(new UsageError(`${tool} is not installed or not on PATH`, [
@@ -265,7 +290,7 @@ function runTool(tool, args, env = {}) {
         ]));
       } else fail(err);
     });
-    proc.on("close", (code) => done({ code: code ?? 1, stderr: Buffer.concat(chunks).toString() }));
+    proc.on("close", (code) => done({ code: code ?? 1, stdout: Buffer.concat(out).toString(), stderr: Buffer.concat(chunks).toString() }));
   });
 }
 
@@ -280,25 +305,46 @@ function tail(stderr) {
  * subdirectory of it.
  * @param {{url: string, ref: string|null, subdir: string|null}} source
  * @param {string} scratch
- * @returns {Promise<string>} the template's path inside the checkout
+ * @returns {Promise<{dir: string, revision: string}>} the template's path inside the checkout, and the commit checked out
  */
 async function cloneGit({ url, ref, subdir }, scratch) {
   const dest = join(scratch, "repo");
-  const args = ["clone", "--depth", "1", "--quiet", ...(ref ? ["--branch", ref] : []), "--", url, dest];
+  // `--branch` takes a branch or a tag, never a commit — and a commit is what
+  // the record holds (§19.10), so `unify update --adopt <url>#<commit>` must
+  // work. A ref that reads as a commit id clones the history and checks it
+  // out; anything else is a shallow clone of that branch or tag.
+  const commit = ref !== null && /^[0-9a-f]{7,40}$/.test(ref);
+  const args = commit
+    ? ["clone", "--quiet", "--", url, dest]
+    : ["clone", "--depth", "1", "--quiet", ...(ref ? ["--branch", ref] : []), "--", url, dest];
   const { code, stderr } = await runTool("git", args, { GIT_TERMINAL_PROMPT: "0" });
   if (code !== 0) {
     throw new UsageError(`git clone failed (exit ${code}) for ${url}${ref ? `#${ref}` : ""}${stderr.trim() ? `: ${tail(stderr)}` : ""}`, [
-      "check the URL and the branch or tag, and that you can clone the repository with git yourself",
+      "check the URL and the branch, tag or commit, and that you can clone the repository with git yourself",
     ]);
   }
-  if (subdir === null) return dest;
+  if (commit) {
+    const out = await runTool("git", ["-C", dest, "checkout", "--quiet", "--detach", ref]);
+    if (out.code !== 0) {
+      throw new UsageError(`git checkout failed (exit ${out.code}) for ${url}#${ref}${out.stderr.trim() ? `: ${tail(out.stderr)}` : ""}`, [
+        "check that the commit exists in the repository",
+      ]);
+    }
+  }
+  // The commit the checkout is at — the revision `unify update` records
+  // (§19.10). git wrote it; reading HEAD through git keeps packed refs and
+  // a detached `--branch <tag>` checkout both right.
+  const head = await runTool("git", ["-C", dest, "rev-parse", "HEAD"], {}, true);
+  if (head.code !== 0) throw new UsageError(`git rev-parse failed (exit ${head.code}) in the clone of ${url}${head.stderr.trim() ? `: ${tail(head.stderr)}` : ""}`);
+  const revision = head.stdout.trim();
+  if (subdir === null) return { dir: dest, revision };
   const inside = join(dest, ...subdir.split("/"));
   if (!existsSync(inside) || !statSync(inside).isDirectory()) {
     throw new UsageError(`${url}${ref ? `#${ref}` : ""} has no directory ${subdir}`, [
       "check the path after the repository; it is read inside the checkout",
     ]);
   }
-  return inside;
+  return { dir: inside, revision };
 }
 
 /**
@@ -306,7 +352,7 @@ async function cloneGit({ url, ref, subdir }, scratch) {
  * produced. The author's `.npmrc` decides the registry and the credentials.
  * @param {{spec: string}} source
  * @param {string} scratch
- * @returns {Promise<string>} the unpacked package's path
+ * @returns {Promise<{dir: string, revision: string|null}>} the unpacked package's path, and its version
  */
 async function packNpm({ spec }, scratch) {
   const { code, stderr } = await runTool("npm", ["pack", spec, "--pack-destination", scratch, "--ignore-scripts", "--loglevel=error"]);
@@ -327,7 +373,17 @@ async function packNpm({ spec }, scratch) {
     mkdirSync(dirname(abs), { recursive: true });
     writeFileSync(abs, data);
   }
-  return dest;
+  // The version npm resolved the spec to — the revision `unify update`
+  // records (§19.10). The package's own package.json is the one place it is
+  // written; it stays in the scratch directory, never in the scaffold.
+  let revision = null;
+  try {
+    const version = JSON.parse(readFileSync(join(dest, "package.json"), "utf8")).version;
+    if (typeof version === "string") revision = version;
+  } catch {
+    // no readable package.json: the version is simply unknown
+  }
+  return { dir: dest, revision };
 }
 
 /**

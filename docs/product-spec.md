@@ -52,6 +52,7 @@ unify build         # write the final site to dist/
 my-site/
 ├── AGENTS.md             # outside site/, so it cannot publish (§6.7)
 ├── DEPLOY.md             # the deployment recipe
+├── unify.template.json   # the template record `unify update` reads (§19.10); never publishes
 └── site/                 # the source root — everything here ships
     ├── _layout.html      # the site chrome — one complete HTML page
     ├── _includes/
@@ -264,6 +265,7 @@ unify audit                evaluate the site the build would publish — writes 
 unify dev                  build, watch, serve, and reload — the inner loop
 unify watch                build + rebuild on change, no server (pair with your own)
 unify init [template]      scaffold a starter site: a built-in (default, basic, blog, docs, portfolio), a directory, a git repository (URL, optionally /<subdirectory> and #ref) or an npm package named unify-<name>-template; --audit keeps the scaffold only if it audits clean
+unify update [template]    bring the recorded template's later version in (or the one named): unchanged files update, local edits are kept and reported as conflicts; --dry-run previews; --adopt records a template without changing files
 
 Options:
   -s, --source <dir>       source directory (default: site/ if it exists, else src/, else .)

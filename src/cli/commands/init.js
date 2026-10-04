@@ -54,9 +54,10 @@ import { existsSync, mkdirSync, rmdirSync, rmSync, statSync, writeFileSync } fro
 import { dirname, join, resolve } from "node:path";
 import { Reporter, UsageError } from "../../core/diagnostics.js";
 import { contains, toRelative } from "../../core/paths.js";
-import { TEMPLATES, TEMPLATE_ROOT_FILES } from "../../templates/index.js";
+import { TEMPLATES } from "../../templates/index.js";
 import { resolveSettings } from "../settings.js";
-import { classifyTemplateSource, loadTemplate } from "../template-source.js";
+import { buildRecord, RECORD_FILE, serializeRecord } from "../template-record.js";
+import { classifyTemplateSource, fetchTemplate } from "../template-source.js";
 
 const DEFAULT_TEMPLATE = "default";
 
@@ -84,20 +85,14 @@ export async function init({ sourceRoot, sourceDefaulted, template, reporter, au
   // name wins over a directory of the same name in the working directory:
   // `unify init blog` means the registry's blog, and `./blog` names the
   // directory.
-  const source = classifyTemplateSource(template ?? DEFAULT_TEMPLATE, Object.keys(TEMPLATES), projectRoot);
   const label = template ?? DEFAULT_TEMPLATE;
-  let files;
-  let rootFiles;
-  if (source.kind === "builtin") {
-    // §19.4/§19.6/§19.8 — the source tree, and the project-root files: AGENTS.md,
-    // DEPLOY.md and the all-commented unify.yaml for every template, plus
-    // whatever this template keeps beside the source tree (the blog's
-    // scripts/gen.mjs; the docs template's unify.yaml with catalog: true live).
-    files = TEMPLATES[source.name];
-    rootFiles = TEMPLATE_ROOT_FILES[source.name] ?? {};
-  } else {
-    ({ files, rootFiles } = await loadTemplate(source));
-  }
+  const source = classifyTemplateSource(label, Object.keys(TEMPLATES), projectRoot);
+  // §19.4/§19.6/§19.8 — a built-in's source tree and project-root files
+  // (AGENTS.md, DEPLOY.md, the all-commented unify.yaml, the blog's
+  // scripts/gen.mjs) come from the registry; every other source is fetched
+  // and read into the same two maps (§19.9).
+  const fetched = await fetchTemplate(source, label);
+  const { files, rootFiles } = fetched;
 
   // An explicit --source (or an already-existing site/ or src/, which
   // resolveSource treats the same way) names the scaffold target directly,
@@ -155,9 +150,16 @@ export async function init({ sourceRoot, sourceDefaulted, template, reporter, au
     );
   }
 
+  // §19.10 — the record of what was scaffolded, for `unify update`: the
+  // source as typed, the revision fetched, and a hash of every file the
+  // template provided. A project-root write like the others (collision-
+  // checked, rolled back with them), and on §4.3's never-shipped list, so it
+  // is left out of the refusal above: wherever it lands, it cannot publish.
+  const record = serializeRecord(buildRecord(fetched));
   const writes = [
     ...Object.entries(files).map(([relPath, content]) => [join(target, ...relPath.split("/")), content]),
     ...Object.entries(rootFiles).map(([relPath, content]) => [join(projectRoot, ...relPath.split("/")), content]),
+    [join(projectRoot, RECORD_FILE), record],
   ];
 
   // §19 doesn't say what happens when the target already has files; the
@@ -225,7 +227,8 @@ export async function init({ sourceRoot, sourceDefaulted, template, reporter, au
 
   const shown = toRelative(projectRoot, target) || ".";
   const atRoot = rootNames.length === 0 ? "" : `, ${rootNames.length === 2 ? rootNames.join(" and ") : rootNames.join(", ")} at the project root`;
-  reporter.summary(`scaffolded ${label} (${writes.length} files): ${Object.keys(files).length} into ${shown}${atRoot}`);
+  reporter.summary(`scaffolded ${label} (${writes.length - 1} files): ${Object.keys(files).length} into ${shown}${atRoot}`);
+  reporter.summary(`recorded the template in ${RECORD_FILE}: unify update brings in its later versions`);
 
   if (audit) {
     // §19.9 — the gate. The project is resolved exactly as a later `unify

@@ -53,7 +53,7 @@ import * as html from "../../core/html.js";
 import * as includes from "../../core/includes.js";
 import * as layout from "../../core/layout.js";
 import * as markdown from "../../core/markdown.js";
-import { contains, isNeverShipped, locateVirtual, nameOf, resolutionRoots, toRelative } from "../../core/paths.js";
+import { contains, isExcluded, isNeverShipped, locateVirtual, nameOf, resolutionRoots, toRelative } from "../../core/paths.js";
 import * as publishModule from "../../core/publish.js";
 import * as references from "../../core/references.js";
 import * as urls from "../../core/urls.js";
@@ -1450,56 +1450,3 @@ function scanSourceTree(sourceRoot, output, excludePatterns, reporter, overlayDi
   }
 }
 
-/**
- * §4.1: a pattern with no `/` is tested against every path segment; a
- * pattern with `/` is tested against the full relative path, with `*`
- * (within a segment), `**` (across segments), `?`, and `[...]` supported.
- */
-function isExcluded(relPath, patterns) {
-  const segments = relPath.split("/");
-  for (const pattern of patterns) {
-    if (pattern.includes("/")) {
-      if (globToRegExp(pattern, { multiSegment: true }).test(relPath)) return true;
-    } else {
-      const re = globToRegExp(pattern, { multiSegment: false });
-      if (segments.some((seg) => re.test(seg))) return true;
-    }
-  }
-  return false;
-}
-
-const GLOB_CACHE = new Map();
-
-function globToRegExp(pattern, { multiSegment }) {
-  const cacheKey = `${multiSegment} ${pattern}`;
-  const cached = GLOB_CACHE.get(cacheKey);
-  if (cached) return cached;
-
-  let src = "";
-  for (let i = 0; i < pattern.length; i++) {
-    if (multiSegment && pattern.startsWith("**", i)) {
-      src += ".*";
-      i++;
-      continue;
-    }
-    const c = pattern[i];
-    if (c === "*") {
-      src += "[^/]*";
-    } else if (c === "?") {
-      src += "[^/]";
-    } else if (c === "[") {
-      const close = pattern.indexOf("]", i + 1);
-      if (close === -1) {
-        src += "\\[";
-      } else {
-        src += pattern.slice(i, close + 1);
-        i = close;
-      }
-    } else {
-      src += c.replace(/[.+^${}()|\\]/g, "\\$&");
-    }
-  }
-  const re = new RegExp(`^${src}$`);
-  GLOB_CACHE.set(cacheKey, re);
-  return re;
-}

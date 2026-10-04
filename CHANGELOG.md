@@ -8,6 +8,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-10-04
+
+Closes [#109](https://github.com/fwdslsh/unify/issues/109): native template updates that never reset a site's configuration or content.
+
+### Added
+
+- **`unify update [template]`** (spec §19.10, rules UPD-01..03). Fetches the project's recorded template
+  again — or the one named, to move to another version (`…#v2`, `…@2.0.0`) or address — through the same
+  resolver and the same git/npm credentials `init` uses, and decides file by file from the recorded hash,
+  the fetched content and the file on disk: an unchanged file updates, a file the site edited is kept and
+  reported as a **conflict** (exit 1, never resolved by a flag), a new file is added unless the site already
+  has one there, a file the template dropped is removed only if the site never touched it. Re-running the
+  same update is a no-op. `--dry-run` shows the change set and writes nothing. Writes are temp-then-rename;
+  a symlink, a path resolving outside the project, or `..` is refused; nothing a template ships executes.
+- **`unify.template.json`**, written by `init` at the project root for every source (built-ins included):
+  the source as typed, the revision fetched (git commit, npm version, unify's version), and a SHA-256 of every
+  file the template provided — the baseline `update` compares against. Never shipped, like `unify.yaml`.
+  A template may ship a file of the same name as its manifest, `{"owned": ["site/config.json", "site/reports/**"]}`,
+  naming the files a site owns after scaffolding: `update` adds them once if absent and otherwise never
+  touches or reports them.
+- **`unify update --adopt <source>`** records a template for a project scaffolded before 0.11.1, or whose
+  record was lost, at the version named, changing no file; a missing record is a usage error naming it.
+
 ## [0.11.0] - 2026-10-04
 
 ### Added
@@ -783,7 +806,8 @@ with generated compare-link notes only. Their diffs are on the
 [releases page](https://github.com/fwdslsh/unify/releases). Nothing here
 retroactively reconstructs detail those notes never carried.
 
-[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.11.1...HEAD
+[0.11.1]: https://github.com/fwdslsh/unify/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/fwdslsh/unify/compare/v0.10.1...v0.11.0
 [0.10.1]: https://github.com/fwdslsh/unify/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/fwdslsh/unify/compare/v0.9.5...v0.10.0

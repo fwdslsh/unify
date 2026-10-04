@@ -7,7 +7,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { UsageError } from "../core/diagnostics.js";
 
-const COMMANDS = ["build", "audit", "dev", "watch", "init"];
+const COMMANDS = ["build", "audit", "dev", "watch", "init", "update"];
 
 /**
  * Long name → kind. `list` repeats, `string` takes a value, `flag` does not.
@@ -73,6 +73,9 @@ const OPTIONS = {
   // §18 — `build` only: upsert the saveable flags on this command line into
   // unify.yaml. Not itself saveable; cli.js enforces the rest.
   "save-config": { kind: "flag" },
+  // §19.10 — `update` only: record the named template as the installed one
+  // without changing a file (the recovery for a missing record).
+  adopt: { kind: "flag" },
   port: { kind: "string", short: "p", about: "the port unify dev serves on", default: "3000", save: "port: 8080" },
   version: { kind: "flag", short: "v" },
   help: { kind: "flag", short: "h" },
@@ -126,7 +129,7 @@ const SHORT = Object.fromEntries(
 /**
  * @typedef {object} ParsedArgs
  * @property {string} command
- * @property {string|undefined} template - the positional argument to `init`
+ * @property {string|undefined} template - the positional argument to `init` and `update`
  * @property {Record<string, string|boolean|string[]>} options
  */
 
@@ -212,7 +215,7 @@ export function parseArgs(argv) {
   if (positional.length > 0 && COMMANDS.includes(positional[0])) {
     command = positional.shift();
   }
-  if (command === "init") template = positional.shift();
+  if (command === "init" || command === "update") template = positional.shift();
 
   if (positional.length > 0) {
     throw new UsageError(`unexpected argument: ${positional[0]}`, ["run `unify --help` for the full surface"]);
