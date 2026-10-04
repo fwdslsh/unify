@@ -1,0 +1,37 @@
+:root {
+  color-scheme: light dark;
+  font: 100%/1.5 system-ui, sans-serif;
+}
+
+body {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+nav a {
+  margin-right: 1rem;
+}
+
+.site-footer {
+  margin-top: 3rem;
+  padding-top: 1rem;
+  border-top: 1px solid #88888880;
+  font-size: 0.875rem;
+}
+
+/* Scaffolded copy nobody should publish: conspicuous on purpose, so a
+   reader cannot mistake an invented name, date, price, or address for a
+   fact. Delete the class along with the text it marks. */
+.placeholder {
+  border: 1px dashed;
+  border-radius: 0.25em;
+  padding: 0 0.25em;
+  font-style: italic;
+  opacity: 0.8;
+}
+
+/* Design-time preview only — built pages contain no <slot> elements. */
+slot {
+  display: contents;
+}

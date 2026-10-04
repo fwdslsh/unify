@@ -26,6 +26,7 @@
  */
 import { test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { join, relative, sep } from "node:path";
 import { CLI, ROOT, covers, mkTmp, runCli } from "./support.mjs";
 
@@ -1393,3 +1394,210 @@ test("scaffold/docs: SCF-12 the All-pages starter degrades without a catalog and
   }
   covers("SCF-12");
 }, TEST_MS * 2);
+
+// ------------------------------------------------------------------ SCF-13
+
+/** The author's own tool, run the way §19.9 says init runs it — a real subprocess, nothing stubbed (H1). */
+function git(cwd, ...args) {
+  const r = spawnSync("git", args, { cwd, encoding: "utf8", env: { ...process.env, GIT_TERMINAL_PROMPT: "0" } });
+  if (r.status !== 0) throw new Error(`git ${args.join(" ")} failed: ${r.stderr}`);
+}
+
+test("scaffold: SCF-13 a template is a directory, a git repository or an npm package, read as a project; a typo is a usage error, not a lookup", async () => {
+  // The reference template is what init itself produces: a project with
+  // site/ beside AGENTS.md, DEPLOY.md and unify.yaml (§19.4) — so a scaffold
+  // from it must reproduce the built-in byte for byte.
+  const origin = mkTmp();
+  const seed = await runCli(["init", "blog"], origin);
+  if (seed.exit !== 0) throw new Error(`unify init blog exited ${seed.exit}: ${seed.stderr}`);
+  // What a template's packaging needs and the scaffold must never carry.
+  writeFileSync(join(origin, "package.json"), JSON.stringify({ name: "unify-template-probe", version: "1.0.0" }));
+  writeFileSync(join(origin, "package-lock.json"), "{}\n");
+  mkdirSync(join(origin, "node_modules", "left-behind"), { recursive: true });
+  writeFileSync(join(origin, "node_modules", "left-behind", "index.js"), "");
+  const expected = readTree(origin);
+  for (const rel of [...expected.keys()]) {
+    if (rel === "package.json" || rel === "package-lock.json" || rel.startsWith("node_modules")) expected.delete(rel);
+  }
+
+  // ---- a directory, by relative and by absolute path ---------------------
+  for (const [label, arg, cwdOf] of [
+    ["absolute", origin, (tmp) => tmp],
+    ["relative", "../origin-link", (tmp) => tmp],
+  ]) {
+    const tmp = mkTmp();
+    const argv = arg === origin ? [arg] : (() => {
+      // A relative path resolves against the working directory: give the
+      // project a sibling named origin-link that is the reference template.
+      mkdirSync(join(tmp, "..", "origin-link"), { recursive: true });
+      for (const [rel, bytes] of readTree(origin)) {
+        mkdirSync(join(tmp, "..", "origin-link", rel, ".."), { recursive: true });
+        writeFileSync(join(tmp, "..", "origin-link", rel), bytes);
+      }
+      return [arg];
+    })();
+    const r = await runCli(["init", ...argv], cwdOf(tmp));
+    if (r.exit !== 0) throw new Error(`unify init <${label} directory> exited ${r.exit}:\n${r.stderr}`);
+    const got = readTree(tmp);
+    for (const [rel, bytes] of expected) {
+      if (!got.has(rel)) throw new Error(`${label}: ${rel} was not scaffolded`);
+      if (!got.get(rel).equals(bytes)) throw new Error(`${label}: ${rel} differs from the template`);
+    }
+    for (const rel of got.keys()) if (!expected.has(rel)) throw new Error(`${label}: ${rel} was scaffolded but the template's packaging must never be copied`);
+    if (!r.stdout.includes(`scaffolded ${arg} `)) throw new Error(`the summary must name the source as written:\n${r.stdout}`);
+    // §19.3 holds for a faithful copy of a built-in, generator and all.
+    const dry = await runCli(["build", "--dry-run", "--strict"], tmp);
+    if (dry.exit !== 0) throw new Error(`${label}: build --dry-run --strict on the scaffold exited ${dry.exit}\n${dry.stdout}${dry.stderr}`);
+    if (label === "relative") rmSync(join(tmp, "..", "origin-link"), { recursive: true, force: true });
+  }
+
+  // ---- a git repository hosting several templates: file:// URL to a bare
+  // repository, the template's subdirectory inside it, and a #ref. ---------
+  const host = mkTmp();
+  mkdirSync(join(host, "templates", "blog"), { recursive: true });
+  for (const [rel, bytes] of expected) {
+    mkdirSync(join(host, "templates", "blog", rel, ".."), { recursive: true });
+    writeFileSync(join(host, "templates", "blog", rel), bytes);
+  }
+  writeFileSync(join(host, "README.md"), "# templates live under templates/\n");
+  git(host, "init", "-q", "-b", "main");
+  git(host, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "add", "-A");
+  git(host, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", "templates");
+  git(host, "branch", "release");
+  const bare = `${host}.git`;
+  git(host, "clone", "-q", "--bare", host, bare);
+  {
+    const tmp = mkTmp();
+    const r = await runCli(["init", `file://${bare}/templates/blog#release`], tmp);
+    if (r.exit !== 0) throw new Error(`unify init <git url>/<subdirectory>#ref exited ${r.exit}:\n${r.stderr}`);
+    const got = readTree(tmp);
+    if ([...got.keys()].some((k) => k === ".git" || k.startsWith(".git/") || k === "README.md")) throw new Error("the checkout outside the subdirectory leaked into the scaffold");
+    for (const [rel, bytes] of expected) {
+      if (!got.has(rel) || !got.get(rel).equals(bytes)) throw new Error(`git: ${rel} missing or differs from the template`);
+    }
+    for (const rel of got.keys()) if (!expected.has(rel)) throw new Error(`git: ${rel} was scaffolded but is not template content`);
+    // The whole repository, no subdirectory: a bare source tree would be wrong here, and it is not what is read —
+    // the checkout has neither site/ nor src/ at its root, so README.md and templates/** all land in site/.
+    const whole = await runCli(["init", `file://${bare}#release`], mkTmp());
+    if (whole.exit !== 0 || !whole.stdout.includes("into site")) throw new Error(`the repository root is a template too: exit ${whole.exit}\n${whole.stderr}`);
+    // A ref that does not exist is the tool's own failure, surfaced as a usage error, with nothing written;
+    // a subdirectory that does not exist is init's, after a clone that succeeded.
+    const badRef = await runCli(["init", `file://${bare}/templates/blog#no-such-branch`], mkTmp());
+    if (badRef.exit !== 2 || !/git clone failed/.test(badRef.stderr)) throw new Error(`a missing ref must exit 2 naming git clone: exit ${badRef.exit}\n${badRef.stderr}`);
+    const badDir = await runCli(["init", `file://${bare}/templates/shop`], mkTmp());
+    if (badDir.exit !== 2 || !/has no directory templates\/shop/.test(badDir.stderr)) throw new Error(`a missing subdirectory must exit 2 naming it: exit ${badDir.exit}\n${badDir.stderr}`);
+  }
+
+  // ---- an npm package is named by its convention and fetched with the
+  // author's own npm; the unpacking is proved on a real tarball in
+  // tests/unit/template-source.test.js. Here: the name pattern reaches npm
+  // (and only the pattern does), and npm's failure is a usage error. ---------
+  {
+    const r = await runCli(["init", "@unify-conformance-probe/unify-no-such-template-template"], mkTmp());
+    if (r.exit !== 2 || !/npm pack failed/.test(r.stderr)) throw new Error(`a template package npm cannot fetch must exit 2 naming npm pack: exit ${r.exit}\n${r.stderr}`);
+    const notIt = await runCli(["init", "no-such-template"], mkTmp());
+    if (notIt.exit !== 2 || /npm/.test(notIt.stderr.split("\n")[0])) throw new Error(`a name outside the convention must not reach npm:\n${notIt.stderr}`);
+  }
+
+  // ---- a bare source tree: no site/, no src/ — every file is content and
+  // nothing lands at the project root, so `--source .` has nothing to refuse. -
+  {
+    const bare = mkTmp();
+    for (const [rel, bytes] of readTree(join(origin, "site"))) {
+      mkdirSync(join(bare, rel, ".."), { recursive: true });
+      writeFileSync(join(bare, rel), bytes);
+    }
+    // The blog's pages depend on the generator the project root carried; a
+    // bare tree stands alone, so the fixture is a page that does.
+    rmSync(join(bare, "posts"), { recursive: true, force: true });
+    rmSync(join(bare, "_data"), { recursive: true, force: true });
+    const tmp = mkTmp();
+    const r = await runCli(["init", bare], tmp);
+    if (r.exit !== 0) throw new Error(`unify init <bare tree> exited ${r.exit}:\n${r.stderr}`);
+    if (!existsSync(join(tmp, "site", "_layout.html"))) throw new Error("a bare tree must land in site/");
+    if (existsSync(join(tmp, "AGENTS.md")) || existsSync(join(tmp, "unify.yaml"))) throw new Error("a bare tree has no project-root files to place");
+    if (!/scaffolded .* into site$/m.test(r.stdout)) throw new Error(`the summary must not mention a project root it wrote nothing to:\n${r.stdout}`);
+    const inPlace = await runCli(["init", bare, "--source", "."], mkTmp());
+    if (inPlace.exit !== 0) throw new Error(`a bare tree into --source . has nothing to refuse over, got exit ${inPlace.exit}:\n${inPlace.stderr}`);
+  }
+
+  // ---- the forms are told apart by shape -----------------------------------
+  {
+    const tmp = mkTmp();
+    // A built-in name wins over a same-named directory in the working directory.
+    mkdirSync(join(tmp, "basic"));
+    writeFileSync(join(tmp, "basic", "index.html"), "<!doctype html><title>not the registry</title>\n");
+    const r = await runCli(["init", "basic"], tmp);
+    if (r.exit !== 0) throw new Error(`unify init basic beside a basic/ directory exited ${r.exit}:\n${r.stderr}`);
+    if (!existsSync(join(tmp, "site", "contact.html"))) throw new Error("the registry's basic must win over the directory of the same name");
+    // A bare word that is neither is refused before any tool runs — and the
+    // refusal says what the four forms are.
+    const typo = await runCli(["init", "blgo"], mkTmp());
+    if (typo.exit !== 2) throw new Error(`unify init blgo exited ${typo.exit}, expected 2`);
+    for (const form of ["default, basic, blog, docs, portfolio", "directory must exist", "unify-<name>-template", "URL"]) {
+      if (!typo.stderr.includes(form)) throw new Error(`the refusal must name the four forms; missing "${form}":\n${typo.stderr}`);
+    }
+    // An empty directory is a template with no source file: a usage error, never an empty scaffold.
+    const empty = await runCli(["init", mkTmp()], mkTmp());
+    if (empty.exit !== 2 || !/no source files/.test(empty.stderr)) throw new Error(`an empty template must exit 2: ${empty.exit}\n${empty.stderr}`);
+  }
+
+  covers("SCF-13");
+}, TEST_MS * 3);
+
+// ------------------------------------------------------------------ SCF-14
+
+test("scaffold: SCF-14 --audit keeps a scaffold only if it audits clean; a finding removes every file init wrote", async () => {
+  // Every built-in passes §19.3's gate, so under --audit it scaffolds, the
+  // audit's own report prints, and the files stay — the blog exercises the
+  // generator named by the scaffolded unify.yaml, the docs template its
+  // catalog: true, both read from the project just written.
+  for (const name of ["blog", "docs"]) {
+    const tmp = mkTmp();
+    const r = await runCli(["init", name, "--audit"], tmp);
+    if (r.exit !== 0) throw new Error(`unify init ${name} --audit exited ${r.exit}:\n${r.stdout}${r.stderr}`);
+    if (!r.stdout.includes("audit: nothing to report")) throw new Error(`${name}: the audit's report must print:\n${r.stdout}`);
+    if (!existsSync(join(tmp, "site", "_layout.html")) || !existsSync(join(tmp, "unify.yaml"))) throw new Error(`${name}: a clean audit must leave the scaffold`);
+    if (existsSync(join(tmp, "dist"))) throw new Error(`${name}: the audit gate must publish nothing`);
+  }
+
+  // A template that is not a proper unify site: a page with no description
+  // and no lang, which audit --strict reports as two incomplete findings.
+  const bad = mkTmp();
+  mkdirSync(join(bad, "site", "deep"), { recursive: true });
+  writeFileSync(join(bad, "site", "deep", "index.html"), "<!doctype html>\n<html><head><title>Bad</title></head><body><main><h1>Bad</h1></main></body></html>\n");
+  writeFileSync(join(bad, "NOTES.md"), "# a project-root file\n");
+  {
+    const tmp = mkTmp();
+    // A directory that existed before init ran is the author's and stays,
+    // whatever init created beneath it.
+    mkdirSync(join(tmp, "site"));
+    const r = await runCli(["init", bad, "--audit"], tmp);
+    if (r.exit !== 1) throw new Error(`unify init <bad template> --audit exited ${r.exit}, expected the audit's 1:\n${r.stdout}${r.stderr}`);
+    // The findings report is the audit's own (stdout), exactly as `unify audit` prints it.
+    if (!/description-missing/.test(r.stdout) || !/lang-missing/.test(r.stdout)) throw new Error(`the audit's findings must print:\n${r.stdout}${r.stderr}`);
+    if (!/nothing was scaffolded/.test(r.stdout)) throw new Error(`init must say the scaffold was removed:\n${r.stdout}`);
+    const left = readdirSync(tmp);
+    if (left.length !== 1 || left[0] !== "site" || readdirSync(join(tmp, "site")).length !== 0) {
+      throw new Error(`after a failed audit only the author's empty site/ may remain, found: ${JSON.stringify(readTree(tmp).size ? [...readTree(tmp).keys()] : left)}`);
+    }
+  }
+  // Without --audit the same template scaffolds: the gate is opt-in, and the
+  // saved form of the flag (audit: true in a unify.yaml the working directory
+  // already holds) means the same thing — a bare tree brings no unify.yaml of
+  // its own, so the author's is not a collision.
+  {
+    const tmp = mkTmp();
+    const r = await runCli(["init", bad], tmp);
+    if (r.exit !== 0 || !existsSync(join(tmp, "site", "deep", "index.html"))) throw new Error(`without --audit the template must scaffold: exit ${r.exit}\n${r.stderr}`);
+  }
+  {
+    const tmp = mkTmp();
+    writeFileSync(join(tmp, "unify.yaml"), "audit: true\n");
+    const r = await runCli(["init", join(bad, "site")], tmp);
+    if (r.exit !== 1) throw new Error(`a saved audit: true must gate init too: exit ${r.exit}\n${r.stdout}${r.stderr}`);
+    if (readdirSync(tmp).join(",") !== "unify.yaml") throw new Error(`only the author's unify.yaml may remain: ${readdirSync(tmp).join(", ")}`);
+  }
+
+  covers("SCF-14");
+}, TEST_MS * 3);

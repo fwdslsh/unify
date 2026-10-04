@@ -263,7 +263,7 @@ unify [build]              build the site (default command)
 unify audit                evaluate the site the build would publish — writes nothing
 unify dev                  build, watch, serve, and reload — the inner loop
 unify watch                build + rebuild on change, no server (pair with your own)
-unify init [template]      scaffold a starter site (default, basic, blog, docs, portfolio)
+unify init [template]      scaffold a starter site: a built-in (default, basic, blog, docs, portfolio), a directory, a git repository (URL, optionally /<subdirectory> and #ref) or an npm package named unify-<name>-template; --audit keeps the scaffold only if it audits clean
 
 Options:
   -s, --source <dir>       source directory (default: site/ if it exists, else src/, else .)

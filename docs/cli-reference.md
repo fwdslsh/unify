@@ -9,7 +9,7 @@ unify [build]              build the site (default command)
 unify audit                evaluate the site the build would publish — writes nothing
 unify dev                  build, watch, serve, and reload — the inner loop
 unify watch                build + rebuild on change, no server
-unify init [template]      scaffold a starter site
+unify init [template]      scaffold a starter site from a built-in template, a directory, a git repository or an npm package
 
 Options:
   -s, --source <dir>       source directory (default: site/ if it exists, else src/, else .)
@@ -97,6 +97,17 @@ The same watch contract as `dev`, no server — for pairing with a server you al
 ### `unify init [template]`
 
 Scaffolds a starter site into `site/`, with `AGENTS.md`, `DEPLOY.md` and a `unify.yaml` beside it at the project root. The `unify.yaml` lists every saveable option commented out, each under a one-line description naming its default, so the whole surface is in front of you and nothing changes until you uncomment a line. Templates: `default`, `basic`, `blog`, `docs`, `portfolio`. Every template exercises the core primitives once — an include, the automatic `_layout.html`, a named slot with a page that fills it, a `data-layout="none"` page, and the underscore convention. The `docs` template also ships an "All pages" starter (`all-pages.html` and `assets/all-pages.js`): a filterable directory of the site read from `catalog.json`, and its `unify.yaml` has the one line `catalog: true` uncommented so a plain `unify build` fills it. The `blog` template also ships the generator pattern worked: `scripts/gen.mjs`, at the project root beside `site/`, is named by its `unify.yaml` (`generate: scripts/gen.mjs`), so every `unify build` runs it; it reads `posts/*.md` and `_data/authors.json` and writes `blog.html` and `feed.xml` into the build's overlay, never into `site/`, and names the fields it emits, so the authors file's private `email` never reaches a page. `AGENTS.md` and `DEPLOY.md` are written to the working directory the command ran in — outside the source root, so neither publishes; `init` refuses (exit 2) rather than scaffold when that directory *is*, or is inside, the source root (`--source .`, `--source ..`), because there the two could only publish as pages. Guaranteed: `unify init && unify build --dry-run --strict` and `unify init && unify audit --strict` both exit `0`.
+
+**Where a template comes from.** The positional names one of four things, told apart by shape:
+
+- a **built-in**, by name — each is a directory of the unify repository, `templates/<name>/`, embedded in the CLI, so the name needs no network and no git;
+- an **npm package**, named by the convention `unify-<name>-template` or `@<organization>/unify-<name>-template`, optionally `@version` (`unify init @fwdslsh/unify-shop-template@1.2.0`) — fetched with your own `npm pack`, so your `.npmrc`, registry and tokens apply; the pattern is also what to search npm for;
+- a **git repository** — a URL, a `git@host:owner/repo.git` address, or any path ending in `.git`, with an optional `#branch-or-tag`, fetched with your own `git clone` (your SSH keys and credential helper apply, and nothing prompts). A **subdirectory may follow the repository**, so one repository can host many templates: `unify init https://github.com/fwdslsh/unify/templates/blog` scaffolds that directory; the URL your browser shows for a directory (`…/tree/main/templates/blog`) works too;
+- a **directory** on disk — anything else, which must exist.
+
+A template is a project laid out as `init` lays one out: `site/` (or `src/`) beside `AGENTS.md`, `DEPLOY.md`, `unify.yaml` and whatever else belongs at the project root; the source tree lands in the target source root and the rest beside it. A directory with neither is a bare source tree, and all of it is content. `.git/`, `node_modules/`, `package.json` and lockfiles are never copied. A bare word that is neither a built-in, a template package name nor a directory exits `2` naming the four forms — a typo never becomes a network lookup. Every refusal above applies to every source: nothing is written if any file would collide.
+
+**`--audit`** keeps the scaffold only if it is a proper unify site: after writing, `unify audit --strict` runs over the new project (with its own `unify.yaml`, so the blog's generator and the docs template's `catalog: true` are honored) and prints its report; a finding removes everything `init` wrote and exits `1`. Every built-in passes it.
 
 ## Options
 
@@ -352,9 +363,9 @@ canonical completion: 5 pages would gain a canonical link
 structured data: 3 pages would gain a JSON-LD block
 ```
 
-### `--audit` (build only)
+### `--audit` (build and init)
 
-Compose once, audit that result, publish only if it passes. The generator (`--generate`) runs once, the site is composed once, and the same findings `unify audit` would print are evaluated over that exact composition, then printed (human format) after the build's diagnostics. The build publishes iff `unify audit` with the same flags would exit `0`: no problems, and with `--strict` also no advisories and no findings. Without `--strict`, findings are reported but block nothing. A blocked gate exits `1` and leaves the previous output untouched. With `--dry-run` it reports and writes nothing, exiting as the gate would. `--external` and `--format` remain `audit`-only. `audit: true` is saveable in `unify.yaml`.
+With `init`: scaffold, audit the result with `unify audit --strict`, keep it only if that passes (see `unify init` above). With `build`: compose once, audit that result, publish only if it passes. The generator (`--generate`) runs once, the site is composed once, and the same findings `unify audit` would print are evaluated over that exact composition, then printed (human format) after the build's diagnostics. The build publishes iff `unify audit` with the same flags would exit `0`: no problems, and with `--strict` also no advisories and no findings. Without `--strict`, findings are reported but block nothing. A blocked gate exits `1` and leaves the previous output untouched. With `--dry-run` it reports and writes nothing, exiting as the gate would. `--external` and `--format` remain `audit`-only. `audit: true` is saveable in `unify.yaml`.
 
 `unify build --audit --strict` replaces the three-step `build --dry-run --strict && build && audit --strict`.
 

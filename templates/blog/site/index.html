@@ -1,0 +1,21 @@
+<!doctype html>
+<html>
+  <head>
+    <link rel="stylesheet" href="assets/style.css">
+    <title>Home</title>
+    <meta name="description" content="Start here: what this blog scaffold ships, which two files are generated, and what to replace first.">
+    <meta property="og:title" content="Home">
+    <meta property="og:description" content="Start here: what this blog scaffold ships, which two files are generated, and what to replace first.">
+    <link rel="alternate" type="application/rss+xml" title="My Blog" href="/feed.xml">
+  </head>
+  <body>
+    <main>
+      <h1>Home</h1>
+      <p>A blog scaffold: two sample posts in <code>posts/</code>, and one script, run by unify on every build, that turns them into a listing page and an RSS feed. <span class="placeholder">Every name and date in it is a placeholder</span> — replace them before you publish.</p>
+      <p>Read the <a href="/blog.html">blog index</a>, open <a href="/posts/hello-world.html">the first post</a>, or <a href="/contact.html">get in touch</a>.</p>
+      <h2>Two of these files are generated</h2>
+      <p><code>blog.html</code> and <code>feed.xml</code> are written by <code>scripts/gen.mjs</code> from the posts and <code>site/_data/authors.json</code>, into a directory unify hands it before every build — neither exists in <code>site/</code>. Edit the posts and the data, and build from the project root, the directory <code>site/</code>, <code>scripts/</code> and <code>unify.yaml</code> sit in:</p>
+      <pre><code>unify build</code></pre>
+    </main>
+  </body>
+</html>

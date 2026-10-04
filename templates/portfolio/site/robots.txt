@@ -1,0 +1,10 @@
+# What crawlers may fetch. This file blocks nothing — unify never decides
+# what a site should block, and a scaffold knows even less. Edit it freely.
+User-agent: *
+Disallow:
+
+# A Sitemap: line has to name a file this site actually publishes.
+# `unify build --base-url https://you.example/` writes dist/sitemap.xml (see
+# DEPLOY.md); once you build that way, uncomment the next line and put your
+# own address in it.
+# Sitemap: https://you.example/sitemap.xml

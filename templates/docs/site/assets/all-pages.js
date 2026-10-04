@@ -1,29 +1,4 @@
-/**
- * The "All pages" starter shipped by `unify init docs` (issue #91): an
- * ordinary page, one stylesheet block and one plain JavaScript module the
- * AUTHOR owns, rendering a directory of the site from
- * `assets/unify/catalog.json`. unify injects nothing: the script is an
- * authored asset like any other and is mirror-copied byte for byte.
- *
- * Why it fits §19.3. The template ships `unify.yaml` with `catalog: true`
- * (§19.8), so a plain `unify build` writes the catalog, and the page's
- * `<link rel="preload" … as="fetch">` makes it a reference §12 checks:
- * drop `catalog: true` and the build says so, rather than shipping a page
- * that can only show its error state. The catalog is addressed relative to the module
- * (`new URL("unify/catalog.json", import.meta.url)`), never as a
- * root-relative string, so it is also right under a `--base-url` with a
- * path prefix, where unify rewrites the `<script src>` in the HTML and
- * the module then finds its sibling directory wherever it was loaded from.
- *
- * The filtering and grouping are exported pure functions, so the suite can
- * import the scaffolded file under Bun and test them without a browser; the
- * DOM half only runs when a `document` exists.
- *
- * The string below is `String.raw` and contains no backtick and no `${`.
- */
-import { pageHtml } from "./shared.js";
-
-export const ALL_PAGES_JS = String.raw`// All pages: renders a directory of the site from assets/unify/catalog.json.
+// All pages: renders a directory of the site from assets/unify/catalog.json.
 // Yours to edit. unify only writes the catalog (build with --catalog); it
 // ships this file exactly as written.
 
@@ -156,46 +131,3 @@ async function start(doc) {
 }
 
 if (typeof document !== "undefined") start(document);
-`;
-
-const STYLE = `<style>
-  .all-pages-search label { display: block; font-weight: bold; }
-  .all-pages-search input { box-sizing: border-box; width: 100%; max-width: 24rem; padding: 0.4rem; font: inherit; }
-  .all-pages-count { min-height: 1.5em; }
-  .all-pages-list h2 { margin-bottom: 0.25rem; text-transform: none; }
-  .all-pages-list ul { margin-top: 0; padding-left: 1.25rem; }
-  .all-pages-error { border: 2px solid; border-radius: 0.25rem; padding: 0.5rem 1rem; }
-</style>`;
-
-export const ALL_PAGES_HTML = pageHtml({
-  title: "All pages",
-  description: "Every page on the site in one searchable list, grouped by section.",
-  head: `${STYLE}
-<link rel="preload" href="/assets/unify/catalog.json" as="fetch" crossorigin>
-<script type="module" src="/assets/all-pages.js"></script>`,
-  main: `<h1>All pages</h1>
-<p>A directory of the whole site, read from <code>assets/unify/catalog.json</code> in your browser.
-Type to filter by title or address.</p>
-<noscript>
-  <p>This directory needs JavaScript to read the site's page list. Without it, start from the
-  <a href="/">home page</a> or use the navigation at the top of any page.</p>
-</noscript>
-<div class="all-pages-search" id="all-pages-controls" role="search" hidden>
-  <label for="all-pages-query">Filter pages</label>
-  <input id="all-pages-query" type="search" autocomplete="off">
-</div>
-<p class="all-pages-count" id="all-pages-count" role="status" aria-live="polite">Loading pages&hellip;</p>
-<div class="all-pages-error" id="all-pages-error" role="alert" hidden>
-  <p><strong>The page list could not be loaded</strong> (<span data-reason></span>).</p>
-  <p>It is read from <code>assets/unify/catalog.json</code>, which unify writes only when you build
-  with <code>--catalog</code>. Build that way, or follow the navigation links instead.</p>
-</div>
-<div class="all-pages-list" id="all-pages-list"></div>
-
-<h2>What is listed</h2>
-<p>The catalog lists the pages a search engine could index: not <code>noindex</code>, not
-<code>404.html</code>, and not a page whose canonical points somewhere else. For a private site
-that marks every page <code>noindex</code>, build with <code>--include-noindex</code> as well so
-the directory is not empty. <code>noindex</code> is a request to crawlers, not access control:
-anything in the catalog is a public file. Edit or delete this paragraph once you have decided.</p>`,
-});
