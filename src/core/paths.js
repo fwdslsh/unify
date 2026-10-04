@@ -37,21 +37,27 @@ export function isNeverShipped(relativePath) {
   });
 }
 
+/** §1 — the directories a bare `unify` looks for, in order: `site/` is the default layout, `src/` the one before 0.10. */
+export const DEFAULT_SOURCE_DIRS = ["site", "src"];
+
 /**
- * Resolve the source root: an explicit --source wins; otherwise `src/` when it
- * exists, else the working directory. The distinction matters beyond
+ * Resolve the source root: an explicit --source wins; otherwise `site/` when
+ * it exists, else `src/` (the pre-0.10 default, kept so no existing site
+ * changes), else the working directory. The distinction matters beyond
  * convenience — defaulting to the working directory is exactly the condition
  * that triggers the would-copy notice (§4.4), so it is reported back.
  *
  * @param {string|undefined} flag - the --source value, if any
  * @param {string} [cwd]
  * @returns {{root: string, defaulted: boolean}} `defaulted` is true only when
- *   no flag was given and no `src/` existed
+ *   no flag was given and neither `site/` nor `src/` existed
  */
 export function resolveSource(flag, cwd = process.cwd()) {
   if (flag !== undefined) return { root: resolve(cwd, flag), defaulted: false };
-  const src = resolve(cwd, "src");
-  if (existsSync(src) && statSync(src).isDirectory()) return { root: src, defaulted: false };
+  for (const name of DEFAULT_SOURCE_DIRS) {
+    const dir = resolve(cwd, name);
+    if (existsSync(dir) && statSync(dir).isDirectory()) return { root: dir, defaulted: false };
+  }
   return { root: resolve(cwd), defaulted: true };
 }
 

@@ -34,9 +34,9 @@ export const files = {
     description: `The front page of ${SITE_NAME} — plain HTML wrapped by the shared layout, and the first file to edit.`,
     main: `<h1>Home</h1>
 <p>This file holds only what you see here. The nav above and the footer below come from
-<code>src/_layout.html</code>, which wrapped this page at build time.</p>
+<code>site/_layout.html</code>, which wrapped this page at build time.</p>
 <p>Edit it, add more <code>.html</code> files beside it in <code>src/</code>, and list them in
-<code>src/_includes/nav.html</code> so readers can reach them. Give each new page its own
+<code>site/_includes/nav.html</code> so readers can reach them. Give each new page its own
 <code>&lt;title&gt;</code>, its own description, and one <code>&lt;h1&gt;</code> — <code>unify audit</code>
 reports every page that is missing one or has more than one.</p>`,
   }),

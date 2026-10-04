@@ -41,12 +41,12 @@ Node >= 22.12.0 or Bun >= 1.2.0. The same `unify` runs on both and produces byte
 ## Quick start
 
 ```bash
-unify init      # scaffold a starter site into src/
+unify init      # scaffold a starter site into site/
 unify dev       # build, watch, serve, reload — http://localhost:3000
 unify build     # write the final site to dist/ — upload it anywhere
 ```
 
-`unify init` scaffolds a complete site into `src/` — a layout, a nav include, HTML and Markdown pages, CSS, and a `robots.txt` — plus two files at the project root, outside `src/` so they can never publish: **`AGENTS.md`**, guidance for whoever (or whatever) edits the site next, and **`DEPLOY.md`**, the deployment recipe. Five templates: `default`, `basic`, `blog`, `docs`, `portfolio`. Every scaffold passes `unify build --dry-run --strict` and `unify audit --strict` out of the box.
+`unify init` scaffolds a complete site into `site/` — a layout, a nav include, HTML and Markdown pages, CSS, and a `robots.txt` — plus two files at the project root, outside `site/` so they can never publish: **`AGENTS.md`**, guidance for whoever (or whatever) edits the site next, and **`DEPLOY.md`**, the deployment recipe. Five templates: `default`, `basic`, `blog`, `docs`, `portfolio`. Every scaffold passes `unify build --dry-run --strict` and `unify audit --strict` out of the box.
 
 New here? The tutorial is **[Getting Started](docs/getting-started.md)**.
 
@@ -55,7 +55,7 @@ New here? The tutorial is **[Getting Started](docs/getting-started.md)**.
 A layout is a complete HTML page — open it in a browser and its slot fallbacks are its own preview:
 
 ```html
-<!-- src/_layout.html -->
+<!-- site/_layout.html -->
 <!doctype html>
 <html>
   <head>
@@ -74,7 +74,7 @@ A layout is a complete HTML page — open it in a browser and its slot fallbacks
 A page is also a complete, ordinary HTML document. It never mentions the layout — the nearest `_layout.html` applies automatically:
 
 ```html
-<!-- src/index.html -->
+<!-- site/index.html -->
 <!doctype html>
 <html>
   <head><title>Home</title></head>
@@ -139,7 +139,7 @@ unify init [template]    scaffold a starter site
 
 Authoring or editing a **site built with unify**? Review **[docs/authoring-rules.md](docs/authoring-rules.md)** — the complete authoring surface in under sixty lines — before writing anything, and do not substitute conventions from other generators: unify has no props, no expressions, no `draft:`/`permalink:`/`slug:` keys, and layouts do not chain.
 
-- `unify init` drops an **`AGENTS.md`** at the project root (outside `src/`, so it cannot publish) restating the most commonly guessed-wrong rules. If the project has one, read it — it restates the rules linked above, never a variant of them.
+- `unify init` drops an **`AGENTS.md`** at the project root (outside `site/`, so it cannot publish) restating the most commonly guessed-wrong rules. If the project has one, read it — it restates the rules linked above, never a variant of them.
 - Finish by checking: `unify build --dry-run --strict`, then `unify audit --strict`. Exit `0` from `unify build` means `dist/` is the complete site; non-zero means **nothing was published** and the previous output is untouched — never report success on a non-zero exit.
 - `unify --help` lists the complete CLI. There are no other commands or flags; the authoring rules live in [docs/authoring-rules.md](docs/authoring-rules.md) and the scaffolded `AGENTS.md`, not in a CLI command.
 

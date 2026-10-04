@@ -38,7 +38,7 @@ import { dirname, join, resolve } from "node:path";
 import { UsageError } from "../../core/diagnostics.js";
 import { contains, toRelative } from "../../core/paths.js";
 import { ROOT_FILES } from "../../templates/shared.js";
-import { TEMPLATES } from "../../templates/index.js";
+import { TEMPLATES, TEMPLATE_ROOT_FILES } from "../../templates/index.js";
 
 const DEFAULT_TEMPLATE = "default";
 
@@ -65,13 +65,18 @@ export async function init({ sourceRoot, sourceDefaulted, template, reporter, pr
     throw new UsageError(`unknown template: ${name}`, [`choose one of: ${Object.keys(TEMPLATES).join(", ")}`]);
   }
 
-  // An explicit --source (or an already-existing src/, which resolveSource
-  // treats the same way) names the scaffold target directly, matching how
-  // --source is read everywhere else. The defaulted case — nothing on the
-  // command line or in unify.yaml, and no src/ yet — is exactly the "my-site/
-  // with no src/" starting point product-spec §2 describes, and init's job
-  // there is to create src/ under it, not to scaffold into the project root.
-  const target = sourceDefaulted ? join(sourceRoot, "src") : sourceRoot;
+  // An explicit --source (or an already-existing site/ or src/, which
+  // resolveSource treats the same way) names the scaffold target directly,
+  // matching how --source is read everywhere else. The defaulted case —
+  // nothing on the command line or in unify.yaml, and no site/ yet — is
+  // exactly the "my-site/ with no site/" starting point product-spec §2
+  // describes, and init's job there is to create site/ under it, not to
+  // scaffold into the project root.
+  const target = sourceDefaulted ? join(sourceRoot, "site") : sourceRoot;
+  // §19.4/§19.6 — the project-root files: AGENTS.md and DEPLOY.md for every
+  // template, plus whatever this template keeps beside the source tree (the
+  // blog's scripts/gen.mjs, the docs template's unify.yaml).
+  const rootFiles = { ...ROOT_FILES, ...(TEMPLATE_ROOT_FILES[name] ?? {}) };
 
   // §19.4 — two files scaffold at the PROJECT ROOT, deliberately outside the
   // source root so that neither can publish: AGENTS.md (product-spec §6.7's
@@ -110,13 +115,13 @@ export async function init({ sourceRoot, sourceDefaulted, template, reporter, pr
     throw new UsageError(
       `init refused: the project root ${same ? "and the source root are the same directory" : "is inside the source root"}, ` +
         `so ${Object.keys(ROOT_FILES).join(" and ")} would publish as pages`,
-      ["run unify init from the parent directory, or pass --source with a subdirectory such as --source src"],
+      ["run unify init from the parent directory, or pass --source with a subdirectory such as --source site"],
     );
   }
 
   const writes = [
     ...Object.entries(files).map(([relPath, content]) => [join(target, ...relPath.split("/")), content]),
-    ...Object.entries(ROOT_FILES).map(([relPath, content]) => [join(projectRoot, ...relPath.split("/")), content]),
+    ...Object.entries(rootFiles).map(([relPath, content]) => [join(projectRoot, ...relPath.split("/")), content]),
   ];
 
   // §19 doesn't say what happens when the target already has files; the
@@ -177,10 +182,10 @@ export async function init({ sourceRoot, sourceDefaulted, template, reporter, pr
   }
 
   const shown = toRelative(projectRoot, target) || ".";
-  const rootNames = Object.keys(ROOT_FILES);
+  const rootNames = Object.keys(rootFiles);
   reporter.summary(
     `scaffolded ${name} (${writes.length} files): ${Object.keys(files).length} into ${shown}, ` +
-      `${rootNames.join(" and ")} at the project root`,
+      `${rootNames.length === 2 ? rootNames.join(" and ") : rootNames.join(", ")} at the project root`,
   );
   reporter.summary("next: unify dev");
   return 0;

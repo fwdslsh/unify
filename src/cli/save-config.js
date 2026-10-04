@@ -8,7 +8,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { UsageError } from "../core/diagnostics.js";
 import { CONFIG_KEYS } from "./options.js";
 
-/** `source` is saveable in principle but never written: the file lives in the source root. */
+/** `source` is written only by cli.js, and only when the file sits outside the source root (§18); here it is never one of the entries. */
 const WRITABLE = CONFIG_KEYS.filter((key) => key !== "source");
 
 /**

@@ -18,7 +18,7 @@
  */
 
 import { existsSync, realpathSync, statSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import pkg from "../package.json" with { type: "json" };
 import { Reporter, UsageError } from "./core/diagnostics.js";
@@ -87,7 +87,18 @@ function version() {
  */
 function resolveSettings(flags) {
   const probe = resolveSource(flags.source);
-  const settings = mergeConfig(flags, loadConfig(probe.root));
+  const config = loadConfig(probe.root);
+  // §18 — a path in unify.yaml is relative to the FILE, not to wherever the
+  // command ran or to the source root: `source: site` and `generate:
+  // scripts/gen.mjs` beside package.json name the directories beside it. For a
+  // file inside the source root the two readings coincide, so nothing written
+  // before 0.10 changes meaning. CLI flags keep their own rules (`--source`
+  // from the working directory, `--generate` from the source root).
+  const configDir = dirname(configPath(probe.root).path);
+  for (const key of ["source", "generate"]) {
+    if (typeof config[key] === "string" && !isAbsolute(config[key])) config[key] = resolve(configDir, config[key]);
+  }
+  const settings = mergeConfig(flags, config);
   const resolved = resolveSource(settings.source);
 
   return {
@@ -273,6 +284,28 @@ export async function run(argv) {
     saving = saveEntries(options);
   }
 
+  /**
+   * §18 — the lines `--save-config` writes name paths relative to the FILE:
+   * a `--generate` the author gave relative to the source root is rewritten
+   * relative to unify.yaml's directory, and `--source` is written when the
+   * file sits outside the source root (beside package.json), where it is the
+   * one thing that tells the next bare `unify build` which directory to read.
+   * Inside the source root `source` stays unwritten, as before: circular there.
+   * @param {Map<string, string[]>} entries
+   * @param {string} path - the unify.yaml being written
+   */
+  function relocateSavedPaths(entries, path) {
+    const dir = dirname(path);
+    const rel = (abs) => relative(dir, abs).split(sep).join("/") || ".";
+    if (entries.has("generate")) {
+      const abs = isAbsolute(options.generate) ? resolve(options.generate) : resolve(sourceRoot, options.generate);
+      entries.set("generate", [`generate: ${rel(abs)}`]);
+    }
+    if (options.source !== undefined && resolve(dir) !== resolve(sourceRoot)) {
+      entries.set("source", [`source: ${rel(resolve(sourceRoot))}`]);
+    }
+  }
+
   const output = resolve(process.cwd(), settings.output);
 
   if (settings.clean) {
@@ -299,10 +332,11 @@ export async function run(argv) {
       // into the unify.yaml that was read (source root, else project root),
       // or a new one in the source root.
       if (saving && code === 0) {
+        const { path } = configPath(sourceRoot);
+        relocateSavedPaths(saving, path);
         if (saving.size === 0) {
           process.stdout.write("--save-config: no saveable options were given, so unify.yaml was not written\n");
         } else {
-          const { path } = configPath(sourceRoot);
           writeConfig(path, saving);
           process.stdout.write(`saved ${[...saving.keys()].join(", ")} to ${path}\n`);
         }

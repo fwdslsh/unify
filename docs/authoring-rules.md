@@ -2,10 +2,10 @@
 
 unify composes plain HTML at build time. No template language, variables, loops, or config: if you reach for
 `{{ }}`, `{% %}`, props, or a config key, you are solving it wrong. The vocabulary is standard HTML — `<main>`,
-`<slot>`, `slot=` — plus `<include>` and `data-layout`. Derived files (a post index) come from a script you write and run yourself: `node _scripts/gen.mjs && unify build`. A feed at `/feed.xml` needs no script: declare `schema: Article` or `BlogPosting` (below) on any page and build with `--base-url`, and unify writes it — Atom, from your title/description/canonical/dates; a `date:` with no time is reported and left out rather than guessed at.
+`<slot>`, `slot=` — plus `<include>` and `data-layout`. Derived files (a post index) come from a script you write and run yourself, kept beside the site: `node scripts/gen.mjs && unify build`. A feed at `/feed.xml` needs no script: declare `schema: Article` or `BlogPosting` (below) on any page and build with `--base-url`, and unify writes it — Atom, from your title/description/canonical/dates; a `date:` with no time is reported and left out rather than guessed at.
 
 ## Files
-- Source root is `src/` if it exists, else the current directory. `.html`/`.md` are pages — except a name
+- Source root is `site/` if it exists (else `src/`, else the current directory), or whatever `source:` in `unify.yaml` names. `.html`/`.md` are pages — except a name
   ending `.fragment.html`, a bare snippet shipped as written, for `<include>`, embeds, or `fetch`/`hx-get` — and every other file copies byte-for-byte to the same path. A leading `/` means the source root, in any path you write. Always
   link the real filename — `/about.html`, never `/about/`; a directory link (`/guides/`) resolves only if you
   wrote a `guides/index.html`. This stays true under `--pretty-urls`: you still write `/about.html`, and the build rewrites it to `/about/` in the output; `--base-url https://you.example/handbook/` — the site's whole address, never a bare path — prefixes them and makes `og:`/`canonical` absolute for share crawlers.
@@ -32,7 +32,7 @@ an error — on a layout too, because layouts don't chain (a section layout is a
 - **Named slots.** The layout writes `<slot name="footer">fallback…</slot>`; the page fills it with `slot=`
   on a real element — `<footer slot="footer">…</footer>`, never a `<slot>` tag, which in a page fills nothing
   — and that element replaces the slot, tag and all, keeping its own markup; only the `slot=` attribute is dropped. Omit the fill and the
-  fallback ships; `slot=` counts on direct children of `<body>` — or of your `<main>`, unwrapped first — and silently does nothing deeper. `grep -o '<slot[^>]*>' src/_layout.html` lists a layout's slots.
+  fallback ships; `slot=` counts on direct children of `<body>` — or of your `<main>`, unwrapped first — and silently does nothing deeper. `grep -o '<slot[^>]*>' site/_layout.html` lists a layout's slots.
 - **Everything else** replaces the layout's bare `<slot></slot>` if it has one — `<main><slot></slot></main>`
   is the usual shape — otherwise the children of its `<main>`. A `<main>` you wrote is dropped and its children used, so write complete semantic
   documents. A bare `<header>`/`<footer>` does **not** replace the layout's — only `slot=` fills, and it fills the *contents*: where the layout wraps its slot in its own `<footer>`, write `<p slot="footer">`, or you ship a footer inside a footer.

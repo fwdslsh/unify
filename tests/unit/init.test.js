@@ -37,14 +37,14 @@ describe("init()", () => {
     const code = await init({ projectRoot: root, sourceRoot: root, sourceDefaulted: true, template: undefined, reporter: silentReporter() });
     expect(code).toBe(0);
     // about.md is unique to the default template (see templates.test.js).
-    expect(existsSync(join(root, "src", "about.md"))).toBe(true);
+    expect(existsSync(join(root, "site", "about.md"))).toBe(true);
   });
 
-  test("scaffolds into <sourceRoot>/src when the source root defaulted to the working directory", async () => {
+  test("scaffolds into <sourceRoot>/site when the source root defaulted to the working directory", async () => {
     const root = tempDir();
     const code = await init({ projectRoot: root, sourceRoot: root, sourceDefaulted: true, template: "basic", reporter: silentReporter() });
     expect(code).toBe(0);
-    expect(existsSync(join(root, "src", "index.html"))).toBe(true);
+    expect(existsSync(join(root, "site", "index.html"))).toBe(true);
     expect(existsSync(join(root, "index.html"))).toBe(false);
   });
 
@@ -94,13 +94,13 @@ describe("init()", () => {
     // mkdirSync then failed mid-loop, leaving nine template files on disk that
     // the same check refused to complete on every later run.
     const root = tempDir();
-    mkdirSync(join(root, "src"), { recursive: true });
-    writeFileSync(join(root, "src", "posts"), "not a directory\n");
+    mkdirSync(join(root, "site"), { recursive: true });
+    writeFileSync(join(root, "site", "posts"), "not a directory\n");
     await expect(
       init({ projectRoot: root, sourceRoot: root, sourceDefaulted: true, template: "blog", reporter: silentReporter() }),
     ).rejects.toThrow(UsageError);
-    expect(readdirSync(join(root, "src"))).toEqual(["posts"]);
-    expect(readdirSync(root)).toEqual(["src"]);
+    expect(readdirSync(join(root, "site"))).toEqual(["posts"]);
+    expect(readdirSync(root)).toEqual(["site"]);
   });
 
   test("an unknown template is a usage fault (exit 2), never a silent fallback", async () => {
@@ -133,14 +133,14 @@ describe("init()", () => {
   test("a collision refusal is a usage fault (exit 2), and the existing files are untouched", async () => {
     const root = tempDir();
     await init({ projectRoot: root, sourceRoot: root, sourceDefaulted: true, template: "basic", reporter: silentReporter() });
-    const before = readFileSync(join(root, "src", "index.html"), "utf8");
+    const before = readFileSync(join(root, "site", "index.html"), "utf8");
     try {
       await init({ projectRoot: root, sourceRoot: root, sourceDefaulted: true, template: "docs", reporter: silentReporter() });
     } catch (e) {
       expect(e).toBeInstanceOf(UsageError);
       expect(e.exitCode).toBe(2);
     }
-    const after = readFileSync(join(root, "src", "index.html"), "utf8");
+    const after = readFileSync(join(root, "site", "index.html"), "utf8");
     expect(after).toBe(before);
   });
 
@@ -156,11 +156,11 @@ describe("init()", () => {
     for (const name of Object.keys(TEMPLATES)) {
       const root = tempDir();
       await init({ projectRoot: root, sourceRoot: root, sourceDefaulted: true, template: name, reporter: silentReporter() });
-      expect(existsSync(join(root, "src", "unify.yaml"))).toBe(name === "docs");
+      expect(existsSync(join(root, "unify.yaml"))).toBe(name === "docs");
     }
   });
 
-  test("never creates a dist/ directory next to src/", async () => {
+  test("never creates a dist/ directory next to site/", async () => {
     const root = tempDir();
     await init({ projectRoot: root, sourceRoot: root, sourceDefaulted: true, template: "default", reporter: silentReporter() });
     expect(existsSync(join(root, "dist"))).toBe(false);
@@ -189,7 +189,7 @@ describe("init()", () => {
         expect(existsSync(join(root, rootFile))).toBe(true);
         // Outside the source root is the whole point: inside it, a .md file
         // is a page and would publish (§19.4).
-        expect(existsSync(join(root, "src", rootFile))).toBe(false);
+        expect(existsSync(join(root, "site", rootFile))).toBe(false);
       }
     }
   });
@@ -218,7 +218,7 @@ describe("init()", () => {
       init({ projectRoot: root, sourceRoot: root, sourceDefaulted: true, template: "basic", reporter: silentReporter() }),
     ).rejects.toThrow(UsageError);
     expect(readFileSync(join(root, "AGENTS.md"), "utf8")).toBe("# my own guidance\n");
-    expect(existsSync(join(root, "src"))).toBe(false);
+    expect(existsSync(join(root, "site"))).toBe(false);
     expect(existsSync(join(root, "DEPLOY.md"))).toBe(false);
   });
 
@@ -283,7 +283,7 @@ describe("init()", () => {
     try {
       const root = tempDir();
       await init({ projectRoot: root, sourceRoot: root, sourceDefaulted: true, template: "bytes-probe", reporter: silentReporter() });
-      const written = readFileSync(join(root, "src", "assets", "probe.bin"));
+      const written = readFileSync(join(root, "site", "assets", "probe.bin"));
       expect(written.equals(Buffer.from(bytes))).toBe(true);
     } finally {
       delete TEMPLATES["bytes-probe"];
@@ -312,7 +312,7 @@ describe("init()", () => {
       const root = tempDir();
       await init({ projectRoot: root, sourceRoot: root, sourceDefaulted: true, template: name, reporter: silentReporter() });
       for (const [relPath, content] of Object.entries(files)) {
-        const written = readFileSync(join(root, "src", ...relPath.split("/")));
+        const written = readFileSync(join(root, "site", ...relPath.split("/")));
         const expected = typeof content === "string" ? Buffer.from(content, "utf8") : Buffer.from(content);
         expect(`${name}/${relPath}: ${written.equals(expected)}`).toBe(`${name}/${relPath}: true`);
       }

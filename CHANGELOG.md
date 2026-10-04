@@ -8,6 +8,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-04
+
+The default project layout. A fresh `unify init` now scaffolds:
+
+```
+AGENTS.md  DEPLOY.md
+scripts/gen.mjs        # the blog template's generator, beside the site
+site/                  # the source root: pages, assets, _layout.html, _includes/
+unify.yaml             # the docs template's saved catalog: true, beside the site
+```
+
+### Changed
+
+- **The default source root is `site/`**, then `src/` (the pre-0.10 default, kept so no
+  existing site changes), then the working directory (rule EXC-13). `unify init` scaffolds
+  into `site/`.
+- **A relative path in `unify.yaml` resolves against the file's own directory** (rule
+  CFG-08): a project-root file says `source: site` and `generate: scripts/gen.mjs`. For a file
+  inside the source root the two readings coincide, so nothing written before 0.10 changes.
+  CLI flags keep their rules. **Breaking for a 0.9.5 project-root file only:** rewrite
+  `generate: ../scripts/gen.mjs` as `generate: scripts/gen.mjs`.
+- `--save-config` creates a new `unify.yaml` at the project root (not in the source root),
+  writes `generate` relative to the file, and writes `source` when the file sits outside the
+  source root, so a bare `unify build` afterwards reads the same directory.
+- The blog template's generator moves from `src/_scripts/gen.mjs` to `scripts/gen.mjs` at the
+  project root (`node scripts/gen.mjs && unify build`, from the project root like every other
+  command); the docs template's `unify.yaml` moves to the project root.
+- The scaffolded layout and 404 link their stylesheet relative to the file
+  (`assets/style.css`), so opening either straight from the folder shows it styled; unify
+  rewrites the link for every page at every depth.
+- The defaulted-source notice reads "no site/ or src/ here".
+
 ## [0.9.5] - 2026-10-03
 
 ### Added
@@ -652,7 +684,8 @@ with generated compare-link notes only. Their diffs are on the
 [releases page](https://github.com/fwdslsh/unify/releases). Nothing here
 retroactively reconstructs detail those notes never carried.
 
-[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.9.5...HEAD
+[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/fwdslsh/unify/compare/v0.9.5...v0.10.0
 [0.9.5]: https://github.com/fwdslsh/unify/compare/v0.9.4...v0.9.5
 [0.9.4]: https://github.com/fwdslsh/unify/compare/v0.9.3...v0.9.4
 [0.9.3]: https://github.com/fwdslsh/unify/compare/v0.9.2...v0.9.3

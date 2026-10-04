@@ -305,7 +305,9 @@ export function layoutHtml(siteName) {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>— ${text(siteName)}</title>
-    <link rel="stylesheet" href="/assets/style.css">
+    <!-- relative, not /assets/…: open this file straight from the folder and
+         the styles apply; unify rewrites it for every page at every depth. -->
+    <link rel="stylesheet" href="assets/style.css">
     <!-- share card: ${SHARE_IMAGE.path} is a PLACEHOLDER, a flat
          ${SHARE_IMAGE.width}×${SHARE_IMAGE.height} image. Replace the file, and correct these two numbers
          if yours is a different size — they must match it (see DEPLOY.md). -->
@@ -415,7 +417,7 @@ export function notFoundHtml(siteName) {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Page not found — ${text(siteName)}</title>
     <meta name="description" content="${attr(description)}">
-    <link rel="stylesheet" href="/assets/style.css">
+    <link rel="stylesheet" href="assets/style.css">
     <meta name="robots" content="noindex">
     <meta property="og:type" content="website">
     <meta property="og:title" content="Page not found">
@@ -600,7 +602,7 @@ published** and the previous \`dist/\` is untouched — never report success on 
 
 ## Files
 
-- The source root is \`src/\`. **Everything in it ships**, at the same path: \`.html\` and \`.md\` are
+- The source root is \`site/\`. **Everything in it ships**, at the same path: \`.html\` and \`.md\` are
   pages, and every other file is copied byte-for-byte.
 - A leading underscore keeps a file or a whole directory out of the output — \`_layout.html\`,
   \`_includes/\`, \`_drafts/\`. The build still reads it; \`dist/\` never contains it. Files inside a
@@ -615,8 +617,8 @@ published** and the previous \`dist/\` is untouched — never report success on 
   they are inert by design, meaningful only to a consumer that chooses to interpret them.
 - Link the real file: \`/about.html\`, never \`/about/\`. A directory link resolves only if you wrote
   \`about/index.html\`. A leading \`/\` means the source root, in any path you write.
-- Derived files — a post index — come from a script you write and run yourself. From this
-  directory, with the source tree in \`src/\`, that is \`node src/_scripts/gen.mjs && unify build\`.
+- Derived files — a post index — come from a script you write and run yourself, kept in
+  \`scripts/\` beside the site: from this directory, \`node scripts/gen.mjs && unify build\`.
   A feed is the one exception: declare \`schema: Article\`/\`BlogPosting\` (below) and build with
   \`--base-url\`, and unify writes \`feed.xml\` itself — no script, unless you ship your own
   (an authored \`feed.xml\` always wins and generates nothing).
@@ -664,7 +666,7 @@ published** and the previous \`dist/\` is untouched — never report success on 
 - unify rewrites only HTML's own URL attributes (\`href\`, \`src\`). A \`url()\` in CSS and a
   \`fetch()\`/\`hx-get\` address ship exactly as written.
 - **Never invent a fact to fill a field.** The placeholders in this scaffold — the site name, the
-  contact details, \`src/assets/share-placeholder.png\` — are there to be replaced, not published.
+  contact details, \`site/assets/share-placeholder.png\` — are there to be replaced, not published.
 `;
 }
 
@@ -689,24 +691,24 @@ Nothing a scaffold writes is a fact about you. **The site's name is written in m
 and the ones a build never corrects are the ones that publish it anyway — so this list names every
 one of them rather than the first:
 
-- **the site's name and byline** — \`src/_layout.html\` (the title suffix and the footer), and then
-  \`src/index.html\`, \`src/404.html\` and \`src/contact.html\`, which each write it into their own
+- **the site's name and byline** — \`site/_layout.html\` (the title suffix and the footer), and then
+  \`site/index.html\`, \`site/404.html\` and \`site/contact.html\`, which each write it into their own
   visible text and their own \`description\`. Grep the scaffolded name once and you will find them
-  all: \`grep -rn 'My Site' src/\`, with whichever name your template shipped;
-- **the contact details** on \`src/contact.html\` — a reserved \`example.com\` address, and no postal
+  all: \`grep -rn 'My Site' site/\`, with whichever name your template shipped;
+- **the contact details** on \`site/contact.html\` — a reserved \`example.com\` address, and no postal
   address at all, because a plausible street address in a scaffold is one an author publishes;
-- **a generator's own constants**, if your source tree has one. The blog template's
-  \`src/_scripts/gen.mjs\` opens with \`SITE_NAME\`, \`SITE_URL\` and \`LISTING_DESCRIPTION\`.
+- **a generator's own constants**, if your project has one. The blog template's
+  \`scripts/gen.mjs\` opens with \`SITE_NAME\`, \`SITE_URL\` and \`LISTING_DESCRIPTION\`.
   \`SITE_URL\` is a placeholder domain (\`https://you.example\`) and it has to match the
   \`--base-url\` you build with, because a feed's links are **absolute**: nothing in unify rewrites
   them, the reference check never follows them off-origin, and \`unify audit\` sees a mirror-copied
   asset. Edit those and **rerun the script** (step 3), or \`feed.xml\` will go on advertising a
   domain you do not own on every page that links to it;
-- \`src/assets/share-placeholder.png\` — a flat 1200×630 placeholder card, not a photograph. It is
+- \`site/assets/share-placeholder.png\` — a flat 1200×630 placeholder card, not a photograph. It is
   the image social crawlers show. Replace the file, and **if your image is a different size,
-  correct \`og:image:width\` and \`og:image:height\` in \`src/_layout.html\` to match it**: a declared
+  correct \`og:image:width\` and \`og:image:height\` in \`site/_layout.html\` to match it**: a declared
   size the file contradicts is a claim nothing else will ever catch;
-- \`src/robots.txt\`, which blocks nothing. Edit it if you need to — unify never decides what a site
+- \`site/robots.txt\`, which blocks nothing. Edit it if you need to — unify never decides what a site
   should block.
 
 ## 2. Check before you publish
@@ -727,9 +729,9 @@ its own gets one naming its own final URL; an authored canonical always wins.
 Hosting the site under a subpath? Name the whole thing, trailing slash included:
 \`--base-url https://you.example/handbook/\`.
 
-If your source tree has a generator — the blog template's \`src/_scripts/gen.mjs\` — run it first,
-so the derived pages are current. Every command in this file runs from here, the project root, so
-the script's path starts at \`src/\` too: \`node src/_scripts/gen.mjs && unify build …\`.
+If your project has a generator — the blog template's \`scripts/gen.mjs\` — run it first, so the
+derived pages are current. Every command in this file runs from here, the project root, where the
+script lives beside the site: \`node scripts/gen.mjs && unify build …\`.
 
 ## 4. Publish \`dist/\`
 

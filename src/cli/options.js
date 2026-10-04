@@ -190,14 +190,13 @@ function unknownOption(arg) {
 /**
  * §18 — where `unify.yaml` is: in the source root if one is there, else at
  * the project root (the working directory), else nowhere — in which case the
- * path returned is the source root's, where `--save-config` would create it.
+ * path returned is the project root's, where `--save-config` creates it.
  *
- * The file is build tooling, not content, so it may sit beside `package.json`
- * rather than inside the content directory; that is also what lets a
- * project-root `unify.yaml` name the source directory (`source: site`),
- * which a file inside that directory could not do before the directory was
- * known. The source root's copy wins when both exist, so no site that already
- * has one changes.
+ * The file is build tooling, not content, so it belongs beside `package.json`
+ * rather than inside the content directory; that is also what lets it name
+ * the source directory (`source: site`), which a file inside that directory
+ * could not do before the directory was known. The source root's copy wins
+ * when both exist, so no site that already keeps one there changes.
  *
  * @param {string} sourceRoot
  * @param {string} [projectRoot]
@@ -208,7 +207,7 @@ export function configPath(sourceRoot, projectRoot = process.cwd()) {
   if (existsSync(inSource)) return { path: inSource, exists: true };
   const inProject = join(projectRoot, "unify.yaml");
   if (existsSync(inProject)) return { path: inProject, exists: true };
-  return { path: inSource, exists: false };
+  return { path: inProject, exists: false };
 }
 
 /**
