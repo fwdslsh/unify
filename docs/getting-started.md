@@ -227,13 +227,14 @@ Want each entry's full rendered content in the feed, not just a summary? Add `--
 
 ## Anything else derived from other files
 
-A blog index, a gallery page — anything else computed from a set of files — is a script you own, run before the build:
+A blog index, a gallery page — anything else computed from a set of files — is a script you own, which unify runs before every build once `unify.yaml` names it:
 
-```bash
-node scripts/gen.mjs && unify build
+```yaml
+# unify.yaml
+generate: scripts/gen.mjs
 ```
 
-The script lives in `scripts/` beside the site and writes real pages into `site/`, where they get layouts, head merging, and reference checking like everything else (`unify init blog` ships a working example: `scripts/gen.mjs` at the project root, and the data file in the site). One habit matters the day the script reads a data file: **name the fields you emit — never spread the whole record**. The underscore keeps `_data/` itself out of `dist/`, but no build check can catch a private field once your script copies it into a page. unify itself has no collections, no data files, and no template language — that's the point.
+The script lives in `scripts/` beside the site and writes real pages into a directory unify hands it for that one build (never into `site/`), where they get layouts, head merging, and reference checking like everything else (`unify init blog` ships a working example: `scripts/gen.mjs` at the project root, the line in `unify.yaml`, and the data file in the site). One habit matters the day the script reads a data file: **name the fields you emit — never spread the whole record**. The underscore keeps `_data/` itself out of `dist/`, but no build check can catch a private field once your script copies it into a page. unify itself has no collections, no data files, and no template language — that's the point.
 
 ## Where to go next
 

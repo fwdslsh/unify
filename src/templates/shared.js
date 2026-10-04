@@ -624,8 +624,9 @@ published** and the previous \`dist/\` is untouched — never report success on 
   they are inert by design, meaningful only to a consumer that chooses to interpret them.
 - Link the real file: \`/about.html\`, never \`/about/\`. A directory link resolves only if you wrote
   \`about/index.html\`. A leading \`/\` means the source root, in any path you write.
-- Derived files — a post index — come from a script you write and run yourself, kept in
-  \`scripts/\` beside the site: from this directory, \`node scripts/gen.mjs && unify build\`.
+- Derived files — a post index — come from a script you write, kept in \`scripts/\` beside the
+  site and named in \`unify.yaml\` (\`generate: scripts/gen.mjs\`): unify runs it before every build,
+  dev rebuild and audit, and it writes into the directory unify hands it, never into \`site/\`.
   A feed is the one exception: declare \`schema: Article\`/\`BlogPosting\` (below) and build with
   \`--base-url\`, and unify writes \`feed.xml\` itself — no script, unless you ship your own
   (an authored \`feed.xml\` always wins and generates nothing).
@@ -705,12 +706,10 @@ one of them rather than the first:
 - **the contact details** on \`site/contact.html\` — a reserved \`example.com\` address, and no postal
   address at all, because a plausible street address in a scaffold is one an author publishes;
 - **a generator's own constants**, if your project has one. The blog template's
-  \`scripts/gen.mjs\` opens with \`SITE_NAME\`, \`SITE_URL\` and \`LISTING_DESCRIPTION\`.
-  \`SITE_URL\` is a placeholder domain (\`https://you.example\`) and it has to match the
-  \`--base-url\` you build with, because a feed's links are **absolute**: nothing in unify rewrites
-  them, the reference check never follows them off-origin, and \`unify audit\` sees a mirror-copied
-  asset. Edit those and **rerun the script** (step 3), or \`feed.xml\` will go on advertising a
-  domain you do not own on every page that links to it;
+  \`scripts/gen.mjs\` opens with \`SITE_NAME\` and \`LISTING_DESCRIPTION\`. Its feed's links are
+  **absolute** and take the \`--base-url\` you build with (step 3); until you pass one they name
+  the placeholder \`https://you.example\`, which unify never rewrites or checks, because the feed
+  is a mirror-copied asset. Build with your address and the feed follows;
 - \`site/assets/share-placeholder.png\` — a flat 1200×630 placeholder card, not a photograph. It is
   the image social crawlers show. Replace the file, and **if your image is a different size,
   correct \`og:image:width\` and \`og:image:height\` in \`site/_layout.html\` to match it**: a declared
@@ -736,9 +735,10 @@ its own gets one naming its own final URL; an authored canonical always wins.
 Hosting the site under a subpath? Name the whole thing, trailing slash included:
 \`--base-url https://you.example/handbook/\`.
 
-If your project has a generator — the blog template's \`scripts/gen.mjs\` — run it first, so the
-derived pages are current. Every command in this file runs from here, the project root, where the
-script lives beside the site: \`node scripts/gen.mjs && unify build …\`.
+If your project has a generator — the blog template's \`scripts/gen.mjs\`, named in \`unify.yaml\` —
+unify runs it as part of every build, so the derived pages are current by construction. Every
+command in this file runs from here, the project root, where \`unify.yaml\` and the script live
+beside the site.
 
 ## 4. Publish \`dist/\`
 

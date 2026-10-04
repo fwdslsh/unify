@@ -30,6 +30,17 @@ the examples and the documentation in line with the layout beta.1 introduced.
 
 ### Changed
 
+- **The blog template's generator runs through `--generate`.** Its `unify.yaml` has
+  `generate: scripts/gen.mjs` live, so a bare `unify build` runs the generator; it writes
+  `blog.html` and `feed.xml` into the build's overlay instead of into `site/`, so no derived
+  file is checked in and none can go stale, and the only command the scaffold shows is
+  `unify build`. The feed's absolute links take the build's `--base-url` from the generator
+  context, falling back to the `https://you.example` placeholder without one (SCF-03,
+  FEED-06, spec §19.6; `docs/authoring-rules.md` names the same literal).
+- **seed-library-alt shares one stylesheet.** Its three layouts carried near-identical
+  inline `<style>` blocks; the shared rules now live in `site/assets/styles.css`, linked
+  relative to each layout, with only each layout's own differences left inline. The cascade
+  on every page is unchanged.
 - **`--save-config` uncomments in place.** Saving a key that has only a commented line in
   the file (`# pretty-urls: true`) replaces that line rather than appending a second copy
   at the end; keys with a live line are replaced as before, and keys with neither are

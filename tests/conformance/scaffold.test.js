@@ -242,80 +242,43 @@ for (const name of TEMPLATES) {
   }, TEST_MS);
 }
 
-test("scaffold/blog: SCF-03 — every shown `node …/gen.mjs && unify build` literal runs from the directory its own file is read in", async () => {
+test("scaffold/blog: SCF-03 — the scaffold's one shown command is `unify build`, and unify.yaml names the generator so it runs it", async () => {
   // §19.6: "a single shown literal is a copied literal", and product-spec §6.7
-  // makes examples executable few-shot material. The scaffold showed ONE
-  // spelling, `node scripts/gen.mjs && unify build`, in five places — three of
-  // them project-root-facing (DEPLOY.md and AGENTS.md at the project root, and
-  // the blog home page a reader opens first). Copied from any of those it is
-  // `Cannot find module …/scripts/gen.mjs`, because the script is at
-  // `src/scripts/gen.mjs` from there. The one directory where its first half
-  // did run was `src/`, and there its SECOND half resolved the source root to
-  // `src/` itself and wrote `src/dist/` — which the next project-root build
-  // then published as `dist/dist/`.
-  //
-  // So the rule this pins is not "one literal everywhere" but "every literal
-  // runs where it is shown": the script path is resolved against the directory
-  // the file carrying it lives in.
+  // makes examples executable few-shot material. Before 0.10 the scaffold
+  // showed `node scripts/gen.mjs && unify build` in five places and the
+  // generator wrote blog.html/feed.xml into the source tree; now unify.yaml
+  // names it (`generate: scripts/gen.mjs`), unify runs it before every build,
+  // and the one command a reader copies anywhere is the bare build. So the
+  // rule this pins: no file of the scaffold tells a reader to run the
+  // generator by hand, the saved key resolves from the project root, and a
+  // bare build from there publishes the derived pages without writing a byte
+  // into site/.
   const tmp = mkTmp();
   const initR = await runCli(["init", "blog"], tmp);
   if (initR.exit !== 0) throw new Error(`unify init blog exited ${initR.exit}: ${initR.stderr}`);
 
-  // Every file of the scaffold that shows the invocation, paired with the
-  // directory a reader of that file is standing in.
-  // Each entry lists the directories that file's own text tells a reader to
-  // stand in. Since 0.10 every one of them names exactly one — the project
-  // root, where scripts/gen.mjs lives beside site/ — so "resolves from a
-  // listed directory" is the whole assertion.
-  const shownIn = [
-    ["AGENTS.md", [tmp]],
-    ["DEPLOY.md", [tmp]],
-    ["site/index.html", [tmp]],            // a page of the site: read from the project root
-    ["site/posts/hello-world.md", [tmp]],  // likewise
-    ["scripts/gen.mjs", [tmp]],
-  ];
-
-  const LITERAL = /node\s+(\S*gen\.mjs)\s+&(?:amp;)?&(?:amp;)?\s+unify build/g;
-  for (const [rel, dirs] of shownIn) {
+  for (const rel of ["AGENTS.md", "DEPLOY.md", "site/index.html", "site/posts/hello-world.md", "scripts/gen.mjs"]) {
     const text = readFileSync(join(tmp, ...rel.split("/")), "utf8");
-    const paths = [...text.matchAll(LITERAL)].map((m) => m[1]);
-    if (paths.length === 0) throw new Error(`${rel} shows no "node …/gen.mjs && unify build" literal — this test's inventory is stale, not the scaffold`);
-    const named = (dir) => relative(tmp, dir) || "the project root";
-    const exercised = new Set();
-    for (const scriptPath of paths) {
-      const from = dirs.find((dir) => existsSync(join(dir, ...scriptPath.split("/"))));
-      if (!from) {
-        throw new Error(
-          `${rel} shows \`node ${scriptPath} && unify build\`, but ${scriptPath} exists from none of the directories that file tells a reader to stand in ` +
-          `(${dirs.map(named).join(", ")}) — a reader who copies the line gets MODULE_NOT_FOUND (§19.6: a single shown literal is a copied literal)`,
-        );
-      }
-      exercised.add(from);
-    }
-    for (const dir of dirs) {
-      if (!exercised.has(dir)) throw new Error(`${rel} names ${named(dir)} as a place to run from but shows no literal that resolves there`);
-    }
+    if (/node\s+\S*gen\.mjs\s+&(?:amp;)?&/.test(text)) throw new Error(`${rel} still shows the pre-0.10 \`node …/gen.mjs && unify build\` recipe; the generator runs through unify.yaml now`);
   }
-
-  // The second half has to land somewhere too: run the project-root spelling
-  // exactly as DEPLOY.md prints it, and require the build to write dist/ at the
-  // project root rather than a dist/ nested inside the source tree.
-  const deploy = readFileSync(join(tmp, "DEPLOY.md"), "utf8");
-  const projectRootSpelling = [...deploy.matchAll(LITERAL)][0][1];
-  const gen = Bun.spawn({ cmd: [process.execPath, projectRootSpelling], cwd: tmp, stdin: "ignore", stdout: "pipe", stderr: "pipe" });
-  const genErr = await new Response(gen.stderr).text();
-  if ((await gen.exited) !== 0) throw new Error(`\`node ${projectRootSpelling}\` from the project root exited non-zero: ${genErr}`);
+  const yaml = readFileSync(join(tmp, "unify.yaml"), "utf8");
+  const live = yaml.split("\n").filter((l) => /^[a-z]/.test(l));
+  if (live.join("|") !== "generate: scripts/gen.mjs") throw new Error(`unify.yaml's live lines should be exactly generate: scripts/gen.mjs, got: ${live.join(" | ")}`);
+  if (!existsSync(join(tmp, "scripts", "gen.mjs"))) throw new Error("generate: scripts/gen.mjs names a file that does not exist from the project root");
 
   const buildR = await runCli(["build"], tmp);
-  if (buildR.exit !== 0) throw new Error(`unify build after the generator exited ${buildR.exit}: ${buildR.stderr}`);
+  if (buildR.exit !== 0) throw new Error(`unify build exited ${buildR.exit}: ${buildR.stderr}`);
   if (existsSync(join(tmp, "site", "dist"))) throw new Error("the build wrote site/dist/ — the recipe was run from the wrong root");
-  if (!existsSync(join(tmp, "dist", "blog.html"))) throw new Error("dist/blog.html is missing after the recipe DEPLOY.md prints");
+  for (const derived of ["blog.html", "feed.xml"]) {
+    if (!existsSync(join(tmp, "dist", derived))) throw new Error(`dist/${derived} is missing after a bare unify build — the generator did not run`);
+    if (existsSync(join(tmp, "site", derived))) throw new Error(`site/${derived} exists — the generator wrote into the source tree instead of the overlay`);
+  }
   if (existsSync(join(tmp, "dist", "dist"))) throw new Error("dist/dist/ exists — a nested build output was published as content");
 
   covers("SCF-03");
 }, TEST_MS);
 
-test("scaffold/blog: SCF-03 — scripts/gen.mjs reproduces the checked-in tree byte-for-byte; SCF-05 — the private field never leaves _data/", async () => {
+test("scaffold/blog: SCF-03 — two builds are byte-identical and the generator writes nothing into site/; SCF-05 — the private field never leaves _data/", async () => {
   const tmp = mkTmp();
   const initR = await runCli(["init", "blog"], tmp);
   if (initR.exit !== 0) throw new Error(`unify init blog exited ${initR.exit}: ${initR.stderr}`);
@@ -324,19 +287,18 @@ test("scaffold/blog: SCF-03 — scripts/gen.mjs reproduces the checked-in tree b
   const scriptPath = join(tmp, "scripts", "gen.mjs");
   if (!existsSync(scriptPath)) throw new Error("blog template is missing scripts/gen.mjs");
 
-  // Zero dependencies: the only import is a node: builtin.
+  // Zero dependencies: every import is a node: builtin.
   const scriptText = readFileSync(scriptPath, "utf8");
   const importLines = scriptText.split("\n").filter((l) => /^\s*import\b/.test(l));
-  if (importLines.length !== 1 || !/from\s+["']node:/.test(importLines[0])) {
-    throw new Error(`scripts/gen.mjs should have exactly one import, from a node: builtin, got:\n${importLines.join("\n")}`);
+  if (importLines.length === 0 || importLines.some((l) => !/from\s+["']node:/.test(l))) {
+    throw new Error(`scripts/gen.mjs should import only node: builtins, got:\n${importLines.join("\n")}`);
   }
 
-  // The run-it-yourself contract, spelled exactly as docs/authoring-rules.md
-  // line 5 spells it — the scaffold and the doc must agree, because a rule
-  // that shows exactly one literal will have that literal copied
-  // (docs/ratification.md §6).
-  if (!scriptText.includes("node scripts/gen.mjs && unify build")) {
-    throw new Error(`scripts/gen.mjs's opening comment must carry the authoring rules' literal "node scripts/gen.mjs && unify build":\n${scriptText.split("\n").slice(0, 5).join("\n")}`);
+  // The seam, spelled exactly as docs/authoring-rules.md spells it — the
+  // scaffold and the doc must agree, because a rule that shows exactly one
+  // literal will have that literal copied (docs/ratification.md §6).
+  if (!scriptText.includes("generate: scripts/gen.mjs")) {
+    throw new Error(`scripts/gen.mjs's opening comment must name the authoring rules' literal "generate: scripts/gen.mjs":\n${scriptText.split("\n").slice(0, 6).join("\n")}`);
   }
 
   // The data file the generator reads: public fields beside a private one.
@@ -354,58 +316,41 @@ test("scaffold/blog: SCF-03 — scripts/gen.mjs reproduces the checked-in tree b
     throw new Error(`_data/authors.json's first record has no private \`email\` field — the field the scaffold exists to keep out of pages (got: ${JSON.stringify(authorRecords[0])})`);
   }
 
-  // Snapshot every byte of the scaffold, delete the two generated artifacts
-  // (so "unchanged" cannot mean "never touched"), rerun the generator, and
-  // require the whole tree back byte-for-byte: freshness (the checked-in
-  // copies are exactly what the script produces) and idempotence (the script
-  // wrote nothing else) in one check.
+  // Nothing pre-generated ships: the derived files exist only in the overlay.
+  for (const derived of ["blog.html", "feed.xml"]) {
+    if (existsSync(join(srcDir, derived))) throw new Error(`the scaffold ships site/${derived}; since 0.10 the generator writes it into the overlay on every build`);
+  }
+
+  // Determinism and a clean source tree: snapshot site/, build twice, and
+  // require site/ untouched and the two dist/ trees byte-identical.
   const before = readTree(srcDir);
-  const blogHtmlPath = join(srcDir, "blog.html");
-  const feedXmlPath = join(srcDir, "feed.xml");
-  if (!existsSync(blogHtmlPath) || !existsSync(feedXmlPath)) {
-    throw new Error("blog template did not ship pre-generated blog.html/feed.xml");
-  }
-  rmSync(blogHtmlPath);
-  rmSync(feedXmlPath);
-
-  const genProc = Bun.spawn({
-    cmd: [process.execPath, scriptPath],
-    cwd: tmp,
-    stdin: "ignore", stdout: "pipe", stderr: "pipe",
-  });
-  const [genOut, genErr] = await Promise.all([new Response(genProc.stdout).text(), new Response(genProc.stderr).text()]);
-  const genExit = await genProc.exited;
-  if (genExit !== 0) throw new Error(`scripts/gen.mjs exited ${genExit}: ${genErr}`);
-  if (!genOut.includes("wrote blog.html and feed.xml")) throw new Error(`gen.mjs did not report success: ${genOut}`);
-
+  const first = await runCli(["build", "-o", "dist"], tmp);
+  if (first.exit !== 0) throw new Error(`unify build exited ${first.exit}: ${first.stderr}`);
+  if (!first.stdout.includes("wrote blog.html and feed.xml")) throw new Error(`gen.mjs did not report success in the build output:\n${first.stdout}`);
+  const second = await runCli(["build", "-o", "dist2"], tmp);
+  if (second.exit !== 0) throw new Error(`second unify build exited ${second.exit}: ${second.stderr}`);
   const after = readTree(srcDir);
-  for (const rel of before.keys()) {
-    if (!after.has(rel)) throw new Error(`running scripts/gen.mjs lost a scaffold file: ${rel}`);
+  if (after.size !== before.size || [...before].some(([rel, bytes]) => !after.has(rel) || !bytes.equals(after.get(rel)))) {
+    throw new Error("building the blog scaffold changed site/ — the generator must write only into the overlay");
   }
-  for (const rel of after.keys()) {
-    if (!before.has(rel)) throw new Error(`running scripts/gen.mjs wrote a file the scaffold does not ship: ${rel}`);
-  }
-  for (const [rel, bytes] of before) {
-    if (!bytes.equals(after.get(rel))) {
-      throw new Error(`running scripts/gen.mjs changed ${rel} — the checked-in copy is stale or the script is not deterministic:\n--- checked-in ---\n${bytes}\n--- regenerated ---\n${after.get(rel)}`);
-    }
+  const distA = readTree(join(tmp, "dist"));
+  const distB = readTree(join(tmp, "dist2"));
+  if (distA.size !== distB.size || [...distA].some(([rel, bytes]) => !distB.has(rel) || !bytes.equals(distB.get(rel)))) {
+    throw new Error("two builds of the blog scaffold differ — the generator is not deterministic");
   }
 
   // Both generated files carry the hand-edit guard, naming the data as the
   // thing to edit.
   const marker = "generated by scripts/gen.mjs — edit the data, not this file";
-  for (const generatedPath of [blogHtmlPath, feedXmlPath]) {
-    if (!readFileSync(generatedPath, "utf8").includes(marker)) {
-      throw new Error(`${generatedPath} is missing the "${marker}" marker`);
+  for (const derived of ["blog.html", "feed.xml"]) {
+    if (!readFileSync(join(tmp, "dist", derived), "utf8").includes(marker)) {
+      throw new Error(`dist/${derived} is missing the "${marker}" marker`);
     }
   }
 
-  // The scaffold must build clean with the regenerated files too — no
-  // intervening step was needed (they matched exactly), so this doubles as
-  // reassurance that SCF-04's guarantee didn't depend on the pre-generated
-  // copies being special-cased somehow.
+  // The dry run exits 0 as well — the generator runs there too (§33.1).
   const dryRunR = await runCli(["build", "--dry-run", "--strict"], tmp);
-  if (dryRunR.exit !== 0) throw new Error(`unify build --dry-run --strict exited ${dryRunR.exit} after regenerating blog.html/feed.xml: ${dryRunR.stderr}`);
+  if (dryRunR.exit !== 0) throw new Error(`unify build --dry-run --strict exited ${dryRunR.exit}: ${dryRunR.stderr}`);
 
   // SCF-05's outcome, on a real build: the public field flowed into the
   // built index (the data was used, not ignored) and the private field's
@@ -413,14 +358,12 @@ test("scaffold/blog: SCF-03 — scripts/gen.mjs reproduces the checked-in tree b
   // the contact page legitimately ships a different @example.com address,
   // and a domain-level grep once turned a 0/6 leak into a phantom 5/6
   // (_notes/ratification-rounds-7-20.md, round 19's judging traps).
-  const buildR = await runCli(["build"], tmp);
-  if (buildR.exit !== 0) throw new Error(`unify build (real) exited ${buildR.exit}: ${buildR.stderr}`);
   const distDir = join(tmp, "dist");
   if (existsSync(join(distDir, "_data"))) throw new Error("dist/_data shipped — the underscore exclusion failed");
   if (!readFileSync(join(distDir, "blog.html"), "utf8").includes(publicName)) {
     throw new Error(`built blog.html does not carry the author's public name "${publicName}" — the generator did not use the data file`);
   }
-  for (const [rel, bytes] of readTree(distDir)) {
+  for (const [rel, bytes] of distA) {
     if (bytes.includes(privateEmail)) {
       throw new Error(`the private field "${privateEmail}" from _data/authors.json shipped in dist/${rel} — the generator leaked a field the exclusion rules cannot protect`);
     }
@@ -1251,13 +1194,9 @@ for (const name of TEMPLATES) {
     }
     if (edited === 0) throw new Error(`${name}: DEPLOY.md step 1 named ${listed.length} source paths and editing all of them changed nothing`);
 
-    // Step 3's own instruction, for a tree with a generator: rerun the script.
-    const script = join(tmp, "scripts", "gen.mjs");
-    if (existsSync(script)) {
-      const gen = Bun.spawn({ cmd: [process.execPath, script], cwd: tmp, stdin: "ignore", stdout: "pipe", stderr: "pipe" });
-      const err = await new Response(gen.stderr).text();
-      if ((await gen.exited) !== 0) throw new Error(`${name}: rerunning the generator after step 1 exited non-zero: ${err}`);
-    }
+    // A tree with a generator (the blog) needs no extra step: unify runs it
+    // inside the build below, and its feed takes the --base-url from the
+    // build's own settings, so the placeholder domain goes without an edit.
 
     const buildR = await runCli(["build", "--base-url", "https://acme-replacement.example/", "--canonical", "auto"], tmp);
     if (buildR.exit !== 0) throw new Error(`${name}: unify build after DEPLOY.md's recipe exited ${buildR.exit}: ${buildR.stderr}`);

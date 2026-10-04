@@ -286,8 +286,9 @@ const sections = [...bySeries].map(([series, list]) => {
 It slots into the generator above in place of `items`; write `sections.join("\n")` into the
 page instead.
 
-The `blog` template ships this worked: `unify init blog` writes a `scripts/gen.mjs` beside `site/` that
-reads `posts/*.md` and `_data/authors.json` and regenerates the index and the feed.
+The `blog` template ships this worked: `unify init blog` writes a `scripts/gen.mjs` beside `site/`, named
+by its `unify.yaml`, that reads `posts/*.md` and `_data/authors.json` and writes the index and the feed into
+the overlay on every build.
 
 ## 2. Image optimization
 

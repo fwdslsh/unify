@@ -13,10 +13,11 @@
  *   failed at (5/5 on the named-slot fill) and mis-teaches placeholders
  *   just as efficiently (3/4 copied one verbatim). What this file
  *   demonstrates, agents will copy; so it demonstrates the pattern
- *   properly: the run-it-yourself contract (`node scripts/gen.mjs &&
- *   unify build` — the authoring rules' own literal, and the two must
- *   agree), a generated-file marker, and the derived files shipped
- *   pre-generated.
+ *   properly: the `--generate` seam (`generate: scripts/gen.mjs` in the
+ *   scaffolded unify.yaml, so a bare `unify build` runs it — the authoring
+ *   rules' own literal, and the two must agree), a generator that writes
+ *   only into the overlay unify hands it and never into `site/`, and a
+ *   generated-file marker.
  * - Eight of those twelve correctly excluded their data file and still
  *   published its private fields. File-level exclusion cannot protect a
  *   field, and no diagnostic can exist once a script copies one into a
@@ -24,14 +25,12 @@
  *   the generator itself, so gen.mjs names the fields it emits — never
  *   spreads the record — and its comments say why.
  *
- * The scaffold ships `blog.html`/`feed.xml` already generated from the two
- * sample posts and the authors file below — `unify init blog && unify build
- * --dry-run --strict` must exit 0 with no intervening step (SCF-04), so the
- * listing page and feed can't depend on the user having run the script
- * first. The checked-in copies are byte-identical to what running the
- * script produces: the SCF-03 test deletes them, reruns the script, and
- * compares the whole tree. **Anything that changes a post, the authors
- * file, or the generator changes those two literals in the same edit.**
+ * The scaffold ships no `blog.html` or `feed.xml`: unify runs the generator
+ * before every build, dev rebuild and audit and the two land in the overlay,
+ * so `unify init blog && unify build --dry-run --strict` exits 0 with no
+ * intervening step (SCF-04) and there is no checked-in copy that can go
+ * stale. The SCF-03 test builds twice and requires byte-identical output,
+ * and requires that nothing was written into `site/`.
  *
  * ── The §19.2 discovery set, in this template ──────────────────────────
  * `commonFiles()` carries the site-wide half (the language, the `og:image`
@@ -51,7 +50,7 @@
  *   `date:` — §20.10 will not invent one and `schema-incomplete` fires
  *   without it — plus `og:type: article`, both replacing the layout's
  *   value by the ordinary head merge (§8);
- * - `blog.html` links every post and the nav links `blog.html`, so nothing
+ * - the generated `blog.html` links every post and the nav links `blog.html`, so nothing
  *   is a `page-orphan` (`index.html` and `404.html` are exempt); and
  *   `feed.xml` is reachable — `<link rel="alternate">` on the home and
  *   listing pages, a visible link on the listing — because §19.7's last
@@ -64,6 +63,7 @@
  * invented person with a plausible date is exactly what a reader would
  * mistake for a fact — and would publish.
  */
+import { configTemplate } from "../cli/options.js";
 import { commonFiles, mdFrontmatter, pageHtml } from "./shared.js";
 
 const SITE_NAME = "My Blog";
@@ -117,24 +117,36 @@ const LISTING_DESCRIPTION_SOURCE = listingDescription("${SITE_NAME}");
 // invents (no date it cannot read, no byline it was not given), and carries
 // the field-privacy comments SCF-05 requires — the teaching is the point,
 // not the byte count.
-const GEN_MJS = `// Regenerates blog.html and feed.xml — the derived files — from the site's
-// posts/*.md and _data/authors.json. Zero dependencies, run it yourself from
-// the project root, where every other command in this project runs too:
-//   node scripts/gen.mjs && unify build
-// It lives in scripts/ beside the site, not inside it: build tooling is not
-// content. If you scaffolded with --source, point SITE at that directory.
-import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+const GEN_MJS = `// Writes blog.html and feed.xml — the derived files — from the site's posts/*.md
+// and _data/authors.json. unify runs this file itself before every build, dev
+// rebuild and audit, because unify.yaml names it:
+//   generate: scripts/gen.mjs
+// so a plain \`unify build\` is the whole command. unify hands it three paths
+// (conformance-spec §33.2): argv[2] the source root, argv[3] a fresh overlay
+// directory whose files join the build as ordinary pages, argv[4] a snapshot of
+// the build's settings. Nothing here is written into site/: the overlay is
+// thrown away after the build, so there is no generated file to keep fresh,
+// commit, or edit by mistake. It lives in scripts/ beside the site, not inside
+// it, because build tooling is not content. To look at its output on its own:
+//   node scripts/gen.mjs site some-empty-dir
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 
-const HERE = import.meta.url;
-const SITE = new URL("../site/", HERE);
-const POSTS = new URL("posts/", SITE);
+const [, , sourceRoot, outDir, contextPath] = process.argv;
+if (!sourceRoot || !outDir) {
+  throw new Error("gen.mjs: unify runs this (generate: scripts/gen.mjs in unify.yaml); by hand, pass the site and an output directory");
+}
+const POSTS = join(sourceRoot, "posts");
 const SITE_NAME = ${JSON.stringify(SITE_NAME)};
 const LISTING_DESCRIPTION =
   \`${LISTING_DESCRIPTION_SOURCE}\`;
-// A feed's links have to be absolute, so this script has to be told the
-// site's address — the same one you pass to \`unify build --base-url\` (see
-// DEPLOY.md). \`you.example\` is a placeholder domain, not an address.
-const SITE_URL = "https://you.example";
+// A feed's links have to be absolute, so they take the address you build with
+// (\`unify build --base-url https://you.example/\`, see DEPLOY.md), read from the
+// settings snapshot. Without a --base-url there is no real address yet, and the
+// placeholder below is what the feed advertises — \`you.example\` is reserved and
+// never resolves, which is the point.
+const context = contextPath ? JSON.parse(readFileSync(contextPath, "utf8")) : null;
+const SITE_URL = (context?.site?.baseUrl ?? "https://you.example/").replace(/\\/$/, "");
 const MARKER = "generated by scripts/gen.mjs — edit the data, not this file";
 // Every title, date and byline below comes from the sample posts, so the
 // listing says so where a reader sees it (the feed does not: an RSS reader
@@ -152,7 +164,7 @@ const cmp = (x, y) => (x < y ? -1 : x > y ? 1 : 0);
 // _data/authors.json holds a private field (email) beside the public ones.
 // The underscore keeps the FILE out of the built site; only this script can
 // keep a FIELD out of the pages it writes.
-const AUTHORS = JSON.parse(readFileSync(new URL("_data/authors.json", SITE), "utf8"));
+const AUTHORS = JSON.parse(readFileSync(join(sourceRoot, "_data", "authors.json"), "utf8"));
 
 function readFrontmatter(text) {
   const m = text.match(/^---\\r?\\n([\\s\\S]*?)\\r?\\n---\\r?\\n?/);
@@ -169,7 +181,7 @@ function readFrontmatter(text) {
 const posts = readdirSync(POSTS)
   .filter((f) => f.endsWith(".md"))
   .map((file) => {
-    const fm = readFrontmatter(readFileSync(new URL(file, POSTS), "utf8"));
+    const fm = readFrontmatter(readFileSync(join(POSTS, file), "utf8"));
     const slug = file.slice(0, -3);
     // Name the fields you emit — never spread the record (no {...author}).
     // Picking \`name\` and \`url\` is what keeps \`email\` private: it never
@@ -197,8 +209,12 @@ const items = posts
   })
   .join("\\n");
 
+mkdirSync(outDir, { recursive: true });
+
+// The listing page. It is a page like any other once it is in the overlay:
+// the layout wraps it, its head merges, and every link in it is checked.
 writeFileSync(
-  new URL("blog.html", SITE),
+  join(outDir, "blog.html"),
   "<!doctype html>\\n<html>\\n  <head>\\n    <title>Blog</title>\\n" +
     '    <meta name="description" content="' + escAttr(LISTING_DESCRIPTION) + '">\\n' +
     '    <meta property="og:title" content="Blog">\\n' +
@@ -216,6 +232,9 @@ writeFileSync(
 // RSS's <author> element wants an email address — exactly the field that
 // stays private — so the feed carries no author at all. A post with no
 // usable date gets no <pubDate> either: leave it out rather than invent one.
+// (unify can write an Atom feed.xml itself from the posts' schema: BlogPosting
+// once you build with --base-url; a feed.xml of your own, like this one, always
+// wins and switches that off. Delete this half to use unify's.)
 const rssItems = posts
   .map((p) => {
     const at = p.date ? new Date(p.date) : null;
@@ -231,7 +250,7 @@ const rssItems = posts
   .join("\\n");
 
 writeFileSync(
-  new URL("feed.xml", SITE),
+  join(outDir, "feed.xml"),
   '<?xml version="1.0" encoding="UTF-8"?>\\n' +
     "<!-- " + MARKER + " -->\\n" +
     '<rss version="2.0">\\n  <channel>\\n' +
@@ -299,14 +318,14 @@ export const files = {
 
 <p class="placeholder">Sample post — the title, the byline, and the date ${HELLO_DATE} are placeholders, not facts. Edit this file, or delete it and write your own.</p>
 
-A post is one Markdown file in \`posts/\`. Its frontmatter carries the title, the description, the date, and the author's name; \`scripts/gen.mjs\` reads those and builds the listing page and the feed out of them.
+A post is one Markdown file in \`posts/\`. Its frontmatter carries the title, the description, the date, and the author's name; \`scripts/gen.mjs\` reads those and builds the listing page and the feed out of them, every time unify builds.
 
 \`schema: BlogPosting\` asks unify to write this page's JSON-LD from what the page already declares. Nothing is guessed — a date it cannot read as \`${HELLO_DATE}\` or \`${HELLO_DATE}T09:30:00Z\` is left out and reported, never filled in from the clock, the filesystem, or Git.
 
-\`blog.html\` and \`feed.xml\` are derived files, so regenerate them whenever you add, edit, or delete a post. Run it from the project root, the directory \`site/\` and \`scripts/\` sit in:
+\`blog.html\` and \`feed.xml\` are derived: there is no copy of either in \`site/\` to keep fresh. \`unify.yaml\` names the script (\`generate: scripts/gen.mjs\`), so adding, editing or deleting a post and running the build from the project root is the whole job:
 
 \`\`\`
-node scripts/gen.mjs && unify build
+unify build
 \`\`\`
 `,
 
@@ -334,64 +353,13 @@ The feed leaves the author out entirely. RSS's \`<author>\` element wants an ema
     description: "Start here: what this blog scaffold ships, which two files are generated, and what to replace first.",
     head: `<link rel="alternate" type="application/rss+xml" title="${SITE_NAME}" href="/feed.xml">`,
     main: `<h1>Home</h1>
-<p>A blog scaffold: two sample posts in <code>posts/</code>, and one script that turns them into a listing page and an RSS feed. <span class="placeholder">Every name and date in it is a placeholder</span> — replace them before you publish.</p>
+<p>A blog scaffold: two sample posts in <code>posts/</code>, and one script, run by unify on every build, that turns them into a listing page and an RSS feed. <span class="placeholder">Every name and date in it is a placeholder</span> — replace them before you publish.</p>
 <p>Read the <a href="/blog.html">blog index</a>, open <a href="/posts/hello-world.html">the first post</a>, or <a href="/contact.html">get in touch</a>.</p>
 <h2>Two of these files are generated</h2>
-<p><code>blog.html</code> and <code>feed.xml</code> are written by <code>scripts/gen.mjs</code> from the posts and <code>site/_data/authors.json</code>. Edit those, never the generated files, and run the script before you build — from the project root, the directory <code>site/</code> and <code>scripts/</code> sit in:</p>
-<pre><code>node scripts/gen.mjs &amp;&amp; unify build</code></pre>`,
+<p><code>blog.html</code> and <code>feed.xml</code> are written by <code>scripts/gen.mjs</code> from the posts and <code>site/_data/authors.json</code>, into a directory unify hands it before every build — neither exists in <code>site/</code>. Edit the posts and the data, and build from the project root, the directory <code>site/</code>, <code>scripts/</code> and <code>unify.yaml</code> sit in:</p>
+<pre><code>unify build</code></pre>`,
   }),
 
-  // Pre-generated — exactly the bytes `node scripts/gen.mjs` produces from
-  // the two posts and the authors file above, so the scaffold builds clean
-  // with no extra step (SCF-04) and rerunning the script changes nothing
-  // (SCF-03). Note the byline: the author's public name and url, never the
-  // email that sits beside them in `_data/authors.json` (SCF-05).
-  "blog.html": `<!doctype html>
-<html>
-  <head>
-    <title>Blog</title>
-    <meta name="description" content="${LISTING_DESCRIPTION}">
-    <meta property="og:title" content="Blog">
-    <meta property="og:description" content="${LISTING_DESCRIPTION}">
-    <link rel="alternate" type="application/rss+xml" title="${SITE_NAME}" href="/feed.xml">
-  </head>
-  <body>
-    <main>
-      <!-- generated by scripts/gen.mjs — edit the data, not this file -->
-      <h1>Blog</h1>
-      <p class="placeholder">${LISTING_PLACEHOLDER_NOTE}</p>
-      <ul>
-        <li><a href="/posts/second-post.html">A second post</a> <time datetime="2026-02-03T14:05:00Z">2026-02-03</time> by <a href="https://author.example/" rel="author">Your Name Here</a></li>
-        <li><a href="/posts/hello-world.html">Hello, world</a> <time datetime="2026-01-15T09:30:00Z">2026-01-15</time> by <a href="https://author.example/" rel="author">Your Name Here</a></li>
-      </ul>
-      <p>Every post above, in one file: the <a href="/feed.xml">RSS feed</a>.</p>
-    </main>
-  </body>
-</html>
-`,
-
-  "feed.xml": `<?xml version="1.0" encoding="UTF-8"?>
-<!-- generated by scripts/gen.mjs — edit the data, not this file -->
-<rss version="2.0">
-  <channel>
-    <title>${SITE_NAME}</title>
-    <link>https://you.example/blog.html</link>
-    <description>${LISTING_DESCRIPTION}</description>
-    <item>
-      <title>A second post</title>
-      <link>https://you.example/posts/second-post.html</link>
-      <description>The second sample post — it exists so the generated listing and feed have more than one item to show.</description>
-      <pubDate>Tue, 03 Feb 2026 14:05:00 GMT</pubDate>
-    </item>
-    <item>
-      <title>Hello, world</title>
-      <link>https://you.example/posts/hello-world.html</link>
-      <description>A sample post — what a post file contains, and what to run after you add one.</description>
-      <pubDate>Thu, 15 Jan 2026 09:30:00 GMT</pubDate>
-    </item>
-  </channel>
-</rss>
-`,
 };
 
 /**
@@ -401,4 +369,6 @@ The feed leaves the author out entirely. RSS's \`<author>\` element wants an ema
  */
 export const rootFiles = {
   "scripts/gen.mjs": GEN_MJS,
+  // The one line this template needs live: unify runs the generator itself.
+  "unify.yaml": configTemplate({ generate: "scripts/gen.mjs" }),
 };
