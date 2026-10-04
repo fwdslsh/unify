@@ -8,37 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.10.0-beta.4] - 2026-10-04
+## [0.10.0] - 2026-10-04
 
-The fourth beta, published to npm under the `next` tag from `release/0.10.0`. Two flags
-become defaults, the blog template's generator moves onto the seam the rest of 0.10 teaches,
-and one example loses its duplicated styles.
+The default project layout, and the configuration that goes with it. Published to npm as
+`latest`; the four betas on the `next` tag (beta.1 to beta.4) are folded into this entry.
+A fresh `unify init` now scaffolds:
 
-### Changed
-
-- **Two defaults flipped.** With `--base-url` set, canonical completion is on (`--canonical
-  auto` is now the default; `--canonical none`, or `canonical: none` in `unify.yaml`, switches
-  it off and is the second accepted value). With a generator named, the source inventory is on
-  (`source-inventory: false` in `unify.yaml` switches it off). Both were opt-in flags that every
-  site with an address or a generator ended up passing; a site that wants neither now says so
-  once. Rules CAN-01, GEN-13 and GEN-16, spec §22.1 and §33.7.
-- **The blog template's generator runs through `--generate`.** Its `unify.yaml` has
-  `generate: scripts/gen.mjs` live, so a bare `unify build` runs the generator; it writes
-  `blog.html` and `feed.xml` into the build's overlay instead of into `site/`, so no derived
-  file is checked in and none can go stale, and the only command the scaffold shows is
-  `unify build`. The feed's absolute links take the build's `--base-url` from the generator
-  context, falling back to the `https://you.example` placeholder without one (SCF-03,
-  FEED-06, spec §19.6; `docs/authoring-rules.md` names the same literal).
-- **seed-library-alt shares one stylesheet.** Its three layouts carried near-identical
-  inline `<style>` blocks; the shared rules now live in `site/assets/styles.css`, linked
-  relative to each layout, with only each layout's own differences left inline. The cascade
-  on every page is unchanged.
-
-## [0.10.0-beta.3] - 2026-10-04
-
-The third beta of the layout change, published to npm under the `next` tag from
-`release/0.10.0`. Nothing in the composition core changes; this beta brings the scaffold,
-the examples and the documentation in line with the layout beta.1 introduced.
+```
+AGENTS.md  DEPLOY.md
+unify.yaml             # every build flag, described and commented out; uncomment what differs
+scripts/gen.mjs        # the blog template's generator, beside the site, run by unify
+site/                  # the source root: pages, assets, _layout.html, _includes/
+```
 
 ### Added
 
@@ -46,73 +27,66 @@ the examples and the documentation in line with the layout beta.1 introduced.
   saveable option, each commented out under a one-line description naming its default
   (`# publish about.html as about/index.html so it is served at /about/ (default: false)`
   over `# pretty-urls: true`). The file changes nothing until a line is uncommented; the
-  docs template's `catalog: true` is the one line any template ships live. It is generated
-  from the option registry (`src/cli/options.js`), where every saveable option now carries
-  its description, default and the line to uncomment, so the scaffolded file cannot fall
-  behind the CLI (rule CFG-09, spec §18/§19.8).
+  docs template's `catalog: true` and the blog template's `generate: scripts/gen.mjs` are the
+  only lines any template ships live. It is generated from the option registry
+  (`src/cli/options.js`), where every saveable option carries its description, default and
+  the line to uncomment, so the scaffolded file cannot fall behind the CLI (rule CFG-09,
+  spec §18/§19.8).
 - **Only what differs from a default needs writing**, on the command line or in the file,
-  and the suite now proves it: a `unify.yaml` stating every default, or the all-commented
-  one `init` writes, builds byte-identically to no file at all (CFG-09).
-
-### Changed
-
-- **`--save-config` uncomments in place.** Saving a key that has only a commented line in
-  the file (`# pretty-urls: true`) replaces that line rather than appending a second copy
-  at the end; keys with a live line are replaced as before, and keys with neither are
-  still appended.
-- **The examples use the 0.10 layout.** All eight sites under `examples/` build from
-  `site/`, keep their build scripts in `scripts/` beside it, and save their documented
-  flags in a `unify.yaml` at the example root, so each builds with a bare `unify build`
-  from its own directory. The three seed-library generators and the catalog-search-blog
-  generator run through `--generate` and write into unify's overlay instead of into the
-  source tree (the generated pages are no longer checked in); catalog-search-blog's reads
-  the page records `--source-inventory` hands it instead of parsing frontmatter. Layouts,
-  fragments and HTML pages link their assets relative to their own file so they preview
-  from the folder. Both workflows build each example from its directory, the way its
-  README documents it. The sandbox-authored `AUTHORS-NOTES.md` files are kept as written
-  and still describe the pre-0.10 trees they were built in.
-- **Documentation** — the examples README, the CLI reference, the Eleventy and
-  integrations guides, the CI and Docker notes — names `site/`, `scripts/` and
-  `unify.yaml` at the project root throughout, and `unify --help` states the `site/`
-  default and that a relative `--generate` is measured from the source root.
-
-## [0.10.0-beta.2] - 2026-10-04
-
-A beta of the layout change below, published to npm under the `next` tag
-(`npm install @fwdslsh/unify@next`) from the `release/0.10.0` branch; 0.10.0 follows once
-the fwdslsh website has run on it. beta.2 adds the per-page stylesheet link to the scaffold
-(every scaffolded HTML page previews styled on its own); beta.1 had it on the layout and 404 only.
-
-The default project layout. A fresh `unify init` now scaffolds:
-
-```
-AGENTS.md  DEPLOY.md
-scripts/gen.mjs        # the blog template's generator, beside the site
-site/                  # the source root: pages, assets, _layout.html, _includes/
-unify.yaml             # the docs template's saved catalog: true, beside the site
-```
+  and the suite proves it: a `unify.yaml` stating every default, or the all-commented one
+  `init` writes, builds byte-identically to no file at all (CFG-09).
+- **`--canonical none`**, the second accepted value, switches canonical completion off now
+  that it is on by default (below).
 
 ### Changed
 
 - **The default source root is `site/`**, then `src/` (the pre-0.10 default, kept so no
   existing site changes), then the working directory (rule EXC-13). `unify init` scaffolds
-  into `site/`.
+  into `site/`. The defaulted-source notice reads "no site/ or src/ here".
 - **A relative path in `unify.yaml` resolves against the file's own directory** (rule
   CFG-08): a project-root file says `source: site` and `generate: scripts/gen.mjs`. For a file
   inside the source root the two readings coincide, so nothing written before 0.10 changes.
-  CLI flags keep their rules. **Breaking for a 0.9.5 project-root file only:** rewrite
+  CLI flags keep their rules (`--source` from the working directory, `--generate` from the
+  source root). **Breaking for a 0.9.5 project-root file only:** rewrite
   `generate: ../scripts/gen.mjs` as `generate: scripts/gen.mjs`.
-- `--save-config` creates a new `unify.yaml` at the project root (not in the source root),
-  writes `generate` relative to the file, and writes `source` when the file sits outside the
-  source root, so a bare `unify build` afterwards reads the same directory.
-- The blog template's generator moves from `src/_scripts/gen.mjs` to `scripts/gen.mjs` at the
-  project root (`node scripts/gen.mjs && unify build`, from the project root like every other
-  command); the docs template's `unify.yaml` moves to the project root.
-- The scaffolded layout, the 404 and every HTML page link the stylesheet relative to their own
-  file (`assets/style.css`, `../assets/style.css` a directory down), so any of them opened
-  straight from the folder shows styled; unify rewrites the link for every page at every depth,
-  and the head merge keeps one copy per built page.
-- The defaulted-source notice reads "no site/ or src/ here".
+- **Two defaults flipped.** With `--base-url` set, canonical completion is on (`--canonical
+  auto` is the default; `--canonical none`, or `canonical: none` in `unify.yaml`, switches it
+  off). With a generator named, the source inventory is on (`source-inventory: false` in
+  `unify.yaml` switches it off). Both were opt-in flags that every site with an address or a
+  generator ended up passing; a site that wants neither now says so once (rules CAN-01,
+  GEN-13, GEN-16; spec §22.1, §33.7). **Breaking only in output:** a site built with
+  `--base-url` and no `--canonical` now gets a canonical link on every page that authors
+  none, and a generator's `inputs.sourcePages` is a path rather than `null`.
+- **`--save-config`** creates a new `unify.yaml` at the project root (not in the source
+  root), writes `generate` relative to the file, writes `source` when the file sits outside
+  the source root, and uncomments a key's commented line in place rather than appending a
+  second copy.
+- **Design-time preview.** The scaffolded layout, the 404 and every HTML page link the
+  stylesheet relative to their own file (`assets/style.css`, `../assets/style.css` a
+  directory down), so any of them opened straight from the folder shows styled; unify
+  rewrites the link for every page at every depth, and the head merge keeps one copy per
+  built page.
+- **The blog template's generator runs through `--generate`.** It moves from
+  `src/_scripts/gen.mjs` to `scripts/gen.mjs` at the project root, the template's
+  `unify.yaml` names it, and it writes `blog.html` and `feed.xml` into the build's overlay
+  instead of into `site/`, so no derived file is checked in and none can go stale; the only
+  command the scaffold shows is `unify build`. The feed's absolute links take the build's
+  `--base-url` from the generator context, falling back to the `https://you.example`
+  placeholder without one (SCF-03, FEED-06, spec §19.6).
+- **The examples use the 0.10 layout.** All eight sites under `examples/` build from
+  `site/`, keep their build scripts in `scripts/` beside it, and save their documented
+  flags in a `unify.yaml` at the example root, so each builds with a bare `unify build`
+  from its own directory. The three seed-library generators and the catalog-search-blog
+  generator run through `--generate` and write into unify's overlay instead of into the
+  source tree (the generated pages are no longer checked in); layouts, fragments and HTML
+  pages link their assets relative to their own file; seed-library-alt's three layouts share
+  one stylesheet. Both workflows build each example from its directory, the way its README
+  documents it. The sandbox-authored `AUTHORS-NOTES.md` files are kept as written and still
+  describe the pre-0.10 trees they were built in.
+- **Documentation** — the CLI reference, getting started, the authoring rules, the examples
+  README, the Eleventy and integrations guides, the CI and Docker notes — names `site/`,
+  `scripts/` and `unify.yaml` at the project root throughout, and `unify --help` states the
+  `site/` default and that a relative `--generate` is measured from the source root.
 
 ## [0.9.5] - 2026-10-03
 
@@ -758,10 +732,8 @@ with generated compare-link notes only. Their diffs are on the
 [releases page](https://github.com/fwdslsh/unify/releases). Nothing here
 retroactively reconstructs detail those notes never carried.
 
-[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.10.0-beta.4...HEAD
-[0.10.0-beta.4]: https://github.com/fwdslsh/unify/compare/v0.10.0-beta.3...v0.10.0-beta.4
-[0.10.0-beta.3]: https://github.com/fwdslsh/unify/compare/v0.10.0-beta.2...v0.10.0-beta.3
-[0.10.0-beta.2]: https://github.com/fwdslsh/unify/compare/v0.9.5...v0.10.0-beta.2
+[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/fwdslsh/unify/compare/v0.9.5...v0.10.0
 [0.9.5]: https://github.com/fwdslsh/unify/compare/v0.9.4...v0.9.5
 [0.9.4]: https://github.com/fwdslsh/unify/compare/v0.9.3...v0.9.4
 [0.9.3]: https://github.com/fwdslsh/unify/compare/v0.9.2...v0.9.3
