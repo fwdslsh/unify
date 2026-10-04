@@ -599,10 +599,10 @@ test("FEED-06: unify init blog ships its own feed.xml, and building/auditing it 
   const tmp = mkTmp();
   const initR = await runCli(["init", "blog"], tmp);
   expectExit(initR, 0, "init blog");
-  if (!existsSync(join(tmp, "src", "feed.xml"))) {
+  if (!existsSync(join(tmp, "site", "feed.xml"))) {
     throw new Error("§19.6/§29.7: the blog template ships its own pre-generated feed.xml — the scaffold that teaches feeds is also the fixture that proves the suppression");
   }
-  const authored = read(tmp, "src", "feed.xml");
+  const authored = read(tmp, "site", "feed.xml");
 
   // Not --strict here: whether A17 fires for a page whose feed.xml is
   // authored (generation, and so §29.4's membership computation, suppressed
@@ -611,11 +611,11 @@ test("FEED-06: unify init blog ships its own feed.xml, and building/auditing it 
   // reading, since advisories never block a publish regardless of --strict,
   // and it is the literal claim FEED-06 makes ("still builds and audits
   // clean").
-  const buildR = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", BASE], tmp);
+  const buildR = await runCli(["build", "-s", "site", "-o", "dist", "--base-url", BASE], tmp);
   expectExit(buildR, 0, "blog template build under --base-url");
   expectBytes(read(tmp, "dist", "feed.xml"), authored, "§29.7: the template's own feed.xml ships byte-for-byte; generation is suppressed even though the template's posts declare BlogPosting");
 
-  const auditR = await runCli(["audit", "-s", "src", "--base-url", BASE], tmp);
+  const auditR = await runCli(["audit", "-s", "site", "--base-url", BASE], tmp);
   if (auditR.exit !== 0) {
     throw new Error(`§29.7: unify init blog must audit clean under --base-url too.\nexit: ${auditR.exit}\nstdout:\n${auditR.stdout}\nstderr:\n${auditR.stderr}`);
   }

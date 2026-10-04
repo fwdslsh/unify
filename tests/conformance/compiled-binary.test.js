@@ -102,7 +102,7 @@ test("§19.5 — the binary scaffolds and builds a site with no runtime on PATH"
   // §19.2's share image is the byte-for-byte case: an SVG would keep the
   // templates textual and would not do the job, so a real raster file has to
   // survive compilation as a literal.
-  const raster = join(dir, "src", "assets", "share-placeholder.png");
+  const raster = join(dir, "site", "assets", "share-placeholder.png");
   if (!existsSync(raster)) throw new Error(`the scaffolded raster share image is missing from ${dir}`);
   const bytes = readFileSync(raster);
   if (bytes.length < 100) throw new Error("the share image compiled to a stub, not real bytes");

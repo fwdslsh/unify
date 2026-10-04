@@ -25,7 +25,7 @@ import { Reporter } from "../../src/core/diagnostics.js";
 import { findAll, getAttr, parse, walk } from "../../src/core/html.js";
 import { inlineIncludes } from "../../src/core/includes.js";
 import { convert, convertFragment } from "../../src/core/markdown.js";
-import { TEMPLATES } from "../../src/templates/index.js";
+import { TEMPLATES, TEMPLATE_ROOT_FILES } from "../../src/templates/index.js";
 
 const TEMPLATE_NAMES = Object.keys(TEMPLATES);
 
@@ -48,12 +48,15 @@ describe.each(TEMPLATE_NAMES)('template "%s" — SCF-01/SCF-02 structure (in-mem
   const paths = Object.keys(files);
   const wholeSource = Object.values(files).join("\n");
 
-  test("ships unify.yaml only when its own page needs a flag (§19.8: docs saves catalog: true)", () => {
+  test("ships unify.yaml only when its own page needs a flag (§19.8: docs saves catalog: true), at the project root", () => {
+    // Never inside the source tree (0.10): the file is build material beside the site.
+    expect(paths).not.toContain("unify.yaml");
+    const root = TEMPLATE_ROOT_FILES[name] ?? {};
     if (name === "docs") {
-      expect(files["unify.yaml"]).toMatch(/^catalog: true$/m);
-      expect(files["unify.yaml"].split("\n").filter((l) => /^[a-z]/.test(l))).toEqual(["catalog: true"]);
+      expect(root["unify.yaml"]).toMatch(/^catalog: true$/m);
+      expect(root["unify.yaml"].split("\n").filter((l) => /^[a-z]/.test(l))).toEqual(["catalog: true"]);
     } else {
-      expect(paths).not.toContain("unify.yaml");
+      expect(Object.keys(root)).not.toContain("unify.yaml");
     }
   });
 
@@ -194,7 +197,7 @@ describe.each(TEMPLATE_NAMES)('template "%s" — full composition (SCF-04: zero 
     const reporter = silentReporter();
     const code = await init({ projectRoot: root, sourceRoot: root, sourceDefaulted: true, template: name, reporter });
     if (code !== 0) throw new Error(`init(${name}) exited ${code}`);
-    target = join(root, "src");
+    target = join(root, "site");
     return target;
   }
 
@@ -249,7 +252,7 @@ describe.each(TEMPLATE_NAMES)('template "%s" — full composition (SCF-04: zero 
     for (const p of pages) emitted.add(p.replace(/\.md$/i, ".html"));
     for (const p of Object.keys(files).filter((f) => !isPage(f) && !isUnderscored(f))) emitted.add(p);
     // A saved `catalog: true` (§19.8, the docs template) makes the build write the catalog.
-    if (/^catalog: true$/m.test(files["unify.yaml"] ?? "")) emitted.add("assets/unify/catalog.json");
+    if (/^catalog: true$/m.test(TEMPLATE_ROOT_FILES[name]?.["unify.yaml"] ?? "")) emitted.add("assets/unify/catalog.json");
 
     const broken = [];
     for (const pageRel of pages) {
