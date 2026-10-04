@@ -361,12 +361,19 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
     // than being re-derived downstream because `buildPage` is the only place
     // that KNOWS — §17's report already prints the same fact as `← page +
     // layout` vs `← page (no layout)`, from this very value.
+    // §20.3 — `includes`: every other file that authored a byte of this
+    // page — fragments included by the page, by its layout, and by those in
+    // turn — read off the provenance spans composition already produced, so
+    // it costs one pass over a list in memory and no extra read. Sorted, so
+    // two builds agree.
+    const includes = [...new Set(p.spans.map((s) => s.file))].filter((f) => f !== p.relPath && f !== p.layoutFile).sort();
     manifestPages.push({
       sourcePath: p.relPath,
       outputPath: finalOutputPath,
       html: rewritten,
       generated: p.generated === true,
       layout: p.layoutFile ?? null,
+      includes,
     });
   }
 

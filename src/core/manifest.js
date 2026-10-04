@@ -61,6 +61,9 @@ import { stripBaseUrl, resolveReference } from "./references.js";
  * @property {string} source.path - source-root-relative path
  * @property {boolean} source.generated - §33.4 — true when the page came
  *   from the `--generate` overlay rather than the source tree
+ * @property {string[]} source.includes - §20.3 — the source-root-relative
+ *   paths of every other file that authored a byte of this page (fragments
+ *   included by the page, by its layout, and transitively), sorted; `[]` when none
  * @property {string|null} source.layout - §20.3 — the source-root-relative
  *   path of the layout this page composed with, `null` when it composed
  *   with none
@@ -94,7 +97,7 @@ function decodeURIComponentSafe(s) {
  * `buildManifest`'s second pass consumes the two extras — so the envelope
  * never carries a transient shape and nothing has to remember to delete a
  * staging field (the 0.8 `_hrefs`/`_refresh` arrangement this replaces).
- * @param {{sourcePath: string, outputPath: string, html: string, generated?: boolean, layout?: string|null}} page
+ * @param {{sourcePath: string, outputPath: string, html: string, generated?: boolean, layout?: string|null, includes?: string[]}} page
  * @param {import('./urls.js').BaseUrlConfig|null} base
  * @returns {{doc: BuildDocument, rawHrefs: string[], refreshRaw: import('./document.js').RefreshReading|null}}
  */
@@ -121,6 +124,11 @@ function extract(page, base) {
       // consumed `data-layout` (§6.4), so the emitted bytes carry no trace
       // of which layout produced them, or of whether one did.
       layout: page.layout ?? null,
+      // §20.3 — every other file that authored a byte of this page (fragments
+      // included directly, by the layout, and transitively), source-root-
+      // relative and sorted. Provenance like `layout`: the emitted bytes
+      // carry no trace of which fragment produced them.
+      includes: page.includes ?? [],
     },
     outputPath: page.outputPath,
     document,

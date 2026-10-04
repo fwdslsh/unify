@@ -8,6 +8,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`/_unify/pages.json`**, served by `unify dev` beside the audit view: a JSON map of every
+  emitted page to its source file, the layout it composed with, its output path, the path the
+  server answers and its absolute URL under `--base-url`, with `schemaVersion: 1`, `built` and
+  the absolute `sourceRoot`, plus `includes`: every other file that authored a byte of the
+  page (fragments included directly, by the layout, and transitively), read off the provenance
+  spans composition already produced. It is projected from the same manifest the report reads, swapped
+  whole by every completed build, and answered with `built: false` before the first one. It is
+  for editors: a live preview of the file being edited can ask which address shows it composed
+  (rule DEV-06, spec §27.6).
+- **`/_unify/preview/<source path>`**, the source preview. A layout opens as itself — includes
+  inlined, slot fallbacks rendered, assets resolved from the file that linked them — or, with
+  `?page=`, composed with that page. An include opens on its own inside a layout's `<head>` and
+  `<body>` start tag with none of the layout's body, its slots filled from `?page=` when that
+  page includes it, else its own fallbacks; `?layout=` picks which layout supplies the head. A
+  corner selector makes those choices and keeps them in the URL, offering only the pages the
+  file reaches; `?config=false` leaves it out. Pages redirect to their own
+  address. Composed on request from the source tree by the build's own inliner, composer and
+  URL rewriting, served with the reload script, written nowhere (rule DEV-07, spec §27.7). With
+  `unify dev`, a browser and an editor, a layout or a component can be designed without a page.
+
 ## [0.10.0] - 2026-10-04
 
 The default project layout, and the configuration that goes with it. Published to npm as

@@ -37,6 +37,10 @@
  */
 import { createDevServer } from "../../core/dev-server.js";
 import { renderInterrupted, renderReport } from "../../core/dev-report.js";
+import { resolve } from "node:path";
+import { renderPageMap } from "../../core/page-map.js";
+import { resolutionRoots } from "../../core/paths.js";
+import { renderPreview } from "../../core/preview.js";
 import { watch } from "./watch.js";
 
 /**
@@ -44,8 +48,28 @@ import { watch } from "./watch.js";
  * @returns {Promise<number>}
  */
 export async function dev(context, opts = {}) {
-  const { output, settings, reporter } = context;
-  const devServer = await createDevServer({ outputDir: output, port: settings.port });
+  const { output, settings, reporter, sourceRoot } = context;
+  const absSourceRoot = resolve(sourceRoot);
+  // §27.7 — the preview reads the last completed build's page map for its
+  // page-to-address and page-to-layout answers, and composes from the source
+  // tree (and the project root, §4.5) on every request.
+  let lastDocuments = [];
+  const roots = resolutionRoots(absSourceRoot, null, process.cwd());
+  const devServer = await createDevServer({
+    outputDir: output,
+    port: settings.port,
+    pages: renderPageMap({ sourceRoot: absSourceRoot, documents: [], built: false }),
+    preview: (relPath, params) => renderPreview({
+      sourceRoot: absSourceRoot,
+      roots,
+      relPath,
+      page: params.get("page") || null,
+      layout: params.get("layout") || null,
+      config: params.get("config") !== "false",
+      pages: lastDocuments.map((d) => ({ source: d.source.path, generated: d.source.generated, layout: d.source.layout, includes: d.source.includes, path: d.document.path, outputPath: d.outputPath })),
+      prettyUrls: Boolean(settings.prettyUrls),
+    }),
+  });
   opts.onReady?.(devServer);
 
   reporter.summary(`serving ${devServer.url} (output: ${output})`);
@@ -71,6 +95,11 @@ export async function dev(context, opts = {}) {
         onEvaluation(evaluation) {
           reports++;
           devServer.setReport(renderReport(evaluation));
+          // §27.6 — the page map follows every COMPLETED build; a rebuild that
+          // produced none leaves the previous map, which still describes the
+          // site in the output directory (§15 left it in place).
+          devServer.setPages(renderPageMap({ sourceRoot: absSourceRoot, documents: evaluation.documents, built: true }));
+          lastDocuments = evaluation.documents;
         },
       },
     }, {

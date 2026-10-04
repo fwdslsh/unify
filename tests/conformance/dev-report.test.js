@@ -374,7 +374,7 @@ describe("§27 the local audit view", () => {
     expect([301, 302, 307, 308]).toContain(bare.status);
     expect(bare.headers.get("location") ?? "").toMatch(/\/_unify\/$/);
 
-    // Any other path beneath it is a 404 from the server itself.
+    // Any other path beneath it is a 404 from the server itself (§27.6's pages.json is the one exception, tested with DEV-06).
     for (const p of ["/_unify/anything-else", "/_unify/index.html", "/_unify/findings.json", "/_unify/a/b"]) {
       const res = await fetch(`http://localhost:${port}${p}`);
       await res.text();
@@ -758,4 +758,171 @@ describe("§27 the local audit view", () => {
     }
     covers("DEV-03");
   }, 30_000);
+  test("DEV-06 — /_unify/pages.json maps every emitted page to its source, layout and served path, from the build's own manifest, and follows the rebuild", async () => {
+    const tmp = mkTmp();
+    writeTree(tmp, SMALL_SITE);
+    const port = await freePort();
+    const d = start(["dev", "-p", String(port), "--pretty-urls"], tmp);
+    await d.ready;
+
+    // Answered as soon as the port is bound: before the first build it says
+    // so rather than guessing (§27.4's rule, applied to the map).
+    const mapUntil = async (predicate) => {
+      const deadline = Date.now() + 20_000;
+      for (;;) {
+        const res = await waitForStatus(`http://localhost:${port}/_unify/pages.json`, 200);
+        expect((res.headers.get("content-type") ?? "").toLowerCase()).toContain("application/json");
+        const map = JSON.parse(await res.text());
+        if (predicate(map) || Date.now() >= deadline) return map;
+        await sleep(100);
+      }
+    };
+    const map = await mapUntil((m) => m.built === true);
+    expect(map.schemaVersion).toBe(1);
+    expect(map.built).toBe(true);
+    expect(map.sourceRoot).toBe(join(tmp, "src"));
+
+    // One record per emitted page, agreeing with the command line's own
+    // --dry-run listing (§27.3: the same manifest, never a second reading).
+    const dry = await runCli(["build", "--dry-run", "--pretty-urls"], tmp);
+    expect(dry.exit).toBe(0);
+    expect(map.pages.map((p) => p.outputPath).sort()).toEqual(pagesFromDryRun(dry.stdout).sort());
+    const about = map.pages.find((p) => p.source === "about.html");
+    expect(about).toEqual({
+      source: "about.html", generated: false, layout: "_layout.html", includes: [],
+      outputPath: "about/index.html", path: "/about/", url: null,
+    });
+    // Nothing but pages: the stylesheet is mirror-copied and has no record.
+    expect(map.pages.some((p) => p.source === "style.css")).toBe(false);
+
+    // Follows the rebuild: a new page appears; a page that opts out of layouts says so.
+    writeFileSync(join(tmp, "src", "team.html"), page("Team", "Who we are here", "<p>Gamma.</p>").replace("<html>", '<html data-layout="none">'));
+    writeFileSync(join(tmp, "src", "index.html"), page("Home", "The landing page here", '<p>Alpha.</p><a href="/about.html">about</a> <a href="/team.html">team</a>'));
+    const after = await mapUntil((m) => m.pages.some((p) => p.source === "team.html"));
+    const team = after.pages.find((p) => p.source === "team.html");
+    expect(team.layout).toBe(null);
+    expect(team.path).toBe("/team/");
+
+    // Every other path beneath /_unify/ is still a 404 (§27.2): this is the one exception.
+    const other = await fetch(`http://localhost:${port}/_unify/pages.json.bak`);
+    await other.text();
+    expect(other.status).toBe(404);
+
+    // Never published: a real build writes no such file.
+    d.proc.kill("SIGTERM");
+    await sleep(300);
+    const built = await runCli(["build", "--pretty-urls"], tmp);
+    expect(built.exit).toBe(0);
+    expect(existsSync(join(tmp, "dist", "_unify"))).toBe(false);
+    covers("DEV-06");
+  }, 60_000);
+  test("DEV-07 — /_unify/preview/ renders a layout and an include on their own, with their defaults and the site's assets, and composed with a chosen page", async () => {
+    const tmp = mkTmp();
+    writeTree(tmp, {
+      "src/_layout.html": '<!doctype html>\n<html lang="en-GB">\n<head><meta charset="utf-8"><title> — Zebra Site</title><link rel="stylesheet" href="assets/site.css"></head>\n'
+        + '<body class="zebra"><include src="/_includes/nav.html"></include><main><slot><p>Layout default content.</p></slot></main>'
+        + '<footer><slot name="footer"><p>Default footer.</p></slot></footer></body>\n</html>\n',
+      "src/_includes/nav.html": '<nav><a href="/index.html">Home</a> <img src="../assets/logo.svg" alt=""></nav>\n',
+      "src/_includes/card.fragment.html": '<article class="card"><h2><slot name="title">Untitled card</slot></h2><slot><p>Nothing here yet.</p></slot></article>\n',
+      "src/assets/site.css": "body{color:red}\n",
+      "src/assets/logo.svg": "<svg xmlns='http://www.w3.org/2000/svg'/>\n",
+      "src/index.html": page("Home", "The landing page here", '<p>Alpha.</p><a href="/about.html">about</a>'),
+      "src/about.html": '<!doctype html>\n<html><head><title>About</title><meta name="description" content="About this site here"></head>\n'
+        + '<body><h1>About</h1><include src="/_includes/card.fragment.html"><span slot="title">Opening hours</span><p>Nine to five.</p></include>'
+        + '<p slot="footer">About page footer.</p></body></html>\n',
+    });
+    const port = await freePort();
+    const d = start(["dev", "-p", String(port), "--pretty-urls"], tmp);
+    await d.ready;
+    await waitForStatus(`http://localhost:${port}/about/`, 200);
+    const get = async (path) => {
+      const res = await fetch(`http://localhost:${port}/_unify/preview/${path}`, { redirect: "manual" });
+      return { status: res.status, location: res.headers.get("location"), text: await res.text() };
+    };
+
+    // A layout on its own: includes inlined, slot fallbacks kept, every URL
+    // resolved against the file that wrote it and served from the output root.
+    const layout = await get("_layout.html");
+    expect(layout.status).toBe(200);
+    expect(layout.text).toContain("Layout default content.");
+    expect(layout.text).toContain("Default footer.");
+    expect(layout.text).toContain("<slot>");
+    expect(layout.text).not.toContain("<include");
+    expect(layout.text).toContain('<link rel="stylesheet" href="/assets/site.css">');
+    expect(layout.text).toContain('<img src="/assets/logo.svg"');
+    expect(layout.text).toContain('href="/"'); // the nav's /index.html, pretty
+    expect(layout.text).toContain('id="unify-preview"'); // the selector
+    expect(layout.text).toContain("__unify_reload__"); // follows the rebuild
+
+    // The same layout composed with a page: §7 exactly — the page's content in
+    // the bare slot, its footer fill in the named one, no fallback left.
+    const composed = await get("_layout.html?page=about.html");
+    expect(composed.status).toBe(200);
+    expect(composed.text).toContain("<title>About — Zebra Site</title>");
+    expect(composed.text).toContain("Nine to five.");
+    expect(composed.text).toContain("About page footer.");
+    expect(composed.text).not.toContain("Default footer.");
+    expect(composed.text).not.toContain("Layout default content.");
+    expect(composed.text).not.toContain("<slot");
+
+    // An include on its own: the fragment's own defaults, inside a shell that
+    // carries the default layout's <html>, <head> and <body> start tag but
+    // NONE of the layout's body.
+    const card = await get("_includes/card.fragment.html");
+    expect(card.status).toBe(200);
+    expect(card.text).toContain('<html lang="en-GB">');
+    expect(card.text).toContain('<link rel="stylesheet" href="/assets/site.css">');
+    expect(card.text).toContain('<body class="zebra">');
+    expect(card.text).toContain("Untitled card");
+    expect(card.text).toContain("Nothing here yet.");
+    expect(card.text).not.toContain("<nav>");
+    expect(card.text).not.toContain("<footer>");
+    expect(card.text).toContain('name="layout"'); // an include's selector offers a layout too
+
+    // The same include filled the way a chosen page fills it (§32).
+    const filled = await get("_includes/card.fragment.html?page=about.html");
+    expect(filled.status).toBe(200);
+    expect(filled.text).toContain("Opening hours");
+    expect(filled.text).toContain("Nine to five.");
+    expect(filled.text).not.toContain("Untitled card");
+    expect(filled.text).not.toContain("<nav>");
+
+    // An include with no slots previews too, assets resolved from its own file.
+    const nav = await get("_includes/nav.html");
+    expect(nav.status).toBe(200);
+    expect(nav.text).toContain('<img src="/assets/logo.svg"');
+
+    // The page map names what each page reaches, read off provenance: the
+    // nav through the layout on every page, the card only where included.
+    const map = JSON.parse(await (await fetch(`http://localhost:${port}/_unify/pages.json`)).text());
+    const rec = (source) => map.pages.find((p) => p.source === source);
+    expect(rec("index.html").includes).toEqual(["_includes/nav.html"]);
+    expect(rec("about.html").includes).toEqual(["_includes/card.fragment.html", "_includes/nav.html"]);
+
+    // So the selector offers only the pages the file reaches, and ?config=false leaves it out.
+    const options = (text) => [...text.matchAll(/<option value="([^"]*)"/g)].map((m) => m[1]).filter(Boolean);
+    expect(options(card.text).filter((o) => o.endsWith(".html") && !o.endsWith("_layout.html"))).toEqual(["about.html"]);
+    expect(options(layout.text).filter((o) => o.endsWith(".html"))).toEqual(["about.html", "index.html"]);
+    const quiet = await get("_includes/card.fragment.html?config=false");
+    expect(quiet.status).toBe(200);
+    expect(quiet.text).not.toContain('id="unify-preview"');
+    expect(quiet.text).toContain("Untitled card");
+
+    // A page redirects to the address the page map gives it.
+    const pageRes = await get("about.html");
+    expect(pageRes.status).toBe(302);
+    expect(pageRes.location).toBe("/about/");
+
+    // Not a source file, or outside the tree: 404, like the rest of /_unify/.
+    expect((await get("missing.html")).status).toBe(404);
+    expect((await get("assets/site.css")).status).toBe(404);
+    expect((await get("../package.json")).status).toBe(404);
+
+    // Served, never written (§27.1).
+    d.proc.kill("SIGTERM");
+    await sleep(300);
+    expect(existsSync(join(tmp, "dist", "_unify"))).toBe(false);
+    for (const rel of readdirSync(join(tmp, "dist"))) expect(rel).not.toContain("preview");
+    covers("DEV-07");
+  }, 60_000);
 });
