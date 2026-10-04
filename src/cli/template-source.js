@@ -248,7 +248,12 @@ function walk(dir) {
  */
 function runTool(tool, args, env = {}) {
   return new Promise((done, fail) => {
-    const proc = spawn(tool, args, { env: { ...process.env, ...env }, stdio: ["ignore", "ignore", "pipe"] });
+    // On Windows `npm` is `npm.cmd`, which node can only run through a shell;
+    // `git` is a real executable everywhere. Every argument that reaches the
+    // shell is unify's own or matched NPM_TEMPLATE (letters, digits, `.`,
+    // `_`, `-`, `@`, `/`), so nothing in it can break out of the command.
+    const shell = tool === "npm" && process.platform === "win32";
+    const proc = spawn(tool, args, { env: { ...process.env, ...env }, stdio: ["ignore", "ignore", "pipe"], shell });
     const chunks = [];
     proc.stderr.on("data", (chunk) => chunks.push(chunk));
     proc.on("error", (err) => {
