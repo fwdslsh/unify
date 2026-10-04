@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-10-04
+
+Development-server additions only; builds are byte-identical to 0.10.0.
+
 ### Added
 
 - **`/_unify/pages.json`**, served by `unify dev` beside the audit view: a JSON map of every
@@ -754,7 +758,8 @@ with generated compare-link notes only. Their diffs are on the
 [releases page](https://github.com/fwdslsh/unify/releases). Nothing here
 retroactively reconstructs detail those notes never carried.
 
-[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/fwdslsh/unify/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/fwdslsh/unify/compare/v0.9.5...v0.10.0
 [0.9.5]: https://github.com/fwdslsh/unify/compare/v0.9.4...v0.9.5
 [0.9.4]: https://github.com/fwdslsh/unify/compare/v0.9.3...v0.9.4
