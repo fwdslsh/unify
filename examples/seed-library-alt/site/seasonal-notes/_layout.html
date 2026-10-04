@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>— Fernhollow Seed Library</title>
+  <meta name="og:type" content="website">
+  <meta name="og:site_name" content="Fernhollow Seed Library">
+  <link rel="stylesheet" href="../assets/styles.css">
+  <style>
+    /* Only what differs from the shared stylesheet for seasonal notes. */
+    main {
+      max-width: 900px;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 1.5rem;
+      border-bottom: 3px solid #d4e4c1;
+      padding-bottom: 0.5rem;
+    }
+
+    h2 {
+      font-size: 1.8rem;
+      margin-top: 2rem;
+      border-left: 4px solid #d4e4c1;
+      padding-left: 1rem;
+    }
+
+    .entry-date {
+      color: #666;
+      font-style: italic;
+      margin-bottom: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <include src="/_includes/header.html"></include>
+  <main>
+    <slot></slot>
+  </main>
+  <include src="/_includes/footer.html"></include>
+</body>
+</html>

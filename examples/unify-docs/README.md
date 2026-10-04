@@ -12,26 +12,33 @@ The look matches [fwdslsh.dev](https://fwdslsh.dev/), the family site: GitHub-da
 surfaces, the fwdslsh green, Protest Revolution for the wordmark, Inter for prose,
 JetBrains Mono for anything the terminal would say. One hand-written stylesheet and no
 build step. The only client JavaScript on the site is the few lines on `/examples/` that
-resolve the "View live" addresses — see the comment in `src/examples/index.html` for why
+resolve the "View live" addresses — see the comment in `site/examples/index.html` for why
 they cannot be plain hrefs.
+
+The build's flags live in `unify.yaml` beside `site/` (generator, pretty URLs, base URL,
+canonical, catalog, search corpus), so the documented build is just:
 
 ```bash
 cd examples/unify-docs
-unify build -s src -o dist \
-  --generate _scripts/gen.mjs \
-  --pretty-urls \
-  --base-url https://unify.fwdslsh.dev/ \
-  --canonical auto \
-  --catalog --search-corpus
+unify build
 ```
 
 Both gates pass:
 
 ```bash
-unify build -s src -o dist --generate _scripts/gen.mjs --pretty-urls \
-  --base-url https://unify.fwdslsh.dev/ --canonical auto --catalog --search-corpus --dry-run --strict   # exit 0
-unify audit -s src --generate _scripts/gen.mjs --pretty-urls \
-  --base-url https://unify.fwdslsh.dev/ --canonical auto --catalog --search-corpus --strict            # exit 0
+unify build --dry-run --strict   # exit 0
+unify audit --strict             # exit 0
+```
+
+From the repository root (what the workflow does, with the CLI from the checkout), name
+the source explicitly; `--generate` on the command line is relative to the source root, so
+it is `../scripts/gen.mjs` there, while `generate:` inside `unify.yaml` is relative to the
+file:
+
+```bash
+unify build -s examples/unify-docs/site -o examples/unify-docs/dist \
+  --generate ../scripts/gen.mjs --pretty-urls \
+  --base-url https://unify.fwdslsh.dev/ --canonical auto --catalog --search-corpus
 ```
 
 21 files: 12 documentation pages, an index, a front page, the examples gallery, a 404,
@@ -40,7 +47,7 @@ the stylesheet, the favicon, `sitemap.xml`, `assets/unify/catalog.json`, and
 
 ## It renders the real docs, not a copy
 
-`src/_scripts/gen.mjs` reads `../../../docs` (the repository's actual documentation) and
+`scripts/gen.mjs` reads the repository's `docs/` (found relative to the script) (the repository's actual documentation) and
 writes one page per file into the `--generate` overlay. **Nothing is copied into this
 example.** Edit `docs/authoring-rules.md` and this site changes on the next build; there is
 no second copy to drift.
@@ -53,22 +60,22 @@ error if `docs/` is missing.
 
 | Primitive | Where |
 |---|---|
-| `<include src>` | the masthead, hand-authored in `src/_includes/`; the sidebar, generated into the overlay's `_includes/` |
-| Layout | one `src/_layout.html` wraps every page, generated ones included; discovery is automatic and no page names it |
+| `<include src>` | the masthead, hand-authored in `site/_includes/`; the sidebar, generated into the overlay's `_includes/` |
+| Layout | one `site/_layout.html` wraps every page, generated ones included; discovery is automatic and no page names it |
 | Named slot | the footer, with fallback content the pages don't override |
-| Underscore | `_includes/` and `_scripts/` are read by the build and never ship |
-| `data-layout="none"` | `src/404.html` opts out of the chrome entirely |
+| Underscore | `_includes/` is read by the build and never ships; `scripts/` and `unify.yaml` sit outside `site/`, so they never ship either |
+| `data-layout="none"` | `site/404.html` opts out of the chrome entirely |
 
 Plus the production layer: `--pretty-urls`, `--base-url`, `--canonical auto`,
 `sitemap.xml`, `--catalog`, `--search-corpus`, and `schema: WebPage` on every generated
 page. The front
-page also demonstrates root-attribute merging: `src/index.html` declares
+page also demonstrates root-attribute merging: `site/index.html` declares
 `<body class="home">`, the union with the layout's `<body>` carries it into the output,
 and the stylesheet uses it to swap the sidebar shell for the full-width hero.
 
 ## The generator
 
-`--generate` names one file and hands it two arguments: the source root and an empty
+`generate:` (`--generate`) names one file and hands it two arguments: the source root and an empty
 overlay directory. `gen.mjs` uses them to do four things:
 
 1. **One page per doc**, with `title`, `description` and `schema` frontmatter derived
@@ -85,7 +92,7 @@ overlay directory. `gen.mjs` uses them to do four things:
    uncurated) with short labels, from the same list the pages came from, so a new document
    cannot be published unreachable. It is written to the overlay's `_includes/docnav.html`
    and picked up by `_layout.html`'s ordinary `<include src="/_includes/docnav.html">`: the
-   overlay and `src/` share one path space, so an include resolves across the boundary in
+   overlay and `site/` share one path space, so an include resolves across the boundary in
    either direction. It was hand-authored with a completeness assertion standing in for
    this until issue #55 was fixed; see `FINDINGS.md`, finding 2.
 
@@ -119,7 +126,7 @@ separate unify project, addressed at its own `--base-url` subpath, and each gate
 own `--dry-run --strict` before the real build. Those five directories, roughly 360 of the
 published tree's ~380 files, are what the `/examples/` gallery's "View live" links resolve
 to at runtime; this site's own build never emits them (see the comment at the bottom of
-`src/examples/index.html`, and Part 2 of `_notes/batches/b10-contract.md`, for why).
+`site/examples/index.html`, and Part 2 of `_notes/batches/b10-contract.md`, for why).
 
 **Two things the workflow could not do for itself, both now done**: GitHub Pages' source is
 set to **Settings > Pages > Build and deployment > Source > "GitHub Actions"**, and the
@@ -134,7 +141,7 @@ If either setting is ever missing (a fresh fork, say) the `deploy` job fails wit
 own "Pages site not found," while the `build` job (both gates plus the real build) succeeds
 regardless, so a red `deploy` step next to a green `build` step means exactly this.
 
-**The examples gallery under `unify dev`.** `src/examples/index.html`'s five "View live"
+**The examples gallery under `unify dev`.** `site/examples/index.html`'s five "View live"
 links resolve against `location.href` no matter what, so `unify dev` on this site still
 builds and serves `/examples/` correctly. Only the deploy workflow's separate assembly
 steps (`.github/workflows/deploy-docs.yml`) ever produce the five `/examples/<name>/`

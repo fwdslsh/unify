@@ -35,7 +35,7 @@ async function scaffold() {
   const root = tmp();
   const init = await runCli(["init", "docs"], root);
   expect(init.exit, init.stderr).toBe(0);
-  const mod = await import(`${pathToFileURL(join(root, "src", "assets", "all-pages.js")).href}?${Math.random()}`);
+  const mod = await import(`${pathToFileURL(join(root, "site", "assets", "all-pages.js")).href}?${Math.random()}`);
   return { root, mod };
 }
 
@@ -129,7 +129,7 @@ describe("the starter page in a built site", () => {
       expect(html).toContain(`<script type="module" src="${prefix}assets/all-pages.js">`);
       // Shipped byte for byte, and the catalog sits where the module's relative URL points.
       const shipped = readFileSync(join(root, "dist", "assets", "all-pages.js"), "utf8");
-      expect(shipped).toBe(readFileSync(join(root, "src", "assets", "all-pages.js"), "utf8"));
+      expect(shipped).toBe(readFileSync(join(root, "site", "assets", "all-pages.js"), "utf8"));
       expect(shipped).toContain('new URL("unify/catalog.json", import.meta.url)');
       const catalog = JSON.parse(readFileSync(join(root, "dist", "assets", "unify", "catalog.json"), "utf8"));
 
@@ -155,7 +155,7 @@ describe("the starter page in a built site", () => {
     expect(html).toContain('<label for="all-pages-query">');
     expect(html).toContain('rel="preload" href="/assets/unify/catalog.json" as="fetch"');
 
-    rmSync(join(root, "src", "unify.yaml"));
+    rmSync(join(root, "unify.yaml"));
     const bare = await runCli(["build", "--dry-run"], root);
     expect(bare.exit).toBe(1);
     expect(bare.stderr).toContain("catalog.json");

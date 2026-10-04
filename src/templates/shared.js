@@ -37,13 +37,15 @@
  *     covers whatever it lists, and a listing page covers what it lists);
  *   - visible text no other page repeats exactly (`text-duplicate`);
  *   - no canonical anywhere (§19.2 item 7 — a scaffold does not know the
- *     site's address; `DEPLOY.md` teaches `--base-url … --canonical auto`).
+ *     site's address; `DEPLOY.md` teaches `--base-url`, which completes them).
  *
  * Placeholders are conspicuous on purpose (§19.7): a reader must never
  * mistake scaffolded text for a fact. Use `class="placeholder"` (styled by
  * `styleCss()`) on any invented business identity, name, date, price,
  * rating, or address, and never write a plausible-looking one.
  */
+
+import { configTemplate } from "../cli/options.js";
 
 // ---------------------------------------------------------------- escaping
 
@@ -200,10 +202,14 @@ function required(what, value) {
  * @param {string} [page.extra] - further head lines, re-indented for you
  * @returns {string} `  <head>` … `  </head>`, indented for a page document
  */
-export function pageHead({ title, description, ogType, extra = "" }) {
+export function pageHead({ title, description, ogType, extra = "", depth = 0 }) {
   required("title", title);
   required("description", description);
   const lines = [
+    // Relative to the page file, so the page previews styled straight from
+    // the folder (§19.1). The layout links the same stylesheet; §8's head
+    // merge compares the two after resolution and keeps one.
+    `    <link rel="stylesheet" href="${"../".repeat(depth)}assets/style.css">`,
     `    <title>${text(title)}</title>`,
     `    <meta name="description" content="${attr(description)}">`,
     `    <meta property="og:title" content="${attr(title)}">`,
@@ -226,14 +232,15 @@ export function pageHead({ title, description, ogType, extra = "" }) {
  * @param {string} [page.ogType]
  * @param {string} [page.head] - extra `<head>` lines
  * @param {string} [page.body] - extra top-level `<body>` elements
+ * @param {number} [page.depth] - directories below the source root, for the page's own relative stylesheet link
  * @returns {string}
  */
-export function pageHtml({ title, description, main, ogType, head = "", body = "" }) {
+export function pageHtml({ title, description, main, ogType, head = "", body = "", depth = 0 }) {
   required("main", main);
   const extras = body.trim() === "" ? "" : `\n${reindent(body, "    ")}`;
   return `<!doctype html>
 <html>
-${pageHead({ title, description, ogType, extra: head })}
+${pageHead({ title, description, ogType, extra: head, depth })}
   <body>
     <main>
 ${reindent(main, "      ")}
@@ -305,7 +312,9 @@ export function layoutHtml(siteName) {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>— ${text(siteName)}</title>
-    <link rel="stylesheet" href="/assets/style.css">
+    <!-- relative, not /assets/…: open this file straight from the folder and
+         the styles apply; unify rewrites it for every page at every depth. -->
+    <link rel="stylesheet" href="assets/style.css">
     <!-- share card: ${SHARE_IMAGE.path} is a PLACEHOLDER, a flat
          ${SHARE_IMAGE.width}×${SHARE_IMAGE.height} image. Replace the file, and correct these two numbers
          if yours is a different size — they must match it (see DEPLOY.md). -->
@@ -415,7 +424,7 @@ export function notFoundHtml(siteName) {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Page not found — ${text(siteName)}</title>
     <meta name="description" content="${attr(description)}">
-    <link rel="stylesheet" href="/assets/style.css">
+    <link rel="stylesheet" href="assets/style.css">
     <meta name="robots" content="noindex">
     <meta property="og:type" content="website">
     <meta property="og:title" content="Page not found">
@@ -600,7 +609,7 @@ published** and the previous \`dist/\` is untouched — never report success on 
 
 ## Files
 
-- The source root is \`src/\`. **Everything in it ships**, at the same path: \`.html\` and \`.md\` are
+- The source root is \`site/\`. **Everything in it ships**, at the same path: \`.html\` and \`.md\` are
   pages, and every other file is copied byte-for-byte.
 - A leading underscore keeps a file or a whole directory out of the output — \`_layout.html\`,
   \`_includes/\`, \`_drafts/\`. The build still reads it; \`dist/\` never contains it. Files inside a
@@ -615,8 +624,9 @@ published** and the previous \`dist/\` is untouched — never report success on 
   they are inert by design, meaningful only to a consumer that chooses to interpret them.
 - Link the real file: \`/about.html\`, never \`/about/\`. A directory link resolves only if you wrote
   \`about/index.html\`. A leading \`/\` means the source root, in any path you write.
-- Derived files — a post index — come from a script you write and run yourself. From this
-  directory, with the source tree in \`src/\`, that is \`node src/_scripts/gen.mjs && unify build\`.
+- Derived files — a post index — come from a script you write, kept in \`scripts/\` beside the
+  site and named in \`unify.yaml\` (\`generate: scripts/gen.mjs\`): unify runs it before every build,
+  dev rebuild and audit, and it writes into the directory unify hands it, never into \`site/\`.
   A feed is the one exception: declare \`schema: Article\`/\`BlogPosting\` (below) and build with
   \`--base-url\`, and unify writes \`feed.xml\` itself — no script, unless you ship your own
   (an authored \`feed.xml\` always wins and generates nothing).
@@ -653,7 +663,7 @@ published** and the previous \`dist/\` is untouched — never report success on 
   bare path. It prefixes root-relative links, makes \`og:\` and canonical URLs absolute for share
   crawlers, and generates \`sitemap.xml\`. See \`DEPLOY.md\`.
 - A canonical is one page's own address, so a layout must never set one and a scaffold cannot know
-  it. Build with \`--base-url … --canonical auto\`, or write it on that one page by hand.
+  it. Build with \`--base-url\` (completion is on by default), or write it on that one page by hand.
 - \`<meta name="schema" content="WebPage">\` — or \`schema: Article\` in Markdown frontmatter; those
   three spellings exactly, \`WebPage\`, \`Article\`, \`BlogPosting\` — has unify write that page's
   JSON-LD from what the page already declares: title, description, canonical, \`og:image\`,
@@ -664,7 +674,7 @@ published** and the previous \`dist/\` is untouched — never report success on 
 - unify rewrites only HTML's own URL attributes (\`href\`, \`src\`). A \`url()\` in CSS and a
   \`fetch()\`/\`hx-get\` address ship exactly as written.
 - **Never invent a fact to fill a field.** The placeholders in this scaffold — the site name, the
-  contact details, \`src/assets/share-placeholder.png\` — are there to be replaced, not published.
+  contact details, \`site/assets/share-placeholder.png\` — are there to be replaced, not published.
 `;
 }
 
@@ -689,24 +699,22 @@ Nothing a scaffold writes is a fact about you. **The site's name is written in m
 and the ones a build never corrects are the ones that publish it anyway — so this list names every
 one of them rather than the first:
 
-- **the site's name and byline** — \`src/_layout.html\` (the title suffix and the footer), and then
-  \`src/index.html\`, \`src/404.html\` and \`src/contact.html\`, which each write it into their own
+- **the site's name and byline** — \`site/_layout.html\` (the title suffix and the footer), and then
+  \`site/index.html\`, \`site/404.html\` and \`site/contact.html\`, which each write it into their own
   visible text and their own \`description\`. Grep the scaffolded name once and you will find them
-  all: \`grep -rn 'My Site' src/\`, with whichever name your template shipped;
-- **the contact details** on \`src/contact.html\` — a reserved \`example.com\` address, and no postal
+  all: \`grep -rn 'My Site' site/\`, with whichever name your template shipped;
+- **the contact details** on \`site/contact.html\` — a reserved \`example.com\` address, and no postal
   address at all, because a plausible street address in a scaffold is one an author publishes;
-- **a generator's own constants**, if your source tree has one. The blog template's
-  \`src/_scripts/gen.mjs\` opens with \`SITE_NAME\`, \`SITE_URL\` and \`LISTING_DESCRIPTION\`.
-  \`SITE_URL\` is a placeholder domain (\`https://you.example\`) and it has to match the
-  \`--base-url\` you build with, because a feed's links are **absolute**: nothing in unify rewrites
-  them, the reference check never follows them off-origin, and \`unify audit\` sees a mirror-copied
-  asset. Edit those and **rerun the script** (step 3), or \`feed.xml\` will go on advertising a
-  domain you do not own on every page that links to it;
-- \`src/assets/share-placeholder.png\` — a flat 1200×630 placeholder card, not a photograph. It is
+- **a generator's own constants**, if your project has one. The blog template's
+  \`scripts/gen.mjs\` opens with \`SITE_NAME\` and \`LISTING_DESCRIPTION\`. Its feed's links are
+  **absolute** and take the \`--base-url\` you build with (step 3); until you pass one they name
+  the placeholder \`https://you.example\`, which unify never rewrites or checks, because the feed
+  is a mirror-copied asset. Build with your address and the feed follows;
+- \`site/assets/share-placeholder.png\` — a flat 1200×630 placeholder card, not a photograph. It is
   the image social crawlers show. Replace the file, and **if your image is a different size,
-  correct \`og:image:width\` and \`og:image:height\` in \`src/_layout.html\` to match it**: a declared
+  correct \`og:image:width\` and \`og:image:height\` in \`site/_layout.html\` to match it**: a declared
   size the file contradicts is a claim nothing else will ever catch;
-- \`src/robots.txt\`, which blocks nothing. Edit it if you need to — unify never decides what a site
+- \`site/robots.txt\`, which blocks nothing. Edit it if you need to — unify never decides what a site
   should block.
 
 ## 2. Check before you publish
@@ -721,15 +729,16 @@ description, and single \`<h1>\`, and a link in from somewhere.
 
 \`--base-url\` is the site's whole public address, never a bare path. It prefixes every
 root-relative link, makes \`og:\` and canonical URLs absolute — which is what share crawlers fetch —
-and writes \`dist/sitemap.xml\`. Add \`--canonical auto\` and every page that authors no canonical of
-its own gets one naming its own final URL; an authored canonical always wins.
+and writes \`dist/sitemap.xml\`. Every page that authors no canonical of its own gets one naming its
+own final URL (\`--canonical none\` switches that off); an authored canonical always wins.
 
 Hosting the site under a subpath? Name the whole thing, trailing slash included:
 \`--base-url https://you.example/handbook/\`.
 
-If your source tree has a generator — the blog template's \`src/_scripts/gen.mjs\` — run it first,
-so the derived pages are current. Every command in this file runs from here, the project root, so
-the script's path starts at \`src/\` too: \`node src/_scripts/gen.mjs && unify build …\`.
+If your project has a generator — the blog template's \`scripts/gen.mjs\`, named in \`unify.yaml\` —
+unify runs it as part of every build, so the derived pages are current by construction. Every
+command in this file runs from here, the project root, where \`unify.yaml\` and the script live
+beside the site.
 
 ## 4. Publish \`dist/\`
 
@@ -740,7 +749,7 @@ from step 2 first and let a non-zero exit stop the deploy.
 
 ## The two commands
 
-    unify build --base-url https://you.example/ --canonical auto
+    unify build --base-url https://you.example/
     rsync -av --delete dist/ you@your-host.example:/var/www/your-site/
 `;
 }
@@ -766,4 +775,7 @@ from step 2 first and let a non-zero exit stop the deploy.
 export const ROOT_FILES = {
   "AGENTS.md": agentsMd(),
   "DEPLOY.md": deployMd(),
+  // §18/§19.8 — every saveable option, described and commented out; a template
+  // that needs a flag live (docs: catalog) overrides this entry.
+  "unify.yaml": configTemplate(),
 };

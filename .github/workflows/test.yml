@@ -133,17 +133,21 @@ jobs:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
+      # Every example is built the way its README documents it: from its own
+      # directory, with the flags its unify.yaml saves (0.10's project-root
+      # layout — site/, scripts/, unify.yaml), overriding only where the
+      # output goes. A broken unify.yaml fails here, not on a reader's machine.
       - name: Dependency-free examples
         run: |
           set -euo pipefail
           for ex in seed-library seed-library-alt seed-library-ondemand htmx-fragments; do
             echo "── $ex"
-            bun src/cli.js build -s "examples/$ex/src" -o "/tmp/$ex" --dry-run --strict
+            (cd "examples/$ex" && bun ../../src/cli.js build -o "/tmp/$ex" --dry-run --strict)
           done
       # The five live examples deploy-docs.yml assembles into the /examples/
-      # gallery run with a DIFFERENT flag set than the loop above — pretty
-      # URLs and a subpath --base-url, which is exactly the axis that turns
-      # on sitemap/canonical/advisory machinery the plain build above never
+      # gallery run with a DIFFERENT --base-url than the one each unify.yaml
+      # saves — a subpath, which is exactly the axis that turns on
+      # sitemap/canonical/advisory machinery the plain build above never
       # exercises. Mirror deploy-docs.yml's exact assembly commands here
       # (minus the real build — --dry-run --strict is the gate) so a
       # --base-url-sensitive regression fails on the PR, not on the deploy.
@@ -155,55 +159,23 @@ jobs:
           SITE_BASE_URL: https://unify.fwdslsh.dev/
         run: |
           set -euo pipefail
-          node examples/seed-library/src/_scripts/gen.mjs
-          bun src/cli.js build -s examples/seed-library/src \
-            -o /tmp/deploy-seed-library \
-            --pretty-urls --base-url "$SITE_BASE_URL"examples/seed-library/ \
-            --clean --dry-run --strict
-
-          (cd examples/seed-library-alt && node src/_scripts/gen.mjs)
-          bun src/cli.js build -s examples/seed-library-alt/src \
-            -o /tmp/deploy-seed-library-alt \
-            --pretty-urls --base-url "$SITE_BASE_URL"examples/seed-library-alt/ \
-            --exclude '_*' --dry-run --strict
-
-          node examples/seed-library-ondemand/src/_scripts/gen.mjs
-          bun src/cli.js build -s examples/seed-library-ondemand/src \
-            -o /tmp/deploy-seed-library-ondemand \
-            --pretty-urls --base-url "$SITE_BASE_URL"examples/seed-library-ondemand/ \
-            --clean --dry-run --strict
-
-          bun src/cli.js build -s examples/htmx-fragments/src \
-            -o /tmp/deploy-htmx-fragments \
-            --base-url "$SITE_BASE_URL"examples/htmx-fragments/ \
-            --dry-run --strict
-
-          bun src/cli.js build -s examples/catalog-search-blog/src \
-            -o /tmp/deploy-catalog-search-blog \
-            --generate _scripts/gen.mjs --pretty-urls \
-            --base-url "$SITE_BASE_URL"examples/catalog-search-blog/ \
-            --catalog --search-corpus --dry-run --strict
+          for ex in seed-library seed-library-alt seed-library-ondemand htmx-fragments catalog-search-blog; do
+            echo "── $ex"
+            (cd "examples/$ex" && bun ../../src/cli.js build -o "/tmp/deploy-$ex" \
+              --base-url "$SITE_BASE_URL"examples/$ex/ --clean --dry-run --strict)
+          done
       - name: unify-docs (build and audit, as deploy-docs.yml gates it)
         run: |
           set -euo pipefail
-          bun src/cli.js build -s examples/unify-docs/src -o /tmp/unify-docs \
-            --generate _scripts/gen.mjs --pretty-urls \
-            --base-url https://unify.fwdslsh.dev/ --canonical auto --catalog --search-corpus \
-            --dry-run --strict
-          bun src/cli.js audit -s examples/unify-docs/src \
-            --generate _scripts/gen.mjs --pretty-urls \
-            --base-url https://unify.fwdslsh.dev/ --canonical auto --catalog --search-corpus \
-            --strict
+          cd examples/unify-docs
+          bun ../../src/cli.js build -o /tmp/unify-docs --dry-run --strict
+          bun ../../src/cli.js audit --strict
       - name: catalog-search-blog (build and audit; dependency-free)
         run: |
           set -euo pipefail
-          bun src/cli.js build -s examples/catalog-search-blog/src -o /tmp/catalog-search-blog \
-            --generate _scripts/gen.mjs --pretty-urls \
-            --base-url https://example.com/blog/ --catalog --search-corpus \
-            --dry-run --strict
-          bun src/cli.js audit -s examples/catalog-search-blog/src \
-            --generate _scripts/gen.mjs --pretty-urls \
-            --base-url https://example.com/blog/ --catalog --search-corpus --strict
+          cd examples/catalog-search-blog
+          bun ../../src/cli.js build -o /tmp/catalog-search-blog --dry-run --strict
+          bun ../../src/cli.js audit --strict
 
   # G13, the half that needs a package install. Deliberately run on NODE:
   # bun auto-installs an import it cannot resolve, so a missing dependency
@@ -226,18 +198,14 @@ jobs:
           cd examples/forge-svelte
           npm install
           npm run build:calculator && npm run build:notes
-          cd "$GITHUB_WORKSPACE"
-          node src/cli.js build -s examples/forge-svelte/src -o /tmp/forge-svelte --dry-run --strict
+          node ../../src/cli.js build -o /tmp/forge-svelte --dry-run --strict
       - name: eleventy-htmx
         run: |
           set -euo pipefail
           cd examples/eleventy-htmx
           npm ci
-          cd "$GITHUB_WORKSPACE"
-          node src/cli.js build -s examples/eleventy-htmx/src -o /tmp/eleventy-htmx \
-            --generate _scripts/eleventy.mjs --pretty-urls --dry-run --strict
-          node src/cli.js audit -s examples/eleventy-htmx/src \
-            --generate _scripts/eleventy.mjs --pretty-urls --strict
+          node ../../src/cli.js build -o /tmp/eleventy-htmx --dry-run --strict
+          node ../../src/cli.js audit --strict
 
   # Always-on gate G14: the CHANGELOG has a section for the version in
   # package.json, because the release body IS that section

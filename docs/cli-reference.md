@@ -12,19 +12,19 @@ unify watch                build + rebuild on change, no server
 unify init [template]      scaffold a starter site
 
 Options:
-  -s, --source <dir>       source directory (default: src/ if it exists, else .)
+  -s, --source <dir>       source directory (default: site/ if it exists, else src/, else .)
   -o, --output <dir>       output directory (default: dist)
       --clean              empty the output directory first
       --exclude <glob>     globs never emitted, still usable by the build (repeatable; default: _*)
       --pretty-urls        about.html → about/index.html, and rewrite internal links to match
-      --canonical auto     add a canonical link to pages that author none, from the site address
+      --canonical <mode>   auto (the default with --base-url) adds a canonical link to pages that author none; none switches it off
       --base-url <url>     the site's whole address (https://site.example/repo/): prefix root-relative links, make og:/canonical absolute for share crawlers, and generate sitemap.xml
       --feed-full          include each entry's full rendered content in feed.xml (needs --base-url)
       --catalog            write assets/unify/catalog.json — a browse/filter/TOC projection of every public page
       --search-corpus      write assets/unify/search-corpus.json — normalized page text for client-side search
       --include-noindex    list noindex pages in the catalog and search corpus (needs one of them)
       --generate <path>    run one JavaScript file before the build (relative to the source root, or absolute)
-      --source-inventory   give that file source-pages.json: every source page's authored title, description, date, meta and links (inert without a generator)
+      --source-inventory   give that file source-pages.json: every source page's authored title, description, date, meta and links (on by default with --generate; source-inventory: false in unify.yaml turns it off)
       --dry-run            run the full build and every check, print the report, write nothing
       --audit              `build` only: audit the composed site before publishing; publish only if `unify audit` would exit 0
       --save-config        `build` only: write the saveable options given here into unify.yaml (after a good build)
@@ -92,7 +92,7 @@ The same watch contract as `dev`, no server — for pairing with a server you al
 
 ### `unify init [template]`
 
-Scaffolds a starter site into `src/`. Templates: `default`, `basic`, `blog`, `docs`, `portfolio`. Every template exercises the core primitives once — an include, the automatic `_layout.html`, a named slot with a page that fills it, a `data-layout="none"` page, and the underscore convention. The `docs` template also ships an "All pages" starter (`all-pages.html` and `assets/all-pages.js`): a filterable directory of the site read from `catalog.json`, plus a `unify.yaml` saving `catalog: true` so a plain `unify build` fills it. The `blog` template also ships the generator pattern worked: `_scripts/gen.mjs` reads `posts/*.md` and `_data/authors.json` and regenerates `blog.html` and `feed.xml` (`node src/_scripts/gen.mjs && unify build`, from the project root); both ship pre-generated, and the generator names the fields it emits, so the authors file's private `email` never reaches a page. `AGENTS.md` and `DEPLOY.md` are written to the working directory the command ran in — outside the source root, so neither publishes; `init` refuses (exit 2) rather than scaffold when that directory *is*, or is inside, the source root (`--source .`, `--source ..`), because there the two could only publish as pages. `init` writes a `unify.yaml` only when a template's own page needs a flag (today, `docs` saving `catalog: true`). Guaranteed: `unify init && unify build --dry-run --strict` and `unify init && unify audit --strict` both exit `0`.
+Scaffolds a starter site into `site/`, with `AGENTS.md`, `DEPLOY.md` and a `unify.yaml` beside it at the project root. The `unify.yaml` lists every saveable option commented out, each under a one-line description naming its default, so the whole surface is in front of you and nothing changes until you uncomment a line. Templates: `default`, `basic`, `blog`, `docs`, `portfolio`. Every template exercises the core primitives once — an include, the automatic `_layout.html`, a named slot with a page that fills it, a `data-layout="none"` page, and the underscore convention. The `docs` template also ships an "All pages" starter (`all-pages.html` and `assets/all-pages.js`): a filterable directory of the site read from `catalog.json`, and its `unify.yaml` has the one line `catalog: true` uncommented so a plain `unify build` fills it. The `blog` template also ships the generator pattern worked: `scripts/gen.mjs`, at the project root beside `site/`, is named by its `unify.yaml` (`generate: scripts/gen.mjs`), so every `unify build` runs it; it reads `posts/*.md` and `_data/authors.json` and writes `blog.html` and `feed.xml` into the build's overlay, never into `site/`, and names the fields it emits, so the authors file's private `email` never reaches a page. `AGENTS.md` and `DEPLOY.md` are written to the working directory the command ran in — outside the source root, so neither publishes; `init` refuses (exit 2) rather than scaffold when that directory *is*, or is inside, the source root (`--source .`, `--source ..`), because there the two could only publish as pages. Guaranteed: `unify init && unify build --dry-run --strict` and `unify init && unify audit --strict` both exit `0`.
 
 ## Options
 
@@ -128,9 +128,9 @@ Knowing the address is also what lets unify write the site's `sitemap.xml`, so `
 
 A bare path (`--base-url /repo-name/`) is a usage error naming the full form. It used to be accepted, and prefixed links correctly while leaving `og:`/`canonical` root-relative — valid-looking metadata no share crawler can fetch. Give the whole address; for a local preview of a subpath site, `http://localhost:3000/repo-name/` is one.
 
-### `--canonical auto`
+### `--canonical auto` / `--canonical none`
 
-Adds `<link rel="canonical" href="…">` to every page that does not author one, using that page's own final public URL — the same address the `--dry-run` report prints and the sitemap lists. `auto` is the only accepted value, and the option needs `--base-url`: a canonical has to be absolute, so without the site's address there is nothing truthful to write.
+With `--base-url` set, unify adds `<link rel="canonical" href="…">` to every page that does not author one, using that page's own final public URL — the same address the `--dry-run` report prints and the sitemap lists. That is the default (`auto`); `--canonical none`, or `canonical: none` in `unify.yaml`, switches it off. Those are the two accepted values. Completion needs `--base-url`: a canonical has to be absolute, so without the site's address there is nothing truthful to write, and `--canonical auto` without it is a usage error.
 
 **A canonical you wrote always wins**, in every shape: one that names another page, several on one page, even one that names a file the site does not build (that last is reported as a broken reference, as it would be anywhere else). Completion fills a gap; it never overrules a value you chose.
 
@@ -296,7 +296,7 @@ if (context.site.baseUrl) {
 
 #### `--source-inventory`
 
-Opt-in, saveable (`source-inventory: true`), and a usage error without a generator. It gives the generator one more file, `source-pages.json`, whose path is `context.inputs.sourcePages`: one record for every **source page**, with the metadata its author wrote, so a script can write a directory page (a reports index, an archive) in the same build that publishes it.
+On by default whenever a generator is named, saveable (`source-inventory: false` switches it off), and inert without a generator. It gives the generator one more file, `source-pages.json`, whose path is `context.inputs.sourcePages`: one record for every **source page**, with the metadata its author wrote, so a script can write a directory page (a reports index, an archive) in the same build that publishes it.
 
 ```json
 {
@@ -320,7 +320,7 @@ The pages are exactly the ones the build would treat as pages in your source tre
 
 The working directory is the source root, so `readFileSync("_data/authors.json")` means what you would expect.
 
-**Layouts and includes can live beside `package.json` too.** The directory you run `unify` from (the project root) is the last place a written path or the layout walk looks, after the source tree and the generated directory: `<include src="/includes/nav.html">` finds `includes/nav.html` at the project root when `src/` has none, and a `_layout.html` there is the site's root layout. Nothing at the project root is scanned or published; it only answers paths. So a repository can look like `site/` (the content), `includes/`, `scripts/` and `unify.yaml` at the top, with `source: site` in the config. The runtime is unify's own — whichever one unify is itself running under, and for the standalone binary that is the binary. So `--generate` works on a machine with no Node and no Bun installed, which is why the flag exists rather than `--run "node gen.mjs"`.
+**Layouts and includes can live beside `package.json` too.** The directory you run `unify` from (the project root) is the last place a written path or the layout walk looks, after the source tree and the generated directory: `<include src="/includes/nav.html">` finds `includes/nav.html` at the project root when `src/` has none, and a `_layout.html` there is the site's root layout. Nothing at the project root is scanned or published; it only answers paths. So a repository can look like `site/` (the content, with its `_layout.html` and `_includes/`, which preview in a browser with file-relative asset links), `scripts/` and `unify.yaml` at the top — the layout `unify init` scaffolds. The runtime is unify's own — whichever one unify is itself running under, and for the standalone binary that is the binary. So `--generate` works on a machine with no Node and no Bun installed, which is why the flag exists rather than `--run "node gen.mjs"`.
 
 It runs on **every** build, including every rebuild under `watch` and `dev` — a generator that ran once would leave watch output stale while the build reported success. A non-zero exit is a located problem: nothing publishes, and the previous `dist/` is untouched.
 
@@ -356,7 +356,7 @@ Compose once, audit that result, publish only if it passes. The generator (`--ge
 
 ### `--save-config`
 
-`build` only. Writes the saveable options you passed on this command line into the `unify.yaml` unify read (source root, else project root), creating one in the source root if there is none: `unify build --pretty-urls --base-url https://example.com/ --save-config`. It is an upsert. Keys you did not pass are left alone, and the file is edited line by line, so your comments, ordering and other keys survive untouched; a key you passed replaces its old line (an `exclude` list replaces its old items), and new keys go at the end. It never writes `save-config` itself, `source` (the file lives in the source root, so naming it there would be circular), or `--dry-run`. A flag like `--pretty-urls` writes `pretty-urls: true`; there is no way to write `false`, so to remove a key, edit the file.
+`build` only. Writes the saveable options you passed on this command line into the `unify.yaml` unify read (source root, else project root), creating one at the project root if there is none: `unify build --pretty-urls --base-url https://example.com/ --save-config`. It is an upsert. Keys you did not pass are left alone, and the file is edited line by line, so your comments, ordering and other keys survive untouched; a key you passed replaces its old line (an `exclude` list replaces its old items), and new keys go at the end. It never writes `save-config` itself or `--dry-run`. Paths are written relative to the file: `--generate ../scripts/gen.mjs` becomes `generate: scripts/gen.mjs` in a project-root file, and `--source` is saved only when the file sits outside the source root, where the next bare `unify build` needs it. A flag like `--pretty-urls` writes `pretty-urls: true`; there is no way to write `false`, so to remove a key, edit the file.
 
 The file is written only if the build exits `0`, so it records settings that produced a good build. With `--dry-run` it saves after a dry run that exits `0` ("check the flags, then keep them"); `dist/` is still untouched. On any command but `build` it is a usage error (exit `2`) and writes nothing.
 
@@ -393,7 +393,7 @@ Cycle and depth errors print the full chain (`_layout.html → _includes/nav.htm
 
 ## `unify.yaml`
 
-Optional: saved flags, nothing more. It lives in the source root, or else beside `package.json` at the project root (the directory you run `unify` from); the source root's copy wins if both exist. A project-root file can name the source directory itself (`source: site`), so a repository can keep its content in `site/` or `pages/` with the config at the top. Keys are the long option names (`source`, `output`, `clean`, `exclude` — a list, `pretty-urls`, `base-url`, `strict`, `audit`, `port`); CLI flags win on conflict. No behavior exists that only the file can express; the file itself never ships. `unify build ... --save-config` writes or updates it for you.
+Optional: saved flags, nothing more. It lives beside `package.json` at the project root (the directory you run `unify` from), or in the source root; the source root's copy wins if both exist. A relative path in the file resolves against the file's own directory, so a project-root file says `source: site` and `generate: scripts/gen.mjs`, naming the directories beside it; a repository can keep its content in `site/`, `pages/` or whatever you like, with the config at the top. Keys are the long option names (`source`, `output`, `clean`, `exclude` — a list, `pretty-urls`, `base-url`, `canonical`, `feed-full`, `catalog`, `search-corpus`, `include-noindex`, `strict`, `audit`, `port`, `generate`, `source-inventory`); CLI flags win on conflict. No behavior exists that only the file can express; the file itself never ships. **Write only what differs from the defaults**: a file that spells out `output: dist` or `exclude: [_*]` builds exactly as no file would. `unify init` writes one with every key listed, described and commented out, so you uncomment what you need; `unify build ... --save-config` writes or updates it for you, taking a commented line's place when there is one.
 
 ```yaml
 # unify.yaml — the committed invocation

@@ -3,7 +3,7 @@
  * difference from the other templates is `guide/`: two ordinary Markdown
  * pages nested a directory down, declaring no layout of their own, so
  * layout discovery is shown walking up more than one directory level —
- * `src/guide/` holds no `_layout.html`, so the walk climbs to the source
+ * `site/guide/` holds no `_layout.html`, so the walk climbs to the source
  * root, which does (conformance-spec §6.1 step 4). Every §19.1 primitive
  * still appears exactly once — the nav `<include>`, the automatic root
  * `_layout.html`, the named "footer" slot plus the one page filling it, the
@@ -25,9 +25,9 @@
  * Two things it teaches that no other template can:
  *
  * 1. **A nested page needs nothing.** Neither `guide/*.md` names a layout,
- *    a section, or a path. The walk starts in `src/guide/`, finds no
+ *    a section, or a path. The walk starts in `site/guide/`, finds no
  *    `_layout.html` there, and keeps going up until it does — so the one at
- *    the source root wraps both. Adding `src/guide/_layout.html` later is
+ *    the source root wraps both. Adding `site/guide/_layout.html` later is
  *    how that section gets its own chrome, and it is a complete standalone
  *    page because layouts do not chain (§6.2, P15).
  * 2. **A Markdown heading is a link target.** §10.4 gives every heading a
@@ -46,6 +46,7 @@
  * (`<your package manager>`) rather than an invented package name a reader
  * could mistake for a real one — or publish.
  */
+import { configTemplate } from "../cli/options.js";
 import { ALL_PAGES_HTML, ALL_PAGES_JS } from "./all-pages.js";
 import { commonFiles, mdFrontmatter, pageHtml } from "./shared.js";
 
@@ -63,9 +64,8 @@ export const files = {
 
   // The "All pages" starter (issue #91): a page plus a small script the
   // author owns, reading assets/unify/catalog.json. The page needs
-  // --catalog, so the template saves that one flag in unify.yaml (§18,
-  // §19.8); see src/templates/all-pages.js.
-  "unify.yaml": "# Saved unify flags (CLI flags win). all-pages.html reads the catalog this writes.\ncatalog: true\n",
+  // --catalog, so the template saves that one flag in unify.yaml at the
+  // project root (§18, §19.8; `rootFiles` below); see src/templates/all-pages.js.
   "all-pages.html": ALL_PAGES_HTML,
   "assets/all-pages.js": ALL_PAGES_JS,
 
@@ -84,13 +84,13 @@ Everything you can read on this site is scaffolding: replace the words, keep the
 </ul>
 
 <h2>How this site is put together</h2>
-<p>Both guide pages are ordinary Markdown files in <code>src/guide/</code>, and neither one says
+<p>Both guide pages are ordinary Markdown files in <code>site/guide/</code>, and neither one says
 anything about a layout. unify looks for <code>_layout.html</code> in a page's own folder and then
 in each folder above it, so the layout at the source root wraps pages a level down without being
-asked. Put a <code>_layout.html</code> in <code>src/guide/</code> and every page under it uses that
+asked. Put a <code>_layout.html</code> in <code>site/guide/</code> and every page under it uses that
 one instead — written out in full, because layouts do not chain.</p>
 <p>Add a page by dropping a <code>.md</code> or <code>.html</code> file beside them and linking it
-from this list, or from <code>src/_includes/nav.html</code> to put it in the nav on every page.
+from this list, or from <code>site/_includes/nav.html</code> to put it in the nav on every page.
 <code>unify audit</code> reports a page nothing links to, along with any page missing a title, a
 description, or a heading.</p>`,
   }),
@@ -113,8 +113,8 @@ page — then run the project:
 
 ## Where this page lives
 
-This file is \`src/guide/getting-started.md\`, one folder below the source root, and it declares no
-layout. unify looks for \`_layout.html\` in \`src/guide/\` first, finds none, and keeps walking up
+This file is \`site/guide/getting-started.md\`, one folder below the source root, and it declares no
+layout. unify looks for \`_layout.html\` in \`site/guide/\` first, finds none, and keeps walking up
 until it does — so the layout at the source root supplies the nav, the head, and the footer for
 this page, for the installation page beside it, and for the home page, with nothing written in any
 of the three to arrange it.
@@ -154,4 +154,9 @@ to the top of this file: every Markdown heading becomes an anchor named after it
 
 Then carry on with [getting started](/guide/getting-started.html).
 `,
+};
+
+/** §19.8 — the shared unify.yaml with the one flag the "All pages" starter needs uncommented, at the project root (§18). */
+export const rootFiles = {
+  "unify.yaml": configTemplate({ catalog: true }),
 };

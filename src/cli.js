@@ -18,7 +18,7 @@
  */
 
 import { existsSync, realpathSync, statSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import pkg from "../package.json" with { type: "json" };
 import { Reporter, UsageError } from "./core/diagnostics.js";
@@ -35,19 +35,19 @@ const HELP = `unify — HTML-native composition: no expression language, no clie
   unify init [template]      scaffold a starter site
 
 Options:
-  -s, --source <dir>       source directory (default: src/ if it exists, else .)
+  -s, --source <dir>       source directory (default: site/ if it exists, else src/, else .)
   -o, --output <dir>       output directory (default: dist)
       --clean              empty the output directory first
       --exclude <glob>     globs never emitted, still usable by the build (repeatable; default: _*)
       --pretty-urls        about.html → about/index.html, and rewrite internal links to match
-      --canonical auto     add a canonical link to pages that author none, from the site address
+      --canonical <mode>   auto (the default with --base-url) adds a canonical link to pages that author none; none switches it off
       --base-url <url>     the site's whole address (https://site.example/repo/): prefix root-relative links, make og:/canonical absolute for share crawlers, and generate sitemap.xml
       --feed-full          include each entry's full rendered content in feed.xml (needs --base-url)
       --catalog            write assets/unify/catalog.json — a browse/filter/TOC projection of every public page
       --search-corpus      write assets/unify/search-corpus.json — normalized page text for client-side search
       --include-noindex    list noindex pages in the catalog and search corpus (needs one of them)
-      --generate <path>    run one JavaScript file from your source tree before the build
-      --source-inventory   give that file source-pages.json: every source page's authored title, description, date, meta and links (needs --generate)
+      --generate <path>    run one JavaScript file before the build (a relative path is from the source root)
+      --source-inventory   give that file source-pages.json: every source page's authored title, description, date, meta and links (on by default with --generate; source-inventory: false in unify.yaml turns it off)
       --dry-run            run the full build and every check, print the report, write nothing
       --audit              \`build\` only: audit the composed site before publishing; publish only if \`unify audit\` would exit 0
       --save-config        \`build\` only: write the saveable options given here into unify.yaml (after a good build)
@@ -87,7 +87,18 @@ function version() {
  */
 function resolveSettings(flags) {
   const probe = resolveSource(flags.source);
-  const settings = mergeConfig(flags, loadConfig(probe.root));
+  const config = loadConfig(probe.root);
+  // §18 — a path in unify.yaml is relative to the FILE, not to wherever the
+  // command ran or to the source root: `source: site` and `generate:
+  // scripts/gen.mjs` beside package.json name the directories beside it. For a
+  // file inside the source root the two readings coincide, so nothing written
+  // before 0.10 changes meaning. CLI flags keep their own rules (`--source`
+  // from the working directory, `--generate` from the source root).
+  const configDir = dirname(configPath(probe.root).path);
+  for (const key of ["source", "generate"]) {
+    if (typeof config[key] === "string" && !isAbsolute(config[key])) config[key] = resolve(configDir, config[key]);
+  }
+  const settings = mergeConfig(flags, config);
   const resolved = resolveSource(settings.source);
 
   return {
@@ -97,7 +108,11 @@ function resolveSettings(flags) {
       exclude: settings.exclude ?? ["_*"],
       prettyUrls: settings["pretty-urls"] === true,
       baseUrl: settings["base-url"],
-      canonical: settings.canonical,
+      // §22.1 — `auto` whenever the site has an address, unless `canonical: none`
+      // (or the explicit --canonical none) opts out; nothing without --base-url.
+      canonical: settings["base-url"] !== undefined && (settings.canonical ?? "auto") === "auto" ? "auto" : undefined,
+      // the value as written, for the usage checks below; the line above is what the build reads
+      canonicalRequested: settings.canonical,
       // §29.6 — full-content feed entries; §30.1 — the catalog and search
       // corpus. All boolean, all read only by build.js (audit reaches them
       // too, since `unify audit` runs the same pipeline). `feed-full`'s
@@ -113,7 +128,9 @@ function resolveSettings(flags) {
       // build.js before the scan (§33.5), so `watch`, `dev` and `audit`
       // get it too: all four scan the source tree.
       generate: settings.generate ?? null,
-      sourceInventory: settings["source-inventory"] === true,
+      // §33.7 — on whenever a generator is named, unless `source-inventory: false`
+      // in unify.yaml opts out; inert without a generator either way.
+      sourceInventory: settings["source-inventory"] ?? settings.generate !== undefined,
       dryRun: settings["dry-run"] === true,
       // §24.1 — set by the audit command itself, never by a flag.
       audit: false,
@@ -174,11 +191,11 @@ export async function run(argv) {
   // ratification samples chose it, and five of five then published dead
   // preview images with a green build. There is no repair for that inside a
   // diagnostic — the fix is that the weaker form no longer exists.
-  // §22.1 — `auto` is the only accepted value, so a future mode cannot be
-  // silently misspelled into today's behaviour.
-  if (settings.canonical !== undefined && String(settings.canonical) !== "auto") {
-    throw new UsageError(`--canonical accepts only "auto", got: ${settings.canonical}`, [
-      "write it as: --canonical auto",
+  // §22.1 — `auto` and `none` are the only accepted values, so a future mode
+  // cannot be silently misspelled into today's behaviour.
+  if (settings.canonicalRequested !== undefined && !["auto", "none"].includes(String(settings.canonicalRequested))) {
+    throw new UsageError(`--canonical accepts only "auto" or "none", got: ${settings.canonicalRequested}`, [
+      "auto is the default whenever --base-url is set; write --canonical none to switch completion off",
       "unify completes a canonical only where a page authors none; an authored one always wins",
     ]);
   }
@@ -186,7 +203,7 @@ export async function run(argv) {
   // address to build one from without --base-url. Saying so beats writing a
   // root-relative canonical or silently doing nothing while the flag says
   // otherwise.
-  if (settings.canonical !== undefined && settings.baseUrl === undefined) {
+  if (settings.canonicalRequested === "auto" && settings.baseUrl === undefined) {
     throw new UsageError("--canonical auto needs the site's address: --base-url is not set", [
       "add it: --base-url https://your-domain.example/",
       "a canonical must be absolute — a root-relative one is ignored by the crawlers it exists for",
@@ -273,6 +290,28 @@ export async function run(argv) {
     saving = saveEntries(options);
   }
 
+  /**
+   * §18 — the lines `--save-config` writes name paths relative to the FILE:
+   * a `--generate` the author gave relative to the source root is rewritten
+   * relative to unify.yaml's directory, and `--source` is written when the
+   * file sits outside the source root (beside package.json), where it is the
+   * one thing that tells the next bare `unify build` which directory to read.
+   * Inside the source root `source` stays unwritten, as before: circular there.
+   * @param {Map<string, string[]>} entries
+   * @param {string} path - the unify.yaml being written
+   */
+  function relocateSavedPaths(entries, path) {
+    const dir = dirname(path);
+    const rel = (abs) => relative(dir, abs).split(sep).join("/") || ".";
+    if (entries.has("generate")) {
+      const abs = isAbsolute(options.generate) ? resolve(options.generate) : resolve(sourceRoot, options.generate);
+      entries.set("generate", [`generate: ${rel(abs)}`]);
+    }
+    if (options.source !== undefined && resolve(dir) !== resolve(sourceRoot)) {
+      entries.set("source", [`source: ${rel(resolve(sourceRoot))}`]);
+    }
+  }
+
   const output = resolve(process.cwd(), settings.output);
 
   if (settings.clean) {
@@ -299,10 +338,11 @@ export async function run(argv) {
       // into the unify.yaml that was read (source root, else project root),
       // or a new one in the source root.
       if (saving && code === 0) {
+        const { path } = configPath(sourceRoot);
+        relocateSavedPaths(saving, path);
         if (saving.size === 0) {
           process.stdout.write("--save-config: no saveable options were given, so unify.yaml was not written\n");
         } else {
-          const { path } = configPath(sourceRoot);
           writeConfig(path, saving);
           process.stdout.write(`saved ${[...saving.keys()].join(", ")} to ${path}\n`);
         }

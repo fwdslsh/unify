@@ -1,0 +1,11 @@
+# The flags this site's documented build uses; everything else is a default.
+# Where the generator lives, relative to this file.
+generate: scripts/gen.mjs
+# Directory-style URLs: /docs/getting-started/ instead of .html.
+pretty-urls: true
+# Absolute origin for sitemap.xml, canonical links and feed URLs.
+base-url: https://unify.fwdslsh.dev/
+# Emit assets/unify/catalog.json.
+catalog: true
+# Emit assets/unify/search-corpus.json.
+search-corpus: true

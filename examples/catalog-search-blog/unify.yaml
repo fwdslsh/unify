@@ -1,0 +1,11 @@
+# Flags a bare `unify build` / `unify audit` should always use (defaults omitted).
+# scripts/gen.mjs writes the series pages, series nav and post-list fallback.
+generate: scripts/gen.mjs
+# /posts/x.html is served as /posts/x/.
+pretty-urls: true
+# Absolute URLs for sitemap.xml, feed.xml and canonicals; note the subpath.
+base-url: https://example.com/blog/
+# Writes assets/unify/catalog.json, which assets/js/blog.js fetches.
+catalog: true
+# Writes assets/unify/search-corpus.json, the search box's index.
+search-corpus: true

@@ -39,7 +39,7 @@ bun src/cli.js audit  [-s src] [-o dist] [--exclude <glob>]... [--pretty-urls] \
                       [--external]  # evaluate, write nothing
 bun src/cli.js dev    [-p 3000]            # build + watch + serve + reload
 bun src/cli.js watch                       # build + rebuild on change, no server
-bun src/cli.js init [template]             # default | basic | blog | docs | portfolio
+bun src/cli.js init [template]             # default | basic | blog | docs | portfolio — scaffolds site/ beside AGENTS.md, DEPLOY.md (and scripts/gen.mjs for blog)
 bun src/cli.js --version | --help          # -v | -h
 ```
 
@@ -72,7 +72,7 @@ Layouts do not chain: a layout that itself declares `data-layout` is a located p
 
 ## Implementation Map
 
-`src/cli.js` (flag parsing + dispatch) → `src/cli/options.js`, `src/cli/commands/{build,dev,watch,init}.js`. Core, one module per §: `includes.js` (§5 inline, SSI comment alias), `layout.js` (§6 discovery walk + data-layout), `compose.js` (§7 slots/merge + §9 root attrs), `head-merge.js` (§8), `markdown.js` (§10), `urls.js` (§11 provenance rewriting, --pretty-urls, --base-url), `references.js` (§12), `collisions.js` (§13), `diagnostics.js` (§14 reporter, dedup), `publish.js` (§15 transactional publish + §17 dry-run report), `watcher.js` + `dev-server.js` (§16), `html.js` (the span-based parser everything shares), `paths.js` (never-shipped list, containment). Templates for `init` live in `src/templates/`. The migration that produced this tree is history, recorded in `docs/migration-plan.md`. `source-inventory.js` (§33.7: the opt-in `source-pages.json` for `--generate`, built from the build's own source scan and the existing frontmatter and `extractDocument` readers).
+`src/cli.js` (flag parsing + dispatch) → `src/cli/options.js`, `src/cli/commands/{build,dev,watch,init}.js`. Core, one module per §: `includes.js` (§5 inline, SSI comment alias), `layout.js` (§6 discovery walk + data-layout), `compose.js` (§7 slots/merge + §9 root attrs), `head-merge.js` (§8), `markdown.js` (§10), `urls.js` (§11 provenance rewriting, --pretty-urls, --base-url), `references.js` (§12), `collisions.js` (§13), `diagnostics.js` (§14 reporter, dedup), `publish.js` (§15 transactional publish + §17 dry-run report), `watcher.js` + `dev-server.js` (§16), `html.js` (the span-based parser everything shares), `paths.js` (never-shipped list, containment, the `site/`→`src/`→cwd source-root default). Templates for `init` live in `src/templates/`. The migration that produced this tree is history, recorded in `docs/migration-plan.md`. `source-inventory.js` (§33.7: the opt-in `source-pages.json` for `--generate`, built from the build's own source scan and the existing frontmatter and `extractDocument` readers).
 
 ## Testing Strategy
 
@@ -84,7 +84,7 @@ Layouts do not chain: a layout that itself declares `data-layout` is a located p
 
 ## Configuration
 
-`unify.yaml`, in the source root or else at the project root (the working directory, where it may say `source: site`), is **saved CLI flags, nothing more** (keys = long option names; CLI wins; never shipped; `init` writes one only when a template's page needs a flag — `docs` saves `catalog: true`). No behavior may exist that only a config file can express. `unify build --save-config` writes it for you (upsert into the file that was read, build only, after an exit-0 build or dry run). The project root is also the last root of the resolution namespace (§4.5): layouts and includes may live beside `package.json` (`includes/nav.html`, `_layout.html`); nothing there is scanned or published.
+`unify.yaml`, at the project root (the working directory, where it says `source: site` and `generate: scripts/gen.mjs`; a relative path in the file resolves against the file's directory) or else in the source root, is **saved CLI flags, nothing more** (keys = long option names; CLI wins; never shipped; `init` writes one, at the project root, only when a template's page needs a flag — `docs` saves `catalog: true`). No behavior may exist that only a config file can express. `unify build --save-config` writes it for you (upsert into the file that was read, else a new one at the project root; build only, after an exit-0 build or dry run). The project root is also the last root of the resolution namespace (§4.5): layouts and includes may live beside `package.json` (`includes/nav.html`, `_layout.html`); nothing there is scanned or published.
 
 ## Security Posture
 

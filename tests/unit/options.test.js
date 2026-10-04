@@ -9,7 +9,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { UsageError } from "../../src/core/diagnostics.js";
-import { loadConfig, mergeConfig, parseArgs } from "../../src/cli/options.js";
+import { CONFIG_KEYS, configTemplate, loadConfig, mergeConfig, parseArgs } from "../../src/cli/options.js";
 import { registerTmp } from "../tmp-reaper.mjs";
 
 describe("parseArgs", () => {
@@ -120,5 +120,45 @@ describe("mergeConfig", () => {
 
   test("the file supplies what the flags left unset", () => {
     expect(mergeConfig({}, { output: "file", strict: true })).toEqual({ output: "file", strict: true });
+  });
+});
+
+describe("configTemplate — the unify.yaml init scaffolds (§18, §19.8)", () => {
+  const keyOf = (line) => line.match(/^#?\s*([a-z][\w-]*):/)?.[1];
+
+  test("lists every saveable option exactly once, each under a one-line description naming its default", () => {
+    const lines = configTemplate().split("\n");
+    const keys = lines.map(keyOf).filter(Boolean);
+    expect(keys).toEqual(CONFIG_KEYS);
+    for (const [i, line] of lines.entries()) {
+      if (!keyOf(line)) continue;
+      expect(lines[i - 1]).toMatch(/^# .+ \(default: .+\)$/);
+    }
+  });
+
+  test("with nothing set, every option is commented out and the file loads as empty", () => {
+    const text = configTemplate();
+    expect(text.split("\n").filter((l) => /^[a-z]/.test(l))).toEqual([]);
+    const dir = mkdtempSync(join(tmpdir(), "unify-tpl-"));
+    registerTmp(dir);
+    writeFileSync(join(dir, "unify.yaml"), text);
+    expect(loadConfig(dir)).toEqual({});
+  });
+
+  test("every commented line is a valid line once uncommented — the reader accepts the whole file", () => {
+    const text = configTemplate()
+      .split("\n")
+      .map((l) => (/^# [a-z][\w-]*:/.test(l) || /^#   - /.test(l) ? l.slice(2) : l))
+      .join("\n");
+    const dir = mkdtempSync(join(tmpdir(), "unify-tpl-"));
+    registerTmp(dir);
+    writeFileSync(join(dir, "unify.yaml"), text);
+    expect(Object.keys(loadConfig(dir)).sort()).toEqual([...CONFIG_KEYS].sort());
+  });
+
+  test("a set key is written live in its place; an unknown key is refused", () => {
+    const live = configTemplate({ catalog: true }).split("\n").filter((l) => /^[a-z]/.test(l));
+    expect(live).toEqual(["catalog: true"]);
+    expect(() => configTemplate({ "dry-run": true })).toThrow(/not a saveable option/);
   });
 });

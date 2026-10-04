@@ -11,11 +11,11 @@ Download the standalone binary for Linux or macOS from the releases page and put
 ## Two commands
 
 ```bash
-unify init          # scaffold a starter site into src/
+unify init          # scaffold a starter site into site/
 unify dev           # build, watch, serve, and reload — one terminal
 ```
 
-Open `http://localhost:3000`, edit a file under `src/`, save — the browser reloads. When you're happy:
+Open `http://localhost:3000`, edit a file under `site/`, save — the browser reloads. When you're happy:
 
 ```bash
 unify build         # write the final site to dist/
@@ -27,9 +27,10 @@ Upload `dist/` anywhere: GitHub Pages, Netlify, any static host.
 
 ```
 my-site/
-├── AGENTS.md             # notes for whoever edits this site next — outside src/, so it never publishes
+├── AGENTS.md             # notes for whoever edits this site next — outside site/, so it never publishes
 ├── DEPLOY.md             # how to publish it, ending in the two commands that carry your address
-└── src/                  # the source root — everything here ships
+├── unify.yaml            # every build flag, described and commented out — uncomment what differs from the default
+└── site/                 # the source root — everything here ships
     ├── _layout.html      # the site chrome — one complete HTML page
     ├── _includes/
     │   └── nav.html      # a fragment
@@ -43,11 +44,11 @@ my-site/
         └── share-placeholder.png   # the image social crawlers show — replace it
 ```
 
-Everything in `src/` ships to the site **except** files and folders whose name starts with `_` — those are the build's working material (layouts, fragments, notes, scripts). Files *inside* an underscore folder don't need their own prefix: `_includes/nav.html` is already held back.
+Everything in `site/` ships to the site **except** files and folders whose name starts with `_` — those are the build's working material (layouts, fragments, notes, scripts). Files *inside* an underscore folder don't need their own prefix: `_includes/nav.html` is already held back.
 
 ## The layout
 
-`src/_layout.html` is a complete HTML page — open it directly in a browser and you'll see the site chrome with its default content:
+`site/_layout.html` is a complete HTML page — open it directly in a browser and you'll see the site chrome with its default content:
 
 ```html
 <!doctype html>
@@ -55,7 +56,7 @@ Everything in `src/` ships to the site **except** files and folders whose name s
   <head>
     <meta charset="utf-8">
     <title>— My Site</title>
-    <link rel="stylesheet" href="/assets/style.css">
+    <link rel="stylesheet" href="assets/style.css">
   </head>
   <body>
     <include src="/_includes/nav.html"></include>
@@ -70,13 +71,13 @@ Everything in `src/` ships to the site **except** files and folders whose name s
 
 Three things are happening:
 
-1. **`<include src="…">`** pulls in a fragment. Paths starting with `/` resolve from `src/`; anything else is relative to the file doing the including. Always write the closing `</include>` tag — it's what makes the source file preview correctly in a browser.
+1. **`<include src="…">`** pulls in a fragment. Paths starting with `/` resolve from the source root (`site/`); anything else is relative to the file doing the including. Always write the closing `</include>` tag — it's what makes the source file preview correctly in a browser.
 2. **`<main>`** is where page content lands. That's not a unify invention — the HTML spec already defines `<main>` as the content unique to each page, as opposed to repeated chrome.
 3. **`<slot name="footer">`** marks a region a page may replace. What's inside the slot is the default (and what a browser shows when you open the layout directly). The starter stylesheet includes `slot { display: contents }` so the design-time wrapper adds no box; built pages contain no `<slot>` elements at all. Name slots for what they hold (`footer`, `hero`, `cta`), not where they sit (`top`, `col2`) — content names outlive redesigns. A plain comment above each slot, like the scaffold's, is all the documentation a layout needs.
 
 ## Pages
 
-`src/index.html` is also a complete page. It never mentions the layout — the nearest `_layout.html` (in its own folder, or any parent) applies automatically:
+`site/index.html` is also a complete page. It never mentions the layout — the nearest `_layout.html` (in its own folder, or any parent) applies automatically:
 
 ```html
 <!doctype html>
@@ -102,7 +103,7 @@ Two details worth knowing:
 
 ## Overriding a region
 
-`src/contact.html` replaces the footer by using the slot's name — one standard HTML attribute on a top-level element:
+`site/contact.html` replaces the footer by using the slot's name — one standard HTML attribute on a top-level element:
 
 ```html
 <!doctype html>
@@ -122,7 +123,7 @@ The built footer contains exactly the `<p>` you wrote — tag, attributes, and a
 
 ## Markdown pages
 
-`src/about.md`:
+`site/about.md`:
 
 ```markdown
 ---
@@ -145,7 +146,7 @@ Two rules that save you from silent mistakes (unify makes both hard errors): HTM
 
 ## Opting out of the layout
 
-`src/404.html` carries `data-layout="none"` on its `<body>` — it ships as-is, with includes and URL rules still applied. Use the same attribute with a path to pick a different layout: `data-layout="/other.html"` (in Markdown: `layout: /other.html`). Layouts are always paths ending in `.html`, never bare names.
+`site/404.html` carries `data-layout="none"` on its `<body>` — it ships as-is, with includes and URL rules still applied. Use the same attribute with a path to pick a different layout: `data-layout="/other.html"` (in Markdown: `layout: /other.html`). Layouts are always paths ending in `.html`, never bare names.
 
 Section layouts work by placement: put a `_layout.html` in `blog/` and every page under `blog/` uses it instead of the site layout. A section layout is a complete standalone page like any other layout — write the shared chrome into it too. Layouts do not chain: a layout that itself carries `data-layout` is a build error (unify tells you rather than silently ignoring it).
 
@@ -156,7 +157,7 @@ something a bit of JavaScript fetches after the page loads. A page cannot do tha
 page is a complete document. Name the file `*.fragment.html` instead:
 
 ```html
-<!-- src/hours.fragment.html -->
+<!-- site/hours.fragment.html -->
 <div class="hours">
   <h3>Opening hours</h3>
   <p>Saturday 10am–4pm</p>
@@ -178,7 +179,7 @@ worked end to end.)
 
 - Write paths that are correct for the file you're editing — relative or root-relative, both work. unify resolves URLs written in layouts and fragments against the file that wrote them, so composed pages are correct at every depth.
 - **Always link the real file**: `href="about.html"`, never a hand-written `/about/`. If you want pretty URLs, build with `--pretty-urls` — pages move to `about/index.html` and every internal link is rewritten for you.
-- Every non-page file in `src/` is copied through byte-for-byte to the same path. What you see in the folder is what ships — compress images before adding them.
+- Every non-page file in `site/` is copied through byte-for-byte to the same path. What you see in the folder is what ships — compress images before adding them.
 - unify does not scope styles. If a fragment's CSS should not leak, use the platform: `@scope`, `@layer`, nesting, or a class prefix.
 
 ## Checking and publishing
@@ -216,23 +217,24 @@ Declare what a page *is* and unify writes its feed entry for you — no script, 
 (Markdown frontmatter: `schema: BlogPosting` and `date: 2026-01-02T09:00:00Z`.) Build with `--base-url`, and every page anywhere on the site declaring `Article` or `BlogPosting` — indexable, not consolidated elsewhere by its own canonical, and dated with a real instant — becomes an entry in `feed.xml` (Atom, at the output root). **The date needs a time, not just a day**: `date: 2026-01-02` alone names a calendar day, and unify will not invent a time to fill the gap — midnight UTC is the wrong publication date for every reader west of Greenwich. It reports the page as excluded instead of guessing:
 
 ```
-src/posts/hello.md: advisory: date is "2026-01-02", which names a day rather than an instant — this page is not in feed.xml
+site/posts/hello.md: advisory: date is "2026-01-02", which names a day rather than an instant — this page is not in feed.xml
   fix: write date: 2026-01-02T09:00:00Z — a feed entry's timestamp needs a time and a time zone
 ```
 
-Want each entry's full rendered content in the feed, not just a summary? Add `--feed-full`. Want to write the feed yourself instead — RSS, extra fields, a generator script — just ship your own `src/feed.xml`: an authored file always wins, and unify generates nothing (`unify init blog`'s own feed is exactly this, and it still builds and audits clean).
+Want each entry's full rendered content in the feed, not just a summary? Add `--feed-full`. Want to write the feed yourself instead — RSS, extra fields, a generator script — just ship your own `site/feed.xml`: an authored file always wins, and unify generates nothing (`unify init blog`'s own feed is exactly this, and it still builds and audits clean).
 
 `--catalog` writes `assets/unify/catalog.json`: a compact, HTML-shaped record of every public page — its head data, root attributes, and heading outline, no body text — for a blog list, a tag facet, or a page chooser to read instead of re-parsing your site. `--search-corpus` writes `assets/unify/search-corpus.json`: just each page's `path` and its normalized visible text, for a client-side search library to index however it likes. The two are independent flags — pass one, the other, or both for a full search UI — and each works with or without `--base-url` (`path` root-relative locally, `url` absolute once you give it an address). A search hit only carries `path` and `text`; look the rest up by joining it against the catalog's own `path`. An authored `src/assets/unify/catalog.json` or `src/assets/unify/search-corpus.json` overrides the matching file the same way a feed does. See [`guides/catalog-and-search.md`](guides/catalog-and-search.md) for a worked blog listing and search UI built on both files.
 
 ## Anything else derived from other files
 
-A blog index, a gallery page — anything else computed from a set of files — is a script you own, run before the build:
+A blog index, a gallery page — anything else computed from a set of files — is a script you own, which unify runs before every build once `unify.yaml` names it:
 
-```bash
-node _scripts/gen.mjs && unify build
+```yaml
+# unify.yaml
+generate: scripts/gen.mjs
 ```
 
-The script writes real pages into `src/`, where they get layouts, head merging, and reference checking like everything else (`unify init blog` ships a working example, generator and data file included). One habit matters the day the script reads a data file: **name the fields you emit — never spread the whole record**. The underscore keeps `_data/` itself out of `dist/`, but no build check can catch a private field once your script copies it into a page. unify itself has no collections, no data files, and no template language — that's the point.
+The script lives in `scripts/` beside the site and writes real pages into a directory unify hands it for that one build (never into `site/`), where they get layouts, head merging, and reference checking like everything else (`unify init blog` ships a working example: `scripts/gen.mjs` at the project root, the line in `unify.yaml`, and the data file in the site). One habit matters the day the script reads a data file: **name the fields you emit — never spread the whole record**. The underscore keeps `_data/` itself out of `dist/`, but no build check can catch a private field once your script copies it into a page. unify itself has no collections, no data files, and no template language — that's the point.
 
 ## Where to go next
 

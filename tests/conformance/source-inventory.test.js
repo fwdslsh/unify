@@ -74,19 +74,25 @@ async function probeSite(tmp, extraArgs = [], then = "succeed", command = "build
   return { r, probe };
 }
 
-test("GEN-13 — without the flag, inputs.sourcePages is null, no file is written, and the output is the same bytes", async () => {
+test("GEN-13 — with source-inventory: false, inputs.sourcePages is null, no file is written, and the output is the same bytes as the default (on)", async () => {
   const off = mkTmp();
+  // The inventory is on whenever a generator is named; the saved `false` is
+  // the opt-out, and the flag on the command line is the same as the default.
+  writeTree(off, { "unify.yaml": "source-inventory: false\n" });
   const { r: rOff, probe: probeOff } = await probeSite(off, ["--exclude", "_*", "--exclude", "skip"]);
-  expectExit(rOff, 0, "a build without the flag");
+  expectExit(rOff, 0, "a build with source-inventory: false");
   const seen = JSON.parse(readFileSync(probeOff, "utf8"));
-  expectEqual(seen.context.inputs, { sourcePages: null }, "inputs without the flag");
+  expectEqual(seen.context.inputs, { sourcePages: null }, "inputs with source-inventory: false");
   expectEqual(Object.keys(seen.context), ["schemaVersion", "unifyVersion", "command", "paths", "site", "outputs", "inputs"], "context key order");
   if (seen.context.schemaVersion !== 1) throw new Error("schemaVersion stays 1: the field is additive");
-  if (seen.strayFile) throw new Error("source-pages.json must not exist without the flag");
+  if (seen.strayFile) throw new Error("source-pages.json must not exist when the inventory is off");
 
   const on = mkTmp();
-  const { r: rOn } = await probeSite(on, ["--exclude", "_*", "--exclude", "skip", "--source-inventory"]);
-  expectExit(rOn, 0, "a build with the flag");
+  const { r: rOn, probe: probeOn } = await probeSite(on, ["--exclude", "_*", "--exclude", "skip"]);
+  expectExit(rOn, 0, "a build with a generator and no flag — the inventory is on by default");
+  if (typeof JSON.parse(readFileSync(probeOn, "utf8")).context.inputs.sourcePages !== "string") {
+    throw new Error("§33.7: a generator gets source-pages.json by default");
+  }
   const walk = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
     e.isDirectory() ? walk(join(dir, e.name)).map((p) => join(e.name, p)) : [e.name]).sort();
   const filesOff = walk(join(off, "dist"));

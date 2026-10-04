@@ -285,7 +285,7 @@ matching — is the library's job, unrelated to what unify wrote.
 
 ## 7. An "All pages" directory
 
-Every `unify init docs` site ships a ready-made page directory built on `catalog.json`: `src/all-pages.html`, a small `<style>` block, and `src/assets/all-pages.js`. All three are yours to edit. unify only writes the catalog; it injects no script and ships yours byte-for-byte. Build with `--catalog` and open `/all-pages/` (or `/all-pages.html`):
+Every `unify init docs` site ships a ready-made page directory built on `catalog.json`: `site/all-pages.html`, a small `<style>` block, and `site/assets/all-pages.js`. All three are yours to edit. unify only writes the catalog; it injects no script and ships yours byte-for-byte. Build with `--catalog` and open `/all-pages/` (or `/all-pages.html`):
 
 ```bash
 unify dev --catalog

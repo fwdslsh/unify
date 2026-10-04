@@ -20,9 +20,9 @@
  */
 import { TEMPLATE_BASE_FILES } from "./shared.js";
 import { files as basic } from "./basic.js";
-import { files as blog } from "./blog.js";
+import { files as blog, rootFiles as blogRoot } from "./blog.js";
 import { files as defaultTemplate } from "./default.js";
-import { files as docs } from "./docs.js";
+import { files as docs, rootFiles as docsRoot } from "./docs.js";
 import { files as portfolio } from "./portfolio.js";
 
 /**
@@ -57,4 +57,16 @@ export const TEMPLATES = {
   blog: template(blog),
   docs: template(docs),
   portfolio: template(portfolio),
+};
+
+/**
+ * §19.4/§19.6 — what a template keeps at the PROJECT ROOT, beside the source
+ * tree, over and above shared.js's `ROOT_FILES` (AGENTS.md and DEPLOY.md):
+ * build material that is not content — the blog's generator in `scripts/`,
+ * the docs template's `unify.yaml`. Keys are project-root-relative.
+ * @type {Record<string, Record<string, string>>}
+ */
+export const TEMPLATE_ROOT_FILES = {
+  blog: blogRoot,
+  docs: docsRoot,
 };

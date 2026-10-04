@@ -108,10 +108,10 @@ volumes:
 
 ## Notes
 
-- **Mount the project root, not just `src/`.** Layout discovery walks up from a page's directory to the source root, and `--source`/`--output` are resolved relative to the working directory.
+- **Mount the project root, not just `site/`.** Layout discovery walks up from a page's directory to the source root, and `--source`/`--output` are resolved relative to the working directory.
 - **What never ships.** Independent of `--exclude`, unify never emits the output directory, `.git/`/`.hg/`/`.svn/`, `node_modules/`, `.env` and `.env.*`, or `unify.yaml` — so mounting a whole project directory does not leak them into `dist/`.
 - **Environment.** `DEBUG=1` (stack traces) is the only environment variable unify reads. There is no `NODE_ENV` behavior.
-- **Saved flags.** A `unify.yaml` at the source root holds the same long option names as the CLI and never ships; CLI flags win on conflict. It keeps a containerized invocation short.
+- **Saved flags.** A `unify.yaml` at the project root (or in the source root) holds the same long option names as the CLI and never ships; CLI flags win on conflict. It keeps a containerized invocation short.
 
 ## Troubleshooting
 
@@ -120,7 +120,7 @@ volumes:
 **Permission denied reading the source.** The mounted tree must be readable by the container user:
 
 ```bash
-chmod -R a+rX src/
+chmod -R a+rX site/
 ```
 
 **Nothing was published and the exit code is 1.** That is the transactional publish working as specified: problems were found, so `dist/` was left untouched. The diagnostics on stderr name the file, line, and fix.

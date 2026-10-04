@@ -738,7 +738,7 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
   if (sourceDefaulted) {
     const n = assetFiles.length;
     reporter.summary(
-      `building from the working directory (no src/ here): ${n} file${n === 1 ? "" : "s"} will be copied as-is` +
+      `building from the working directory (no site/ or src/ here): ${n} file${n === 1 ? "" : "s"} will be copied as-is` +
       ` — run unify build --dry-run to list them`,
     );
   }

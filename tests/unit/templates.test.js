@@ -25,7 +25,9 @@ import { Reporter } from "../../src/core/diagnostics.js";
 import { findAll, getAttr, parse, walk } from "../../src/core/html.js";
 import { inlineIncludes } from "../../src/core/includes.js";
 import { convert, convertFragment } from "../../src/core/markdown.js";
-import { TEMPLATES } from "../../src/templates/index.js";
+import { configTemplate } from "../../src/cli/options.js";
+import { TEMPLATES, TEMPLATE_ROOT_FILES } from "../../src/templates/index.js";
+import { ROOT_FILES } from "../../src/templates/shared.js";
 
 const TEMPLATE_NAMES = Object.keys(TEMPLATES);
 
@@ -48,13 +50,13 @@ describe.each(TEMPLATE_NAMES)('template "%s" — SCF-01/SCF-02 structure (in-mem
   const paths = Object.keys(files);
   const wholeSource = Object.values(files).join("\n");
 
-  test("ships unify.yaml only when its own page needs a flag (§19.8: docs saves catalog: true)", () => {
-    if (name === "docs") {
-      expect(files["unify.yaml"]).toMatch(/^catalog: true$/m);
-      expect(files["unify.yaml"].split("\n").filter((l) => /^[a-z]/.test(l))).toEqual(["catalog: true"]);
-    } else {
-      expect(paths).not.toContain("unify.yaml");
-    }
+  test("ships unify.yaml at the project root, every option described and commented out; docs (catalog: true) and blog (generate:) have one live line each (§18, §19.6, §19.8)", () => {
+    // Never inside the source tree (0.10): the file is build material beside the site.
+    expect(paths).not.toContain("unify.yaml");
+    const yaml = { ...ROOT_FILES, ...(TEMPLATE_ROOT_FILES[name] ?? {}) }["unify.yaml"];
+    const live = { docs: { catalog: true }, blog: { generate: "scripts/gen.mjs" } }[name] ?? {};
+    expect(yaml).toBe(configTemplate(live));
+    expect(yaml.split("\n").filter((l) => /^[a-z]/.test(l))).toEqual(Object.entries(live).map(([k, v]) => `${k}: ${v}`));
   });
 
   test("exercises the underscore convention: every non-page file lives under an underscore path or is a real asset", () => {
@@ -194,7 +196,7 @@ describe.each(TEMPLATE_NAMES)('template "%s" — full composition (SCF-04: zero 
     const reporter = silentReporter();
     const code = await init({ projectRoot: root, sourceRoot: root, sourceDefaulted: true, template: name, reporter });
     if (code !== 0) throw new Error(`init(${name}) exited ${code}`);
-    target = join(root, "src");
+    target = join(root, "site");
     return target;
   }
 
@@ -249,7 +251,9 @@ describe.each(TEMPLATE_NAMES)('template "%s" — full composition (SCF-04: zero 
     for (const p of pages) emitted.add(p.replace(/\.md$/i, ".html"));
     for (const p of Object.keys(files).filter((f) => !isPage(f) && !isUnderscored(f))) emitted.add(p);
     // A saved `catalog: true` (§19.8, the docs template) makes the build write the catalog.
-    if (/^catalog: true$/m.test(files["unify.yaml"] ?? "")) emitted.add("assets/unify/catalog.json");
+    if (/^catalog: true$/m.test(TEMPLATE_ROOT_FILES[name]?.["unify.yaml"] ?? "")) emitted.add("assets/unify/catalog.json");
+    // The blog's saved `generate: scripts/gen.mjs` (§19.6) writes the listing and the feed into the overlay.
+    if (/^generate: scripts\/gen\.mjs$/m.test(TEMPLATE_ROOT_FILES[name]?.["unify.yaml"] ?? "")) { emitted.add("blog.html"); emitted.add("feed.xml"); }
 
     const broken = [];
     for (const pageRel of pages) {
@@ -349,7 +353,7 @@ describe.each(TEMPLATE_NAMES)('template "%s" — SCF-06/SCF-07 at the source', (
     // the argument was omitted.
     //
     // Scoped to the files whose bytes a reader receives — the pages, the
-    // layout, and the include. `_scripts/gen.mjs` is deliberately out of
+    // layout, and the include. `scripts/gen.mjs` is deliberately out of
     // scope: it is a program, `Number.isNaN` is the right thing for it to
     // call, and the pages it writes are `.html` entries in this same map and
     // are checked here like any other.
@@ -420,7 +424,7 @@ describe("§19.5 — a template file may be bytes, and nothing reaches them thro
     //
     // The scan uses Bun's own transpiler rather than a grep, and that is
     // load-bearing rather than fastidious: src/templates/blog.js carries the
-    // text of `_scripts/gen.mjs` in a template literal, and that script
+    // text of `scripts/gen.mjs` in a template literal, and that script
     // legitimately opens with `import { readFileSync } from "node:fs"`. A grep
     // reads the scaffold's own generator as a violation by the module that
     // ships it; scanImports reads the module's actual import graph and ignores

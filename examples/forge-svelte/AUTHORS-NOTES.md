@@ -7,42 +7,42 @@
   scripts that make republishing repeatable.
 - `package-lock.json` — lockfile from `npm install`, so the toolchain installs identically
   next time.
-- `_scripts/build-fee-calculator.mjs` — compiles `components/FeeCalculator.svelte` (the
+- `scripts/build-fee-calculator.mjs` — compiles `components/FeeCalculator.svelte` (the
   volunteer developer's source of truth, left untouched) into a self-contained browser
   bundle. Rerun whenever the `.svelte` file changes.
-- `_scripts/fee-calculator-entry.js` — the esbuild entry point: imports the `.svelte`
+- `scripts/fee-calculator-entry.js` — the esbuild entry point: imports the `.svelte`
   component and mounts it at `#fee-calculator`. This is the only file that "wraps" the
   component; the component itself is never edited.
-- `_scripts/gen-notes-index.mjs` — a derived-file generator, exactly the shape rules.md
+- `scripts/gen-notes-index.mjs` — a derived-file generator, exactly the shape rules.md
   describes ("a script you write and run yourself"). Reads the frontmatter of every file
-  in `src/notes/*.md` and writes `src/notes/index.html`, newest first, so instructors never
+  in `site/notes/*.md` and writes `site/notes/index.html`, newest first, so instructors never
   have to hand-maintain the index.
-- `src/_layout.html` — the one root layout: doctype, `<head>`, stylesheet, favicon, the
+- `site/_layout.html` — the one root layout: doctype, `<head>`, stylesheet, favicon, the
   included header/footer, and the page slot. Every page in the site resolves to this
   layout (no subfolder overrides it).
-- `src/_includes/header.html` — header fragment: anvil mark + site nav. Included by the
+- `site/_includes/header.html` — header fragment: anvil mark + site nav. Included by the
   layout so it's identical on every page.
-- `src/_includes/footer.html` — footer fragment, included by the layout.
-- `src/assets/css/site.css` — the site's only stylesheet, hand-written; also styles the
+- `site/_includes/footer.html` — footer fragment, included by the layout.
+- `site/assets/css/site.css` — the site's only stylesheet, hand-written; also styles the
   Svelte component's rendered markup (see §4).
-- `src/assets/img/anvil.svg` — placeholder anvil-mark SVG, used as both the header logo
+- `site/assets/img/anvil.svg` — placeholder anvil-mark SVG, used as both the header logo
   and the favicon, since no image files were supplied.
-- `src/assets/js/fee-calculator.js` — build **output** of `build-fee-calculator.mjs`
+- `site/assets/js/fee-calculator.js` — build **output** of `build-fee-calculator.mjs`
   (checked in so the repo always has a working site even before anyone reruns the build);
   the actual file a visitor's browser downloads and runs.
-- `src/index.html` — the home page.
-- `src/courses.html` — the Courses page: what's taught, the fee-estimator mount point and
+- `site/index.html` — the home page.
+- `site/courses.html` — the Courses page: what's taught, the fee-estimator mount point and
   its `<script>` tag, and a link into the notes.
-- `src/visit.html` — the Visit page: location, open days, safety rules.
-- `src/notes/2026-05-12-forge-basics-recap.md` — course note 1 (plain Markdown, as
+- `site/visit.html` — the Visit page: location, open days, safety rules.
+- `site/notes/2026-05-12-forge-basics-recap.md` — course note 1 (plain Markdown, as
   instructors write).
-- `src/notes/2026-06-30-tool-care-sharpening.md` — course note 2.
-- `src/notes/2026-08-02-heat-treatment-intro.md` — course note 3.
-- `src/notes/index.html` — build **output** of `gen-notes-index.mjs`: the generated,
+- `site/notes/2026-06-30-tool-care-sharpening.md` — course note 2.
+- `site/notes/2026-08-02-heat-treatment-intro.md` — course note 3.
+- `site/notes/index.html` — build **output** of `gen-notes-index.mjs`: the generated,
   newest-first notes index.
 - `REPORT.md` — this file.
 
-`drafts/rota.md` was left exactly where it was, outside `src/` — the source root — so it
+`drafts/rota.md` was left exactly where it was, outside `site/` — the source root — so it
 is structurally unreachable by the build, not merely excluded by a naming convention.
 
 ## 2. Publish command and verification
@@ -50,14 +50,14 @@ is structurally unreachable by the build, not merely excluded by a naming conven
 Estimator build command (run once per `.svelte` revision):
 
 ```
-node _scripts/build-fee-calculator.mjs
+node scripts/build-fee-calculator.mjs
 ```
 
 Site publish command (the address is a subdirectory, so pretty URLs and a base URL are
 both required):
 
 ```
-node _scripts/gen-notes-index.mjs && ./unify build --clean --pretty-urls --base-url https://thistleknap.pages.dev/forge/
+node scripts/gen-notes-index.mjs && ./unify build --clean --pretty-urls --base-url https://thistleknap.pages.dev/forge/
 ```
 
 Both are wired into one command for the collective to run on every revision —
@@ -75,7 +75,7 @@ actual bytes in `dist/`):
    `<script src>` for the calculator, and every internal page link — carries the
    `/forge/` prefix, and every internal page link is the pretty (no `.html`, trailing
    slash) form. Confirmed with `grep` across the whole `dist/` tree, not just spot checks.
-3. `diff`'d `src/assets/js/fee-calculator.js` against `dist/assets/js/fee-calculator.js`:
+3. `diff`'d `site/assets/js/fee-calculator.js` against `dist/assets/js/fee-calculator.js`:
    byte-identical. unify copies JS/CSS byte-for-byte (rules.md says so), so this confirms
    the exact file compiled from the `.svelte` source is what ships to `/forge/assets/js/fee-calculator.js`.
 4. `grep -r` for the draft file's private text ("NOT FOR THE WEBSITE", "Aldercott opens

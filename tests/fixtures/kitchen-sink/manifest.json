@@ -112,7 +112,9 @@
    "flags": [
     "--pretty-urls",
     "--base-url",
-    "https://meridian.coffee/coffee/"
+    "https://meridian.coffee/coffee/",
+    "--canonical",
+    "none"
    ],
    "expectedTree": "expected-pretty-base",
    "exit": 0,
@@ -145,7 +147,9 @@
   "origin": {
    "flags": [
     "--base-url",
-    "https://meridian.coffee/"
+    "https://meridian.coffee/",
+    "--canonical",
+    "none"
    ],
    "expectedTree": "expected-origin",
    "exit": 0,

@@ -298,11 +298,13 @@ test("CFG-05 — --save-config creates unify.yaml from the flags given, and the 
 
   const r = await runCli(["build", "-s", "src", "-o", "dist", "--pretty-urls", "--base-url=https://x.example/", "--exclude", "_drafts/**", "--save-config"], tmp);
   if (r.exit !== 0) throw new Error(`exit ${r.exit}\n${r.stderr}`);
-  const text = readFileSync(join(tmp, "src", "unify.yaml"), "utf8");
-  if (text !== 'output: dist\nexclude:\n  - _drafts/**\npretty-urls: true\nbase-url: https://x.example/\n') {
+  // A new file lands at the project root, and the explicit --source is saved
+  // there (CFG-08): it is what a bare `unify build` needs next time.
+  const text = readFileSync(join(tmp, "unify.yaml"), "utf8");
+  if (text !== 'output: dist\nexclude:\n  - _drafts/**\npretty-urls: true\nbase-url: https://x.example/\nsource: src\n') {
     throw new Error(`unexpected file:\n${text}`);
   }
-  if (/save-config|source|dry-run/.test(text)) throw new Error("must not write save-config, source or dry-run");
+  if (/save-config|dry-run/.test(text)) throw new Error("must not write save-config or dry-run");
   if (existsSync(join(tmp, "dist", "unify.yaml"))) throw new Error("unify.yaml shipped");
 
   // Round trip: a build from the file alone matches a build from the flags.
@@ -339,9 +341,10 @@ test("CFG-05 — upsert keeps comments and untouched keys byte-for-byte and repl
 test("CFG-05 — nothing saveable creates no file; an exclude list's indented comments go with it", async () => {
   const tmp = mkTmp();
   writeTree(join(tmp, "src"), { "index.html": PAGE });
-  const bare = await runCli(["build", "-s", "src", "--save-config"], tmp);
+  // No --source either: with src/ found by the legacy default there is nothing to save.
+  const bare = await runCli(["build", "--save-config"], tmp);
   if (bare.exit !== 0) throw new Error(bare.stderr);
-  if (existsSync(join(tmp, "src", "unify.yaml"))) throw new Error("an empty save created unify.yaml");
+  if (existsSync(join(tmp, "src", "unify.yaml")) || existsSync(join(tmp, "unify.yaml"))) throw new Error("an empty save created unify.yaml");
 
   writeTree(join(tmp, "src"), { "unify.yaml": "exclude:\n  - old-a\n  # old note\n  - old-b\n# next\nstrict: true\n" });
   const r = await runCli(["build", "-s", "src", "--exclude", "_x", "--save-config"], tmp);
@@ -413,7 +416,8 @@ test("CFG-06 — the source root's unify.yaml wins when both exist; --save-confi
   const saved = await runCli(["build", "-s", "src", "--pretty-urls", "--save-config"], tmp);
   if (saved.exit !== 0) throw new Error(saved.stderr);
   const project = readFileSync(join(tmp, "unify.yaml"), "utf8");
-  if (project !== "output: from-project\npretty-urls: true\n") throw new Error(`the project-root file was upserted:\n${project}`);
+  // The explicit -s src is saved too, since the file sits outside the source root (CFG-08).
+  if (project !== "output: from-project\npretty-urls: true\nsource: src\n") throw new Error(`the project-root file was upserted:\n${project}`);
   if (existsSync(join(tmp, "src", "unify.yaml"))) throw new Error("no second file in the source root");
   covers("CFG-06");
 }, TEST_MS);
@@ -426,14 +430,113 @@ test("CFG-07 — --save-config with --dry-run saves after a dry run that exits 0
   const r = await runCli(["build", "-s", "src", "-o", "dist", "--dry-run", "--pretty-urls", "--save-config"], tmp);
   if (r.exit !== 0) throw new Error(`a dry run with --save-config\n${r.stderr}`);
   if (existsSync(join(tmp, "dist"))) throw new Error("a dry run never writes dist/");
-  const text = readFileSync(join(tmp, "src", "unify.yaml"), "utf8");
-  if (text !== "output: dist\npretty-urls: true\n") throw new Error(`the flags were saved:\n${text}`);
-  if (!r.stdout.includes("saved output, pretty-urls to")) throw new Error(`the save is reported:\n${r.stdout}`);
+  const text = readFileSync(join(tmp, "unify.yaml"), "utf8");
+  if (text !== "output: dist\npretty-urls: true\nsource: src\n") throw new Error(`the flags were saved:\n${text}`);
+  if (!r.stdout.includes("saved output, pretty-urls, source to")) throw new Error(`the save is reported:\n${r.stdout}`);
 
   // A dry run that fails saves nothing.
   writeTree(join(tmp, "src"), { "broken.html": PAGE.replace("Home", "Broken").replace("</body>", '<a href="/nope.html">x</a></body>') });
   const bad = await runCli(["build", "-s", "src", "-o", "dist", "--dry-run", "--base-url", "https://x.example/", "--save-config"], tmp);
   if (bad.exit !== 1) throw new Error(`a broken link fails the dry run: got ${bad.exit}\n${bad.stderr}`);
-  if (readFileSync(join(tmp, "src", "unify.yaml"), "utf8").includes("base-url")) throw new Error("a failed dry run must not save");
+  if (readFileSync(join(tmp, "unify.yaml"), "utf8").includes("base-url")) throw new Error("a failed dry run must not save");
   covers("CFG-07");
+}, TEST_MS);
+
+// ------------------------------------------------------------------- CFG-08
+
+test("CFG-08 — a relative path in unify.yaml resolves against the file's own directory; CLI flags keep their rules", async () => {
+  const tmp = mkTmp();
+  const gen = 'import { writeFileSync } from "node:fs"; import { join } from "node:path";\nwriteFileSync(join(process.argv[3], "g.html"), \'<!doctype html>\\n<html lang="en"><head><meta charset="utf-8"><title>G</title><meta name="description" content="g"></head><body><h1>G</h1></body></html>\\n\');\n';
+  // The default layout: content in site/, the generator in scripts/, the config beside them.
+  writeTree(tmp, { "site/index.html": PAGE, "scripts/gen.mjs": gen, "unify.yaml": "source: site\ngenerate: scripts/gen.mjs\n" });
+  const r = await runCli(["build", "-o", "dist"], tmp);
+  if (r.exit !== 0) throw new Error(`a project-root unify.yaml naming scripts/gen.mjs beside it\n${r.stderr}`);
+  if (!existsSync(join(tmp, "dist", "g.html"))) throw new Error("generate: scripts/gen.mjs must resolve beside the file, not from the source root");
+
+  // The same file inside the source root reads the same paths from there, as before 0.10.
+  rmSync(join(tmp, "unify.yaml"));
+  rmSync(join(tmp, "dist"), { recursive: true });
+  writeTree(join(tmp, "site"), { "_scripts/gen.mjs": gen, "unify.yaml": "generate: _scripts/gen.mjs\n" });
+  const inside = await runCli(["build", "-o", "dist"], tmp);
+  if (inside.exit !== 0) throw new Error(`an in-source unify.yaml\n${inside.stderr}`);
+  if (!existsSync(join(tmp, "dist", "g.html"))) throw new Error("an in-source generate: still resolves from the source root");
+
+  // The CLI flag is still source-root-relative: ../scripts/gen.mjs from site/.
+  rmSync(join(tmp, "site", "unify.yaml"));
+  rmSync(join(tmp, "dist"), { recursive: true });
+  const cli = await runCli(["build", "-o", "dist", "--generate", "../scripts/gen.mjs"], tmp);
+  if (cli.exit !== 0) throw new Error(`--generate relative to the source root\n${cli.stderr}`);
+  if (!existsSync(join(tmp, "dist", "g.html"))) throw new Error("--generate on the command line resolves from the source root");
+
+  // --save-config writes the CLI's source-root-relative value relative to the file.
+  const saved = await runCli(["build", "-o", "dist", "--generate", "../scripts/gen.mjs", "--save-config"], tmp);
+  if (saved.exit !== 0) throw new Error(saved.stderr);
+  const text = readFileSync(join(tmp, "unify.yaml"), "utf8");
+  if (text !== "output: dist\ngenerate: scripts/gen.mjs\n") throw new Error(`generate is saved relative to the file:\n${text}`);
+  covers("CFG-08");
+}, TEST_MS);
+
+// ------------------------------------------------------------------- EXC-13
+
+test("EXC-13 — the default source root is site/, then src/, then the working directory", async () => {
+  const tmp = mkTmp();
+  writeTree(tmp, { "site/index.html": PAGE.replace("<h1>H</h1>", "<h1>From site</h1>"), "src/index.html": PAGE.replace("<h1>H</h1>", "<h1>From src</h1>") });
+  const both = await runCli(["build", "-o", "dist"], tmp);
+  if (both.exit !== 0) throw new Error(both.stderr);
+  if (!readFileSync(join(tmp, "dist", "index.html"), "utf8").includes("From site")) throw new Error("site/ wins over src/");
+
+  rmSync(join(tmp, "site"), { recursive: true });
+  const legacy = await runCli(["build", "-o", "dist"], tmp);
+  if (legacy.exit !== 0) throw new Error(legacy.stderr);
+  if (!readFileSync(join(tmp, "dist", "index.html"), "utf8").includes("From src")) throw new Error("src/ is still found when site/ is absent");
+  if (legacy.stdout.includes("building from the working directory")) throw new Error("src/ is a default, not the defaulted-source case");
+
+  rmSync(join(tmp, "src"), { recursive: true });
+  rmSync(join(tmp, "dist"), { recursive: true });
+  writeTree(tmp, { "index.html": PAGE.replace("<h1>H</h1>", "<h1>From cwd</h1>") });
+  const cwd = await runCli(["build", "-o", "dist"], tmp);
+  if (cwd.exit !== 0) throw new Error(cwd.stderr);
+  if (!cwd.stdout.includes("no site/ or src/ here")) throw new Error(`the defaulted-source notice names both directories:\n${cwd.stdout}`);
+  covers("EXC-13");
+}, TEST_MS);
+
+test("CFG-09 — only a value that differs from the default needs writing: every default stated, or init's all-commented file, builds byte-identically to no file", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "site"), { "index.html": PAGE, "_draft.html": PAGE, "about.html": PAGE.replace("<h1>H</h1>", "<h1>A</h1>") });
+
+  const bare = await runCli(["build", "-o", "dist"], tmp);
+  if (bare.exit !== 0) throw new Error(`no file: exit ${bare.exit}\n${bare.stderr}`);
+
+  // Every option that has a default, written out as that default.
+  writeTree(tmp, {
+    "unify.yaml":
+      "source: site\noutput: dist\nclean: false\nexclude:\n  - _*\npretty-urls: false\nfeed-full: false\ncatalog: false\n" +
+      "search-corpus: false\ninclude-noindex: false\nstrict: false\naudit: false\nport: 3000\nsource-inventory: false\n",
+  });
+  const stated = await runCli(["build", "-o", "dist2"], tmp);
+  if (stated.exit !== 0) throw new Error(`defaults stated: exit ${stated.exit}\n${stated.stderr}`);
+  let cmp = compareTrees(join(tmp, "dist"), join(tmp, "dist2"));
+  if (cmp && cmp.length) throw new Error(`stating the defaults changed the build: ${JSON.stringify(cmp)}`);
+
+  // The file `unify init` writes: every option present, every one commented out.
+  const scaffold = mkTmp();
+  const init = await runCli(["init"], scaffold);
+  if (init.exit !== 0) throw new Error(init.stderr);
+  const template = readFileSync(join(scaffold, "unify.yaml"), "utf8");
+  if (!/^# source: site$/m.test(template) || !/^# generate: scripts\/gen\.mjs$/m.test(template)) throw new Error(`init's unify.yaml does not list the options commented out:\n${template}`);
+  if (/^[a-z]/m.test(template)) throw new Error(`the default template must have no live line:\n${template}`);
+  writeTree(tmp, { "unify.yaml": template });
+  const commented = await runCli(["build", "-o", "dist3"], tmp);
+  if (commented.exit !== 0) throw new Error(`all-commented file: exit ${commented.exit}\n${commented.stderr}`);
+  cmp = compareTrees(join(tmp, "dist"), join(tmp, "dist3"));
+  if (cmp && cmp.length) throw new Error(`the all-commented file changed the build: ${JSON.stringify(cmp)}`);
+
+  // --save-config uncomments the key's own line instead of appending a second copy.
+  const save = await runCli(["build", "-o", "dist", "--pretty-urls", "--save-config"], tmp);
+  if (save.exit !== 0) throw new Error(save.stderr);
+  const after = readFileSync(join(tmp, "unify.yaml"), "utf8");
+  if (after.split("\n").filter((l) => /pretty-urls:/.test(l)).join("|") !== "pretty-urls: true") throw new Error(`expected the commented pretty-urls line replaced in place:\n${after}`);
+  const lineOf = (text, re) => text.split("\n").findIndex((l) => re.test(l));
+  if (lineOf(after, /^pretty-urls: true$/) !== lineOf(template, /^# pretty-urls: true$/)) throw new Error("the saved key did not take its commented line's place");
+  covers("CFG-09");
 }, TEST_MS);

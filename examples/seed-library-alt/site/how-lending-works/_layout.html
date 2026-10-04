@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>— Fernhollow Seed Library</title>
+  <meta name="og:type" content="website">
+  <meta name="og:site_name" content="Fernhollow Seed Library">
+  <link rel="stylesheet" href="../assets/styles.css">
+  <style>
+    /* Only what differs from the shared stylesheet for the lending page. */
+    .membership-terms {
+      background: #f0f5eb;
+      padding: 1.5rem;
+      border-radius: 4px;
+      margin: 1.5rem 0;
+    }
+
+    footer {
+      background: #d4e4c1;
+      border-top: 2px solid #c8d9b3;
+    }
+
+    .membership-footer {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .membership-footer p {
+      margin-bottom: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <include src="/_includes/header.html"></include>
+
+  <main>
+    <slot></slot>
+  </main>
+
+  <footer>
+    <div class="membership-footer">
+      <p><strong>Questions about membership?</strong></p>
+      <p>Email: membership@fernhollow.example</p>
+      <p>Visit us: Saturdays 10am–2pm during the growing season</p>
+    </div>
+  </footer>
+</body>
+</html>

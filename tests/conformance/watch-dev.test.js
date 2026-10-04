@@ -364,7 +364,7 @@ appendFileSync(${JSON.stringify(log)}, JSON.stringify(JSON.parse(readFileSync(co
   test("WCH-09 — an edit to a layout, include or generator beside the source root rebuilds like a source edit", async () => {
     const tmp = mkTmp();
     writeTree(tmp, {
-      "unify.yaml": "source: site\ngenerate: ../scripts/gen.mjs\n",
+      "unify.yaml": "source: site\ngenerate: scripts/gen.mjs\n",
       "_layout.html": '<!doctype html>\n<html lang="en">\n<head>\n  <meta charset="utf-8">\n  <title>— Root</title>\n</head>\n<body>\n  <include src="/includes/nav.html"></include>\n  <main><slot></slot></main>\n</body>\n</html>\n',
       "includes/nav.html": "<nav>nav one</nav>\n",
       "scripts/gen.mjs": 'import { writeFileSync } from "node:fs"; import { join } from "node:path";\nwriteFileSync(join(process.argv[3], "gen.html"), \'<!doctype html>\\n<html lang="en"><head><meta charset="utf-8"><title>Gen</title></head><body><p>gen one</p></body></html>\\n\');\n',
