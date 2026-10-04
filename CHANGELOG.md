@@ -8,6 +8,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0-beta.4] - 2026-10-04
+
+The fourth beta, published to npm under the `next` tag from `release/0.10.0`. Two flags
+become defaults, the blog template's generator moves onto the seam the rest of 0.10 teaches,
+and one example loses its duplicated styles.
+
+### Changed
+
+- **Two defaults flipped.** With `--base-url` set, canonical completion is on (`--canonical
+  auto` is now the default; `--canonical none`, or `canonical: none` in `unify.yaml`, switches
+  it off and is the second accepted value). With a generator named, the source inventory is on
+  (`source-inventory: false` in `unify.yaml` switches it off). Both were opt-in flags that every
+  site with an address or a generator ended up passing; a site that wants neither now says so
+  once. Rules CAN-01, GEN-13 and GEN-16, spec §22.1 and §33.7.
+- **The blog template's generator runs through `--generate`.** Its `unify.yaml` has
+  `generate: scripts/gen.mjs` live, so a bare `unify build` runs the generator; it writes
+  `blog.html` and `feed.xml` into the build's overlay instead of into `site/`, so no derived
+  file is checked in and none can go stale, and the only command the scaffold shows is
+  `unify build`. The feed's absolute links take the build's `--base-url` from the generator
+  context, falling back to the `https://you.example` placeholder without one (SCF-03,
+  FEED-06, spec §19.6; `docs/authoring-rules.md` names the same literal).
+- **seed-library-alt shares one stylesheet.** Its three layouts carried near-identical
+  inline `<style>` blocks; the shared rules now live in `site/assets/styles.css`, linked
+  relative to each layout, with only each layout's own differences left inline. The cascade
+  on every page is unchanged.
+
 ## [0.10.0-beta.3] - 2026-10-04
 
 The third beta of the layout change, published to npm under the `next` tag from
@@ -30,23 +56,6 @@ the examples and the documentation in line with the layout beta.1 introduced.
 
 ### Changed
 
-- **Two defaults flipped.** With `--base-url` set, canonical completion is on (`--canonical
-  auto` is now the default; `--canonical none`, or `canonical: none` in `unify.yaml`, switches
-  it off and is the second accepted value). With a generator named, the source inventory is on
-  (`source-inventory: false` in `unify.yaml` switches it off). Both were opt-in flags that every
-  site with an address or a generator ended up passing; a site that wants neither now says so
-  once. Rules CAN-01, GEN-13 and GEN-16, spec §22.1 and §33.7.
-- **The blog template's generator runs through `--generate`.** Its `unify.yaml` has
-  `generate: scripts/gen.mjs` live, so a bare `unify build` runs the generator; it writes
-  `blog.html` and `feed.xml` into the build's overlay instead of into `site/`, so no derived
-  file is checked in and none can go stale, and the only command the scaffold shows is
-  `unify build`. The feed's absolute links take the build's `--base-url` from the generator
-  context, falling back to the `https://you.example` placeholder without one (SCF-03,
-  FEED-06, spec §19.6; `docs/authoring-rules.md` names the same literal).
-- **seed-library-alt shares one stylesheet.** Its three layouts carried near-identical
-  inline `<style>` blocks; the shared rules now live in `site/assets/styles.css`, linked
-  relative to each layout, with only each layout's own differences left inline. The cascade
-  on every page is unchanged.
 - **`--save-config` uncomments in place.** Saving a key that has only a commented line in
   the file (`# pretty-urls: true`) replaces that line rather than appending a second copy
   at the end; keys with a live line are replaced as before, and keys with neither are
@@ -749,7 +758,8 @@ with generated compare-link notes only. Their diffs are on the
 [releases page](https://github.com/fwdslsh/unify/releases). Nothing here
 retroactively reconstructs detail those notes never carried.
 
-[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.10.0-beta.3...HEAD
+[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.10.0-beta.4...HEAD
+[0.10.0-beta.4]: https://github.com/fwdslsh/unify/compare/v0.10.0-beta.3...v0.10.0-beta.4
 [0.10.0-beta.3]: https://github.com/fwdslsh/unify/compare/v0.10.0-beta.2...v0.10.0-beta.3
 [0.10.0-beta.2]: https://github.com/fwdslsh/unify/compare/v0.9.5...v0.10.0-beta.2
 [0.9.5]: https://github.com/fwdslsh/unify/compare/v0.9.4...v0.9.5
