@@ -46,6 +46,7 @@
  * (`<your package manager>`) rather than an invented package name a reader
  * could mistake for a real one — or publish.
  */
+import { configTemplate } from "../cli/options.js";
 import { ALL_PAGES_HTML, ALL_PAGES_JS } from "./all-pages.js";
 import { commonFiles, mdFrontmatter, pageHtml } from "./shared.js";
 
@@ -155,7 +156,7 @@ Then carry on with [getting started](/guide/getting-started.html).
 `,
 };
 
-/** §19.8 — the one saved flag the "All pages" starter needs, kept beside the site at the project root (§18). */
+/** §19.8 — the shared unify.yaml with the one flag the "All pages" starter needs uncommented, at the project root (§18). */
 export const rootFiles = {
-  "unify.yaml": "# Saved unify flags (CLI flags win). all-pages.html reads the catalog this writes.\ncatalog: true\n",
+  "unify.yaml": configTemplate({ catalog: true }),
 };

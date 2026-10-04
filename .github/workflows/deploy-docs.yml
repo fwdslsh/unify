@@ -69,24 +69,22 @@ jobs:
       # The pre-publish gate, same discipline as any other unify site: the
       # whole build and every check writing nothing, then the completeness
       # audit — both --strict, both must exit 0 before anything is published.
+      # The site's flags live in examples/unify-docs/unify.yaml (0.10's
+      # project-root layout: site/, scripts/gen.mjs, unify.yaml); only the
+      # address is overridden here, and only so a fork deploys to its own.
       - name: Verify — build --dry-run --strict
         run: |
-          bun src/cli.js build -s examples/unify-docs/src -o examples/unify-docs/dist \
-            --generate _scripts/gen.mjs --pretty-urls \
-            --base-url "$SITE_BASE_URL" --canonical auto --catalog --search-corpus \
-            --dry-run --strict
+          cd examples/unify-docs
+          bun ../../src/cli.js build --base-url "$SITE_BASE_URL" --dry-run --strict
       - name: Verify — audit --strict
         run: |
-          bun src/cli.js audit -s examples/unify-docs/src \
-            --generate _scripts/gen.mjs --pretty-urls \
-            --base-url "$SITE_BASE_URL" --canonical auto --catalog --search-corpus \
-            --strict
+          cd examples/unify-docs
+          bun ../../src/cli.js audit --base-url "$SITE_BASE_URL" --strict
 
       - name: Build
         run: |
-          bun src/cli.js build -s examples/unify-docs/src -o examples/unify-docs/dist \
-            --generate _scripts/gen.mjs --pretty-urls --clean \
-            --base-url "$SITE_BASE_URL" --canonical auto --catalog --search-corpus --strict
+          cd examples/unify-docs
+          bun ../../src/cli.js build --base-url "$SITE_BASE_URL" --clean --strict
 
       # --- Assemble example galleries -----------------------------------
       #
@@ -113,80 +111,29 @@ jobs:
       # examples/unify-docs/src/ ever linking to them, is correct rather
       # than an oversight.
       #
-      # Each example's flags are its own README/AUTHORS-NOTES-documented
-      # build command (examples/<name>/README.md or AUTHORS-NOTES.md),
-      # translated from "cd examples/<name> && unify build ..." to run from
-      # the repo root against the checkout CLI, with -s/-o pointed at this
-      # assembly's paths and --base-url overridden to this deploy's real
-      # subpath. htmx-fragments documents no build flags anywhere (it is
-      # hand-maintained, not sandbox-authored like the others) and its
-      # hx-get targets are deliberately page-relative — a flat, non-pretty
-      # layout is what makes that addressing scheme work at any deploy
-      # depth (see examples/README.md's "patterns worth copying") — so it
-      # gets no --pretty-urls here, matching what it actually documents:
-      # nothing beyond a plain build.
-      - name: Assemble example — seed-library
+      # Each example builds FROM ITS OWN DIRECTORY with the flags its
+      # unify.yaml saves — the same `cd examples/<name> && unify build` its
+      # README or AUTHORS-NOTES documents — against the checkout's CLI, with
+      # -o pointed at this assembly's path and --base-url overridden to this
+      # deploy's real subpath (the file's own base-url is the address the
+      # example documents for itself). htmx-fragments has no unify.yaml: it
+      # documents no build flags anywhere (it is hand-maintained, not
+      # sandbox-authored like the others) and its hx-get targets are
+      # deliberately page-relative — a flat, non-pretty layout is what makes
+      # that addressing scheme work at any deploy depth (see
+      # examples/README.md's "patterns worth copying") — so it gets no
+      # --pretty-urls here, matching what it actually documents: nothing
+      # beyond a plain build.
+      - name: Assemble examples
         run: |
-          node examples/seed-library/src/_scripts/gen.mjs
-          bun src/cli.js build -s examples/seed-library/src \
-            -o examples/unify-docs/dist/examples/seed-library \
-            --pretty-urls --base-url "$SITE_BASE_URL"examples/seed-library/ --clean \
-            --dry-run --strict
-          bun src/cli.js build -s examples/seed-library/src \
-            -o examples/unify-docs/dist/examples/seed-library \
-            --pretty-urls --base-url "$SITE_BASE_URL"examples/seed-library/ --clean --strict
-
-      - name: Assemble example — seed-library-alt
-        run: |
-          # gen.mjs resolves its paths (./varieties.json, ./src/catalogue)
-          # relative to the CURRENT DIRECTORY, not to the script's own
-          # location — unlike the other two seed-library generators — so it
-          # must run with the example's own root as the working directory.
-          (cd examples/seed-library-alt && node src/_scripts/gen.mjs)
-          bun src/cli.js build -s examples/seed-library-alt/src \
-            -o examples/unify-docs/dist/examples/seed-library-alt \
-            --pretty-urls --base-url "$SITE_BASE_URL"examples/seed-library-alt/ --exclude '_*' \
-            --dry-run --strict
-          bun src/cli.js build -s examples/seed-library-alt/src \
-            -o examples/unify-docs/dist/examples/seed-library-alt \
-            --pretty-urls --base-url "$SITE_BASE_URL"examples/seed-library-alt/ --exclude '_*' \
-            --strict
-
-      - name: Assemble example — seed-library-ondemand
-        run: |
-          node examples/seed-library-ondemand/src/_scripts/gen.mjs
-          bun src/cli.js build -s examples/seed-library-ondemand/src \
-            -o examples/unify-docs/dist/examples/seed-library-ondemand \
-            --pretty-urls --base-url "$SITE_BASE_URL"examples/seed-library-ondemand/ --clean \
-            --dry-run --strict
-          bun src/cli.js build -s examples/seed-library-ondemand/src \
-            -o examples/unify-docs/dist/examples/seed-library-ondemand \
-            --pretty-urls --base-url "$SITE_BASE_URL"examples/seed-library-ondemand/ --clean \
-            --strict
-
-      - name: Assemble example — htmx-fragments
-        run: |
-          bun src/cli.js build -s examples/htmx-fragments/src \
-            -o examples/unify-docs/dist/examples/htmx-fragments \
-            --base-url "$SITE_BASE_URL"examples/htmx-fragments/ \
-            --dry-run --strict
-          bun src/cli.js build -s examples/htmx-fragments/src \
-            -o examples/unify-docs/dist/examples/htmx-fragments \
-            --base-url "$SITE_BASE_URL"examples/htmx-fragments/ --strict
-
-      - name: Assemble example — catalog-search-blog
-        run: |
-          bun src/cli.js build -s examples/catalog-search-blog/src \
-            -o examples/unify-docs/dist/examples/catalog-search-blog \
-            --generate _scripts/gen.mjs --pretty-urls \
-            --base-url "$SITE_BASE_URL"examples/catalog-search-blog/ \
-            --catalog --search-corpus \
-            --dry-run --strict
-          bun src/cli.js build -s examples/catalog-search-blog/src \
-            -o examples/unify-docs/dist/examples/catalog-search-blog \
-            --generate _scripts/gen.mjs --pretty-urls \
-            --base-url "$SITE_BASE_URL"examples/catalog-search-blog/ \
-            --catalog --search-corpus --strict
+          set -euo pipefail
+          for ex in seed-library seed-library-alt seed-library-ondemand htmx-fragments catalog-search-blog; do
+            echo "── $ex"
+            (cd "examples/$ex" && bun ../../src/cli.js build -o "../unify-docs/dist/examples/$ex" \
+              --base-url "$SITE_BASE_URL"examples/$ex/ --clean --dry-run --strict)
+            (cd "examples/$ex" && bun ../../src/cli.js build -o "../unify-docs/dist/examples/$ex" \
+              --base-url "$SITE_BASE_URL"examples/$ex/ --clean --strict)
+          done
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

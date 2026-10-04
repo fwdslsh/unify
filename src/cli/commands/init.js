@@ -73,9 +73,10 @@ export async function init({ sourceRoot, sourceDefaulted, template, reporter, pr
   // describes, and init's job there is to create site/ under it, not to
   // scaffold into the project root.
   const target = sourceDefaulted ? join(sourceRoot, "site") : sourceRoot;
-  // §19.4/§19.6 — the project-root files: AGENTS.md and DEPLOY.md for every
-  // template, plus whatever this template keeps beside the source tree (the
-  // blog's scripts/gen.mjs, the docs template's unify.yaml).
+  // §19.4/§19.6/§19.8 — the project-root files: AGENTS.md, DEPLOY.md and the
+  // all-commented unify.yaml for every template, plus whatever this template
+  // keeps beside the source tree (the blog's scripts/gen.mjs; the docs
+  // template's unify.yaml with catalog: true live).
   const rootFiles = { ...ROOT_FILES, ...(TEMPLATE_ROOT_FILES[name] ?? {}) };
 
   // §19.4 — two files scaffold at the PROJECT ROOT, deliberately outside the
@@ -114,7 +115,7 @@ export async function init({ sourceRoot, sourceDefaulted, template, reporter, pr
     const same = resolve(target) === resolve(projectRoot);
     throw new UsageError(
       `init refused: the project root ${same ? "and the source root are the same directory" : "is inside the source root"}, ` +
-        `so ${Object.keys(ROOT_FILES).join(" and ")} would publish as pages`,
+        `so ${Object.keys(ROOT_FILES).filter((f) => f.endsWith(".md")).join(" and ")} would publish as pages`,
       ["run unify init from the parent directory, or pass --source with a subdirectory such as --source site"],
     );
   }

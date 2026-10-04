@@ -499,3 +499,44 @@ test("EXC-13 — the default source root is site/, then src/, then the working d
   if (!cwd.stdout.includes("no site/ or src/ here")) throw new Error(`the defaulted-source notice names both directories:\n${cwd.stdout}`);
   covers("EXC-13");
 }, TEST_MS);
+
+test("CFG-09 — only a value that differs from the default needs writing: every default stated, or init's all-commented file, builds byte-identically to no file", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "site"), { "index.html": PAGE, "_draft.html": PAGE, "about.html": PAGE.replace("<h1>H</h1>", "<h1>A</h1>") });
+
+  const bare = await runCli(["build", "-o", "dist"], tmp);
+  if (bare.exit !== 0) throw new Error(`no file: exit ${bare.exit}\n${bare.stderr}`);
+
+  // Every option that has a default, written out as that default.
+  writeTree(tmp, {
+    "unify.yaml":
+      "source: site\noutput: dist\nclean: false\nexclude:\n  - _*\npretty-urls: false\nfeed-full: false\ncatalog: false\n" +
+      "search-corpus: false\ninclude-noindex: false\nstrict: false\naudit: false\nport: 3000\nsource-inventory: false\n",
+  });
+  const stated = await runCli(["build", "-o", "dist2"], tmp);
+  if (stated.exit !== 0) throw new Error(`defaults stated: exit ${stated.exit}\n${stated.stderr}`);
+  let cmp = compareTrees(join(tmp, "dist"), join(tmp, "dist2"));
+  if (cmp && cmp.length) throw new Error(`stating the defaults changed the build: ${JSON.stringify(cmp)}`);
+
+  // The file `unify init` writes: every option present, every one commented out.
+  const scaffold = mkTmp();
+  const init = await runCli(["init"], scaffold);
+  if (init.exit !== 0) throw new Error(init.stderr);
+  const template = readFileSync(join(scaffold, "unify.yaml"), "utf8");
+  if (!/^# source: site$/m.test(template) || !/^# generate: scripts\/gen\.mjs$/m.test(template)) throw new Error(`init's unify.yaml does not list the options commented out:\n${template}`);
+  if (/^[a-z]/m.test(template)) throw new Error(`the default template must have no live line:\n${template}`);
+  writeTree(tmp, { "unify.yaml": template });
+  const commented = await runCli(["build", "-o", "dist3"], tmp);
+  if (commented.exit !== 0) throw new Error(`all-commented file: exit ${commented.exit}\n${commented.stderr}`);
+  cmp = compareTrees(join(tmp, "dist"), join(tmp, "dist3"));
+  if (cmp && cmp.length) throw new Error(`the all-commented file changed the build: ${JSON.stringify(cmp)}`);
+
+  // --save-config uncomments the key's own line instead of appending a second copy.
+  const save = await runCli(["build", "-o", "dist", "--pretty-urls", "--save-config"], tmp);
+  if (save.exit !== 0) throw new Error(save.stderr);
+  const after = readFileSync(join(tmp, "unify.yaml"), "utf8");
+  if (after.split("\n").filter((l) => /pretty-urls:/.test(l)).join("|") !== "pretty-urls: true") throw new Error(`expected the commented pretty-urls line replaced in place:\n${after}`);
+  const lineOf = (text, re) => text.split("\n").findIndex((l) => re.test(l));
+  if (lineOf(after, /^pretty-urls: true$/) !== lineOf(template, /^# pretty-urls: true$/)) throw new Error("the saved key did not take its commented line's place");
+  covers("CFG-09");
+}, TEST_MS);

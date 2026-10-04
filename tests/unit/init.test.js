@@ -152,11 +152,13 @@ describe("init()", () => {
     expect(existsSync(join(root, "src", "_layout.html"))).toBe(true);
   });
 
-  test("writes unify.yaml only for docs, whose All pages starter needs catalog: true (§19.8)", async () => {
+  test("writes unify.yaml at the project root for every template, all commented out except docs' catalog: true (§18, §19.8)", async () => {
     for (const name of Object.keys(TEMPLATES)) {
       const root = tempDir();
       await init({ projectRoot: root, sourceRoot: root, sourceDefaulted: true, template: name, reporter: silentReporter() });
-      expect(existsSync(join(root, "unify.yaml"))).toBe(name === "docs");
+      const live = readFileSync(join(root, "unify.yaml"), "utf8").split("\n").filter((l) => /^[a-z]/.test(l));
+      expect(live).toEqual(name === "docs" ? ["catalog: true"] : []);
+      expect(existsSync(join(root, "site", "unify.yaml"))).toBe(false);
     }
   });
 

@@ -8,20 +8,17 @@ at build time. Nothing here is queried on a server; there isn't one.
 
 ```bash
 cd examples/catalog-search-blog
-unify build -s src -o dist \
-  --generate _scripts/gen.mjs \
-  --pretty-urls \
-  --base-url https://example.com/blog/ \
-  --catalog --search-corpus
+unify build
 ```
 
-Both gates pass, dependency-free (no `npm install` anywhere in this example):
+`unify.yaml` at this folder's root carries the flags (`generate`, `source-inventory`,
+`pretty-urls`, `base-url`, `catalog`, `search-corpus`), and the content is in `site/`,
+unify's default source root. Both gates pass, dependency-free (no `npm install`
+anywhere in this example):
 
 ```bash
-unify build -s src -o dist --generate _scripts/gen.mjs --pretty-urls \
-  --base-url https://example.com/blog/ --catalog --search-corpus --dry-run --strict   # exit 0
-unify audit -s src --generate _scripts/gen.mjs --pretty-urls \
-  --base-url https://example.com/blog/ --catalog --search-corpus                      # exit 0, nothing to report
+unify build --dry-run --strict   # exit 0
+unify audit --strict             # exit 0, nothing to report
 ```
 
 14 files: an index, five posts, two generated series pages, the stylesheet, the client
@@ -37,14 +34,12 @@ the file directly (`file://`) leaves the list on its static fallback (see below)
 search box and facets inert. `unify dev` serves and rebuilds on change:
 
 ```bash
-unify dev -s src -o dist --generate _scripts/gen.mjs --catalog --search-corpus
+unify dev
 ```
 
-then open <http://localhost:3000/>. (`--pretty-urls`/`--base-url` are left off here because
-`--base-url` changes every emitted path to start with its subpath while `dev` always serves
-the built output at the root, so the two only combine usefully when the base URL has no
-path segment — this example's `https://example.com/blog/` does, so it is a `build`-only
-flag here.)
+then open <http://localhost:3000/>. (`dev` serves the built output at the root while the saved `base-url` starts every emitted
+path with `/blog/`, so for local browsing run `unify dev --base-url http://localhost:3000/`,
+which has no subpath. `build` is the command the saved address is for.)
 
 ## What each generated file contains
 
@@ -78,11 +73,15 @@ moment this site moved under a subpath. `import.meta.url` is the address the scr
 actually loaded from, so the relative path resolves correctly at any deploy address with
 no edit — see §4 of the guide.
 
-## The generator, and what it reads from `generator-context.json`
+## The generator, and what it reads
 
-`_scripts/gen.mjs` is the `--generate` script (`docs/cli-reference.md`'s `--generate`
-section, conformance-spec §33.2). Reading `posts/*.md` itself (unify hasn't scanned
-anything yet at this point in the build), it writes three things into the overlay:
+`scripts/gen.mjs` is the `--generate` script (`docs/cli-reference.md`'s `--generate`
+section, conformance-spec §33.2). It lives in `scripts/` beside `unify.yaml`, outside
+`site/`, so it never ships. `source-inventory: true` hands it `source-pages.json`
+(§33.7: every source page's authored title, date and `<meta>` records), whose path is
+`context.inputs.sourcePages` in `generator-context.json` (`process.argv[4]`); the generator
+keeps the pages under `posts/` and never parses frontmatter itself. It writes three things
+into the overlay:
 
 1. **One archive page per `series:` value** (`series/fundamentals.html`,
    `series/recipes.html`) — a real, crawlable page listing that series' posts, newest
@@ -99,21 +98,27 @@ anything yet at this point in the build), it writes three things into the overla
    (the one post with no `series`, so it's in no generated series page either) would be
    exactly that.
 
-`_scripts/gen.mjs` reads `generator-context.json` (`process.argv[4]`) for one decision:
-whether to write a `<link rel="canonical">` on each series page. `context.site.baseUrl` is
-the effective `--base-url` this build is about to apply, or `null` without the flag — a
-canonical only means something once it can be made absolute, so it's added only once a
-base address is actually known, the same call `examples/eleventy-htmx`'s generator makes
-for `og:url`.
+The generator also reads `context.site.baseUrl` for one decision: whether to write a
+`<link rel="canonical">` on each series page. It is the effective `--base-url` this build
+is about to apply, or `null` without the flag — a canonical only means something once it
+can be made absolute, so it's added only once a base address is actually known, the same
+call `examples/eleventy-htmx`'s generator makes for `og:url`.
+
+## Design-time preview
+
+The layout and `index.html` link their stylesheet and script relative to their own file
+(`assets/css/site.css`, `assets/js/blog.js`), so opening `site/_layout.html` straight from
+the folder shows it styled; unify resolves each relative URL against the file that wrote it
+and rewrites it per page, and the head merge keeps one stylesheet link.
 
 ## What each primitive is doing here
 
 | Primitive | Where |
 |---|---|
-| `<include src>` | the header/footer, hand-authored in `src/_includes/`; the series nav and the post-list fallback, generated into the overlay's `_includes/` |
-| Layout | one `src/_layout.html` wraps every page, generated ones included |
+| `<include src>` | the header/footer, hand-authored in `site/_includes/`; the series nav and the post-list fallback, generated into the overlay's `_includes/` |
+| Layout | one `site/_layout.html` wraps every page, generated ones included |
 | Named slot | the footer, with fallback content no page overrides |
-| Underscore | `_includes/` and `_scripts/` are read by the build and never ship |
+| Underscore | `_includes/` is read by the build and never ships; `scripts/` and `unify.yaml` sit outside `site/` |
 | Markdown + frontmatter | five posts; `tags`/`series`/`description`/`date`/`schema` all become `<meta>` tags, with no schema unify registers anywhere |
 
 Plus the production layer: `--pretty-urls`, `--base-url`, `--catalog`, `--search-corpus`,

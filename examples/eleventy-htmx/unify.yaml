@@ -1,0 +1,4 @@
+# Eleventy runs first, inside unify's --generate seam (relative to this file).
+generate: scripts/eleventy.mjs
+# Publish /docs/ rather than /docs/index.html.
+pretty-urls: true

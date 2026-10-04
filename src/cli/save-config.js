@@ -1,6 +1,6 @@
 /**
  * `unify build --save-config` (§18): upsert the saveable flags given on this
- * command line into `<source root>/unify.yaml`, line by line, so the author's
+ * command line into the `unify.yaml` that was read, line by line, so the author's
  * comments, ordering and untouched keys survive byte-for-byte.
  */
 
@@ -62,14 +62,25 @@ export function writeConfig(path, entries) {
   if (lines.at(-1) === "") lines.pop();
 
   const pending = new Map(entries);
+  // The file `init` writes lists every option commented out (`# catalog: true`
+  // under its one-line description). A key with no live line takes the place
+  // of its commented line, so saving a flag reads as uncommenting it rather
+  // than leaving the commented copy behind and appending a second one at the end.
+  const live = new Set(lines.map((line) => line.match(/^([A-Za-z][\w-]*):/)?.[1]).filter(Boolean));
   const out = [];
   for (let i = 0; i < lines.length; i++) {
     const key = lines[i].match(/^([A-Za-z][\w-]*):/)?.[1];
+    const commented = lines[i].match(/^#\s*([A-Za-z][\w-]*):/)?.[1];
     if (key && pending.has(key)) {
       out.push(...pending.get(key));
       pending.delete(key);
       // A replaced list takes its old items (and comments indented among them) with it.
       while (i + 1 < lines.length && /^\s*-\s|^\s+#/.test(lines[i + 1])) i++;
+    } else if (commented && pending.has(commented) && !live.has(commented)) {
+      out.push(...pending.get(commented));
+      pending.delete(commented);
+      // The commented list items under it go too.
+      while (i + 1 < lines.length && /^#\s+-\s/.test(lines[i + 1])) i++;
     } else {
       out.push(lines[i]);
     }

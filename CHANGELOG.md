@@ -8,6 +8,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0-beta.3] - 2026-10-04
+
+The third beta of the layout change, published to npm under the `next` tag from
+`release/0.10.0`. Nothing in the composition core changes; this beta brings the scaffold,
+the examples and the documentation in line with the layout beta.1 introduced.
+
+### Added
+
+- **`unify init` writes `unify.yaml` for every template**, at the project root: every
+  saveable option, each commented out under a one-line description naming its default
+  (`# publish about.html as about/index.html so it is served at /about/ (default: false)`
+  over `# pretty-urls: true`). The file changes nothing until a line is uncommented; the
+  docs template's `catalog: true` is the one line any template ships live. It is generated
+  from the option registry (`src/cli/options.js`), where every saveable option now carries
+  its description, default and the line to uncomment, so the scaffolded file cannot fall
+  behind the CLI (rule CFG-09, spec §18/§19.8).
+- **Only what differs from a default needs writing**, on the command line or in the file,
+  and the suite now proves it: a `unify.yaml` stating every default, or the all-commented
+  one `init` writes, builds byte-identically to no file at all (CFG-09).
+
+### Changed
+
+- **`--save-config` uncomments in place.** Saving a key that has only a commented line in
+  the file (`# pretty-urls: true`) replaces that line rather than appending a second copy
+  at the end; keys with a live line are replaced as before, and keys with neither are
+  still appended.
+- **The examples use the 0.10 layout.** All eight sites under `examples/` build from
+  `site/`, keep their build scripts in `scripts/` beside it, and save their documented
+  flags in a `unify.yaml` at the example root, so each builds with a bare `unify build`
+  from its own directory. The three seed-library generators and the catalog-search-blog
+  generator run through `--generate` and write into unify's overlay instead of into the
+  source tree (the generated pages are no longer checked in); catalog-search-blog's reads
+  the page records `--source-inventory` hands it instead of parsing frontmatter. Layouts,
+  fragments and HTML pages link their assets relative to their own file so they preview
+  from the folder. Both workflows build each example from its directory, the way its
+  README documents it. The sandbox-authored `AUTHORS-NOTES.md` files are kept as written
+  and still describe the pre-0.10 trees they were built in.
+- **Documentation** — the examples README, the CLI reference, the Eleventy and
+  integrations guides, the CI and Docker notes — names `site/`, `scripts/` and
+  `unify.yaml` at the project root throughout, and `unify --help` states the `site/`
+  default and that a relative `--generate` is measured from the source root.
+
 ## [0.10.0-beta.2] - 2026-10-04
 
 A beta of the layout change below, published to npm under the `next` tag
@@ -690,7 +732,8 @@ with generated compare-link notes only. Their diffs are on the
 [releases page](https://github.com/fwdslsh/unify/releases). Nothing here
 retroactively reconstructs detail those notes never carried.
 
-[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.10.0-beta.2...HEAD
+[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.10.0-beta.3...HEAD
+[0.10.0-beta.3]: https://github.com/fwdslsh/unify/compare/v0.10.0-beta.2...v0.10.0-beta.3
 [0.10.0-beta.2]: https://github.com/fwdslsh/unify/compare/v0.9.5...v0.10.0-beta.2
 [0.9.5]: https://github.com/fwdslsh/unify/compare/v0.9.4...v0.9.5
 [0.9.4]: https://github.com/fwdslsh/unify/compare/v0.9.3...v0.9.4

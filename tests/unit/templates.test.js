@@ -25,7 +25,9 @@ import { Reporter } from "../../src/core/diagnostics.js";
 import { findAll, getAttr, parse, walk } from "../../src/core/html.js";
 import { inlineIncludes } from "../../src/core/includes.js";
 import { convert, convertFragment } from "../../src/core/markdown.js";
+import { configTemplate } from "../../src/cli/options.js";
 import { TEMPLATES, TEMPLATE_ROOT_FILES } from "../../src/templates/index.js";
+import { ROOT_FILES } from "../../src/templates/shared.js";
 
 const TEMPLATE_NAMES = Object.keys(TEMPLATES);
 
@@ -48,16 +50,12 @@ describe.each(TEMPLATE_NAMES)('template "%s" — SCF-01/SCF-02 structure (in-mem
   const paths = Object.keys(files);
   const wholeSource = Object.values(files).join("\n");
 
-  test("ships unify.yaml only when its own page needs a flag (§19.8: docs saves catalog: true), at the project root", () => {
+  test("ships unify.yaml at the project root, every option described and commented out; only docs has a live line (§18, §19.8: catalog: true)", () => {
     // Never inside the source tree (0.10): the file is build material beside the site.
     expect(paths).not.toContain("unify.yaml");
-    const root = TEMPLATE_ROOT_FILES[name] ?? {};
-    if (name === "docs") {
-      expect(root["unify.yaml"]).toMatch(/^catalog: true$/m);
-      expect(root["unify.yaml"].split("\n").filter((l) => /^[a-z]/.test(l))).toEqual(["catalog: true"]);
-    } else {
-      expect(Object.keys(root)).not.toContain("unify.yaml");
-    }
+    const yaml = { ...ROOT_FILES, ...(TEMPLATE_ROOT_FILES[name] ?? {}) }["unify.yaml"];
+    expect(yaml).toBe(configTemplate(name === "docs" ? { catalog: true } : {}));
+    expect(yaml.split("\n").filter((l) => /^[a-z]/.test(l))).toEqual(name === "docs" ? ["catalog: true"] : []);
   });
 
   test("exercises the underscore convention: every non-page file lives under an underscore path or is a real asset", () => {

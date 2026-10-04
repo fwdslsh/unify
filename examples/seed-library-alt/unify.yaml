@@ -1,0 +1,6 @@
+# Where the example is published: the address its own notes document.
+base-url: https://fernhollow.pages.dev/library/
+# /catalogue/ rather than /catalogue.html.
+pretty-urls: true
+# Writes the 27 catalogue pages from varieties.json before every build.
+generate: scripts/gen.mjs

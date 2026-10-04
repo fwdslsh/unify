@@ -106,16 +106,18 @@ test("recipe 1 — the source-inventory generator builds clean in ONE strict aud
   const command = codeBlock(H, "sh", 0).trim();
   // The command literal, run as written: `unify` is the CLI under test, and
   // the layout flags the test needs are added after it.
-  if (command !== "unify build --generate _scripts/reports.mjs --source-inventory --audit --strict") {
+  if (command !== "unify build --generate ../scripts/reports.mjs --source-inventory --audit --strict") {
     throw new Error(`the documented command changed — update the test to run what the document says:\n${command}`);
   }
   const flags = command.replace(/^unify build /, "").split(" ");
 
   const report = (n, title, date) =>
     `---\ntitle: ${title}\ndescription: Report number ${n}\nlang: en\ndate: ${date}\n---\n# Report ${n}\n\nBody of report ${n}.\n`;
+  // The layout the document describes: content in site/, the generator in
+  // scripts/ beside it (outside the source root), so `--generate` on the
+  // command line counts from the source root — hence the `../`.
   const tree = {
     "index.html": page("Home", '<h1>Home</h1><a href="/reports/index.html">reports</a>'),
-    "_scripts/reports.mjs": generator,
     "reports/q1.md": report(1, '"Q1: the numbers"', "2026-04-02T09:00:00Z"),
     "reports/q2.md": report(2, "Q2", "2026-07-02T09:00:00Z"),
     "reports/undated.html": page("Undated &amp; loose", "<h1>Undated</h1>"),
@@ -129,8 +131,9 @@ test("recipe 1 — the source-inventory generator builds clean in ONE strict aud
   ];
   for (const v of variants) {
     const tmp = mkTmp();
-    writeTree(join(tmp, "src"), tree);
-    const r = await runCli(["build", "-s", "src", "-o", "dist", ...flags, ...v.args], tmp);
+    writeTree(join(tmp, "site"), tree);
+    writeTree(join(tmp, "scripts"), { "reports.mjs": generator });
+    const r = await runCli(["build", "-o", "dist", ...flags, ...v.args], tmp);
     expectExit(r, 0, `the document's one-build index with [${v.args.join(" ")}]`);
     const indexPath = v.args.includes("--pretty-urls") ? "reports/index.html" : v.index;
     const out = readFileSync(join(tmp, "dist", indexPath), "utf8");
@@ -147,8 +150,10 @@ test("recipe 1 — the source-inventory generator builds clean in ONE strict aud
   // `generate:` and `source-inventory: true` saved in unify.yaml: the command
   // the document ends on is then just `unify build --audit --strict`.
   const saved = mkTmp();
-  writeTree(join(saved, "src"), { ...tree, "unify.yaml": "generate: _scripts/reports.mjs\nsource-inventory: true\n" });
-  expectExit(await runCli(["build", "-s", "src", "-o", "dist", "--audit", "--strict"], saved), 0, "the saved-config command");
+  writeTree(join(saved, "site"), tree);
+  writeTree(join(saved, "scripts"), { "reports.mjs": generator });
+  writeTree(saved, { "unify.yaml": "generate: scripts/reports.mjs\nsource-inventory: true\n" });
+  expectExit(await runCli(["build", "-o", "dist", "--audit", "--strict"], saved), 0, "the saved-config command");
   if (!existsSync(join(saved, "dist", "reports", "index.html"))) throw new Error("saved config did not generate the index");
 }, TEST_MS);
 

@@ -45,6 +45,8 @@
  * rating, or address, and never write a plausible-looking one.
  */
 
+import { configTemplate } from "../cli/options.js";
+
 // ---------------------------------------------------------------- escaping
 
 /**
@@ -773,4 +775,7 @@ from step 2 first and let a non-zero exit stop the deploy.
 export const ROOT_FILES = {
   "AGENTS.md": agentsMd(),
   "DEPLOY.md": deployMd(),
+  // §18/§19.8 — every saveable option, described and commented out; a template
+  // that needs a flag live (docs: catalog) overrides this entry.
+  "unify.yaml": configTemplate(),
 };

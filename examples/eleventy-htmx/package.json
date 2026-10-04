@@ -3,13 +3,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "unify dev -s src -o dist --generate _scripts/eleventy.mjs --pretty-urls",
-    "check": "unify build -s src -o dist --generate _scripts/eleventy.mjs --pretty-urls --dry-run --strict",
-    "audit": "unify audit -s src --generate _scripts/eleventy.mjs --pretty-urls --strict",
-    "build": "unify build -s src -o dist --generate _scripts/eleventy.mjs --pretty-urls --clean"
+    "dev": "unify dev",
+    "check": "unify build --dry-run --strict",
+    "audit": "unify audit --strict",
+    "build": "unify build --clean"
   },
   "devDependencies": {
     "@11ty/eleventy": "^3.1.6",
-    "@fwdslsh/unify": "^0.8.2"
+    "@fwdslsh/unify": "^0.10.0-beta.2"
   }
 }

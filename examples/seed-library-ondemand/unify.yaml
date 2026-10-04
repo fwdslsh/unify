@@ -1,0 +1,6 @@
+# pretty URLs: /catalogue/ instead of /catalogue.html
+pretty-urls: true
+# the address the library is published at; every page, link and asset is rewritten for it
+base-url: https://fernhollow.pages.dev/library/
+# scripts/gen.mjs writes the 225 variety pages, family data and the family nav
+generate: scripts/gen.mjs

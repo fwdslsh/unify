@@ -13,42 +13,48 @@ const COMMANDS = ["build", "audit", "dev", "watch", "init"];
  * Long name → kind. `list` repeats, `string` takes a value, `flag` does not.
  * `example` supplies a real value for the missing-value fix line, where the
  * option has one worth naming.
+ *
+ * Every saveable option (CONFIG_KEYS) also carries `about` (one line, what it
+ * does), `default` (what happens when it is left out) and `save` (the line an
+ * author uncomments to change it). `configTemplate` below writes `unify.yaml`
+ * from them, so the file `init` scaffolds can never fall behind this registry:
+ * a saveable option added without the three fields fails the template test.
  */
 const OPTIONS = {
-  source: { kind: "string", short: "s" },
-  output: { kind: "string", short: "o" },
-  clean: { kind: "flag" },
-  exclude: { kind: "list" },
-  "pretty-urls": { kind: "flag" },
-  "base-url": { kind: "string", example: "https://your-domain.example/" },
-  canonical: { kind: "string", example: "auto" },
+  source: { kind: "string", short: "s", about: "the directory to build from", default: "site/ if it exists, else src/, else this directory", save: "source: site" },
+  output: { kind: "string", short: "o", about: "the directory the site is published to", default: "dist", save: "output: public" },
+  clean: { kind: "flag", about: "empty the output directory before publishing", default: "false", save: "clean: true" },
+  exclude: { kind: "list", about: "glob patterns to leave out of the build, one per list item", default: "_*", save: "exclude:\n  - _*\n  - drafts/**" },
+  "pretty-urls": { kind: "flag", about: "publish about.html as about/index.html so it is served at /about/", default: "false", save: "pretty-urls: true" },
+  "base-url": { kind: "string", example: "https://your-domain.example/", about: "the site's absolute address; turns on sitemap.xml, feed.xml and absolute URLs", default: "none", save: "base-url: https://your-domain.example/" },
+  canonical: { kind: "string", example: "auto", about: "add a canonical link to every page that lacks one; needs base-url", default: "none", save: "canonical: auto" },
   // §29.6 — full-content feed entries. Boolean like every other flag here;
   // the "requires --base-url" usage error is cross-cutting validation (it
   // needs settings.baseUrl too), so it lives beside --canonical auto's own
   // equivalent check in cli.js, not in this registry.
-  "feed-full": { kind: "flag" },
+  "feed-full": { kind: "flag", about: "put each post's full content in feed.xml instead of its description; needs base-url", default: "false", save: "feed-full: true" },
   "dry-run": { kind: "flag" },
-  strict: { kind: "flag" },
+  strict: { kind: "flag", about: "exit 1 on advisories too, not only on problems", default: "false", save: "strict: true" },
   // §24.8 — `build --audit`: gate the publish on the audit's findings. Boolean.
-  audit: { kind: "flag" },
+  audit: { kind: "flag", about: "build only: run the audit and publish nothing if it reports a finding", default: "false", save: "audit: true" },
   // §30.1 — flags rather than a consequence: unlike a sitemap or a feed,
   // nothing about a page declares "catalog me" or "index me", so there is no
   // record-derived condition that could activate either the way
   // `--base-url` activates §21. Independent of each other too: `catalog`
   // writes `assets/unify/catalog.json`, `search-corpus` writes
   // `assets/unify/search-corpus.json`, and neither implies the other.
-  catalog: { kind: "flag" },
-  "search-corpus": { kind: "flag" },
+  catalog: { kind: "flag", about: "write assets/unify/catalog.json, one record per published page", default: "false", save: "catalog: true" },
+  "search-corpus": { kind: "flag", about: "write assets/unify/search-corpus.json, the text of every page for client-side search", default: "false", save: "search-corpus: true" },
   // §30.4 — catalog/corpus membership only: also list pages that are
   // excluded solely for being `noindex`. Needs --catalog or --search-corpus.
-  "include-noindex": { kind: "flag" },
+  "include-noindex": { kind: "flag", about: "also list noindex pages in the catalog and search corpus; needs one of them", default: "false", save: "include-noindex: true" },
   // §33.1 — a PATH to a JavaScript file (relative to the source root, or
   // absolute; anywhere on disk), never a command. Saved in unify.yaml like any
   // other long option.
-  generate: { kind: "value" },
+  generate: { kind: "value", about: "a JavaScript file unify runs before every build, relative to this file", default: "none", save: "generate: scripts/gen.mjs" },
   // §33.7 — opt in to `source-pages.json` for the generator. A boolean, saveable;
   // naming it with no generator is a usage error (cli.js), like --include-noindex.
-  "source-inventory": { kind: "flag" },
+  "source-inventory": { kind: "flag", about: "hand that file source-pages.json: every source page's title, description, date, metas and links; needs generate", default: "false", save: "source-inventory: true" },
   // §31.1 — `unify audit`'s own output shape. This registry stays a
   // syntactic parser like every entry here: the closed set (human/json/sarif)
   // and its usage error are audit.js's own concern, the same split
@@ -67,13 +73,49 @@ const OPTIONS = {
   // §18 — `build` only: upsert the saveable flags on this command line into
   // unify.yaml. Not itself saveable; cli.js enforces the rest.
   "save-config": { kind: "flag" },
-  port: { kind: "string", short: "p" },
+  port: { kind: "string", short: "p", about: "the port unify dev serves on", default: "3000", save: "port: 8080" },
   version: { kind: "flag", short: "v" },
   help: { kind: "flag", short: "h" },
 };
 
 /** Keys `unify.yaml` may carry — the long option names, minus the ones that make no sense to save. */
 export const CONFIG_KEYS = ["source", "output", "clean", "exclude", "pretty-urls", "base-url", "canonical", "feed-full", "catalog", "search-corpus", "include-noindex", "strict", "audit", "port", "generate", "source-inventory"];
+
+/**
+ * §18/§19.8 — the `unify.yaml` that `init` writes at the project root: every
+ * saveable option, each described in one line and commented out, so the file
+ * documents the whole surface and changes nothing until a line is uncommented.
+ * Only a value that differs from the default needs to be written; `set` names
+ * the ones a template needs live (the docs template's `catalog: true`).
+ *
+ * @param {Record<string, string|boolean|string[]>} [set] - keys to write uncommented, with their values
+ * @returns {string}
+ */
+export function configTemplate(set = {}) {
+  for (const key of Object.keys(set)) {
+    if (!CONFIG_KEYS.includes(key)) throw new Error(`configTemplate: ${key} is not a saveable option`);
+  }
+  const lines = [
+    "# unify.yaml — saved flags for `unify build`, `audit`, `dev` and `watch`.",
+    "# Keys are the long option names; a flag on the command line wins over this file.",
+    "# Every option is listed with its default. Uncomment a line only to change it: a",
+    "# default never needs writing. A relative path here resolves against this file.",
+    "",
+  ];
+  for (const key of CONFIG_KEYS) {
+    const { about, default: fallback, save } = OPTIONS[key];
+    lines.push(`# ${about} (default: ${fallback})`);
+    if (key in set) {
+      const value = set[key];
+      if (Array.isArray(value)) lines.push(`${key}:`, ...value.map((item) => `  - ${item}`));
+      else lines.push(`${key}: ${value}`);
+    } else {
+      lines.push(...save.split("\n").map((line) => `# ${line}`));
+    }
+    lines.push("");
+  }
+  return lines.join("\n");
+}
 
 const SHORT = Object.fromEntries(
   Object.entries(OPTIONS)

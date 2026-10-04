@@ -1,0 +1,16 @@
+// Compiles components/FeeCalculator.svelte (the volunteer developer's source of
+// truth) into a plain browser bundle that unify ships byte-for-byte.
+// Re-run this whenever FeeCalculator.svelte changes, then run `unify build`.
+import { build } from "esbuild";
+import esbuildSvelte from "esbuild-svelte";
+
+await build({
+  entryPoints: ["scripts/fee-calculator-entry.js"],
+  bundle: true,
+  minify: true,
+  format: "iife",
+  target: "es2018",
+  outfile: "site/assets/js/fee-calculator.js",
+  plugins: [esbuildSvelte()],
+  logLevel: "info",
+});

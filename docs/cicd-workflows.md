@@ -62,8 +62,10 @@ The static check also enforces spec↔inventory sync: if `docs/conformance-spec.
 ### `examples` — gate G13 (dependency-free examples)
 
 ```bash
-bun src/cli.js build -s examples/<name>/src -o /tmp/<name> --dry-run --strict
+(cd examples/<name> && bun ../../src/cli.js build -o /tmp/<name> --dry-run --strict)
 ```
+
+Each example is built from its own directory, the way its README documents it, so the flags come from the example's `unify.yaml` and the gate also proves that file.
 
 Builds every example that needs no `npm install` — `seed-library`, `seed-library-alt`, `seed-library-ondemand`, `htmx-fragments`, `unify-docs`, and `catalog-search-blog` — with `--dry-run --strict`, plus an `audit --strict` pass for `unify-docs` and `catalog-search-blog`. `examples/README.md` cites several of these as the evidence that `docs/authoring-rules.md` is sufficient to author from, and evidence that silently stops building is worse than none, because it is still being cited. `build --dry-run --strict` is the gate for all of them; `audit --strict` only for the two that already meet it — the other four (`seed-library`, `seed-library-alt`, `seed-library-ondemand` sandbox-authored, plus `htmx-fragments`, hand-maintained) carry 385 `incomplete` findings between them (41 / 80 / 259 / 5) and always have — `seed-library`'s dominated by `image-missing-dimensions`, `seed-library-alt`'s by `description-missing`, `seed-library-ondemand`'s by `page-orphan` — so demanding audit cleanliness there would be a new requirement wearing a regression gate's clothes.
 
@@ -72,8 +74,8 @@ Builds every example that needs no `npm install` — `seed-library`, `seed-libra
 ```bash
 cd examples/forge-svelte && npm install && npm run build:calculator && npm run build:notes
 cd examples/eleventy-htmx && npm ci
-node src/cli.js build …   # node, deliberately — see below
-node src/cli.js audit --strict …   # eleventy-htmx only
+node ../../src/cli.js build -o /tmp/<name> --dry-run --strict   # node, deliberately — see below
+node ../../src/cli.js audit --strict                            # eleventy-htmx only
 ```
 
 Builds `forge-svelte` and `eleventy-htmx`, the two examples with an npm dependency step before unify can build them, plus an `audit --strict` pass for `eleventy-htmx` — the third example (with `unify-docs` and `catalog-search-blog` in the `examples` job above) that already meets audit cleanliness. The unify build itself runs under **node**, not bun: bun auto-installs an import it cannot resolve, so a missing dependency would be silently fetched from npm mid-build and this gate would pass on a tree that fails for an `npx @fwdslsh/unify` user (issue #75). Running the generator seam under node is what makes this gate mean anything.

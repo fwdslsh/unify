@@ -29,6 +29,7 @@ Upload `dist/` anywhere: GitHub Pages, Netlify, any static host.
 my-site/
 ├── AGENTS.md             # notes for whoever edits this site next — outside site/, so it never publishes
 ├── DEPLOY.md             # how to publish it, ending in the two commands that carry your address
+├── unify.yaml            # every build flag, described and commented out — uncomment what differs from the default
 └── site/                 # the source root — everything here ships
     ├── _layout.html      # the site chrome — one complete HTML page
     ├── _includes/
@@ -216,11 +217,11 @@ Declare what a page *is* and unify writes its feed entry for you — no script, 
 (Markdown frontmatter: `schema: BlogPosting` and `date: 2026-01-02T09:00:00Z`.) Build with `--base-url`, and every page anywhere on the site declaring `Article` or `BlogPosting` — indexable, not consolidated elsewhere by its own canonical, and dated with a real instant — becomes an entry in `feed.xml` (Atom, at the output root). **The date needs a time, not just a day**: `date: 2026-01-02` alone names a calendar day, and unify will not invent a time to fill the gap — midnight UTC is the wrong publication date for every reader west of Greenwich. It reports the page as excluded instead of guessing:
 
 ```
-src/posts/hello.md: advisory: date is "2026-01-02", which names a day rather than an instant — this page is not in feed.xml
+site/posts/hello.md: advisory: date is "2026-01-02", which names a day rather than an instant — this page is not in feed.xml
   fix: write date: 2026-01-02T09:00:00Z — a feed entry's timestamp needs a time and a time zone
 ```
 
-Want each entry's full rendered content in the feed, not just a summary? Add `--feed-full`. Want to write the feed yourself instead — RSS, extra fields, a generator script — just ship your own `src/feed.xml`: an authored file always wins, and unify generates nothing (`unify init blog`'s own feed is exactly this, and it still builds and audits clean).
+Want each entry's full rendered content in the feed, not just a summary? Add `--feed-full`. Want to write the feed yourself instead — RSS, extra fields, a generator script — just ship your own `site/feed.xml`: an authored file always wins, and unify generates nothing (`unify init blog`'s own feed is exactly this, and it still builds and audits clean).
 
 `--catalog` writes `assets/unify/catalog.json`: a compact, HTML-shaped record of every public page — its head data, root attributes, and heading outline, no body text — for a blog list, a tag facet, or a page chooser to read instead of re-parsing your site. `--search-corpus` writes `assets/unify/search-corpus.json`: just each page's `path` and its normalized visible text, for a client-side search library to index however it likes. The two are independent flags — pass one, the other, or both for a full search UI — and each works with or without `--base-url` (`path` root-relative locally, `url` absolute once you give it an address). A search hit only carries `path` and `text`; look the rest up by joining it against the catalog's own `path`. An authored `src/assets/unify/catalog.json` or `src/assets/unify/search-corpus.json` overrides the matching file the same way a feed does. See [`guides/catalog-and-search.md`](guides/catalog-and-search.md) for a worked blog listing and search UI built on both files.
 

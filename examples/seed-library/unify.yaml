@@ -1,0 +1,6 @@
+# the generator unify runs before every build, dev rebuild and audit (writes the derived pages into its overlay)
+generate: scripts/gen.mjs
+# publish /catalogue/ rather than /catalogue.html
+pretty-urls: true
+# where the site is deployed; sitemap, canonical links and absolute URLs derive from it
+base-url: https://fernhollow.pages.dev/library/

@@ -5,13 +5,14 @@ Eight sites. Four were built by an agent that had never seen unify before — it
 documentation. They are kept because they passed review, not because they were written to
 be examples: what they show is what the 60 lines actually lead someone to build.
 
-The first two are one brief solved two ways; the third is a later, larger brief; the fourth integrates a Svelte component (its extra steps: `npm install`, then `npm run build:calculator && npm run build:notes` — the build scripts live in `_scripts/` at the example root). The fifth, `htmx-fragments`, is hand-maintained: no sandboxed agent could download htmx, so it is written and tested by the maintainers to document the fragment + htmx pattern. The sixth, seventh, and eighth are hand-maintained too, and have sections of their own below. All build clean:
+The first two are one brief solved two ways; the third is a later, larger brief; the fourth integrates a Svelte component (its extra steps: `npm install`, then `npm run build:calculator && npm run build:notes` — the build scripts live in `scripts/` at the example root, beside `site/`). The fifth, `htmx-fragments`, is hand-maintained: no sandboxed agent could download htmx, so it is written and tested by the maintainers to document the fragment + htmx pattern. The sixth, seventh, and eighth are hand-maintained too, and have sections of their own below. Every example uses unify 0.10's default layout — the content in `site/`, build scripts in `scripts/`, and a `unify.yaml` at the example root saving the flags its own notes document — so each builds with no flags at all:
 
 ```bash
 cd seed-library
-node src/_scripts/gen.mjs
-unify build -s src -o dist --pretty-urls --base-url https://fernhollow.pages.dev/library/
+unify build
 ```
+
+(The sandbox-authored examples' `AUTHORS-NOTES.md` files are kept as written and still name the pre-0.10 layout they were built in: `src/`, `_scripts/` inside it, and the generator run by hand before `unify build`. The trees themselves have moved; the notes are the record of the experiment.)
 
 | | `seed-library` | `seed-library-alt` | `seed-library-ondemand` |
 |---|---|---|---|
@@ -26,7 +27,7 @@ unify build -s src -o dist --pretty-urls --base-url https://fernhollow.pages.dev
 ## `unify-docs` — the dogfooding site
 
 The sixth is different in kind: it is unify's own documentation site, built by unify from the
-repository's real `docs/` directory (issue #51). Nothing is copied — `_scripts/gen.mjs` reads
+repository's real `docs/` directory (issue #51). Nothing is copied — `scripts/gen.mjs` reads
 `../../../docs` through `--generate`, so the site cannot drift from the documentation it
 renders. It exercises the production layer end to end (`--pretty-urls`, `--base-url`,
 `--canonical auto`, `sitemap.xml`, `--catalog`, `--search-corpus`, `schema:`) and both gates pass:
@@ -46,7 +47,7 @@ The seventh answers "can I keep the generator I already have?". Ashgrove Instrum
 product front page, three documentation pages, six release notes, and a release stream
 filtered by topic — where the filter is a real page you can link to *and* an htmx swap when
 JavaScript is available. Eleventy owns the collection, the pagination and the data cascade;
-unify owns every page's chrome, `<head>`, URLs and checks. `src/_scripts/eleventy.mjs` is 24
+unify owns every page's chrome, `<head>`, URLs and checks. `scripts/eleventy.mjs` is a few dozen
 lines: it constructs Eleventy with unify's overlay directory as its output and calls
 `write()`. Nothing Eleventy-shaped exists in unify core, and nothing unify-shaped exists in
 the Eleventy config — the existing `--generate` seam was already enough.
@@ -79,13 +80,13 @@ it belongs to the dependency-free half of gate G13.
 
 ```bash
 cd catalog-search-blog
-unify build -s src -o dist --generate _scripts/gen.mjs --pretty-urls \
-  --base-url https://example.com/blog/ --catalog --search-corpus
+unify build   # generate, source-inventory, pretty-urls, base-url, catalog and search-corpus come from unify.yaml
 ```
 
 12 source files, 14 built. Both gates pass — `build --dry-run --strict` and `audit`, the
-latter with nothing to report, not merely nothing blocking. `_scripts/gen.mjs` is the
-`--generate` seam demonstrated with no other generator in the loop: it reads
+latter with nothing to report, not merely nothing blocking. `scripts/gen.mjs` is the
+`--generate` seam demonstrated with no other generator in the loop: it reads the page
+records `--source-inventory` hands it instead of parsing frontmatter itself, and reads
 `generator-context.json` (`process.argv[4]`, new in 0.9) to decide whether a `<link
 rel="canonical">` on each of its generated per-series archive pages can be made absolute,
 and it writes the plain-link fallback list `assets/js/blog.js` overwrites once its fetch
@@ -95,13 +96,16 @@ what each generated JSON file actually contains.
 
 ## The patterns worth copying
 
-**Pages generated from data, by a script you run yourself.** unify has no data files and no
-collections. `src/_scripts/gen.mjs` reads `varieties.json` and writes one Markdown page per
-variety into the source tree; `unify build` then treats them as ordinary pages. The script
-lives under `_scripts/` so it never ships, and the build step is two commands, not a plugin:
+**Pages generated from data, by a script unify runs for you.** unify has no data files and no
+collections. `scripts/gen.mjs` reads `varieties.json` and writes one page per variety into
+the overlay directory unify hands it (`process.argv[3]`); the build then treats them as
+ordinary pages, and nothing generated is ever written into `site/`. The script lives in
+`scripts/` beside the site, outside the source root, so it never ships, and `unify.yaml`
+names it, so the build step is one command, not a plugin:
 
-```bash
-node src/_scripts/gen.mjs && unify build
+```yaml
+# unify.yaml
+generate: scripts/gen.mjs
 ```
 
 The same shape produces the seasonal-notes index — read the entries' frontmatter, write the
@@ -150,7 +154,7 @@ publishes to a different host by changing one flag.
 
 **Fragments fetched by htmx, with a no-JS fallback.** `htmx-fragments` is the
 `.fragment.html` feature working end to end: the month lists are bare fragments a button
-swaps in with `hx-get`, htmx itself is **vendored** (`src/assets/js/htmx.min.js`, copied
+swaps in with `hx-get`, htmx itself is **vendored** (`site/assets/js/htmx.min.js`, copied
 from the npm package — the site loads nothing from another origin, and unify rewrites the
 script tag like any URL), and the opening-hours panel is one file consumed twice — spliced
 into the Visit page by `<include>` at build time, fetched raw by anyone else at runtime.
@@ -163,7 +167,7 @@ before htmx loads, with JavaScript off, and for every crawler; the buttons only 
 **A whole second generator, adopted through one flag.** `eleventy-htmx` runs Eleventy
 inside `--generate` and hands unify its output. The seam is one directory: Eleventy's
 output directory is the overlay unify created for that build, so everything it writes is
-scanned, composed into `src/_layout.html` by the ordinary discovery walk,
+scanned, composed into `site/_layout.html` by the ordinary discovery walk,
 reference-checked, collision-checked and published in the same transaction as the files
 you wrote by hand. Three settings do the real work — Eleventy's input is `"."` (relative to
 the working directory, which is the source root), its template formats are narrowed to
@@ -187,11 +191,11 @@ each `hx-get` and leaves the `hx-get` alone.
 
 **A Svelte component on one page, without adopting a framework for the site.**
 `forge-svelte` integrates a fee estimator maintained as a `.svelte` file by someone
-else. The shape: `npm i svelte esbuild esbuild-svelte`, a ~20-line `_scripts/` build
-that compiles and bundles the component to one plain JS file under `assets/`, and a
-`<script src="/assets/js/fee-calculator.js">` that unify rewrites like any other URL.
+else. The shape: `npm i svelte esbuild esbuild-svelte`, a ~20-line build script in `scripts/`
+that compiles and bundles the component to one plain JS file under `site/assets/`, and a
+`<script src="assets/js/fee-calculator.js">` that unify rewrites like any other URL.
 unify needs to know nothing about Svelte: the bundle is an ordinary asset, mirror-copied;
-`node_modules/` at the source root never ships (it is on the never-shipped list); and
+`node_modules/` beside `site/` is outside the source root and never ships (it is on the never-shipped list); and
 the repeatable pipeline is two npm scripts plus `unify build`. The one hazard is not
 unify's: in the same experiment that produced this example, two of six authors quietly
 *re-implemented* the component in vanilla JS and labelled the copy "compiled from

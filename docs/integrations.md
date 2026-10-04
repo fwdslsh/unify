@@ -12,24 +12,29 @@ like any other asset. Every literal in this document is tested; the worked examp
 
 - A compiled bundle is an **ordinary asset**: mirror-copied byte-for-byte, referenced by an
   ordinary `<script src>` that `--base-url`/`--pretty-urls` rewrite like any link.
-- `node_modules/` in the source root **never ships** — it is on the never-shipped list
-  (conformance spec §4.3) — so `npm install` beside your pages is safe by design.
-- Your build script lives under `_scripts/` (the underscore keeps it out of the output) and
-  runs **before** unify, by you: `node _scripts/build-components.mjs && unify build`.
+- `node_modules/` **never ships**: at the project root it sits beside `site/`, outside the
+  source tree unify scans, and even inside the source root it is on the never-shipped list
+  (conformance spec §4.3) — so `npm install` is safe by design wherever `package.json` is.
+- Your build script lives in `scripts/` at the project root, beside `site/` and
+  `package.json`. Being outside the source root is what keeps it out of the output — no
+  underscore needed — and it runs **before** unify, by you:
+  `node scripts/build-components.mjs && unify build`.
 - URLs *inside* your component's JavaScript ship as written — unify rewrites HTML, never
   JS — so a component that fetches must build addresses relative to the page, or read them
   back from an `href` unify rewrote (`docs/authoring-rules.md`, Styles/scripts).
 
 ## The Svelte recipe
 
-The component — say `components/FeeCalculator.svelte`, maintained by whoever writes your
-Svelte — needs three small files and two commands. Once:
+The component — say `components/FeeCalculator.svelte` at the project root, maintained by
+whoever writes your Svelte — needs three small files and two commands. Everything below
+runs from the project root, the directory holding `site/`, `scripts/`, `components/` and
+`package.json`. Once:
 
 ```bash
 npm install svelte esbuild esbuild-svelte
 ```
 
-`_scripts/estimator-entry.js` — mounts the component onto the element your page provides:
+`scripts/estimator-entry.js` — mounts the component onto the element your page provides:
 
 ```js
 import { mount } from "svelte";
@@ -38,35 +43,38 @@ import FeeCalculator from "../components/FeeCalculator.svelte";
 mount(FeeCalculator, { target: document.getElementById("estimator") });
 ```
 
-`_scripts/build-components.mjs` — compiles and bundles to one plain file in the source
-tree:
+`scripts/build-components.mjs` — compiles and bundles to one plain file under
+`site/assets/js/`, inside the source tree, where unify finds it like any other asset:
 
 ```js
 import esbuild from "esbuild";
 import sveltePlugin from "esbuild-svelte";
 
 await esbuild.build({
-  entryPoints: ["_scripts/estimator-entry.js"],
+  entryPoints: ["scripts/estimator-entry.js"],
   bundle: true,
   minify: true,
   format: "iife",
-  outfile: "src/assets/estimator.js",
+  outfile: "site/assets/js/estimator.js",
   plugins: [sveltePlugin()],
 });
-console.log("built src/assets/estimator.js");
+console.log("built site/assets/js/estimator.js");
 ```
 
-On the page that hosts it:
+On the page that hosts it — say `site/courses.html` — the script is linked **relative to
+the page's own file**, so the page previews when opened straight from the folder, and
+unify rewrites the address for wherever the page is published (a page one directory down
+writes `../assets/js/estimator.js`):
 
 ```html
 <div id="estimator"></div>
-<script src="/assets/estimator.js"></script>
+<script src="assets/js/estimator.js" defer></script>
 ```
 
 And the repeatable build is one line:
 
 ```bash
-node _scripts/build-components.mjs && unify build
+node scripts/build-components.mjs && unify build
 ```
 
 That is the whole integration. `bundle: true` matters: the compiler's raw output imports
@@ -87,7 +95,7 @@ The test is mechanical, and worth running once after wiring anything up:
 
 1. Change the component's **markup** — add a visible line.
 2. Run your build command.
-3. Look for the change in the emitted file: `grep "visible line" src/assets/estimator.js`.
+3. Look for the change in the emitted file: `grep "visible line" site/assets/js/estimator.js`.
 
 If a value change propagates but a markup change does not, the pipeline is a counterfeit —
 something is extracting numbers instead of compiling. (In the experiment that produced
@@ -96,8 +104,8 @@ real compiler and never calling it.)
 
 ## The same shape for anything else
 
-TypeScript, JSX, Sass — identical pattern: compiler runs under `_scripts/`, output lands
-in the source tree as an ordinary file, unify ships it untouched. unify will never run
+TypeScript, JSX, Sass — identical pattern: compiler runs from `scripts/` at the project
+root, output lands in `site/assets/` as an ordinary file, unify ships it untouched. unify will never run
 `npm` for you, watch your components, or rewrite your bundle: one tool composes HTML, your
 toolchain makes assets, and the seam between them is the filesystem.
 
@@ -110,8 +118,9 @@ the common variations, and the first of them is the only place unify reaches out
 
 ## 1. The generator context: what `--generate` hands you
 
-`unify build --generate _scripts/gen.mjs` runs one file you wrote, before it scans
-anything. The whole interface is three positional arguments:
+`generate: scripts/gen.mjs` in `unify.yaml` — a path in the file counts from the file's
+own directory, the project root, so it names the `scripts/` beside `site/` — runs one file
+you wrote, before unify scans anything. The whole interface is three positional arguments:
 
 ```js
 const [, , sourceRoot, generatedDir, contextPath] = process.argv;
@@ -120,7 +129,7 @@ const [, , sourceRoot, generatedDir, contextPath] = process.argv;
 `sourceRoot` is the absolute path of your source tree; `generatedDir` is an absolute path
 to an empty directory that exists only for this build. Files you write into
 `generatedDir` join the build as an overlay — scanned, composed, checked, and published
-exactly like files in `src/`. Files you write anywhere else are your own business, and
+exactly like files in `site/`. Files you write anywhere else are your own business, and
 unify neither collects them nor notices them.
 
 `contextPath` is the absolute path of `generator-context.json`, a small versioned snapshot
@@ -133,7 +142,7 @@ failure:
   "unifyVersion": "0.9.0",
   "command": "build",
   "paths": {
-    "sourceRoot": "/project/src",
+    "sourceRoot": "/project/site",
     "generatedRoot": "/tmp/unify-generated-abc123/overlay",
     "outputRoot": "/project/dist"
   },
@@ -183,8 +192,9 @@ writeFileSync(
 
 Five properties are worth knowing before you write a longer one:
 
-- **The working directory is the source root**, so `readFileSync("_data/authors.json")`
-  means what you would expect from reading the source tree.
+- **The working directory is the source root**, not the directory the script lives in, so
+  `readFileSync("_data/authors.json")` reads `site/_data/authors.json`, what you would
+  expect from reading the source tree.
 - **The runtime is unify's own.** The standalone binary carries it: `--generate` works
   on a machine with no Node installed, which is the point of the flag existing at all.
 - **It runs on every build**, including every rebuild under `unify watch` and `unify dev`.
@@ -242,12 +252,14 @@ ${items.join("\n")}
 ```
 
 ```sh
-unify build --generate _scripts/reports.mjs --source-inventory --audit --strict
+unify build --generate ../scripts/reports.mjs --source-inventory --audit --strict
 ```
 
-The `href`s are ordinary links to your source pages, so `--pretty-urls` and a `--base-url`
-path prefix rewrite them like links you typed, and the audit checks every one. Put
-`generate: _scripts/reports.mjs` and `source-inventory: true` in `unify.yaml` and the
+On the command line `--generate` counts from the **source root**, hence the `../` to reach
+`scripts/` beside `site/`; in `unify.yaml` the same file is `generate: scripts/reports.mjs`,
+relative to the file. The `href`s are ordinary links to your source pages, so `--pretty-urls`
+and a `--base-url` path prefix rewrite them like links you typed, and the audit checks every
+one. Put `generate: scripts/reports.mjs` and `source-inventory: true` in `unify.yaml` and the
 command is just `unify build --audit --strict`.
 
 Every record also carries `meta` and `links`: the `<meta>` and `<link>` elements the page
@@ -285,10 +297,12 @@ derivatives — that is a job with real decisions in it (which sizes, which form
 quality), and a tool that guessed would guess wrong quietly.
 
 Run a real image tool, and run it where its output is cached. The shape that works:
-originals live outside the published tree under an underscore, derivatives land in it.
+originals live in the source tree under an underscore (`site/_originals/`), so they are
+build material that never publishes; derivatives land beside the pages that use them.
 
 ```js
-// _scripts/images.mjs — run by --generate, or by hand before unify build
+// scripts/images.mjs — generate: scripts/images.mjs in unify.yaml, or by hand before
+// unify build: node scripts/images.mjs site
 import { mkdirSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import sharp from "sharp";
@@ -312,8 +326,8 @@ for (const name of readdirSync(from)) {
 }
 ```
 
-`_originals/` is excluded by the default `_*` glob, so the masters never publish; the
-derivatives sit in `assets/img/` and ship like any other file. Reference them with an
+`site/_originals/` is excluded by the default `_*` glob, so the masters never publish; the
+derivatives sit in `site/assets/img/` and ship like any other file. Reference them with an
 ordinary `srcset`, which unify rewrites like any other URL:
 
 ```html
@@ -340,20 +354,20 @@ sites on different days. Split it in two.
 The fetch is a separate command you run when content changes:
 
 ```js
-// _scripts/pull-cms.mjs — run by hand: node _scripts/pull-cms.mjs
+// scripts/pull-cms.mjs — run by hand from the project root: node scripts/pull-cms.mjs
 import { mkdirSync, writeFileSync } from "node:fs";
 
 const res = await fetch("https://cms.example/api/posts");
 if (!res.ok) throw new Error(`CMS returned ${res.status}`);
-mkdirSync("_cms", { recursive: true });
-writeFileSync("_cms/posts.json", JSON.stringify(await res.json(), null, 2));
+mkdirSync("site/_cms", { recursive: true });
+writeFileSync("site/_cms/posts.json", JSON.stringify(await res.json(), null, 2));
 ```
 
 The generator only reads what the fetch left on disk, so it is offline, fast, and
 deterministic:
 
 ```js
-// _scripts/gen.mjs — run by --generate on every build
+// scripts/gen.mjs — generate: scripts/gen.mjs in unify.yaml; runs on every build
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -369,7 +383,7 @@ for (const post of posts) {
 }
 ```
 
-Commit `_cms/posts.json`. It is excluded from the output by the default `_*` glob, it
+Commit `site/_cms/posts.json`. It is excluded from the output by the default `_*` glob, it
 makes every build reproducible from the checkout alone, and it turns "the CMS was down"
 into a problem you have at `pull-cms` time rather than at deploy time.
 
@@ -421,12 +435,12 @@ Some packages need no toolchain at all: they ship a bundle a browser can load, a
 need is that file in your output. `node_modules/` is on the never-shipped list, so it
 cannot get there by being where it is — and there is no copy flag to name it with. A
 generator copies it, which keeps the dependency tracked by your package manager instead of
-by whoever last dragged files into `src/`.
+by whoever last dragged files into `site/`.
 
 Anchor on the package's own `package.json` and join paths from its directory:
 
 ```js
-// _scripts/vendor.mjs — run by --generate on every build
+// scripts/vendor.mjs — generate: scripts/vendor.mjs in unify.yaml; runs on every build
 import { copyFileSync, mkdirSync, readdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
