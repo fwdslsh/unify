@@ -37,6 +37,8 @@
  */
 import { createDevServer } from "../../core/dev-server.js";
 import { renderInterrupted, renderReport } from "../../core/dev-report.js";
+import { resolve } from "node:path";
+import { renderPageMap } from "../../core/page-map.js";
 import { watch } from "./watch.js";
 
 /**
@@ -44,8 +46,13 @@ import { watch } from "./watch.js";
  * @returns {Promise<number>}
  */
 export async function dev(context, opts = {}) {
-  const { output, settings, reporter } = context;
-  const devServer = await createDevServer({ outputDir: output, port: settings.port });
+  const { output, settings, reporter, sourceRoot } = context;
+  const absSourceRoot = resolve(sourceRoot);
+  const devServer = await createDevServer({
+    outputDir: output,
+    port: settings.port,
+    pages: renderPageMap({ sourceRoot: absSourceRoot, documents: [], built: false }),
+  });
   opts.onReady?.(devServer);
 
   reporter.summary(`serving ${devServer.url} (output: ${output})`);
@@ -71,6 +78,10 @@ export async function dev(context, opts = {}) {
         onEvaluation(evaluation) {
           reports++;
           devServer.setReport(renderReport(evaluation));
+          // §27.6 — the page map follows every COMPLETED build; a rebuild that
+          // produced none leaves the previous map, which still describes the
+          // site in the output directory (§15 left it in place).
+          devServer.setPages(renderPageMap({ sourceRoot: absSourceRoot, documents: evaluation.documents, built: true }));
         },
       },
     }, {

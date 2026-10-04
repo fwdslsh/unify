@@ -77,6 +77,7 @@ import { createServer } from "node:http";
 import { extname, resolve } from "node:path";
 import { UsageError } from "./diagnostics.js";
 import { renderPending } from "./dev-report.js";
+import { renderPageMap } from "./page-map.js";
 import { contains } from "./paths.js";
 
 /** Namespaced so a real site path can never collide with it. */
@@ -84,6 +85,8 @@ export const RELOAD_PATH = "/__unify_reload__";
 
 /** §27.2 — the local audit view. The trailing slash is part of the path. */
 export const REPORT_PATH = "/_unify/";
+/** §27.6 — the page map, the one path beneath the report that answers. */
+export const PAGES_PATH = "/_unify/pages.json";
 
 const RELOAD_SCRIPT =
   `<script>new EventSource(${JSON.stringify(RELOAD_PATH)}).onmessage=function(){location.reload();};</script>`;
@@ -331,7 +334,7 @@ function openReloadStream(res, clients) {
  * @param {() => string} report - the current §27 report, read at request time
  *   so a request always gets the latest FINISHED one (§27.4)
  */
-function handleRequest(req, res, outputDir, clients, report) {
+function handleRequest(req, res, outputDir, clients, report, pages) {
   // `req.url` is a path under `node:http` and was an absolute URL under
   // `Bun.serve`; a base makes both parse, and an absolute-form request line
   // (what a proxy sends) still wins over the base, as it did before.
@@ -345,6 +348,12 @@ function handleRequest(req, res, outputDir, clients, report) {
   // is what makes the same stream that refreshes a page refresh the report.
   if (url.pathname === REPORT_PATH) {
     return respond(res, 200, "text/html; charset=utf-8", injectReloadScript(report()));
+  }
+  // §27.6 — the page map: JSON for an editor, from the same payload as the
+  // report and swapped whole by the same rebuild. The one path beneath
+  // /_unify/ that answers; every other one is the 404 below.
+  if (url.pathname === PAGES_PATH) {
+    return respond(res, 200, "application/json; charset=utf-8", pages());
   }
   // §27.2's directory redirect — "as any directory would" is the web's
   // convention, not a symmetry with the static half below, which does not
@@ -392,17 +401,21 @@ function handleRequest(req, res, outputDir, clients, report) {
  *   document from the moment it binds and swaps it whole. The default IS that
  *   first answer — kept here rather than at the call site so the guarantee is
  *   the server's own and cannot be lost by a caller that forgets it.
- * @returns {Promise<{url: string, port: number, notifyReload(): void, setReport(html: string): void, stop(): void}>}
+ * @param {string} [args.pages] - the §27.6 page map served at `/_unify/pages.json`,
+ *   replaced by `setPages` after every completed build; the default answers
+ *   before the first build with an empty map that says so (`built: false`).
+ * @returns {Promise<{url: string, port: number, notifyReload(): void, setReport(html: string): void, setPages(json: string): void, stop(): void}>}
  * @throws {UsageError} when the port is already in use (§14.1, exit 2)
  */
-export async function createDevServer({ outputDir, port, report = renderPending() }) {
+export async function createDevServer({ outputDir, port, report = renderPending(), pages = renderPageMap({ sourceRoot: "", documents: [], built: false }) }) {
   /** @type {Set<() => void>} */
   const clients = new Set();
   let currentReport = report;
+  let currentPages = pages;
 
   const server = createServer((req, res) => {
     try {
-      handleRequest(req, res, outputDir, clients, () => currentReport);
+      handleRequest(req, res, outputDir, clients, () => currentReport, () => currentPages);
     } catch {
       // A throw on the request path (a malformed percent-escape reaching
       // `decodeURIComponent` is the realistic one) used to become Bun's own
@@ -459,6 +472,14 @@ export async function createDevServer({ outputDir, port, report = renderPending(
      */
     setReport(html) {
       currentReport = html;
+    },
+    /**
+     * §27.6 — one assignment of one complete JSON string, for the same reason
+     * as `setReport`: a request gets the previous build's map or this one.
+     * @param {string} json
+     */
+    setPages(json) {
+      currentPages = json;
     },
     stop() {
       // `closeAllConnections()` is what `Bun.serve`'s `stop(true)` meant here:

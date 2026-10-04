@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`/_unify/pages.json`**, served by `unify dev` beside the audit view: a JSON map of every
+  emitted page to its source file, the layout it composed with, its output path, the path the
+  server answers and its absolute URL under `--base-url`, with `schemaVersion: 1`, `built` and
+  the absolute `sourceRoot`. It is projected from the same manifest the report reads, swapped
+  whole by every completed build, and answered with `built: false` before the first one. It is
+  for editors: a live preview of the file being edited can ask which address shows it composed
+  (rule DEV-06, spec §27.6).
+
 ## [0.10.0] - 2026-10-04
 
 The default project layout, and the configuration that goes with it. Published to npm as

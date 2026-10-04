@@ -1858,7 +1858,7 @@ Published pages are untouched: §16's reload script is injected into HTML the se
 
 That is the whole reason the name has an underscore. A reserved path that could shadow an author's file would be a new rule; this one is the underscore convention, read from the URL side.
 
-Exactly one path serves the report: `/_unify/`. A request to `/_unify` (no trailing slash) redirects to it, as any directory would, and any other path beneath it is a 404 from the server itself — the reservation is a promise about who answers, not an invitation to guess sub-pages.
+Exactly one path serves the report: `/_unify/`. A request to `/_unify` (no trailing slash) redirects to it, as any directory would, and any other path beneath it is a 404 from the server itself — the reservation is a promise about who answers, not an invitation to guess sub-pages. The one exception is §27.6's `/_unify/pages.json`, which this section reserves by the same rule.
 
 **One output path is not held back, and the redirect above answers it anyway.** §4.2's guard deliberately spares root-level `_`-prefixed **non-page** files — that is the Netlify seam, the reason `_headers` and `_redirects` can ship — so a source root holding a file named exactly `_unify`, built with an exclude set that spares it (`--exclude '_*.html' --exclude '_*.md'`), emits `dist/_unify` with no diagnostic, and `unify dev` answers `/_unify` with the redirect above regardless of what is on disk. That one file is therefore unreachable through the development server while every static host serves it. It is stated rather than repaired, and the paragraph above is stated as the narrower claim it can support, because the alternative is worse than the gap: an "is there a real file at this path?" branch in the server would make who answers depend on the output directory's contents — a second rule to learn, in the one place it would almost never take its other branch, and one that could hide the report from the author who needs it. `dev` is not the deploy; a site that needs that byte served locally renames the file, and `unify build` ships it either way.
 
@@ -1885,8 +1885,16 @@ A request that arrives before any build has completed is answered — with the r
 
 - **Not a second audit.** No finding exists that only this view can raise, and no finding it shows is absent from `unify audit`. If the two ever disagree, this section is the defect.
 - **Not configurable.** No flag turns it on or off, no flag moves it, and `--port` is the only thing about the server anyone chooses (§16).
-- **Not an API.** The report is HTML for a person. Machine-readable findings are `unify audit --format json` (§6.5.3), which is a different artifact with a `schemaVersion` and stable identifiers; this page promises neither.
+- **Not an API.** The report is HTML for a person. Machine-readable findings are `unify audit --format json` (§6.5.3), which is a different artifact with a `schemaVersion` and stable identifiers; this page promises neither. The server's one machine-readable answer is §27.6's page map, which is not a view of the findings at all.
 - **Not served by anything else.** `unify watch` has no server. `unify build` writes files. Only `unify dev` answers `/_unify/`.
+
+### 27.6 The page map (`/_unify/pages.json`)
+
+`unify dev` answers one more path, for editors rather than people: `/_unify/pages.json`, a JSON document that maps every emitted page to the source file it came from, the layout it composed with, and the address the server answers for it. An editor showing a live preview of the file being edited needs exactly those three facts, and each is something only the build knows — §13's output path, §11's address for it, §6's layout resolution — so the map is projected from the §20 manifest of the build that just ran, the same payload §27.3's report is rendered from, and from nothing else. It re-derives nothing: a page listed here and the same page in the report or in `--dry-run`'s listing cannot disagree.
+
+The document is `{ "schemaVersion": 1, "built": <boolean>, "sourceRoot": <absolute path>, "pages": [ … ] }`, two-space-indented with a trailing newline, and each record carries exactly: `source` (the page's path relative to the source root, or relative to the generator's overlay when `generated` is true), `generated`, `layout` (relative to the source root, or `null` for a page that composed with none, §20.3), `outputPath` (under the output directory), `path` (the path the server and the site answer: `/about/` under `--pretty-urls`), and `url` (absolute under `--base-url`, else `null`). Only pages have records: a mirror-copied asset, the sitemap, the feed and the catalog are not in it. `schemaVersion` moves only when a field's meaning changes in a way an existing reader would misread; a new field is not a bump.
+
+It follows the rebuild the way the report does (§27.4): a completed build swaps in a whole new map, and a request before any build has completed is answered at once with `"built": false` and no pages. A rebuild that fails leaves the previous map in place, because §15 left the previous output directory in place and the map describes the site the server is serving. It is never written to the output directory (§27.1), it is the one path beneath `/_unify/` that answers (§27.2; every other stays a 404), and only `unify dev` serves it.
 
 ---
 

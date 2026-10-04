@@ -374,7 +374,7 @@ describe("§27 the local audit view", () => {
     expect([301, 302, 307, 308]).toContain(bare.status);
     expect(bare.headers.get("location") ?? "").toMatch(/\/_unify\/$/);
 
-    // Any other path beneath it is a 404 from the server itself.
+    // Any other path beneath it is a 404 from the server itself (§27.6's pages.json is the one exception, tested with DEV-06).
     for (const p of ["/_unify/anything-else", "/_unify/index.html", "/_unify/findings.json", "/_unify/a/b"]) {
       const res = await fetch(`http://localhost:${port}${p}`);
       await res.text();
@@ -758,4 +758,62 @@ describe("§27 the local audit view", () => {
     }
     covers("DEV-03");
   }, 30_000);
+  test("DEV-06 — /_unify/pages.json maps every emitted page to its source, layout and served path, from the build's own manifest, and follows the rebuild", async () => {
+    const tmp = mkTmp();
+    writeTree(tmp, SMALL_SITE);
+    const port = await freePort();
+    const d = start(["dev", "-p", String(port), "--pretty-urls"], tmp);
+    await d.ready;
+
+    // Answered as soon as the port is bound: before the first build it says
+    // so rather than guessing (§27.4's rule, applied to the map).
+    const mapUntil = async (predicate) => {
+      const deadline = Date.now() + 20_000;
+      for (;;) {
+        const res = await waitForStatus(`http://localhost:${port}/_unify/pages.json`, 200);
+        expect((res.headers.get("content-type") ?? "").toLowerCase()).toContain("application/json");
+        const map = JSON.parse(await res.text());
+        if (predicate(map) || Date.now() >= deadline) return map;
+        await sleep(100);
+      }
+    };
+    const map = await mapUntil((m) => m.built === true);
+    expect(map.schemaVersion).toBe(1);
+    expect(map.built).toBe(true);
+    expect(map.sourceRoot).toBe(join(tmp, "src"));
+
+    // One record per emitted page, agreeing with the command line's own
+    // --dry-run listing (§27.3: the same manifest, never a second reading).
+    const dry = await runCli(["build", "--dry-run", "--pretty-urls"], tmp);
+    expect(dry.exit).toBe(0);
+    expect(map.pages.map((p) => p.outputPath).sort()).toEqual(pagesFromDryRun(dry.stdout).sort());
+    const about = map.pages.find((p) => p.source === "about.html");
+    expect(about).toEqual({
+      source: "about.html", generated: false, layout: "_layout.html",
+      outputPath: "about/index.html", path: "/about/", url: null,
+    });
+    // Nothing but pages: the stylesheet is mirror-copied and has no record.
+    expect(map.pages.some((p) => p.source === "style.css")).toBe(false);
+
+    // Follows the rebuild: a new page appears; a page that opts out of layouts says so.
+    writeFileSync(join(tmp, "src", "team.html"), page("Team", "Who we are here", "<p>Gamma.</p>").replace("<html>", '<html data-layout="none">'));
+    writeFileSync(join(tmp, "src", "index.html"), page("Home", "The landing page here", '<p>Alpha.</p><a href="/about.html">about</a> <a href="/team.html">team</a>'));
+    const after = await mapUntil((m) => m.pages.some((p) => p.source === "team.html"));
+    const team = after.pages.find((p) => p.source === "team.html");
+    expect(team.layout).toBe(null);
+    expect(team.path).toBe("/team/");
+
+    // Every other path beneath /_unify/ is still a 404 (§27.2): this is the one exception.
+    const other = await fetch(`http://localhost:${port}/_unify/pages.json.bak`);
+    await other.text();
+    expect(other.status).toBe(404);
+
+    // Never published: a real build writes no such file.
+    d.proc.kill("SIGTERM");
+    await sleep(300);
+    const built = await runCli(["build", "--pretty-urls"], tmp);
+    expect(built.exit).toBe(0);
+    expect(existsSync(join(tmp, "dist", "_unify"))).toBe(false);
+    covers("DEV-06");
+  }, 60_000);
 });
