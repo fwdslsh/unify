@@ -200,10 +200,14 @@ function required(what, value) {
  * @param {string} [page.extra] - further head lines, re-indented for you
  * @returns {string} `  <head>` … `  </head>`, indented for a page document
  */
-export function pageHead({ title, description, ogType, extra = "" }) {
+export function pageHead({ title, description, ogType, extra = "", depth = 0 }) {
   required("title", title);
   required("description", description);
   const lines = [
+    // Relative to the page file, so the page previews styled straight from
+    // the folder (§19.1). The layout links the same stylesheet; §8's head
+    // merge compares the two after resolution and keeps one.
+    `    <link rel="stylesheet" href="${"../".repeat(depth)}assets/style.css">`,
     `    <title>${text(title)}</title>`,
     `    <meta name="description" content="${attr(description)}">`,
     `    <meta property="og:title" content="${attr(title)}">`,
@@ -226,14 +230,15 @@ export function pageHead({ title, description, ogType, extra = "" }) {
  * @param {string} [page.ogType]
  * @param {string} [page.head] - extra `<head>` lines
  * @param {string} [page.body] - extra top-level `<body>` elements
+ * @param {number} [page.depth] - directories below the source root, for the page's own relative stylesheet link
  * @returns {string}
  */
-export function pageHtml({ title, description, main, ogType, head = "", body = "" }) {
+export function pageHtml({ title, description, main, ogType, head = "", body = "", depth = 0 }) {
   required("main", main);
   const extras = body.trim() === "" ? "" : `\n${reindent(body, "    ")}`;
   return `<!doctype html>
 <html>
-${pageHead({ title, description, ogType, extra: head })}
+${pageHead({ title, description, ogType, extra: head, depth })}
   <body>
     <main>
 ${reindent(main, "      ")}

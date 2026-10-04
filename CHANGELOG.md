@@ -8,11 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.10.0-beta.1] - 2026-10-04
+## [0.10.0-beta.2] - 2026-10-04
 
 A beta of the layout change below, published to npm under the `next` tag
 (`npm install @fwdslsh/unify@next`) from the `release/0.10.0` branch; 0.10.0 follows once
-the fwdslsh website has run on it.
+the fwdslsh website has run on it. beta.2 adds the per-page stylesheet link to the scaffold
+(every scaffolded HTML page previews styled on its own); beta.1 had it on the layout and 404 only.
 
 The default project layout. A fresh `unify init` now scaffolds:
 
@@ -39,9 +40,10 @@ unify.yaml             # the docs template's saved catalog: true, beside the sit
 - The blog template's generator moves from `src/_scripts/gen.mjs` to `scripts/gen.mjs` at the
   project root (`node scripts/gen.mjs && unify build`, from the project root like every other
   command); the docs template's `unify.yaml` moves to the project root.
-- The scaffolded layout and 404 link their stylesheet relative to the file
-  (`assets/style.css`), so opening either straight from the folder shows it styled; unify
-  rewrites the link for every page at every depth.
+- The scaffolded layout, the 404 and every HTML page link the stylesheet relative to their own
+  file (`assets/style.css`, `../assets/style.css` a directory down), so any of them opened
+  straight from the folder shows styled; unify rewrites the link for every page at every depth,
+  and the head merge keeps one copy per built page.
 - The defaulted-source notice reads "no site/ or src/ here".
 
 ## [0.9.5] - 2026-10-03
@@ -688,8 +690,8 @@ with generated compare-link notes only. Their diffs are on the
 [releases page](https://github.com/fwdslsh/unify/releases). Nothing here
 retroactively reconstructs detail those notes never carried.
 
-[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.10.0-beta.1...HEAD
-[0.10.0-beta.1]: https://github.com/fwdslsh/unify/compare/v0.9.5...v0.10.0-beta.1
+[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.10.0-beta.2...HEAD
+[0.10.0-beta.2]: https://github.com/fwdslsh/unify/compare/v0.9.5...v0.10.0-beta.2
 [0.9.5]: https://github.com/fwdslsh/unify/compare/v0.9.4...v0.9.5
 [0.9.4]: https://github.com/fwdslsh/unify/compare/v0.9.3...v0.9.4
 [0.9.3]: https://github.com/fwdslsh/unify/compare/v0.9.2...v0.9.3

@@ -1078,7 +1078,7 @@ A template is the first unify anyone reads, and product-spec §6.7 states the co
 
 ### 19.1 The primitive set
 
-Every template scaffolds into `site/` beside a `dist/`-free project root and exercises each primitive exactly once: one `<include>` (the nav), the automatic `_layout.html`, one named slot with a fallback (`footer`) plus one page that fills it, one `data-layout="none"` page (`404.html`), and the underscore (`_includes/`). The scaffolded layout declares `<meta charset="utf-8">` and carries a plain HTML comment above each slot naming its purpose (a convention, never a rule). The starter stylesheet includes `slot { display: contents }` — design-time preview only; built pages contain no `<slot>` elements.
+Every template scaffolds into `site/` beside a `dist/`-free project root and exercises each primitive exactly once: one `<include>` (the nav), the automatic `_layout.html`, one named slot with a fallback (`footer`) plus one page that fills it, one `data-layout="none"` page (`404.html`), and the underscore (`_includes/`). The scaffolded layout declares `<meta charset="utf-8">` and carries a plain HTML comment above each slot naming its purpose (a convention, never a rule). The layout, the `404.html` and every HTML page link the stylesheet **relative to their own file** (`assets/style.css`, `../assets/style.css` one directory down), so each previews styled when opened straight from the folder; a page's link and the layout's resolve to the same file, and §8's head merge keeps one. The starter stylesheet includes `slot { display: contents }` — design-time preview only; built pages contain no `<slot>` elements.
 
 ### 19.2 The discovery set
 

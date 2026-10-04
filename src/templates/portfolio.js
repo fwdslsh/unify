@@ -87,6 +87,7 @@ and nothing generates this list.</p>
   }),
 
   "projects/project-one.html": pageHtml({
+    depth: 1,
     title: "Project One",
     description: "A placeholder project page: the problem, what you did about it, and what changed.",
     main: `<h1>Project One</h1>
@@ -103,6 +104,7 @@ shipped. Keep it to things you can show.</p>
   }),
 
   "projects/project-two.html": pageHtml({
+    depth: 1,
     title: "Project Two",
     description: "A second placeholder project page, so the pattern is visible: one file per project.",
     main: `<h1>Project Two</h1>
