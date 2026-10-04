@@ -17,14 +17,14 @@ Options:
       --clean              empty the output directory first
       --exclude <glob>     globs never emitted, still usable by the build (repeatable; default: _*)
       --pretty-urls        about.html → about/index.html, and rewrite internal links to match
-      --canonical auto     add a canonical link to pages that author none, from the site address
+      --canonical <mode>   auto (the default with --base-url) adds a canonical link to pages that author none; none switches it off
       --base-url <url>     the site's whole address (https://site.example/repo/): prefix root-relative links, make og:/canonical absolute for share crawlers, and generate sitemap.xml
       --feed-full          include each entry's full rendered content in feed.xml (needs --base-url)
       --catalog            write assets/unify/catalog.json — a browse/filter/TOC projection of every public page
       --search-corpus      write assets/unify/search-corpus.json — normalized page text for client-side search
       --include-noindex    list noindex pages in the catalog and search corpus (needs one of them)
       --generate <path>    run one JavaScript file before the build (relative to the source root, or absolute)
-      --source-inventory   give that file source-pages.json: every source page's authored title, description, date, meta and links (inert without a generator)
+      --source-inventory   give that file source-pages.json: every source page's authored title, description, date, meta and links (on by default with --generate; source-inventory: false in unify.yaml turns it off)
       --dry-run            run the full build and every check, print the report, write nothing
       --audit              `build` only: audit the composed site before publishing; publish only if `unify audit` would exit 0
       --save-config        `build` only: write the saveable options given here into unify.yaml (after a good build)
@@ -128,9 +128,9 @@ Knowing the address is also what lets unify write the site's `sitemap.xml`, so `
 
 A bare path (`--base-url /repo-name/`) is a usage error naming the full form. It used to be accepted, and prefixed links correctly while leaving `og:`/`canonical` root-relative — valid-looking metadata no share crawler can fetch. Give the whole address; for a local preview of a subpath site, `http://localhost:3000/repo-name/` is one.
 
-### `--canonical auto`
+### `--canonical auto` / `--canonical none`
 
-Adds `<link rel="canonical" href="…">` to every page that does not author one, using that page's own final public URL — the same address the `--dry-run` report prints and the sitemap lists. `auto` is the only accepted value, and the option needs `--base-url`: a canonical has to be absolute, so without the site's address there is nothing truthful to write.
+With `--base-url` set, unify adds `<link rel="canonical" href="…">` to every page that does not author one, using that page's own final public URL — the same address the `--dry-run` report prints and the sitemap lists. That is the default (`auto`); `--canonical none`, or `canonical: none` in `unify.yaml`, switches it off. Those are the two accepted values. Completion needs `--base-url`: a canonical has to be absolute, so without the site's address there is nothing truthful to write, and `--canonical auto` without it is a usage error.
 
 **A canonical you wrote always wins**, in every shape: one that names another page, several on one page, even one that names a file the site does not build (that last is reported as a broken reference, as it would be anywhere else). Completion fills a gap; it never overrules a value you chose.
 
@@ -296,7 +296,7 @@ if (context.site.baseUrl) {
 
 #### `--source-inventory`
 
-Opt-in, saveable (`source-inventory: true`), and a usage error without a generator. It gives the generator one more file, `source-pages.json`, whose path is `context.inputs.sourcePages`: one record for every **source page**, with the metadata its author wrote, so a script can write a directory page (a reports index, an archive) in the same build that publishes it.
+On by default whenever a generator is named, saveable (`source-inventory: false` switches it off), and inert without a generator. It gives the generator one more file, `source-pages.json`, whose path is `context.inputs.sourcePages`: one record for every **source page**, with the metadata its author wrote, so a script can write a directory page (a reports index, an archive) in the same build that publishes it.
 
 ```json
 {

@@ -31,23 +31,45 @@ function expectExit(r, code, what) {
 
 // ------------------------------------------------------------------- §22.1
 
-test("CAN-01: --canonical auto completes; without it the page is byte-identical", async () => {
+test("CAN-01: with --base-url completion is on by default (auto); --canonical none switches it off; without --base-url nothing runs", async () => {
   const files = { "index.html": page("Home"), "about.html": page("About") };
+  const completed = '<link rel="canonical" href="https://example.com/about.html">';
+
+  const byDefault = mkTmp();
+  writeTree(join(byDefault, "src"), files);
+  const a = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", BASE], byDefault);
+  expectExit(a, 0, "--base-url alone");
+  if (!read(byDefault, "dist", "about.html").includes(completed)) {
+    throw new Error(`§22.1: auto is the default whenever --base-url is set:\n${read(byDefault, "dist", "about.html")}`);
+  }
+
+  const explicit = mkTmp();
+  writeTree(join(explicit, "src"), files);
+  const b = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", BASE, "--canonical", "auto"], explicit);
+  expectExit(b, 0, "--canonical auto");
+  if (read(explicit, "dist", "about.html") !== read(byDefault, "dist", "about.html")) {
+    throw new Error("§22.1: --canonical auto is the same setting as the default");
+  }
 
   const off = mkTmp();
   writeTree(join(off, "src"), files);
-  const a = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", BASE], off);
-  expectExit(a, 0, "no --canonical");
+  const c = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", BASE, "--canonical", "none"], off);
+  expectExit(c, 0, "--canonical none");
   if (read(off, "dist", "about.html").includes("canonical")) {
-    throw new Error(`§22.1: without the option nothing in this section runs:\n${read(off, "dist", "about.html")}`);
+    throw new Error(`§22.1: --canonical none must switch completion off:\n${read(off, "dist", "about.html")}`);
   }
+  const offSaved = mkTmp();
+  writeTree(join(offSaved, "src"), { ...files, "unify.yaml": `canonical: none\nbase-url: ${BASE}\n` });
+  const d = await runCli(["build", "-s", "src", "-o", "dist"], offSaved);
+  expectExit(d, 0, "canonical: none in unify.yaml");
+  if (read(offSaved, "dist", "about.html").includes("canonical")) throw new Error("§22.1: a saved canonical: none must switch completion off");
 
-  const on = mkTmp();
-  writeTree(join(on, "src"), files);
-  const b = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", BASE, "--canonical", "auto"], on);
-  expectExit(b, 0, "--canonical auto");
-  if (!read(on, "dist", "about.html").includes('<link rel="canonical" href="https://example.com/about.html">')) {
-    throw new Error(`§22.2: expected the completed element:\n${read(on, "dist", "about.html")}`);
+  const noBase = mkTmp();
+  writeTree(join(noBase, "src"), files);
+  const e = await runCli(["build", "-s", "src", "-o", "dist"], noBase);
+  expectExit(e, 0, "no --base-url");
+  if (read(noBase, "dist", "about.html").includes("canonical")) {
+    throw new Error("§22.1: without --base-url there is no address to complete from, so nothing runs");
   }
   covers("CAN-01");
 }, TEST_MS);
@@ -58,7 +80,7 @@ test("CAN-01: any value but auto is a usage error, and so is auto without --base
 
   const bad = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", BASE, "--canonical", "always"], tmp);
   expectExit(bad, 2, "an unknown --canonical value");
-  if (!bad.stderr.includes("auto")) {
+  if (!bad.stderr.includes("auto") || !bad.stderr.includes("none")) {
     throw new Error(`§22.1: the error must name the accepted value.\nstderr:\n${bad.stderr}`);
   }
 
@@ -89,7 +111,8 @@ test("CAN-01: unify.yaml canonical: auto is the identical setting", async () => 
 test("CAN-02: the element lands at </head>'s own indentation, everything else byte-identical", async () => {
   const tmp = mkTmp();
   writeTree(join(tmp, "src"), { "about.html": page("About"), "index.html": page("Home") });
-  const before = await runCli(["build", "-s", "src", "-o", "plain", "--base-url", BASE], tmp);
+  // The baseline is completion switched off (auto is the default under --base-url).
+  const before = await runCli(["build", "-s", "src", "-o", "plain", "--base-url", BASE, "--canonical", "none"], tmp);
   expectExit(before, 0, "baseline build");
   const after = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", BASE, "--canonical", "auto"], tmp);
   expectExit(after, 0, "completed build");

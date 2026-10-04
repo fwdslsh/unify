@@ -5,8 +5,6 @@ generate: scripts/gen.mjs
 pretty-urls: true
 # Absolute origin for sitemap.xml, canonical links and feed URLs.
 base-url: https://unify.fwdslsh.dev/
-# Fill in a canonical link on every page.
-canonical: auto
 # Emit assets/unify/catalog.json.
 catalog: true
 # Emit assets/unify/search-corpus.json.

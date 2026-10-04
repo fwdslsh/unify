@@ -40,14 +40,14 @@ Options:
       --clean              empty the output directory first
       --exclude <glob>     globs never emitted, still usable by the build (repeatable; default: _*)
       --pretty-urls        about.html → about/index.html, and rewrite internal links to match
-      --canonical auto     add a canonical link to pages that author none, from the site address
+      --canonical <mode>   auto (the default with --base-url) adds a canonical link to pages that author none; none switches it off
       --base-url <url>     the site's whole address (https://site.example/repo/): prefix root-relative links, make og:/canonical absolute for share crawlers, and generate sitemap.xml
       --feed-full          include each entry's full rendered content in feed.xml (needs --base-url)
       --catalog            write assets/unify/catalog.json — a browse/filter/TOC projection of every public page
       --search-corpus      write assets/unify/search-corpus.json — normalized page text for client-side search
       --include-noindex    list noindex pages in the catalog and search corpus (needs one of them)
       --generate <path>    run one JavaScript file before the build (a relative path is from the source root)
-      --source-inventory   give that file source-pages.json: every source page's authored title, description, date, meta and links (inert without --generate)
+      --source-inventory   give that file source-pages.json: every source page's authored title, description, date, meta and links (on by default with --generate; source-inventory: false in unify.yaml turns it off)
       --dry-run            run the full build and every check, print the report, write nothing
       --audit              \`build\` only: audit the composed site before publishing; publish only if \`unify audit\` would exit 0
       --save-config        \`build\` only: write the saveable options given here into unify.yaml (after a good build)
@@ -108,7 +108,11 @@ function resolveSettings(flags) {
       exclude: settings.exclude ?? ["_*"],
       prettyUrls: settings["pretty-urls"] === true,
       baseUrl: settings["base-url"],
-      canonical: settings.canonical,
+      // §22.1 — `auto` whenever the site has an address, unless `canonical: none`
+      // (or the explicit --canonical none) opts out; nothing without --base-url.
+      canonical: settings["base-url"] !== undefined && (settings.canonical ?? "auto") === "auto" ? "auto" : undefined,
+      // the value as written, for the usage checks below; the line above is what the build reads
+      canonicalRequested: settings.canonical,
       // §29.6 — full-content feed entries; §30.1 — the catalog and search
       // corpus. All boolean, all read only by build.js (audit reaches them
       // too, since `unify audit` runs the same pipeline). `feed-full`'s
@@ -124,7 +128,9 @@ function resolveSettings(flags) {
       // build.js before the scan (§33.5), so `watch`, `dev` and `audit`
       // get it too: all four scan the source tree.
       generate: settings.generate ?? null,
-      sourceInventory: settings["source-inventory"] === true,
+      // §33.7 — on whenever a generator is named, unless `source-inventory: false`
+      // in unify.yaml opts out; inert without a generator either way.
+      sourceInventory: settings["source-inventory"] ?? settings.generate !== undefined,
       dryRun: settings["dry-run"] === true,
       // §24.1 — set by the audit command itself, never by a flag.
       audit: false,
@@ -185,11 +191,11 @@ export async function run(argv) {
   // ratification samples chose it, and five of five then published dead
   // preview images with a green build. There is no repair for that inside a
   // diagnostic — the fix is that the weaker form no longer exists.
-  // §22.1 — `auto` is the only accepted value, so a future mode cannot be
-  // silently misspelled into today's behaviour.
-  if (settings.canonical !== undefined && String(settings.canonical) !== "auto") {
-    throw new UsageError(`--canonical accepts only "auto", got: ${settings.canonical}`, [
-      "write it as: --canonical auto",
+  // §22.1 — `auto` and `none` are the only accepted values, so a future mode
+  // cannot be silently misspelled into today's behaviour.
+  if (settings.canonicalRequested !== undefined && !["auto", "none"].includes(String(settings.canonicalRequested))) {
+    throw new UsageError(`--canonical accepts only "auto" or "none", got: ${settings.canonicalRequested}`, [
+      "auto is the default whenever --base-url is set; write --canonical none to switch completion off",
       "unify completes a canonical only where a page authors none; an authored one always wins",
     ]);
   }
@@ -197,7 +203,7 @@ export async function run(argv) {
   // address to build one from without --base-url. Saying so beats writing a
   // root-relative canonical or silently doing nothing while the flag says
   // otherwise.
-  if (settings.canonical !== undefined && settings.baseUrl === undefined) {
+  if (settings.canonicalRequested === "auto" && settings.baseUrl === undefined) {
     throw new UsageError("--canonical auto needs the site's address: --base-url is not set", [
       "add it: --base-url https://your-domain.example/",
       "a canonical must be absolute — a root-relative one is ignored by the crawlers it exists for",

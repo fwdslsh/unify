@@ -107,7 +107,8 @@ for (const name of TEMPLATES) {
     // §19.2 items 4 and 7 both defer here: the two commands that carry the
     // site's address are the last thing the file says.
     const deployTail = deployMd.trimEnd().split("\n").slice(-2).join("\n");
-    if (!/unify build .*--base-url \S+ --canonical auto/.test(deployTail)) {
+    // The address alone completes canonicals (§22.1: auto is the default under --base-url).
+    if (!/unify build .*--base-url \S+/.test(deployTail)) {
       throw new Error(`DEPLOY.md does not end in the build command carrying the site's address:\n${deployTail}`);
     }
     if (deployTail.split("\n")[1].trim() === "") {
@@ -684,7 +685,7 @@ for (const name of TEMPLATES) {
     for (const { rel, html } of emittedPages(distDir)) {
       const canonicals = linksOf(html).filter((a) => a.rel?.toLowerCase() === "canonical");
       if (canonicals.length > 0) {
-        throw new Error(`${name}: dist/${rel} ships rel="canonical" href=${JSON.stringify(canonicals[0].href)} — §19.2 item 7 forbids it; the address lives in DEPLOY.md's --base-url … --canonical auto instead`);
+        throw new Error(`${name}: dist/${rel} ships rel="canonical" href=${JSON.stringify(canonicals[0].href)} — §19.2 item 7 forbids it; the address lives in DEPLOY.md's --base-url instead, which completes them`);
       }
     }
 
@@ -703,11 +704,11 @@ for (const name of TEMPLATES) {
     // The absence above is a template decision, not a pipeline that cannot
     // emit one: the same tree under DEPLOY.md's own recipe DOES get canonicals
     // (§22), which is what makes "no canonical" a claim rather than a vacuum.
-    const canonR = await runCli(["build", "-o", "dist-canonical", "--base-url", "https://you.example/", "--canonical", "auto"], tmp);
-    if (canonR.exit !== 0) throw new Error(`unify build --base-url … --canonical auto exited ${canonR.exit} for "${name}": ${canonR.stderr}`);
+    const canonR = await runCli(["build", "-o", "dist-canonical", "--base-url", "https://you.example/"], tmp);
+    if (canonR.exit !== 0) throw new Error(`unify build --base-url exited ${canonR.exit} for "${name}": ${canonR.stderr}`);
     const completed = emittedPages(join(tmp, "dist-canonical")).filter(({ html }) => linksOf(html).some((a) => a.rel?.toLowerCase() === "canonical"));
     if (completed.length === 0) {
-      throw new Error(`${name}: --canonical auto completed no canonical at all, so the "no canonical" assertion above proves nothing about the template`);
+      throw new Error(`${name}: --base-url completed no canonical at all, so the "no canonical" assertion above proves nothing about the template`);
     }
 
     covers("SCF-07");

@@ -161,7 +161,9 @@ test("MAN-03 — a page declaring almost nothing still carries the bounded Docum
   writeTree(join(tmp, "src"), {
     "index.html": `<!doctype html>\n<html lang="en">\n<head><meta charset="utf-8"></head>\n<body><p>Nothing but text.</p></body>\n</html>\n`,
   });
-  const home = (await records(tmp)).get("index.html");
+  // --canonical none: under --base-url completion is on by default (§22.1) and
+  // would add the one <link> this test needs absent.
+  const home = (await records(tmp, ["--canonical", "none"])).get("index.html");
 
   // §31.1's page shape, present on every document: source/generated/outputPath
   // plus the DocumentSnapshot whole, and NOTHING else — no derived scalar

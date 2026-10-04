@@ -37,7 +37,7 @@
  *     covers whatever it lists, and a listing page covers what it lists);
  *   - visible text no other page repeats exactly (`text-duplicate`);
  *   - no canonical anywhere (§19.2 item 7 — a scaffold does not know the
- *     site's address; `DEPLOY.md` teaches `--base-url … --canonical auto`).
+ *     site's address; `DEPLOY.md` teaches `--base-url`, which completes them).
  *
  * Placeholders are conspicuous on purpose (§19.7): a reader must never
  * mistake scaffolded text for a fact. Use `class="placeholder"` (styled by
@@ -663,7 +663,7 @@ published** and the previous \`dist/\` is untouched — never report success on 
   bare path. It prefixes root-relative links, makes \`og:\` and canonical URLs absolute for share
   crawlers, and generates \`sitemap.xml\`. See \`DEPLOY.md\`.
 - A canonical is one page's own address, so a layout must never set one and a scaffold cannot know
-  it. Build with \`--base-url … --canonical auto\`, or write it on that one page by hand.
+  it. Build with \`--base-url\` (completion is on by default), or write it on that one page by hand.
 - \`<meta name="schema" content="WebPage">\` — or \`schema: Article\` in Markdown frontmatter; those
   three spellings exactly, \`WebPage\`, \`Article\`, \`BlogPosting\` — has unify write that page's
   JSON-LD from what the page already declares: title, description, canonical, \`og:image\`,
@@ -729,8 +729,8 @@ description, and single \`<h1>\`, and a link in from somewhere.
 
 \`--base-url\` is the site's whole public address, never a bare path. It prefixes every
 root-relative link, makes \`og:\` and canonical URLs absolute — which is what share crawlers fetch —
-and writes \`dist/sitemap.xml\`. Add \`--canonical auto\` and every page that authors no canonical of
-its own gets one naming its own final URL; an authored canonical always wins.
+and writes \`dist/sitemap.xml\`. Every page that authors no canonical of its own gets one naming its
+own final URL (\`--canonical none\` switches that off); an authored canonical always wins.
 
 Hosting the site under a subpath? Name the whole thing, trailing slash included:
 \`--base-url https://you.example/handbook/\`.
@@ -749,7 +749,7 @@ from step 2 first and let a non-zero exit stop the deploy.
 
 ## The two commands
 
-    unify build --base-url https://you.example/ --canonical auto
+    unify build --base-url https://you.example/
     rsync -av --delete dist/ you@your-host.example:/var/www/your-site/
 `;
 }

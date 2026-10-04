@@ -1,8 +1,6 @@
 # Flags a bare `unify build` / `unify audit` should always use (defaults omitted).
 # scripts/gen.mjs writes the series pages, series nav and post-list fallback.
 generate: scripts/gen.mjs
-# Hands the generator source-pages.json, so it never parses frontmatter itself.
-source-inventory: true
 # /posts/x.html is served as /posts/x/.
 pretty-urls: true
 # Absolute URLs for sitemap.xml, feed.xml and canonicals; note the subpath.

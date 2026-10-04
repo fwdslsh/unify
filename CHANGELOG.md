@@ -30,6 +30,12 @@ the examples and the documentation in line with the layout beta.1 introduced.
 
 ### Changed
 
+- **Two defaults flipped.** With `--base-url` set, canonical completion is on (`--canonical
+  auto` is now the default; `--canonical none`, or `canonical: none` in `unify.yaml`, switches
+  it off and is the second accepted value). With a generator named, the source inventory is on
+  (`source-inventory: false` in `unify.yaml` switches it off). Both were opt-in flags that every
+  site with an address or a generator ended up passing; a site that wants neither now says so
+  once. Rules CAN-01, GEN-13 and GEN-16, spec §22.1 and §33.7.
 - **The blog template's generator runs through `--generate`.** Its `unify.yaml` has
   `generate: scripts/gen.mjs` live, so a bare `unify build` runs the generator; it writes
   `blog.html` and `feed.xml` into the build's overlay instead of into `site/`, so no derived

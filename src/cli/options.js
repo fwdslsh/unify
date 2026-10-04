@@ -27,7 +27,7 @@ const OPTIONS = {
   exclude: { kind: "list", about: "glob patterns to leave out of the build, one per list item", default: "_*", save: "exclude:\n  - _*\n  - drafts/**" },
   "pretty-urls": { kind: "flag", about: "publish about.html as about/index.html so it is served at /about/", default: "false", save: "pretty-urls: true" },
   "base-url": { kind: "string", example: "https://your-domain.example/", about: "the site's absolute address; turns on sitemap.xml, feed.xml and absolute URLs", default: "none", save: "base-url: https://your-domain.example/" },
-  canonical: { kind: "string", example: "auto", about: "add a canonical link to every page that lacks one; needs base-url", default: "none", save: "canonical: auto" },
+  canonical: { kind: "string", example: "auto", about: "auto adds a canonical link to every page that lacks one, none switches it off", default: "auto whenever base-url is set", save: "canonical: none" },
   // §29.6 — full-content feed entries. Boolean like every other flag here;
   // the "requires --base-url" usage error is cross-cutting validation (it
   // needs settings.baseUrl too), so it lives beside --canonical auto's own
@@ -54,7 +54,7 @@ const OPTIONS = {
   generate: { kind: "value", about: "a JavaScript file unify runs before every build, relative to this file", default: "none", save: "generate: scripts/gen.mjs" },
   // §33.7 — opt in to `source-pages.json` for the generator. A boolean, saveable;
   // naming it with no generator is a usage error (cli.js), like --include-noindex.
-  "source-inventory": { kind: "flag", about: "hand that file source-pages.json: every source page's title, description, date, metas and links; needs generate", default: "false", save: "source-inventory: true" },
+  "source-inventory": { kind: "flag", about: "hand that file source-pages.json: every source page's title, description, date, metas and links", default: "true whenever generate is set", save: "source-inventory: false" },
   // §31.1 — `unify audit`'s own output shape. This registry stays a
   // syntactic parser like every entry here: the closed set (human/json/sarif)
   // and its usage error are audit.js's own concern, the same split
