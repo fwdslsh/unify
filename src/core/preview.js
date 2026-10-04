@@ -96,11 +96,12 @@ function scanLayouts(sourceRoot) {
  * @param {string} args.relPath - the source path after `/_unify/preview/`
  * @param {string|null} args.page - `?page=`: a page's source path, or null
  * @param {string|null} args.layout - `?layout=`: a layout's source path, or null
- * @param {{source: string, layout: string|null, path: string, outputPath: string}[]} args.pages - the page map's records (empty before the first build)
+ * @param {boolean} [args.config] - `?config=false` leaves the selector out
+ * @param {{source: string, generated?: boolean, layout: string|null, includes?: string[], path: string, outputPath: string}[]} args.pages - the page map's records (empty before the first build)
  * @param {boolean} args.prettyUrls
  * @returns {Promise<{status: number, html?: string, location?: string}>}
  */
-export async function renderPreview({ sourceRoot, roots, relPath, page = null, layout = null, pages = [], prettyUrls = false }) {
+export async function renderPreview({ sourceRoot, roots, relPath, page = null, layout = null, config = true, pages = [], prettyUrls = false }) {
   const rel = posix.normalize(relPath).replace(/^\/+/, "");
   const abs = locateExisting(roots, rel);
   const ext = extname(rel).toLowerCase();
@@ -117,7 +118,12 @@ export async function renderPreview({ sourceRoot, roots, relPath, page = null, l
     if (prettyUrls && pages.length) out = applyPrettyLinks(out, { pageOutputPath: "index.html", emittedHtmlPaths: new Set(pages.map((p) => p.outputPath)) });
     return out;
   };
-  const selector = (opts) => widget({ rel, kind, page, layout, pages, layouts: [...new Set([...scanLayouts(sourceRoot), ...knownLayouts])].sort(), ...opts });
+  // The selector offers only the pages this file reaches: for a layout the
+  // pages that composed with it, for an include the pages whose bytes it
+  // authored (directly or through a layout) — the page map's own provenance,
+  // so the list is the build's answer, never a guess.
+  const uses = (p) => (kind === "layout" ? p.layout === rel : (p.includes ?? []).includes(rel));
+  const selector = (opts) => (config ? widget({ rel, kind, page, layout, pages: pages.filter((p) => !p.generated && uses(p)), layouts: [...new Set([...scanLayouts(sourceRoot), ...knownLayouts])].sort(), ...opts }) : "");
 
   if (kind === "page") {
     const record = pages.find((p) => p.source === rel);
@@ -288,7 +294,13 @@ function message(title, body) {
  */
 function widget({ rel, kind, page, layout, pages, layouts, withLayout }) {
   const opt = (value, label, selected) => `<option value="${esc(value)}"${selected ? " selected" : ""}>${esc(label)}</option>`;
-  const pageOptions = [opt("", kind === "layout" ? "no page (the layout's own defaults)" : "no page (the fragment's own defaults)", !page), ...pages.filter((p) => !p.generated).map((p) => opt(p.source, p.source, p.source === page))].join("");
+  const none = kind === "layout" ? "no page (the layout's own defaults)" : "no page (the fragment's own defaults)";
+  const pageOptions = [
+    opt("", pages.length ? none : `${none} — no built page uses this file`, !page),
+    ...pages.map((p) => opt(p.source, p.source, p.source === page)),
+    // A page chosen by hand (or from before a rebuild) stays selectable.
+    ...(page && !pages.some((p) => p.source === page) ? [opt(page, page, true)] : []),
+  ].join("");
   const layoutOptions = [opt("", "default layout", !layout), ...layouts.map((l) => opt(l, l, l === layout))].join("");
   return `<form id="unify-preview" method="get" style="position:fixed;bottom:8px;right:8px;z-index:2147483647;display:flex;gap:6px;align-items:center;flex-wrap:wrap;max-width:calc(100vw - 16px);background:#1b1b1b;color:#f4f4f4;border-radius:6px;padding:6px 8px;font:12px/1.2 system-ui,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.3)">
 <strong style="font-weight:600">unify preview</strong> <code style="opacity:.8">${esc(rel)}</code>

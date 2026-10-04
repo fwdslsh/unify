@@ -31,8 +31,11 @@ export function renderPageMap({ sourceRoot, documents, built }) {
     // overlay (§33) for a generated one, which `generated` marks.
     source: doc.source.path,
     generated: doc.source.generated,
-    // The layout the page composed with, source-root-relative, or null (§20.3).
+    // The layout the page composed with, source-root-relative, or null, and
+    // every other file that authored a byte of the page — fragments included
+    // by the page, by its layout, and transitively — sorted (§20.3).
     layout: doc.source.layout,
+    includes: doc.source.includes,
     // Where the page landed under the output directory, and the path the
     // server (and the site) answers for it — `/about/` under --pretty-urls.
     outputPath: doc.outputPath,

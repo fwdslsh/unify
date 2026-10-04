@@ -65,7 +65,8 @@ export async function dev(context, opts = {}) {
       relPath,
       page: params.get("page") || null,
       layout: params.get("layout") || null,
-      pages: lastDocuments.map((d) => ({ source: d.source.path, generated: d.source.generated, layout: d.source.layout, path: d.document.path, outputPath: d.outputPath })),
+      config: params.get("config") !== "false",
+      pages: lastDocuments.map((d) => ({ source: d.source.path, generated: d.source.generated, layout: d.source.layout, includes: d.source.includes, path: d.document.path, outputPath: d.outputPath })),
       prettyUrls: Boolean(settings.prettyUrls),
     }),
   });

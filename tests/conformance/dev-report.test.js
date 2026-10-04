@@ -789,7 +789,7 @@ describe("§27 the local audit view", () => {
     expect(map.pages.map((p) => p.outputPath).sort()).toEqual(pagesFromDryRun(dry.stdout).sort());
     const about = map.pages.find((p) => p.source === "about.html");
     expect(about).toEqual({
-      source: "about.html", generated: false, layout: "_layout.html",
+      source: "about.html", generated: false, layout: "_layout.html", includes: [],
       outputPath: "about/index.html", path: "/about/", url: null,
     });
     // Nothing but pages: the stylesheet is mirror-copied and has no record.
@@ -891,6 +891,22 @@ describe("§27 the local audit view", () => {
     const nav = await get("_includes/nav.html");
     expect(nav.status).toBe(200);
     expect(nav.text).toContain('<img src="/assets/logo.svg"');
+
+    // The page map names what each page reaches, read off provenance: the
+    // nav through the layout on every page, the card only where included.
+    const map = JSON.parse(await (await fetch(`http://localhost:${port}/_unify/pages.json`)).text());
+    const rec = (source) => map.pages.find((p) => p.source === source);
+    expect(rec("index.html").includes).toEqual(["_includes/nav.html"]);
+    expect(rec("about.html").includes).toEqual(["_includes/card.fragment.html", "_includes/nav.html"]);
+
+    // So the selector offers only the pages the file reaches, and ?config=false leaves it out.
+    const options = (text) => [...text.matchAll(/<option value="([^"]*)"/g)].map((m) => m[1]).filter(Boolean);
+    expect(options(card.text).filter((o) => o.endsWith(".html") && !o.endsWith("_layout.html"))).toEqual(["about.html"]);
+    expect(options(layout.text).filter((o) => o.endsWith(".html"))).toEqual(["about.html", "index.html"]);
+    const quiet = await get("_includes/card.fragment.html?config=false");
+    expect(quiet.status).toBe(200);
+    expect(quiet.text).not.toContain('id="unify-preview"');
+    expect(quiet.text).toContain("Untitled card");
 
     // A page redirects to the address the page map gives it.
     const pageRes = await get("about.html");
