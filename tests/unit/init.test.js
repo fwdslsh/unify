@@ -14,8 +14,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { init } from "../../src/cli/commands/init.js";
 import { Reporter, UsageError } from "../../src/core/diagnostics.js";
-import { ROOT_FILES, SHARE_IMAGE } from "../../src/templates/shared.js";
-import { TEMPLATES } from "../../src/templates/index.js";
+import { TEMPLATES, TEMPLATE_ROOT_FILES } from "../../src/templates/index.js";
+
+/** The project-root files every built-in shares (§19.4). */
+const ROOT_FILES = Object.fromEntries(["AGENTS.md", "DEPLOY.md", "unify.yaml"].map((f) => [f, TEMPLATE_ROOT_FILES.default[f]]));
 
 const dirs = [];
 function tempDir() {
@@ -230,7 +232,7 @@ describe("init()", () => {
     const summaryLines = [];
     reporter.summary = (line) => summaryLines.push(line);
     await init({ projectRoot: root, sourceRoot: root, sourceDefaulted: true, template: "basic", reporter });
-    const total = Object.keys(TEMPLATES.basic).length + Object.keys(ROOT_FILES).length;
+    const total = Object.keys(TEMPLATES.basic).length + Object.keys(TEMPLATE_ROOT_FILES.basic).length;
     expect(summaryLines.some((l) => l.includes(`(${total} files)`))).toBe(true);
     for (const rootFile of Object.keys(ROOT_FILES)) {
       expect(summaryLines.some((l) => l.includes(rootFile))).toBe(true);
@@ -292,17 +294,19 @@ describe("init()", () => {
     }
   });
 
-  test("the share image's declared dimensions are the ones its own IHDR states (§19.2 item 4)", async () => {
+  test("each template's layout declares the share image's dimensions as its own IHDR states (§19.2 item 4)", async () => {
     // A declared dimension that does not match the file is the invented claim
     // product-spec §6.1 forbids, in the one place nothing would ever catch it
-    // — so the numbers templates write come from SHARE_IMAGE, and SHARE_IMAGE
-    // is checked against the bytes it ships.
-    const png = SHARE_IMAGE.bytes;
-    expect(Array.from(png.slice(0, 8))).toEqual([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-    expect(String.fromCharCode(...png.slice(12, 16))).toBe("IHDR");
-    const view = new DataView(png.buffer, png.byteOffset, png.byteLength);
-    expect(view.getUint32(16)).toBe(SHARE_IMAGE.width);
-    expect(view.getUint32(20)).toBe(SHARE_IMAGE.height);
+    // — so the numbers a layout writes are checked against the bytes beside it.
+    for (const [name, files] of Object.entries(TEMPLATES)) {
+      const png = files["assets/share-placeholder.png"];
+      expect(Array.from(png.slice(0, 8))).toEqual([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+      expect(String.fromCharCode(...png.slice(12, 16))).toBe("IHDR");
+      const view = new DataView(png.buffer, png.byteOffset, png.byteLength);
+      const layout = files["_layout.html"];
+      expect(layout).toContain(`<meta property="og:image:width" content="${view.getUint32(16)}">`);
+      expect(layout).toContain(`<meta property="og:image:height" content="${view.getUint32(20)}">`);
+    }
   });
   test("every scaffolded file is byte-identical to the registry value it came from, for every template", async () => {
     // §19.5's write path, proved on the real templates rather than on a

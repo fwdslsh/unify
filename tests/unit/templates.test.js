@@ -27,7 +27,8 @@ import { inlineIncludes } from "../../src/core/includes.js";
 import { convert, convertFragment } from "../../src/core/markdown.js";
 import { configTemplate } from "../../src/cli/options.js";
 import { TEMPLATES, TEMPLATE_ROOT_FILES } from "../../src/templates/index.js";
-import { ROOT_FILES } from "../../src/templates/shared.js";
+import { SNAPSHOT } from "../../src/templates/snapshot.js";
+import { buildSnapshot, liveEntries, TEMPLATES_DIR } from "../../scripts/sync-templates.mjs";
 
 const TEMPLATE_NAMES = Object.keys(TEMPLATES);
 
@@ -53,7 +54,7 @@ describe.each(TEMPLATE_NAMES)('template "%s" — SCF-01/SCF-02 structure (in-mem
   test("ships unify.yaml at the project root, every option described and commented out; docs (catalog: true) and blog (generate:) have one live line each (§18, §19.6, §19.8)", () => {
     // Never inside the source tree (0.10): the file is build material beside the site.
     expect(paths).not.toContain("unify.yaml");
-    const yaml = { ...ROOT_FILES, ...(TEMPLATE_ROOT_FILES[name] ?? {}) }["unify.yaml"];
+    const yaml = TEMPLATE_ROOT_FILES[name]["unify.yaml"];
     const live = { docs: { catalog: true }, blog: { generate: "scripts/gen.mjs" } }[name] ?? {};
     expect(yaml).toBe(configTemplate(live));
     expect(yaml.split("\n").filter((l) => /^[a-z]/.test(l))).toEqual(Object.entries(live).map(([k, v]) => `${k}: ${v}`));
@@ -423,7 +424,7 @@ describe("§19.5 — a template file may be bytes, and nothing reaches them thro
     // ships must be data reachable by static import.
     //
     // The scan uses Bun's own transpiler rather than a grep, and that is
-    // load-bearing rather than fastidious: src/templates/blog.js carries the
+    // load-bearing rather than fastidious: the blog's generator carries the
     // text of `scripts/gen.mjs` in a template literal, and that script
     // legitimately opens with `import { readFileSync } from "node:fs"`. A grep
     // reads the scaffold's own generator as a violation by the module that
@@ -441,5 +442,31 @@ describe("§19.5 — a template file may be bytes, and nothing reaches them thro
       }
     }
     expect(offenders).toEqual([]);
+  });
+});
+
+// ---- §19.5/§19.9 — templates/<name>/ is the source of truth; the snapshot is its embedding
+
+describe("the embedded snapshot and templates/ agree", () => {
+  test("src/templates/snapshot.js is exactly what scripts/sync-templates.mjs would write from templates/", () => {
+    // The directories are what `unify init <git url>/templates/<name>` reads;
+    // the snapshot is what `unify init <name>` reads. A difference means one
+    // was edited without the other: run `bun scripts/sync-templates.mjs`.
+    expect(SNAPSHOT).toEqual(buildSnapshot(TEMPLATES_DIR));
+  });
+
+  test("every template's unify.yaml is the registry's file with only that template's live lines (§18, §19.8)", () => {
+    for (const name of Object.keys(TEMPLATES)) {
+      const yaml = TEMPLATE_ROOT_FILES[name]["unify.yaml"];
+      expect(`${name}: ${yaml === configTemplate(liveEntries(yaml))}`).toBe(`${name}: true`);
+    }
+  });
+
+  test("every template is a complete project: site/ beside AGENTS.md, DEPLOY.md and unify.yaml, and all five ship the same share image", () => {
+    const png = TEMPLATES.default["assets/share-placeholder.png"];
+    for (const name of Object.keys(TEMPLATES)) {
+      for (const rootFile of ["AGENTS.md", "DEPLOY.md", "unify.yaml"]) expect(`${name}/${rootFile}`).toBe(`${name}/${rootFile}`.replace(/.*/, (m) => (rootFile in TEMPLATE_ROOT_FILES[name] ? m : `${m} missing`)));
+      expect(Buffer.from(TEMPLATES[name]["assets/share-placeholder.png"]).equals(Buffer.from(png))).toBe(true);
+    }
   });
 });

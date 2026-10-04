@@ -8,6 +8,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-04
+
+### Added
+
+- **`unify init` takes a template source**, not only a built-in name (spec §19.9, rules SCF-13/14).
+  The positional is told apart by shape: a built-in name; an npm package named by the convention
+  **`unify-<name>-template`** or **`@<organization>/unify-<name>-template`** (optionally
+  `@version`), fetched with your own `npm pack`; a git repository (a URL, `git@host:` address or
+  `.git` path, with an optional **subdirectory** so one repository can host many templates —
+  `https://github.com/fwdslsh/unify/templates/blog` — and `#ref`; the browser's
+  `/tree/<ref>/<dir>` URL works too), fetched with your own `git clone`; else a directory. A
+  template is a project laid out as `init` lays one out — `site/` (or `src/`) beside `AGENTS.md`,
+  `DEPLOY.md`, `unify.yaml` — or a bare source tree; `.git/`, `node_modules/`, `package.json` and
+  lockfiles are never copied. A typo is a usage error naming the four forms, never a network lookup.
+- **`unify init --audit`** keeps the scaffold only if `unify audit --strict` passes on it, read with
+  the new project's own `unify.yaml`; a finding prints the report, removes everything `init` wrote
+  and exits 1, as `build --audit` refuses to publish.
+
+### Changed
+
+- **The built-in templates are real projects** under `templates/<name>/` in the repository, each
+  usable as a git template in its own right; the CLI embeds a generated snapshot of them
+  (`scripts/sync-templates.mjs`), so `unify init blog` still needs no network and no git and
+  scaffolds byte-for-byte what the directory holds. Scaffolded output is unchanged.
+
 ## [0.10.1] - 2026-10-04
 
 Development-server additions only; builds are byte-identical to 0.10.0.
@@ -758,7 +783,8 @@ with generated compare-link notes only. Their diffs are on the
 [releases page](https://github.com/fwdslsh/unify/releases). Nothing here
 retroactively reconstructs detail those notes never carried.
 
-[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.10.1...HEAD
+[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/fwdslsh/unify/compare/v0.10.1...v0.11.0
 [0.10.1]: https://github.com/fwdslsh/unify/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/fwdslsh/unify/compare/v0.9.5...v0.10.0
 [0.9.5]: https://github.com/fwdslsh/unify/compare/v0.9.4...v0.9.5

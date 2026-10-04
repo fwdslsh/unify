@@ -36,7 +36,7 @@ const OPTIONS = {
   "dry-run": { kind: "flag" },
   strict: { kind: "flag", about: "exit 1 on advisories too, not only on problems", default: "false", save: "strict: true" },
   // §24.8 — `build --audit`: gate the publish on the audit's findings. Boolean.
-  audit: { kind: "flag", about: "build only: run the audit and publish nothing if it reports a finding", default: "false", save: "audit: true" },
+  audit: { kind: "flag", about: "with build, run the audit and publish nothing if it reports a finding; with init, keep the scaffold only if it audits clean", default: "false", save: "audit: true" },
   // §30.1 — flags rather than a consequence: unlike a sitemap or a feed,
   // nothing about a page declares "catalog me" or "index me", so there is no
   // record-derived condition that could activate either the way

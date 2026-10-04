@@ -49,7 +49,7 @@
  *   - Nothing is ever overwritten. An authored `feed.xml` suppresses
  *     generation outright (§29.7, reusing §21.5's rule verbatim, unchanged)
  *     — the blog template's own generator writes one
- *     (src/templates/blog.js), which makes this the fixture that proves the
+ *     (templates/blog/scripts/gen.mjs), which makes this the fixture that proves the
  *     suppression rather than a hypothetical.
  *   - `--feed-full` is the one place this module reads more than `records`.
  *     Atom's `<content type="html">` needs the emitted `<main>`'s inner

@@ -1,0 +1,54 @@
+# unify.yaml — saved flags for `unify build`, `audit`, `dev` and `watch`.
+# Keys are the long option names; a flag on the command line wins over this file.
+# Every option is listed with its default. Uncomment a line only to change it: a
+# default never needs writing. A relative path here resolves against this file.
+
+# the directory to build from (default: site/ if it exists, else src/, else this directory)
+# source: site
+
+# the directory the site is published to (default: dist)
+# output: public
+
+# empty the output directory before publishing (default: false)
+# clean: true
+
+# glob patterns to leave out of the build, one per list item (default: _*)
+# exclude:
+#   - _*
+#   - drafts/**
+
+# publish about.html as about/index.html so it is served at /about/ (default: false)
+# pretty-urls: true
+
+# the site's absolute address; turns on sitemap.xml, feed.xml and absolute URLs (default: none)
+# base-url: https://your-domain.example/
+
+# auto adds a canonical link to every page that lacks one, none switches it off (default: auto whenever base-url is set)
+# canonical: none
+
+# put each post's full content in feed.xml instead of its description; needs base-url (default: false)
+# feed-full: true
+
+# write assets/unify/catalog.json, one record per published page (default: false)
+catalog: true
+
+# write assets/unify/search-corpus.json, the text of every page for client-side search (default: false)
+# search-corpus: true
+
+# also list noindex pages in the catalog and search corpus; needs one of them (default: false)
+# include-noindex: true
+
+# exit 1 on advisories too, not only on problems (default: false)
+# strict: true
+
+# with build, run the audit and publish nothing if it reports a finding; with init, keep the scaffold only if it audits clean (default: false)
+# audit: true
+
+# the port unify dev serves on (default: 3000)
+# port: 8080
+
+# a JavaScript file unify runs before every build, relative to this file (default: none)
+# generate: scripts/gen.mjs
+
+# hand that file source-pages.json: every source page's title, description, date, metas and links (default: true whenever generate is set)
+# source-inventory: false

@@ -100,7 +100,7 @@ unify [build]            build the site (default command)
 unify audit              evaluate the site the build would publish — writes nothing
 unify dev                build, watch, serve, and reload — the inner loop
 unify watch              build + rebuild on change, no server
-unify init [template]    scaffold a starter site
+unify init [template]    scaffold a starter site — a built-in name, a directory, a git repository (URL/<subdirectory>#ref), or an npm package named unify-<name>-template
 ```
 
 `unify --help` lists every option — among them `--pretty-urls`, `--base-url` (which also generates `sitemap.xml`, and `feed.xml` once a page declares `schema: Article`/`BlogPosting`), `--canonical none` (completion is on once `--base-url` is set), `--catalog`, `--search-corpus`, `--dry-run`, and `--strict`. The **[CLI Reference](docs/cli-reference.md)** documents every command, option, and exit code — there are no others. An optional `unify.yaml` at the project root holds saved flags and nothing more — only what differs from the defaults; `unify init` writes one with every option described and commented out, and `unify build --save-config` fills it from the flags you pass.

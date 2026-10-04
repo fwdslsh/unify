@@ -17,7 +17,7 @@
  * Two live promises are checked here and nowhere else:
  *
  *   §19.5 — `init` scaffolds from bytes compiled into the executable, with no
- *   sibling directory to read. The existing check for this greps `src/templates`
+ *   sibling directory to read. The existing check for this scans `src/templates`
  *   for `readFileSync`, which is a proxy; this runs the real thing.
  *
  *   §33.2 — "the runtime is unify's own", so `--generate` works for an author
