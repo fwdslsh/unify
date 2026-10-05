@@ -42,6 +42,7 @@ export function resolveSettings(flags, cwd = process.cwd()) {
   for (const key of ["source", "generate"]) {
     if (typeof config[key] === "string" && !isAbsolute(config[key])) config[key] = resolve(configDir, config[key]);
   }
+  if (Array.isArray(config.keep)) config.keep = config.keep.map((p) => (isAbsolute(p) ? p : resolve(configDir, p)));
   const settings = mergeConfig(flags, config);
   const resolved = resolveSource(settings.source, cwd);
 
@@ -98,6 +99,10 @@ export function resolveSettings(flags, cwd = process.cwd()) {
       template: flags.template,
       recordedTemplate: typeof config.template === "string" ? config.template : undefined,
       yes: flags.yes === true,
+      // §19.10 — the files `update` never overwrites once they exist, as absolute
+      // paths: a line in unify.yaml is relative to the file (resolved above), a
+      // --keep to the working directory, and the flag replaces the list like --exclude.
+      keep: (Array.isArray(settings.keep) ? settings.keep : []).map((p) => (isAbsolute(p) ? p : resolve(cwd, p))),
     },
     sourceRoot: resolved.root,
     // The would-copy notice (§4.4) fires only when nothing chose the source

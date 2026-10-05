@@ -1,10 +1,12 @@
 /* The template's stylesheet: tooling, kept current by unify update. Its look is
-   the custom properties set on :root below, and a site changes them without
-   editing this file: site/_includes/theme.html — copied from
-   site/_examples/theme.html — carries the site's own values in a <style> block
-   the layout includes. Every rule here sits in the base cascade layer, and an
-   unlayered declaration beats a layered one whatever the order, so a value set
-   there wins, and a property left out keeps its default below. */
+   the custom properties set in :root below, and the site's own values for them
+   live in theme.css beside this file — a file unify update never overwrites,
+   because unify.yaml lists it under keep:. The import puts that file in the
+   theme layer, which wins over the base layer whatever the order, so a value
+   set there wins and a property left out keeps its default here. */
+@layer base, theme;
+@import url("theme.css") layer(theme);
+
 @layer base {
   :root {
     color-scheme: light dark;

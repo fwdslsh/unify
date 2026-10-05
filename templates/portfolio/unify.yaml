@@ -48,7 +48,7 @@
 # port: 8080
 
 # a JavaScript file unify runs before every build, relative to this file (default: none)
-generate: scripts/gen.mjs
+# generate: scripts/gen.mjs
 
 # hand that file source-pages.json: every source page's title, description, date, metas and links (default: true whenever generate is set)
 # source-inventory: false

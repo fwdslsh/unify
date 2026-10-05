@@ -30,25 +30,25 @@ Upload `dist/` anywhere: GitHub Pages, Netlify, any static host.
 ```
 my-site/
 ├── AGENTS.md             # notes for whoever edits this site next — outside site/, so it never publishes
-├── _includes/theme.html  # the theme every page includes until you copy your own to site/_includes/theme.html
 ├── DEPLOY.md             # how to publish it, ending in the two commands that carry your address
-├── unify.yaml            # every build flag, described and commented out — uncomment what differs from the default; one live line, template:, records where this came from for `unify update`
+├── unify.yaml            # every build flag, described and commented out — uncomment what differs from the default; live: template:, where this came from for `unify update`, and keep:, the files it never overwrites
 └── site/                 # the source root — everything here ships
     ├── _layout.html      # the site chrome — one complete HTML page
     ├── _includes/
     │   └── nav.html      # a fragment
-    ├── _examples/        # to copy into place and edit — about.md, contact.html, theme.html — never published
+    ├── _examples/        # to copy into place and edit — about.md, contact.html — never published
     ├── index.html        # a page — it also overrides the footer
     ├── 404.html          # a page with no layout
     ├── robots.txt        # minimal and honest: it blocks nothing
     └── assets/
         ├── style.css
+        ├── theme.css     # the look: custom properties you edit — unify update never overwrites it
         └── share-placeholder.png   # the image social crawlers show — replace it
 ```
 
 Everything in `site/` ships to the site **except** files and folders whose name starts with `_` — those are the build's working material (layouts, fragments, notes, scripts). Files *inside* an underscore folder don't need their own prefix: `_includes/nav.html` is already held back.
 
-That is also why the examples live where they do. `site/_examples/` holds a copy-ready version of each kind of page the template expects you to add: copy one into `site/`, edit the copy, and link it from `site/_includes/nav.html`. The example itself never publishes, and `unify update` — which refreshes the template's own files — never touches a file you copied. The look works the same way: copy `_examples/theme.html` to `site/_includes/theme.html` and change the custom properties in it; the layout includes that path, and your copy is found ahead of the template's default beside `AGENTS.md`. Every built-in template works this way.
+That is also why the examples live where they do. `site/_examples/` holds a copy-ready version of each kind of page the template expects you to add: copy one into `site/`, edit the copy, and link it from `site/_includes/nav.html`. The example itself never publishes, and `unify update` — which refreshes the template's own files — never touches a file you copied. The look is `site/assets/theme.css`: the custom properties the stylesheet reads, yours to edit, and `unify.yaml` lists it under `keep:` so `unify update` never overwrites it. Every built-in template works this way.
 
 ## The layout
 

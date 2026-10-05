@@ -55,3 +55,8 @@ catalog: true
 
 # the template this project was scaffolded from; unify update fetches it again and copies its changed files over this project, after asking (default: none)
 # template: unify-shop-template
+
+# files unify update never overwrites once they exist — the ones this site customized — one path per list item, relative to this file (default: none)
+keep:
+  - unify.yaml
+  - site/assets/theme.css

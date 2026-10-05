@@ -19,8 +19,8 @@
       <code>&lt;title&gt;</code>, its own description, and one <code>&lt;h1&gt;</code> — <code>unify audit</code>
       reports every page that is missing one or has more than one. Nothing under <code>_examples/</code> ships,
       and <code>unify update</code> never touches a file you copied.</p>
-      <p>To change the look, copy <code>site/_examples/theme.html</code> to <code>site/_includes/theme.html</code> and edit the
-      values: the layout includes that file, and your copy takes the place of the template's default.</p>
+      <p>To change the look, edit <code>site/assets/theme.css</code>: the custom properties the stylesheet reads, each at
+      its default. <code>unify.yaml</code> lists it under <code>keep:</code>, so <code>unify update</code> never overwrites it.</p>
     </main>
     <p slot="footer">© My Site — <a href="mailto:hi@example.com">email us</a></p>
   </body>

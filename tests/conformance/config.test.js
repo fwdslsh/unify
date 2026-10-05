@@ -524,9 +524,10 @@ test("CFG-09 — only a value that differs from the default needs writing: every
   if (init.exit !== 0) throw new Error(init.stderr);
   const template = readFileSync(join(scaffold, "unify.yaml"), "utf8");
   if (!/^# source: site$/m.test(template) || !/^# generate: scripts\/gen\.mjs$/m.test(template)) throw new Error(`init's unify.yaml does not list the options commented out:\n${template}`);
-  // §19.10 — the ONE live line is the record, which no build reads.
+  // §19.10 — the live lines are the record and keep: (the file itself and the theme), and no build reads either.
   if (!/^template: default$/m.test(template)) throw new Error(`init's unify.yaml must record the template live:\n${template}`);
-  if (/^(?!template:)[a-z]/m.test(template)) throw new Error(`the default template must have no live line but template::\n${template}`);
+  if (!/^keep:\n  - unify\.yaml\n  - site\/assets\/theme\.css$/m.test(template)) throw new Error(`init's unify.yaml must keep itself and the theme:\n${template}`);
+  if (/^(?!template:|keep:)[a-z]/m.test(template)) throw new Error(`the default template must have no live line but template: and keep::\n${template}`);
   writeTree(tmp, { "unify.yaml": template });
   const commented = await runCli(["build", "-o", "dist3"], tmp);
   if (commented.exit !== 0) throw new Error(`all-commented file: exit ${commented.exit}\n${commented.stderr}`);

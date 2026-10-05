@@ -18,15 +18,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it easy to find on npm, not a rule the CLI enforces; `--audit` is what tells a template from a package that
   is not one. The cost is that a misspelled directory name reaches npm and fails there, with npm's message
   (spec §19.9, rule SCF-13). The order of the forms is now built-in, git, directory, npm.
-- **A theme file to copy.** Every built-in template expresses its look as custom properties, keeps every rule of
-  `assets/style.css` in a `base` cascade layer, and includes `/_includes/theme.html` from its layout and its 404
-  page. The template ships that fragment beside `AGENTS.md` — inert, the last place an include resolves from
-  (§4.5) — and `site/_examples/theme.html`, a `<style>` block with the properties at their defaults. Copy it to
-  `site/_includes/theme.html` — a path the template never ships, so `unify update` never lists it — and change
-  the font, the colours or the measure: the site's file is found first, its values win over the layer, and a
-  property you delete keeps the default. A stylesheet import of a file the site copies later was the first
-  design, and it cannot work: a reference to nothing blocks the publish (§12). Recommended, not required, of
-  any other template (spec §19.1 and §19.11, rules SCF-01 and SCF-16, `docs/templates.md` §3).
+- **`keep`: the files `unify update` never overwrites.** `keep:` in `unify.yaml` (a list of paths relative to the
+  file) or `--keep <path>` (repeatable, relative to the working directory, replacing the list) names the files this
+  site customized. A listed file that exists is never overwritten — printed as `keep <path>` when the template's
+  copy differs, counted as kept in the summary, never asked about — and one that does not exist yet is added.
+  Nothing else reads the list and nothing is required of a template (spec §18 and §19.10, rules CFG-01, CFG-09
+  and UPD-04).
+- **The look is a file the site keeps.** Every built-in template's `assets/style.css` opens with `@layer base, theme;`
+  and `@import url("theme.css") layer(theme);`, expresses its look as custom properties in the base layer, and ships
+  `assets/theme.css` with those properties at their defaults — yours to edit: a changed value changes the look, a
+  deleted one keeps the default. Every built-in now ships a `unify.yaml` whose `keep:` names that file and
+  `unify.yaml` itself, so neither the theme nor a line you uncomment is ever overwritten by `unify update`
+  (spec §19.11, rule SCF-16, `docs/templates.md` §3).
 
 ## [0.11.5] - 2026-10-05
 

@@ -16,8 +16,8 @@
       <code>site/_examples/project.html</code> into <code>site/projects/</code> once per project. Edit the copies and
       link the work page from <code>site/_includes/nav.html</code>. Nothing under <code>_examples/</code> ships, and
       <code>unify update</code> never touches a file you copied.</p>
-      <p>To change the look, copy <code>site/_examples/theme.html</code> to <code>site/_includes/theme.html</code> and edit the
-      values: the layout includes that file, and your copy takes the place of the template's default.</p>
+      <p>To change the look, edit <code>site/assets/theme.css</code>: the custom properties the stylesheet reads, each at
+      its default. <code>unify.yaml</code> lists it under <code>keep:</code>, so <code>unify update</code> never overwrites it.</p>
     </main>
     <p slot="footer">© My Portfolio — <a href="mailto:hi@example.com">email us</a></p>
   </body>

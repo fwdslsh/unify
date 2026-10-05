@@ -265,8 +265,8 @@ test("scaffold/blog: SCF-03 — the scaffold's one shown command is `unify build
   }
   const yaml = readFileSync(join(tmp, "unify.yaml"), "utf8");
   const live = yaml.split("\n").filter((l) => /^[a-z]/.test(l));
-  // The one live BUILD line is the generator; the template: record (§19.10) is live in every scaffold and no build reads it.
-  if (!/^generate: scripts\/gen\.mjs\|template: blog$/.test(live.join("|"))) throw new Error(`unify.yaml's live lines should be exactly generate: scripts/gen.mjs and the template: record, got: ${live.join(" | ")}`);
+  // The one live BUILD line is the generator; the template: record and the keep: list (§19.10) are live in every scaffold and no build reads them.
+  if (!/^generate: scripts\/gen\.mjs\|template: blog\|keep:$/.test(live.join("|"))) throw new Error(`unify.yaml's live lines should be exactly generate: scripts/gen.mjs, the template: record and keep:, got: ${live.join(" | ")}`);
   if (!existsSync(join(tmp, "scripts", "gen.mjs"))) throw new Error("generate: scripts/gen.mjs names a file that does not exist from the project root");
 
   const buildR = await runCli(["build"], tmp);
@@ -1373,10 +1373,27 @@ for (const name of TEMPLATES) {
         referenced.add(clean === "" || clean.endsWith("/") ? `${clean}index.html` : clean);
       }
     }
+    // ...and from the emitted stylesheets, which §12 reads the same way: a `url()` or a bare `@import "…"` in a
+    // published CSS file is a reference too, relative to that file (assets/style.css importing theme.css).
+    let grew = true;
+    while (grew) {
+      grew = false;
+      for (const asUrl of [...referenced].filter((p) => p.endsWith(".css"))) {
+        const css = published.get(asUrl.split("/").join(sep));
+        if (css === undefined) continue;
+        const dir = asUrl.includes("/") ? asUrl.slice(0, asUrl.lastIndexOf("/") + 1) : "";
+        for (const m of css.toString("utf8").matchAll(/url\(\s*["']?([^"')\s]+)["']?\s*\)|@import\s+["']([^"']+)["']/gi)) {
+          const value = m[1] ?? m[2];
+          if (/^(?:[a-z]+:|\/\/|#)/i.test(value)) continue;
+          const target = value.startsWith("/") ? value.slice(1) : `${dir}${value}`;
+          if (!referenced.has(target)) { referenced.add(target); grew = true; }
+        }
+      }
+    }
     for (const rel of [...published.keys()].sort()) {
       const asUrl = rel.split(sep).join("/");
       if (referenced.has(asUrl) || WELL_KNOWN.has(asUrl)) continue;
-      throw new Error(`${name}: dist/${asUrl} ships and no emitted page references it — §19.7: never ship a file the site does not use`);
+      throw new Error(`${name}: dist/${asUrl} ships and nothing emitted references it — §19.7: never ship a file the site does not use`);
     }
 
     covers("SCF-11");
@@ -1638,11 +1655,11 @@ test("scaffold: SCF-14 --audit keeps a scaffold only if it audits clean; a findi
 
 /** Where each template's examples belong once copied (§19.11) — what each example's own placeholder paragraph says. */
 const EXAMPLE_HOMES = {
-  default: { "about.md": "about.md", "contact.html": "contact.html", "theme.html": "_includes/theme.html" },
-  basic: { "contact.html": "contact.html", "theme.html": "_includes/theme.html" },
-  blog: { "post.md": "posts/hello-world.md", "authors.json": "_data/authors.json", "contact.html": "contact.html", "theme.html": "_includes/theme.html" },
-  docs: { "guide-page.md": "guide/getting-started.md", "contact.html": "contact.html", "theme.html": "_includes/theme.html" },
-  portfolio: { "work.html": "work.html", "project.html": "projects/project-one.html", "contact.html": "contact.html", "theme.html": "_includes/theme.html" },
+  default: { "about.md": "about.md", "contact.html": "contact.html" },
+  basic: { "contact.html": "contact.html" },
+  blog: { "post.md": "posts/hello-world.md", "authors.json": "_data/authors.json", "contact.html": "contact.html" },
+  docs: { "guide-page.md": "guide/getting-started.md", "contact.html": "contact.html" },
+  portfolio: { "work.html": "work.html", "project.html": "projects/project-one.html", "contact.html": "contact.html" },
 };
 
 for (const name of TEMPLATES) {
@@ -1659,39 +1676,36 @@ for (const name of TEMPLATES) {
     const examples = readdirSync(join(site, "_examples")).sort();
     if (examples.join(",") !== Object.keys(EXAMPLE_HOMES[name]).sort().join(",")) throw new Error(`${name}'s examples are ${examples.join(", ")}; this test knows ${Object.keys(EXAMPLE_HOMES[name]).join(", ")}`);
 
-    // ---- unify.yaml: the template ships its own copy only when a page needs a flag live (docs, blog); otherwise
-    // init wrote the registry's file, and a line the site uncomments is never in update's list.
+    // ---- unify.yaml: every template ships its own copy, whose keep: names the file itself and the theme (§19.10), so a
+    // line the site uncomments is never overwritten — reported as kept, never listed as an overwrite.
     const yaml = readFileSync(join(tmp, "unify.yaml"), "utf8");
+    if (!/^keep:\n  - unify\.yaml\n  - site\/assets\/theme\.css$/m.test(yaml)) throw new Error(`${name}: the scaffolded unify.yaml must keep itself and the theme:\n${yaml}`);
     if (!yaml.includes("# pretty-urls: true")) throw new Error(`${name}: the scaffolded unify.yaml lacks the commented pretty-urls line this test uncomments`);
     writeFileSync(join(tmp, "unify.yaml"), yaml.replace("# pretty-urls: true", "pretty-urls: true"));
     const edited = await runCli(["update", "--dry-run"], tmp);
     if (edited.exit !== 0) throw new Error(`${name}: update --dry-run exited ${edited.exit}\n${edited.stdout}${edited.stderr}`);
-    const shipsYaml = name === "docs" || name === "blog";
-    if (shipsYaml && !edited.stdout.includes("would overwrite unify.yaml")) throw new Error(`${name} ships a unify.yaml (its page needs a flag live), so an edited copy is in the list:\n${edited.stdout}`);
-    if (!shipsYaml && !edited.stdout.includes("nothing to do")) throw new Error(`${name} ships no unify.yaml, so the site's edits to it are never in the list:\n${edited.stdout}`);
+    if (!edited.stdout.includes("keep unify.yaml") || !edited.stdout.includes("nothing to do") || !edited.stdout.includes("1 kept") || /would (overwrite|add)/.test(edited.stdout)) throw new Error(`${name}: an uncommented line in unify.yaml is kept, never overwritten:\n${edited.stdout}`);
     writeFileSync(join(tmp, "unify.yaml"), yaml);
 
     // ---- a build emits nothing from _examples/
     const built = await runCli(["build"], tmp);
     if (built.exit !== 0) throw new Error(`unify build exited ${built.exit} for ${name}: ${built.stderr}`);
     if (existsSync(join(tmp, "dist", "_examples"))) throw new Error(`${name}: dist/_examples/ exists — the examples published`);
-    // The fresh scaffold resolved the theme include from the project root (the build would be P01 otherwise), and that
-    // default sets nothing: the stylesheet's own values apply until the site copies the example into place.
-    if (/--measure:/.test(readFileSync(join(tmp, "dist", "index.html"), "utf8"))) throw new Error(`${name}: the template's default theme fragment sets properties of its own`);
 
     // ---- copy every example where it says it belongs, link the new pages from the nav, and the site builds and audits clean
     for (const [example, home] of Object.entries(EXAMPLE_HOMES[name])) {
       mkdirSync(dirname(join(site, ...home.split("/"))), { recursive: true });
       copyFileSync(join(site, "_examples", example), join(site, ...home.split("/")));
     }
-    // Every copied page gets a nav link except the ones another copy already links (a post from the generated
-    // listing, a project from the work page) and the theme fragment, which is not a page.
-    const linked = Object.values(EXAMPLE_HOMES[name]).filter((home) => /\.(html|md)$/.test(home) && !/^(posts|projects|_)/.test(home));
-    // The theme copy is edited — that is what it is for — so the built pages must show the site's value, not the default.
-    const themeCopy = join(site, "_includes", "theme.html");
-    const theme = readFileSync(themeCopy, "utf8");
-    if (!theme.includes("--measure: 42rem;")) throw new Error(`${name}: the theme example does not expose --measure at its default`);
-    writeFileSync(themeCopy, theme.replace("--measure: 42rem;", "--measure: 60rem;"));
+    // Every copied page gets a nav link except the ones another copy already links: a post from the generated
+    // listing, a project from the work page.
+    const linked = Object.values(EXAMPLE_HOMES[name]).filter((home) => /\.(html|md)$/.test(home) && !/^(posts|projects)\//.test(home));
+    // The theme is the site's: assets/theme.css ships in place, imported into a layer that wins over the stylesheet's,
+    // and unify.yaml keeps it (§19.11). Edited here, so the published file must carry the site's value.
+    const theme = join(site, "assets", "theme.css");
+    const themeText = readFileSync(theme, "utf8");
+    if (!themeText.includes("--measure: 42rem;")) throw new Error(`${name}: assets/theme.css does not expose --measure at its default`);
+    writeFileSync(theme, themeText.replace("--measure: 42rem;", "--measure: 60rem;"));
     const nav = readFileSync(join(site, "_includes", "nav.html"), "utf8");
     writeFileSync(join(site, "_includes", "nav.html"), nav.replace("</nav>", linked.map((home) => ` <a href="/${home.replace(/\.md$/, ".html")}">${home}</a>`).join("") + "</nav>"));
     for (const args of [["build", "--dry-run", "--strict"], ["audit", "--strict"]]) {
@@ -1700,27 +1714,23 @@ for (const name of TEMPLATES) {
     }
     const rebuilt = await runCli(["build"], tmp);
     if (rebuilt.exit !== 0) throw new Error(`unify build exited ${rebuilt.exit} for ${name} with its examples in place: ${rebuilt.stderr}`);
-    for (const home of Object.values(EXAMPLE_HOMES[name]).filter((h) => /\.(html|md)$/.test(h) && !h.startsWith("_"))) {
+    for (const home of Object.values(EXAMPLE_HOMES[name]).filter((h) => /\.(html|md)$/.test(h))) {
       if (!existsSync(join(tmp, "dist", ...home.replace(/\.md$/, ".html").split("/")))) throw new Error(`${name}: the copy of an example at ${home} did not publish`);
     }
     if (name === "blog" && !readFileSync(join(tmp, "dist", "blog.html"), "utf8").includes('href="/posts/hello-world.html"')) throw new Error("the blog listing does not list the copied post");
-    // The theme: the layout and the 404 include /_includes/theme.html, which the site's copy satisfies ahead of the
-    // template's default beside AGENTS.md (§4.5), so a value set in the copy reaches every page without an edit to
-    // any template file (§19.11). The stylesheet keeps every rule in the base layer and imports nothing, so the
-    // copy's unlayered values win.
+    // The theme: the stylesheet imports assets/theme.css into the theme layer, and the edited file published as is.
     const css = readFileSync(join(tmp, "dist", "assets", "style.css"), "utf8");
-    if (!/^@layer base \{/m.test(css) || /@import/.test(css)) throw new Error(`${name}: assets/style.css must keep its rules in the base layer and import nothing:\n${css.slice(0, 400)}`);
-    for (const page of ["index.html", "404.html"]) {
-      if (!readFileSync(join(tmp, "dist", page), "utf8").includes("--measure: 60rem;")) throw new Error(`${name}: dist/${page} does not carry the site's theme`);
-    }
+    if (!/^@layer base, theme;\n@import url\("theme\.css"\) layer\(theme\);/m.test(css)) throw new Error(`${name}: assets/style.css must import theme.css into the theme layer:\n${css.slice(0, 400)}`);
+    if (!readFileSync(join(tmp, "dist", "assets", "theme.css"), "utf8").includes("--measure: 60rem;")) throw new Error(`${name}: the edited theme did not publish`);
 
     // ---- the copies are the site's: a path the template does not ship is never visited. The one file in the list is
-    // the nav the pages were linked from — the template ships it, and the site edited it.
+    // the nav the pages were linked from — the template ships it, and the site edited it. The edited theme is kept.
     const again = await runCli(["update", "--dry-run"], tmp);
     const listed = again.stdout.split("\n").filter((l) => /^would (overwrite|add) /.test(l));
     if (again.exit !== 0 || listed.join("|") !== "would overwrite site/_includes/nav.html") throw new Error(`${name}: with every example copied into place, update may list only the edited nav, got:\n${again.stdout}${again.stderr}`);
+    if (!again.stdout.includes("keep site/assets/theme.css") || !again.stdout.includes("1 kept")) throw new Error(`${name}: the edited theme is kept, and the report says so:\n${again.stdout}`);
 
-    covers("SCF-16");
+    covers("SCF-16", "UPD-04");
   }, TEST_MS * 2);
 }
 
@@ -1832,6 +1842,24 @@ test("scaffold: SCF-15 + UPD-01..03 — init records the source as typed in unif
   const back = await runCli(["update", url, "-y"], tmp);
   if (back.exit !== 0 || !readFileSync(join(tmp, "site", "index.html"), "utf8").includes("v3") || recordOf(tmp) !== url) throw new Error(`naming the default branch again moves back: exit ${back.exit}\n${back.stdout}${back.stderr}`);
 
+  // ---- keep (UPD-04): a listed file that exists is never overwritten — named on the command line, or under keep: in
+  // unify.yaml (relative to the file) — and a listed file the site does not have yet is added
+  writeFileSync(join(tmp, "site", "config.json"), '{"lab": "Mine again"}\n');
+  writeFileSync(join(host, "site", "config.json"), '{"lab": "NEWER SEED"}\n');
+  release("v3.1");
+  const keptFlag = await runCli(["update", "--keep", "site/config.json", "-y"], tmp);
+  if (keptFlag.exit !== 0 || !keptFlag.stdout.includes("keep site/config.json") || !keptFlag.stdout.includes("nothing to do") || !keptFlag.stdout.includes("1 kept") || keptFlag.stderr.includes("[y/N]")) throw new Error(`--keep must keep the file, report it and ask nothing: exit ${keptFlag.exit}\n${keptFlag.stdout}${keptFlag.stderr}`);
+  if (readFileSync(join(tmp, "site", "config.json"), "utf8") !== '{"lab": "Mine again"}\n') throw new Error("a kept file was overwritten");
+  const unkept = await runCli(["update", "--dry-run"], tmp);
+  if (!unkept.stdout.includes("would overwrite site/config.json")) throw new Error(`without the list the same file is an overwrite:\n${unkept.stdout}`);
+  writeFileSync(join(tmp, "unify.yaml"), `${readFileSync(join(tmp, "unify.yaml"), "utf8")}keep:\n  - site/config.json\n`);
+  const keptYaml = await runCli(["update"], tmp);
+  if (keptYaml.exit !== 0 || !keptYaml.stdout.includes("keep site/config.json") || !keptYaml.stdout.includes("1 kept") || keptYaml.stderr.includes("[y/N]")) throw new Error(`keep: in unify.yaml is the same list: exit ${keptYaml.exit}\n${keptYaml.stdout}${keptYaml.stderr}`);
+  if (readFileSync(join(tmp, "site", "config.json"), "utf8") !== '{"lab": "Mine again"}\n') throw new Error("a file kept by unify.yaml was overwritten");
+  rmSync(join(tmp, "site", "config.json"));
+  const added = await runCli(["update"], tmp);
+  if (added.exit !== 0 || !added.stdout.includes("add site/config.json") || readFileSync(join(tmp, "site", "config.json"), "utf8") !== '{"lab": "NEWER SEED"}\n') throw new Error(`a listed file the site does not have is added: exit ${added.exit}\n${added.stdout}${added.stderr}`);
+
   // ---- safety (UPD-03): a symlink is skipped, never followed or replaced; an unreachable source changes nothing
   const elsewhere = mkTmp();
   writeFileSync(join(elsewhere, "target"), "outside\n");
@@ -1866,5 +1894,5 @@ test("scaffold: SCF-15 + UPD-01..03 — init records the source as typed in unif
     if (gone.exit !== 2 || !/unknown option/.test(gone.stderr)) throw new Error(`${flag} must not exist`);
   }
 
-  covers("SCF-15", "UPD-01", "UPD-02", "UPD-03");
+  covers("SCF-15", "UPD-01", "UPD-02", "UPD-03", "UPD-04");
 }, TEST_MS * 3);

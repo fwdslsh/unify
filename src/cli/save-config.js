@@ -39,8 +39,8 @@ export function saveEntries(flags) {
   for (const key of WRITABLE) {
     if (!(key in flags)) continue;
     const value = flags[key];
-    if (key === "exclude") {
-      entries.set(key, ["exclude:", ...value.map((glob) => `  - ${scalar(glob, key)}`)]);
+    if (Array.isArray(value)) {
+      entries.set(key, [`${key}:`, ...value.map((item) => `  - ${scalar(item, key)}`)]);
     } else if (value === true) {
       entries.set(key, [`${key}: true`]);
     } else {

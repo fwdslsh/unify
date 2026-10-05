@@ -59,6 +59,12 @@ const OPTIONS = {
   // records it (the one line it writes live); `update` fetches it again. The
   // positional of `init`/`update` is the same thing spelled without the flag.
   template: { kind: "value", example: "unify-shop-template", about: "the template this project was scaffolded from; unify update fetches it again and copies its changed files over this project, after asking", default: "none", save: "template: unify-shop-template" },
+  // §19.10 — `update` only: the files it never overwrites once they exist —
+  // the ones this site customized (the theme, the nav). A list like `exclude`:
+  // repeatable on the command line (relative to the working directory,
+  // replacing the file's list), one path per item in unify.yaml (relative to
+  // the file). Nothing else reads it.
+  keep: { kind: "list", example: "site/assets/theme.css", about: "files unify update never overwrites once they exist — the ones this site customized — one path per list item, relative to this file", default: "none", save: "keep:\n  - site/assets/theme.css" },
   // §19.10 — `update` only: overwrite the listed files without asking.
   yes: { kind: "flag", short: "y" },
   // §31.1 — `unify audit`'s own output shape. This registry stays a
@@ -85,7 +91,7 @@ const OPTIONS = {
 };
 
 /** Keys `unify.yaml` may carry — the long option names, minus the ones that make no sense to save. */
-export const CONFIG_KEYS = ["source", "output", "clean", "exclude", "pretty-urls", "base-url", "canonical", "feed-full", "catalog", "search-corpus", "include-noindex", "strict", "audit", "port", "generate", "source-inventory", "template"];
+export const CONFIG_KEYS = ["source", "output", "clean", "exclude", "pretty-urls", "base-url", "canonical", "feed-full", "catalog", "search-corpus", "include-noindex", "strict", "audit", "port", "generate", "source-inventory", "template", "keep"];
 
 /**
  * §18/§19.8 — the `unify.yaml` that `init` writes at the project root: every

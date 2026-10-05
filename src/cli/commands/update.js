@@ -17,6 +17,11 @@
  *   different bytes           → overwrite — listed, and confirmed first
  *
  * Nothing is removed, and nothing outside the template's paths is visited.
+ * One exception, declared in the open: `keep:` in unify.yaml (or `--keep
+ * <path>`) lists the files this site customized — the theme, the nav — and a
+ * listed file that exists is never overwritten: it is reported as `keep` when
+ * the template's copy differs, counted as kept, and never asked about. A
+ * listed file that does not exist yet is added like any other.
  * The confirmation is the protection for local edits: every file that would
  * be overwritten is listed, and the command waits for `y` on stdin unless
  * `--yes` was passed. Anything else writes nothing and exits 1. `--dry-run`
@@ -43,7 +48,7 @@ import { classifyTemplateSource, fetchTemplate, recordSource } from "../template
 /**
  * @param {object} context
  * @param {string} context.sourceRoot
- * @param {{dryRun: boolean, yes: boolean, template?: string, recordedTemplate?: string}} context.settings
+ * @param {{dryRun: boolean, yes: boolean, keep?: string[], template?: string, recordedTemplate?: string}} context.settings
  * @param {string|undefined} context.template - the positional (or --template): a source to move to; else the recorded one
  * @param {import('../../core/diagnostics.js').Reporter} context.reporter
  * @param {string} [context.projectRoot]
@@ -72,26 +77,29 @@ export async function update({ sourceRoot, settings, template, reporter, project
   ];
   const roots = [resolve(projectRoot), resolve(sourceRoot)];
   const shown = (abs) => toRelative(projectRoot, abs) || ".";
+  const kept = new Set((settings.keep ?? []).map((p) => resolve(p)));
 
-  const plan = { overwrite: [], add: [], skip: [] };
+  const plan = { overwrite: [], add: [], keep: [], skip: [] };
   for (const [rel, abs, content] of targets) {
     if (rel.split("/").includes("..")) { plan.skip.push([rel, "the path escapes the project"]); continue; }
     const local = localState(abs, roots);
     if (local.fault) plan.skip.push([shown(abs), local.fault]);
     else if (local.hash === null) plan.add.push([abs, content]);
-    else if (local.hash !== hashOf(abs, content)) plan.overwrite.push([abs, content]);
+    else if (local.hash !== hashOf(abs, content)) (kept.has(resolve(abs)) ? plan.keep : plan.overwrite).push([abs, content]);
   }
-  for (const list of [plan.overwrite, plan.add, plan.skip]) list.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  for (const list of [plan.overwrite, plan.add, plan.keep, plan.skip]) list.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
 
   // ---- the report -----------------------------------------------------------
   const would = settings.dryRun ? "would " : "";
   for (const [abs] of plan.overwrite) reporter.summary(`${would}overwrite ${shown(abs)}`);
   for (const [abs] of plan.add) reporter.summary(`${would}add ${shown(abs)}`);
+  for (const [abs] of plan.keep) reporter.summary(`keep ${shown(abs)}`);
   for (const [name, why] of plan.skip) reporter.summary(`skip ${name}: ${why}`);
+  const keptCount = plan.keep.length === 0 ? "" : `, ${plan.keep.length} kept`;
   const skipped = plan.skip.length === 0 ? "" : `, ${plan.skip.length} skipped`;
   const changes = plan.overwrite.length + plan.add.length;
-  if (changes === 0) reporter.summary(`update: nothing to do — ${label} is already applied${skipped}`);
-  else if (settings.dryRun) reporter.summary(`update: would overwrite ${plan.overwrite.length}, add ${plan.add.length}${skipped} — ${label}`);
+  if (changes === 0) reporter.summary(`update: nothing to do — ${label} is already applied${keptCount}${skipped}`);
+  else if (settings.dryRun) reporter.summary(`update: would overwrite ${plan.overwrite.length}, add ${plan.add.length}${keptCount}${skipped} — ${label}`);
   if (settings.dryRun) return 0;
 
   // ---- the question ---------------------------------------------------------
@@ -112,7 +120,7 @@ export async function update({ sourceRoot, settings, template, reporter, project
     writeFileSync(tmp, content);
     renameSync(tmp, abs);
   }
-  if (changes > 0) reporter.summary(`update: overwrote ${plan.overwrite.length}, added ${plan.add.length}${skipped} — ${label}`);
+  if (changes > 0) reporter.summary(`update: overwrote ${plan.overwrite.length}, added ${plan.add.length}${keptCount}${skipped} — ${label}`);
   // The record is written back after the copy (a template's unify.yaml has no
   // template: line of its own), and follows a source named on the command line.
   if (changes > 0 || explicit !== undefined) {

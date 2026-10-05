@@ -5,8 +5,8 @@
  *
  * `templates/<name>/` is the source of truth for a built-in template: a
  * complete project — `site/` beside `AGENTS.md`, `DEPLOY.md` (and the blog's
- * `scripts/gen.mjs`, and a `unify.yaml` only where a page needs a flag live,
- * §19.11) — laid out exactly as `unify init`
+ * `scripts/gen.mjs`, and a `unify.yaml` with the lines the template needs
+ * live — `keep:` in every built-in, §19.11) — laid out exactly as `unify init`
  * lays one out, which is also what makes each directory usable as a git
  * template on its own (`unify init https://github.com/fwdslsh/unify/templates/blog`).
  *
@@ -19,10 +19,9 @@
  *
  * It also regenerates the `unify.yaml` of each template that ships one from
  * the option registry (§18: the file lists every saveable option, so it cannot
- * fall behind the CLI), keeping whichever lines the template has live (the
- * docs template's `catalog: true`, the blog's `generate: scripts/gen.mjs`).
- * The other templates ship none: `init` writes the all-commented file, and it
- * is then the site's.
+ * fall behind the CLI), keeping whichever lines the template has live (`keep:`
+ * in every built-in, the docs template's `catalog: true`, the blog's
+ * `generate: scripts/gen.mjs`).
  */
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";

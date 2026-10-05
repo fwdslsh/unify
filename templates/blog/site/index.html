@@ -19,8 +19,8 @@
       address, and <code>site/_examples/authors.json</code> to <code>site/_data/authors.json</code> with your own
       name in it. Edit the copies: nothing under <code>_examples/</code> ships, and <code>unify update</code> never
       touches a file you copied.</p>
-      <p>To change the look, copy <code>site/_examples/theme.html</code> to <code>site/_includes/theme.html</code> and edit the
-      values: the layout includes that file, and your copy takes the place of the template's default.</p>
+      <p>To change the look, edit <code>site/assets/theme.css</code>: the custom properties the stylesheet reads, each at
+      its default. <code>unify.yaml</code> lists it under <code>keep:</code>, so <code>unify update</code> never overwrites it.</p>
       <h2>One of these pages is generated</h2>
       <p><code>blog.html</code> is written by <code>scripts/gen.mjs</code> from the posts unify has already read and
       <code>site/_data/authors.json</code>, into a directory unify hands it before every build — it does not exist in
