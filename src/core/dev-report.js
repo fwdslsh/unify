@@ -117,6 +117,7 @@ ${body}
  */
 export function renderPending() {
   return page(`<h1>unify — local audit view</h1>
+<p class="links"><a href="/_unify/preview/">Preview layouts and includes</a></p>
 <p class="address">No build has completed yet. This page reloads when one does.</p>`);
 }
 
@@ -137,6 +138,7 @@ export function renderPending() {
  */
 export function renderInterrupted() {
   return page(`<h1>unify — local audit view</h1>
+<p class="links"><a href="/_unify/preview/">Preview layouts and includes</a></p>
 <p class="address">The last rebuild ended before the build could report on it. Its diagnostics are on the
 terminal running <code>unify dev</code>. This page reloads when a rebuild completes.</p>`);
 }
@@ -195,6 +197,7 @@ function summarySection({ findings, address, diagnostics, published }) {
   // actually did.
   const state = published ? "published" : "not published";
   return `<h1>unify — local audit view</h1>
+<p class="links"><a href="/_unify/preview/">Preview layouts and includes</a></p>
 <p class="address">${esc(address)}<br>${esc(counts)}<br>${esc(
     `build: ${problems} problem${problems === 1 ? "" : "s"}, ${advisories} advisor${advisories === 1 ? "y" : "ies"} — ${state}`,
   )}</p>`;

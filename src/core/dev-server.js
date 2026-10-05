@@ -358,6 +358,10 @@ async function handleRequest(req, res, outputDir, clients, report, pages, previe
   }
   // §27.7 — the source preview: composed on request from the source tree,
   // served with the reload script so an edit re-renders it, written nowhere.
+  if (preview && url.pathname === PREVIEW_PATH.slice(0, -1)) {
+    res.writeHead(302, { location: PREVIEW_PATH, "content-length": 0 });
+    return res.end();
+  }
   if (preview && url.pathname.startsWith(PREVIEW_PATH)) {
     const result = await preview(decodeURIComponent(url.pathname.slice(PREVIEW_PATH.length)), url.searchParams);
     if (result.status === 302) {

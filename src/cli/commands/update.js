@@ -149,7 +149,7 @@ function confirm(question, input, output) {
 /**
  * §19.10 — a project with no `template:` line has nothing to update from, and
  * nothing is guessed. The fix names the line to add; a `unify.template.json`
- * left by 0.11.2 gets its own line, composed from the source it recorded.
+ * left by 0.11.2 or 0.11.3 gets its own line, composed from the source it recorded.
  * @param {string} projectRoot
  * @param {string} configShown
  */
@@ -162,9 +162,9 @@ function noRecord(projectRoot, configShown) {
   if (existsSync(legacy)) {
     try {
       const { source } = JSON.parse(readFileSync(legacy, "utf8"));
-      fixes.unshift(`unify.template.json is 0.11.2's record: add  template: ${String(source)}  to ${configShown} and delete that file`);
+      fixes.unshift(`unify.template.json is the 0.11.2–0.11.3 record: add  template: ${String(source)}  to ${configShown} and delete that file`);
     } catch {
-      fixes.unshift("unify.template.json is 0.11.2's record; its source is the template: line to add, then delete that file");
+      fixes.unshift("unify.template.json is the 0.11.2–0.11.3 record; its source is the template: line to add, then delete that file");
     }
   }
   return new UsageError(`no template recorded in ${configShown}: this project has nothing to update from`, fixes);

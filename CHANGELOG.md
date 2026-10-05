@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.11.3] - 2026-10-05
+## [0.11.4] - 2026-10-05
 
 The template record is one line in `unify.yaml`, and `unify update` is a copy you confirm; `unify.template.json` is gone.
 
@@ -31,11 +31,28 @@ The template record is one line in `unify.yaml`, and `unify update` is a copy yo
 
 ### Added
 
-- **`docs/templates.md`**, the template guide — the four source forms, the scaffold-configure-author-update
-  workflow, and how to publish a template: tooling in place, everything a site fills in only as examples under
-  `_examples/` (which the build never publishes and `update` therefore never lists as the site's), and no
-  `unify.yaml` unless a page needs a flag live — rendered on the docs site under Guides and linked from the
-  README, the tutorial and the CLI reference.
+- **A template-authoring convention, and the built-in templates follow it** (`docs/templates.md` §3, spec §19.11):
+  tooling ships in place and everything a site fills in ships only as examples under `site/_examples/`, which the
+  default `_*` exclusion keeps out of the build — copy one into place, edit the copy, and `unify update` never lists
+  it. The five built-ins now ship `index.html`, `404.html`, the layout, the nav, the stylesheet and `robots.txt` in
+  place (plus the docs template's "All pages" starter and the blog's generator), and their pages, posts, guide pages,
+  project pages and the blog's authors file as examples. Only `docs` (`catalog: true`) and `blog`
+  (`generate: scripts/gen.mjs`) ship a `unify.yaml`; `init` writes the all-commented file for the others, and it is
+  then the site's. The blog generator writes an empty listing and feed for a scaffold with no posts yet.
+
+## [0.11.3] - 2026-10-05
+
+### Added
+
+- **`/_unify/preview/`, the preview index.** `unify dev` now prints a second address at
+  startup; it lists every layout, include and page in the site, each a link to its preview
+  (a built page to its own address), with the number of built pages that use each layout and
+  include. The audit view links to it and every preview's selector links back. Start
+  `unify dev`, open the address, choose the file (rule DEV-07, spec §27.7).
+
+- **`docs/templates.md`**, the template guide — the four source forms, the configure-once-then-`unify update`
+  workflow, and how to publish a template — rendered on the docs site under Guides and linked from the README,
+  the tutorial and the CLI reference.
 
 ## [0.11.2] - 2026-10-04
 
