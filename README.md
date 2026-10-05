@@ -46,7 +46,7 @@ unify dev       # build, watch, serve, reload — http://localhost:3000
 unify build     # write the final site to dist/ — upload it anywhere
 ```
 
-`unify init` scaffolds a complete site into `site/` — a layout, a nav include, HTML and Markdown pages, CSS, and a `robots.txt` — plus three files at the project root, outside `site/` so they can never publish: **`AGENTS.md`**, guidance for whoever (or whatever) edits the site next, **`DEPLOY.md`**, the deployment recipe, and a **`unify.yaml`** listing every build flag, described and commented out, so you uncomment only what differs from the default. Five templates: `default`, `basic`, `blog`, `docs`, `portfolio`. Every scaffold passes `unify build --dry-run --strict` and `unify audit --strict` out of the box.
+`unify init` scaffolds a complete site into `site/` — a layout, a nav include, HTML and Markdown pages, CSS, and a `robots.txt` — plus four files at the project root, outside `site/` so they can never publish: **`AGENTS.md`**, guidance for whoever (or whatever) edits the site next, **`DEPLOY.md`**, the deployment recipe, **`unify.template.json`**, the record of the template it came from (what `unify update` reads to bring a later version in without touching your edits), and a **`unify.yaml`** listing every build flag, described and commented out, so you uncomment only what differs from the default. Five templates: `default`, `basic`, `blog`, `docs`, `portfolio`. Every scaffold passes `unify build --dry-run --strict` and `unify audit --strict` out of the box.
 
 New here? The tutorial is **[Getting Started](docs/getting-started.md)**.
 
@@ -101,6 +101,7 @@ unify audit              evaluate the site the build would publish — writes no
 unify dev                build, watch, serve, and reload — the inner loop
 unify watch              build + rebuild on change, no server
 unify init [template]    scaffold a starter site — a built-in name, a directory, a git repository (URL/<subdirectory>#ref), or an npm package named unify-<name>-template
+unify update [template]  bring the template's later version in: unchanged files update, your edits are kept and reported, --dry-run previews
 ```
 
 `unify --help` lists every option — among them `--pretty-urls`, `--base-url` (which also generates `sitemap.xml`, and `feed.xml` once a page declares `schema: Article`/`BlogPosting`), `--canonical none` (completion is on once `--base-url` is set), `--catalog`, `--search-corpus`, `--dry-run`, and `--strict`. The **[CLI Reference](docs/cli-reference.md)** documents every command, option, and exit code — there are no others. An optional `unify.yaml` at the project root holds saved flags and nothing more — only what differs from the defaults; `unify init` writes one with every option described and commented out, and `unify build --save-config` fills it from the flags you pass.

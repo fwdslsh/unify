@@ -25,13 +25,14 @@ Upload `dist/` anywhere: GitHub Pages, Netlify, any static host.
 
 ## What `init` gave you
 
-(`unify init blog`, `docs` or `portfolio` start from a different built-in; `unify init <directory>`, a git URL such as `https://github.com/fwdslsh/unify/templates/blog`, or an npm package named `unify-<name>-template` start from a template somebody published — add `--audit` to keep it only if it audits clean. The [CLI reference](cli-reference.md#unify-init-template) has the details.)
+(`unify init blog`, `docs` or `portfolio` start from a different built-in; `unify init <directory>`, a git URL such as `https://github.com/fwdslsh/unify/templates/blog`, or an npm package named `unify-<name>-template` start from a template somebody published — add `--audit` to keep it only if it audits clean. Later, `unify update` brings the template's next version in: files you never touched update, files you edited are kept and listed. The [CLI reference](cli-reference.md#unify-init-template) has the details.)
 
 ```
 my-site/
 ├── AGENTS.md             # notes for whoever edits this site next — outside site/, so it never publishes
 ├── DEPLOY.md             # how to publish it, ending in the two commands that carry your address
 ├── unify.yaml            # every build flag, described and commented out — uncomment what differs from the default
+├── unify.template.json   # which template this came from, at which version — what `unify update` reads; never publishes
 └── site/                 # the source root — everything here ships
     ├── _layout.html      # the site chrome — one complete HTML page
     ├── _includes/

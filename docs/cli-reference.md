@@ -10,6 +10,7 @@ unify audit                evaluate the site the build would publish — writes 
 unify dev                  build, watch, serve, and reload — the inner loop
 unify watch                build + rebuild on change, no server
 unify init [template]      scaffold a starter site from a built-in template, a directory, a git repository or an npm package
+unify update [template]    bring the recorded template's later version into the project
 
 Options:
   -s, --source <dir>       source directory (default: site/ if it exists, else src/, else .)
@@ -102,12 +103,31 @@ Scaffolds a starter site into `site/`, with `AGENTS.md`, `DEPLOY.md` and a `unif
 
 - a **built-in**, by name — each is a directory of the unify repository, `templates/<name>/`, embedded in the CLI, so the name needs no network and no git;
 - an **npm package**, named by the convention `unify-<name>-template` or `@<organization>/unify-<name>-template`, optionally `@version` (`unify init @fwdslsh/unify-shop-template@1.2.0`) — fetched with your own `npm pack`, so your `.npmrc`, registry and tokens apply; the pattern is also what to search npm for;
-- a **git repository** — a URL, a `git@host:owner/repo.git` address, or any path ending in `.git`, with an optional `#branch-or-tag`, fetched with your own `git clone` (your SSH keys and credential helper apply, and nothing prompts). A **subdirectory may follow the repository**, so one repository can host many templates: `unify init https://github.com/fwdslsh/unify/templates/blog` scaffolds that directory; the URL your browser shows for a directory (`…/tree/main/templates/blog`) works too;
+- a **git repository** — a URL, a `git@host:owner/repo.git` address, or any path ending in `.git`, with an optional `#ref` (a branch, a tag, or a commit), fetched with your own `git clone` (your SSH keys and credential helper apply, and nothing prompts). A **subdirectory may follow the repository**, so one repository can host many templates: `unify init https://github.com/fwdslsh/unify/templates/blog` scaffolds that directory; the URL your browser shows for a directory (`…/tree/main/templates/blog`) works too;
 - a **directory** on disk — anything else, which must exist.
 
 A template is a project laid out as `init` lays one out: `site/` (or `src/`) beside `AGENTS.md`, `DEPLOY.md`, `unify.yaml` and whatever else belongs at the project root; the source tree lands in the target source root and the rest beside it. A directory with neither is a bare source tree, and all of it is content. `.git/`, `node_modules/`, `package.json` and lockfiles are never copied. A bare word that is neither a built-in, a template package name nor a directory exits `2` naming the four forms — a typo never becomes a network lookup. Every refusal above applies to every source: nothing is written if any file would collide.
 
 **`--audit`** keeps the scaffold only if it is a proper unify site: after writing, `unify audit --strict` runs over the new project (with its own `unify.yaml`, so the blog's generator and the docs template's `catalog: true` are honored) and prints its report; a finding removes everything `init` wrote and exits `1`. Every built-in passes it.
+
+`init` also writes **`unify.template.json`** at the project root: the template source as you typed it, the revision it fetched (a git commit, an npm version, unify's own version for a built-in) and a hash of every file it provided. It is never shipped, like `unify.yaml`, and it is what `unify update` reads.
+
+### `unify update [template]`
+
+Brings a later version of the project's template in without resetting what you own. It fetches the recorded template again (or the one you name, to move to a new version: `unify update https://github.com/o/r/templates/blog#v2`, `unify update unify-shop-template@2.0.0`), with the same resolver and the same git and npm credentials `init` uses, and compares three things per file: what the template provided last time (the recorded hash), what it provides now, and what is on disk.
+
+- The template did not change a file: nothing happens to it, whatever you did.
+- The template changed it and you did not: **updated**.
+- The template changed it and so did you (or you removed it): **conflict**. Your bytes stay, the line names the file and why, and the exit code is `1`. Nothing resolves a conflict but you: take the template's version (the next run then records it as current) or keep yours.
+- A new template file lands where you have nothing; where you already have a file, it is a conflict.
+- A file the template dropped is removed only if you never touched it.
+- A file the template declares **owned** — a seed, a config file, a content folder — is added once if absent and otherwise never touched or mentioned.
+
+The report lists each `update`, `add`, `remove` and `conflict`, then one summary line with the counts and the revision; running the same update again says `nothing to do`. **`--dry-run`** prints the same change set with `would` and writes nothing, not even the record. Writes are temp-then-rename beside their target; a symlink, a path that resolves outside the project, or a `..` in a template path is refused as a conflict; the fetch happens before any write, so an unreachable source changes nothing; and nothing a template ships is ever executed.
+
+**Template authors** declare what sites own in a `unify.template.json` at the template's root — `{"owned": ["site/config.json", "site/reports/**"]}`, patterns in the `--exclude` grammar against template-relative paths. The file is packaging, like `package.json`: read, never copied.
+
+**`--adopt <source>`** is the recovery when a project has no record (scaffolded before 0.11.2, or the file was lost): it fetches the template at the version you name (`#ref`, `@version`) and writes the record from it without changing a file; the next `unify update` compares against that baseline. Without a record, `unify update` exits `2` and says so.
 
 ## Options
 
@@ -362,6 +382,10 @@ Work that edits pages rather than adding files is named above the list, one line
 canonical completion: 5 pages would gain a canonical link
 structured data: 3 pages would gain a JSON-LD block
 ```
+
+### `--adopt <source>` (update only)
+
+Record `<source>` at the version fetched as this project's template, changing no file. See `unify update` above.
 
 ### `--audit` (build and init)
 
