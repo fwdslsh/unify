@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`docs/templates.md`**, the template guide — the four source forms, the configure-once-then-`unify update`
+  workflow, and how to publish a template — rendered on the docs site under Guides and linked from the README,
+  the tutorial and the CLI reference.
+
 ## [0.11.2] - 2026-10-04
 
 Closes [#109](https://github.com/fwdslsh/unify/issues/109): native template updates that never reset a site's configuration or content.

@@ -25,7 +25,7 @@ Upload `dist/` anywhere: GitHub Pages, Netlify, any static host.
 
 ## What `init` gave you
 
-(`unify init blog`, `docs` or `portfolio` start from a different built-in; `unify init <directory>`, a git URL such as `https://github.com/fwdslsh/unify/templates/blog`, or an npm package named `unify-<name>-template` start from a template somebody published — add `--audit` to keep it only if it audits clean. Later, `unify update` brings the template's next version in: files you never touched update, files you edited are kept and listed. The [CLI reference](cli-reference.md#unify-init-template) has the details.)
+(`unify init blog`, `docs` or `portfolio` start from a different built-in; `unify init <directory>`, a git URL such as `https://github.com/fwdslsh/unify/templates/blog`, or an npm package named `unify-<name>-template` start from a template somebody published — add `--audit` to keep it only if it audits clean. Later, `unify update` brings the template's next version in: files you never touched update, files you edited are kept and listed. [`templates.md`](templates.md) walks through the whole workflow.)
 
 ```
 my-site/
@@ -242,6 +242,7 @@ The script lives in `scripts/` beside the site and writes real pages into a dire
 ## Where to go next
 
 - [`authoring-rules.md`](authoring-rules.md) — every authoring rule on one screen
+- [`templates.md`](templates.md) — starting from a template, taking its later versions with `unify update`, and publishing one
 - [`cli-reference.md`](cli-reference.md) — every command and flag
 - [`product-spec.md`](product-spec.md) — the product contract, including what unify refuses to do and why
 - [`conformance-spec.md`](conformance-spec.md) — the exact composition rules, for implementers and the curious
