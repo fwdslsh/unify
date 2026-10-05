@@ -8,6 +8,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.3] - 2026-10-05
+
+The template record is one line in `unify.yaml`; `unify.template.json` is gone.
+
+### Changed
+
+- **The record `init` leaves is `template: <source>` in `unify.yaml`**, pinned to the version fetched
+  (`blog@0.11.3`, `unify-shop-template@1.4.0`, `https://…/templates/shop#<commit>`, `../shop#<commit>` for
+  a directory that is a clean git checkout). Nothing else is recorded: no file list, no hashes. `unify update`
+  fetches the template at that pin as its **baseline** and at its latest as the target, and compares the two
+  with what is on disk (spec §19.10). The line advances only when a run ends with no conflict, so an
+  unresolved conflict is reported on every run until the site takes the template's version or lists the
+  file under `owned:`. `--template <source>` is the positional as an option.
+- **`owned:` is a `unify.yaml` list** (also `--owned <glob>`, repeatable): the paths a template leaves to the
+  site, relative to the file, in `--exclude`'s grammar. A template declares it in its own `unify.yaml`, which
+  travels with it; a site can extend it.
+- A built-in can be pinned to a unify version, `unify init blog@0.11.2`: the same `templates/blog` as that
+  release shipped, fetched from the unify repository.
+
+### Removed
+
+- **`unify.template.json`** (the record and the manifest) and **`unify update --adopt`**. A project that still
+  has the 0.11.2 file is told the exact `template:` line to add. A record with no version compares two ways
+  — every differing file is a conflict, nothing is removed — and says so.
+
 ### Added
 
 - **`docs/templates.md`**, the template guide — the four source forms, the configure-once-then-`unify update`
@@ -820,7 +845,8 @@ with generated compare-link notes only. Their diffs are on the
 [releases page](https://github.com/fwdslsh/unify/releases). Nothing here
 retroactively reconstructs detail those notes never carried.
 
-[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.11.2...HEAD
+[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.11.3...HEAD
+[0.11.3]: https://github.com/fwdslsh/unify/compare/v0.11.2...v0.11.3
 [0.11.2]: https://github.com/fwdslsh/unify/compare/v0.11.1...v0.11.2
 [0.11.1]: https://github.com/fwdslsh/unify/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/fwdslsh/unify/compare/v0.10.1...v0.11.0

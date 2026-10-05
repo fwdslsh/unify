@@ -15,6 +15,7 @@ import { join } from "node:path";
 import { init } from "../../src/cli/commands/init.js";
 import { Reporter, UsageError } from "../../src/core/diagnostics.js";
 import { TEMPLATES, TEMPLATE_ROOT_FILES } from "../../src/templates/index.js";
+import pkg from "../../package.json" with { type: "json" };
 
 /** The project-root files every built-in shares (§19.4). */
 const ROOT_FILES = Object.fromEntries(["AGENTS.md", "DEPLOY.md", "unify.yaml"].map((f) => [f, TEMPLATE_ROOT_FILES.default[f]]));
@@ -154,12 +155,13 @@ describe("init()", () => {
     expect(existsSync(join(root, "src", "_layout.html"))).toBe(true);
   });
 
-  test("writes unify.yaml at the project root for every template, all commented out except docs' catalog: true and blog's generate: (§18, §19.6, §19.8)", async () => {
+  test("writes unify.yaml at the project root for every template, all commented out except docs' catalog: true, blog's generate:, and the template: record (§18, §19.6, §19.8, §19.10)", async () => {
     for (const name of Object.keys(TEMPLATES)) {
       const root = tempDir();
       await init({ projectRoot: root, sourceRoot: root, sourceDefaulted: true, template: name, reporter: silentReporter() });
       const live = readFileSync(join(root, "unify.yaml"), "utf8").split("\n").filter((l) => /^[a-z]/.test(l));
-      expect(live).toEqual({ docs: ["catalog: true"], blog: ["generate: scripts/gen.mjs"] }[name] ?? []);
+      // §19.10 — a built-in is recorded as name@<unify version>, in the key's own place in the file.
+      expect(live).toEqual([...({ docs: ["catalog: true"], blog: ["generate: scripts/gen.mjs"] }[name] ?? []), `template: ${name}@${pkg.version}`]);
       expect(existsSync(join(root, "site", "unify.yaml"))).toBe(false);
     }
   });

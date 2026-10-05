@@ -110,24 +110,24 @@ A template is a project laid out as `init` lays one out: `site/` (or `src/`) bes
 
 **`--audit`** keeps the scaffold only if it is a proper unify site: after writing, `unify audit --strict` runs over the new project (with its own `unify.yaml`, so the blog's generator and the docs template's `catalog: true` are honored) and prints its report; a finding removes everything `init` wrote and exits `1`. Every built-in passes it.
 
-`init` also writes **`unify.template.json`** at the project root: the template source as you typed it, the revision it fetched (a git commit, an npm version, unify's own version for a built-in) and a hash of every file it provided. It is never shipped, like `unify.yaml`, and it is what `unify update` reads.
+`init` also writes one line into `unify.yaml`: `template: <source>`, the template as you typed it **pinned to the version it fetched** — a git commit, an npm version, unify's own version for a built-in (`blog@0.11.3`), the commit of the repository a directory sits in. That line is the whole record, and it is what `unify update` reads. `--template <source>` is the positional spelled as an option.
 
 ### `unify update [template]`
 
-Brings a later version of the project's template in without resetting what you own. It fetches the recorded template again (or the one you name, to move to a new version: `unify update https://github.com/o/r/templates/blog#v2`, `unify update unify-shop-template@2.0.0`), with the same resolver and the same git and npm credentials `init` uses, and compares three things per file: what the template provided last time (the recorded hash), what it provides now, and what is on disk.
+Brings a later version of the project's template in without resetting what you own. It fetches the template twice, with the same resolver and the same git and npm credentials `init` uses: at the version `unify.yaml` records — the baseline, exactly what you started from — and at its latest (or the one you name, to move to a version or address: `unify update https://github.com/o/r/templates/blog#v2`, `unify update unify-shop-template@2.0.0`). Then it compares three things per file: the baseline, the template now, and what is on disk.
 
 - The template did not change a file: nothing happens to it, whatever you did.
 - The template changed it and you did not: **updated**.
-- The template changed it and so did you (or you removed it): **conflict**. Your bytes stay, the line names the file and why, and the exit code is `1`. Nothing resolves a conflict but you: take the template's version (the next run then records it as current) or keep yours.
+- The template changed it and so did you (or you removed it): **conflict**. Your bytes stay, the line names the file and why, and the exit code is `1`. Nothing resolves a conflict but you: take the template's version, or keep yours and list the file under `owned:`. The `template:` line moves to the new version only when a run ends with no conflict, so an unresolved conflict is reported again rather than forgotten.
 - A new template file lands where you have nothing; where you already have a file, it is a conflict.
 - A file the template dropped is removed only if you never touched it.
-- A file the template declares **owned** — a seed, a config file, a content folder — is added once if absent and otherwise never touched or mentioned.
+- A file listed under **`owned:`** in `unify.yaml` — a seed, a config file, a content folder — is added once if absent and otherwise never touched or mentioned.
 
-The report lists each `update`, `add`, `remove` and `conflict`, then one summary line with the counts and the revision; running the same update again says `nothing to do`. **`--dry-run`** prints the same change set with `would` and writes nothing, not even the record. Writes are temp-then-rename beside their target; a symlink, a path that resolves outside the project, or a `..` in a template path is refused as a conflict; the fetch happens before any write, so an unreachable source changes nothing; and nothing a template ships is ever executed.
+The report lists each `update`, `add`, `remove` and `conflict`, then one summary line with the counts and the pinned version; running the same update again says `nothing to do`. **`--dry-run`** prints the same change set with `would` and writes nothing, not even the record. Writes are temp-then-rename beside their target; a symlink, a path that resolves outside the project, or a `..` in a template path is refused as a conflict; the fetches happen before any write, so an unreachable source changes nothing; and nothing a template ships is ever executed. A record with no version (a directory that was not a clean git checkout when scaffolded) has no baseline: every file that differs is then a conflict and nothing is removed, and the report says so.
 
-The workflow around these two commands, and how to publish a template, is in [`templates.md`](templates.md). **Template authors** declare what sites own in a `unify.template.json` at the template's root — `{"owned": ["site/config.json", "site/reports/**"]}`, patterns in the `--exclude` grammar against template-relative paths. The file is packaging, like `package.json`: read, never copied.
+The workflow around these two commands, and how to publish a template, is in [`templates.md`](templates.md). **Template authors** declare what sites own under `owned:` in the template's own `unify.yaml` — patterns in the `--exclude` grammar against paths relative to the file (`site/config.json`, `site/reports/**`) — and the file travels with the template like any other.
 
-**`--adopt <source>`** is the recovery when a project has no record (scaffolded before 0.11.2, or the file was lost): it fetches the template at the version you name (`#ref`, `@version`) and writes the record from it without changing a file; the next `unify update` compares against that baseline. Without a record, `unify update` exits `2` and says so.
+A project with no `template:` line (scaffolded before 0.11.3, or the line was lost) has no record: `unify update` exits `2` and names the line to add, pinned to the version the project was scaffolded from — and, where a `unify.template.json` from 0.11.2 is still present, the exact line composed from it.
 
 ## Options
 
@@ -383,9 +383,13 @@ canonical completion: 5 pages would gain a canonical link
 structured data: 3 pages would gain a JSON-LD block
 ```
 
-### `--adopt <source>` (update only)
+### `--template <source>` (init and update)
 
-Record `<source>` at the version fetched as this project's template, changing no file. See `unify update` above.
+The template, the same as the positional. Saved in `unify.yaml` by `init`, pinned to the version fetched; `unify update` reads the saved line as its baseline and the flag or positional as where to move to.
+
+### `--owned <glob>` (update)
+
+A path the template leaves to the site, relative to `unify.yaml` and in `--exclude`'s grammar: never rewritten, removed or reported by `update`, added once if absent. Repeatable; the saved form is the `owned:` list a template ships in its `unify.yaml`.
 
 ### `--audit` (build and init)
 

@@ -31,8 +31,7 @@ Upload `dist/` anywhere: GitHub Pages, Netlify, any static host.
 my-site/
 ├── AGENTS.md             # notes for whoever edits this site next — outside site/, so it never publishes
 ├── DEPLOY.md             # how to publish it, ending in the two commands that carry your address
-├── unify.yaml            # every build flag, described and commented out — uncomment what differs from the default
-├── unify.template.json   # which template this came from, at which version — what `unify update` reads; never publishes
+├── unify.yaml            # every build flag, described and commented out — uncomment what differs from the default; one live line, template:, records where this came from for `unify update`
 └── site/                 # the source root — everything here ships
     ├── _layout.html      # the site chrome — one complete HTML page
     ├── _includes/

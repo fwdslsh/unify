@@ -6,7 +6,7 @@
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { UsageError } from "../core/diagnostics.js";
-import { CONFIG_KEYS } from "./options.js";
+import { CONFIG_KEYS, LIST_KEYS } from "./options.js";
 
 /** `source` is written only by cli.js, and only when the file sits outside the source root (§18); here it is never one of the entries. */
 const WRITABLE = CONFIG_KEYS.filter((key) => key !== "source");
@@ -39,8 +39,8 @@ export function saveEntries(flags) {
   for (const key of WRITABLE) {
     if (!(key in flags)) continue;
     const value = flags[key];
-    if (key === "exclude") {
-      entries.set(key, ["exclude:", ...value.map((glob) => `  - ${scalar(glob, key)}`)]);
+    if (LIST_KEYS.includes(key)) {
+      entries.set(key, [`${key}:`, ...value.map((item) => `  - ${scalar(item, key)}`)]);
     } else if (value === true) {
       entries.set(key, [`${key}: true`]);
     } else {

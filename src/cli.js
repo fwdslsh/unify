@@ -53,7 +53,8 @@ Options:
       --dry-run            run the full build and every check, print the report, write nothing (with \`update\`: show the change set, write nothing)
       --audit              \`build\`: audit the composed site before publishing; publish only if \`unify audit\` would exit 0. \`init\`: keep the scaffold only if \`unify audit --strict\` passes on it
       --save-config        \`build\` only: write the saveable options given here into unify.yaml (after a good build)
-      --adopt              \`update\` only: record the named template as this project's, at the version fetched, without changing a file
+      --template <source>  \`init\`/\`update\`: the template, the same as the positional; init saves it in unify.yaml pinned to the version fetched
+      --owned <glob>       \`update\`: a path the template leaves to the site, never rewritten, removed or reported (repeatable; unify.yaml key owned)
       --strict             advisories count as problems for the exit code (with \`audit\`, findings too)
       --format <kind>      \`audit\` report shape: human (default), json, or sarif
       --external           \`audit\` only: fetch every off-origin URL the site emits and report the ones that don't resolve
@@ -199,11 +200,6 @@ export async function run(argv) {
     }
   }
 
-  // §19.10 — `--adopt` is `update`'s alone, and needs the template to adopt.
-  if (options.adopt && command !== "update") {
-    throw new UsageError(`--adopt applies only to \`unify update\`, not \`unify ${command}\``, ["run it as: unify update --adopt <template source>"]);
-  }
-
   // §18 — `--save-config` is `build`'s alone. With `--dry-run` it saves after
   // a dry run that exited 0: "check the flags, then keep them" — the one
   // thing a dry run then writes is unify.yaml, never dist/.
@@ -285,9 +281,11 @@ export async function run(argv) {
     case "init":
       // §19.9 — `--audit` (or a saved `audit: true`) gates the scaffold the way
       // it gates a publish; `auditGate` is the one setting init reads.
-      return (await import("./cli/commands/init.js")).init({ ...context, audit: settings.auditGate });
+      return (await import("./cli/commands/init.js")).init({ ...context, template: template ?? settings.template, audit: settings.auditGate });
     case "update":
-      return (await import("./cli/commands/update.js")).update({ ...context, adopt: options.adopt === true });
+      // §19.10 — the positional (or --template) names where to move to; the
+      // recorded line in unify.yaml, read by resolveSettings, is the baseline.
+      return (await import("./cli/commands/update.js")).update({ ...context, template: template ?? settings.template });
     default:
       throw new UsageError(`unknown command: ${command}`);
   }

@@ -31,7 +31,8 @@
  * nav), the automatic `_layout.html`, one named slot with a fallback
  * (`footer`) plus one page that fills it, one `data-layout="none"` page
  * (`404.html`), and the underscore convention (`_includes/`, and `_scripts/`
- * for `blog`). `init` never writes `unify.yaml` — nothing here does.
+ * for `blog`). The one line `init` writes into `unify.yaml` of its own is
+ * `template:` — the record §19.10 describes.
  *
  * §19.9 — the positional may also name a template OUTSIDE the registry: a
  * directory, a git repository, or an npm package (src/cli/template-source.js
@@ -50,14 +51,15 @@
  * is how an author holds a template somebody else wrote to the same bar.
  */
 
-import { existsSync, mkdirSync, rmdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { Reporter, UsageError } from "../../core/diagnostics.js";
 import { contains, toRelative } from "../../core/paths.js";
 import { TEMPLATES } from "../../templates/index.js";
+import { configPath, configTemplate } from "../options.js";
+import { saveEntries, writeConfig } from "../save-config.js";
 import { resolveSettings } from "../settings.js";
-import { buildRecord, RECORD_FILE, serializeRecord } from "../template-record.js";
-import { classifyTemplateSource, fetchTemplate } from "../template-source.js";
+import { classifyTemplateSource, fetchTemplate, pinSource } from "../template-source.js";
 
 const DEFAULT_TEMPLATE = "default";
 
@@ -150,16 +152,9 @@ export async function init({ sourceRoot, sourceDefaulted, template, reporter, au
     );
   }
 
-  // §19.10 — the record of what was scaffolded, for `unify update`: the
-  // source as typed, the revision fetched, and a hash of every file the
-  // template provided. A project-root write like the others (collision-
-  // checked, rolled back with them), and on §4.3's never-shipped list, so it
-  // is left out of the refusal above: wherever it lands, it cannot publish.
-  const record = serializeRecord(buildRecord(fetched));
   const writes = [
     ...Object.entries(files).map(([relPath, content]) => [join(target, ...relPath.split("/")), content]),
     ...Object.entries(rootFiles).map(([relPath, content]) => [join(projectRoot, ...relPath.split("/")), content]),
-    [join(projectRoot, RECORD_FILE), record],
   ];
 
   // §19 doesn't say what happens when the target already has files; the
@@ -225,10 +220,24 @@ export async function init({ sourceRoot, sourceDefaulted, template, reporter, au
     writeFileSync(absPath, content);
   }
 
+  // §19.10 — the record: ONE line in unify.yaml, `template: <source>` pinned
+  // to the version just fetched, which `unify update` fetches again as its
+  // baseline. The file is the template's own copy when it shipped one (just
+  // written above), else the project's existing one, else a fresh
+  // all-commented file at the project root — in every case the file §18
+  // says unify.yaml is, upserted the way `--save-config` upserts. Its prior
+  // bytes are kept so the audit gate below can put them back.
+  const { path: configFile } = configPath(target, projectRoot);
+  const priorConfig = existsSync(configFile) ? readFileSync(configFile) : null;
+  if (priorConfig === null) writeFileSync(configFile, configTemplate());
+  const pinned = pinSource(source, fetched.revision, label, dirname(configFile));
+  writeConfig(configFile, saveEntries({ template: pinned }));
+  const restoreConfig = () => (priorConfig === null ? rmSync(configFile, { force: true }) : writeFileSync(configFile, priorConfig));
+
   const shown = toRelative(projectRoot, target) || ".";
   const atRoot = rootNames.length === 0 ? "" : `, ${rootNames.length === 2 ? rootNames.join(" and ") : rootNames.join(", ")} at the project root`;
-  reporter.summary(`scaffolded ${label} (${writes.length - 1} files): ${Object.keys(files).length} into ${shown}${atRoot}`);
-  reporter.summary(`recorded the template in ${RECORD_FILE}: unify update brings in its later versions`);
+  reporter.summary(`scaffolded ${label} (${writes.length} files): ${Object.keys(files).length} into ${shown}${atRoot}`);
+  reporter.summary(`recorded template: ${pinned} in ${toRelative(projectRoot, configFile) || "unify.yaml"} — unify update brings in its later versions`);
 
   if (audit) {
     // §19.9 — the gate. The project is resolved exactly as a later `unify
@@ -247,10 +256,12 @@ export async function init({ sourceRoot, sourceDefaulted, template, reporter, au
     try {
       code = await (await import("./audit.js")).audit(context);
     } catch (error) {
+      restoreConfig();
       rollback(writes, createdDirs);
       throw error;
     }
     if (code !== 0) {
+      restoreConfig();
       rollback(writes, createdDirs);
       reporter.summary(`--audit: ${label} did not audit clean, so nothing was scaffolded`);
       return code;
@@ -263,7 +274,8 @@ export async function init({ sourceRoot, sourceDefaulted, template, reporter, au
 
 /**
  * §19.9 — undo a scaffold the audit gate rejected: every file this run
- * wrote, then every directory it created, deepest first and only while empty.
+ * wrote (unify.yaml's prior bytes are restored by the caller first), then
+ * every directory it created, deepest first and only while empty.
  * A directory that existed before init ran is never touched, and a file the
  * audit left behind inside a created one (there is none — audit writes
  * nothing — but the rule is stated, not assumed) keeps its directory.
