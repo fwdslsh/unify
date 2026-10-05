@@ -18,13 +18,14 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { extname, join } from "node:path";
+import { dirname, extname, join } from "node:path";
 import { init } from "../../src/cli/commands/init.js";
 import { compose, assembleMarkdownDocument } from "../../src/core/compose.js";
 import { Reporter } from "../../src/core/diagnostics.js";
 import { findAll, getAttr, parse, walk } from "../../src/core/html.js";
 import { inlineIncludes } from "../../src/core/includes.js";
 import { convert, convertFragment } from "../../src/core/markdown.js";
+import { resolutionRoots } from "../../src/core/paths.js";
 import { configTemplate } from "../../src/cli/options.js";
 import { TEMPLATES, TEMPLATE_ROOT_FILES } from "../../src/templates/index.js";
 import { SNAPSHOT } from "../../src/templates/snapshot.js";
@@ -42,6 +43,11 @@ function isUnderscored(relPath) {
 
 function isPage(relPath) {
   return /\.(html|md)$/i.test(relPath);
+}
+
+/** The §33.3 namespace of a scaffold: its site/ first, the project root beside it last (§4.5), where the template's default theme fragment lives. */
+function rootsOf(sourceDir) {
+  return resolutionRoots(sourceDir, null, dirname(sourceDir));
 }
 
 // ---------------------------------------------------------- in-memory checks
@@ -85,9 +91,11 @@ describe.each(TEMPLATE_NAMES)('template "%s" — SCF-01/SCF-02 structure (in-mem
     expect(paths.some((p) => p.startsWith("_includes/"))).toBe(true);
   });
 
-  test("SCF-01: exactly one <include> across the whole template", () => {
-    const count = (wholeSource.match(/<include\b/gi) || []).length;
-    expect(count).toBe(1);
+  test("SCF-01: one <include> for chrome (the nav), and the theme include in the two documents that own a <head> — the layout and the 404 (§4.5)", () => {
+    expect((wholeSource.match(/<include\s+src="\/_includes\/nav\.html"/gi) || []).length).toBe(1);
+    const themed = paths.filter((p) => /<include\s+src="\/_includes\/theme\.html"/i.test(files[p])).sort();
+    expect(themed).toEqual(["404.html", "_layout.html"]);
+    expect((wholeSource.match(/<include\b/gi) || []).length).toBe(3);
   });
 
   test("SCF-01: exactly one _layout.html (the automatic layout, discovered by name)", () => {
@@ -162,6 +170,25 @@ describe.each(TEMPLATE_NAMES)('template "%s" — SCF-01/SCF-02 structure (in-mem
     for (const css of cssFiles) expect(files[css]).toMatch(/slot\s*\{\s*display:\s*contents\s*;?\s*\}/);
   });
 
+  test("§19.11: the look is a fragment to copy — _examples/theme.html sets the stylesheet's custom properties in a <style> block, the template ships the default beside AGENTS.md, and the layout includes the path the site's copy shadows", () => {
+    expect(paths).toContain("_examples/theme.html");
+    expect(TEMPLATE_ROOT_FILES[name]["_includes/theme.html"]).toBeDefined();
+    const style = files["assets/style.css"];
+    // Every rule of the stylesheet sits in the base layer, so the site's unlayered values win whatever the order —
+    // and it imports nothing: a reference to a file the site copies later is P13 in a fresh scaffold (§12).
+    expect(style).toMatch(/^@layer base \{/m);
+    expect(style).not.toMatch(/@import/);
+    // Every property the example exposes is one the stylesheet both sets (the default) and reads.
+    const example = files["_examples/theme.html"];
+    expect(example).toMatch(/<style>[\s\S]*:root[\s\S]*<\/style>/);
+    const exposed = [...example.matchAll(/^\s*(--[\w-]+):\s*([^;]+);/gm)];
+    expect(exposed.length).toBeGreaterThan(0);
+    for (const [, prop, value] of exposed) {
+      expect(style).toContain(`${prop}: ${value};`);
+      expect(style).toContain(`var(${prop})`);
+    }
+  });
+
   test("built pages contain no <slot> elements outside the design-time layout itself", () => {
     // The layout is the one file that legitimately carries <slot> (its own
     // browser preview, product-spec §2). Every *page* must not — a stray
@@ -182,9 +209,9 @@ describe.each(TEMPLATE_NAMES)('template "%s" — SCF-01/SCF-02 structure (in-mem
         }
       });
       expect(problems).toEqual([]);
-      // Fragments (_includes/*) are snippets by design (authoring-rules.md);
-      // every real page and the layout must be a complete document.
-      if (!p.startsWith("_includes/")) expect(doctype?.raw?.toLowerCase()).toBe("<!doctype html>");
+      // Fragments (_includes/*, and the theme example, whose copy lands there) are snippets by design
+      // (authoring-rules.md); every real page and the layout must be a complete document.
+      if (!p.startsWith("_includes/") && p !== "_examples/theme.html") expect(doctype?.raw?.toLowerCase()).toBe("<!doctype html>");
     }
   });
 
@@ -242,14 +269,14 @@ describe.each(TEMPLATE_NAMES)('template "%s" — full composition (SCF-04: zero 
     } else {
       pageText = readFileSync(pageAbs, "utf8");
     }
-    const inlinedPage = await inlineIncludes({ text: pageText, file: pageAbs, sourceRoot: dir, reporter, convertMarkdown });
+    const inlinedPage = await inlineIncludes({ text: pageText, file: pageAbs, sourceRoot: dir, roots: rootsOf(dir), reporter, convertMarkdown });
 
     let layoutText = null;
     let layoutSpans;
     if (layoutRelPath) {
       const layoutAbs = join(dir, layoutRelPath);
       const inlinedLayout = await inlineIncludes({
-        text: readFileSync(layoutAbs, "utf8"), file: layoutAbs, sourceRoot: dir, reporter, convertMarkdown,
+        text: readFileSync(layoutAbs, "utf8"), file: layoutAbs, sourceRoot: dir, roots: rootsOf(dir), reporter, convertMarkdown,
       });
       layoutText = inlinedLayout.text;
       layoutSpans = inlinedLayout.spans;
@@ -289,14 +316,14 @@ describe.each(TEMPLATE_NAMES)('template "%s" — full composition (SCF-04: zero 
       } else {
         pageText = readFileSync(pageAbs, "utf8");
       }
-      const inlinedPage = await inlineIncludes({ text: pageText, file: pageAbs, sourceRoot: dir, reporter, convertMarkdown });
+      const inlinedPage = await inlineIncludes({ text: pageText, file: pageAbs, sourceRoot: dir, roots: rootsOf(dir), reporter, convertMarkdown });
 
       let layoutText = null;
       let layoutSpans;
       if (layoutRelPath) {
         const layoutAbs = join(dir, layoutRelPath);
         const inlinedLayout = await inlineIncludes({
-          text: readFileSync(layoutAbs, "utf8"), file: layoutAbs, sourceRoot: dir, reporter, convertMarkdown,
+          text: readFileSync(layoutAbs, "utf8"), file: layoutAbs, sourceRoot: dir, roots: rootsOf(dir), reporter, convertMarkdown,
         });
         layoutText = inlinedLayout.text;
         layoutSpans = inlinedLayout.spans;

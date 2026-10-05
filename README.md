@@ -100,7 +100,7 @@ unify [build]            build the site (default command)
 unify audit              evaluate the site the build would publish — writes nothing
 unify dev                build, watch, serve, and reload — the inner loop
 unify watch              build + rebuild on change, no server
-unify init [template]    scaffold a starter site — a built-in name, a directory, a git repository (URL/<subdirectory>#ref), or an npm package named unify-<name>-template
+unify init [template]    scaffold a starter site — a built-in name, a directory, a git repository (URL/<subdirectory>#ref), or any npm package
 unify update [template]  fetch the template again and copy its changed files over the site: the files it would overwrite are listed and confirmed first (--yes answers, --dry-run previews)
 ```
 

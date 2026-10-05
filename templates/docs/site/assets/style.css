@@ -1,37 +1,59 @@
-:root {
-  color-scheme: light dark;
-  font: 100%/1.5 system-ui, sans-serif;
-}
+/* The template's stylesheet: tooling, kept current by unify update. Its look is
+   the custom properties set on :root below, and a site changes them without
+   editing this file: site/_includes/theme.html — copied from
+   site/_examples/theme.html — carries the site's own values in a <style> block
+   the layout includes. Every rule here sits in the base cascade layer, and an
+   unlayered declaration beats a layered one whatever the order, so a value set
+   there wins, and a property left out keeps its default below. */
+@layer base {
+  :root {
+    color-scheme: light dark;
+    --font-body: 100%/1.5 system-ui, sans-serif;
+    --color-text: canvastext;
+    --color-background: canvas;
+    --color-link: linktext;
+    --color-rule: #88888880;
+    --measure: 42rem;
+    --space: 1.5rem;
+  }
 
-body {
-  max-width: 42rem;
-  margin: 0 auto;
-  padding: 1.5rem;
-}
+  body {
+    max-width: var(--measure);
+    margin: 0 auto;
+    padding: var(--space);
+    font: var(--font-body);
+    color: var(--color-text);
+    background: var(--color-background);
+  }
 
-nav a {
-  margin-right: 1rem;
-}
+  a {
+    color: var(--color-link);
+  }
 
-.site-footer {
-  margin-top: 3rem;
-  padding-top: 1rem;
-  border-top: 1px solid #88888880;
-  font-size: 0.875rem;
-}
+  nav a {
+    margin-right: 1rem;
+  }
 
-/* Scaffolded copy nobody should publish: conspicuous on purpose, so a
-   reader cannot mistake an invented name, date, price, or address for a
-   fact. Delete the class along with the text it marks. */
-.placeholder {
-  border: 1px dashed;
-  border-radius: 0.25em;
-  padding: 0 0.25em;
-  font-style: italic;
-  opacity: 0.8;
-}
+  .site-footer {
+    margin-top: 3rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-rule);
+    font-size: 0.875rem;
+  }
 
-/* Design-time preview only — built pages contain no <slot> elements. */
-slot {
-  display: contents;
+  /* Scaffolded copy nobody should publish: conspicuous on purpose, so a
+     reader cannot mistake an invented name, date, price, or address for a
+     fact. Delete the class along with the text it marks. */
+  .placeholder {
+    border: 1px dashed;
+    border-radius: 0.25em;
+    padding: 0 0.25em;
+    font-style: italic;
+    opacity: 0.8;
+  }
+
+  /* Design-time preview only — built pages contain no <slot> elements. */
+  slot {
+    display: contents;
+  }
 }

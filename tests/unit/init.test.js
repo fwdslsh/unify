@@ -106,21 +106,24 @@ describe("init()", () => {
     expect(readdirSync(root)).toEqual(["site"]);
   });
 
-  test("an unknown template is a usage fault (exit 2), never a silent fallback", async () => {
+  test("an argument that is no form at all is a usage fault (exit 2), never a silent fallback — and never a network lookup", async () => {
+    // A bare word is an npm package now (§19.9, any package can be a template), so the no-form
+    // argument is one no package, directory or URL could be spelled as.
     const root = tempDir();
     await expect(
-      init({ projectRoot: root, sourceRoot: root, sourceDefaulted: true, template: "not-a-real-template", reporter: silentReporter() }),
+      init({ projectRoot: root, sourceRoot: root, sourceDefaulted: true, template: "not a template", reporter: silentReporter() }),
     ).rejects.toThrow(UsageError);
   });
 
-  test("the unknown-template error names every valid choice", async () => {
+  test("the no-form error names every built-in and the other three forms", async () => {
     const root = tempDir();
     try {
-      await init({ projectRoot: root, sourceRoot: root, sourceDefaulted: true, template: "nope", reporter: silentReporter() });
+      await init({ projectRoot: root, sourceRoot: root, sourceDefaulted: true, template: "not a template", reporter: silentReporter() });
       throw new Error("expected init() to throw");
     } catch (e) {
       expect(e).toBeInstanceOf(UsageError);
       for (const name of Object.keys(TEMPLATES)) expect(e.fixes.join(" ")).toContain(name);
+      for (const form of ["directory", "npm package", "URL"]) expect(e.fixes.join(" ")).toContain(form);
     }
   });
 

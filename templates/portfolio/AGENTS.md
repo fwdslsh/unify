@@ -48,7 +48,7 @@ published** and the previous `dist/` is untouched — never report success on a 
   `--base-url`, and unify writes `feed.xml` itself — no script, unless you ship your own
   (an authored `feed.xml` always wins and generates nothing).
 
-## Adding pages: copy an example
+## Adding pages and a theme: copy an example
 
 - `site/_examples/` holds a copy-ready version of each kind of file this template expects you to
   add — a page, a post, a data file. **Copy one into place and edit the copy.** Never edit an
@@ -56,6 +56,10 @@ published** and the previous `dist/` is untouched — never report success on a 
 - Each example says where its copy belongs (`site/contact.html`, `site/posts/<slug>.md`). Once it
   is in place, link the new page from `site/_includes/nav.html` or from another page — `unify audit`
   reports a page nothing links to.
+- `site/_examples/theme.html` is the template's look: the custom properties its stylesheet reads, in
+  a `<style>` block. Copy it to `site/_includes/theme.html` and change the values: the layout and the
+  404 page include that path, and the site's file is found ahead of the template's `_includes/theme.html`
+  beside this one, so nothing in the template's stylesheet or layout is edited.
 - `unify update` fetches this template again and copies its changed files over this project after
   listing them and asking. It never visits a file the template does not ship, so your copies are
   yours for good; the examples and the tooling (`_layout.html`, `_includes/`, `assets/style.css`,

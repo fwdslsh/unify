@@ -1514,15 +1514,16 @@ test("scaffold: SCF-13 a template is a directory, a git repository or an npm pac
     if (badDir.exit !== 2 || !/has no directory templates\/shop/.test(badDir.stderr)) throw new Error(`a missing subdirectory must exit 2 naming it: exit ${badDir.exit}\n${badDir.stderr}`);
   }
 
-  // ---- an npm package is named by its convention and fetched with the
-  // author's own npm; the unpacking is proved on a real tarball in
-  // tests/unit/template-source.test.js. Here: the name pattern reaches npm
-  // (and only the pattern does), and npm's failure is a usage error. ---------
+  // ---- an npm package is ANY package name, fetched with the author's own
+  // npm; the unpacking is proved on a real tarball in
+  // tests/unit/template-source.test.js. Here: a scoped name and a bare word
+  // that is neither a built-in nor a directory both reach npm, and npm's
+  // failure is a usage error carrying its message. ---------------------------
   {
-    const r = await runCli(["init", "@unify-conformance-probe/unify-no-such-template-template"], mkTmp());
-    if (r.exit !== 2 || !/npm pack failed/.test(r.stderr)) throw new Error(`a template package npm cannot fetch must exit 2 naming npm pack: exit ${r.exit}\n${r.stderr}`);
-    const notIt = await runCli(["init", "no-such-template"], mkTmp());
-    if (notIt.exit !== 2 || /npm/.test(notIt.stderr.split("\n")[0])) throw new Error(`a name outside the convention must not reach npm:\n${notIt.stderr}`);
+    for (const spec of ["@unify-conformance-probe/unify-no-such-template-template", "unify-conformance-probe-no-such-package"]) {
+      const r = await runCli(["init", spec], mkTmp());
+      if (r.exit !== 2 || !/npm pack failed/.test(r.stderr)) throw new Error(`a package npm cannot fetch must exit 2 naming npm pack: exit ${r.exit}\n${r.stderr}`);
+    }
   }
 
   // ---- a bare source tree: no site/, no src/ — every file is content and
@@ -1559,11 +1560,11 @@ test("scaffold: SCF-13 a template is a directory, a git repository or an npm pac
     const r = await runCli(["init", "basic"], tmp);
     if (r.exit !== 0) throw new Error(`unify init basic beside a basic/ directory exited ${r.exit}:\n${r.stderr}`);
     if (!existsSync(join(tmp, "site", "_examples", "contact.html"))) throw new Error("the registry's basic must win over the directory of the same name");
-    // A bare word that is neither is refused before any tool runs — and the
-    // refusal says what the four forms are.
-    const typo = await runCli(["init", "blgo"], mkTmp());
-    if (typo.exit !== 2) throw new Error(`unify init blgo exited ${typo.exit}, expected 2`);
-    for (const form of ["default, basic, blog, docs, portfolio", "directory must exist", "unify-<name>-template", "URL"]) {
+    // An argument that is no form at all is refused before any tool runs —
+    // and the refusal says what the four forms are.
+    const typo = await runCli(["init", "not a template"], mkTmp());
+    if (typo.exit !== 2) throw new Error(`unify init "not a template" exited ${typo.exit}, expected 2`);
+    for (const form of ["default, basic, blog, docs, portfolio", "directory must exist", "npm package", "URL"]) {
       if (!typo.stderr.includes(form)) throw new Error(`the refusal must name the four forms; missing "${form}":\n${typo.stderr}`);
     }
     // An empty directory is a template with no source file: a usage error, never an empty scaffold.
@@ -1637,11 +1638,11 @@ test("scaffold: SCF-14 --audit keeps a scaffold only if it audits clean; a findi
 
 /** Where each template's examples belong once copied (§19.11) — what each example's own placeholder paragraph says. */
 const EXAMPLE_HOMES = {
-  default: { "about.md": "about.md", "contact.html": "contact.html" },
-  basic: { "contact.html": "contact.html" },
-  blog: { "post.md": "posts/hello-world.md", "authors.json": "_data/authors.json", "contact.html": "contact.html" },
-  docs: { "guide-page.md": "guide/getting-started.md", "contact.html": "contact.html" },
-  portfolio: { "work.html": "work.html", "project.html": "projects/project-one.html", "contact.html": "contact.html" },
+  default: { "about.md": "about.md", "contact.html": "contact.html", "theme.html": "_includes/theme.html" },
+  basic: { "contact.html": "contact.html", "theme.html": "_includes/theme.html" },
+  blog: { "post.md": "posts/hello-world.md", "authors.json": "_data/authors.json", "contact.html": "contact.html", "theme.html": "_includes/theme.html" },
+  docs: { "guide-page.md": "guide/getting-started.md", "contact.html": "contact.html", "theme.html": "_includes/theme.html" },
+  portfolio: { "work.html": "work.html", "project.html": "projects/project-one.html", "contact.html": "contact.html", "theme.html": "_includes/theme.html" },
 };
 
 for (const name of TEMPLATES) {
@@ -1674,15 +1675,23 @@ for (const name of TEMPLATES) {
     const built = await runCli(["build"], tmp);
     if (built.exit !== 0) throw new Error(`unify build exited ${built.exit} for ${name}: ${built.stderr}`);
     if (existsSync(join(tmp, "dist", "_examples"))) throw new Error(`${name}: dist/_examples/ exists — the examples published`);
+    // The fresh scaffold resolved the theme include from the project root (the build would be P01 otherwise), and that
+    // default sets nothing: the stylesheet's own values apply until the site copies the example into place.
+    if (/--measure:/.test(readFileSync(join(tmp, "dist", "index.html"), "utf8"))) throw new Error(`${name}: the template's default theme fragment sets properties of its own`);
 
     // ---- copy every example where it says it belongs, link the new pages from the nav, and the site builds and audits clean
     for (const [example, home] of Object.entries(EXAMPLE_HOMES[name])) {
       mkdirSync(dirname(join(site, ...home.split("/"))), { recursive: true });
       copyFileSync(join(site, "_examples", example), join(site, ...home.split("/")));
     }
-    // Every copied page gets a nav link except the ones another copy already links: a post from the generated
-    // listing, a project from the work page.
-    const linked = Object.values(EXAMPLE_HOMES[name]).filter((home) => /\.(html|md)$/.test(home) && !/^(posts|projects)\//.test(home));
+    // Every copied page gets a nav link except the ones another copy already links (a post from the generated
+    // listing, a project from the work page) and the theme fragment, which is not a page.
+    const linked = Object.values(EXAMPLE_HOMES[name]).filter((home) => /\.(html|md)$/.test(home) && !/^(posts|projects|_)/.test(home));
+    // The theme copy is edited — that is what it is for — so the built pages must show the site's value, not the default.
+    const themeCopy = join(site, "_includes", "theme.html");
+    const theme = readFileSync(themeCopy, "utf8");
+    if (!theme.includes("--measure: 42rem;")) throw new Error(`${name}: the theme example does not expose --measure at its default`);
+    writeFileSync(themeCopy, theme.replace("--measure: 42rem;", "--measure: 60rem;"));
     const nav = readFileSync(join(site, "_includes", "nav.html"), "utf8");
     writeFileSync(join(site, "_includes", "nav.html"), nav.replace("</nav>", linked.map((home) => ` <a href="/${home.replace(/\.md$/, ".html")}">${home}</a>`).join("") + "</nav>"));
     for (const args of [["build", "--dry-run", "--strict"], ["audit", "--strict"]]) {
@@ -1691,10 +1700,19 @@ for (const name of TEMPLATES) {
     }
     const rebuilt = await runCli(["build"], tmp);
     if (rebuilt.exit !== 0) throw new Error(`unify build exited ${rebuilt.exit} for ${name} with its examples in place: ${rebuilt.stderr}`);
-    for (const home of Object.values(EXAMPLE_HOMES[name]).filter((h) => /\.(html|md)$/.test(h))) {
+    for (const home of Object.values(EXAMPLE_HOMES[name]).filter((h) => /\.(html|md)$/.test(h) && !h.startsWith("_"))) {
       if (!existsSync(join(tmp, "dist", ...home.replace(/\.md$/, ".html").split("/")))) throw new Error(`${name}: the copy of an example at ${home} did not publish`);
     }
     if (name === "blog" && !readFileSync(join(tmp, "dist", "blog.html"), "utf8").includes('href="/posts/hello-world.html"')) throw new Error("the blog listing does not list the copied post");
+    // The theme: the layout and the 404 include /_includes/theme.html, which the site's copy satisfies ahead of the
+    // template's default beside AGENTS.md (§4.5), so a value set in the copy reaches every page without an edit to
+    // any template file (§19.11). The stylesheet keeps every rule in the base layer and imports nothing, so the
+    // copy's unlayered values win.
+    const css = readFileSync(join(tmp, "dist", "assets", "style.css"), "utf8");
+    if (!/^@layer base \{/m.test(css) || /@import/.test(css)) throw new Error(`${name}: assets/style.css must keep its rules in the base layer and import nothing:\n${css.slice(0, 400)}`);
+    for (const page of ["index.html", "404.html"]) {
+      if (!readFileSync(join(tmp, "dist", page), "utf8").includes("--measure: 60rem;")) throw new Error(`${name}: dist/${page} does not carry the site's theme`);
+    }
 
     // ---- the copies are the site's: a path the template does not ship is never visited. The one file in the list is
     // the nav the pages were linked from — the template ships it, and the site edited it.

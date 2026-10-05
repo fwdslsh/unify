@@ -35,8 +35,9 @@ describe("classifyTemplateSource()", () => {
     expect(recordSource({ kind: "dir", path: "/projects/templates/shop" }, "../templates/shop", "/projects/site")).toBe("../templates/shop");
     expect(recordSource({ kind: "dir", path: "/projects/templates/shop" }, "../../templates/shop", "/projects/site")).toBe("../templates/shop");
     expect(recordSource({ kind: "dir", path: "/projects/templates/shop" }, "/projects/templates/shop", "/projects/site")).toBe("/projects/templates/shop");
-    // A version suffix is npm's alone: a built-in has no versions but unify's own.
-    expect(() => classifyTemplateSource("blog@0.11.2", BUILT_INS, tempDir())).toThrow(UsageError);
+    // A version suffix is npm's alone: a built-in has no versions but unify's own, so
+    // `blog@0.11.2` is the npm package `blog` at that version, never the built-in.
+    expect(classifyTemplateSource("blog@0.11.2", BUILT_INS, tempDir())).toEqual({ kind: "npm", spec: "blog@0.11.2" });
   });
 
   test("an exact built-in name is the registry's, even beside a directory of that name", () => {
@@ -46,13 +47,17 @@ describe("classifyTemplateSource()", () => {
     expect(classifyTemplateSource("./blog", BUILT_INS, cwd)).toEqual({ kind: "dir", path: join(cwd, "blog") });
   });
 
-  test("an npm template is named by the convention: unify-<name>-template, optionally @org/ and @version", () => {
-    for (const spec of ["unify-shop-template", "@fwdslsh/unify-shop-template", "@fwdslsh/unify-shop-template@1.2.0", "unify-shop-template@next", "unify-a.b_c-template"]) {
-      expect(classifyTemplateSource(spec, BUILT_INS)).toEqual({ kind: "npm", spec });
+  test("an npm package is any name as published, scoped or not, optionally @version or @tag — the unify-<name>-template convention is not required", () => {
+    const cwd = tempDir();
+    for (const spec of ["unify-shop-template", "@fwdslsh/unify-shop-template", "@fwdslsh/unify-shop-template@1.2.0", "unify-shop-template@next", "shop-template", "some-theme", "@acme/site", "a.b_c@1.x", "site@^2.0.0"]) {
+      expect(classifyTemplateSource(spec, BUILT_INS, cwd)).toEqual({ kind: "npm", spec });
     }
-    // Not the pattern: no network lookup, a usage error instead (checked below).
-    for (const notIt of ["unify-template", "unify--template", "shop-template", "unify-shop", "Unify-Shop-Template", "@org/shop"]) {
-      expect(() => classifyTemplateSource(notIt, BUILT_INS, tempDir())).toThrow(UsageError);
+    // A directory that exists wins over a package of the same name.
+    mkdirSync(join(cwd, "some-theme"));
+    expect(classifyTemplateSource("some-theme", BUILT_INS, cwd)).toEqual({ kind: "dir", path: join(cwd, "some-theme") });
+    // Not a package name either: a usage error, never a lookup (checked below).
+    for (const notIt of ["Unify-Shop-Template", "has space", "../nope", "nope/sub", "site@1.0.0;rm", "@org/"]) {
+      expect(() => classifyTemplateSource(notIt, BUILT_INS, cwd)).toThrow(UsageError);
     }
   });
 
@@ -85,18 +90,19 @@ describe("classifyTemplateSource()", () => {
     expect(classifyTemplateSource(join(cwd, "my-template"), BUILT_INS, tempDir())).toEqual({ kind: "dir", path: join(cwd, "my-template") });
   });
 
-  test("a bare word that is neither a built-in nor a directory is a usage error naming the four forms — never a lookup", () => {
+  test("an argument that is no form at all is a usage error naming the four forms — never a lookup", () => {
     const cwd = tempDir();
     try {
-      classifyTemplateSource("blgo", BUILT_INS, cwd);
+      classifyTemplateSource("not a template", BUILT_INS, cwd);
       throw new Error("expected a UsageError");
     } catch (e) {
       expect(e).toBeInstanceOf(UsageError);
-      expect(e.message).toBe("not a template: blgo");
+      expect(e.message).toBe("not a template: not a template");
       const fixes = e.fixes.join("\n");
       expect(fixes).toContain("default, basic, blog");
-      expect(fixes).toContain(join(cwd, "blgo"));
-      expect(fixes).toContain("unify-<name>-template");
+      expect(fixes).toContain(join(cwd, "not a template"));
+      expect(fixes).toContain("npm package");
+      expect(fixes).toContain("--audit");
       expect(fixes).toContain("URL");
     }
   });

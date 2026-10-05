@@ -8,6 +8,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.6] - 2026-10-05
+
+### Changed
+
+- **Any npm package can be a template.** `unify init <name>` reads a bare word that is neither a built-in
+  nor an existing directory as an npm package (`name` or `@scope/name`, optionally `@version` or `@tag`), and
+  fetches it with your own `npm pack`. Naming a template `unify-<name>-template` is the convention that makes
+  it easy to find on npm, not a rule the CLI enforces; `--audit` is what tells a template from a package that
+  is not one. The cost is that a misspelled directory name reaches npm and fails there, with npm's message
+  (spec §19.9, rule SCF-13). The order of the forms is now built-in, git, directory, npm.
+- **A theme file to copy.** Every built-in template expresses its look as custom properties, keeps every rule of
+  `assets/style.css` in a `base` cascade layer, and includes `/_includes/theme.html` from its layout and its 404
+  page. The template ships that fragment beside `AGENTS.md` — inert, the last place an include resolves from
+  (§4.5) — and `site/_examples/theme.html`, a `<style>` block with the properties at their defaults. Copy it to
+  `site/_includes/theme.html` — a path the template never ships, so `unify update` never lists it — and change
+  the font, the colours or the measure: the site's file is found first, its values win over the layer, and a
+  property you delete keeps the default. A stylesheet import of a file the site copies later was the first
+  design, and it cannot work: a reference to nothing blocks the publish (§12). Recommended, not required, of
+  any other template (spec §19.1 and §19.11, rules SCF-01 and SCF-16, `docs/templates.md` §3).
+
 ## [0.11.5] - 2026-10-05
 
 The template record is one line in `unify.yaml`, and `unify update` is a copy you confirm; `unify.template.json` is gone.

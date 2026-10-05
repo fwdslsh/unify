@@ -71,7 +71,7 @@ const DEFAULT_TEMPLATE = "default";
  *   source root (no --source, no unify.yaml key, no src/) — the exact
  *   "fresh project" state this command exists to fix by creating src/
  * @param {string|undefined} context.template - the positional argument: a
- *   built-in name, a directory, a git URL, or `npm:<spec>` (§19.9)
+ *   built-in name, a git URL, a directory, or an npm package (§19.9)
  * @param {boolean} [context.audit] - §19.9's `--audit`: scaffold only if the
  *   result passes `unify audit --strict`
  * @param {import('../../core/diagnostics.js').Reporter} context.reporter

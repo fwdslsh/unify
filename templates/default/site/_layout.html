@@ -7,6 +7,11 @@
     <!-- relative, not /assets/…: open this file straight from the folder and
          the styles apply; unify rewrites it for every page at every depth. -->
     <link rel="stylesheet" href="assets/style.css">
+    <!-- theme: the site's values for the stylesheet's custom properties, from
+         site/_includes/theme.html — copy site/_examples/theme.html there — or,
+         until it exists, the template's own _includes/theme.html beside
+         AGENTS.md: the project root is the last place an include resolves from. -->
+    <include src="/_includes/theme.html"></include>
     <!-- share card: assets/share-placeholder.png is a PLACEHOLDER, a flat
          1200×630 image. Replace the file, and correct these two numbers
          if yours is a different size — they must match it (see DEPLOY.md). -->
