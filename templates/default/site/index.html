@@ -10,7 +10,16 @@
   <body>
     <main>
       <h1>Home</h1>
-      <p>This content lands in the layout's &lt;main&gt;.</p>
+      <p>This content lands in the layout's &lt;main&gt;. The nav above comes from <code>site/_layout.html</code>,
+      which wrapped this page at build time; the footer below is this page's own, addressed to the layout's
+      named slot.</p>
+      <p><span class="placeholder">The site name and the footer's mailbox are placeholders</span> — replace them before you
+      publish.</p>
+      <p>To add a page, copy one out of <code>site/_examples/</code> — <code>about.md</code>, a Markdown page, or
+      <code>contact.html</code>, an HTML page — into <code>site/</code>, edit the copy, and link it from
+      <code>site/_includes/nav.html</code>. Nothing under <code>_examples/</code> ships, and <code>unify update</code>
+      never touches a file you copied.</p>
     </main>
+    <p slot="footer">© My Site — <a href="mailto:hi@example.com">email us</a></p>
   </body>
 </html>

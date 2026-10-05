@@ -36,9 +36,8 @@ my-site/
     ├── _layout.html      # the site chrome — one complete HTML page
     ├── _includes/
     │   └── nav.html      # a fragment
-    ├── index.html        # a page
-    ├── about.md          # a Markdown page
-    ├── contact.html      # a page that overrides the footer
+    ├── _examples/        # pages to copy into place and edit — about.md, contact.html — never published
+    ├── index.html        # a page — it also overrides the footer
     ├── 404.html          # a page with no layout
     ├── robots.txt        # minimal and honest: it blocks nothing
     └── assets/
@@ -47,6 +46,8 @@ my-site/
 ```
 
 Everything in `site/` ships to the site **except** files and folders whose name starts with `_` — those are the build's working material (layouts, fragments, notes, scripts). Files *inside* an underscore folder don't need their own prefix: `_includes/nav.html` is already held back.
+
+That is also why the examples live where they do. `site/_examples/` holds a copy-ready version of each kind of page the template expects you to add: copy one into `site/`, edit the copy, and link it from `site/_includes/nav.html`. The example itself never publishes, and `unify update` — which refreshes the template's own files — never touches a file you copied. Every built-in template works this way.
 
 ## The layout
 
@@ -105,16 +106,16 @@ Two details worth knowing:
 
 ## Overriding a region
 
-`site/contact.html` replaces the footer by using the slot's name — one standard HTML attribute on a top-level element:
+`site/index.html` replaces the footer by using the slot's name — one standard HTML attribute on a top-level element:
 
 ```html
 <!doctype html>
 <html>
   <head>
-    <title>Contact</title>
+    <title>Home</title>
   </head>
   <body>
-    <h1>Contact</h1>
+    <h1>Home</h1>
     <p>Ordinary content as usual.</p>
     <p slot="footer">© My Site — <a href="mailto:hi@example.com">email us</a></p>
   </body>
@@ -125,7 +126,7 @@ The built footer contains exactly the `<p>` you wrote — tag, attributes, and a
 
 ## Markdown pages
 
-`site/about.md`:
+`site/_examples/about.md`, once copied to `site/about.md`:
 
 ```markdown
 ---

@@ -4,8 +4,9 @@
  * snapshot in step (conformance-spec §19.5, §19.9).
  *
  * `templates/<name>/` is the source of truth for a built-in template: a
- * complete project — `site/` beside `AGENTS.md`, `DEPLOY.md`, `unify.yaml`
- * (and the blog's `scripts/gen.mjs`) — laid out exactly as `unify init`
+ * complete project — `site/` beside `AGENTS.md`, `DEPLOY.md` (and the blog's
+ * `scripts/gen.mjs`, and a `unify.yaml` only where a page needs a flag live,
+ * §19.11) — laid out exactly as `unify init`
  * lays one out, which is also what makes each directory usable as a git
  * template on its own (`unify init https://github.com/fwdslsh/unify/templates/blog`).
  *
@@ -16,12 +17,14 @@
  * and the suite fails when the two disagree (tests/unit/templates.test.js).
  * Edit the files under templates/, run this, commit both.
  *
- * It also regenerates each template's `unify.yaml` from the option registry
- * (§18: the file lists every saveable option, so it cannot fall behind the
- * CLI), keeping whichever lines the template has live (the docs template's
- * `catalog: true`, the blog's `generate: scripts/gen.mjs`).
+ * It also regenerates the `unify.yaml` of each template that ships one from
+ * the option registry (§18: the file lists every saveable option, so it cannot
+ * fall behind the CLI), keeping whichever lines the template has live (the
+ * docs template's `catalog: true`, the blog's `generate: scripts/gen.mjs`).
+ * The other templates ship none: `init` writes the all-commented file, and it
+ * is then the site's.
  */
-import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { configTemplate } from "../src/cli/options.js";
@@ -88,11 +91,11 @@ export function renderSnapshot(snapshot) {
   ].join("\n");
 }
 
-/** Rewrite every template's unify.yaml from the registry, keeping its live lines, then write the snapshot. */
+/** Rewrite the unify.yaml of every template that ships one from the registry, keeping its live lines, then write the snapshot. */
 export function sync() {
   for (const name of readdirSync(TEMPLATES_DIR)) {
     const path = join(TEMPLATES_DIR, name, "unify.yaml");
-    writeFileSync(path, configTemplate(liveEntries(readFileSync(path, "utf8"))));
+    if (existsSync(path)) writeFileSync(path, configTemplate(liveEntries(readFileSync(path, "utf8"))));
   }
   writeFileSync(SNAPSHOT_PATH, renderSnapshot(buildSnapshot()));
 }

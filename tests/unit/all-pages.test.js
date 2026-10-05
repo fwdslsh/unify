@@ -14,7 +14,7 @@
  * The repo has no browser runner; the DOM wiring is deliberately thin.
  */
 import { afterAll, describe, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -30,11 +30,20 @@ afterAll(() => {
   for (const dir of made) rmSync(dir, { recursive: true, force: true });
 });
 
-/** Scaffold the docs template into a fresh project and import its script. */
+/**
+ * Scaffold the docs template into a fresh project, give it a guide page the
+ * way a site does (§19.11: copy the example into place and link it, so the
+ * catalog has a nested section to group), and import its script.
+ */
 async function scaffold() {
   const root = tmp();
   const init = await runCli(["init", "docs"], root);
   expect(init.exit, init.stderr).toBe(0);
+  const site = join(root, "site");
+  mkdirSync(join(site, "guide"));
+  copyFileSync(join(site, "_examples", "guide-page.md"), join(site, "guide", "getting-started.md"));
+  const nav = readFileSync(join(site, "_includes", "nav.html"), "utf8");
+  writeFileSync(join(site, "_includes", "nav.html"), nav.replace("</nav>", ' <a href="/guide/getting-started.html">Guide</a></nav>'));
   const mod = await import(`${pathToFileURL(join(root, "site", "assets", "all-pages.js")).href}?${Math.random()}`);
   return { root, mod };
 }

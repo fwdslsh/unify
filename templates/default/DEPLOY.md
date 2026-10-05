@@ -11,11 +11,12 @@ and the ones a build never corrects are the ones that publish it anyway — so t
 one of them rather than the first:
 
 - **the site's name and byline** — `site/_layout.html` (the title suffix and the footer), and then
-  `site/index.html`, `site/404.html` and `site/contact.html`, which each write it into their own
-  visible text and their own `description`. Grep the scaffolded name once and you will find them
-  all: `grep -rn 'My Site' site/`, with whichever name your template shipped;
-- **the contact details** on `site/contact.html` — a reserved `example.com` address, and no postal
-  address at all, because a plausible street address in a scaffold is one an author publishes;
+  `site/index.html` and `site/404.html`, which each write it into their own visible text and their own
+  `description`, as does every page you copy out of `site/_examples/`. Grep the scaffolded name once
+  and you will find them all: `grep -rn 'My Site' site/`, with whichever name your template shipped;
+- **the contact details** — the reserved `example.com` mailbox in `site/index.html`'s footer line and
+  in `site/_examples/contact.html`, and no postal address at all, because a plausible street address
+  in a scaffold is one an author publishes;
 - **a generator's own constants**, if your project has one. The blog template's
   `scripts/gen.mjs` opens with `SITE_NAME` and `LISTING_DESCRIPTION`. Its feed's links are
   **absolute** and take the `--base-url` you build with (step 3); until you pass one they name

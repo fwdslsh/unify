@@ -57,9 +57,8 @@ my-site/
     ├── _layout.html      # the site chrome — one complete HTML page
     ├── _includes/
     │   └── nav.html      # a fragment
-    ├── index.html        # a page
-    ├── about.md          # a Markdown page — equal citizen
-    ├── contact.html      # a page that overrides a named region
+    ├── _examples/        # about.md, contact.html — pages to copy into place; never published (§19.11)
+    ├── index.html        # a page — and the one that overrides a named region
     ├── 404.html          # a page that opts out of the layout
     ├── robots.txt        # minimal and honest: it blocks nothing
     └── assets/
@@ -67,7 +66,7 @@ my-site/
         └── share-placeholder.png   # the og:image, at its declared size
 ```
 
-Scaffolding into `site/` is what makes zero-config safe: the source root holds only what you meant to publish, so nothing outside it — `.git/`, `.env`, notes, screenshots, the output directory — can reach the built site. A flat site with no `src/` still builds with no flags (§4). The scaffold exercises the composition primitives once each: an include, the automatic layout, a named-slot override, a layout opt-out, and the underscore. (The `.fragment.html` opt-out is the one primitive it leaves out — §4 documents it.)
+Scaffolding into `site/` is what makes zero-config safe: the source root holds only what you meant to publish, so nothing outside it — `.git/`, `.env`, notes, screenshots, the output directory — can reach the built site. A flat site with no `src/` still builds with no flags (§4). The scaffold exercises the composition primitives once each: an include, the automatic layout, a named-slot override, a layout opt-out, and the underscore. (The `.fragment.html` opt-out is the one primitive it leaves out — §4 documents it.) It ships its tooling in place and the pages a site fills in only as examples under `site/_examples/`, which never publish: copy one into place, edit the copy, and `unify update` never touches it (§19.11).
 
 **`_layout.html`** — a complete page you can open in a browser right now. Its slot fallbacks are its own preview (the starter stylesheet carries `slot { display: contents }` so the design-time wrapper adds no box; built pages contain no `<slot>` elements at all):
 
@@ -109,7 +108,7 @@ Scaffolding into `site/` is what makes zero-config safe: the source root holds o
 
 Built result: the layout, with its `<main>` content replaced by the page's, and the page's title prepended to the layout's: `<title>Home — My Site</title>`. The separator lives in the layout, so pages write only their own name.
 
-**`contact.html`** — overriding a named region. The layout marked its footer contents with `<slot name="footer">`, so any page may replace them with one standard attribute:
+**`contact.html`** (shipped as `_examples/contact.html`, copied into place) — overriding a named region. The layout marked its footer contents with `<slot name="footer">`, so any page may replace them with one standard attribute; the scaffold's own `index.html` does the same:
 
 ```html
 <!doctype html>
@@ -148,7 +147,7 @@ Built `contact.html` — note that the footer contains exactly the element the a
 </html>
 ```
 
-**`about.md`** — Markdown pages work identically; frontmatter supplies the head:
+**`about.md`** (likewise an example to copy) — Markdown pages work identically; frontmatter supplies the head:
 
 ```markdown
 ---

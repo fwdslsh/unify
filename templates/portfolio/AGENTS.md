@@ -44,6 +44,19 @@ published** and the previous `dist/` is untouched — never report success on a 
   `--base-url`, and unify writes `feed.xml` itself — no script, unless you ship your own
   (an authored `feed.xml` always wins and generates nothing).
 
+## Adding pages: copy an example
+
+- `site/_examples/` holds a copy-ready version of each kind of file this template expects you to
+  add — a page, a post, a data file. **Copy one into place and edit the copy.** Never edit an
+  example where it is, and never link to one: the folder starts with `_`, so nothing in it ships.
+- Each example says where its copy belongs (`site/contact.html`, `site/posts/<slug>.md`). Once it
+  is in place, link the new page from `site/_includes/nav.html` or from another page — `unify audit`
+  reports a page nothing links to.
+- `unify update` fetches this template again and copies its changed files over this project after
+  listing them and asking. It never visits a file the template does not ship, so your copies are
+  yours for good; the examples and the tooling (`_layout.html`, `_includes/`, `assets/style.css`,
+  `scripts/`) take the template's new version when you say yes.
+
 ## Composition
 
 - Every page is wrapped by the nearest `_layout.html` — its own folder, then each parent. Choose a
@@ -87,4 +100,4 @@ published** and the previous `dist/` is untouched — never report success on a 
 - unify rewrites only HTML's own URL attributes (`href`, `src`). A `url()` in CSS and a
   `fetch()`/`hx-get` address ship exactly as written.
 - **Never invent a fact to fill a field.** The placeholders in this scaffold — the site name, the
-  contact details, `site/assets/share-placeholder.png` — are there to be replaced, not published.
+  `example.com` mailbox, `site/assets/share-placeholder.png` — are there to be replaced, not published.

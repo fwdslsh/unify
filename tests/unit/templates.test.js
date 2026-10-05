@@ -51,13 +51,31 @@ describe.each(TEMPLATE_NAMES)('template "%s" — SCF-01/SCF-02 structure (in-mem
   const paths = Object.keys(files);
   const wholeSource = Object.values(files).join("\n");
 
-  test("ships unify.yaml at the project root, every option described and commented out; docs (catalog: true) and blog (generate:) have one live line each (§18, §19.6, §19.8)", () => {
+  test("ships unify.yaml only where a page needs a flag live — docs (catalog: true) and blog (generate:) — every option described and commented out around that one line; the others ship none and init writes the registry's file (§18, §19.6, §19.8, §19.11)", () => {
     // Never inside the source tree (0.10): the file is build material beside the site.
     expect(paths).not.toContain("unify.yaml");
-    const yaml = TEMPLATE_ROOT_FILES[name]["unify.yaml"];
-    const live = { docs: { catalog: true }, blog: { generate: "scripts/gen.mjs" } }[name] ?? {};
+    const live = { docs: { catalog: true }, blog: { generate: "scripts/gen.mjs" } }[name];
+    const yaml = TEMPLATE_ROOT_FILES[name]?.["unify.yaml"];
+    if (live === undefined) {
+      expect(yaml).toBeUndefined();
+      return;
+    }
     expect(yaml).toBe(configTemplate(live));
     expect(yaml.split("\n").filter((l) => /^[a-z]/.test(l))).toEqual(Object.entries(live).map(([k, v]) => `${k}: ${v}`));
+  });
+
+  test("§19.11: the pages it ships in place are the home page, the 404 and (docs) the All-pages starter; everything else a site fills in is an example under _examples/", () => {
+    const shipped = paths.filter((p) => isPage(p) && !isUnderscored(p)).sort();
+    expect(shipped).toEqual(name === "docs" ? ["404.html", "all-pages.html", "index.html"] : ["404.html", "index.html"]);
+    const examples = paths.filter((p) => p.startsWith("_examples/"));
+    expect(examples.length).toBeGreaterThan(0);
+    for (const p of examples) {
+      // An example is one page or data file to copy — never a layout, an include, or a directory of its own.
+      expect(p.split("/").length).toBe(2);
+      expect(p.endsWith("_layout.html")).toBe(false);
+      // Each page says where its copy belongs, in the placeholder paragraph §19.7's convention puts first.
+      if (/\.(html|md)$/.test(p)) expect(files[p]).toMatch(/copy this file/i);
+    }
   });
 
   test("exercises the underscore convention: every non-page file lives under an underscore path or is a real asset", () => {
@@ -455,17 +473,17 @@ describe("the embedded snapshot and templates/ agree", () => {
     expect(SNAPSHOT).toEqual(buildSnapshot(TEMPLATES_DIR));
   });
 
-  test("every template's unify.yaml is the registry's file with only that template's live lines (§18, §19.8)", () => {
+  test("the unify.yaml a template ships is the registry's file with only that template's live lines; only docs and blog ship one (§18, §19.8, §19.11)", () => {
     for (const name of Object.keys(TEMPLATES)) {
-      const yaml = TEMPLATE_ROOT_FILES[name]["unify.yaml"];
-      expect(`${name}: ${yaml === configTemplate(liveEntries(yaml))}`).toBe(`${name}: true`);
+      const yaml = TEMPLATE_ROOT_FILES[name]?.["unify.yaml"];
+      expect(`${name}: ${yaml === undefined ? "none" : yaml === configTemplate(liveEntries(yaml))}`).toBe(`${name}: ${["docs", "blog"].includes(name) ? "true" : "none"}`);
     }
   });
 
-  test("every template is a complete project: site/ beside AGENTS.md, DEPLOY.md and unify.yaml, and all five ship the same share image", () => {
+  test("every template is a complete project: site/ beside AGENTS.md and DEPLOY.md, and all five ship the same share image", () => {
     const png = TEMPLATES.default["assets/share-placeholder.png"];
     for (const name of Object.keys(TEMPLATES)) {
-      for (const rootFile of ["AGENTS.md", "DEPLOY.md", "unify.yaml"]) expect(`${name}/${rootFile}`).toBe(`${name}/${rootFile}`.replace(/.*/, (m) => (rootFile in TEMPLATE_ROOT_FILES[name] ? m : `${m} missing`)));
+      for (const rootFile of ["AGENTS.md", "DEPLOY.md"]) expect(`${name}/${rootFile}`).toBe(`${name}/${rootFile}`.replace(/.*/, (m) => (rootFile in TEMPLATE_ROOT_FILES[name] ? m : `${m} missing`)));
       expect(Buffer.from(TEMPLATES[name]["assets/share-placeholder.png"]).equals(Buffer.from(png))).toBe(true);
     }
   });

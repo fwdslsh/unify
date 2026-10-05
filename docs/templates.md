@@ -118,6 +118,8 @@ DEPLOY.md
 
 The underscore does the work. `_examples/` is excluded from the build by the default `_*` rule, so the examples ship with the template, land in every site, and never publish. The site's author copies `_examples/post.md` to `posts/first-post.md` and edits the copy. The copy is a path the template does not ship, so `update` never visits it; `_examples/post.md` itself is never edited, so it updates cleanly whenever you improve it. Convention over configuration: nothing is declared anywhere, and the path alone says whose a file is. Say so in the template's `AGENTS.md`, which is where an author or an agent looks first.
 
+The five built-ins are laid out this way: `unify init blog`, for instance, ships `_examples/post.md` and `_examples/authors.json`, and its generator writes a listing that says there are no posts yet until the first one is copied into place.
+
 The same rule reaches the project root. **Do not ship `unify.yaml` unless a page of yours needs a flag live** (the `docs` built-in needs `catalog: true`): `init` writes the all-commented file for a template that has none, and that file is then the site's — uncommented freely, never in an update's list. A `.env`, keys, and anything else a site fills in belong in an example or in `DEPLOY.md`'s instructions, never in the template.
 
 ### What a template must still ship

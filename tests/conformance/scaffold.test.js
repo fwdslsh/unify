@@ -25,9 +25,9 @@
  * layout or by §8's merge rather than written on the page that ships them.
  */
 import { test } from "bun:test";
-import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { join, relative, sep } from "node:path";
+import { dirname, join, relative, sep } from "node:path";
 import { CLI, ROOT, covers, mkTmp, runCli } from "./support.mjs";
 
 const TEST_MS = 45_000;
@@ -65,8 +65,8 @@ for (const name of TEMPLATES) {
     if (!existsSync(join(srcDir, "_includes", "nav.html"))) throw new Error("missing _includes/nav.html — the underscore convention primitive");
 
     if (!layoutText.includes('<slot name="footer">')) throw new Error(`_layout.html is missing the named "footer" slot with a fallback:\n${layoutText}`);
-    if (!existsSync(join(srcDir, "contact.html")) || !readFileSync(join(srcDir, "contact.html"), "utf8").includes('slot="footer"')) {
-      throw new Error("missing a page filling the footer slot (contact.html with slot=\"footer\")");
+    if (!readFileSync(join(srcDir, "index.html"), "utf8").includes('slot="footer"')) {
+      throw new Error("missing a page filling the footer slot (index.html with slot=\"footer\" — the one page every scaffold ships, §19.11)");
     }
 
     const notFoundPath = join(srcDir, "404.html");
@@ -259,7 +259,7 @@ test("scaffold/blog: SCF-03 — the scaffold's one shown command is `unify build
   const initR = await runCli(["init", "blog"], tmp);
   if (initR.exit !== 0) throw new Error(`unify init blog exited ${initR.exit}: ${initR.stderr}`);
 
-  for (const rel of ["AGENTS.md", "DEPLOY.md", "site/index.html", "site/posts/hello-world.md", "scripts/gen.mjs"]) {
+  for (const rel of ["AGENTS.md", "DEPLOY.md", "site/index.html", "site/_examples/post.md", "scripts/gen.mjs"]) {
     const text = readFileSync(join(tmp, ...rel.split("/")), "utf8");
     if (/node\s+\S*gen\.mjs\s+&(?:amp;)?&/.test(text)) throw new Error(`${rel} still shows the pre-0.10 \`node …/gen.mjs && unify build\` recipe; the generator runs through unify.yaml now`);
   }
@@ -289,6 +289,11 @@ test("scaffold/blog: SCF-03 — two builds are byte-identical and the generator 
   const srcDir = join(tmp, "site");
   const scriptPath = join(tmp, "scripts", "gen.mjs");
   if (!existsSync(scriptPath)) throw new Error("blog template is missing scripts/gen.mjs");
+  // §19.11 — the post and the authors file start as examples; a site copies them into place, as the examples say.
+  mkdirSync(join(srcDir, "posts"));
+  copyFileSync(join(srcDir, "_examples", "post.md"), join(srcDir, "posts", "hello-world.md"));
+  mkdirSync(join(srcDir, "_data"));
+  copyFileSync(join(srcDir, "_examples", "authors.json"), join(srcDir, "_data", "authors.json"));
 
   // Zero dependencies: every import is a node: builtin.
   const scriptText = readFileSync(scriptPath, "utf8");
@@ -889,23 +894,24 @@ test("scaffold: SCF-09 — init refuses, writing nothing, when the working direc
 test("scaffold: SCF-09 — a path the template needs as a directory, already a file, refuses before the first write", async () => {
   // "init writes nothing when any file it would create already exists" held
   // only for LEAF paths. A plain file where a template needs a directory —
-  // `src/posts`, in the blog template — passed the leaf check, and the write
-  // loop then died at mkdirSync with Node's own `EEXIST: file already exists`
-  // AFTER nine template files had landed. The leaf check then saw those nine
-  // and refused every later run, so the half-written scaffold was permanent.
+  // `src/posts`, in the blog template of the day; `src/_examples` in every
+  // template since §19.11 — passed the leaf check, and the write loop then
+  // died at mkdirSync with Node's own `EEXIST: file already exists` AFTER
+  // nine template files had landed. The leaf check then saw those nine and
+  // refused every later run, so the half-written scaffold was permanent.
   const tmp = mkTmp();
   mkdirSync(join(tmp, "src"), { recursive: true });
-  writeFileSync(join(tmp, "src", "posts"), "not a directory\n");
+  writeFileSync(join(tmp, "src", "_examples"), "not a directory\n");
 
   const r = await runCli(["init", "blog"], tmp);
-  if (r.exit !== 2) throw new Error(`unify init blog exited ${r.exit} with src/posts a plain file, expected the usage refusal (2)\nstderr:\n${r.stderr}`);
-  if (!r.stderr.includes("src/posts")) throw new Error(`the refusal does not name the path that blocked it:\n${r.stderr}`);
+  if (r.exit !== 2) throw new Error(`unify init blog exited ${r.exit} with src/_examples a plain file, expected the usage refusal (2)\nstderr:\n${r.stderr}`);
+  if (!r.stderr.includes("src/_examples")) throw new Error(`the refusal does not name the path that blocked it:\n${r.stderr}`);
   if (/EEXIST|ENOTDIR/.test(r.stderr)) throw new Error(`the refusal is Node's raw error rather than a located unify diagnostic:\n${r.stderr}`);
   if (!/fix:/.test(r.stderr)) throw new Error(`the refusal names no fix (§14.1):\n${r.stderr}`);
 
   // Nothing written: the source root still holds only the file the test made,
   // and the project-root pair was never created either.
-  if (JSON.stringify(readdirSync(join(tmp, "src")).sort()) !== JSON.stringify(["posts"])) {
+  if (JSON.stringify(readdirSync(join(tmp, "src")).sort()) !== JSON.stringify(["_examples"])) {
     throw new Error(`init refused but still wrote into src/: ${readdirSync(join(tmp, "src")).join(", ")}`);
   }
   if (JSON.stringify(readdirSync(tmp).sort()) !== JSON.stringify(["src"])) {
@@ -914,7 +920,7 @@ test("scaffold: SCF-09 — a path the template needs as a directory, already a f
 
   // ...and the tree is still scaffoldable once the blocker is gone, which is
   // what "permanent" meant before.
-  rmSync(join(tmp, "src", "posts"));
+  rmSync(join(tmp, "src", "_examples"));
   const again = await runCli(["init", "blog"], tmp);
   if (again.exit !== 0) throw new Error(`unify init blog exited ${again.exit} after the blocking file was removed: ${again.stderr}`);
 
@@ -1543,7 +1549,7 @@ test("scaffold: SCF-13 a template is a directory, a git repository or an npm pac
     writeFileSync(join(tmp, "basic", "index.html"), "<!doctype html><title>not the registry</title>\n");
     const r = await runCli(["init", "basic"], tmp);
     if (r.exit !== 0) throw new Error(`unify init basic beside a basic/ directory exited ${r.exit}:\n${r.stderr}`);
-    if (!existsSync(join(tmp, "site", "contact.html"))) throw new Error("the registry's basic must win over the directory of the same name");
+    if (!existsSync(join(tmp, "site", "_examples", "contact.html"))) throw new Error("the registry's basic must win over the directory of the same name");
     // A bare word that is neither is refused before any tool runs — and the
     // refusal says what the four forms are.
     const typo = await runCli(["init", "blgo"], mkTmp());
@@ -1617,6 +1623,79 @@ test("scaffold: SCF-14 --audit keeps a scaffold only if it audits clean; a findi
 
   covers("SCF-14");
 }, TEST_MS * 3);
+
+// ------------------------------------------------------------------ SCF-16
+
+/** Where each template's examples belong once copied (§19.11) — what each example's own placeholder paragraph says. */
+const EXAMPLE_HOMES = {
+  default: { "about.md": "about.md", "contact.html": "contact.html" },
+  basic: { "contact.html": "contact.html" },
+  blog: { "post.md": "posts/hello-world.md", "authors.json": "_data/authors.json", "contact.html": "contact.html" },
+  docs: { "guide-page.md": "guide/getting-started.md", "contact.html": "contact.html" },
+  portfolio: { "work.html": "work.html", "project.html": "projects/project-one.html", "contact.html": "contact.html" },
+};
+
+for (const name of TEMPLATES) {
+  test(`scaffold/${name}: SCF-16 — tooling in place, examples to copy: nothing under _examples/ ships, the copies build and audit clean, and update lists none of them`, async () => {
+    const tmp = mkTmp();
+    const initR = await runCli(["init", name], tmp);
+    if (initR.exit !== 0) throw new Error(`unify init ${name} exited ${initR.exit}: ${initR.stderr}`);
+    const site = join(tmp, "site");
+
+    // ---- the shape: the home page, the 404 (and docs' All-pages starter) in place; every other page an example
+    const sourcePages = [...readTree(site).keys()].map((rel) => rel.split(sep).join("/")).filter((rel) => /\.(html|md)$/.test(rel) && !rel.split("/").some((seg) => seg.startsWith("_"))).sort();
+    const expectedPages = name === "docs" ? ["404.html", "all-pages.html", "index.html"] : ["404.html", "index.html"];
+    if (sourcePages.join(",") !== expectedPages.join(",")) throw new Error(`${name} ships pages in place beyond the home page and the 404: ${sourcePages.join(", ")}`);
+    const examples = readdirSync(join(site, "_examples")).sort();
+    if (examples.join(",") !== Object.keys(EXAMPLE_HOMES[name]).sort().join(",")) throw new Error(`${name}'s examples are ${examples.join(", ")}; this test knows ${Object.keys(EXAMPLE_HOMES[name]).join(", ")}`);
+
+    // ---- unify.yaml: the template ships its own copy only when a page needs a flag live (docs, blog); otherwise
+    // init wrote the registry's file, and a line the site uncomments is never in update's list.
+    const yaml = readFileSync(join(tmp, "unify.yaml"), "utf8");
+    if (!yaml.includes("# pretty-urls: true")) throw new Error(`${name}: the scaffolded unify.yaml lacks the commented pretty-urls line this test uncomments`);
+    writeFileSync(join(tmp, "unify.yaml"), yaml.replace("# pretty-urls: true", "pretty-urls: true"));
+    const edited = await runCli(["update", "--dry-run"], tmp);
+    if (edited.exit !== 0) throw new Error(`${name}: update --dry-run exited ${edited.exit}\n${edited.stdout}${edited.stderr}`);
+    const shipsYaml = name === "docs" || name === "blog";
+    if (shipsYaml && !edited.stdout.includes("would overwrite unify.yaml")) throw new Error(`${name} ships a unify.yaml (its page needs a flag live), so an edited copy is in the list:\n${edited.stdout}`);
+    if (!shipsYaml && !edited.stdout.includes("nothing to do")) throw new Error(`${name} ships no unify.yaml, so the site's edits to it are never in the list:\n${edited.stdout}`);
+    writeFileSync(join(tmp, "unify.yaml"), yaml);
+
+    // ---- a build emits nothing from _examples/
+    const built = await runCli(["build"], tmp);
+    if (built.exit !== 0) throw new Error(`unify build exited ${built.exit} for ${name}: ${built.stderr}`);
+    if (existsSync(join(tmp, "dist", "_examples"))) throw new Error(`${name}: dist/_examples/ exists — the examples published`);
+
+    // ---- copy every example where it says it belongs, link the new pages from the nav, and the site builds and audits clean
+    for (const [example, home] of Object.entries(EXAMPLE_HOMES[name])) {
+      mkdirSync(dirname(join(site, ...home.split("/"))), { recursive: true });
+      copyFileSync(join(site, "_examples", example), join(site, ...home.split("/")));
+    }
+    // Every copied page gets a nav link except the ones another copy already links: a post from the generated
+    // listing, a project from the work page.
+    const linked = Object.values(EXAMPLE_HOMES[name]).filter((home) => /\.(html|md)$/.test(home) && !/^(posts|projects)\//.test(home));
+    const nav = readFileSync(join(site, "_includes", "nav.html"), "utf8");
+    writeFileSync(join(site, "_includes", "nav.html"), nav.replace("</nav>", linked.map((home) => ` <a href="/${home.replace(/\.md$/, ".html")}">${home}</a>`).join("") + "</nav>"));
+    for (const args of [["build", "--dry-run", "--strict"], ["audit", "--strict"]]) {
+      const r = await runCli(args, tmp);
+      if (r.exit !== 0) throw new Error(`${name} with its examples copied into place: unify ${args.join(" ")} exited ${r.exit}\n${r.stdout}${r.stderr}`);
+    }
+    const rebuilt = await runCli(["build"], tmp);
+    if (rebuilt.exit !== 0) throw new Error(`unify build exited ${rebuilt.exit} for ${name} with its examples in place: ${rebuilt.stderr}`);
+    for (const home of Object.values(EXAMPLE_HOMES[name]).filter((h) => /\.(html|md)$/.test(h))) {
+      if (!existsSync(join(tmp, "dist", ...home.replace(/\.md$/, ".html").split("/")))) throw new Error(`${name}: the copy of an example at ${home} did not publish`);
+    }
+    if (name === "blog" && !readFileSync(join(tmp, "dist", "blog.html"), "utf8").includes('href="/posts/hello-world.html"')) throw new Error("the blog listing does not list the copied post");
+
+    // ---- the copies are the site's: a path the template does not ship is never visited. The one file in the list is
+    // the nav the pages were linked from — the template ships it, and the site edited it.
+    const again = await runCli(["update", "--dry-run"], tmp);
+    const listed = again.stdout.split("\n").filter((l) => /^would (overwrite|add) /.test(l));
+    if (again.exit !== 0 || listed.join("|") !== "would overwrite site/_includes/nav.html") throw new Error(`${name}: with every example copied into place, update may list only the edited nav, got:\n${again.stdout}${again.stderr}`);
+
+    covers("SCF-16");
+  }, TEST_MS * 2);
+}
 
 // ------------------------------------------------------- SCF-15 / UPD-01..03
 
