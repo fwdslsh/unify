@@ -46,7 +46,7 @@ unify dev       # build, watch, serve, reload — http://localhost:3000
 unify build     # write the final site to dist/ — upload it anywhere
 ```
 
-`unify init` scaffolds a complete site into `site/` — a layout, a nav include, a home page, CSS, a `robots.txt`, and ready-to-copy example pages under `site/_examples/` that never publish — plus three files at the project root, outside `site/` so they can never publish: **`AGENTS.md`**, guidance for whoever (or whatever) edits the site next, **`DEPLOY.md`**, the deployment recipe, and a **`unify.yaml`** listing every build flag, described and commented out, so you uncomment only what differs from the default — with one line live, `template:`, the template this site came from, which `unify update` fetches again to copy its changed files over the site — after showing you the list and asking. Five templates: `default`, `basic`, `blog`, `docs`, `portfolio`. Every scaffold passes `unify build --dry-run --strict` and `unify audit --strict` out of the box.
+`unify init` scaffolds a complete site into `site/` — a layout, a nav include, a home page, CSS with a theme file of custom properties you edit, a `robots.txt`, and ready-to-copy example pages under `site/_examples/` that never publish — plus three files at the project root, outside `site/` so they can never publish: **`AGENTS.md`**, guidance for whoever (or whatever) edits the site next, **`DEPLOY.md`**, the deployment recipe, and a **`unify.yaml`** listing every build flag, described and commented out, so you uncomment only what differs from the default — with `template:` live — the template this site came from, which `unify update` fetches again to copy its changed files over the site after showing you the list and asking, and under it `keep:`, the files an update never overwrites: the theme and `unify.yaml` itself. Five templates: `default`, `basic`, `blog`, `docs`, `portfolio`. Every scaffold passes `unify build --dry-run --strict` and `unify audit --strict` out of the box.
 
 New here? The tutorial is **[Getting Started](docs/getting-started.md)**.
 
@@ -100,8 +100,8 @@ unify [build]            build the site (default command)
 unify audit              evaluate the site the build would publish — writes nothing
 unify dev                build, watch, serve, and reload — the inner loop
 unify watch              build + rebuild on change, no server
-unify init [template]    scaffold a starter site — a built-in name, a directory, a git repository (URL/<subdirectory>#ref), or an npm package named unify-<name>-template
-unify update [template]  fetch the template again and copy its changed files over the site: the files it would overwrite are listed and confirmed first (--yes answers, --dry-run previews)
+unify init [template]    scaffold a starter site — a built-in name, a directory, a git repository (URL/<subdirectory>#ref), or any npm package
+unify update [template]  fetch the template again and copy its changed files over the site: the files it would overwrite are listed and confirmed first (--yes answers, --dry-run previews); keep: under template: in unify.yaml names the files it never overwrites
 ```
 
 `unify --help` lists every option — among them `--pretty-urls`, `--base-url` (which also generates `sitemap.xml`, and `feed.xml` once a page declares `schema: Article`/`BlogPosting`), `--canonical none` (completion is on once `--base-url` is set), `--catalog`, `--search-corpus`, `--dry-run`, and `--strict`. The **[CLI Reference](docs/cli-reference.md)** documents every command, option, and exit code — there are no others. An optional `unify.yaml` at the project root holds saved flags and nothing more — only what differs from the defaults; `unify init` writes one with every option described and commented out, and `unify build --save-config` fills it from the flags you pass.

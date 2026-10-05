@@ -15,7 +15,7 @@ unify init ../our-house-template # a directory on disk
 unify init https://github.com/fwdslsh/unify/templates/blog      # a git repository, one subdirectory of it
 unify init https://github.com/acme/site-templates/tree/v2/shop  # the URL your browser shows, ref included
 unify init git@github.com:acme/templates.git/shop#v2            # an SSH address, a subdirectory, a tag
-unify init unify-shop-template                                  # an npm package, by its conventional name
+unify init unify-shop-template                                  # an npm package — any package; this is the searchable name
 unify init @acme/unify-shop-template@1.4.0                      # the same under an organization, at a version
 ```
 
@@ -24,9 +24,9 @@ What each form does:
 - **A built-in** is a directory of the unify repository, `templates/<name>/`, embedded in the CLI. It needs no network and no git; the name is a shortcut to that directory at the version of unify you are running.
 - **A directory** must exist. Nothing is fetched.
 - **A git repository** is cloned with your own `git`, so your SSH keys and credential helper apply and nothing prompts. The repository ends at the `.git` segment where there is one, else at `host/owner/repo`; what follows is a **subdirectory**, so one repository can host many templates. `#ref` names a branch, a tag or a commit.
-- **An npm package** is fetched with your own `npm pack`, so your `.npmrc`, registry and tokens apply. It is recognized by its name: `unify-<name>-template`, or `@<organization>/unify-<name>-template`, optionally with `@version`. The convention is also what to search npm for.
+- **An npm package** is fetched with your own `npm pack`, so your `.npmrc`, registry and tokens apply. Any package can be one: a bare word that is neither a built-in nor an existing directory is read as a package name (`name` or `@scope/name`, optionally `@version` or `@tag`). Naming a template `unify-<name>-template` is a convention for finding it on npm, not a requirement; `--audit` is what tells a template from a package that is not one. The cost is that a misspelled directory name reaches npm and fails there, with npm's own message.
 
-A bare word that is none of these — not a built-in, not a template package name, not a directory — exits 2 and lists the four forms. A typo never becomes a network request.
+An argument that is no form at all — a space in it, a `/`-path that names no directory — exits 2 and lists the four forms.
 
 Every template lands the same way: its `site/` (or `src/`) becomes your source root and everything beside it lands at your project root. A template with neither directory is a bare source tree, and all of it is content. `.git/`, `node_modules/`, `package.json` and lockfiles are never copied. `init` writes nothing if any file it would create already exists.
 
@@ -40,13 +40,23 @@ unify init https://github.com/acme/templates/shop --audit
 
 ### What `init` leaves behind
 
-One line in `unify.yaml`:
+The record in `unify.yaml`: the template exactly as you typed it (a directory is written relative to the file), as the value of `template:`,
 
 ```yaml
 template: https://github.com/acme/templates/shop
 ```
 
-It is the template exactly as you typed it (a directory is written relative to the file). That is the whole record — no version, no file list, no hashes, no copy of the template. It is a saved flag like every other line in the file (`--template` is the same thing on the command line), it is never published, and it is what `unify update` reads. Commit it.
+or, when the template ships a `unify.yaml` with files to keep (§3), as `source:` inside that block:
+
+```yaml
+template:
+  source: https://github.com/acme/templates/shop
+  keep:
+    - unify.yaml
+    - site/assets/theme.css
+```
+
+That is the whole record — no version, no file list, no hashes, no copy of the template. It is a saved flag like every other line in the file (`--template` is the same thing on the command line), it is never published, and it is what `unify update` reads. Commit it.
 
 ## 2. The recommended workflow
 
@@ -54,7 +64,7 @@ Configure once, author freely, take template improvements when they come.
 
 1. **Scaffold** from the template and commit everything.
 2. **Configure** the site: uncomment what you need in `unify.yaml`, copy the template's examples into place (a template built as §3 recommends keeps them under `site/_examples/`) and fill them in, set up deployment. Commit.
-3. **Author**: add pages and content — copies of the examples, edited — and customize the stylesheet or layout where you want to. Commit as you go.
+3. **Author**: add pages and content — copies of the examples, edited — edit the theme, and add any other file you make your own (the nav, the home page) to the `keep:` list under `template:` in `unify.yaml`. Commit as you go.
 4. When the template has moved on, **preview** what would change:
 
    ```sh
@@ -76,9 +86,22 @@ Configure once, author freely, take template improvements when they come.
 
 Running `unify update` when nothing differs says so and writes nothing. In a script, `unify update --yes` (`-y`) answers the question for you. To move to a specific version or another address, name it: `unify update https://github.com/acme/templates/shop#v3`, or `unify update @acme/unify-shop-template@2.0.0`; the line follows.
 
-### The list is the protection
+### The list is the protection, and `keep` is the exception you declare
 
-`update` has no merge, no ownership rules and no file list to maintain. A file you edited that the template also ships shows up in the list like any other difference, and the answer is yours: read the list, and say no if it names something you want to keep. A template built as §3 recommends ships the files you fill in only as examples to copy, so its list is tooling and little else. A quick `git stash` of the files you mean to keep, `unify update -y`, `git stash pop` takes the template's changes everywhere else in three commands.
+`update` has no merge and no ownership rules. A file you edited that the template also ships shows up in the list like any other difference, and the answer is yours: read the list, and say no if it names something you want to keep. A template built as §3 recommends ships the files you fill in only as examples to copy, so its list is tooling and little else.
+
+For the files you customize and mean to keep for good — the theme, the nav, the home page — `keep:` under `template:` in `unify.yaml` names them, relative to the file, and `update` never overwrites a listed file that exists: it prints `keep <path>` when the template's copy differs, counts it as kept, and never asks about it; a listed file you do not have yet is added. `--keep <path>` on the command line is the same list for one run (repeatable, relative to the working directory, replacing the file's). The built-ins list `unify.yaml` itself and `site/assets/theme.css`:
+
+```yaml
+template:
+  source: https://github.com/acme/templates/shop
+  keep:
+    - unify.yaml
+    - site/assets/theme.css
+    - site/_includes/nav.html
+```
+
+That is the whole mechanism: a list of paths under the record, nothing more.
 
 ### What `update` never does
 
@@ -107,6 +130,7 @@ site/
   _layout.html          tooling: ships in place, updates cleanly
   _includes/nav.html
   assets/style.css
+  assets/theme.css      the look: the site edits it, and unify.yaml's keep: list protects it (see below)
   index.html            the one page a scaffold cannot build without (see below)
   _examples/
     post.md             examples: copied into place, then edited — never edited where they are
@@ -114,17 +138,34 @@ site/
     landing-page.html
 AGENTS.md               tooling: tells the author (or their agent) to copy from _examples/
 DEPLOY.md
+unify.yaml              its template: block keeps unify.yaml and site/assets/theme.css — the files update never overwrites
 ```
 
 The underscore does the work. `_examples/` is excluded from the build by the default `_*` rule, so the examples ship with the template, land in every site, and never publish. The site's author copies `_examples/post.md` to `posts/first-post.md` and edits the copy. The copy is a path the template does not ship, so `update` never visits it; `_examples/post.md` itself is never edited, so it updates cleanly whenever you improve it. Convention over configuration: nothing is declared anywhere, and the path alone says whose a file is. Say so in the template's `AGENTS.md`, which is where an author or an agent looks first.
 
 The five built-ins are laid out this way: `unify init blog`, for instance, ships `_examples/post.md` and `_examples/authors.json`, and its generator writes a listing that says there are no posts yet until the first one is copied into place.
 
-The same rule reaches the project root. **Do not ship `unify.yaml` unless a page of yours needs a flag live** (the `docs` built-in needs `catalog: true`): `init` writes the all-commented file for a template that has none, and that file is then the site's — uncommented freely, never in an update's list. A `.env`, keys, and anything else a site fills in belong in an example or in `DEPLOY.md`'s instructions, never in the template.
+### The look is a file the site keeps
+
+Your stylesheet is tooling, so a site must be able to change the look without editing it. Express the look as custom properties, and open the stylesheet with two lines:
+
+```css
+@layer base, theme;
+@import url("theme.css") layer(theme);
+
+@layer base {
+  :root { --font-body: 100%/1.5 system-ui, sans-serif; --color-link: linktext; /* … */ }
+  /* the template's rules, reading var(--font-body) and the rest */
+}
+```
+
+Then ship `assets/theme.css` in place — the same properties at their defaults, and nothing else — and name it under `keep:` in the `template:` block of the `unify.yaml` you ship (§19.10). The site edits the file: the import places it in the `theme` layer, which wins over `base` whatever the order, so a changed value changes the look and a deleted one keeps your default, and `unify update` never overwrites it. The file ships in place rather than as an example because a file you ship can only reference files you ship: unify refuses to publish a reference to nothing (§12), so a stylesheet importing a theme the site had not copied yet would fail a fresh scaffold's audit. The built-ins do exactly this. It is a convention, not a rule: a template that wants no theme file ships none.
+
+The same rule reaches the project root. **Ship `unify.yaml` only for the lines you need live**, and name it under the `keep:` list of its own `template:` block — the built-ins do, beside `site/assets/theme.css` — so the lines a site uncomments are never overwritten; `init` writes the all-commented file for a template that ships none, and that file is then the site's. A `.env`, keys, and anything else a site fills in belong in an example or in `DEPLOY.md`'s instructions, never in the template.
 
 ### What a template must still ship
 
-A fresh scaffold has to build — `unify audit --strict` must pass on it, since that is what `--audit` checks — so a template needs at least a home page, and a home page is the first file every site rewrites. Keep that set as small as it can be, usually `index.html` alone, and change those files as rarely as you can; when you must, the site's author sees them in the list and answers for themselves. A data file your generator reads on a fresh scaffold is the same case: ship it and leave it alone, or have the generator fall back to the example when the real file is absent.
+A fresh scaffold has to build — `unify audit --strict` must pass on it, since that is what `--audit` checks — so a template needs at least a home page, and a home page is the first file every site rewrites. Keep that set as small as it can be, usually `index.html` alone. Once a site has edited such a file it differs from yours, so it is in every update's list from then on and the site's author answers for it each time — or names it under `keep:` and answers once; the fewer such files, the quieter the list. A data file your generator reads on a fresh scaffold is the same case: ship it and leave it alone, or have the generator fall back to the example when the real file is absent.
 
 ### Make it audit clean, then host it
 
@@ -132,7 +173,7 @@ A fresh scaffold has to build — `unify audit --strict` must pass on it, since 
 2. **Make it audit clean**: `unify audit --strict` must exit 0 from a fresh scaffold, with no flags and nothing edited. That is what `--audit` checks on the receiving side, and what the built-ins guarantee. Examples under `_examples/` are never built, so they cannot fail it.
 3. **Host it** wherever its users can fetch it:
    - **One or many in a git repository**: `templates/shop/`, `templates/docs/` and so on — users write `https://github.com/acme/templates/templates/shop`, and `#v2` names a tag. Tag releases, so a user can stay on a version by name.
-   - **On npm**: name the package `unify-<name>-template` (or `@acme/unify-<name>-template`), so `unify init unify-shop-template` finds it and so that searching npm for `unify-` `-template` lists it beside the others. `package.json` and lockfiles are never scaffolded, so the package can carry whatever metadata it needs. Publish versions as usual; users name one with `@version`.
+   - **On npm**: any package works (`unify init <name>`), and naming it `unify-<name>-template` (or `@acme/unify-<name>-template`) is the convention that lets a search for `unify-` `-template` list it beside the others. `package.json` and lockfiles are never scaffolded, so the package can carry whatever metadata it needs. Publish versions as usual; users name one with `@version`.
    - **As a directory**, for a template that lives beside the sites it serves.
 4. **Release updates** with the copy in mind: change the tooling and the examples freely — a site that followed the convention has edited neither — and leave the few files from the section above alone. A file you remove stays in every site.
 

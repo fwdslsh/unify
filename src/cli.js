@@ -33,7 +33,7 @@ const HELP = `unify — HTML-native composition: no expression language, no clie
   unify audit                evaluate the site the build would publish — writes nothing
   unify dev                  build, watch, serve, and reload — the inner loop
   unify watch                build + rebuild on change, no server
-  unify init [template]      scaffold a starter site: a built-in name, a directory, a git repository (URL[/subdirectory][#ref]) or an npm package named unify-<name>-template
+  unify init [template]      scaffold a starter site: a built-in name, a directory, a git repository (URL[/subdirectory][#ref]) or an npm package
   unify update [template]    fetch the recorded template again and copy its changed files over this project, after showing the list and asking
 
 Options:
@@ -55,6 +55,7 @@ Options:
       --save-config        \`build\` only: write the saveable options given here into unify.yaml (after a good build)
       --template <source>  \`init\`/\`update\`: the template, the same as the positional; init saves it in unify.yaml
   -y, --yes                \`update\`: overwrite the listed files without asking
+      --keep <path>        \`update\`: a file it never overwrites once it exists — the ones you customized (repeatable, relative to the working directory; the file's list is keep: under template: in unify.yaml, relative to the file)
       --strict             advisories count as problems for the exit code (with \`audit\`, findings too)
       --format <kind>      \`audit\` report shape: human (default), json, or sarif
       --external           \`audit\` only: fetch every off-origin URL the site emits and report the ones that don't resolve

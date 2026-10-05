@@ -51,17 +51,14 @@ describe.each(TEMPLATE_NAMES)('template "%s" — SCF-01/SCF-02 structure (in-mem
   const paths = Object.keys(files);
   const wholeSource = Object.values(files).join("\n");
 
-  test("ships unify.yaml only where a page needs a flag live — docs (catalog: true) and blog (generate:) — every option described and commented out around that one line; the others ship none and init writes the registry's file (§18, §19.6, §19.8, §19.11)", () => {
+  test("ships unify.yaml with the lines it needs live — a template: block whose keep: names the file itself and the theme in every template, docs' catalog: true and blog's generate: — every other option described and commented out (§18, §19.6, §19.8, §19.11)", () => {
     // Never inside the source tree (0.10): the file is build material beside the site.
     expect(paths).not.toContain("unify.yaml");
-    const live = { docs: { catalog: true }, blog: { generate: "scripts/gen.mjs" } }[name];
-    const yaml = TEMPLATE_ROOT_FILES[name]?.["unify.yaml"];
-    if (live === undefined) {
-      expect(yaml).toBeUndefined();
-      return;
-    }
+    const live = { ...({ docs: { catalog: true }, blog: { generate: "scripts/gen.mjs" } }[name] ?? {}), template: { keep: ["unify.yaml", "site/assets/theme.css"] } };
+    const yaml = TEMPLATE_ROOT_FILES[name]["unify.yaml"];
     expect(yaml).toBe(configTemplate(live));
-    expect(yaml.split("\n").filter((l) => /^[a-z]/.test(l))).toEqual(Object.entries(live).map(([k, v]) => `${k}: ${v}`));
+    expect(yaml.split("\n").filter((l) => /^[a-z]/.test(l))).toEqual(Object.entries(live).map(([k, v]) => (typeof v === "object" ? `${k}:` : `${k}: ${v}`)));
+    expect(yaml).toContain("template:\n  keep:\n    - unify.yaml\n    - site/assets/theme.css\n");
   });
 
   test("§19.11: the pages it ships in place are the home page, the 404 and (docs) the All-pages starter; everything else a site fills in is an example under _examples/", () => {
@@ -157,9 +154,23 @@ describe.each(TEMPLATE_NAMES)('template "%s" — SCF-01/SCF-02 structure (in-mem
   });
 
   test("SCF-02: the starter stylesheet declares slot { display: contents }", () => {
-    const cssFiles = paths.filter((p) => p.endsWith(".css"));
-    expect(cssFiles.length).toBeGreaterThan(0);
-    for (const css of cssFiles) expect(files[css]).toMatch(/slot\s*\{\s*display:\s*contents\s*;?\s*\}/);
+    // The stylesheet the layout links; theme.css beside it is custom properties only.
+    expect(files["assets/style.css"]).toMatch(/slot\s*\{\s*display:\s*contents\s*;?\s*\}/);
+  });
+
+  test("§19.11: the look is a file the site keeps — assets/theme.css ships in place, assets/style.css imports it into a theme layer declared after base, and the template's unify.yaml names it under keep:", () => {
+    expect(paths).toContain("assets/theme.css");
+    const style = files["assets/style.css"];
+    expect(style).toMatch(/^@layer base, theme;\n@import url\("theme\.css"\) layer\(theme\);/m);
+    expect(style).toMatch(/^@layer base \{/m);
+    // Every property the theme exposes is one the stylesheet both sets (the default) and reads.
+    const exposed = [...files["assets/theme.css"].matchAll(/^\s*(--[\w-]+):\s*([^;]+);/gm)];
+    expect(exposed.length).toBeGreaterThan(0);
+    for (const [, prop, value] of exposed) {
+      expect(style).toContain(`${prop}: ${value};`);
+      expect(style).toContain(`var(${prop})`);
+    }
+    expect(TEMPLATE_ROOT_FILES[name]["unify.yaml"]).toMatch(/^template:\n(?:  source: .*\n)?  keep:\n(?:    - .*\n)*    - site\/assets\/theme\.css\n/m);
   });
 
   test("built pages contain no <slot> elements outside the design-time layout itself", () => {
@@ -473,10 +484,10 @@ describe("the embedded snapshot and templates/ agree", () => {
     expect(SNAPSHOT).toEqual(buildSnapshot(TEMPLATES_DIR));
   });
 
-  test("the unify.yaml a template ships is the registry's file with only that template's live lines; only docs and blog ship one (§18, §19.8, §19.11)", () => {
+  test("the unify.yaml every template ships is the registry's file with only that template's live lines (§18, §19.8, §19.11)", () => {
     for (const name of Object.keys(TEMPLATES)) {
-      const yaml = TEMPLATE_ROOT_FILES[name]?.["unify.yaml"];
-      expect(`${name}: ${yaml === undefined ? "none" : yaml === configTemplate(liveEntries(yaml))}`).toBe(`${name}: ${["docs", "blog"].includes(name) ? "true" : "none"}`);
+      const yaml = TEMPLATE_ROOT_FILES[name]["unify.yaml"];
+      expect(`${name}: ${yaml === configTemplate(liveEntries(yaml))}`).toBe(`${name}: true`);
     }
   });
 

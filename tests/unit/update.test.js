@@ -64,18 +64,22 @@ async function scaffold() {
 }
 
 /** unify.yaml's record line. */
-const recordOf = (root) => readFileSync(join(root, "unify.yaml"), "utf8").match(/^template: (.+)$/m)?.[1] ?? null;
+const recordOf = (root) => {
+  const text = readFileSync(join(root, "unify.yaml"), "utf8");
+  return text.match(/^template: (.+)$/m)?.[1] ?? text.match(/^\s+source: (.+)$/m)?.[1] ?? null;
+};
 
 /**
  * Run update() the way the CLI does: settings resolved from the project's
  * own unify.yaml, the answer read from a stream holding `answer` (nothing,
  * by default — a closed stdin).
  */
-async function run(root, { template, dryRun = false, yes = false, answer = "" } = {}) {
+async function run(root, { template, dryRun = false, yes = false, answer = "", keep } = {}) {
   const { reporter, lines, err } = collecting();
   const flags = { command: "update", source: join(root, "site") };
   if (dryRun) flags["dry-run"] = true;
   if (yes) flags.yes = true;
+  if (keep) flags.keep = keep;
   const { settings } = resolveSettings(flags, root);
   const stdin = Readable.from(answer === "" ? [] : [answer]);
   const code = await update({ projectRoot: root, sourceRoot: join(root, "site"), settings, template, reporter, stdin });
@@ -242,6 +246,79 @@ describe("update() — copies the template over the project, after asking (§19.
     write(twin, { ...V1, "site/index.html": "<main>fork</main>\n" });
     expect((await run(root, { template: twin })).text).toContain("nothing to do");
     expect(recordOf(root)).toBe(twin);
+  });
+});
+
+describe("update() — keep: the files it never overwrites (§19.10)", () => {
+  /** The template moves config.json on, and the site has edited its own copy. */
+  async function diverged() {
+    const { tpl, root, site } = await scaffold();
+    writeFileSync(join(site, "config.json"), '{"lab": "Mine"}\n');
+    writeFileSync(join(tpl, "site", "config.json"), '{"lab": "NEW SEED"}\n');
+    return { tpl, root, site };
+  }
+  /** The record, respelled as the block with a keep: list under it. */
+  const keepLine = (root) => {
+    const path = join(root, "unify.yaml");
+    writeFileSync(path, readFileSync(path, "utf8").replace(/^template: (.+)$/m, "template:\n  source: $1\n  keep:\n    - site/config.json"));
+  };
+
+  test("a template that ships unify.yaml with a keep: list under template: gets its source written into that block, and update keeps the listed file", async () => {
+    const tpl = tempDir();
+    write(tpl, { ...V1, "unify.yaml": "template:\n  keep:\n    - site/config.json\n" });
+    const root = tempDir();
+    expect(await init({ projectRoot: root, sourceRoot: root, sourceDefaulted: true, template: tpl, reporter: collecting().reporter })).toBe(0);
+    expect(readFileSync(join(root, "unify.yaml"), "utf8")).toContain(`template:\n  source: ${tpl}\n  keep:\n    - site/config.json\n`);
+    writeFileSync(join(root, "site", "config.json"), '{"lab": "Mine"}\n');
+    writeFileSync(join(tpl, "site", "config.json"), '{"lab": "NEW SEED"}\n');
+    const { code, text, asked } = await run(root);
+    expect(code).toBe(0);
+    expect(text).toContain("keep site/config.json");
+    expect(asked).toBe(false);
+    expect(readFileSync(join(root, "site", "config.json"), "utf8")).toBe('{"lab": "Mine"}\n');
+    // The record stays in the block, and the block keeps its list, when update writes it back.
+    writeFileSync(join(tpl, "site", "index.html"), "<title>Home</title><main><h1>v2</h1></main>\n");
+    expect((await run(root, { yes: true })).code).toBe(0);
+    expect(readFileSync(join(root, "unify.yaml"), "utf8")).toContain(`template:\n  source: ${tpl}\n  keep:\n    - site/config.json\n`);
+  });
+
+  test("a listed file that exists is never overwritten: reported as keep, counted as kept, never asked about", async () => {
+    const { root, site } = await diverged();
+    keepLine(root);
+    const { code, text, asked } = await run(root);
+    expect(code).toBe(0);
+    expect(text).toContain("keep site/config.json");
+    expect(text).toContain(`update: nothing to do — ${recordOf(root)} is already applied, 1 kept`);
+    expect(asked).toBe(false);
+    expect(readFileSync(join(site, "config.json"), "utf8")).toBe('{"lab": "Mine"}\n');
+  });
+
+  test("--keep is the same list for one run, relative to the working directory, and replaces the file's", async () => {
+    const { root, site } = await diverged();
+    const { code, text, asked } = await run(root, { keep: ["site/config.json"] });
+    expect(code).toBe(0);
+    expect(text).toContain("keep site/config.json");
+    expect(asked).toBe(false);
+    expect(readFileSync(join(site, "config.json"), "utf8")).toBe('{"lab": "Mine"}\n');
+    // The file's list names the file; the flag's list, naming another, is the one that counts.
+    keepLine(root);
+    const replaced = await run(root, { keep: ["site/_layout.html"], dryRun: true });
+    expect(replaced.text).toContain("would overwrite site/config.json");
+  });
+
+  test("a listed file the site does not have is added, and a kept file never counts as a change", async () => {
+    const { tpl, root, site } = await diverged();
+    keepLine(root);
+    writeFileSync(join(tpl, "site", "index.html"), "<title>Home</title><main><h1>v2</h1></main>\n");
+    const { code, text } = await run(root, { answer: "y\n" });
+    expect(code).toBe(0);
+    expect(text).toContain(`update: overwrote 1, added 0, 1 kept — ${recordOf(root)}`);
+    expect(readFileSync(join(site, "config.json"), "utf8")).toBe('{"lab": "Mine"}\n');
+    rmSync(join(site, "config.json"));
+    const added = await run(root);
+    expect(added.code).toBe(0);
+    expect(added.text).toContain("add site/config.json");
+    expect(readFileSync(join(site, "config.json"), "utf8")).toBe('{"lab": "NEW SEED"}\n');
   });
 });
 

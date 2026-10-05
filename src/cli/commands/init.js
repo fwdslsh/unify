@@ -57,7 +57,7 @@ import { Reporter, UsageError } from "../../core/diagnostics.js";
 import { contains, toRelative } from "../../core/paths.js";
 import { TEMPLATES } from "../../templates/index.js";
 import { configPath, configTemplate } from "../options.js";
-import { saveEntries, writeConfig } from "../save-config.js";
+import { recordTemplate } from "../save-config.js";
 import { resolveSettings } from "../settings.js";
 import { classifyTemplateSource, fetchTemplate, recordSource } from "../template-source.js";
 
@@ -71,7 +71,7 @@ const DEFAULT_TEMPLATE = "default";
  *   source root (no --source, no unify.yaml key, no src/) — the exact
  *   "fresh project" state this command exists to fix by creating src/
  * @param {string|undefined} context.template - the positional argument: a
- *   built-in name, a directory, a git URL, or `npm:<spec>` (§19.9)
+ *   built-in name, a git URL, a directory, or an npm package (§19.9)
  * @param {boolean} [context.audit] - §19.9's `--audit`: scaffold only if the
  *   result passes `unify audit --strict`
  * @param {import('../../core/diagnostics.js').Reporter} context.reporter
@@ -220,9 +220,10 @@ export async function init({ sourceRoot, sourceDefaulted, template, reporter, au
     writeFileSync(absPath, content);
   }
 
-  // §19.10 — the record: ONE line in unify.yaml, `template: <source>` as it
-  // was typed (a relative directory relative to the file), which `unify
-  // update` fetches again. The file is the template's own copy when it
+  // §19.10 — the record in unify.yaml: `template: <source>` as it was typed
+  // (a relative directory relative to the file), or `source:` under
+  // `template:` when the file carries a `keep:` list (the built-ins do), which
+  // `unify update` fetches again. The file is the template's own copy when it
   // shipped one (just written above), else the project's existing one, else
   // a fresh all-commented file at the project root — in every case the file
   // §18 says unify.yaml is, upserted the way `--save-config` upserts. Its
@@ -231,7 +232,7 @@ export async function init({ sourceRoot, sourceDefaulted, template, reporter, au
   const priorConfig = existsSync(configFile) ? readFileSync(configFile) : null;
   if (priorConfig === null) writeFileSync(configFile, configTemplate());
   const recorded = recordSource(source, label, dirname(configFile));
-  writeConfig(configFile, saveEntries({ template: recorded }));
+  recordTemplate(configFile, recorded);
   const restoreConfig = () => (priorConfig === null ? rmSync(configFile, { force: true }) : writeFileSync(configFile, priorConfig));
 
   const shown = toRelative(projectRoot, target) || ".";

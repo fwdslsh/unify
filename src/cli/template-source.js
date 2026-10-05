@@ -1,18 +1,17 @@
 /**
  * `unify init <source>` — where a template comes from (conformance-spec §19.9).
  *
- * The positional argument names one of four things, told apart by SHAPE, never
- * by probing: a built-in template (an exact name from the registry), an npm
- * package (named by the convention `unify-<name>-template`, or
- * `@org/unify-<name>-template`, with an optional `@version` — the pattern is
- * what makes unify templates searchable on npm, so it is also what marks one
- * on the command line), a git repository (a URL, a `git@host:` address, or a
- * `.git` segment, with an optional subdirectory and `#ref`), or else a
- * directory on disk. The order matters only where two shapes could both
- * apply, and there the rule is the one that reaches no network on a typo:
- * `blgo` is not a built-in, not a template package name and no directory of
- * that name exists, so it is a usage error naming the four forms — never an
- * npm lookup that fails later and slower.
+ * The positional argument names one of four things, told apart by SHAPE, in
+ * this order: a built-in template (an exact name from the registry), a git
+ * repository (a URL, a `git@host:` address, or a `.git` segment, with an
+ * optional subdirectory and `#ref`), a directory on disk (which must exist),
+ * or else an npm package — ANY package, named as published, optionally with
+ * `@version` or `@tag`. The `unify-<name>-template` convention exists so a
+ * template can be found on npm; it is not what makes a package a template.
+ * `--audit` is: it keeps a scaffold only if it audits clean. The cost of the
+ * open form is that a misspelled directory name reaches npm and fails there,
+ * with npm's own message; an argument that is no form at all (a space in it,
+ * a `/` outside a scope) is a usage error naming the four forms.
  *
  * A git source may name a SUBDIRECTORY of the repository, so one repository
  * can host many templates (this one does: `templates/<name>/`). The
@@ -86,18 +85,24 @@ const SKIPPED_ROOT_FILES = new Set(["package.json", "package-lock.json", "npm-sh
 export function classifyTemplateSource(arg, builtIns, cwd = process.cwd()) {
   if (builtIns.includes(arg)) return { kind: "builtin", name: arg };
 
-  if (NPM_TEMPLATE.test(arg)) return { kind: "npm", spec: arg };
-
   const git = parseGitSource(arg);
   if (git) return git;
 
+  // A directory that exists wins over a package of the same name: what is on
+  // disk is what the author can see.
   const path = resolve(cwd, arg);
   if (existsSync(path) && statSync(path).isDirectory()) return { kind: "dir", path };
+
+  // Anything else that is a package name is an npm package — any package,
+  // not only one named by the convention: --audit is what tells a template
+  // from a package that is not one. A misspelled directory name lands here
+  // too, and fails at npm with npm's own message.
+  if (NPM_SPEC.test(arg)) return { kind: "npm", spec: arg };
 
   throw new UsageError(`not a template: ${arg}`, [
     `a built-in template is one of: ${builtIns.join(", ")}`,
     `a directory must exist: ${path} does not`,
-    "an npm package is named unify-<name>-template or @org/unify-<name>-template (optionally @version)",
+    "an npm package is named as published (name or @scope/name, optionally @version or @tag); add --audit to keep it only if it audits clean",
     "a git repository is given by its URL, optionally /<subdirectory> and #<branch, tag or commit>",
   ]);
 }
@@ -118,11 +123,15 @@ export function recordSource(source, label, configDir) {
 }
 
 /**
- * The naming convention for a template published to npm: `unify-<name>-template`,
- * optionally under an organization, optionally pinned. Anchored, lower-case
- * (npm names are), and the `<name>` is at least one character.
+ * An npm package as published: an optionally scoped name, optionally
+ * `@version` or `@tag`. Anchored and lower-case, as npm names are, and the
+ * version part keeps to the characters a version or dist-tag can hold —
+ * which is also what keeps the one argument that reaches a shell (npm on
+ * Windows, below) free of metacharacters. `unify-<name>-template` is the
+ * convention that makes a template findable on npm (§19.9); nothing here
+ * requires it.
  */
-export const NPM_TEMPLATE = /^(@[a-z0-9][a-z0-9._-]*\/)?unify-[a-z0-9][a-z0-9._-]*-template(@[^@\s/]+)?$/;
+export const NPM_SPEC = /^(@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*(@[A-Za-z0-9._^~-]+)?$/;
 
 /**
  * A git source, or null when `arg` is not one.
@@ -283,8 +292,8 @@ function runTool(tool, args, env = {}) {
   return new Promise((done, fail) => {
     // On Windows `npm` is `npm.cmd`, which node can only run through a shell;
     // `git` is a real executable everywhere. Every argument that reaches the
-    // shell is unify's own or matched NPM_TEMPLATE (letters, digits, `.`,
-    // `_`, `-`, `@`, `/`), so nothing in it can break out of the command.
+    // shell is unify's own or matched NPM_SPEC (letters, digits, `.`, `_`,
+    // `-`, `@`, `/`, `^`, `~`), so nothing in it can break out of the command.
     const shell = tool === "npm" && process.platform === "win32";
     const proc = spawn(tool, args, { env: { ...process.env, ...env }, stdio: ["ignore", "ignore", "pipe"], shell });
     const chunks = [];
@@ -360,7 +369,7 @@ async function packNpm({ spec }, scratch) {
   if (code !== 0) {
     throw new UsageError(`npm pack failed (exit ${code}) for ${spec}${stderr.trim() ? `: ${tail(stderr)}` : ""}`, [
       "check the package name and version, and that you can install it with npm yourself",
-      "a template package is named unify-<name>-template, or @org/unify-<name>-template",
+      "a bare word that is not a built-in or an existing directory is read as an npm package, so a misspelled directory name lands here too",
     ]);
   }
   const tarballs = readdirSync(scratch).filter((name) => name.endsWith(".tgz"));

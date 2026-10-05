@@ -30,7 +30,7 @@
 # feed-full: true
 
 # write assets/unify/catalog.json, one record per published page (default: false)
-catalog: true
+# catalog: true
 
 # write assets/unify/search-corpus.json, the text of every page for client-side search (default: false)
 # search-corpus: true

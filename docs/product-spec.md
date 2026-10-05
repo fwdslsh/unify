@@ -52,7 +52,7 @@ unify build         # write the final site to dist/
 my-site/
 ├── AGENTS.md             # outside site/, so it cannot publish (§6.7)
 ├── DEPLOY.md             # the deployment recipe
-├── unify.yaml            # saved flags, all commented out but template:, the source `unify update` fetches again (§19.10)
+├── unify.yaml            # saved flags, all commented out but template:, the source `unify update` fetches again and, under it, keep:, the files it never overwrites (§19.10)
 └── site/                 # the source root — everything here ships
     ├── _layout.html      # the site chrome — one complete HTML page
     ├── _includes/
@@ -263,7 +263,7 @@ unify [build]              build the site (default command)
 unify audit                evaluate the site the build would publish — writes nothing
 unify dev                  build, watch, serve, and reload — the inner loop
 unify watch                build + rebuild on change, no server (pair with your own)
-unify init [template]      scaffold a starter site: a built-in (default, basic, blog, docs, portfolio), a directory, a git repository (URL, optionally /<subdirectory> and #ref) or an npm package named unify-<name>-template; --audit keeps the scaffold only if it audits clean
+unify init [template]      scaffold a starter site: a built-in (default, basic, blog, docs, portfolio), a directory, a git repository (URL, optionally /<subdirectory> and #ref) or any npm package; --audit keeps the scaffold only if it audits clean
 unify update [template]    fetch the recorded template (or the one named) again and copy its changed files over the project: the files that would be overwritten are listed and confirmed first; --dry-run previews
 
 Options:
@@ -285,6 +285,7 @@ Options:
       --save-config        `build` only: write the saveable options given here into unify.yaml (after a good build)
       --template <source>  `init`/`update`: the template, the same as the positional; init saves it in unify.yaml
   -y, --yes                `update`: overwrite the listed files without asking
+      --keep <path>        `update`: a file it never overwrites once it exists (repeatable; keep: under template: in unify.yaml is the same list, relative to the file)
       --strict             advisories count as problems for the exit code (with `audit`, findings too)
       --format <kind>      `audit` report shape: human (default), json, or sarif
       --external           `audit` only: fetch every off-origin URL the site emits and report the ones that don't resolve

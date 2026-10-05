@@ -106,21 +106,24 @@ describe("init()", () => {
     expect(readdirSync(root)).toEqual(["site"]);
   });
 
-  test("an unknown template is a usage fault (exit 2), never a silent fallback", async () => {
+  test("an argument that is no form at all is a usage fault (exit 2), never a silent fallback — and never a network lookup", async () => {
+    // A bare word is an npm package now (§19.9, any package can be a template), so the no-form
+    // argument is one no package, directory or URL could be spelled as.
     const root = tempDir();
     await expect(
-      init({ projectRoot: root, sourceRoot: root, sourceDefaulted: true, template: "not-a-real-template", reporter: silentReporter() }),
+      init({ projectRoot: root, sourceRoot: root, sourceDefaulted: true, template: "not a template", reporter: silentReporter() }),
     ).rejects.toThrow(UsageError);
   });
 
-  test("the unknown-template error names every valid choice", async () => {
+  test("the no-form error names every built-in and the other three forms", async () => {
     const root = tempDir();
     try {
-      await init({ projectRoot: root, sourceRoot: root, sourceDefaulted: true, template: "nope", reporter: silentReporter() });
+      await init({ projectRoot: root, sourceRoot: root, sourceDefaulted: true, template: "not a template", reporter: silentReporter() });
       throw new Error("expected init() to throw");
     } catch (e) {
       expect(e).toBeInstanceOf(UsageError);
       for (const name of Object.keys(TEMPLATES)) expect(e.fixes.join(" ")).toContain(name);
+      for (const form of ["directory", "npm package", "URL"]) expect(e.fixes.join(" ")).toContain(form);
     }
   });
 
@@ -155,13 +158,15 @@ describe("init()", () => {
     expect(existsSync(join(root, "src", "_layout.html"))).toBe(true);
   });
 
-  test("writes unify.yaml at the project root for every template, all commented out except docs' catalog: true, blog's generate:, and the template: record (§18, §19.6, §19.8, §19.10)", async () => {
+  test("writes unify.yaml at the project root for every template, all commented out except the template: block (the record over keep:, the file itself and the theme), docs' catalog: true and blog's generate: (§18, §19.6, §19.8, §19.10)", async () => {
     for (const name of Object.keys(TEMPLATES)) {
       const root = tempDir();
       await init({ projectRoot: root, sourceRoot: root, sourceDefaulted: true, template: name, reporter: silentReporter() });
-      const live = readFileSync(join(root, "unify.yaml"), "utf8").split("\n").filter((l) => /^[a-z]/.test(l));
+      const text = readFileSync(join(root, "unify.yaml"), "utf8");
+      const live = text.split("\n").filter((l) => /^[a-z]/.test(l));
       // §19.10 — a built-in is recorded by its name, in the key's own place in the file.
-      expect(live).toEqual([...({ docs: ["catalog: true"], blog: ["generate: scripts/gen.mjs"] }[name] ?? []), `template: ${name}`]);
+      expect(live).toEqual([...({ docs: ["catalog: true"], blog: ["generate: scripts/gen.mjs"] }[name] ?? []), "template:"]);
+      expect(text).toContain(`template:\n  source: ${name}\n  keep:\n    - unify.yaml\n    - site/assets/theme.css\n`);
       expect(existsSync(join(root, "site", "unify.yaml"))).toBe(false);
     }
   });
