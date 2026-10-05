@@ -3,25 +3,25 @@
   <head>
     <link rel="stylesheet" href="assets/style.css">
     <title>Home</title>
-    <meta name="description" content="Start here: what this blog scaffold ships, which two files are generated, and where the first post comes from.">
+    <meta name="description" content="Start here: what this blog scaffold ships, which page is generated, and where the first post comes from.">
     <meta property="og:title" content="Home">
-    <meta property="og:description" content="Start here: what this blog scaffold ships, which two files are generated, and where the first post comes from.">
-    <link rel="alternate" type="application/rss+xml" title="My Blog" href="/feed.xml">
+    <meta property="og:description" content="Start here: what this blog scaffold ships, which page is generated, and where the first post comes from.">
   </head>
   <body>
     <main>
       <h1>Home</h1>
       <p>A blog scaffold: a <code>posts/</code> folder, and one script, run by unify on every build, that turns
-      whatever is in it into a <a href="/blog.html">listing page</a> and an RSS feed.
+      whatever is in it into a <a href="/blog.html">listing page</a>. Build with your address (see <code>DEPLOY.md</code>)
+      and unify writes an Atom feed and a sitemap from the same posts, with nothing to run.
       <span class="placeholder">The site name and the byline are placeholders</span> — replace them before you publish.</p>
       <h2>The first post</h2>
       <p>Copy <code>site/_examples/post.md</code> into <code>site/posts/</code> under the name you want in its
       address, and <code>site/_examples/authors.json</code> to <code>site/_data/authors.json</code> with your own
       name in it. Edit the copies: nothing under <code>_examples/</code> ships, and <code>unify update</code> never
       touches a file you copied.</p>
-      <h2>Two of these files are generated</h2>
-      <p><code>blog.html</code> and <code>feed.xml</code> are written by <code>scripts/gen.mjs</code> from the posts and
-      <code>site/_data/authors.json</code>, into a directory unify hands it before every build — neither exists in
+      <h2>One of these pages is generated</h2>
+      <p><code>blog.html</code> is written by <code>scripts/gen.mjs</code> from the posts unify has already read and
+      <code>site/_data/authors.json</code>, into a directory unify hands it before every build — it does not exist in
       <code>site/</code>. Build from the project root, the directory <code>site/</code>, <code>scripts/</code> and
       <code>unify.yaml</code> sit in:</p>
       <pre><code>unify build</code></pre>

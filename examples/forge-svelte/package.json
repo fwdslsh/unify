@@ -4,12 +4,16 @@
   "type": "module",
   "scripts": {
     "build:calculator": "node scripts/build-fee-calculator.mjs",
-    "build:notes": "node scripts/gen-notes-index.mjs",
-    "publish": "npm run build:calculator && npm run build:notes && unify build --clean --pretty-urls --base-url https://thistleknap.pages.dev/forge/"
+    "dev": "unify dev",
+    "check": "unify build --dry-run --strict",
+    "audit": "unify audit --strict",
+    "build": "unify build --clean --audit --strict",
+    "publish": "npm run build:calculator && npm run build"
   },
   "devDependencies": {
+    "@fwdslsh/unify": "^0.11.4",
     "esbuild": "^0.28.2",
     "esbuild-svelte": "^0.9.5",
-    "svelte": "^5.56.10"
+    "svelte": "^5.57.1"
   }
 }

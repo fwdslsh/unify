@@ -271,8 +271,8 @@ describe.each(TEMPLATE_NAMES)('template "%s" — full composition (SCF-04: zero 
     for (const p of Object.keys(files).filter((f) => !isPage(f) && !isUnderscored(f))) emitted.add(p);
     // A saved `catalog: true` (§19.8, the docs template) makes the build write the catalog.
     if (/^catalog: true$/m.test(TEMPLATE_ROOT_FILES[name]?.["unify.yaml"] ?? "")) emitted.add("assets/unify/catalog.json");
-    // The blog's saved `generate: scripts/gen.mjs` (§19.6) writes the listing and the feed into the overlay.
-    if (/^generate: scripts\/gen\.mjs$/m.test(TEMPLATE_ROOT_FILES[name]?.["unify.yaml"] ?? "")) { emitted.add("blog.html"); emitted.add("feed.xml"); }
+    // The blog's saved `generate: scripts/gen.mjs` (§19.6) writes the listing into the overlay; the feed is unify's, under --base-url only.
+    if (/^generate: scripts\/gen\.mjs$/m.test(TEMPLATE_ROOT_FILES[name]?.["unify.yaml"] ?? "")) emitted.add("blog.html");
 
     const broken = [];
     for (const pageRel of pages) {

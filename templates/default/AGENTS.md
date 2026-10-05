@@ -9,13 +9,17 @@ documentation states — one rule set, three audiences — not a variant for age
 inner loop is `unify dev` (build, watch, serve on localhost, reload), which also serves
 `http://localhost:3000/_unify/` — every `unify audit` finding grouped by page, with that page's
 title, description, language, canonical, headings and links beside it, and the build's own
-diagnostics underneath. Nothing about it is written to `dist/`. `unify --help` lists every
-command and flag there is.
+diagnostics underneath — and `/_unify/preview/`, which lists every layout, include and page and
+opens any layout or include on its own, composed with a page you pick. Every page `dev` serves
+carries a small corner overlay naming its source file and linking its layout and includes
+(`?chrome=off` hides it). Nothing about any of this is written to `dist/`. `unify --help` lists
+every command and flag there is.
 
 ## Finish by checking, and read the exit code
 
-    unify build --dry-run --strict    # the whole build and every check, writing nothing
-    unify audit --strict              # evaluates the site the build would publish; writes nothing
+    unify build --audit --strict      # the whole build, every check and the audit; publishes only if all of it passes
+    unify build --dry-run --strict    # the build and its checks, writing nothing
+    unify audit --strict              # the findings alone, on the site the build would publish; writes nothing
 
 Exit 0 from `unify build` means `dist/` is the complete site. Non-zero means **nothing was
 published** and the previous `dist/` is untouched — never report success on a non-zero exit.

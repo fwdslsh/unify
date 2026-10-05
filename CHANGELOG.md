@@ -23,6 +23,17 @@ The template record is one line in `unify.yaml`, and `unify update` is a copy yo
   script; `--dry-run` lists and never asks. Nothing is removed, nothing outside the template's paths is
   visited, and nothing merges. `unify update <source>` moves the project to another source and the line
   follows.
+- **The blog template's generator reads unify's source inventory** (`generator-context.json`'s
+  `inputs.sourcePages`, §33.7) instead of parsing frontmatter itself, writes only the listing, and leaves the
+  feed to unify: with `--base-url` the posts' `schema: BlogPosting` activates `feed.xml` (§29), so the script
+  writes no RSS and the scaffold links no feed it does not have yet (DEPLOY.md says where to add the link).
+- **The scaffolds' AGENTS.md and DEPLOY.md** name `unify build --audit --strict` as the one-command release gate
+  and point at `/_unify/preview/` and the dev chrome.
+- **Examples brought up to date**: htmx 2.0.11 vendored in `htmx-fragments` and `eleventy-htmx`; `eleventy-htmx`
+  pins `@fwdslsh/unify ^0.11.4` and its `npm run build` is the full gate; `forge-svelte` moves to Svelte 5.57.1,
+  gets a `unify.yaml`, generates its course-notes index through `generate:` from the source inventory instead of
+  a hand-run script writing into `site/`, and now audits clean; `seed-library` builds its seasonal-notes index
+  from the inventory too, byte-identical to before.
 
 ### Removed
 
@@ -208,6 +219,7 @@ site/                  # the source root: pages, assets, _layout.html, _includes
   directory down), so any of them opened straight from the folder shows styled; unify
   rewrites the link for every page at every depth, and the head merge keeps one copy per
   built page.
+
 - **The blog template's generator runs through `--generate`.** It moves from
   `src/_scripts/gen.mjs` to `scripts/gen.mjs` at the project root, the template's
   `unify.yaml` names it, and it writes `blog.html` and `feed.xml` into the build's overlay

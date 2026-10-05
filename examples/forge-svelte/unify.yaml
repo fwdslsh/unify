@@ -1,0 +1,5 @@
+# The flags this example documents, saved so `unify build` needs none of them.
+# A relative path here resolves against this file.
+generate: scripts/gen-notes-index.mjs
+pretty-urls: true
+base-url: https://thistleknap.pages.dev/forge/

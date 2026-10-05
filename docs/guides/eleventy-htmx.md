@@ -20,7 +20,7 @@ install. The example root holds a `unify.yaml` (§4) carrying the two flags ever
 shares, so the commands are bare: `unify build`, `unify audit --strict`. To exercise *this*
 checkout rather than the pinned published release, substitute `bun ../../src/cli.js` or
 `node ../../src/cli.js` — same `unify.yaml`, same output, same exit codes. The pin is
-`^0.10.0`, because the project-root `unify.yaml` and the `site/` default are 0.10 features.
+`^0.11.4`, the release this example was last run against; the project-root `unify.yaml` and the `site/` default need 0.10 or later.
 
 ## 1. Why combine these tools
 
@@ -105,7 +105,7 @@ site/
   notes/2026-01-14-firmware-2-4-0.md   … and five more release notes
   assets/css/site.css
   assets/img/redpoll.svg
-  assets/js/htmx.min.js               vendored, 51,238 bytes, htmx 2.0.10
+  assets/js/htmx.min.js               vendored, 52,182 bytes, htmx 2.0.11
 ```
 
 Two placements are load-bearing.
@@ -585,7 +585,7 @@ means the natural spelling, `layout:`, reaches unify and only unify.
 
 ## 8. htmx progressive enhancement
 
-htmx is **vendored** — `site/assets/js/htmx.min.js`, 51,238 bytes, version 2.0.10, copied
+htmx is **vendored** — `site/assets/js/htmx.min.js`, 52,182 bytes, version 2.0.11, copied
 from the npm package. The site loads nothing from another origin, and unify rewrites the
 `<script src>` like any other URL. There is no bundler and no build step for it.
 

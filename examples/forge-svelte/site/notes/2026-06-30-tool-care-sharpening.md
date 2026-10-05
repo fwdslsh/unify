@@ -1,8 +1,11 @@
 ---
 title: "Tool Care & Sharpening: bring your own steel"
+description: Tool Care let people bring their own chisels and drawknives for the first time, and what that changed about the session.
 date: 2026-06-30
 instructor: M. Aldercott
 ---
+
+# Tool Care & Sharpening: bring your own steel
 
 Good turnout for Tool Care this month, and for the first time we let people
 bring in their own chisels and drawknives instead of practising only on the
