@@ -44,6 +44,7 @@ if (!existsSync(DOCS)) {
 const GROUPS = [
   { label: "Guides", files: [
     ["getting-started.md", "Getting started"],
+    ["templates.md", "Templates"],
     ["authoring-rules.md", "Authoring rules"],
     ["integrations.md", "Integrations"],
     ["docker-usage.md", "Docker"],

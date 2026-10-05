@@ -125,7 +125,7 @@ Brings a later version of the project's template in without resetting what you o
 
 The report lists each `update`, `add`, `remove` and `conflict`, then one summary line with the counts and the revision; running the same update again says `nothing to do`. **`--dry-run`** prints the same change set with `would` and writes nothing, not even the record. Writes are temp-then-rename beside their target; a symlink, a path that resolves outside the project, or a `..` in a template path is refused as a conflict; the fetch happens before any write, so an unreachable source changes nothing; and nothing a template ships is ever executed.
 
-**Template authors** declare what sites own in a `unify.template.json` at the template's root — `{"owned": ["site/config.json", "site/reports/**"]}`, patterns in the `--exclude` grammar against template-relative paths. The file is packaging, like `package.json`: read, never copied.
+The workflow around these two commands, and how to publish a template, is in [`templates.md`](templates.md). **Template authors** declare what sites own in a `unify.template.json` at the template's root — `{"owned": ["site/config.json", "site/reports/**"]}`, patterns in the `--exclude` grammar against template-relative paths. The file is packaging, like `package.json`: read, never copied.
 
 **`--adopt <source>`** is the recovery when a project has no record (scaffolded before 0.11.2, or the file was lost): it fetches the template at the version you name (`#ref`, `@version`) and writes the record from it without changing a file; the next `unify update` compares against that baseline. Without a record, `unify update` exits `2` and says so.
 
