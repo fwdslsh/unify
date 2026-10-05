@@ -53,8 +53,8 @@ It is the template exactly as you typed it (a directory is written relative to t
 Configure once, author freely, take template improvements when they come.
 
 1. **Scaffold** from the template and commit everything.
-2. **Configure** the site: edit `unify.yaml`, the config file the template seeded, the deployment settings. Commit.
-3. **Author**: add pages and content, customize the stylesheet or layout where you want to. Commit as you go.
+2. **Configure** the site: uncomment what you need in `unify.yaml`, copy the template's examples into place (a template built as §3 recommends keeps them under `site/_examples/`) and fill them in, set up deployment. Commit.
+3. **Author**: add pages and content — copies of the examples, edited — and customize the stylesheet or layout where you want to. Commit as you go.
 4. When the template has moved on, **preview** what would change:
 
    ```sh
@@ -78,7 +78,7 @@ Running `unify update` when nothing differs says so and writes nothing. In a scr
 
 ### The list is the protection
 
-`update` has no merge, no ownership rules and no file list to maintain. A file you edited that the template also ships shows up in the list like any other difference, and the answer is yours: read the list, and say no if it names something you want to keep. A quick `git stash` of the files you mean to keep, `unify update -y`, `git stash pop` takes the template's changes everywhere else in three commands.
+`update` has no merge, no ownership rules and no file list to maintain. A file you edited that the template also ships shows up in the list like any other difference, and the answer is yours: read the list, and say no if it names something you want to keep. A template built as §3 recommends ships the files you fill in only as examples to copy, so its list is tooling and little else. A quick `git stash` of the files you mean to keep, `unify update -y`, `git stash pop` takes the template's changes everywhere else in three commands.
 
 ### What `update` never does
 
@@ -96,16 +96,43 @@ or run `unify update <source>` once, which records the source it was given. A pr
 
 ## 3. Publish a template
 
-A template is a project, so the way to make one is to make a site and strip it to the starting point you want others to have.
+A template is a project, so the way to make one is to make a site and strip it to the starting point you want others to have. One fact shapes everything else: **`update` copies every file the template ships, so ship only what you mean to keep updating.**
 
-1. **Lay it out as `init` does**: `site/` beside `AGENTS.md`, `DEPLOY.md`, `unify.yaml` (and `scripts/gen.mjs` if the site needs a generator). The easiest start is `unify init` itself.
-2. **Make it audit clean**: `unify audit --strict` must exit 0 from a fresh scaffold, with no flags and nothing edited. That is what `--audit` checks on the receiving side, and what the built-ins guarantee.
+### Tooling in place, examples to copy
+
+A site is two kinds of file. The **tooling** — layout, includes, stylesheet, scripts, the deployment recipe, `AGENTS.md` — is yours as the template's author: sites take it as is, and every improvement you release should reach them. The **content and configuration** — pages, posts, data files, a settings file — is the site's: its author rewrites it on day one and never wants it back. Ship the first kind in place, and the second kind only as **examples**, under a path the build never publishes:
+
+```
+site/
+  _layout.html          tooling: ships in place, updates cleanly
+  _includes/nav.html
+  assets/style.css
+  index.html            the one page a scaffold cannot build without (see below)
+  _examples/
+    post.md             examples: copied into place, then edited — never edited where they are
+    author.json
+    landing-page.html
+AGENTS.md               tooling: tells the author (or their agent) to copy from _examples/
+DEPLOY.md
+```
+
+The underscore does the work. `_examples/` is excluded from the build by the default `_*` rule, so the examples ship with the template, land in every site, and never publish. The site's author copies `_examples/post.md` to `posts/first-post.md` and edits the copy. The copy is a path the template does not ship, so `update` never visits it; `_examples/post.md` itself is never edited, so it updates cleanly whenever you improve it. Convention over configuration: nothing is declared anywhere, and the path alone says whose a file is. Say so in the template's `AGENTS.md`, which is where an author or an agent looks first.
+
+The same rule reaches the project root. **Do not ship `unify.yaml` unless a page of yours needs a flag live** (the `docs` built-in needs `catalog: true`): `init` writes the all-commented file for a template that has none, and that file is then the site's — uncommented freely, never in an update's list. A `.env`, keys, and anything else a site fills in belong in an example or in `DEPLOY.md`'s instructions, never in the template.
+
+### What a template must still ship
+
+A fresh scaffold has to build — `unify audit --strict` must pass on it, since that is what `--audit` checks — so a template needs at least a home page, and a home page is the first file every site rewrites. Keep that set as small as it can be, usually `index.html` alone, and change those files as rarely as you can; when you must, the site's author sees them in the list and answers for themselves. A data file your generator reads on a fresh scaffold is the same case: ship it and leave it alone, or have the generator fall back to the example when the real file is absent.
+
+### Make it audit clean, then host it
+
+1. **Lay it out as `init` does**: `site/` beside `AGENTS.md`, `DEPLOY.md` (and `scripts/gen.mjs` if the site needs a generator). The easiest start is `unify init` itself.
+2. **Make it audit clean**: `unify audit --strict` must exit 0 from a fresh scaffold, with no flags and nothing edited. That is what `--audit` checks on the receiving side, and what the built-ins guarantee. Examples under `_examples/` are never built, so they cannot fail it.
 3. **Host it** wherever its users can fetch it:
    - **One or many in a git repository**: `templates/shop/`, `templates/docs/` and so on — users write `https://github.com/acme/templates/templates/shop`, and `#v2` names a tag. Tag releases, so a user can stay on a version by name.
    - **On npm**: name the package `unify-<name>-template` (or `@acme/unify-<name>-template`), so `unify init unify-shop-template` finds it and so that searching npm for `unify-` `-template` lists it beside the others. `package.json` and lockfiles are never scaffolded, so the package can carry whatever metadata it needs. Publish versions as usual; users name one with `@version`.
    - **As a directory**, for a template that lives beside the sites it serves.
-
-4. **Release updates** with the copy in mind: every file you change is a file every site will be asked to overwrite, so keep the shared tooling (layout, stylesheet, generator, deployment files) and the seeds a site edits (a config file, a sample post) in separate files, and change a seed only when you must. A file you remove stays in every site.
+4. **Release updates** with the copy in mind: change the tooling and the examples freely — a site that followed the convention has edited neither — and leave the few files from the section above alone. A file you remove stays in every site.
 
 Nothing a template ships is ever executed by `init` or `update`. A template that needs a setup step documents it in its `AGENTS.md` or `DEPLOY.md`, exactly as the built-ins do.
 

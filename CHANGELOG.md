@@ -32,8 +32,10 @@ The template record is one line in `unify.yaml`, and `unify update` is a copy yo
 ### Added
 
 - **`docs/templates.md`**, the template guide — the four source forms, the scaffold-configure-author-update
-  workflow, and how to publish a template — rendered on the docs site under Guides and linked from the README,
-  the tutorial and the CLI reference.
+  workflow, and how to publish a template: tooling in place, everything a site fills in only as examples under
+  `_examples/` (which the build never publishes and `update` therefore never lists as the site's), and no
+  `unify.yaml` unless a page needs a flag live — rendered on the docs site under Guides and linked from the
+  README, the tutorial and the CLI reference.
 
 ## [0.11.2] - 2026-10-04
 
