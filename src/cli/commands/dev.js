@@ -40,7 +40,8 @@ import { renderInterrupted, renderReport } from "../../core/dev-report.js";
 import { resolve } from "node:path";
 import { renderPageMap } from "../../core/page-map.js";
 import { resolutionRoots } from "../../core/paths.js";
-import { renderPreview } from "../../core/preview.js";
+import { AUDIT_PATH, PREVIEW_PATH, renderPreview } from "../../core/preview.js";
+import { renderChrome } from "../../core/chrome.js";
 import { watch } from "./watch.js";
 
 /**
@@ -65,11 +66,24 @@ export async function dev(context, opts = {}) {
       relPath,
       page: params.get("page") || null,
       layout: params.get("layout") || null,
-      config: params.get("config") !== "false",
+      chrome: params.get("chrome") !== "off" && params.get("chrome") !== "false",
       pages: lastDocuments.map((d) => ({ source: d.source.path, generated: d.source.generated, layout: d.source.layout, includes: d.source.includes, path: d.document.path, outputPath: d.outputPath })),
       prettyUrls: Boolean(settings.prettyUrls),
       outputDir: resolve(output),
     }),
+    // §27.8 — on a served page the chrome names the source file and links the
+    // layout and includes it reaches, from the page map (no second reading).
+    chrome: (servedPath) => {
+      const record = lastDocuments.find((d) => d.document.path === servedPath || d.document.path === `${servedPath}/`);
+      if (!record) return "";
+      return renderChrome({
+        kind: "page",
+        rel: record.source.path,
+        record: { path: record.document.path, layout: record.source.layout, includes: record.source.includes },
+        reaching: [], layouts: [], selection: { page: null, layout: null }, problems: [],
+        previewPath: PREVIEW_PATH, auditPath: AUDIT_PATH,
+      });
+    },
   });
   opts.onReady?.(devServer);
 

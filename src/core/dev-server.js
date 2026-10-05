@@ -100,6 +100,12 @@ const RELOAD_SCRIPT =
  * @param {string} html
  * @returns {string}
  */
+/** Insert `insertion` right before `</body>`, or append it when there is none. */
+function injectBeforeBodyEnd(html, insertion) {
+  const i = html.lastIndexOf("</body>");
+  return i === -1 ? html + insertion : html.slice(0, i) + insertion + html.slice(i);
+}
+
 export function injectReloadScript(html) {
   const idx = html.lastIndexOf("</body>");
   if (idx === -1) return html + RELOAD_SCRIPT;
@@ -335,7 +341,7 @@ function openReloadStream(res, clients) {
  * @param {() => string} report - the current §27 report, read at request time
  *   so a request always gets the latest FINISHED one (§27.4)
  */
-async function handleRequest(req, res, outputDir, clients, report, pages, preview) {
+async function handleRequest(req, res, outputDir, clients, report, pages, preview, chrome) {
   // `req.url` is a path under `node:http` and was an absolute URL under
   // `Bun.serve`; a base makes both parse, and an absolute-form request line
   // (what a proxy sends) still wins over the base, as it did before.
@@ -390,7 +396,10 @@ async function handleRequest(req, res, outputDir, clients, report, pages, previe
 
   if (filePath.endsWith(".html")) {
     const text = readFileSync(filePath, "utf8");
-    return respond(res, 200, "text/html; charset=utf-8", injectReloadScript(text));
+    // §27.8 — the chrome rides on every served page the page map knows, like
+    // the reload script: inserted into the response, never into dist/.
+    const overlay = chrome && url.searchParams.get("chrome") !== "off" && url.searchParams.get("chrome") !== "false" ? chrome(url.pathname) : "";
+    return respond(res, 200, "text/html; charset=utf-8", injectReloadScript(overlay ? injectBeforeBodyEnd(text, overlay) : text));
   }
   // Streamed, not buffered — `Bun.file` streamed too, and a site's largest
   // mirror-copied asset has no business being read whole into memory to be
@@ -421,10 +430,12 @@ async function handleRequest(req, res, outputDir, clients, report, pages, previe
  *   before the first build with an empty map that says so (`built: false`).
  * @param {(relPath: string, params: URLSearchParams) => Promise<{status: number, html?: string, location?: string}>} [args.preview] -
  *   the §27.7 renderer for `/_unify/preview/<path>`; without one the path is a 404 like the rest of /_unify/.
+ * @param {(servedPath: string) => string} [args.chrome] - the §27.8 chrome for a served page, "" when the
+ *   page map has no record for that path; without one no served page carries it.
  * @returns {Promise<{url: string, port: number, notifyReload(): void, setReport(html: string): void, setPages(json: string): void, stop(): void}>}
  * @throws {UsageError} when the port is already in use (§14.1, exit 2)
  */
-export async function createDevServer({ outputDir, port, report = renderPending(), pages = renderPageMap({ sourceRoot: "", documents: [], built: false }), preview = null }) {
+export async function createDevServer({ outputDir, port, report = renderPending(), pages = renderPageMap({ sourceRoot: "", documents: [], built: false }), preview = null, chrome = null }) {
   /** @type {Set<() => void>} */
   const clients = new Set();
   let currentReport = report;
@@ -432,7 +443,7 @@ export async function createDevServer({ outputDir, port, report = renderPending(
 
   const server = createServer(async (req, res) => {
     try {
-      await handleRequest(req, res, outputDir, clients, () => currentReport, () => currentPages, preview);
+      await handleRequest(req, res, outputDir, clients, () => currentReport, () => currentPages, preview, chrome);
     } catch {
       // A throw on the request path (a malformed percent-escape reaching
       // `decodeURIComponent` is the realistic one) used to become Bun's own

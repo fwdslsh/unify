@@ -8,6 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.4] - 2026-10-05
+
+### Changed
+
+- **The preview's chrome is redesigned**, and it is now on every page `unify dev` serves, not
+  only on previews: a small overlay in the corner that names the file, links a page to its
+  layout and includes, carries the page and layout pickers on a layout or include preview,
+  and opens the build's diagnostics for the file on demand. It is styled from a reset, so a
+  site's CSS cannot touch it. Three modes, each remembered by the browser once given in a
+  URL: `?chrome=off` removes it, `?chrome=on` (default) shows it, `?chrome=partials` keeps it
+  collapsed on pages and open on layouts and includes; `?collapsed=true` tucks it away for a
+  load, and the show and collapse buttons remember the choice. `?config=false` is gone;
+  `?chrome=off` is its replacement (rule DEV-08, spec §27.8).
+
 ## [0.11.3] - 2026-10-05
 
 ### Added
@@ -828,7 +842,8 @@ with generated compare-link notes only. Their diffs are on the
 [releases page](https://github.com/fwdslsh/unify/releases). Nothing here
 retroactively reconstructs detail those notes never carried.
 
-[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.11.3...HEAD
+[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.11.4...HEAD
+[0.11.4]: https://github.com/fwdslsh/unify/compare/v0.11.3...v0.11.4
 [0.11.3]: https://github.com/fwdslsh/unify/compare/v0.11.2...v0.11.3
 [0.11.2]: https://github.com/fwdslsh/unify/compare/v0.11.1...v0.11.2
 [0.11.1]: https://github.com/fwdslsh/unify/compare/v0.11.0...v0.11.1
