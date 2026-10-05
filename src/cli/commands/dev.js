@@ -68,11 +68,14 @@ export async function dev(context, opts = {}) {
       config: params.get("config") !== "false",
       pages: lastDocuments.map((d) => ({ source: d.source.path, generated: d.source.generated, layout: d.source.layout, includes: d.source.includes, path: d.document.path, outputPath: d.outputPath })),
       prettyUrls: Boolean(settings.prettyUrls),
+      outputDir: resolve(output),
     }),
   });
   opts.onReady?.(devServer);
 
   reporter.summary(`serving ${devServer.url} (output: ${output})`);
+  // §27.7 — the one address a designer needs: every layout, include and page, linked.
+  reporter.summary(`preview layouts and includes at ${devServer.url}/_unify/preview/`);
 
   // A rebuild that reached the end of `build()` reported; one that threw did
   // not (watcher.js catches it). Counting reports is the exact test, because

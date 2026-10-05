@@ -913,6 +913,26 @@ describe("§27 the local audit view", () => {
     expect(pageRes.status).toBe(302);
     expect(pageRes.location).toBe("/about/");
 
+    // The index: every layout, include and page, linked, with the reach counts;
+    // the bare path redirects to it; the server said where it is at startup.
+    const index = await get("");
+    expect(index.status).toBe(200);
+    expect(index.text).toContain('href="/_unify/preview/_layout.html"');
+    expect(index.text).toContain('href="/_unify/preview/_includes/nav.html"');
+    expect(index.text).toContain('href="/_unify/preview/_includes/card.fragment.html"');
+    expect(index.text).toContain('href="/about/"'); // a built page: its own address
+    expect(index.text).toMatch(/_layout\.html<\/a> <small>2 page\(s\)/); // index and about; team opted out of layouts
+    expect(index.text).toMatch(/card\.fragment\.html<\/a> <small>1 page\(s\)/);
+    expect(index.text).not.toContain("site.css");
+    const bare = await fetch(`http://localhost:${port}/_unify/preview`, { redirect: "manual" });
+    await bare.text();
+    expect(bare.status).toBe(302);
+    expect(bare.headers.get("location")).toBe("/_unify/preview/");
+    expect(d.stdout).toContain(`${port}/_unify/preview/`);
+    const audit = await (await fetch(`http://localhost:${port}/_unify/`)).text();
+    expect(audit).toContain('href="/_unify/preview/"');
+    expect(layout.text).toContain('href="/_unify/preview/"'); // the selector's way back
+
     // Not a source file, or outside the tree: 404, like the rest of /_unify/.
     expect((await get("missing.html")).status).toBe(404);
     expect((await get("assets/site.css")).status).toBe(404);

@@ -8,7 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.3] - 2026-10-05
+
 ### Added
+
+- **`/_unify/preview/`, the preview index.** `unify dev` now prints a second address at
+  startup; it lists every layout, include and page in the site, each a link to its preview
+  (a built page to its own address), with the number of built pages that use each layout and
+  include. The audit view links to it and every preview's selector links back. Start
+  `unify dev`, open the address, choose the file (rule DEV-07, spec §27.7).
 
 - **`docs/templates.md`**, the template guide — the four source forms, the configure-once-then-`unify update`
   workflow, and how to publish a template — rendered on the docs site under Guides and linked from the README,
@@ -820,7 +828,8 @@ with generated compare-link notes only. Their diffs are on the
 [releases page](https://github.com/fwdslsh/unify/releases). Nothing here
 retroactively reconstructs detail those notes never carried.
 
-[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.11.2...HEAD
+[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.11.3...HEAD
+[0.11.3]: https://github.com/fwdslsh/unify/compare/v0.11.2...v0.11.3
 [0.11.2]: https://github.com/fwdslsh/unify/compare/v0.11.1...v0.11.2
 [0.11.1]: https://github.com/fwdslsh/unify/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/fwdslsh/unify/compare/v0.10.1...v0.11.0

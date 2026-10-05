@@ -34,7 +34,7 @@
  * preview is fetched from. The result is served, never written.
  */
 
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { extname, posix, join } from "node:path";
 import { Reporter } from "./diagnostics.js";
 import { contentSpan, findFirst, getAttr, isElement, parse, rawSpan } from "./html.js";
@@ -48,6 +48,7 @@ import { applyPrettyLinks, rewriteProvenanceUrls, spansToLocator } from "./urls.
 export const PREVIEW_PATH = "/_unify/preview/";
 
 const LAYOUT_FILENAME = "_layout.html";
+const SKIP_DIRS = new Set(["node_modules", ".git", ".hg", ".svn"]);
 
 /** A reporter whose output goes nowhere: the preview shows problems itself (below). */
 function quietReporter() {
@@ -68,25 +69,98 @@ export function kindOf(relPath, knownLayouts = new Set()) {
 }
 
 /**
- * Every `_layout.html` under the source root, source-root-relative, for the
- * selector. The scan is the preview's own and tiny; nothing else reads it.
- * @param {string} sourceRoot
- * @returns {string[]}
+ * Every `.html` and `.md` file the preview can show, as virtual paths: the
+ * whole source root, plus what the project root (§4.5, the last root) may
+ * hold for the namespace — a `_layout.html` beside package.json and the
+ * `_includes/` or `includes/` directory there. Nothing else at the project
+ * root is a unify file, so nothing else is walked. The scan is the preview's
+ * own and small; the build's own scan is not reused because the build never
+ * lists what it excludes, and layouts and includes are exactly that.
+ * @param {string[]} roots - the §33.3 namespace, source root first
+ * @param {string} [outputDir] - never listed, even inside the source root
+ * @returns {string[]} sorted, unique
  */
-function scanLayouts(sourceRoot) {
-  const found = [];
+function scanSourceFiles(roots, outputDir = null) {
+  const found = new Set();
   const walk = (dir, rel) => {
     let entries;
     try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
     for (const e of entries) {
-      if (e.name === "node_modules" || e.name === ".git") continue;
+      if (SKIP_DIRS.has(e.name)) continue;
+      const abs = join(dir, e.name);
+      if (outputDir && abs === outputDir) continue;
       const next = rel ? `${rel}/${e.name}` : e.name;
-      if (e.isDirectory()) walk(join(dir, e.name), next);
-      else if (e.name === LAYOUT_FILENAME) found.push(next);
+      if (e.isDirectory()) walk(abs, next);
+      else if (/\.(html|md)$/i.test(e.name)) found.add(next);
     }
   };
-  walk(sourceRoot, "");
-  return found.sort();
+  walk(roots[0], "");
+  const projectRoot = roots[roots.length - 1];
+  if (projectRoot !== roots[0]) {
+    for (const name of [LAYOUT_FILENAME]) {
+      try { if (statSync(join(projectRoot, name)).isFile()) found.add(name); } catch { /* absent */ }
+    }
+    for (const dir of ["_includes", "includes"]) walk(join(projectRoot, dir), dir);
+  }
+  return [...found].sort();
+}
+
+/** Every `_layout.html` the namespace holds, for the selector. */
+function scanLayouts(roots) {
+  return scanSourceFiles(roots).filter((rel) => posix.basename(rel) === LAYOUT_FILENAME);
+}
+
+/**
+ * §27.7 — the index at `/_unify/preview/`: every layout, include and page the
+ * namespace holds, each a link to its preview (a built page to its own
+ * address), so a designer who starts `unify dev` and opens the address it
+ * prints can reach any file without knowing the preview's path shape.
+ */
+function renderIndex({ roots, pages, outputDir }) {
+  const knownLayouts = new Set(pages.map((p) => p.layout).filter(Boolean));
+  const groups = { layout: [], fragment: [], page: [] };
+  for (const rel of scanSourceFiles(roots, outputDir)) groups[kindOf(rel, knownLayouts)].push(rel);
+  for (const p of pages) if (p.generated && !groups.page.includes(p.source)) groups.page.push(p.source);
+  const built = new Map(pages.map((p) => [p.source, p]));
+  const previewHref = (rel) => `${PREVIEW_PATH}${rel.split("/").map(encodeURIComponent).join("/")}`;
+  const list = (items, link) => (items.length ? `<ul>\n${items.map(link).join("\n")}\n</ul>` : "<p>none</p>");
+  const layouts = list(groups.layout, (rel) => `<li><a href="${esc(previewHref(rel))}">${esc(rel)}</a> <small>${pages.filter((p) => p.layout === rel).length} page(s)</small></li>`);
+  const fragments = list(groups.fragment, (rel) => `<li><a href="${esc(previewHref(rel))}">${esc(rel)}</a> <small>${pages.filter((p) => (p.includes || []).includes(rel)).length} page(s)</small></li>`);
+  const pageList = list(groups.page.sort(), (rel) => {
+    const record = built.get(rel);
+    return record
+      ? `<li><a href="${esc(record.path)}">${esc(rel)}</a> <small>${esc(record.path)}${record.generated ? " · generated" : ""}${record.layout ? ` · ${esc(record.layout)}` : " · no layout"}</small></li>`
+      : `<li><a href="${esc(previewHref(rel))}">${esc(rel)}</a> <small>not in the last build</small></li>`;
+  });
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>unify — preview</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 15px/1.5 system-ui, sans-serif; margin: 0 auto; max-width: 60rem; padding: 1.5rem; }
+  h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+  h2 { font-size: 1.1rem; margin: 2rem 0 .5rem; border-bottom: 1px solid currentColor; padding-bottom: .2rem; }
+  ul { list-style: none; padding: 0; margin: 0; }
+  li { padding: .2rem 0; }
+  small { opacity: .7; margin-left: .5rem; }
+  .intro { margin: 0 0 1rem; opacity: .85; }
+</style>
+</head>
+<body>
+<h1>unify — preview</h1>
+<p class="intro">Every layout and include rendered on its own, with the site's styles and its own default content; every page at its built address. A preview reloads when you save. <a href="/_unify/">Audit view</a></p>
+<h2>Layouts</h2>
+${layouts}
+<h2>Includes</h2>
+${fragments}
+<h2>Pages</h2>
+${pageList}
+</body>
+</html>
+`;
 }
 
 /**
@@ -99,10 +173,13 @@ function scanLayouts(sourceRoot) {
  * @param {boolean} [args.config] - `?config=false` leaves the selector out
  * @param {{source: string, generated?: boolean, layout: string|null, includes?: string[], path: string, outputPath: string}[]} args.pages - the page map's records (empty before the first build)
  * @param {boolean} args.prettyUrls
+ * @param {string} [args.outputDir] - absolute; never listed by the index
  * @returns {Promise<{status: number, html?: string, location?: string}>}
  */
-export async function renderPreview({ sourceRoot, roots, relPath, page = null, layout = null, config = true, pages = [], prettyUrls = false }) {
+export async function renderPreview({ sourceRoot, roots, relPath, page = null, layout = null, config = true, pages = [], prettyUrls = false, outputDir = null }) {
   const rel = posix.normalize(relPath).replace(/^\/+/, "");
+  // The index: no file named.
+  if (rel === "" || rel === ".") return { status: 200, html: renderIndex({ roots, pages, outputDir }) };
   const abs = locateExisting(roots, rel);
   const ext = extname(rel).toLowerCase();
   if (!abs || (ext !== ".html" && ext !== ".md")) {
@@ -123,7 +200,7 @@ export async function renderPreview({ sourceRoot, roots, relPath, page = null, l
   // authored (directly or through a layout) — the page map's own provenance,
   // so the list is the build's answer, never a guess.
   const uses = (p) => (kind === "layout" ? p.layout === rel : (p.includes ?? []).includes(rel));
-  const selector = (opts) => (config ? widget({ rel, kind, page, layout, pages: pages.filter((p) => !p.generated && uses(p)), layouts: [...new Set([...scanLayouts(sourceRoot), ...knownLayouts])].sort(), ...opts }) : "");
+  const selector = (opts) => (config ? widget({ rel, kind, page, layout, pages: pages.filter((p) => !p.generated && uses(p)), layouts: [...new Set([...scanLayouts(roots), ...knownLayouts])].sort(), ...opts }) : "");
 
   if (kind === "page") {
     const record = pages.find((p) => p.source === rel);
@@ -310,7 +387,7 @@ function widget({ rel, kind, page, layout, pages, layouts, withLayout }) {
   ].join("");
   const layoutOptions = [opt("", "default layout", !layout), ...layouts.map((l) => opt(l, l, l === layout))].join("");
   return `<form id="unify-preview" method="get" style="position:fixed;bottom:8px;right:8px;z-index:2147483647;display:flex;gap:6px;align-items:center;flex-wrap:wrap;max-width:calc(100vw - 16px);background:#1b1b1b;color:#f4f4f4;border-radius:6px;padding:6px 8px;font:12px/1.2 system-ui,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.3)">
-<strong style="font-weight:600">unify preview</strong> <code style="opacity:.8">${esc(rel)}</code>
+<a href="${PREVIEW_PATH}" style="color:#9ad;text-decoration:none" title="every layout, include and page">&larr;</a> <strong style="font-weight:600">unify preview</strong> <code style="opacity:.8">${esc(rel)}</code>
 ${withLayout ? `<label>layout <select name="layout" onchange="this.form.submit()" style="font:inherit">${layoutOptions}</select></label>` : ""}
 <label>page <select name="page" onchange="this.form.submit()" style="font:inherit">${pageOptions}</select></label>
 <noscript><button style="font:inherit">apply</button></noscript>
