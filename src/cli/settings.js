@@ -93,14 +93,11 @@ export function resolveSettings(flags, cwd = process.cwd()) {
       port: settings.port === undefined ? 3000 : Number(settings.port),
       // §19.10 — read by `update` alone. `template` is the --template flag (the
       // positional spelled as an option); `recordedTemplate` is the line
-      // unify.yaml carries, kept apart because `update` needs both: the
-      // record is the baseline, the flag or positional is where to move to.
+      // unify.yaml carries, kept apart because a named source replaces it;
+      // `yes` answers the overwrite question.
       template: flags.template,
       recordedTemplate: typeof config.template === "string" ? config.template : undefined,
-      owned: settings.owned ?? [],
-      // where unify.yaml was read, or would be written: a relative template
-      // directory recorded there resolves against it (§18)
-      configDir,
+      yes: flags.yes === true,
     },
     sourceRoot: resolved.root,
     // The would-copy notice (§4.4) fires only when nothing chose the source

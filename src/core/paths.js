@@ -270,7 +270,7 @@ export function locateVirtual(roots, virtualPath) {
 
 /**
  * §4.1: a pattern with no `/` is tested against every path segment (the
- * `--exclude` matcher; §19.10's `owned` patterns use the same grammar); a
+ * `--exclude` matcher); a
  * pattern with `/` is tested against the full relative path, with `*`
  * (within a segment), `**` (across segments), `?`, and `[...]` supported.
  */

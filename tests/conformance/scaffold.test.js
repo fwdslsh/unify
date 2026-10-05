@@ -25,7 +25,7 @@
  * layout or by §8's merge rather than written on the page that ships them.
  */
 import { test } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { join, relative, sep } from "node:path";
 import { CLI, ROOT, covers, mkTmp, runCli } from "./support.mjs";
@@ -266,7 +266,7 @@ test("scaffold/blog: SCF-03 — the scaffold's one shown command is `unify build
   const yaml = readFileSync(join(tmp, "unify.yaml"), "utf8");
   const live = yaml.split("\n").filter((l) => /^[a-z]/.test(l));
   // The one live BUILD line is the generator; the template: record (§19.10) is live in every scaffold and no build reads it.
-  if (!/^generate: scripts\/gen\.mjs\|template: blog@\d+\.\d+\.\d+/.test(live.join("|"))) throw new Error(`unify.yaml's live lines should be exactly generate: scripts/gen.mjs and the template: record, got: ${live.join(" | ")}`);
+  if (!/^generate: scripts\/gen\.mjs\|template: blog$/.test(live.join("|"))) throw new Error(`unify.yaml's live lines should be exactly generate: scripts/gen.mjs and the template: record, got: ${live.join(" | ")}`);
   if (!existsSync(join(tmp, "scripts", "gen.mjs"))) throw new Error("generate: scripts/gen.mjs names a file that does not exist from the project root");
 
   const buildR = await runCli(["build"], tmp);
@@ -1625,40 +1625,42 @@ function recordOf(tmp) {
   return readFileSync(join(tmp, "unify.yaml"), "utf8").match(/^template: (.+)$/m)?.[1] ?? null;
 }
 
-test("scaffold: SCF-15 + UPD-01..03 — init records one pinned line in unify.yaml; update fetches that pin as the baseline and brings a git template's next commit in three-way, through the real CLI", async () => {
-  // A template repository at v1: a project laid out as init lays one out,
-  // whose unify.yaml names the files a site owns.
+test("scaffold: SCF-15 + UPD-01..03 — init records the source as typed in unify.yaml; update fetches a git template again, lists what it would overwrite, asks, and copies on y, through the real CLI", async () => {
+  // A template repository at v1: a project laid out as init lays one out.
   const host = mkTmp();
   const v1 = {
     "site/_layout.html": '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><title>Lab</title><meta name="description" content="lab reports"></head><body><main></main></body></html>\n',
     "site/index.html": "<!doctype html>\n<html><head><title>Home</title><meta name=\"description\" content=\"home\"></head><body><main><h1>v1</h1></main></body></html>\n",
     "site/config.json": '{"lab": "CHANGE ME"}\n',
     "AGENTS.md": "# agents v1\n",
-    "unify.yaml": "owned:\n  - site/config.json\n  - site/reports/**\n",
   };
   for (const [rel, text] of Object.entries(v1)) { mkdirSync(join(host, rel, ".."), { recursive: true }); writeFileSync(join(host, rel), text); }
   git(host, "init", "-q", "-b", "main");
   git(host, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "add", "-A");
   git(host, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", "v1");
+  git(host, "tag", "v1");
   const bare = `${host}.git`;
   git(host, "clone", "-q", "--bare", host, bare);
   const url = `file://${bare}`;
-  const sha1 = spawnSync("git", ["-C", host, "rev-parse", "HEAD"], { encoding: "utf8" }).stdout.trim();
+  const release = (msg) => {
+    git(host, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "add", "-A");
+    git(host, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", msg);
+    git(host, "push", "-q", bare, "main");
+  };
 
-  // ---- init records ONE line, pinned to the commit; the template's owned: list travels in the same file (SCF-15)
+  // ---- init records ONE line: the source as typed, and nothing else (SCF-15)
   const tmp = mkTmp();
   const r = await runCli(["init", url], tmp);
   if (r.exit !== 0) throw new Error(`unify init <git url> exited ${r.exit}:\n${r.stderr}`);
-  if (!r.stdout.includes(`recorded template: ${url}#${sha1} in unify.yaml`)) throw new Error(`init must say what it recorded:\n${r.stdout}`);
-  if (recordOf(tmp) !== `${url}#${sha1}`) throw new Error(`unify.yaml must carry template: ${url}#${sha1}, has ${recordOf(tmp)}`);
-  const yaml = readFileSync(join(tmp, "unify.yaml"), "utf8");
-  if (!/^owned:\n  - site\/config\.json\n  - site\/reports\/\*\*$/m.test(yaml)) throw new Error(`the template's owned: list must arrive with its unify.yaml:\n${yaml}`);
+  if (!r.stdout.includes(`recorded template: ${url} in unify.yaml`)) throw new Error(`init must say what it recorded:\n${r.stdout}`);
+  if (recordOf(tmp) !== url) throw new Error(`unify.yaml must carry template: ${url}, has ${recordOf(tmp)}`);
   if (existsSync(join(tmp, "unify.template.json"))) throw new Error("no record file: the record is the one line in unify.yaml");
+  if (readdirSync(tmp).sort().join(",") !== "AGENTS.md,site,unify.yaml") throw new Error(`init writes the template and unify.yaml, nothing else: ${readdirSync(tmp).join(", ")}`);
   const dry = await runCli(["build", "--dry-run", "--strict"], tmp);
   if (dry.exit !== 0) throw new Error(`build --dry-run --strict exited ${dry.exit}\n${dry.stdout}${dry.stderr}`);
-  // The same version is a no-op (UPD-02).
+  // The same template is a no-op, and nothing asks (UPD-02).
   const same = await runCli(["update"], tmp);
-  if (same.exit !== 0 || !same.stdout.includes("nothing to do")) throw new Error(`same version must be a no-op: exit ${same.exit}\n${same.stdout}${same.stderr}`);
+  if (same.exit !== 0 || !same.stdout.includes("nothing to do") || same.stderr.includes("[y/N]")) throw new Error(`the same template must be a no-op: exit ${same.exit}\n${same.stdout}${same.stderr}`);
 
   // ---- the site configures and authors; the template moves to v2
   writeFileSync(join(tmp, "site", "config.json"), '{"lab": "Mine"}\n');
@@ -1671,67 +1673,72 @@ test("scaffold: SCF-15 + UPD-01..03 — init records one pinned line in unify.ya
   writeFileSync(join(host, "site", "config.json"), '{"lab": "NEW SEED"}\n');
   mkdirSync(join(host, "site", "reports"), { recursive: true });
   writeFileSync(join(host, "site", "reports", "seed.md"), "---\ntitle: Seed\ndescription: d\n---\n# Seed\n");
-  writeFileSync(join(host, "unify.yaml"), `${v1["unify.yaml"]}catalog: true\n`); // the template's own unify.yaml changes too
   rmSync(join(host, "AGENTS.md"));
   writeFileSync(join(host, "DEPLOY.md"), "# deploy v2\n");
-  git(host, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "add", "-A");
-  git(host, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", "v2");
-  git(host, "push", "-q", bare, "main");
-  const sha2 = spawnSync("git", ["-C", host, "rev-parse", "HEAD"], { encoding: "utf8" }).stdout.trim();
+  release("v2");
 
-  // ---- preview writes nothing (UPD-02)
+  // ---- preview: the list, with "would", and nothing written or asked (UPD-02)
   const preview = await runCli(["update", "--dry-run"], tmp);
-  if (preview.exit !== 1) throw new Error(`a preview with a conflict exits 1, got ${preview.exit}\n${preview.stdout}${preview.stderr}`);
-  for (const line of ["would update site/index.html", "would update unify.yaml", "would add site/reports/seed.md", "would add DEPLOY.md", "would remove AGENTS.md", "conflict site/_layout.html: changed locally and in the template"]) {
+  if (preview.exit !== 0) throw new Error(`a preview exits 0, got ${preview.exit}\n${preview.stdout}${preview.stderr}`);
+  for (const line of ["would overwrite site/_layout.html", "would overwrite site/config.json", "would overwrite site/index.html", "would add site/reports/seed.md", "would add DEPLOY.md", "update: would overwrite 3, add 2"]) {
     if (!preview.stdout.includes(line)) throw new Error(`preview lacks "${line}":\n${preview.stdout}`);
   }
-  if (preview.stdout.includes("config.json")) throw new Error(`an owned file is never reported:\n${preview.stdout}`);
+  if (/AGENTS\.md|2026-01|\.env/.test(preview.stdout)) throw new Error(`a file the template dropped, or the site's own, is never mentioned:\n${preview.stdout}`);
+  if (preview.stderr.includes("[y/N]")) throw new Error("--dry-run must not ask");
   if (!readFileSync(join(tmp, "site", "index.html"), "utf8").includes("v1") || existsSync(join(tmp, "DEPLOY.md"))) throw new Error("--dry-run wrote");
-  if (recordOf(tmp) !== `${url}#${sha1}`) throw new Error("--dry-run moved the record");
 
-  // ---- apply (UPD-02): unchanged files update, owned and authored files are byte-identical, the edit is a conflict, the record stays
-  const applied = await runCli(["update"], tmp);
-  if (applied.exit !== 1) throw new Error(`an update with a conflict exits 1, got ${applied.exit}\n${applied.stdout}${applied.stderr}`);
-  if (!readFileSync(join(tmp, "site", "index.html"), "utf8").includes("v2")) throw new Error("index.html was not updated");
-  if (readFileSync(join(tmp, "DEPLOY.md"), "utf8") !== "# deploy v2\n") throw new Error("DEPLOY.md was not added");
-  if (readFileSync(join(tmp, "site", "reports", "seed.md"), "utf8") !== "---\ntitle: Seed\ndescription: d\n---\n# Seed\n") throw new Error("an owned seed the site lacks is added once");
-  if (existsSync(join(tmp, "AGENTS.md"))) throw new Error("AGENTS.md, untouched locally and gone upstream, must be removed");
-  for (const [rel, text] of [["site/config.json", '{"lab": "Mine"}\n'], ["site/reports/2026-01.md", "---\ntitle: Jan\ndescription: d\n---\n# Jan\n"], [".env", "SECRET=1\n"]]) {
-    if (readFileSync(join(tmp, rel), "utf8") !== text) throw new Error(`${rel} must be byte-identical after an update`);
+  // ---- the question (UPD-02): no stdin, or anything but y, writes nothing and exits 1
+  for (const [answer, input] of [["closed stdin", undefined], ["n", "n\n"], ["a blank line", "\n"]]) {
+    const declined = await runCli(["update"], tmp, {}, input);
+    if (declined.exit !== 1) throw new Error(`${answer} must decline with exit 1, got ${declined.exit}\n${declined.stdout}${declined.stderr}`);
+    if (!declined.stderr.includes("overwrite 3 file(s)? [y/N]")) throw new Error(`the question names the count:\n${declined.stderr}`);
+    if (!declined.stdout.includes("overwrite site/_layout.html") || !declined.stdout.includes("nothing written") || !declined.stdout.includes("--yes")) throw new Error(`a declined run lists the files, says nothing was written and names --yes:\n${declined.stdout}`);
+    if (!readFileSync(join(tmp, "site", "index.html"), "utf8").includes("v1") || existsSync(join(tmp, "DEPLOY.md")) || existsSync(join(tmp, "site", "reports", "seed.md"))) throw new Error(`${answer}: something was written`);
   }
-  if (!readFileSync(join(tmp, "site", "_layout.html"), "utf8").includes("my theme")) throw new Error("a conflicting file must keep the site's bytes");
-  // unify.yaml took the template's new content, compared and written without the template: line — which stays at v1 while a conflict is open.
-  const yaml2 = readFileSync(join(tmp, "unify.yaml"), "utf8");
-  if (!/^catalog: true$/m.test(yaml2) || !/^owned:$/m.test(yaml2)) throw new Error(`unify.yaml must carry the template's new lines:\n${yaml2}`);
-  if (recordOf(tmp) !== `${url}#${sha1}`) throw new Error(`with a conflict open the record must stay at v1, has ${recordOf(tmp)}`);
-  if (!applied.stdout.includes(`unify.yaml stays at template: ${url}#${sha1}`)) throw new Error(`the report must say the record did not move:\n${applied.stdout}`);
 
-  // ---- again: the conflict is still visible, nothing else changes; taking the template's version resolves it and the record advances
+  // ---- y (UPD-01/UPD-02): the listed files are overwritten and added, nothing is removed, nothing else is visited
+  const applied = await runCli(["update"], tmp, {}, "y\n");
+  if (applied.exit !== 0) throw new Error(`y applies, exit ${applied.exit}\n${applied.stdout}${applied.stderr}`);
+  if (!applied.stdout.includes("update: overwrote 3, added 2")) throw new Error(`the summary counts what was written:\n${applied.stdout}`);
+  if (!readFileSync(join(tmp, "site", "index.html"), "utf8").includes("v2")) throw new Error("index.html was not overwritten");
+  const layout = readFileSync(join(tmp, "site", "_layout.html"), "utf8");
+  if (!layout.includes("Lab Reports") || layout.includes("my theme")) throw new Error("a listed, confirmed file takes the template's bytes");
+  if (readFileSync(join(tmp, "site", "config.json"), "utf8") !== '{"lab": "NEW SEED"}\n') throw new Error("config.json was listed and confirmed, so it is the template's");
+  if (readFileSync(join(tmp, "DEPLOY.md"), "utf8") !== "# deploy v2\n" || !existsSync(join(tmp, "site", "reports", "seed.md"))) throw new Error("new files are added");
+  if (!existsSync(join(tmp, "AGENTS.md"))) throw new Error("nothing is removed: a file the template dropped stays");
+  for (const [rel, text] of [["site/reports/2026-01.md", "---\ntitle: Jan\ndescription: d\n---\n# Jan\n"], [".env", "SECRET=1\n"]]) {
+    if (readFileSync(join(tmp, rel), "utf8") !== text) throw new Error(`${rel} is the site's own and must be byte-identical after an update`);
+  }
+  if (recordOf(tmp) !== url) throw new Error(`the line stays ${url}, has ${recordOf(tmp)}`);
   const again = await runCli(["update"], tmp);
-  if (again.exit !== 1 || !again.stdout.includes("conflict site/_layout.html") || /^(update|add|remove) /m.test(again.stdout)) throw new Error(`re-running must show only the conflict:\n${again.stdout}`);
-  writeFileSync(join(tmp, "site", "_layout.html"), readFileSync(join(host, "site", "_layout.html")));
-  const resolved = await runCli(["update"], tmp);
-  if (resolved.exit !== 0 || !resolved.stdout.includes("nothing to do")) throw new Error(`taking the template's version resolves the conflict: exit ${resolved.exit}\n${resolved.stdout}`);
-  if (recordOf(tmp) !== `${url}#${sha2}`) throw new Error(`a conflict-free run advances the record to v2, has ${recordOf(tmp)}`);
-  // The updated project still builds as a site (with the template's catalog: true now live).
+  if (again.exit !== 0 || !again.stdout.includes("nothing to do")) throw new Error(`re-running is a no-op:\n${again.stdout}${again.stderr}`);
   const rebuilt = await runCli(["build", "--dry-run", "--strict"], tmp);
   if (rebuilt.exit !== 0) throw new Error(`the updated site must build clean: exit ${rebuilt.exit}\n${rebuilt.stdout}${rebuilt.stderr}`);
 
-  // ---- safety (UPD-03): a symlink is refused, an unreachable source changes nothing
+  // ---- --yes answers for a script; a named source (here, the v1 tag) replaces the line and its #ref is honored (UPD-01/UPD-02)
+  writeFileSync(join(host, "site", "index.html"), v1["site/index.html"].replace("v1", "v3"));
+  release("v3");
+  const yes = await runCli(["update", "--yes"], tmp);
+  if (yes.exit !== 0 || yes.stderr.includes("[y/N]") || !readFileSync(join(tmp, "site", "index.html"), "utf8").includes("v3")) throw new Error(`--yes must overwrite without asking: exit ${yes.exit}\n${yes.stdout}${yes.stderr}`);
+  const tagged = await runCli(["update", `${url}#v1`, "-y"], tmp);
+  if (tagged.exit !== 0 || !readFileSync(join(tmp, "site", "index.html"), "utf8").includes("v1")) throw new Error(`a named source is fetched at its ref: exit ${tagged.exit}\n${tagged.stdout}${tagged.stderr}`);
+  if (recordOf(tmp) !== `${url}#v1`) throw new Error(`the line follows a named source, has ${recordOf(tmp)}`);
+  const back = await runCli(["update", url, "-y"], tmp);
+  if (back.exit !== 0 || !readFileSync(join(tmp, "site", "index.html"), "utf8").includes("v3") || recordOf(tmp) !== url) throw new Error(`naming the default branch again moves back: exit ${back.exit}\n${back.stdout}${back.stderr}`);
+
+  // ---- safety (UPD-03): a symlink is skipped, never followed or replaced; an unreachable source changes nothing
   const elsewhere = mkTmp();
   writeFileSync(join(elsewhere, "target"), "outside\n");
   rmSync(join(tmp, "site", "index.html"));
   symlinkSync(join(elsewhere, "target"), join(tmp, "site", "index.html"));
-  writeFileSync(join(host, "site", "index.html"), v1["site/index.html"].replace("v1", "v3"));
-  git(host, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-am", "v3");
-  git(host, "push", "-q", bare, "main");
-  const sha3 = spawnSync("git", ["-C", host, "rev-parse", "HEAD"], { encoding: "utf8" }).stdout.trim();
-  const sym = await runCli(["update"], tmp);
-  if (sym.exit !== 1 || !sym.stdout.includes("conflict site/index.html: it is a symlink")) throw new Error(`a symlink must be a conflict:\n${sym.stdout}${sym.stderr}`);
-  if (readFileSync(join(elsewhere, "target"), "utf8") !== "outside\n") throw new Error("the symlink was followed");
-  if (recordOf(tmp) !== `${url}#${sha2}`) throw new Error("a conflicted run must not move the record");
+  writeFileSync(join(host, "site", "index.html"), v1["site/index.html"].replace("v1", "v4"));
+  release("v4");
+  const sym = await runCli(["update", "-y"], tmp);
+  if (sym.exit !== 0 || !sym.stdout.includes("skip site/index.html: it is a symlink") || !sym.stdout.includes("1 skipped")) throw new Error(`a symlink must be skipped and reported:\n${sym.stdout}${sym.stderr}`);
+  if (readFileSync(join(elsewhere, "target"), "utf8") !== "outside\n" || !lstatSync(join(tmp, "site", "index.html")).isSymbolicLink()) throw new Error("the symlink was followed or replaced");
   const unreachable = await runCli(["update", `file://${mkTmp()}/missing.git`], tmp);
   if (unreachable.exit !== 2 || !/git clone failed/.test(unreachable.stderr)) throw new Error(`an unreachable source is a usage error: ${unreachable.exit}\n${unreachable.stderr}`);
+  if (recordOf(tmp) !== url) throw new Error("a failed fetch must not move the line");
   rmSync(join(tmp, "site", "index.html"));
   writeFileSync(join(tmp, "site", "index.html"), readFileSync(join(host, "site", "index.html")));
 
@@ -1739,19 +1746,19 @@ test("scaffold: SCF-15 + UPD-01..03 — init records one pinned line in unify.ya
   const lines = readFileSync(join(tmp, "unify.yaml"), "utf8").split("\n").filter((l) => !/^template:/.test(l));
   writeFileSync(join(tmp, "unify.yaml"), lines.join("\n"));
   const missing = await runCli(["update"], tmp);
-  if (missing.exit !== 2 || !missing.stderr.includes("no template recorded") || !missing.stderr.includes("template: <git url>#<commit>")) throw new Error(`a missing record is a usage error naming the line: ${missing.exit}\n${missing.stderr}`);
-  writeFileSync(join(tmp, "unify.template.json"), JSON.stringify({ schemaVersion: 1, source: url, revision: sha2, files: {} }));
+  if (missing.exit !== 2 || !missing.stderr.includes("no template recorded") || !missing.stderr.includes("template: <source>")) throw new Error(`a missing record is a usage error naming the line: ${missing.exit}\n${missing.stderr}`);
+  writeFileSync(join(tmp, "unify.template.json"), JSON.stringify({ schemaVersion: 1, source: url, revision: "abc", files: {} }));
   const legacy = await runCli(["update"], tmp);
-  if (legacy.exit !== 2 || !legacy.stderr.includes(`template: ${url}#${sha2}`)) throw new Error(`a 0.11.2 record file must yield the exact line to add:\n${legacy.stderr}`);
+  if (legacy.exit !== 2 || !legacy.stderr.includes(`template: ${url}`)) throw new Error(`a 0.11.2 record file must yield the exact line to add:\n${legacy.stderr}`);
   rmSync(join(tmp, "unify.template.json"));
-  writeFileSync(join(tmp, "unify.yaml"), `${lines.join("\n")}\ntemplate: ${url}#${sha2}\n`);
-  // The hand-written line pins v2; the site already holds v3's index.html, so nothing is to do — and the record advances to v3.
+  writeFileSync(join(tmp, "unify.yaml"), `${lines.join("\n")}\ntemplate: ${url}\n`);
   const byHand = await runCli(["update"], tmp);
   if (byHand.exit !== 0 || !byHand.stdout.includes("nothing to do")) throw new Error(`the hand-written line is the record: exit ${byHand.exit}\n${byHand.stdout}${byHand.stderr}`);
-  if (recordOf(tmp) !== `${url}#${sha3}`) throw new Error(`a clean run from the hand-written line advances the record, has ${recordOf(tmp)}`);
-  // There is no --adopt: the line is the whole mechanism.
-  const adopt = await runCli(["update", "--adopt", url], mkTmp());
-  if (adopt.exit !== 2 || !/unknown option/.test(adopt.stderr)) throw new Error("--adopt must not exist");
+  // There is no --owned and no --adopt: the line and the question are the whole mechanism.
+  for (const flag of ["--owned", "--adopt"]) {
+    const gone = await runCli(["update", flag, url], mkTmp());
+    if (gone.exit !== 2 || !/unknown option/.test(gone.stderr)) throw new Error(`${flag} must not exist`);
+  }
 
   covers("SCF-15", "UPD-01", "UPD-02", "UPD-03");
 }, TEST_MS * 3);

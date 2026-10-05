@@ -12,7 +12,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { classifyTemplateSource, fetchTemplate, isPinned, pinSource, unpinned } from "../../src/cli/template-source.js";
+import { classifyTemplateSource, fetchTemplate, recordSource } from "../../src/cli/template-source.js";
 import { UsageError } from "../../src/core/diagnostics.js";
 
 const BUILT_INS = ["default", "basic", "blog"];
@@ -27,40 +27,23 @@ afterAll(() => {
 });
 
 describe("classifyTemplateSource()", () => {
-  test("a built-in may be pinned to a unify version, name@x.y.z — the same directory as that release shipped (§19.10)", () => {
-    expect(classifyTemplateSource("blog@0.11.2", BUILT_INS)).toEqual({ kind: "builtin", name: "blog", version: "0.11.2" });
-    expect(classifyTemplateSource("blog", BUILT_INS)).toEqual({ kind: "builtin", name: "blog", version: null });
-    // Not a built-in: falls through to the other forms (and is a usage error, not a lookup).
-    expect(() => classifyTemplateSource("shop@0.11.2", BUILT_INS, tempDir())).toThrow(UsageError);
-  });
-
-  test("a directory may be pinned to a commit of the repository it sits in; anything else after the # is refused", () => {
-    const cwd = tempDir();
-    mkdirSync(join(cwd, "tpl"));
-    expect(classifyTemplateSource("tpl#3f9c2e1a", BUILT_INS, cwd)).toEqual({ kind: "dir", path: join(cwd, "tpl"), ref: "3f9c2e1a" });
-    expect(classifyTemplateSource("tpl", BUILT_INS, cwd)).toEqual({ kind: "dir", path: join(cwd, "tpl"), ref: null });
-    expect(() => classifyTemplateSource("tpl#main", BUILT_INS, cwd)).toThrow(/only be pinned to a commit/);
-  });
-
-  test("pinSource spells the record, unpinned drops it, isPinned tells the two apart", () => {
-    const git = classifyTemplateSource("https://github.com/o/r/tree/main/templates/blog", BUILT_INS);
-    expect(pinSource(git, "3f9c2e1a7b3f9c2e1a7b3f9c2e1a7b3f9c2e1a7b", "https://github.com/o/r/tree/main/templates/blog", "/p")).toBe("https://github.com/o/r/templates/blog#3f9c2e1a7b3f9c2e1a7b3f9c2e1a7b3f9c2e1a7b");
-    expect(isPinned(git)).toBe(true); // tree/main is a ref — a floating one, but a ref
-    expect(unpinned(git)).toEqual({ kind: "git", url: "https://github.com/o/r", ref: null, subdir: "templates/blog" });
-    const npm = classifyTemplateSource("@acme/unify-shop-template@1.4.0", BUILT_INS);
-    expect(pinSource(unpinned(npm), "1.5.0", "@acme/unify-shop-template", "/p")).toBe("@acme/unify-shop-template@1.5.0");
-    expect(isPinned(unpinned(npm))).toBe(false);
-    expect(pinSource({ kind: "builtin", name: "blog", version: null }, "0.11.3", "blog", "/p")).toBe("blog@0.11.3");
-    // A directory is written relative to unify.yaml's directory, pinned when it has a commit.
-    expect(pinSource({ kind: "dir", path: "/projects/templates/shop", ref: null }, "abc1234", "../templates/shop", "/projects/site")).toBe("../templates/shop#abc1234");
-    expect(pinSource({ kind: "dir", path: "/projects/templates/shop", ref: null }, null, "/projects/templates/shop", "/projects/site")).toBe("/projects/templates/shop");
+  test("recordSource spells the line init writes: the source as typed, a directory relative to unify.yaml's directory (§19.10)", () => {
+    const url = "https://github.com/o/r/tree/main/templates/blog";
+    expect(recordSource(classifyTemplateSource(url, BUILT_INS), url, "/p")).toBe(url);
+    expect(recordSource({ kind: "npm", spec: "@acme/unify-shop-template@1.4.0" }, "@acme/unify-shop-template@1.4.0", "/p")).toBe("@acme/unify-shop-template@1.4.0");
+    expect(recordSource({ kind: "builtin", name: "blog" }, "blog", "/p")).toBe("blog");
+    expect(recordSource({ kind: "dir", path: "/projects/templates/shop" }, "../templates/shop", "/projects/site")).toBe("../templates/shop");
+    expect(recordSource({ kind: "dir", path: "/projects/templates/shop" }, "../../templates/shop", "/projects/site")).toBe("../templates/shop");
+    expect(recordSource({ kind: "dir", path: "/projects/templates/shop" }, "/projects/templates/shop", "/projects/site")).toBe("/projects/templates/shop");
+    // A version suffix is npm's alone: a built-in has no versions but unify's own.
+    expect(() => classifyTemplateSource("blog@0.11.2", BUILT_INS, tempDir())).toThrow(UsageError);
   });
 
   test("an exact built-in name is the registry's, even beside a directory of that name", () => {
     const cwd = tempDir();
     mkdirSync(join(cwd, "blog"));
-    expect(classifyTemplateSource("blog", BUILT_INS, cwd)).toEqual({ kind: "builtin", name: "blog", version: null });
-    expect(classifyTemplateSource("./blog", BUILT_INS, cwd)).toEqual({ kind: "dir", path: join(cwd, "blog"), ref: null });
+    expect(classifyTemplateSource("blog", BUILT_INS, cwd)).toEqual({ kind: "builtin", name: "blog" });
+    expect(classifyTemplateSource("./blog", BUILT_INS, cwd)).toEqual({ kind: "dir", path: join(cwd, "blog") });
   });
 
   test("an npm template is named by the convention: unify-<name>-template, optionally @org/ and @version", () => {
@@ -98,8 +81,8 @@ describe("classifyTemplateSource()", () => {
   test("anything else is a directory that must exist, resolved against the working directory", () => {
     const cwd = tempDir();
     mkdirSync(join(cwd, "my-template"));
-    expect(classifyTemplateSource("my-template", BUILT_INS, cwd)).toEqual({ kind: "dir", path: join(cwd, "my-template"), ref: null });
-    expect(classifyTemplateSource(join(cwd, "my-template"), BUILT_INS, tempDir())).toEqual({ kind: "dir", path: join(cwd, "my-template"), ref: null });
+    expect(classifyTemplateSource("my-template", BUILT_INS, cwd)).toEqual({ kind: "dir", path: join(cwd, "my-template") });
+    expect(classifyTemplateSource(join(cwd, "my-template"), BUILT_INS, tempDir())).toEqual({ kind: "dir", path: join(cwd, "my-template") });
   });
 
   test("a bare word that is neither a built-in nor a directory is a usage error naming the four forms — never a lookup", () => {
@@ -133,9 +116,7 @@ describe("fetchTemplate() — the npm path", () => {
     const long = `${"deeply-".repeat(12)}nested`;
     mkdirSync(join(pkg, "site", long), { recursive: true });
     writeFileSync(join(pkg, "site", long, "página.md"), "---\ntitle: ñ\n---\n# ñ\n");
-    const { files, rootFiles, revision, sourceDir } = await fetchTemplate({ kind: "npm", spec: pkg }, pkg);
-    // §19.10 — the version npm resolved is the revision the record keeps.
-    expect(revision).toBe("0.0.1");
+    const { files, rootFiles, sourceDir } = await fetchTemplate({ kind: "npm", spec: pkg }, pkg);
     expect(sourceDir).toBe("site");
     expect(Object.keys(files).sort()).toEqual(["_includes/nav.html", `${long}/página.md`, "index.html"].sort());
     expect(Buffer.from(files["index.html"]).toString()).toBe("<!doctype html>\n<title>P</title>\n");

@@ -25,7 +25,7 @@ Upload `dist/` anywhere: GitHub Pages, Netlify, any static host.
 
 ## What `init` gave you
 
-(`unify init blog`, `docs` or `portfolio` start from a different built-in; `unify init <directory>`, a git URL such as `https://github.com/fwdslsh/unify/templates/blog`, or an npm package named `unify-<name>-template` start from a template somebody published — add `--audit` to keep it only if it audits clean. Later, `unify update` brings the template's next version in: files you never touched update, files you edited are kept and listed. [`templates.md`](templates.md) walks through the whole workflow.)
+(`unify init blog`, `docs` or `portfolio` start from a different built-in; `unify init <directory>`, a git URL such as `https://github.com/fwdslsh/unify/templates/blog`, or an npm package named `unify-<name>-template` start from a template somebody published — add `--audit` to keep it only if it audits clean. Later, `unify update` fetches the template again and copies its changed files over the site, listing the files it would overwrite and asking first. [`templates.md`](templates.md) walks through the whole workflow.)
 
 ```
 my-site/

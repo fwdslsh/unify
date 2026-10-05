@@ -50,9 +50,11 @@ export const covers = (...ruleIds) => {
  * @param {string} cwd
  * @param {Record<string,string>} [envOverrides] - merged over a clean base
  *   env; set `DEBUG` here to test DIA-09 (the base env otherwise deletes it)
+ * @param {string} [input] - what the CLI reads on stdin (`unify update`'s
+ *   answer); left out, stdin is closed, which a prompt reads as a no
  * @returns {Promise<{exit: number, stdout: string, stderr: string}>}
  */
-export async function runCli(args, cwd, envOverrides = {}) {
+export async function runCli(args, cwd, envOverrides = {}, input) {
   const env = { ...process.env, NO_COLOR: "1" };
   delete env.DEBUG;
   delete env.FORCE_COLOR;
@@ -60,7 +62,7 @@ export async function runCli(args, cwd, envOverrides = {}) {
   Object.assign(env, envOverrides);
   const proc = Bun.spawn({
     cmd: [process.execPath, CLI, ...args],
-    cwd, env, stdin: "ignore", stdout: "pipe", stderr: "pipe",
+    cwd, env, stdin: input === undefined ? "ignore" : Buffer.from(input), stdout: "pipe", stderr: "pipe",
   });
   const timer = setTimeout(() => { try { proc.kill(9); } catch { /* already gone */ } }, CLI_TIMEOUT_MS);
   const [stdout, stderr] = await Promise.all([

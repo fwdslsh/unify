@@ -15,7 +15,6 @@ import { join } from "node:path";
 import { init } from "../../src/cli/commands/init.js";
 import { Reporter, UsageError } from "../../src/core/diagnostics.js";
 import { TEMPLATES, TEMPLATE_ROOT_FILES } from "../../src/templates/index.js";
-import pkg from "../../package.json" with { type: "json" };
 
 /** The project-root files every built-in shares (§19.4). */
 const ROOT_FILES = Object.fromEntries(["AGENTS.md", "DEPLOY.md", "unify.yaml"].map((f) => [f, TEMPLATE_ROOT_FILES.default[f]]));
@@ -160,8 +159,8 @@ describe("init()", () => {
       const root = tempDir();
       await init({ projectRoot: root, sourceRoot: root, sourceDefaulted: true, template: name, reporter: silentReporter() });
       const live = readFileSync(join(root, "unify.yaml"), "utf8").split("\n").filter((l) => /^[a-z]/.test(l));
-      // §19.10 — a built-in is recorded as name@<unify version>, in the key's own place in the file.
-      expect(live).toEqual([...({ docs: ["catalog: true"], blog: ["generate: scripts/gen.mjs"] }[name] ?? []), `template: ${name}@${pkg.version}`]);
+      // §19.10 — a built-in is recorded by its name, in the key's own place in the file.
+      expect(live).toEqual([...({ docs: ["catalog: true"], blog: ["generate: scripts/gen.mjs"] }[name] ?? []), `template: ${name}`]);
       expect(existsSync(join(root, "site", "unify.yaml"))).toBe(false);
     }
   });

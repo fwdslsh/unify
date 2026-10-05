@@ -10,32 +10,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.11.3] - 2026-10-05
 
-The template record is one line in `unify.yaml`; `unify.template.json` is gone.
+The template record is one line in `unify.yaml`, and `unify update` is a copy you confirm; `unify.template.json` is gone.
 
 ### Changed
 
-- **The record `init` leaves is `template: <source>` in `unify.yaml`**, pinned to the version fetched
-  (`blog@0.11.3`, `unify-shop-template@1.4.0`, `https://…/templates/shop#<commit>`, `../shop#<commit>` for
-  a directory that is a clean git checkout). Nothing else is recorded: no file list, no hashes. `unify update`
-  fetches the template at that pin as its **baseline** and at its latest as the target, and compares the two
-  with what is on disk (spec §19.10). The line advances only when a run ends with no conflict, so an
-  unresolved conflict is reported on every run until the site takes the template's version or lists the
-  file under `owned:`. `--template <source>` is the positional as an option.
-- **`owned:` is a `unify.yaml` list** (also `--owned <glob>`, repeatable): the paths a template leaves to the
-  site, relative to the file, in `--exclude`'s grammar. A template declares it in its own `unify.yaml`, which
-  travels with it; a site can extend it.
-- A built-in can be pinned to a unify version, `unify init blog@0.11.2`: the same `templates/blog` as that
-  release shipped, fetched from the unify repository.
+- **The record `init` leaves is `template: <source>` in `unify.yaml`** — the source as you typed it
+  (`blog`, `unify-shop-template`, `https://…/templates/shop#v2`, `../shop`). Nothing else is recorded: no
+  version, no file list, no hashes. `--template <source>` is the positional as an option.
+- **`unify update` fetches the template again and copies its changed files over the project** (spec §19.10).
+  It lists every file it would overwrite and add, asks `overwrite N file(s)? [y/N]` when at least one file
+  would be overwritten, and writes nothing on any answer but `y` (exit 1). `--yes`/`-y` answers for a
+  script; `--dry-run` lists and never asks. Nothing is removed, nothing outside the template's paths is
+  visited, and nothing merges. `unify update <source>` moves the project to another source and the line
+  follows.
 
 ### Removed
 
-- **`unify.template.json`** (the record and the manifest) and **`unify update --adopt`**. A project that still
-  has the 0.11.2 file is told the exact `template:` line to add. A record with no version compares two ways
-  — every differing file is a conflict, nothing is removed — and says so.
+- **`unify.template.json`** (the record and the manifest), **`unify update --adopt`**, and the per-file
+  conflict logic. A project that still has the 0.11.2 file is told the exact `template:` line to add.
 
 ### Added
 
-- **`docs/templates.md`**, the template guide — the four source forms, the configure-once-then-`unify update`
+- **`docs/templates.md`**, the template guide — the four source forms, the scaffold-configure-author-update
   workflow, and how to publish a template — rendered on the docs site under Guides and linked from the README,
   the tutorial and the CLI reference.
 

@@ -59,7 +59,7 @@ import { TEMPLATES } from "../../templates/index.js";
 import { configPath, configTemplate } from "../options.js";
 import { saveEntries, writeConfig } from "../save-config.js";
 import { resolveSettings } from "../settings.js";
-import { classifyTemplateSource, fetchTemplate, pinSource } from "../template-source.js";
+import { classifyTemplateSource, fetchTemplate, recordSource } from "../template-source.js";
 
 const DEFAULT_TEMPLATE = "default";
 
@@ -220,24 +220,24 @@ export async function init({ sourceRoot, sourceDefaulted, template, reporter, au
     writeFileSync(absPath, content);
   }
 
-  // §19.10 — the record: ONE line in unify.yaml, `template: <source>` pinned
-  // to the version just fetched, which `unify update` fetches again as its
-  // baseline. The file is the template's own copy when it shipped one (just
-  // written above), else the project's existing one, else a fresh
-  // all-commented file at the project root — in every case the file §18
-  // says unify.yaml is, upserted the way `--save-config` upserts. Its prior
-  // bytes are kept so the audit gate below can put them back.
+  // §19.10 — the record: ONE line in unify.yaml, `template: <source>` as it
+  // was typed (a relative directory relative to the file), which `unify
+  // update` fetches again. The file is the template's own copy when it
+  // shipped one (just written above), else the project's existing one, else
+  // a fresh all-commented file at the project root — in every case the file
+  // §18 says unify.yaml is, upserted the way `--save-config` upserts. Its
+  // prior bytes are kept so the audit gate below can put them back.
   const { path: configFile } = configPath(target, projectRoot);
   const priorConfig = existsSync(configFile) ? readFileSync(configFile) : null;
   if (priorConfig === null) writeFileSync(configFile, configTemplate());
-  const pinned = pinSource(source, fetched.revision, label, dirname(configFile));
-  writeConfig(configFile, saveEntries({ template: pinned }));
+  const recorded = recordSource(source, label, dirname(configFile));
+  writeConfig(configFile, saveEntries({ template: recorded }));
   const restoreConfig = () => (priorConfig === null ? rmSync(configFile, { force: true }) : writeFileSync(configFile, priorConfig));
 
   const shown = toRelative(projectRoot, target) || ".";
   const atRoot = rootNames.length === 0 ? "" : `, ${rootNames.length === 2 ? rootNames.join(" and ") : rootNames.join(", ")} at the project root`;
   reporter.summary(`scaffolded ${label} (${writes.length} files): ${Object.keys(files).length} into ${shown}${atRoot}`);
-  reporter.summary(`recorded template: ${pinned} in ${toRelative(projectRoot, configFile) || "unify.yaml"} — unify update brings in its later versions`);
+  reporter.summary(`recorded template: ${recorded} in ${toRelative(projectRoot, configFile) || "unify.yaml"} — unify update fetches it again`);
 
   if (audit) {
     // §19.9 — the gate. The project is resolved exactly as a later `unify

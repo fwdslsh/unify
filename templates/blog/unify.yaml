@@ -53,10 +53,5 @@ generate: scripts/gen.mjs
 # hand that file source-pages.json: every source page's title, description, date, metas and links (default: true whenever generate is set)
 # source-inventory: false
 
-# the template this project was scaffolded from, pinned to the version fetched; unify update compares the project against it (default: none)
-# template: unify-shop-template@1.4.0
-
-# paths the template leaves to the site, relative to this file: unify update never rewrites, removes or reports them (default: none)
-# owned:
-#   - site/config.json
-#   - site/posts/**
+# the template this project was scaffolded from; unify update fetches it again and copies its changed files over this project, after asking (default: none)
+# template: unify-shop-template

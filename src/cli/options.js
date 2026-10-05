@@ -55,14 +55,12 @@ const OPTIONS = {
   // §33.7 — opt in to `source-pages.json` for the generator. A boolean, saveable;
   // naming it with no generator is a usage error (cli.js), like --include-noindex.
   "source-inventory": { kind: "flag", about: "hand that file source-pages.json: every source page's title, description, date, metas and links", default: "true whenever generate is set", save: "source-inventory: false" },
-  // §19.10 — the template this project came from, pinned to the version that
-  // was fetched. `init` records it (the one line it writes live), `update`
-  // compares the project against it and advances it. The positional of
-  // `init`/`update` is the same thing spelled without the flag.
-  template: { kind: "value", example: "unify-shop-template@1.4.0", about: "the template this project was scaffolded from, pinned to the version fetched; unify update compares the project against it", default: "none", save: "template: unify-shop-template@1.4.0" },
-  // §19.10 — paths the template leaves to the site (relative to this file,
-  // --exclude's grammar): `update` never rewrites, removes or reports them.
-  owned: { kind: "list", about: "paths the template leaves to the site, relative to this file: unify update never rewrites, removes or reports them", default: "none", save: "owned:\n  - site/config.json\n  - site/posts/**" },
+  // §19.10 — the template this project came from, as typed to `init`, which
+  // records it (the one line it writes live); `update` fetches it again. The
+  // positional of `init`/`update` is the same thing spelled without the flag.
+  template: { kind: "value", example: "unify-shop-template", about: "the template this project was scaffolded from; unify update fetches it again and copies its changed files over this project, after asking", default: "none", save: "template: unify-shop-template" },
+  // §19.10 — `update` only: overwrite the listed files without asking.
+  yes: { kind: "flag", short: "y" },
   // §31.1 — `unify audit`'s own output shape. This registry stays a
   // syntactic parser like every entry here: the closed set (human/json/sarif)
   // and its usage error are audit.js's own concern, the same split
@@ -87,9 +85,7 @@ const OPTIONS = {
 };
 
 /** Keys `unify.yaml` may carry — the long option names, minus the ones that make no sense to save. */
-export const CONFIG_KEYS = ["source", "output", "clean", "exclude", "pretty-urls", "base-url", "canonical", "feed-full", "catalog", "search-corpus", "include-noindex", "strict", "audit", "port", "generate", "source-inventory", "template", "owned"];
-/** The saveable options that are lists (`exclude:` and `owned:` blocks), for the reader and the writer alike. */
-export const LIST_KEYS = CONFIG_KEYS.filter((key) => OPTIONS[key].kind === "list");
+export const CONFIG_KEYS = ["source", "output", "clean", "exclude", "pretty-urls", "base-url", "canonical", "feed-full", "catalog", "search-corpus", "include-noindex", "strict", "audit", "port", "generate", "source-inventory", "template"];
 
 /**
  * §18/§19.8 — the `unify.yaml` that `init` writes at the project root: every
