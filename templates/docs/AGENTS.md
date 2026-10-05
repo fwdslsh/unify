@@ -57,9 +57,9 @@ published** and the previous `dist/` is untouched — never report success on a 
   is in place, link the new page from `site/_includes/nav.html` or from another page — `unify audit`
   reports a page nothing links to.
 - `site/assets/theme.css` is the look: the custom properties the stylesheet reads, each at the template's
-  default. Edit the values. `unify.yaml` lists it under `keep:` — the files `unify update` never
-  overwrites once they exist — beside `unify.yaml` itself; add any other file you customize, such as
-  `site/_includes/nav.html` or `site/index.html`, to that list.
+  default. Edit the values. `unify.yaml` names it under `keep:` in its `template:` block — the files
+  `unify update` never overwrites once they exist — beside `unify.yaml` itself; add any other file you
+  customize, such as `site/_includes/nav.html` or `site/index.html`, to that list.
 - `unify update` fetches this template again and copies its changed files over this project after
   listing them and asking. It never visits a file the template does not ship, so your copies are
   yours for good; the examples and the tooling (`_layout.html`, `_includes/`, `assets/style.css`,

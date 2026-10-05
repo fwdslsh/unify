@@ -1,7 +1,7 @@
 /* The template's stylesheet: tooling, kept current by unify update. Its look is
    the custom properties set in :root below, and the site's own values for them
    live in theme.css beside this file — a file unify update never overwrites,
-   because unify.yaml lists it under keep:. The import puts that file in the
+   named under keep: in unify.yaml's template: block. The import puts it in the
    theme layer, which wins over the base layer whatever the order, so a value
    set there wins and a property left out keeps its default here. */
 @layer base, theme;

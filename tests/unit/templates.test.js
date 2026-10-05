@@ -51,14 +51,14 @@ describe.each(TEMPLATE_NAMES)('template "%s" — SCF-01/SCF-02 structure (in-mem
   const paths = Object.keys(files);
   const wholeSource = Object.values(files).join("\n");
 
-  test("ships unify.yaml with the lines it needs live — keep: naming the file itself and the theme in every template, docs' catalog: true and blog's generate: — every other option described and commented out (§18, §19.6, §19.8, §19.11)", () => {
+  test("ships unify.yaml with the lines it needs live — a template: block whose keep: names the file itself and the theme in every template, docs' catalog: true and blog's generate: — every other option described and commented out (§18, §19.6, §19.8, §19.11)", () => {
     // Never inside the source tree (0.10): the file is build material beside the site.
     expect(paths).not.toContain("unify.yaml");
-    const live = { ...({ docs: { catalog: true }, blog: { generate: "scripts/gen.mjs" } }[name] ?? {}), keep: ["unify.yaml", "site/assets/theme.css"] };
+    const live = { ...({ docs: { catalog: true }, blog: { generate: "scripts/gen.mjs" } }[name] ?? {}), template: { keep: ["unify.yaml", "site/assets/theme.css"] } };
     const yaml = TEMPLATE_ROOT_FILES[name]["unify.yaml"];
     expect(yaml).toBe(configTemplate(live));
-    expect(yaml.split("\n").filter((l) => /^[a-z]/.test(l))).toEqual(Object.entries(live).map(([k, v]) => (Array.isArray(v) ? `${k}:` : `${k}: ${v}`)));
-    expect(yaml).toContain("keep:\n  - unify.yaml\n  - site/assets/theme.css\n");
+    expect(yaml.split("\n").filter((l) => /^[a-z]/.test(l))).toEqual(Object.entries(live).map(([k, v]) => (typeof v === "object" ? `${k}:` : `${k}: ${v}`)));
+    expect(yaml).toContain("template:\n  keep:\n    - unify.yaml\n    - site/assets/theme.css\n");
   });
 
   test("§19.11: the pages it ships in place are the home page, the 404 and (docs) the All-pages starter; everything else a site fills in is an example under _examples/", () => {
@@ -170,7 +170,7 @@ describe.each(TEMPLATE_NAMES)('template "%s" — SCF-01/SCF-02 structure (in-mem
       expect(style).toContain(`${prop}: ${value};`);
       expect(style).toContain(`var(${prop})`);
     }
-    expect(TEMPLATE_ROOT_FILES[name]["unify.yaml"]).toMatch(/^keep:\n(?:  - .*\n)*  - site\/assets\/theme\.css\n/m);
+    expect(TEMPLATE_ROOT_FILES[name]["unify.yaml"]).toMatch(/^template:\n(?:  source: .*\n)?  keep:\n(?:    - .*\n)*    - site\/assets\/theme\.css\n/m);
   });
 
   test("built pages contain no <slot> elements outside the design-time layout itself", () => {

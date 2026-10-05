@@ -9,7 +9,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { UsageError } from "../../src/core/diagnostics.js";
-import { CONFIG_KEYS, configTemplate, loadConfig, mergeConfig, parseArgs } from "../../src/cli/options.js";
+import { CONFIG_KEYS, configTemplate, loadConfig, mergeConfig, parseArgs, templateLines, templateRecord } from "../../src/cli/options.js";
 import { registerTmp } from "../tmp-reaper.mjs";
 
 describe("parseArgs", () => {
@@ -124,7 +124,8 @@ describe("mergeConfig", () => {
 });
 
 describe("configTemplate — the unify.yaml init scaffolds (§18, §19.8)", () => {
-  const keyOf = (line) => line.match(/^#?\s*([a-z][\w-]*):/)?.[1];
+  // Top-level keys only: the lines indented under template: (source:, keep:) are the block's, not keys of their own.
+  const keyOf = (line) => line.match(/^(?:# )?([a-z][\w-]*):/)?.[1];
 
   test("lists every saveable option exactly once, each under a one-line description naming its default", () => {
     const lines = configTemplate().split("\n");
@@ -148,7 +149,7 @@ describe("configTemplate — the unify.yaml init scaffolds (§18, §19.8)", () =
   test("every commented line is a valid line once uncommented — the reader accepts the whole file", () => {
     const text = configTemplate()
       .split("\n")
-      .map((l) => (/^# [a-z][\w-]*:/.test(l) || /^#   - /.test(l) ? l.slice(2) : l))
+      .map((l) => (/^# [a-z][\w-]*:/.test(l) || /^#   [a-z][\w-]*:/.test(l) || /^#   - /.test(l) || /^#     - /.test(l) ? l.slice(2) : l))
       .join("\n");
     const dir = mkdtempSync(join(tmpdir(), "unify-tpl-"));
     registerTmp(dir);
@@ -160,5 +161,53 @@ describe("configTemplate — the unify.yaml init scaffolds (§18, §19.8)", () =
     const live = configTemplate({ catalog: true }).split("\n").filter((l) => /^[a-z]/.test(l));
     expect(live).toEqual(["catalog: true"]);
     expect(() => configTemplate({ "dry-run": true })).toThrow(/not a saveable option/);
+  });
+});
+
+describe("the template block — the one key that takes a block (§18, §19.10)", () => {
+  const load = (text) => {
+    const dir = mkdtempSync(join(tmpdir(), "unify-tpl-"));
+    registerTmp(dir);
+    writeFileSync(join(dir, "unify.yaml"), text);
+    return loadConfig(dir);
+  };
+
+  test("template: <source> alone is the record; the block spells source: and keep: under it; either is read", () => {
+    expect(load("template: blog\n")).toEqual({ template: "blog" });
+    expect(load("template:\n  source: blog\n  keep:\n    - unify.yaml\n    - site/assets/theme.css\n")).toEqual({ template: { source: "blog", keep: ["unify.yaml", "site/assets/theme.css"] } });
+    expect(load("template:\n  keep:\n    - site/assets/theme.css\n")).toEqual({ template: { keep: ["site/assets/theme.css"] } });
+    expect(load("template:\n  keep: site/assets/theme.css\n")).toEqual({ template: { keep: ["site/assets/theme.css"] } });
+    expect(templateRecord("blog")).toEqual({ source: "blog" });
+    expect(templateRecord({ keep: ["x"] })).toEqual({ keep: ["x"] });
+    expect(templateRecord(undefined)).toEqual({});
+  });
+
+  test("keep: at the top level, a stray indented line, an unknown member and a list under template: itself are usage errors naming the block", () => {
+    // The message and the fix lines together: what was wrong, and the shape to write instead.
+    const failure = (text) => {
+      try {
+        load(text);
+      } catch (e) {
+        return `${e.message} | ${e.fixes.join(" ")}`;
+      }
+      return "no error";
+    };
+    expect(failure("keep:\n  - site/x\n")).toMatch(/unknown key: keep \| keep: belongs under template:/);
+    expect(failure("output: dist\n  keep:\n    - site/x\n")).toMatch(/cannot read line: keep: \| only template: takes an indented block/);
+    expect(failure("template:\n  files:\n    - site/x\n")).toMatch(/unknown key under template: files/);
+    expect(failure("template:\n  - site/x\n")).toMatch(/cannot read line: - site\/x \| a list item needs its key/);
+  });
+
+  test("templateLines renders the bare line when there is nothing to keep, else the block; configTemplate writes it live the same way, and keep is not a key of its own", () => {
+    expect(templateLines({ source: "blog" })).toEqual(["template: blog"]);
+    expect(templateLines({ source: "blog", keep: ["unify.yaml", "site/assets/theme.css"] })).toEqual(["template:", "  source: blog", "  keep:", "    - unify.yaml", "    - site/assets/theme.css"]);
+    expect(templateLines({ keep: ["site/assets/theme.css"] })).toEqual(["template:", "  keep:", "    - site/assets/theme.css"]);
+    expect(configTemplate({ template: { keep: ["site/assets/theme.css"] } })).toContain("\ntemplate:\n  keep:\n    - site/assets/theme.css\n");
+    expect(configTemplate({ template: "blog" })).toContain("\ntemplate: blog\n");
+    expect(() => configTemplate({ keep: ["x"] })).toThrow(/not a saveable option/);
+  });
+
+  test("--keep repeats into a list, like --exclude", () => {
+    expect(parseArgs(["update", "--keep", "site/assets/theme.css", "--keep", "site/_includes/nav.html"]).options.keep).toEqual(["site/assets/theme.css", "site/_includes/nav.html"]);
   });
 });

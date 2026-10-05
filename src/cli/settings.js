@@ -12,7 +12,7 @@
  */
 import { dirname, isAbsolute, resolve } from "node:path";
 import { resolveSource } from "../core/paths.js";
-import { configPath, loadConfig, mergeConfig } from "./options.js";
+import { configPath, loadConfig, mergeConfig, templateRecord } from "./options.js";
 
 /**
  * Resolve the full run configuration from flags plus `unify.yaml`.
@@ -42,7 +42,11 @@ export function resolveSettings(flags, cwd = process.cwd()) {
   for (const key of ["source", "generate"]) {
     if (typeof config[key] === "string" && !isAbsolute(config[key])) config[key] = resolve(configDir, config[key]);
   }
-  if (Array.isArray(config.keep)) config.keep = config.keep.map((p) => (isAbsolute(p) ? p : resolve(configDir, p)));
+  // §19.10 — the record, whichever spelling the file used: `template: blog`,
+  // or the block with `source:` and `keep:` under it; a kept path is relative
+  // to the file like every other path in it.
+  const record = templateRecord(config.template);
+  if (Array.isArray(record.keep)) record.keep = record.keep.map((p) => (isAbsolute(p) ? p : resolve(configDir, p)));
   const settings = mergeConfig(flags, config);
   const resolved = resolveSource(settings.source, cwd);
 
@@ -97,12 +101,12 @@ export function resolveSettings(flags, cwd = process.cwd()) {
       // unify.yaml carries, kept apart because a named source replaces it;
       // `yes` answers the overwrite question.
       template: flags.template,
-      recordedTemplate: typeof config.template === "string" ? config.template : undefined,
+      recordedTemplate: typeof record.source === "string" ? record.source : undefined,
       yes: flags.yes === true,
       // §19.10 — the files `update` never overwrites once they exist, as absolute
-      // paths: a line in unify.yaml is relative to the file (resolved above), a
-      // --keep to the working directory, and the flag replaces the list like --exclude.
-      keep: (Array.isArray(settings.keep) ? settings.keep : []).map((p) => (isAbsolute(p) ? p : resolve(cwd, p))),
+      // paths: the file's list is relative to the file (resolved above), a --keep
+      // to the working directory, and the flag replaces the list like --exclude.
+      keep: Array.isArray(flags.keep) ? flags.keep.map((p) => (isAbsolute(p) ? p : resolve(cwd, p))) : record.keep ?? [],
     },
     sourceRoot: resolved.root,
     // The would-copy notice (§4.4) fires only when nothing chose the source

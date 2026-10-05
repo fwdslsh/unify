@@ -53,10 +53,8 @@ generate: scripts/gen.mjs
 # hand that file source-pages.json: every source page's title, description, date, metas and links (default: true whenever generate is set)
 # source-inventory: false
 
-# the template this project was scaffolded from; unify update fetches it again and copies its changed files over this project, after asking (default: none)
-# template: unify-shop-template
-
-# files unify update never overwrites once they exist — the ones this site customized — one path per list item, relative to this file (default: none)
-keep:
-  - unify.yaml
-  - site/assets/theme.css
+# the template this project was scaffolded from, which unify update fetches again — as the value, or as source: under it beside keep:, the files update never overwrites once they exist, one path per item, relative to this file (default: none)
+template:
+  keep:
+    - unify.yaml
+    - site/assets/theme.css

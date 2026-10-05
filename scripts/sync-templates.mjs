@@ -6,7 +6,8 @@
  * `templates/<name>/` is the source of truth for a built-in template: a
  * complete project — `site/` beside `AGENTS.md`, `DEPLOY.md` (and the blog's
  * `scripts/gen.mjs`, and a `unify.yaml` with the lines the template needs
- * live — `keep:` in every built-in, §19.11) — laid out exactly as `unify init`
+ * live — `keep:` under `template:` in every built-in, §19.11) — laid out
+ * exactly as `unify init`
  * lays one out, which is also what makes each directory usable as a git
  * template on its own (`unify init https://github.com/fwdslsh/unify/templates/blog`).
  *
@@ -19,14 +20,14 @@
  *
  * It also regenerates the `unify.yaml` of each template that ships one from
  * the option registry (§18: the file lists every saveable option, so it cannot
- * fall behind the CLI), keeping whichever lines the template has live (`keep:`
- * in every built-in, the docs template's `catalog: true`, the blog's
- * `generate: scripts/gen.mjs`).
+ * fall behind the CLI), keeping whichever lines the template has live (the
+ * `template:` block with its `keep:` list in every built-in, the docs
+ * template's `catalog: true`, the blog's `generate: scripts/gen.mjs`).
  */
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { configTemplate } from "../src/cli/options.js";
+import { configTemplate, parseConfig } from "../src/cli/options.js";
 import { readTemplateTree } from "../src/cli/template-source.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -35,22 +36,13 @@ export const SNAPSHOT_PATH = join(ROOT, "src", "templates", "snapshot.js");
 
 /**
  * The live (uncommented) entries of a scaffolded unify.yaml, in the shape
- * `configTemplate` takes: scalars as written, a list as an array.
+ * `configTemplate` takes — read by the CLI's own reader, so the `template:`
+ * block comes back as it is written.
  * @param {string} yaml
- * @returns {Record<string, string|string[]>}
+ * @returns {ReturnType<typeof parseConfig>}
  */
 export function liveEntries(yaml) {
-  const set = {};
-  let listKey = null;
-  for (const line of yaml.split(/\r?\n/)) {
-    const item = line.match(/^\s+-\s+(.*)$/);
-    if (item && listKey) { set[listKey].push(item[1]); continue; }
-    const entry = line.match(/^([a-z][\w-]*):\s*(.*)$/);
-    if (!entry) continue;
-    listKey = null;
-    if (entry[2] === "") { set[entry[1]] = []; listKey = entry[1]; } else set[entry[1]] = entry[2];
-  }
-  return set;
+  return parseConfig(yaml);
 }
 
 /**

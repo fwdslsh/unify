@@ -18,16 +18,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it easy to find on npm, not a rule the CLI enforces; `--audit` is what tells a template from a package that
   is not one. The cost is that a misspelled directory name reaches npm and fails there, with npm's message
   (spec §19.9, rule SCF-13). The order of the forms is now built-in, git, directory, npm.
-- **`keep`: the files `unify update` never overwrites.** `keep:` in `unify.yaml` (a list of paths relative to the
-  file) or `--keep <path>` (repeatable, relative to the working directory, replacing the list) names the files this
-  site customized. A listed file that exists is never overwritten — printed as `keep <path>` when the template's
+- **`keep`: the files `unify update` never overwrites.** `keep:` under `template:` in `unify.yaml` (a list of paths
+  relative to the file, beside `source:`, the record) or `--keep <path>` (repeatable, relative to the working
+  directory, replacing the list) names the files this site customized. `template:` is now the one key that takes a
+  block: `template: <source>` alone is still the record, and the block spells `source:` and `keep:` under it. A listed file that exists is never overwritten — printed as `keep <path>` when the template's
   copy differs, counted as kept in the summary, never asked about — and one that does not exist yet is added.
   Nothing else reads the list and nothing is required of a template (spec §18 and §19.10, rules CFG-01, CFG-09
   and UPD-04).
 - **The look is a file the site keeps.** Every built-in template's `assets/style.css` opens with `@layer base, theme;`
   and `@import url("theme.css") layer(theme);`, expresses its look as custom properties in the base layer, and ships
   `assets/theme.css` with those properties at their defaults — yours to edit: a changed value changes the look, a
-  deleted one keeps the default. Every built-in now ships a `unify.yaml` whose `keep:` names that file and
+  deleted one keeps the default. Every built-in now ships a `unify.yaml` whose `template:` block keeps that file and
   `unify.yaml` itself, so neither the theme nor a line you uncomment is ever overwritten by `unify update`
   (spec §19.11, rule SCF-16, `docs/templates.md` §3).
 

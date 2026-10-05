@@ -7,7 +7,8 @@
  *
  *     template: https://github.com/acme/templates/shop
  *
- * — the source as it was typed. Nothing is stored about files or versions.
+ * — the source as it was typed (or `source:` under `template:`, beside the
+ * `keep:` list, when the file has one). Nothing is stored about versions.
  * This command fetches that source (or the one named on the command line,
  * which then replaces the line) through init's own resolver and compares
  * every file the template ships with the project's copy at the same place:
@@ -17,11 +18,12 @@
  *   different bytes           → overwrite — listed, and confirmed first
  *
  * Nothing is removed, and nothing outside the template's paths is visited.
- * One exception, declared in the open: `keep:` in unify.yaml (or `--keep
- * <path>`) lists the files this site customized — the theme, the nav — and a
- * listed file that exists is never overwritten: it is reported as `keep` when
- * the template's copy differs, counted as kept, and never asked about. A
- * listed file that does not exist yet is added like any other.
+ * One exception, declared in the open: `keep:` under `template:` in
+ * unify.yaml (or `--keep <path>`, repeatable) lists the files this site
+ * customized — the theme, the nav — and a listed file that exists is never
+ * overwritten: it is reported as `keep` when the template's copy differs,
+ * counted as kept, and never asked about. A listed file that does not exist
+ * yet is added like any other.
  * The confirmation is the protection for local edits: every file that would
  * be overwritten is listed, and the command waits for `y` on stdin unless
  * `--yes` was passed. Anything else writes nothing and exits 1. `--dry-run`
@@ -42,7 +44,7 @@ import { UsageError } from "../../core/diagnostics.js";
 import { contains, toRelative } from "../../core/paths.js";
 import { TEMPLATES } from "../../templates/index.js";
 import { configPath } from "../options.js";
-import { saveEntries, writeConfig } from "../save-config.js";
+import { recordTemplate } from "../save-config.js";
 import { classifyTemplateSource, fetchTemplate, recordSource } from "../template-source.js";
 
 /**
@@ -122,11 +124,9 @@ export async function update({ sourceRoot, settings, template, reporter, project
   }
   if (changes > 0) reporter.summary(`update: overwrote ${plan.overwrite.length}, added ${plan.add.length}${keptCount}${skipped} — ${label}`);
   // The record is written back after the copy (a template's unify.yaml has no
-  // template: line of its own), and follows a source named on the command line.
-  if (changes > 0 || explicit !== undefined) {
-    if (!existsSync(configFile)) writeFileSync(configFile, "");
-    writeConfig(configFile, saveEntries({ template: record }));
-  }
+  // source of its own, only a keep: list at most, which stays), and follows a
+  // source named on the command line.
+  if (changes > 0 || explicit !== undefined) recordTemplate(configFile, record);
   return 0;
 }
 
@@ -163,7 +163,7 @@ function confirm(question, input, output) {
  */
 function noRecord(projectRoot, configShown) {
   const fixes = [
-    "add the line unify init writes: template: <source> — the built-in name, directory, git URL or npm package this project was scaffolded from",
+    "add the line unify init writes: template: <source> — the built-in name, directory, git URL or npm package this project was scaffolded from (or source: <source> under template:, beside a keep: list)",
     "or name the template now: unify update <source>, which records it",
   ];
   const legacy = join(projectRoot, "unify.template.json");
@@ -179,17 +179,18 @@ function noRecord(projectRoot, configShown) {
 }
 
 /**
- * A content hash, with one normalization: `unify.yaml`'s own `template:` line
- * is unify's, not the template's or the site's, so it never counts as a
- * difference — nor does the commented `# template:` line it took the place of
- * in the file init writes.
+ * A content hash, with one normalization: `unify.yaml`'s record — the
+ * `template:` line, or `source:` under it — is unify's, not the template's or
+ * the site's, so it never counts as a difference, nor do the commented lines
+ * it took the place of in the file init writes; a `keep:` list under
+ * `template:` is compared like any other line.
  * @param {string} abs - the file's place in the project (its name decides)
  * @param {Uint8Array|string} content
  */
 function hashOf(abs, content) {
   let bytes = typeof content === "string" ? Buffer.from(content, "utf8") : Buffer.from(content);
   if (basename(abs) === "unify.yaml") {
-    bytes = Buffer.from(bytes.toString("utf8").split(/\r?\n/).filter((line) => !/^#?\s*template:/.test(line)).join("\n"), "utf8");
+    bytes = Buffer.from(bytes.toString("utf8").split(/\r?\n/).filter((line) => !/^#?\s*template:/.test(line) && !/^#?\s+source:/.test(line)).join("\n"), "utf8");
   }
   return createHash("sha256").update(bytes).digest("hex");
 }

@@ -58,13 +58,17 @@ const OPTIONS = {
   // §19.10 — the template this project came from, as typed to `init`, which
   // records it (the one line it writes live); `update` fetches it again. The
   // positional of `init`/`update` is the same thing spelled without the flag.
-  template: { kind: "value", example: "unify-shop-template", about: "the template this project was scaffolded from; unify update fetches it again and copies its changed files over this project, after asking", default: "none", save: "template: unify-shop-template" },
-  // §19.10 — `update` only: the files it never overwrites once they exist —
-  // the ones this site customized (the theme, the nav). A list like `exclude`:
-  // repeatable on the command line (relative to the working directory,
-  // replacing the file's list), one path per item in unify.yaml (relative to
-  // the file). Nothing else reads it.
-  keep: { kind: "list", example: "site/assets/theme.css", about: "files unify update never overwrites once they exist — the ones this site customized — one path per list item, relative to this file", default: "none", save: "keep:\n  - site/assets/theme.css" },
+  // §19.10 — the one key that takes a block. `template: <source>` is the
+  // record alone; with files to keep it is `template:` over `source:` (the
+  // same value) and `keep:`, the files `update` never overwrites once they
+  // exist, one path per item, relative to the file. `templateLines` renders
+  // both spellings and `parseConfig` reads both.
+  template: { kind: "value", example: "unify-shop-template", about: "the template this project was scaffolded from, which unify update fetches again — as the value, or as source: under it beside keep:, the files update never overwrites once they exist, one path per item, relative to this file", default: "none", save: "template:\n  source: unify-shop-template\n  keep:\n    - site/assets/theme.css" },
+  // §19.10 — `update` only: `--keep <path>`, repeatable, relative to the
+  // working directory, replacing the file's `keep:` list for the run the way
+  // `--exclude` replaces `exclude:`. Not a key of its own in unify.yaml — the
+  // list lives under `template:` there — so not in CONFIG_KEYS.
+  keep: { kind: "list", example: "site/assets/theme.css" },
   // §19.10 — `update` only: overwrite the listed files without asking.
   yes: { kind: "flag", short: "y" },
   // §31.1 — `unify audit`'s own output shape. This registry stays a
@@ -91,7 +95,7 @@ const OPTIONS = {
 };
 
 /** Keys `unify.yaml` may carry — the long option names, minus the ones that make no sense to save. */
-export const CONFIG_KEYS = ["source", "output", "clean", "exclude", "pretty-urls", "base-url", "canonical", "feed-full", "catalog", "search-corpus", "include-noindex", "strict", "audit", "port", "generate", "source-inventory", "template", "keep"];
+export const CONFIG_KEYS = ["source", "output", "clean", "exclude", "pretty-urls", "base-url", "canonical", "feed-full", "catalog", "search-corpus", "include-noindex", "strict", "audit", "port", "generate", "source-inventory", "template"];
 
 /**
  * §18/§19.8 — the `unify.yaml` that `init` writes at the project root: every
@@ -100,7 +104,7 @@ export const CONFIG_KEYS = ["source", "output", "clean", "exclude", "pretty-urls
  * Only a value that differs from the default needs to be written; `set` names
  * the ones a template needs live (the docs template's `catalog: true`).
  *
- * @param {Record<string, string|boolean|string[]>} [set] - keys to write uncommented, with their values
+ * @param {Record<string, string|boolean|string[]|{source?: string, keep?: string[]}>} [set] - keys to write uncommented, with their values
  * @returns {string}
  */
 export function configTemplate(set = {}) {
@@ -119,7 +123,8 @@ export function configTemplate(set = {}) {
     lines.push(`# ${about} (default: ${fallback})`);
     if (key in set) {
       const value = set[key];
-      if (Array.isArray(value)) lines.push(`${key}:`, ...value.map((item) => `  - ${item}`));
+      if (key === "template") lines.push(...templateLines(typeof value === "string" ? { source: value } : value));
+      else if (Array.isArray(value)) lines.push(`${key}:`, ...value.map((item) => `  - ${item}`));
       else lines.push(`${key}: ${value}`);
     } else {
       lines.push(...save.split("\n").map((line) => `# ${line}`));
@@ -127,6 +132,32 @@ export function configTemplate(set = {}) {
     lines.push("");
   }
   return lines.join("\n");
+}
+
+/**
+ * §19.10 — the `template:` block, rendered: the bare line `template: <source>`
+ * when there is nothing to keep, else the block with `source:` and `keep:`
+ * under it. `init` and `update` write it (save-config's `recordTemplate`);
+ * `configTemplate` writes it live for a template that ships a keep list.
+ * @param {{source?: string, keep?: string[]}} record
+ * @param {(value: string) => string} [quote] - how a value is spelled (save-config's `scalar` when a file is written)
+ * @returns {string[]}
+ */
+export function templateLines({ source, keep } = {}, quote = (value) => value) {
+  const items = Array.isArray(keep) ? keep : [];
+  if (items.length === 0) return [source === undefined ? "template:" : `template: ${quote(source)}`];
+  return ["template:", ...(source === undefined ? [] : [`  source: ${quote(source)}`]), "  keep:", ...items.map((item) => `    - ${quote(item)}`)];
+}
+
+/**
+ * §19.10 — the record as one shape, whichever spelling the file used:
+ * `template: blog` is `{source: "blog"}`, and no key at all is `{}`.
+ * @param {unknown} value - `config.template`
+ * @returns {{source?: string, keep?: string[]}}
+ */
+export function templateRecord(value) {
+  if (typeof value === "string") return { source: value };
+  return value && typeof value === "object" ? { ...value } : {};
 }
 
 const SHORT = Object.fromEntries(
@@ -266,22 +297,23 @@ export function configPath(sourceRoot, projectRoot = process.cwd()) {
 
 /**
  * `unify.yaml` is saved flags and nothing more (§18). Parsed with a deliberately
- * tiny reader: scalars and one level of list. Anything richer would be a
+ * tiny reader: scalars, one level of list, and one block — `template:`, with
+ * `source:` and `keep:` under it (§19.10). Anything richer would be a
  * configuration language, which §5 refuses.
  *
- * @param {string} sourceRoot
- * @param {string} [projectRoot] - see `configPath`
- * @returns {Record<string, string|boolean|string[]>}
+ * @param {string} text - the file's contents
+ * @param {string} [shown] - how the file is named in a diagnostic
+ * @returns {Record<string, string|boolean|string[]|{source?: string, keep?: string[]}>}
  */
-export function loadConfig(sourceRoot, projectRoot = process.cwd()) {
-  const { path, exists } = configPath(sourceRoot, projectRoot);
-  if (!exists) return {};
-
-  /** @type {Record<string, string|boolean|string[]>} */
+export function parseConfig(text, shown = "unify.yaml") {
+  /** @type {Record<string, any>} */
   const config = {};
-  let listKey = null;
+  /** @type {string[]|null} where the next `- item` lines go */
+  let list = null;
+  /** @type {{source?: string, keep?: string[]}|null} the template block being read */
+  let block = null;
 
-  for (const raw of readFileSync(path, "utf8").split(/\r?\n/)) {
+  for (const raw of text.split(/\r?\n/)) {
     // A whole-line comment is the commonest thing in a YAML file and used to
     // be a fatal usage error here: the trailing-comment strip below requires
     // whitespace before the `#`, so a `# Build settings` at column 0 reached
@@ -295,36 +327,68 @@ export function loadConfig(sourceRoot, projectRoot = process.cwd()) {
     if (line.trim() === "") continue;
 
     const item = line.match(/^\s*-\s+(.*)$/);
-    if (item && listKey) {
-      /** @type {string[]} */ (config[listKey]).push(unquote(item[1].trim()));
+    if (item) {
+      if (!list) throw new UsageError(`${shown}: cannot read line: ${raw.trim()}`, ["a list item needs its key above it: exclude:, or keep: under template:"]);
+      list.push(unquote(item[1].trim()));
       continue;
     }
 
-    const entry = line.match(/^([A-Za-z][\w-]*):\s*(.*)$/);
+    const entry = line.match(/^(\s*)([A-Za-z][\w-]*):\s*(.*)$/);
     if (!entry) {
-      throw new UsageError(`unify.yaml: cannot read line: ${raw.trim()}`, [
-        "unify.yaml holds saved flags only — keys with scalar or list values",
+      throw new UsageError(`${shown}: cannot read line: ${raw.trim()}`, [
+        `${shown} holds saved flags only — keys with scalar or list values, and template: with source: and keep: under it`,
       ]);
     }
+    const [, indent, key, value] = entry;
 
-    const [, key, value] = entry;
-    if (!CONFIG_KEYS.includes(key)) {
-      throw new UsageError(`unify.yaml: unknown key: ${key}`, [
-        `keys are the long option names: ${CONFIG_KEYS.join(", ")}`,
-      ]);
-    }
-
-    if (value === "") {
-      config[key] = [];
-      listKey = key;
+    if (indent !== "") {
+      // §19.10 — the one block: template, with source and keep under it.
+      if (!block) throw new UsageError(`${shown}: cannot read line: ${raw.trim()}`, ["only template: takes an indented block — source: (the template as typed) and keep: (the files unify update never overwrites)"]);
+      if (key !== "source" && key !== "keep") throw new UsageError(`${shown}: unknown key under template: ${key}`, ["template: takes source: and keep:"]);
+      list = null;
+      if (key === "keep") {
+        block.keep = value === "" ? [] : [unquote(value.trim())];
+        list = block.keep;
+      } else if (value !== "") {
+        block.source = unquote(value.trim());
+      }
       continue;
     }
-    listKey = null;
+
+    block = null;
+    list = null;
+    if (!CONFIG_KEYS.includes(key)) {
+      const fixes = [`keys are the long option names: ${CONFIG_KEYS.join(", ")}`];
+      if (key === "keep") fixes.unshift("keep: belongs under template: — write template:, then source: and keep: indented under it");
+      throw new UsageError(`${shown}: unknown key: ${key}`, fixes);
+    }
+    if (value === "") {
+      if (key === "template") {
+        config.template = {};
+        block = config.template;
+      } else {
+        config[key] = [];
+        list = config[key];
+      }
+      continue;
+    }
     if (value === "true" || value === "false") config[key] = value === "true";
     else config[key] = unquote(value.trim());
   }
 
   return config;
+}
+
+/**
+ * The file `configPath` finds, parsed — or nothing when there is none.
+ * @param {string} sourceRoot
+ * @param {string} [projectRoot] - see `configPath`
+ * @returns {ReturnType<typeof parseConfig>}
+ */
+export function loadConfig(sourceRoot, projectRoot = process.cwd()) {
+  const { path, exists } = configPath(sourceRoot, projectRoot);
+  if (!exists) return {};
+  return parseConfig(readFileSync(path, "utf8"));
 }
 
 /**

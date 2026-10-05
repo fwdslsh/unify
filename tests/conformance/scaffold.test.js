@@ -265,8 +265,8 @@ test("scaffold/blog: SCF-03 — the scaffold's one shown command is `unify build
   }
   const yaml = readFileSync(join(tmp, "unify.yaml"), "utf8");
   const live = yaml.split("\n").filter((l) => /^[a-z]/.test(l));
-  // The one live BUILD line is the generator; the template: record and the keep: list (§19.10) are live in every scaffold and no build reads them.
-  if (!/^generate: scripts\/gen\.mjs\|template: blog\|keep:$/.test(live.join("|"))) throw new Error(`unify.yaml's live lines should be exactly generate: scripts/gen.mjs, the template: record and keep:, got: ${live.join(" | ")}`);
+  // The one live BUILD line is the generator; the template: block (the record and the keep list, §19.10) is live in every scaffold and no build reads it.
+  if (!/^generate: scripts\/gen\.mjs\|template:$/.test(live.join("|"))) throw new Error(`unify.yaml's live lines should be exactly generate: scripts/gen.mjs and the template: block, got: ${live.join(" | ")}`);
   if (!existsSync(join(tmp, "scripts", "gen.mjs"))) throw new Error("generate: scripts/gen.mjs names a file that does not exist from the project root");
 
   const buildR = await runCli(["build"], tmp);
@@ -1452,14 +1452,18 @@ test("scaffold: SCF-13 a template is a directory, a git repository or an npm pac
   for (const rel of [...expected.keys()]) {
     if (rel === "package.json" || rel === "package-lock.json" || rel.startsWith("node_modules")) expected.delete(rel);
   }
-  // §19.10 — unify.yaml's `template:` line names the SOURCE, so it differs per
-  // scaffold by design (origin's says blog@<version>, a scaffold's names the
-  // directory or URL it came from). Compared without that one line, exactly as
-  // `update` compares it; the line itself is SCF-15's.
+  // §19.10 — unify.yaml's record names the SOURCE, so it differs per scaffold
+  // by design (origin's says blog, a scaffold's names the directory or URL it
+  // came from). Compared without the record — the `template:` line, or
+  // `source:` under it — exactly as `update` compares it; the record itself
+  // is SCF-15's.
   const withoutRecord = (tree) => {
-    if (tree.has("unify.yaml")) tree.set("unify.yaml", Buffer.from(tree.get("unify.yaml").toString("utf8").split("\n").filter((l) => !/^template:/.test(l)).join("\n")));
+    if (tree.has("unify.yaml")) tree.set("unify.yaml", Buffer.from(tree.get("unify.yaml").toString("utf8").split("\n").filter((l) => !/^template:/.test(l) && !/^\s+source:/.test(l)).join("\n")));
     return tree;
   };
+  // The template's files as they are, for the git host below: a copy of the record-stripped tree would ship a
+  // keep: list with no template: line over it, which is not a file init could have written.
+  const files = new Map(expected);
   withoutRecord(expected);
   const scaffolded = (dir) => withoutRecord(readTree(dir));
 
@@ -1498,7 +1502,7 @@ test("scaffold: SCF-13 a template is a directory, a git repository or an npm pac
   // repository, the template's subdirectory inside it, and a #ref. ---------
   const host = mkTmp();
   mkdirSync(join(host, "templates", "blog"), { recursive: true });
-  for (const [rel, bytes] of expected) {
+  for (const [rel, bytes] of files) {
     mkdirSync(join(host, "templates", "blog", rel, ".."), { recursive: true });
     writeFileSync(join(host, "templates", "blog", rel), bytes);
   }
@@ -1676,10 +1680,10 @@ for (const name of TEMPLATES) {
     const examples = readdirSync(join(site, "_examples")).sort();
     if (examples.join(",") !== Object.keys(EXAMPLE_HOMES[name]).sort().join(",")) throw new Error(`${name}'s examples are ${examples.join(", ")}; this test knows ${Object.keys(EXAMPLE_HOMES[name]).join(", ")}`);
 
-    // ---- unify.yaml: every template ships its own copy, whose keep: names the file itself and the theme (§19.10), so a
-    // line the site uncomments is never overwritten — reported as kept, never listed as an overwrite.
+    // ---- unify.yaml: every template ships its own copy, whose template: block keeps the file itself and the theme under
+    // the record (§19.10), so a line the site uncomments is never overwritten — reported as kept, never listed as an overwrite.
     const yaml = readFileSync(join(tmp, "unify.yaml"), "utf8");
-    if (!/^keep:\n  - unify\.yaml\n  - site\/assets\/theme\.css$/m.test(yaml)) throw new Error(`${name}: the scaffolded unify.yaml must keep itself and the theme:\n${yaml}`);
+    if (!new RegExp(`^template:\\n  source: ${name}\\n  keep:\\n    - unify\\.yaml\\n    - site\\/assets\\/theme\\.css$`, "m").test(yaml)) throw new Error(`${name}: the scaffolded unify.yaml must record the template and keep itself and the theme under it:\n${yaml}`);
     if (!yaml.includes("# pretty-urls: true")) throw new Error(`${name}: the scaffolded unify.yaml lacks the commented pretty-urls line this test uncomments`);
     writeFileSync(join(tmp, "unify.yaml"), yaml.replace("# pretty-urls: true", "pretty-urls: true"));
     const edited = await runCli(["update", "--dry-run"], tmp);
@@ -1738,7 +1742,9 @@ for (const name of TEMPLATES) {
 
 /** unify.yaml's record line, or null. */
 function recordOf(tmp) {
-  return readFileSync(join(tmp, "unify.yaml"), "utf8").match(/^template: (.+)$/m)?.[1] ?? null;
+  // The record: `template: <source>`, or `source:` under `template:` beside a keep: list (§19.10).
+  const text = readFileSync(join(tmp, "unify.yaml"), "utf8");
+  return text.match(/^template: (.+)$/m)?.[1] ?? text.match(/^\s+source: (.+)$/m)?.[1] ?? null;
 }
 
 test("scaffold: SCF-15 + UPD-01..03 — init records the source as typed in unify.yaml; update fetches a git template again, lists what it would overwrite, asks, and copies on y, through the real CLI", async () => {
@@ -1843,7 +1849,7 @@ test("scaffold: SCF-15 + UPD-01..03 — init records the source as typed in unif
   if (back.exit !== 0 || !readFileSync(join(tmp, "site", "index.html"), "utf8").includes("v3") || recordOf(tmp) !== url) throw new Error(`naming the default branch again moves back: exit ${back.exit}\n${back.stdout}${back.stderr}`);
 
   // ---- keep (UPD-04): a listed file that exists is never overwritten — named on the command line, or under keep: in
-  // unify.yaml (relative to the file) — and a listed file the site does not have yet is added
+  // unify.yaml's template: block (relative to the file) — and a listed file the site does not have yet is added
   writeFileSync(join(tmp, "site", "config.json"), '{"lab": "Mine again"}\n');
   writeFileSync(join(host, "site", "config.json"), '{"lab": "NEWER SEED"}\n');
   release("v3.1");
@@ -1852,13 +1858,16 @@ test("scaffold: SCF-15 + UPD-01..03 — init records the source as typed in unif
   if (readFileSync(join(tmp, "site", "config.json"), "utf8") !== '{"lab": "Mine again"}\n') throw new Error("a kept file was overwritten");
   const unkept = await runCli(["update", "--dry-run"], tmp);
   if (!unkept.stdout.includes("would overwrite site/config.json")) throw new Error(`without the list the same file is an overwrite:\n${unkept.stdout}`);
-  writeFileSync(join(tmp, "unify.yaml"), `${readFileSync(join(tmp, "unify.yaml"), "utf8")}keep:\n  - site/config.json\n`);
+  writeFileSync(join(tmp, "unify.yaml"), readFileSync(join(tmp, "unify.yaml"), "utf8").replace(/^template: (.+)$/m, "template:\n  source: $1\n  keep:\n    - site/config.json"));
+  if (recordOf(tmp) !== url) throw new Error(`the block spells the same record, has ${recordOf(tmp)}`);
   const keptYaml = await runCli(["update"], tmp);
   if (keptYaml.exit !== 0 || !keptYaml.stdout.includes("keep site/config.json") || !keptYaml.stdout.includes("1 kept") || keptYaml.stderr.includes("[y/N]")) throw new Error(`keep: in unify.yaml is the same list: exit ${keptYaml.exit}\n${keptYaml.stdout}${keptYaml.stderr}`);
   if (readFileSync(join(tmp, "site", "config.json"), "utf8") !== '{"lab": "Mine again"}\n') throw new Error("a file kept by unify.yaml was overwritten");
   rmSync(join(tmp, "site", "config.json"));
   const added = await runCli(["update"], tmp);
   if (added.exit !== 0 || !added.stdout.includes("add site/config.json") || readFileSync(join(tmp, "site", "config.json"), "utf8") !== '{"lab": "NEWER SEED"}\n') throw new Error(`a listed file the site does not have is added: exit ${added.exit}\n${added.stdout}${added.stderr}`);
+  // The record written back after that copy stays in the block, and the block keeps its list.
+  if (!readFileSync(join(tmp, "unify.yaml"), "utf8").includes(`template:\n  source: ${url}\n  keep:\n    - site/config.json\n`)) throw new Error(`update must write the record into the block and keep the list:\n${readFileSync(join(tmp, "unify.yaml"), "utf8")}`);
 
   // ---- safety (UPD-03): a symlink is skipped, never followed or replaced; an unreachable source changes nothing
   const elsewhere = mkTmp();
@@ -1877,7 +1886,7 @@ test("scaffold: SCF-15 + UPD-01..03 — init records the source as typed in unif
   writeFileSync(join(tmp, "site", "index.html"), readFileSync(join(host, "site", "index.html")));
 
   // ---- the record (UPD-01): no template: line → exit 2 naming the line; a 0.11.2 record file yields the exact line; the line added by hand works
-  const lines = readFileSync(join(tmp, "unify.yaml"), "utf8").split("\n").filter((l) => !/^template:/.test(l));
+  const lines = readFileSync(join(tmp, "unify.yaml"), "utf8").split("\n").filter((l) => !/^template:/.test(l) && !/^\s+(source|keep):|^\s+- /.test(l));
   writeFileSync(join(tmp, "unify.yaml"), lines.join("\n"));
   const missing = await runCli(["update"], tmp);
   if (missing.exit !== 2 || !missing.stderr.includes("no template recorded") || !missing.stderr.includes("template: <source>")) throw new Error(`a missing record is a usage error naming the line: ${missing.exit}\n${missing.stderr}`);

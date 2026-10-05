@@ -55,7 +55,7 @@ Options:
       --save-config        \`build\` only: write the saveable options given here into unify.yaml (after a good build)
       --template <source>  \`init\`/\`update\`: the template, the same as the positional; init saves it in unify.yaml
   -y, --yes                \`update\`: overwrite the listed files without asking
-      --keep <path>        \`update\`: a file it never overwrites once it exists — the ones you customized (repeatable, relative to the working directory; the keep: list in unify.yaml is the same, relative to the file)
+      --keep <path>        \`update\`: a file it never overwrites once it exists — the ones you customized (repeatable, relative to the working directory; the file's list is keep: under template: in unify.yaml, relative to the file)
       --strict             advisories count as problems for the exit code (with \`audit\`, findings too)
       --format <kind>      \`audit\` report shape: human (default), json, or sarif
       --external           \`audit\` only: fetch every off-origin URL the site emits and report the ones that don't resolve
@@ -234,8 +234,6 @@ export async function run(argv) {
     if (options.source !== undefined && resolve(dir) !== resolve(sourceRoot)) {
       entries.set("source", [`source: ${rel(resolve(sourceRoot))}`]);
     }
-    // A --keep is relative to the working directory; the file reads its list relative to itself.
-    if (entries.has("keep")) entries.set("keep", ["keep:", ...options.keep.map((p) => `  - ${rel(resolve(p))}`)]);
   }
 
   const output = resolve(process.cwd(), settings.output);

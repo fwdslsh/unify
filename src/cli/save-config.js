@@ -6,10 +6,10 @@
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { UsageError } from "../core/diagnostics.js";
-import { CONFIG_KEYS } from "./options.js";
+import { CONFIG_KEYS, parseConfig, templateLines, templateRecord } from "./options.js";
 
-/** `source` is written only by cli.js, and only when the file sits outside the source root (§18); here it is never one of the entries. */
-const WRITABLE = CONFIG_KEYS.filter((key) => key !== "source");
+/** `source` is written only by cli.js, and only when the file sits outside the source root (§18); `template` only by `recordTemplate` below (init and update, §19.10). Neither is ever one of these entries. */
+const WRITABLE = CONFIG_KEYS.filter((key) => key !== "source" && key !== "template");
 
 /**
  * @param {string} value
@@ -74,13 +74,13 @@ export function writeConfig(path, entries) {
     if (key && pending.has(key)) {
       out.push(...pending.get(key));
       pending.delete(key);
-      // A replaced list takes its old items (and comments indented among them) with it.
-      while (i + 1 < lines.length && /^\s*-\s|^\s+#/.test(lines[i + 1])) i++;
+      // A replaced key takes its old block with it: list items, the lines indented under template:, comments among them.
+      while (i + 1 < lines.length && /^\s+\S|^-\s/.test(lines[i + 1])) i++;
     } else if (commented && pending.has(commented) && !live.has(commented)) {
       out.push(...pending.get(commented));
       pending.delete(commented);
-      // The commented list items under it go too.
-      while (i + 1 < lines.length && /^#\s+-\s/.test(lines[i + 1])) i++;
+      // The commented lines indented under it — list items, template:'s source: and keep: — go too.
+      while (i + 1 < lines.length && /^#\s+-\s|^#\s{2,}\S/.test(lines[i + 1])) i++;
     } else {
       out.push(lines[i]);
     }
@@ -89,4 +89,19 @@ export function writeConfig(path, entries) {
 
   writeFileSync(path, out.join(eol) + eol);
   return path;
+}
+
+/**
+ * §19.10 — the record: `template: <source>` as it was typed, or `source:`
+ * inside the `template:` block when the file carries a `keep:` list — the
+ * block is rewritten whole, its list kept — upserted into the file like any
+ * saved flag, taking the commented block's place when there is one. The
+ * file is created when absent.
+ * @param {string} path - the unify.yaml to write
+ * @param {string} source
+ * @returns {string} the path written
+ */
+export function recordTemplate(path, source) {
+  const { keep } = templateRecord(existsSync(path) ? parseConfig(readFileSync(path, "utf8")).template : undefined);
+  return writeConfig(path, new Map([["template", templateLines({ source, keep }, (value) => scalar(value, "template"))]]));
 }

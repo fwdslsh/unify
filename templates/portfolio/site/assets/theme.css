@@ -1,7 +1,7 @@
 /* The look of this site: the custom properties the stylesheet reads, each at
    the template's default. This file is yours — change the values. unify.yaml
-   lists it under keep:, so unify update never overwrites it; a property you
-   delete keeps the stylesheet's default. */
+   names it under keep: in its template: block, so unify update never
+   overwrites it; a property you delete keeps the stylesheet's default. */
 :root {
   --font-body: 100%/1.5 system-ui, sans-serif;
   --color-text: canvastext;

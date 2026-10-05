@@ -40,13 +40,23 @@ unify init https://github.com/acme/templates/shop --audit
 
 ### What `init` leaves behind
 
-One line in `unify.yaml`:
+The record in `unify.yaml`: the template exactly as you typed it (a directory is written relative to the file), as the value of `template:`,
 
 ```yaml
 template: https://github.com/acme/templates/shop
 ```
 
-It is the template exactly as you typed it (a directory is written relative to the file). That is the whole record — no version, no file list, no hashes, no copy of the template. It is a saved flag like every other line in the file (`--template` is the same thing on the command line), it is never published, and it is what `unify update` reads. Commit it.
+or, when the template ships a `unify.yaml` with files to keep (§3), as `source:` inside that block:
+
+```yaml
+template:
+  source: https://github.com/acme/templates/shop
+  keep:
+    - unify.yaml
+    - site/assets/theme.css
+```
+
+That is the whole record — no version, no file list, no hashes, no copy of the template. It is a saved flag like every other line in the file (`--template` is the same thing on the command line), it is never published, and it is what `unify update` reads. Commit it.
 
 ## 2. The recommended workflow
 
@@ -54,7 +64,7 @@ Configure once, author freely, take template improvements when they come.
 
 1. **Scaffold** from the template and commit everything.
 2. **Configure** the site: uncomment what you need in `unify.yaml`, copy the template's examples into place (a template built as §3 recommends keeps them under `site/_examples/`) and fill them in, set up deployment. Commit.
-3. **Author**: add pages and content — copies of the examples, edited — edit the theme, and add any other file you make your own (the nav, the home page) to `keep:` in `unify.yaml`. Commit as you go.
+3. **Author**: add pages and content — copies of the examples, edited — edit the theme, and add any other file you make your own (the nav, the home page) to the `keep:` list under `template:` in `unify.yaml`. Commit as you go.
 4. When the template has moved on, **preview** what would change:
 
    ```sh
@@ -80,16 +90,18 @@ Running `unify update` when nothing differs says so and writes nothing. In a scr
 
 `update` has no merge and no ownership rules. A file you edited that the template also ships shows up in the list like any other difference, and the answer is yours: read the list, and say no if it names something you want to keep. A template built as §3 recommends ships the files you fill in only as examples to copy, so its list is tooling and little else.
 
-For the files you customize and mean to keep for good — the theme, the nav, the home page — `keep:` in `unify.yaml` names them, relative to the file, and `update` never overwrites a listed file that exists: it prints `keep <path>` when the template's copy differs, counts it as kept, and never asks about it; a listed file you do not have yet is added. `--keep <path>` on the command line is the same list for one run (repeatable, relative to the working directory, replacing the file's). The built-ins list `unify.yaml` itself and `site/assets/theme.css`:
+For the files you customize and mean to keep for good — the theme, the nav, the home page — `keep:` under `template:` in `unify.yaml` names them, relative to the file, and `update` never overwrites a listed file that exists: it prints `keep <path>` when the template's copy differs, counts it as kept, and never asks about it; a listed file you do not have yet is added. `--keep <path>` on the command line is the same list for one run (repeatable, relative to the working directory, replacing the file's). The built-ins list `unify.yaml` itself and `site/assets/theme.css`:
 
 ```yaml
-keep:
-  - unify.yaml
-  - site/assets/theme.css
-  - site/_includes/nav.html
+template:
+  source: https://github.com/acme/templates/shop
+  keep:
+    - unify.yaml
+    - site/assets/theme.css
+    - site/_includes/nav.html
 ```
 
-That is the whole mechanism: a list of paths, nothing more.
+That is the whole mechanism: a list of paths under the record, nothing more.
 
 ### What `update` never does
 
@@ -126,7 +138,7 @@ site/
     landing-page.html
 AGENTS.md               tooling: tells the author (or their agent) to copy from _examples/
 DEPLOY.md
-unify.yaml              keep: unify.yaml and site/assets/theme.css — the files update never overwrites
+unify.yaml              its template: block keeps unify.yaml and site/assets/theme.css — the files update never overwrites
 ```
 
 The underscore does the work. `_examples/` is excluded from the build by the default `_*` rule, so the examples ship with the template, land in every site, and never publish. The site's author copies `_examples/post.md` to `posts/first-post.md` and edits the copy. The copy is a path the template does not ship, so `update` never visits it; `_examples/post.md` itself is never edited, so it updates cleanly whenever you improve it. Convention over configuration: nothing is declared anywhere, and the path alone says whose a file is. Say so in the template's `AGENTS.md`, which is where an author or an agent looks first.
@@ -147,9 +159,9 @@ Your stylesheet is tooling, so a site must be able to change the look without ed
 }
 ```
 
-Then ship `assets/theme.css` in place — the same properties at their defaults, and nothing else — and name it under `keep:` in the `unify.yaml` you ship (§19.10). The site edits the file: the import places it in the `theme` layer, which wins over `base` whatever the order, so a changed value changes the look and a deleted one keeps your default, and `unify update` never overwrites it. The file ships in place rather than as an example because a file you ship can only reference files you ship: unify refuses to publish a reference to nothing (§12), so a stylesheet importing a theme the site had not copied yet would fail a fresh scaffold's audit. The built-ins do exactly this. It is a convention, not a rule: a template that wants no theme file ships none.
+Then ship `assets/theme.css` in place — the same properties at their defaults, and nothing else — and name it under `keep:` in the `template:` block of the `unify.yaml` you ship (§19.10). The site edits the file: the import places it in the `theme` layer, which wins over `base` whatever the order, so a changed value changes the look and a deleted one keeps your default, and `unify update` never overwrites it. The file ships in place rather than as an example because a file you ship can only reference files you ship: unify refuses to publish a reference to nothing (§12), so a stylesheet importing a theme the site had not copied yet would fail a fresh scaffold's audit. The built-ins do exactly this. It is a convention, not a rule: a template that wants no theme file ships none.
 
-The same rule reaches the project root. **Ship `unify.yaml` only for the lines you need live**, and name it under its own `keep:` — the built-ins do, beside `site/assets/theme.css` — so the lines a site uncomments are never overwritten; `init` writes the all-commented file for a template that ships none, and that file is then the site's. A `.env`, keys, and anything else a site fills in belong in an example or in `DEPLOY.md`'s instructions, never in the template.
+The same rule reaches the project root. **Ship `unify.yaml` only for the lines you need live**, and name it under the `keep:` list of its own `template:` block — the built-ins do, beside `site/assets/theme.css` — so the lines a site uncomments are never overwritten; `init` writes the all-commented file for a template that ships none, and that file is then the site's. A `.env`, keys, and anything else a site fills in belong in an example or in `DEPLOY.md`'s instructions, never in the template.
 
 ### What a template must still ship
 

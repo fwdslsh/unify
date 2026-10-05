@@ -158,15 +158,15 @@ describe("init()", () => {
     expect(existsSync(join(root, "src", "_layout.html"))).toBe(true);
   });
 
-  test("writes unify.yaml at the project root for every template, all commented out except keep: (the file itself and the theme), docs' catalog: true, blog's generate:, and the template: record (§18, §19.6, §19.8, §19.10)", async () => {
+  test("writes unify.yaml at the project root for every template, all commented out except the template: block (the record over keep:, the file itself and the theme), docs' catalog: true and blog's generate: (§18, §19.6, §19.8, §19.10)", async () => {
     for (const name of Object.keys(TEMPLATES)) {
       const root = tempDir();
       await init({ projectRoot: root, sourceRoot: root, sourceDefaulted: true, template: name, reporter: silentReporter() });
       const text = readFileSync(join(root, "unify.yaml"), "utf8");
       const live = text.split("\n").filter((l) => /^[a-z]/.test(l));
       // §19.10 — a built-in is recorded by its name, in the key's own place in the file.
-      expect(live).toEqual([...({ docs: ["catalog: true"], blog: ["generate: scripts/gen.mjs"] }[name] ?? []), `template: ${name}`, "keep:"]);
-      expect(text).toContain("keep:\n  - unify.yaml\n  - site/assets/theme.css\n");
+      expect(live).toEqual([...({ docs: ["catalog: true"], blog: ["generate: scripts/gen.mjs"] }[name] ?? []), "template:"]);
+      expect(text).toContain(`template:\n  source: ${name}\n  keep:\n    - unify.yaml\n    - site/assets/theme.css\n`);
       expect(existsSync(join(root, "site", "unify.yaml"))).toBe(false);
     }
   });

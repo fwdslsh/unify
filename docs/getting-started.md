@@ -31,7 +31,7 @@ Upload `dist/` anywhere: GitHub Pages, Netlify, any static host.
 my-site/
 ├── AGENTS.md             # notes for whoever edits this site next — outside site/, so it never publishes
 ├── DEPLOY.md             # how to publish it, ending in the two commands that carry your address
-├── unify.yaml            # every build flag, described and commented out — uncomment what differs from the default; live: template:, where this came from for `unify update`, and keep:, the files it never overwrites
+├── unify.yaml            # every build flag, described and commented out — uncomment what differs from the default; live: template:, where this came from for `unify update` and, under it, keep:, the files it never overwrites
 └── site/                 # the source root — everything here ships
     ├── _layout.html      # the site chrome — one complete HTML page
     ├── _includes/
@@ -48,7 +48,7 @@ my-site/
 
 Everything in `site/` ships to the site **except** files and folders whose name starts with `_` — those are the build's working material (layouts, fragments, notes, scripts). Files *inside* an underscore folder don't need their own prefix: `_includes/nav.html` is already held back.
 
-That is also why the examples live where they do. `site/_examples/` holds a copy-ready version of each kind of page the template expects you to add: copy one into `site/`, edit the copy, and link it from `site/_includes/nav.html`. The example itself never publishes, and `unify update` — which refreshes the template's own files — never touches a file you copied. The look is `site/assets/theme.css`: the custom properties the stylesheet reads, yours to edit, and `unify.yaml` lists it under `keep:` so `unify update` never overwrites it. Every built-in template works this way.
+That is also why the examples live where they do. `site/_examples/` holds a copy-ready version of each kind of page the template expects you to add: copy one into `site/`, edit the copy, and link it from `site/_includes/nav.html`. The example itself never publishes, and `unify update` — which refreshes the template's own files — never touches a file you copied. The look is `site/assets/theme.css`: the custom properties the stylesheet reads, yours to edit, and `unify.yaml` names it under `keep:` in its `template:` block, so `unify update` never overwrites it. Every built-in template works this way.
 
 ## The layout
 
