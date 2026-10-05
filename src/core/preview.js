@@ -44,8 +44,10 @@ import { convert, convertFragment } from "./markdown.js";
 import { assembleMarkdownDocument, compose } from "./compose.js";
 import { locateExisting, nameOf, virtualOf } from "./paths.js";
 import { applyPrettyLinks, rewriteProvenanceUrls, spansToLocator } from "./urls.js";
+import { renderChrome } from "./chrome.js";
 
 export const PREVIEW_PATH = "/_unify/preview/";
+export const AUDIT_PATH = "/_unify/";
 
 const LAYOUT_FILENAME = "_layout.html";
 const SKIP_DIRS = new Set(["node_modules", ".git", ".hg", ".svn"]);
@@ -170,13 +172,13 @@ ${pageList}
  * @param {string} args.relPath - the source path after `/_unify/preview/`
  * @param {string|null} args.page - `?page=`: a page's source path, or null
  * @param {string|null} args.layout - `?layout=`: a layout's source path, or null
- * @param {boolean} [args.config] - `?config=false` leaves the selector out
+ * @param {boolean} [args.chrome] - false when the URL said `chrome=off`: the chrome is left out server-side (§27.8)
  * @param {{source: string, generated?: boolean, layout: string|null, includes?: string[], path: string, outputPath: string}[]} args.pages - the page map's records (empty before the first build)
  * @param {boolean} args.prettyUrls
  * @param {string} [args.outputDir] - absolute; never listed by the index
  * @returns {Promise<{status: number, html?: string, location?: string}>}
  */
-export async function renderPreview({ sourceRoot, roots, relPath, page = null, layout = null, config = true, pages = [], prettyUrls = false, outputDir = null }) {
+export async function renderPreview({ sourceRoot, roots, relPath, page = null, layout = null, chrome = true, pages = [], prettyUrls = false, outputDir = null }) {
   const rel = posix.normalize(relPath).replace(/^\/+/, "");
   // The index: no file named.
   if (rel === "" || rel === ".") return { status: 200, html: renderIndex({ roots, pages, outputDir }) };
@@ -195,12 +197,19 @@ export async function renderPreview({ sourceRoot, roots, relPath, page = null, l
     if (prettyUrls && pages.length) out = applyPrettyLinks(out, { pageOutputPath: "index.html", emittedHtmlPaths: new Set(pages.map((p) => p.outputPath)) });
     return out;
   };
-  // The selector offers only the pages this file reaches: for a layout the
-  // pages that composed with it, for an include the pages whose bytes it
+  // §27.8 — the chrome offers only the pages this file reaches: for a layout
+  // the pages that composed with it, for an include the pages whose bytes it
   // authored (directly or through a layout) — the page map's own provenance,
   // so the list is the build's answer, never a guess.
   const uses = (p) => (kind === "layout" ? p.layout === rel : (p.includes ?? []).includes(rel));
-  const selector = (opts) => (config ? widget({ rel, kind, page, layout, pages: pages.filter((p) => !p.generated && uses(p)), layouts: [...new Set([...scanLayouts(roots), ...knownLayouts])].sort(), ...opts }) : "");
+  const chromeHtml = () => (chrome ? renderChrome({
+    kind, rel, record: null,
+    reaching: pages.filter((p) => !p.generated && uses(p)).map((p) => ({ source: p.source, path: p.path })),
+    layouts: kind === "fragment" ? [...new Set([...scanLayouts(roots), ...knownLayouts])].sort() : [],
+    selection: { page, layout },
+    problems: reporter.sorted().map((d) => Reporter.format(d)),
+    previewPath: PREVIEW_PATH, auditPath: AUDIT_PATH,
+  }) : "");
 
   if (kind === "page") {
     const record = pages.find((p) => p.source === rel);
@@ -217,14 +226,14 @@ export async function renderPreview({ sourceRoot, roots, relPath, page = null, l
     let text, spans, file;
     if (pageAbs) {
       const composed = await composePage({ pageAbs, layoutAbs: abs, ctx });
-      if (!composed) return { status: 200, html: problems(reporter, rel) + selector({}) };
+      if (!composed) return { status: 200, html: message("Could not compose", `<code>${esc(page)}</code> with <code>${esc(rel)}</code>: the problems are in the chrome.`).replace("</body>", `${chromeHtml()}</body>`) };
       ({ text, spans } = composed);
       file = nameOf(roots, pageAbs);
     } else {
       ({ text, spans, file } = await loadInlined(abs, ctx));
     }
-    const html = problems(reporter, rel) ? insertBeforeBodyEnd(finish(text, spans, file), problems(reporter, rel)) : finish(text, spans, file);
-    return { status: 200, html: insertBeforeBodyEnd(insertBeforeHeadEnd(html, SLOT_STYLE), selector({ withLayout: false })) };
+    const html = finish(text, spans, file);
+    return { status: 200, html: insertBeforeBodyEnd(insertBeforeHeadEnd(html, SLOT_STYLE), chromeHtml()) };
   }
 
   // fragment
@@ -241,7 +250,7 @@ export async function renderPreview({ sourceRoot, roots, relPath, page = null, l
   const fragmentHtml = finish(body.text, body.spans ?? [{ start: 0, end: body.text.length, file: body.file, fileOffset: 0 }], body.file);
   const shell = shellAbs ? await loadInlined(shellAbs, ctx) : null;
   const html = shellDocument(shell ? finish(shell.text, shell.spans, shell.file) : null, fragmentHtml, rel);
-  return { status: 200, html: insertBeforeBodyEnd(html, problems(reporter, rel) + selector({ withLayout: true })) };
+  return { status: 200, html: insertBeforeBodyEnd(html, chromeHtml()) };
 }
 
 // ------------------------------------------------------------- composition
@@ -350,48 +359,8 @@ function insertBeforeHeadEnd(html, insertion) {
   return i === -1 ? html : html.slice(0, i) + insertion + html.slice(i);
 }
 
-/**
- * §14's diagnostics for this preview, shown in the document rather than lost.
- * Collapsed by default and styled inline from a reset, so the site's own CSS
- * (a dark `pre`, a hidden `details`) cannot make the text unreadable — the
- * panel is unify's, not the site's.
- */
-function problems(reporter, rel) {
-  if (reporter.diagnostics.length === 0) return "";
-  const reset = "all:initial;display:block;box-sizing:border-box;font:13px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;color:#1b1b1b;";
-  const items = reporter.sorted().map((d) => `<pre style="${reset}white-space:pre-wrap;margin:6px 0 0;padding:6px 8px;background:#fff;border:1px solid #e0a800;border-radius:4px">${esc(Reporter.format(d))}</pre>`).join("\n");
-  const n = reporter.diagnostics.length;
-  return `<details id="unify-preview-problems" style="${reset}position:fixed;left:8px;right:8px;bottom:48px;max-height:40vh;overflow:auto;background:#fff3cd;border:1px solid #e0a800;border-radius:6px;padding:6px 10px;z-index:2147483646;box-shadow:0 2px 8px rgba(0,0,0,.2)">
-<summary style="${reset}display:list-item;cursor:pointer;font-weight:600">unify: ${n} thing${n === 1 ? "" : "s"} the build would report for ${esc(rel)}</summary>
-${items}
-</details>`;
-}
-
 function message(title, body) {
   return `<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><title>unify preview — ${esc(title)}</title></head>\n<body style="font:16px/1.5 system-ui,sans-serif;max-width:40rem;margin:3rem auto;padding:0 1rem">\n<h1>${esc(title)}</h1>\n<p>${body}</p>\n</body></html>\n`;
-}
-
-/**
- * The selector (§27.7): a plain GET form to the preview's own path, so the
- * choice is the URL and survives a reload. No script beyond submitting on
- * change; nothing of it is in the site.
- */
-function widget({ rel, kind, page, layout, pages, layouts, withLayout }) {
-  const opt = (value, label, selected) => `<option value="${esc(value)}"${selected ? " selected" : ""}>${esc(label)}</option>`;
-  const none = kind === "layout" ? "no page (the layout's own defaults)" : "no page (the fragment's own defaults)";
-  const pageOptions = [
-    opt("", pages.length ? none : `${none} — no built page uses this file`, !page),
-    ...pages.map((p) => opt(p.source, p.source, p.source === page)),
-    // A page chosen by hand (or from before a rebuild) stays selectable.
-    ...(page && !pages.some((p) => p.source === page) ? [opt(page, page, true)] : []),
-  ].join("");
-  const layoutOptions = [opt("", "default layout", !layout), ...layouts.map((l) => opt(l, l, l === layout))].join("");
-  return `<form id="unify-preview" method="get" style="position:fixed;bottom:8px;right:8px;z-index:2147483647;display:flex;gap:6px;align-items:center;flex-wrap:wrap;max-width:calc(100vw - 16px);background:#1b1b1b;color:#f4f4f4;border-radius:6px;padding:6px 8px;font:12px/1.2 system-ui,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.3)">
-<a href="${PREVIEW_PATH}" style="color:#9ad;text-decoration:none" title="every layout, include and page">&larr;</a> <strong style="font-weight:600">unify preview</strong> <code style="opacity:.8">${esc(rel)}</code>
-${withLayout ? `<label>layout <select name="layout" onchange="this.form.submit()" style="font:inherit">${layoutOptions}</select></label>` : ""}
-<label>page <select name="page" onchange="this.form.submit()" style="font:inherit">${pageOptions}</select></label>
-<noscript><button style="font:inherit">apply</button></noscript>
-</form>`;
 }
 
 function esc(value) {

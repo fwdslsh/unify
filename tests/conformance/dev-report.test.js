@@ -851,7 +851,7 @@ describe("§27 the local audit view", () => {
     expect(layout.text).toContain('<link rel="stylesheet" href="/assets/site.css">');
     expect(layout.text).toContain('<img src="/assets/logo.svg"');
     expect(layout.text).toContain('href="/"'); // the nav's /index.html, pretty
-    expect(layout.text).toContain('id="unify-preview"'); // the selector
+    expect(layout.text).toContain('id="unify-chrome"'); // the chrome, §27.8
     expect(layout.text).toContain("__unify_reload__"); // follows the rebuild
 
     // The same layout composed with a page: §7 exactly — the page's content in
@@ -877,7 +877,7 @@ describe("§27 the local audit view", () => {
     expect(card.text).toContain("Nothing here yet.");
     expect(card.text).not.toContain("<nav>");
     expect(card.text).not.toContain("<footer>");
-    expect(card.text).toContain('name="layout"'); // an include's selector offers a layout too
+    expect(card.text).toContain('name="layout"'); // an include's chrome offers a layout too
 
     // The same include filled the way a chosen page fills it (§32).
     const filled = await get("_includes/card.fragment.html?page=about.html");
@@ -899,13 +899,13 @@ describe("§27 the local audit view", () => {
     expect(rec("index.html").includes).toEqual(["_includes/nav.html"]);
     expect(rec("about.html").includes).toEqual(["_includes/card.fragment.html", "_includes/nav.html"]);
 
-    // So the selector offers only the pages the file reaches, and ?config=false leaves it out.
+    // So the chrome offers only the pages the file reaches, and ?chrome=off leaves it out server-side.
     const options = (text) => [...text.matchAll(/<option value="([^"]*)"/g)].map((m) => m[1]).filter(Boolean);
     expect(options(card.text).filter((o) => o.endsWith(".html") && !o.endsWith("_layout.html"))).toEqual(["about.html"]);
     expect(options(layout.text).filter((o) => o.endsWith(".html"))).toEqual(["about.html", "index.html"]);
-    const quiet = await get("_includes/card.fragment.html?config=false");
+    const quiet = await get("_includes/card.fragment.html?chrome=off");
     expect(quiet.status).toBe(200);
-    expect(quiet.text).not.toContain('id="unify-preview"');
+    expect(quiet.text).not.toContain('id="unify-chrome"');
     expect(quiet.text).toContain("Untitled card");
 
     // A page redirects to the address the page map gives it.
@@ -931,7 +931,7 @@ describe("§27 the local audit view", () => {
     expect(d.stdout).toContain(`${port}/_unify/preview/`);
     const audit = await (await fetch(`http://localhost:${port}/_unify/`)).text();
     expect(audit).toContain('href="/_unify/preview/"');
-    expect(layout.text).toContain('href="/_unify/preview/"'); // the selector's way back
+    expect(layout.text).toContain('href="/_unify/preview/"'); // the chrome's way back
 
     // Not a source file, or outside the tree: 404, like the rest of /_unify/.
     expect((await get("missing.html")).status).toBe(404);
@@ -944,5 +944,58 @@ describe("§27 the local audit view", () => {
     expect(existsSync(join(tmp, "dist", "_unify"))).toBe(false);
     for (const rel of readdirSync(join(tmp, "dist"))) expect(rel).not.toContain("preview");
     covers("DEV-07");
+  }, 60_000);
+  test("DEV-08 — the chrome rides on every served page the page map knows and on every preview, from the page map, and chrome=off omits it", async () => {
+    const tmp = mkTmp();
+    writeTree(tmp, {
+      "src/_layout.html": '<!doctype html>\n<html lang="en-GB">\n<head><meta charset="utf-8"><title> — Zebra Site</title><link rel="stylesheet" href="assets/site.css"></head>\n'
+        + '<body><include src="/_includes/nav.html"></include><main><slot></slot></main></body>\n</html>\n',
+      "src/_includes/nav.html": '<nav><a href="/index.html">Home</a></nav>\n',
+      "src/assets/site.css": "body{color:red}\n",
+      "src/index.html": page("Home", "The landing page here", '<p>Alpha.</p><a href="/about.html">about</a>'),
+      "src/about.html": page("About", "About this site here", "<p>Beta.</p>"),
+      "src/plain.html": '<!doctype html>\n<html data-layout="none"><head><title>Plain</title><meta name="description" content="No layout here"></head><body><h1>Plain</h1><a href="/index.html">home</a></body></html>\n',
+    });
+    const port = await freePort();
+    const d = start(["dev", "-p", String(port), "--pretty-urls"], tmp);
+    await d.ready;
+    await waitForStatus(`http://localhost:${port}/about/`, 200);
+    const text = async (path) => (await fetch(`http://localhost:${port}${path}`)).text();
+
+    // A served page: the chrome names its source, links its layout's and
+    // includes' previews, the index and the audit view — all from the page map.
+    const about = await text("/about/");
+    expect(about).toContain('id="unify-chrome"');
+    expect(about).toContain('data-kind="page"');
+    expect(about).toContain("about.html");
+    expect(about).toContain('href="/_unify/preview/_layout.html"');
+    expect(about).toContain('href="/_unify/preview/_includes/nav.html"');
+    expect(about).toContain('href="/_unify/preview/"');
+    expect(about).toContain('href="/_unify/"');
+    expect((await text("/about")).includes('id="unify-chrome"')).toBe(true); // the slashless spelling too
+    // A page with no layout and no includes says so rather than linking nowhere.
+    const plain = await text("/plain/");
+    expect(plain).toContain('id="unify-chrome"');
+    expect(plain).not.toContain('href="/_unify/preview/_layout.html"');
+
+    // §27.1 holds: dist/ carries none of it, and neither does the reload script.
+    expect(readFileSync(join(tmp, "dist", "about", "index.html"), "utf8")).not.toContain("unify-chrome");
+
+    // Off for the request that says so; what the browser stores is its own business.
+    expect(await text("/about/?chrome=off")).not.toContain('id="unify-chrome"');
+    expect(await text("/about/?chrome=false")).not.toContain('id="unify-chrome"');
+    expect(await text("/about/?chrome=partials")).toContain('id="unify-chrome"');
+
+    // A preview carries it with its kind and the pickers (DEV-07 covers their contents).
+    const nav = await text("/_unify/preview/_includes/nav.html");
+    expect(nav).toContain('data-kind="fragment"');
+    expect(nav).toContain('name="page"');
+    // The document the chrome rides on is otherwise untouched: the stylesheet
+    // link and the page's own markup are exactly what dist/ holds.
+    const served = about.replace(/<div id="unify-chrome"[\s\S]*?<\/script>\n?<\/div>\n?/, "").replace(/<script>new EventSource[^<]*<\/script>/, "");
+    expect(served).toBe(readFileSync(join(tmp, "dist", "about", "index.html"), "utf8"));
+    d.proc.kill("SIGTERM");
+    await sleep(200);
+    covers("DEV-08");
   }, 60_000);
 });

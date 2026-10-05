@@ -1185,7 +1185,7 @@ Nothing is removed: a file the template dropped stays, and a file the site added
 
 **The confirmation is the protection.** The command prints every file it would overwrite and every file it would add, and — when at least one file would be overwritten — asks `overwrite N file(s)? [y/N]` on standard input before writing anything. `y` writes, and one summary line then counts what was written and names the source; anything else, including end of input, writes nothing, exits 1 and names `--yes`. `--yes` (`-y`) answers for a script. `--dry-run` prints the same list with `would` and never asks or writes, not even the record. When nothing differs the command says `nothing to do` and exits 0. There is no file list, no ownership declaration and no merge: the list is what the author reads, and the answer is theirs.
 
-**A project with no `template:` line** has nothing to update from, and nothing is guessed: `unify update` is a usage error (exit 2) naming the line to add — or `unify update <source>`, which records the source it was given. Where a `unify.template.json` left by 0.11.2 or 0.11.3 is present, the error composes the exact line from the source it recorded.
+**A project with no `template:` line** has nothing to update from, and nothing is guessed: `unify update` is a usage error (exit 2) naming the line to add — or `unify update <source>`, which records the source it was given. Where a `unify.template.json` left by 0.11.2 to 0.11.4 is present, the error composes the exact line from the source it recorded.
 
 **Safety.** The fetch happens first, so a source that cannot be reached writes nothing and moves no line. Every target is checked before the first write: a path that is a symlink is skipped (never followed, never replaced), a path whose existing directory resolves outside the project root and the source root is skipped, and a template path containing `..` is skipped — each is reported, and none is ever written. Writes are temp-then-rename beside their target (§15's discipline), and nothing outside the template's paths is read or written, so `.env`, keys, state, the output directory and the site's own files are never visited. Nothing a template ships is executed: `npm pack --ignore-scripts`, a bare `git clone`, and plain file writes — a template cannot bring a hook, a migration or an install script to an update any more than to an init.
 
@@ -1969,11 +1969,31 @@ Three kinds of file, told apart by the rules that already exist (a file named `_
 
 Every URL in the result is rewritten against the file that authored it (§11.1), as if the document had moved, so `assets/style.css` written in `site/_layout.html` is served from `/assets/style.css` whatever path the preview is fetched from — the same provenance rule that lets a layout link its stylesheet relative to itself (§19.1). Under `--pretty-urls` links to emitted pages take their pretty form (§11.2). `--base-url` is not applied: the preview is served from the development server's own root. Diagnostics the build would report for the file are shown inside the document rather than dropped, and none is ever a new finding. The result carries the reload script (§16), so an edit to the layout, the fragment, anything they include, or the chosen page re-renders it.
 
-The rendering ends with a **selector**: a plain GET form posting to the preview's own path, offering the page (and, for an include, the layout) from the last build's page map and the `_layout.html` files under the source root. It offers only the pages the file reaches — for a layout, the pages whose `layout` it is; for an include, the pages whose `includes` name it (§20.4, so a fragment reached through a layout counts) — and says so when none does. The choice is therefore the URL — bookmarkable, shareable, and intact across the reload. `?config=false` leaves the selector out, for a preview framed by something that makes the choice itself; the rendering is otherwise identical. The form is the only markup the preview adds beyond the shell, and like the reload script it exists in no published file.
-
 **The index.** `/_unify/preview/` itself, with no file named, lists every layout, include and page the namespace holds — the source root whole, plus the `_layout.html`, `_includes/` and `includes/` the project root may hold for §4.5 — grouped by the same three kinds, each a link: a layout or include to its preview, a built page to its own address, a page the last build did not emit to its preview. Beside each layout and include is the number of built pages that reach it (§20.4), so an unused fragment reads as such. `unify dev` prints the index's address at startup beside the site's, the audit view (§27.3) links to it, and every preview's selector links back to it. This is the one address a designer needs: start `unify dev`, open it, choose the file. `/_unify/preview` without the slash redirects to it, as `/_unify` does (§27.2).
 
-The preview writes nothing (§27.1), is served by `unify dev` alone (§27.5), is not configurable, and answers only `.html` and `.md` files under the namespace: any other path, and any path that escapes it, is the same 404 as the rest of `/_unify/`.
+The preview writes nothing (§27.1), is served by `unify dev` alone (§27.5), is not configurable beyond §27.8's chrome, and answers only `.html` and `.md` files under the namespace: any other path, and any path that escapes it, is the same 404 as the rest of `/_unify/`.
+
+### 27.8 The chrome
+
+Every HTML document `unify dev` serves — a built page the page map knows, and every §27.7 preview — carries one small overlay, the **chrome**, inserted into the response immediately before `</body>` exactly as §16's reload script is: into what is served, never into the output directory, so §27.1 holds unchanged and a page fetched from `dist/` by any other means is byte-identical. It is one root element with its own inline style and script, styled from a reset so the site's own CSS cannot restyle or hide it, and it loads nothing.
+
+What it shows depends on the file:
+
+- On a **page**: the kind, the source path, the layout the page composed with (linked to that layout's preview) or that it has none, the includes it reaches (§20.4, each linked to its preview), and links to the index and the audit view.
+- On a **layout** preview: the kind, the path, a page picker offering the built pages whose `layout` it is (or saying that none does), submitting `?page=` as a plain GET to the preview's own path, and the two links.
+- On an **include** preview: the same, with the pages whose `includes` name it, plus a layout picker offering every layout the namespace holds, submitting `?layout=`.
+- When the build would report diagnostics for the file (§14), a count in the chrome opens a panel listing them, formatted as `unify build` prints them. Nothing in it is a new finding.
+
+**Modes and state.** Two query parameters govern it, and both persist in the browser (`localStorage`, keys `unify.chrome` and `unify.collapsed`) whenever they appear in a URL, so a link from one page to the next keeps the choice without every address carrying it:
+
+- `chrome=off` (or `false`): the chrome is not served for that request and, once stored, is removed on every document until `chrome=on` is given. This is the whole of "I want no chrome".
+- `chrome=on` (or `true`, the default): the chrome is present everywhere, expanded unless collapsed.
+- `chrome=partials`: present everywhere; on a page it starts **collapsed**, on a layout or include preview it follows the stored collapsed state and starts expanded when none is stored. A designer working on layouts and components sees the chrome open on them and tucked away on pages, without touching it.
+- `collapsed=true|false`: the state for this load, taking precedence over the mode's default; stored.
+
+Collapsed, the chrome is a small show control in the bottom corner; expanded, it carries a collapse control, and Escape collapses it. Pressing either control stores the new state, so the user's choice follows them; the automatic collapse of `partials` mode on a page stores nothing, so a choice made on a layout survives a detour through a page. Precedence, in one line: `chrome=off` beats everything; then the URL's `collapsed`; then, under `partials` on a page, collapsed; then the stored state; then expanded.
+
+The chrome is the only markup the server adds to a document beyond the reload script and, on a layout preview, the one `slot { display: contents }` rule, and like them it exists in no published file.
 
 ---
 

@@ -86,13 +86,13 @@ It never removes a file, never touches a file the template does not ship — not
 
 ### If the line is missing
 
-A project scaffolded before 0.11.4, or one whose `unify.yaml` lost the line, has no record, and `unify update` says so rather than guessing one. Add the line yourself:
+A project scaffolded before 0.11.5, or one whose `unify.yaml` lost the line, has no record, and `unify update` says so rather than guessing one. Add the line yourself:
 
 ```yaml
 template: https://github.com/acme/templates/shop
 ```
 
-or run `unify update <source>` once, which records the source it was given. A project that still has a `unify.template.json` from 0.11.2 or 0.11.3 is told the exact line to add, composed from what that file recorded, and can then delete it.
+or run `unify update <source>` once, which records the source it was given. A project that still has a `unify.template.json` from 0.11.2 to 0.11.4 is told the exact line to add, composed from what that file recorded, and can then delete it.
 
 ## 3. Publish a template
 
