@@ -25,21 +25,19 @@ Upload `dist/` anywhere: GitHub Pages, Netlify, any static host.
 
 ## What `init` gave you
 
-(`unify init blog`, `docs` or `portfolio` start from a different built-in; `unify init <directory>`, a git URL such as `https://github.com/fwdslsh/unify/templates/blog`, or an npm package named `unify-<name>-template` start from a template somebody published — add `--audit` to keep it only if it audits clean. Later, `unify update` brings the template's next version in: files you never touched update, files you edited are kept and listed. [`templates.md`](templates.md) walks through the whole workflow.)
+(`unify init blog`, `docs` or `portfolio` start from a different built-in; `unify init <directory>`, a git URL such as `https://github.com/fwdslsh/unify/templates/blog`, or an npm package named `unify-<name>-template` start from a template somebody published — add `--audit` to keep it only if it audits clean. Later, `unify update` fetches the template again and copies its changed files over the site, listing the files it would overwrite and asking first. [`templates.md`](templates.md) walks through the whole workflow.)
 
 ```
 my-site/
 ├── AGENTS.md             # notes for whoever edits this site next — outside site/, so it never publishes
 ├── DEPLOY.md             # how to publish it, ending in the two commands that carry your address
-├── unify.yaml            # every build flag, described and commented out — uncomment what differs from the default
-├── unify.template.json   # which template this came from, at which version — what `unify update` reads; never publishes
+├── unify.yaml            # every build flag, described and commented out — uncomment what differs from the default; one live line, template:, records where this came from for `unify update`
 └── site/                 # the source root — everything here ships
     ├── _layout.html      # the site chrome — one complete HTML page
     ├── _includes/
     │   └── nav.html      # a fragment
-    ├── index.html        # a page
-    ├── about.md          # a Markdown page
-    ├── contact.html      # a page that overrides the footer
+    ├── _examples/        # pages to copy into place and edit — about.md, contact.html — never published
+    ├── index.html        # a page — it also overrides the footer
     ├── 404.html          # a page with no layout
     ├── robots.txt        # minimal and honest: it blocks nothing
     └── assets/
@@ -48,6 +46,8 @@ my-site/
 ```
 
 Everything in `site/` ships to the site **except** files and folders whose name starts with `_` — those are the build's working material (layouts, fragments, notes, scripts). Files *inside* an underscore folder don't need their own prefix: `_includes/nav.html` is already held back.
+
+That is also why the examples live where they do. `site/_examples/` holds a copy-ready version of each kind of page the template expects you to add: copy one into `site/`, edit the copy, and link it from `site/_includes/nav.html`. The example itself never publishes, and `unify update` — which refreshes the template's own files — never touches a file you copied. Every built-in template works this way.
 
 ## The layout
 
@@ -106,16 +106,16 @@ Two details worth knowing:
 
 ## Overriding a region
 
-`site/contact.html` replaces the footer by using the slot's name — one standard HTML attribute on a top-level element:
+`site/index.html` replaces the footer by using the slot's name — one standard HTML attribute on a top-level element:
 
 ```html
 <!doctype html>
 <html>
   <head>
-    <title>Contact</title>
+    <title>Home</title>
   </head>
   <body>
-    <h1>Contact</h1>
+    <h1>Home</h1>
     <p>Ordinary content as usual.</p>
     <p slot="footer">© My Site — <a href="mailto:hi@example.com">email us</a></p>
   </body>
@@ -126,7 +126,7 @@ The built footer contains exactly the `<p>` you wrote — tag, attributes, and a
 
 ## Markdown pages
 
-`site/about.md`:
+`site/_examples/about.md`, once copied to `site/about.md`:
 
 ```markdown
 ---

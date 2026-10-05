@@ -14,21 +14,20 @@
       Everything you can read on this site is scaffolding: replace the words, keep the shape.</p>
 
       <h2>The guide</h2>
-      <ul>
-        <li><a href="/guide/getting-started.html">Getting started</a> — the first run, and what to read next.</li>
-        <li><a href="/guide/installation.html">Installation</a> — what to set up before that.</li>
-      </ul>
+      <p>Guide pages live in <code>site/guide/</code>, one Markdown file each. Start one by copying
+      <code>site/_examples/guide-page.md</code> there under the name you want in its address, editing the copy,
+      and linking it from this page or from <code>site/_includes/nav.html</code>. Nothing under
+      <code>_examples/</code> ships, and <code>unify update</code> never touches a file you copied.
+      <a href="/all-pages.html">All pages</a> lists every page the build publishes.</p>
 
       <h2>How this site is put together</h2>
-      <p>Both guide pages are ordinary Markdown files in <code>site/guide/</code>, and neither one says
-      anything about a layout. unify looks for <code>_layout.html</code> in a page's own folder and then
-      in each folder above it, so the layout at the source root wraps pages a level down without being
+      <p>A guide page says nothing about a layout. unify looks for <code>_layout.html</code> in a page's own folder
+      and then in each folder above it, so the layout at the source root wraps pages a level down without being
       asked. Put a <code>_layout.html</code> in <code>site/guide/</code> and every page under it uses that
       one instead — written out in full, because layouts do not chain.</p>
-      <p>Add a page by dropping a <code>.md</code> or <code>.html</code> file beside them and linking it
-      from this list, or from <code>site/_includes/nav.html</code> to put it in the nav on every page.
-      <code>unify audit</code> reports a page nothing links to, along with any page missing a title, a
+      <p><code>unify audit</code> reports a page nothing links to, along with any page missing a title, a
       description, or a heading.</p>
     </main>
+    <p slot="footer">© Project Docs — <a href="mailto:hi@example.com">email us</a></p>
   </body>
 </html>

@@ -10,7 +10,7 @@ unify audit                evaluate the site the build would publish — writes 
 unify dev                  build, watch, serve, and reload — the inner loop
 unify watch                build + rebuild on change, no server
 unify init [template]      scaffold a starter site from a built-in template, a directory, a git repository or an npm package
-unify update [template]    bring the recorded template's later version into the project
+unify update [template]    fetch the recorded template again and copy its changed files over the project, after asking
 
 Options:
   -s, --source <dir>       source directory (default: site/ if it exists, else src/, else .)
@@ -97,7 +97,7 @@ The same watch contract as `dev`, no server — for pairing with a server you al
 
 ### `unify init [template]`
 
-Scaffolds a starter site into `site/`, with `AGENTS.md`, `DEPLOY.md` and a `unify.yaml` beside it at the project root. The `unify.yaml` lists every saveable option commented out, each under a one-line description naming its default, so the whole surface is in front of you and nothing changes until you uncomment a line. Templates: `default`, `basic`, `blog`, `docs`, `portfolio`. Every template exercises the core primitives once — an include, the automatic `_layout.html`, a named slot with a page that fills it, a `data-layout="none"` page, and the underscore convention. The `docs` template also ships an "All pages" starter (`all-pages.html` and `assets/all-pages.js`): a filterable directory of the site read from `catalog.json`, and its `unify.yaml` has the one line `catalog: true` uncommented so a plain `unify build` fills it. The `blog` template also ships the generator pattern worked: `scripts/gen.mjs`, at the project root beside `site/`, is named by its `unify.yaml` (`generate: scripts/gen.mjs`), so every `unify build` runs it; it reads `posts/*.md` and `_data/authors.json` and writes `blog.html` and `feed.xml` into the build's overlay, never into `site/`, and names the fields it emits, so the authors file's private `email` never reaches a page. `AGENTS.md` and `DEPLOY.md` are written to the working directory the command ran in — outside the source root, so neither publishes; `init` refuses (exit 2) rather than scaffold when that directory *is*, or is inside, the source root (`--source .`, `--source ..`), because there the two could only publish as pages. Guaranteed: `unify init && unify build --dry-run --strict` and `unify init && unify audit --strict` both exit `0`.
+Scaffolds a starter site into `site/`, with `AGENTS.md`, `DEPLOY.md` and a `unify.yaml` beside it at the project root. The `unify.yaml` lists every saveable option commented out, each under a one-line description naming its default, so the whole surface is in front of you and nothing changes until you uncomment a line. Templates: `default`, `basic`, `blog`, `docs`, `portfolio`. Every template exercises the core primitives once — an include, the automatic `_layout.html`, a named slot with a page that fills it, a `data-layout="none"` page, and the underscore convention — and ships its tooling in place with the pages a site fills in only as examples under `site/_examples/`, which never publish: copy one into place and edit the copy, and `unify update` never touches it ([`templates.md`](templates.md) §3). The `docs` template also ships an "All pages" starter (`all-pages.html` and `assets/all-pages.js`): a filterable directory of the site read from `catalog.json`, and its `unify.yaml` has the one line `catalog: true` uncommented so a plain `unify build` fills it. The `blog` template also ships the generator pattern worked: `scripts/gen.mjs`, at the project root beside `site/`, is named by its `unify.yaml` (`generate: scripts/gen.mjs`), so every `unify build` runs it; it reads `posts/*.md` and `_data/authors.json` and writes `blog.html` and `feed.xml` into the build's overlay, never into `site/`, and names the fields it emits, so the authors file's private `email` never reaches a page. `AGENTS.md` and `DEPLOY.md` are written to the working directory the command ran in — outside the source root, so neither publishes; `init` refuses (exit 2) rather than scaffold when that directory *is*, or is inside, the source root (`--source .`, `--source ..`), because there the two could only publish as pages. Guaranteed: `unify init && unify build --dry-run --strict` and `unify init && unify audit --strict` both exit `0`.
 
 **Where a template comes from.** The positional names one of four things, told apart by shape:
 
@@ -110,24 +110,23 @@ A template is a project laid out as `init` lays one out: `site/` (or `src/`) bes
 
 **`--audit`** keeps the scaffold only if it is a proper unify site: after writing, `unify audit --strict` runs over the new project (with its own `unify.yaml`, so the blog's generator and the docs template's `catalog: true` are honored) and prints its report; a finding removes everything `init` wrote and exits `1`. Every built-in passes it.
 
-`init` also writes **`unify.template.json`** at the project root: the template source as you typed it, the revision it fetched (a git commit, an npm version, unify's own version for a built-in) and a hash of every file it provided. It is never shipped, like `unify.yaml`, and it is what `unify update` reads.
+`init` also writes one line into `unify.yaml`: `template: <source>`, the template as you typed it (a directory relative to the file). That line is the whole record — no version, no file list — and it is what `unify update` reads. `--template <source>` is the positional spelled as an option.
 
 ### `unify update [template]`
 
-Brings a later version of the project's template in without resetting what you own. It fetches the recorded template again (or the one you name, to move to a new version: `unify update https://github.com/o/r/templates/blog#v2`, `unify update unify-shop-template@2.0.0`), with the same resolver and the same git and npm credentials `init` uses, and compares three things per file: what the template provided last time (the recorded hash), what it provides now, and what is on disk.
+Fetches the project's template again — the source `unify.yaml` records, or the one you name, which then replaces the line (`unify update https://github.com/o/r/templates/blog#v2`, `unify update unify-shop-template@2.0.0`) — with the same resolver and the same git and npm credentials `init` uses, and compares every file it ships with your copy at the same place: the template's `site/` against your source root, the rest against the project root.
 
-- The template did not change a file: nothing happens to it, whatever you did.
-- The template changed it and you did not: **updated**.
-- The template changed it and so did you (or you removed it): **conflict**. Your bytes stay, the line names the file and why, and the exit code is `1`. Nothing resolves a conflict but you: take the template's version (the next run then records it as current) or keep yours.
-- A new template file lands where you have nothing; where you already have a file, it is a conflict.
-- A file the template dropped is removed only if you never touched it.
-- A file the template declares **owned** — a seed, a config file, a content folder — is added once if absent and otherwise never touched or mentioned.
+- A file you do not have is **added**.
+- A file with the same bytes is left alone.
+- A file that differs is **overwritten** — after you say so.
 
-The report lists each `update`, `add`, `remove` and `conflict`, then one summary line with the counts and the revision; running the same update again says `nothing to do`. **`--dry-run`** prints the same change set with `would` and writes nothing, not even the record. Writes are temp-then-rename beside their target; a symlink, a path that resolves outside the project, or a `..` in a template path is refused as a conflict; the fetch happens before any write, so an unreachable source changes nothing; and nothing a template ships is ever executed.
+The command prints every file it would overwrite and add, and when at least one file would be overwritten asks `overwrite N file(s)? [y/N]` before writing anything. `y` writes, and one summary line counts what was written; anything else — `n`, a blank line, a closed stdin — writes nothing, exits `1` and names `--yes`. **`--yes`** (`-y`) answers for a script. **`--dry-run`** prints the same list with `would`, never asks and writes nothing, not even the record. Nothing is ever removed: a file the template dropped stays, and files you added are never visited. Your `unify.yaml` is compared with its `template:` line left out, and the line is written back after the copy. When nothing differs the command says `nothing to do` and exits `0`.
 
-The workflow around these two commands, and how to publish a template, is in [`templates.md`](templates.md). **Template authors** declare what sites own in a `unify.template.json` at the template's root — `{"owned": ["site/config.json", "site/reports/**"]}`, patterns in the `--exclude` grammar against template-relative paths. The file is packaging, like `package.json`: read, never copied.
+The list is the protection for your edits: a file you changed that the template also ships is in it like any other difference, and the answer is yours. Nothing merges and no flag merges. A template built as [`templates.md`](templates.md) §3 recommends ships the files you fill in only as examples under `_examples/`, so its list is tooling and little else. Writes are temp-then-rename beside their target; a symlink, a path that resolves outside the project, or a `..` in a template path is skipped and reported, never written; the fetch happens before any write, so an unreachable source changes nothing; and nothing a template ships is ever executed.
 
-**`--adopt <source>`** is the recovery when a project has no record (scaffolded before 0.11.2, or the file was lost): it fetches the template at the version you name (`#ref`, `@version`) and writes the record from it without changing a file; the next `unify update` compares against that baseline. Without a record, `unify update` exits `2` and says so.
+The workflow around these two commands, and how to publish a template, is in [`templates.md`](templates.md).
+
+A project with no `template:` line (scaffolded before 0.11.5, or the line was lost) has no record: `unify update` exits `2` and names the line to add — or run `unify update <source>` once, which records the source it was given. Where a `unify.template.json` from 0.11.2 to 0.11.4 is still present, the error composes the exact line from it.
 
 ## Options
 
@@ -383,9 +382,13 @@ canonical completion: 5 pages would gain a canonical link
 structured data: 3 pages would gain a JSON-LD block
 ```
 
-### `--adopt <source>` (update only)
+### `--template <source>` (init and update)
 
-Record `<source>` at the version fetched as this project's template, changing no file. See `unify update` above.
+The template, the same as the positional. Saved in `unify.yaml` by `init` as typed; `unify update` fetches the saved line — or the flag or positional, which then replaces it.
+
+### `-y, --yes` (update)
+
+Overwrite the listed files without asking. Without it, `update` waits for `y` on standard input whenever a file would be overwritten, and writes nothing on any other answer.
 
 ### `--audit` (build and init)
 

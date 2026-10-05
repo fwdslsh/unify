@@ -1,8 +1,11 @@
 ---
 title: "Forge Basics: what stuck this round"
+description: Six of eight had never lit a coal fire; by the second hour everyone could bank one and draw a taper. What stuck from this round of Forge Basics.
 date: 2026-05-12
 instructor: R. Okonkwo-Byrne
 ---
+
+# Forge Basics: what stuck this round
 
 Six of eight in Saturday's Forge Basics group had never lit a coal fire before.
 By the second hour everyone could bank a fire and draw a decent taper without

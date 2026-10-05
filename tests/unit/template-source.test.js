@@ -12,7 +12,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { classifyTemplateSource, fetchTemplate } from "../../src/cli/template-source.js";
+import { classifyTemplateSource, fetchTemplate, recordSource } from "../../src/cli/template-source.js";
 import { UsageError } from "../../src/core/diagnostics.js";
 
 const BUILT_INS = ["default", "basic", "blog"];
@@ -27,6 +27,18 @@ afterAll(() => {
 });
 
 describe("classifyTemplateSource()", () => {
+  test("recordSource spells the line init writes: the source as typed, a directory relative to unify.yaml's directory (§19.10)", () => {
+    const url = "https://github.com/o/r/tree/main/templates/blog";
+    expect(recordSource(classifyTemplateSource(url, BUILT_INS), url, "/p")).toBe(url);
+    expect(recordSource({ kind: "npm", spec: "@acme/unify-shop-template@1.4.0" }, "@acme/unify-shop-template@1.4.0", "/p")).toBe("@acme/unify-shop-template@1.4.0");
+    expect(recordSource({ kind: "builtin", name: "blog" }, "blog", "/p")).toBe("blog");
+    expect(recordSource({ kind: "dir", path: "/projects/templates/shop" }, "../templates/shop", "/projects/site")).toBe("../templates/shop");
+    expect(recordSource({ kind: "dir", path: "/projects/templates/shop" }, "../../templates/shop", "/projects/site")).toBe("../templates/shop");
+    expect(recordSource({ kind: "dir", path: "/projects/templates/shop" }, "/projects/templates/shop", "/projects/site")).toBe("/projects/templates/shop");
+    // A version suffix is npm's alone: a built-in has no versions but unify's own.
+    expect(() => classifyTemplateSource("blog@0.11.2", BUILT_INS, tempDir())).toThrow(UsageError);
+  });
+
   test("an exact built-in name is the registry's, even beside a directory of that name", () => {
     const cwd = tempDir();
     mkdirSync(join(cwd, "blog"));
@@ -104,9 +116,7 @@ describe("fetchTemplate() — the npm path", () => {
     const long = `${"deeply-".repeat(12)}nested`;
     mkdirSync(join(pkg, "site", long), { recursive: true });
     writeFileSync(join(pkg, "site", long, "página.md"), "---\ntitle: ñ\n---\n# ñ\n");
-    const { files, rootFiles, revision, sourceDir } = await fetchTemplate({ kind: "npm", spec: pkg }, pkg);
-    // §19.10 — the version npm resolved is the revision the record keeps.
-    expect(revision).toBe("0.0.1");
+    const { files, rootFiles, sourceDir } = await fetchTemplate({ kind: "npm", spec: pkg }, pkg);
     expect(sourceDir).toBe("site");
     expect(Object.keys(files).sort()).toEqual(["_includes/nav.html", `${long}/página.md`, "index.html"].sort());
     expect(Buffer.from(files["index.html"]).toString()).toBe("<!doctype html>\n<title>P</title>\n");

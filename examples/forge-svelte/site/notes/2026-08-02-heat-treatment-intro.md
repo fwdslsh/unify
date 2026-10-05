@@ -1,8 +1,11 @@
 ---
 title: "Heat Treatment: first run of the new group"
+description: The first Heat Treatment course since Forge Basics became a prerequisite, and what the change showed.
 date: 2026-08-02
 instructor: R. Okonkwo-Byrne
 ---
+
+# Heat Treatment: first run of the new group
 
 First outing for the Heat Treatment course since we rewrote it to require
 Forge Basics as a prerequisite, and it showed — nobody needed the fire

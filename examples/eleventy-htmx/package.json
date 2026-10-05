@@ -6,10 +6,10 @@
     "dev": "unify dev",
     "check": "unify build --dry-run --strict",
     "audit": "unify audit --strict",
-    "build": "unify build --clean"
+    "build": "unify build --clean --audit --strict"
   },
   "devDependencies": {
     "@11ty/eleventy": "^3.1.6",
-    "@fwdslsh/unify": "^0.10.0"
+    "@fwdslsh/unify": "^0.11.4"
   }
 }

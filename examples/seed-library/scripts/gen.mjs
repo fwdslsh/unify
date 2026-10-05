@@ -1,18 +1,22 @@
 // Generates derived pages from varieties.json and from the seasonal-notes
 // entries. unify runs this before every build, dev rebuild and audit
 // (`generate: scripts/gen.mjs` in unify.yaml) and hands it:
-//   argv[2] = the source root (site/), argv[3] = the overlay directory.
+//   argv[2] = the source root (site/), argv[3] = the overlay directory,
+//   argv[4] = generator-context.json, whose inputs.sourcePages names the
+//   source page list unify read (every page's title, date and metas), so
+//   the notes index below parses no frontmatter of its own.
 // Every page is written into the overlay, never into site/.
-import { readFileSync, writeFileSync, readdirSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
-const SRC = process.argv[2]; // source root: the seasonal notes are read from here
+const SRC = process.argv[2]; // source root
 const OUT = process.argv[3]; // overlay: everything generated is written here
-if (!SRC || !OUT) {
-  throw new Error("run through unify (--generate): expected the source root and overlay directory as arguments");
+const CONTEXT = process.argv[4]; // generator-context.json
+if (!SRC || !OUT || !CONTEXT) {
+  throw new Error("run through unify (--generate): expected the source root, the overlay directory and the context file as arguments");
 }
 
 function write(rel, html) {
@@ -218,23 +222,19 @@ ${availabilityRows}
 write("availability.html", availabilityHtml);
 
 // ---------------------------------------------------------------------------
-// Seasonal notes index, from the markdown entries already on disk
+// Seasonal notes index, from the source page list unify already read: each
+// Markdown entry under seasonal-notes/ with the title and date its
+// frontmatter declares (null when it declares none).
 // ---------------------------------------------------------------------------
-const notesDir = path.join(SRC, "seasonal-notes");
-const noteFiles = readdirSync(notesDir).filter(
-  (f) => f.endsWith(".md") && f !== "index.md"
-);
-
-const notes = noteFiles.map((file) => {
-  const text = readFileSync(path.join(notesDir, file), "utf8");
-  const fm = text.match(/^---\n([\s\S]*?)\n---/);
-  const titleMatch = fm && fm[1].match(/^title:\s*(.+)$/m);
-  const dateMatch = fm && fm[1].match(/^date:\s*(.+)$/m);
-  const title = titleMatch ? titleMatch[1].trim() : file;
-  const date = dateMatch ? dateMatch[1].trim() : "0000-00-00";
-  const slug = file.replace(/\.md$/, "");
-  return { title, date, slug };
-});
+const context = JSON.parse(readFileSync(CONTEXT, "utf8"));
+const inventory = JSON.parse(readFileSync(context.inputs.sourcePages, "utf8"));
+const notes = inventory.pages
+  .filter((p) => p.source.startsWith("seasonal-notes/") && p.source.endsWith(".md"))
+  .map((p) => ({
+    title: p.title || p.source,
+    date: p.date || "0000-00-00",
+    slug: p.source.slice("seasonal-notes/".length, -".md".length),
+  }));
 
 notes.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
 

@@ -9,13 +9,17 @@ documentation states — one rule set, three audiences — not a variant for age
 inner loop is `unify dev` (build, watch, serve on localhost, reload), which also serves
 `http://localhost:3000/_unify/` — every `unify audit` finding grouped by page, with that page's
 title, description, language, canonical, headings and links beside it, and the build's own
-diagnostics underneath. Nothing about it is written to `dist/`. `unify --help` lists every
-command and flag there is.
+diagnostics underneath — and `/_unify/preview/`, which lists every layout, include and page and
+opens any layout or include on its own, composed with a page you pick. Every page `dev` serves
+carries a small corner overlay naming its source file and linking its layout and includes
+(`?chrome=off` hides it). Nothing about any of this is written to `dist/`. `unify --help` lists
+every command and flag there is.
 
 ## Finish by checking, and read the exit code
 
-    unify build --dry-run --strict    # the whole build and every check, writing nothing
-    unify audit --strict              # evaluates the site the build would publish; writes nothing
+    unify build --audit --strict      # the whole build, every check and the audit; publishes only if all of it passes
+    unify build --dry-run --strict    # the build and its checks, writing nothing
+    unify audit --strict              # the findings alone, on the site the build would publish; writes nothing
 
 Exit 0 from `unify build` means `dist/` is the complete site. Non-zero means **nothing was
 published** and the previous `dist/` is untouched — never report success on a non-zero exit.
@@ -43,6 +47,19 @@ published** and the previous `dist/` is untouched — never report success on a 
   A feed is the one exception: declare `schema: Article`/`BlogPosting` (below) and build with
   `--base-url`, and unify writes `feed.xml` itself — no script, unless you ship your own
   (an authored `feed.xml` always wins and generates nothing).
+
+## Adding pages: copy an example
+
+- `site/_examples/` holds a copy-ready version of each kind of file this template expects you to
+  add — a page, a post, a data file. **Copy one into place and edit the copy.** Never edit an
+  example where it is, and never link to one: the folder starts with `_`, so nothing in it ships.
+- Each example says where its copy belongs (`site/contact.html`, `site/posts/<slug>.md`). Once it
+  is in place, link the new page from `site/_includes/nav.html` or from another page — `unify audit`
+  reports a page nothing links to.
+- `unify update` fetches this template again and copies its changed files over this project after
+  listing them and asking. It never visits a file the template does not ship, so your copies are
+  yours for good; the examples and the tooling (`_layout.html`, `_includes/`, `assets/style.css`,
+  `scripts/`) take the template's new version when you say yes.
 
 ## Composition
 
@@ -87,4 +104,4 @@ published** and the previous `dist/` is untouched — never report success on a 
 - unify rewrites only HTML's own URL attributes (`href`, `src`). A `url()` in CSS and a
   `fetch()`/`hx-get` address ship exactly as written.
 - **Never invent a fact to fill a field.** The placeholders in this scaffold — the site name, the
-  contact details, `site/assets/share-placeholder.png` — are there to be replaced, not published.
+  `example.com` mailbox, `site/assets/share-placeholder.png` — are there to be replaced, not published.

@@ -11,8 +11,9 @@ cd examples/catalog-search-blog
 unify build
 ```
 
-`unify.yaml` at this folder's root carries the flags (`generate`, `source-inventory`,
-`pretty-urls`, `base-url`, `catalog`, `search-corpus`), and the content is in `site/`,
+`unify.yaml` at this folder's root carries the flags (`generate`, `pretty-urls`, `base-url`,
+`catalog`, `search-corpus`; the source inventory the generator reads is on whenever `generate`
+is), and the content is in `site/`,
 unify's default source root. Both gates pass, dependency-free (no `npm install`
 anywhere in this example):
 

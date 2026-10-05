@@ -10,7 +10,7 @@ import { existsSync, statSync } from "node:fs";
 import { isAbsolute, posix, relative, resolve, sep } from "node:path";
 
 /** Never emitted, independent of --exclude and not replaceable by it (§4.3). */
-const NEVER_SHIPPED = [".git", ".hg", ".svn", "node_modules", ".env", "unify.yaml", "unify.template.json"];
+const NEVER_SHIPPED = [".git", ".hg", ".svn", "node_modules", ".env", "unify.yaml"];
 
 /**
  * Is `candidate` inside `root` (or the root itself)?
@@ -270,7 +270,7 @@ export function locateVirtual(roots, virtualPath) {
 
 /**
  * §4.1: a pattern with no `/` is tested against every path segment (the
- * `--exclude` matcher; §19.10's `owned` patterns use the same grammar); a
+ * `--exclude` matcher); a
  * pattern with `/` is tested against the full relative path, with `*`
  * (within a segment), `**` (across segments), `?`, and `[...]` supported.
  */

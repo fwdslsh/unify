@@ -34,7 +34,7 @@ const HELP = `unify — HTML-native composition: no expression language, no clie
   unify dev                  build, watch, serve, and reload — the inner loop
   unify watch                build + rebuild on change, no server
   unify init [template]      scaffold a starter site: a built-in name, a directory, a git repository (URL[/subdirectory][#ref]) or an npm package named unify-<name>-template
-  unify update [template]    bring the recorded template's later version into this project: unchanged files update, local edits are kept and reported
+  unify update [template]    fetch the recorded template again and copy its changed files over this project, after showing the list and asking
 
 Options:
   -s, --source <dir>       source directory (default: site/ if it exists, else src/, else .)
@@ -50,10 +50,11 @@ Options:
       --include-noindex    list noindex pages in the catalog and search corpus (needs one of them)
       --generate <path>    run one JavaScript file before the build (a relative path is from the source root)
       --source-inventory   give that file source-pages.json: every source page's authored title, description, date, meta and links (on by default with --generate; source-inventory: false in unify.yaml turns it off)
-      --dry-run            run the full build and every check, print the report, write nothing (with \`update\`: show the change set, write nothing)
+      --dry-run            run the full build and every check, print the report, write nothing (with \`update\`: list the files it would write, write nothing)
       --audit              \`build\`: audit the composed site before publishing; publish only if \`unify audit\` would exit 0. \`init\`: keep the scaffold only if \`unify audit --strict\` passes on it
       --save-config        \`build\` only: write the saveable options given here into unify.yaml (after a good build)
-      --adopt              \`update\` only: record the named template as this project's, at the version fetched, without changing a file
+      --template <source>  \`init\`/\`update\`: the template, the same as the positional; init saves it in unify.yaml
+  -y, --yes                \`update\`: overwrite the listed files without asking
       --strict             advisories count as problems for the exit code (with \`audit\`, findings too)
       --format <kind>      \`audit\` report shape: human (default), json, or sarif
       --external           \`audit\` only: fetch every off-origin URL the site emits and report the ones that don't resolve
@@ -199,11 +200,6 @@ export async function run(argv) {
     }
   }
 
-  // §19.10 — `--adopt` is `update`'s alone, and needs the template to adopt.
-  if (options.adopt && command !== "update") {
-    throw new UsageError(`--adopt applies only to \`unify update\`, not \`unify ${command}\``, ["run it as: unify update --adopt <template source>"]);
-  }
-
   // §18 — `--save-config` is `build`'s alone. With `--dry-run` it saves after
   // a dry run that exited 0: "check the flags, then keep them" — the one
   // thing a dry run then writes is unify.yaml, never dist/.
@@ -285,9 +281,11 @@ export async function run(argv) {
     case "init":
       // §19.9 — `--audit` (or a saved `audit: true`) gates the scaffold the way
       // it gates a publish; `auditGate` is the one setting init reads.
-      return (await import("./cli/commands/init.js")).init({ ...context, audit: settings.auditGate });
+      return (await import("./cli/commands/init.js")).init({ ...context, template: template ?? settings.template, audit: settings.auditGate });
     case "update":
-      return (await import("./cli/commands/update.js")).update({ ...context, adopt: options.adopt === true });
+      // §19.10 — the positional (or --template) names another template; else
+      // the recorded line in unify.yaml, read by resolveSettings, is fetched.
+      return (await import("./cli/commands/update.js")).update({ ...context, template: template ?? settings.template });
     default:
       throw new UsageError(`unknown command: ${command}`);
   }

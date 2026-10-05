@@ -117,7 +117,8 @@ jobs:
   # than none, because it is still being cited.
   #
   # `build --dry-run --strict` is the gate for ALL of them; `audit --strict`
-  # only for the three that already meet it. The other four —
+  # only for the four that already meet it (unify-docs and catalog-search-blog
+  # below, eleventy-htmx and forge-svelte in the npm job). The other four —
   # seed-library, seed-library-alt, seed-library-ondemand (sandbox-authored),
   # and htmx-fragments (hand-maintained) — carry 385 `incomplete` findings
   # between them (41 / 80 / 259 / 5: image-missing-dimensions dominates only
@@ -197,8 +198,9 @@ jobs:
           set -euo pipefail
           cd examples/forge-svelte
           npm install
-          npm run build:calculator && npm run build:notes
+          npm run build:calculator
           node ../../src/cli.js build -o /tmp/forge-svelte --dry-run --strict
+          node ../../src/cli.js audit --strict
       - name: eleventy-htmx
         run: |
           set -euo pipefail

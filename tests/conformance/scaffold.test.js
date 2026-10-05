@@ -25,9 +25,9 @@
  * layout or by §8's merge rather than written on the page that ships them.
  */
 import { test } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { join, relative, sep } from "node:path";
+import { dirname, join, relative, sep } from "node:path";
 import { CLI, ROOT, covers, mkTmp, runCli } from "./support.mjs";
 
 const TEST_MS = 45_000;
@@ -65,8 +65,8 @@ for (const name of TEMPLATES) {
     if (!existsSync(join(srcDir, "_includes", "nav.html"))) throw new Error("missing _includes/nav.html — the underscore convention primitive");
 
     if (!layoutText.includes('<slot name="footer">')) throw new Error(`_layout.html is missing the named "footer" slot with a fallback:\n${layoutText}`);
-    if (!existsSync(join(srcDir, "contact.html")) || !readFileSync(join(srcDir, "contact.html"), "utf8").includes('slot="footer"')) {
-      throw new Error("missing a page filling the footer slot (contact.html with slot=\"footer\")");
+    if (!readFileSync(join(srcDir, "index.html"), "utf8").includes('slot="footer"')) {
+      throw new Error("missing a page filling the footer slot (index.html with slot=\"footer\" — the one page every scaffold ships, §19.11)");
     }
 
     const notFoundPath = join(srcDir, "404.html");
@@ -259,22 +259,23 @@ test("scaffold/blog: SCF-03 — the scaffold's one shown command is `unify build
   const initR = await runCli(["init", "blog"], tmp);
   if (initR.exit !== 0) throw new Error(`unify init blog exited ${initR.exit}: ${initR.stderr}`);
 
-  for (const rel of ["AGENTS.md", "DEPLOY.md", "site/index.html", "site/posts/hello-world.md", "scripts/gen.mjs"]) {
+  for (const rel of ["AGENTS.md", "DEPLOY.md", "site/index.html", "site/_examples/post.md", "scripts/gen.mjs"]) {
     const text = readFileSync(join(tmp, ...rel.split("/")), "utf8");
     if (/node\s+\S*gen\.mjs\s+&(?:amp;)?&/.test(text)) throw new Error(`${rel} still shows the pre-0.10 \`node …/gen.mjs && unify build\` recipe; the generator runs through unify.yaml now`);
   }
   const yaml = readFileSync(join(tmp, "unify.yaml"), "utf8");
   const live = yaml.split("\n").filter((l) => /^[a-z]/.test(l));
-  if (live.join("|") !== "generate: scripts/gen.mjs") throw new Error(`unify.yaml's live lines should be exactly generate: scripts/gen.mjs, got: ${live.join(" | ")}`);
+  // The one live BUILD line is the generator; the template: record (§19.10) is live in every scaffold and no build reads it.
+  if (!/^generate: scripts\/gen\.mjs\|template: blog$/.test(live.join("|"))) throw new Error(`unify.yaml's live lines should be exactly generate: scripts/gen.mjs and the template: record, got: ${live.join(" | ")}`);
   if (!existsSync(join(tmp, "scripts", "gen.mjs"))) throw new Error("generate: scripts/gen.mjs names a file that does not exist from the project root");
 
   const buildR = await runCli(["build"], tmp);
   if (buildR.exit !== 0) throw new Error(`unify build exited ${buildR.exit}: ${buildR.stderr}`);
   if (existsSync(join(tmp, "site", "dist"))) throw new Error("the build wrote site/dist/ — the recipe was run from the wrong root");
-  for (const derived of ["blog.html", "feed.xml"]) {
-    if (!existsSync(join(tmp, "dist", derived))) throw new Error(`dist/${derived} is missing after a bare unify build — the generator did not run`);
-    if (existsSync(join(tmp, "site", derived))) throw new Error(`site/${derived} exists — the generator wrote into the source tree instead of the overlay`);
-  }
+  if (!existsSync(join(tmp, "dist", "blog.html"))) throw new Error("dist/blog.html is missing after a bare unify build — the generator did not run");
+  if (existsSync(join(tmp, "site", "blog.html"))) throw new Error("site/blog.html exists — the generator wrote into the source tree instead of the overlay");
+  // The feed is unify's (§29), not the generator's: a bare build, with no --base-url and no post, writes none.
+  if (existsSync(join(tmp, "dist", "feed.xml"))) throw new Error("dist/feed.xml exists after a bare build — the generator must leave the feed to unify");
   if (existsSync(join(tmp, "dist", "dist"))) throw new Error("dist/dist/ exists — a nested build output was published as content");
 
   covers("SCF-03");
@@ -288,6 +289,11 @@ test("scaffold/blog: SCF-03 — two builds are byte-identical and the generator 
   const srcDir = join(tmp, "site");
   const scriptPath = join(tmp, "scripts", "gen.mjs");
   if (!existsSync(scriptPath)) throw new Error("blog template is missing scripts/gen.mjs");
+  // §19.11 — the post and the authors file start as examples; a site copies them into place, as the examples say.
+  mkdirSync(join(srcDir, "posts"));
+  copyFileSync(join(srcDir, "_examples", "post.md"), join(srcDir, "posts", "hello-world.md"));
+  mkdirSync(join(srcDir, "_data"));
+  copyFileSync(join(srcDir, "_examples", "authors.json"), join(srcDir, "_data", "authors.json"));
 
   // Zero dependencies: every import is a node: builtin.
   const scriptText = readFileSync(scriptPath, "utf8");
@@ -318,17 +324,18 @@ test("scaffold/blog: SCF-03 — two builds are byte-identical and the generator 
     throw new Error(`_data/authors.json's first record has no private \`email\` field — the field the scaffold exists to keep out of pages (got: ${JSON.stringify(authorRecords[0])})`);
   }
 
-  // Nothing pre-generated ships: the derived files exist only in the overlay.
-  for (const derived of ["blog.html", "feed.xml"]) {
-    if (existsSync(join(srcDir, derived))) throw new Error(`the scaffold ships site/${derived}; since 0.10 the generator writes it into the overlay on every build`);
-  }
+  // Nothing pre-generated ships: the derived page exists only in the overlay.
+  if (existsSync(join(srcDir, "blog.html"))) throw new Error("the scaffold ships site/blog.html; since 0.10 the generator writes it into the overlay on every build");
+  // §33.7 — the generator reads unify's source inventory rather than parsing frontmatter itself.
+  if (!scriptText.includes("inputs.sourcePages")) throw new Error("scripts/gen.mjs must read the posts from the source inventory (generator-context.json's inputs.sourcePages)");
+  if (scriptText.includes("/^---")) throw new Error("scripts/gen.mjs parses frontmatter itself; the inventory is the reader");
 
   // Determinism and a clean source tree: snapshot site/, build twice, and
   // require site/ untouched and the two dist/ trees byte-identical.
   const before = readTree(srcDir);
   const first = await runCli(["build", "-o", "dist"], tmp);
   if (first.exit !== 0) throw new Error(`unify build exited ${first.exit}: ${first.stderr}`);
-  if (!first.stdout.includes("wrote blog.html and feed.xml")) throw new Error(`gen.mjs did not report success in the build output:\n${first.stdout}`);
+  if (!first.stdout.includes("wrote blog.html from 1 post(s)")) throw new Error(`gen.mjs did not report success in the build output:\n${first.stdout}`);
   const second = await runCli(["build", "-o", "dist2"], tmp);
   if (second.exit !== 0) throw new Error(`second unify build exited ${second.exit}: ${second.stderr}`);
   const after = readTree(srcDir);
@@ -341,14 +348,10 @@ test("scaffold/blog: SCF-03 — two builds are byte-identical and the generator 
     throw new Error("two builds of the blog scaffold differ — the generator is not deterministic");
   }
 
-  // Both generated files carry the hand-edit guard, naming the data as the
+  // The generated listing carries the hand-edit guard, naming the data as the
   // thing to edit.
   const marker = "generated by scripts/gen.mjs — edit the data, not this file";
-  for (const derived of ["blog.html", "feed.xml"]) {
-    if (!readFileSync(join(tmp, "dist", derived), "utf8").includes(marker)) {
-      throw new Error(`dist/${derived} is missing the "${marker}" marker`);
-    }
-  }
+  if (!readFileSync(join(tmp, "dist", "blog.html"), "utf8").includes(marker)) throw new Error(`dist/blog.html is missing the "${marker}" marker`);
 
   // The dry run exits 0 as well — the generator runs there too (§33.1).
   const dryRunR = await runCli(["build", "--dry-run", "--strict"], tmp);
@@ -369,6 +372,18 @@ test("scaffold/blog: SCF-03 — two builds are byte-identical and the generator 
     if (bytes.includes(privateEmail)) {
       throw new Error(`the private field "${privateEmail}" from _data/authors.json shipped in dist/${rel} — the generator leaked a field the exclusion rules cannot protect`);
     }
+  }
+
+  // The feed is unify's own (§29): with --base-url the copied post's schema: BlogPosting
+  // activates feed.xml, an Atom feed the generator never wrote — and the private field is
+  // in it nowhere either, since unify reads the post, not the authors file.
+  const addressed = await runCli(["build", "-o", "dist3", "--base-url", "https://example.com/"], tmp);
+  if (addressed.exit !== 0) throw new Error(`unify build --base-url exited ${addressed.exit}: ${addressed.stderr}`);
+  const feed = readFileSync(join(tmp, "dist3", "feed.xml"), "utf8");
+  if (!feed.includes('<feed xmlns="http://www.w3.org/2005/Atom"') || !feed.includes("Hello, world")) throw new Error(`dist3/feed.xml is not unify's Atom feed of the post:\n${feed.slice(0, 400)}`);
+  if (feed.includes(marker)) throw new Error("feed.xml carries the generator's marker — the generator must leave the feed to unify");
+  for (const [rel, bytes] of readTree(join(tmp, "dist3"))) {
+    if (bytes.includes(privateEmail)) throw new Error(`the private field shipped in dist3/${rel}`);
   }
 
   covers("SCF-03", "SCF-05");
@@ -888,23 +903,24 @@ test("scaffold: SCF-09 — init refuses, writing nothing, when the working direc
 test("scaffold: SCF-09 — a path the template needs as a directory, already a file, refuses before the first write", async () => {
   // "init writes nothing when any file it would create already exists" held
   // only for LEAF paths. A plain file where a template needs a directory —
-  // `src/posts`, in the blog template — passed the leaf check, and the write
-  // loop then died at mkdirSync with Node's own `EEXIST: file already exists`
-  // AFTER nine template files had landed. The leaf check then saw those nine
-  // and refused every later run, so the half-written scaffold was permanent.
+  // `src/posts`, in the blog template of the day; `src/_examples` in every
+  // template since §19.11 — passed the leaf check, and the write loop then
+  // died at mkdirSync with Node's own `EEXIST: file already exists` AFTER
+  // nine template files had landed. The leaf check then saw those nine and
+  // refused every later run, so the half-written scaffold was permanent.
   const tmp = mkTmp();
   mkdirSync(join(tmp, "src"), { recursive: true });
-  writeFileSync(join(tmp, "src", "posts"), "not a directory\n");
+  writeFileSync(join(tmp, "src", "_examples"), "not a directory\n");
 
   const r = await runCli(["init", "blog"], tmp);
-  if (r.exit !== 2) throw new Error(`unify init blog exited ${r.exit} with src/posts a plain file, expected the usage refusal (2)\nstderr:\n${r.stderr}`);
-  if (!r.stderr.includes("src/posts")) throw new Error(`the refusal does not name the path that blocked it:\n${r.stderr}`);
+  if (r.exit !== 2) throw new Error(`unify init blog exited ${r.exit} with src/_examples a plain file, expected the usage refusal (2)\nstderr:\n${r.stderr}`);
+  if (!r.stderr.includes("src/_examples")) throw new Error(`the refusal does not name the path that blocked it:\n${r.stderr}`);
   if (/EEXIST|ENOTDIR/.test(r.stderr)) throw new Error(`the refusal is Node's raw error rather than a located unify diagnostic:\n${r.stderr}`);
   if (!/fix:/.test(r.stderr)) throw new Error(`the refusal names no fix (§14.1):\n${r.stderr}`);
 
   // Nothing written: the source root still holds only the file the test made,
   // and the project-root pair was never created either.
-  if (JSON.stringify(readdirSync(join(tmp, "src")).sort()) !== JSON.stringify(["posts"])) {
+  if (JSON.stringify(readdirSync(join(tmp, "src")).sort()) !== JSON.stringify(["_examples"])) {
     throw new Error(`init refused but still wrote into src/: ${readdirSync(join(tmp, "src")).join(", ")}`);
   }
   if (JSON.stringify(readdirSync(tmp).sort()) !== JSON.stringify(["src"])) {
@@ -913,7 +929,7 @@ test("scaffold: SCF-09 — a path the template needs as a directory, already a f
 
   // ...and the tree is still scaffoldable once the blocker is gone, which is
   // what "permanent" meant before.
-  rmSync(join(tmp, "src", "posts"));
+  rmSync(join(tmp, "src", "_examples"));
   const again = await runCli(["init", "blog"], tmp);
   if (again.exit !== 0) throw new Error(`unify init blog exited ${again.exit} after the blocking file was removed: ${again.stderr}`);
 
@@ -1419,11 +1435,16 @@ test("scaffold: SCF-13 a template is a directory, a git repository or an npm pac
   for (const rel of [...expected.keys()]) {
     if (rel === "package.json" || rel === "package-lock.json" || rel.startsWith("node_modules")) expected.delete(rel);
   }
-  // §19.10 — the record init writes names the SOURCE, so it differs per
-  // scaffold by design; in the template it is the manifest (packaging, never
-  // copied). Compared separately in SCF-15; left out of the byte comparisons.
-  expected.delete("unify.template.json");
-  const scaffolded = (dir) => { const t = readTree(dir); t.delete("unify.template.json"); return t; };
+  // §19.10 — unify.yaml's `template:` line names the SOURCE, so it differs per
+  // scaffold by design (origin's says blog@<version>, a scaffold's names the
+  // directory or URL it came from). Compared without that one line, exactly as
+  // `update` compares it; the line itself is SCF-15's.
+  const withoutRecord = (tree) => {
+    if (tree.has("unify.yaml")) tree.set("unify.yaml", Buffer.from(tree.get("unify.yaml").toString("utf8").split("\n").filter((l) => !/^template:/.test(l)).join("\n")));
+    return tree;
+  };
+  withoutRecord(expected);
+  const scaffolded = (dir) => withoutRecord(readTree(dir));
 
   // ---- a directory, by relative and by absolute path ---------------------
   for (const [label, arg, cwdOf] of [
@@ -1520,7 +1541,10 @@ test("scaffold: SCF-13 a template is a directory, a git repository or an npm pac
     const r = await runCli(["init", bare], tmp);
     if (r.exit !== 0) throw new Error(`unify init <bare tree> exited ${r.exit}:\n${r.stderr}`);
     if (!existsSync(join(tmp, "site", "_layout.html"))) throw new Error("a bare tree must land in site/");
-    if (existsSync(join(tmp, "AGENTS.md")) || existsSync(join(tmp, "unify.yaml"))) throw new Error("a bare tree has no project-root files to place");
+    if (existsSync(join(tmp, "AGENTS.md"))) throw new Error("a bare tree has no project-root files to place");
+    // …but the record still has a home: a fresh all-commented unify.yaml with the one live line (§19.10).
+    const fresh = readFileSync(join(tmp, "unify.yaml"), "utf8");
+    if (!new RegExp(`^template: ${bare.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "m").test(fresh) || /^(?!template:)[a-z]/m.test(fresh)) throw new Error(`a bare tree's unify.yaml holds the record and nothing else live:\n${fresh}`);
     if (!/scaffolded .* into site$/m.test(r.stdout)) throw new Error(`the summary must not mention a project root it wrote nothing to:\n${r.stdout}`);
     const inPlace = await runCli(["init", bare, "--source", "."], mkTmp());
     if (inPlace.exit !== 0) throw new Error(`a bare tree into --source . has nothing to refuse over, got exit ${inPlace.exit}:\n${inPlace.stderr}`);
@@ -1534,7 +1558,7 @@ test("scaffold: SCF-13 a template is a directory, a git repository or an npm pac
     writeFileSync(join(tmp, "basic", "index.html"), "<!doctype html><title>not the registry</title>\n");
     const r = await runCli(["init", "basic"], tmp);
     if (r.exit !== 0) throw new Error(`unify init basic beside a basic/ directory exited ${r.exit}:\n${r.stderr}`);
-    if (!existsSync(join(tmp, "site", "contact.html"))) throw new Error("the registry's basic must win over the directory of the same name");
+    if (!existsSync(join(tmp, "site", "_examples", "contact.html"))) throw new Error("the registry's basic must win over the directory of the same name");
     // A bare word that is neither is refused before any tool runs — and the
     // refusal says what the four forms are.
     const typo = await runCli(["init", "blgo"], mkTmp());
@@ -1602,49 +1626,129 @@ test("scaffold: SCF-14 --audit keeps a scaffold only if it audits clean; a findi
     const r = await runCli(["init", join(bad, "site")], tmp);
     if (r.exit !== 1) throw new Error(`a saved audit: true must gate init too: exit ${r.exit}\n${r.stdout}${r.stderr}`);
     if (readdirSync(tmp).join(",") !== "unify.yaml") throw new Error(`only the author's unify.yaml may remain: ${readdirSync(tmp).join(", ")}`);
+    // §19.10 — the record was upserted into the author's file; the rollback put the prior bytes back.
+    if (readFileSync(join(tmp, "unify.yaml"), "utf8") !== "audit: true\n") throw new Error(`the author's unify.yaml must be restored byte for byte:\n${readFileSync(join(tmp, "unify.yaml"), "utf8")}`);
   }
 
   covers("SCF-14");
 }, TEST_MS * 3);
 
+// ------------------------------------------------------------------ SCF-16
+
+/** Where each template's examples belong once copied (§19.11) — what each example's own placeholder paragraph says. */
+const EXAMPLE_HOMES = {
+  default: { "about.md": "about.md", "contact.html": "contact.html" },
+  basic: { "contact.html": "contact.html" },
+  blog: { "post.md": "posts/hello-world.md", "authors.json": "_data/authors.json", "contact.html": "contact.html" },
+  docs: { "guide-page.md": "guide/getting-started.md", "contact.html": "contact.html" },
+  portfolio: { "work.html": "work.html", "project.html": "projects/project-one.html", "contact.html": "contact.html" },
+};
+
+for (const name of TEMPLATES) {
+  test(`scaffold/${name}: SCF-16 — tooling in place, examples to copy: nothing under _examples/ ships, the copies build and audit clean, and update lists none of them`, async () => {
+    const tmp = mkTmp();
+    const initR = await runCli(["init", name], tmp);
+    if (initR.exit !== 0) throw new Error(`unify init ${name} exited ${initR.exit}: ${initR.stderr}`);
+    const site = join(tmp, "site");
+
+    // ---- the shape: the home page, the 404 (and docs' All-pages starter) in place; every other page an example
+    const sourcePages = [...readTree(site).keys()].map((rel) => rel.split(sep).join("/")).filter((rel) => /\.(html|md)$/.test(rel) && !rel.split("/").some((seg) => seg.startsWith("_"))).sort();
+    const expectedPages = name === "docs" ? ["404.html", "all-pages.html", "index.html"] : ["404.html", "index.html"];
+    if (sourcePages.join(",") !== expectedPages.join(",")) throw new Error(`${name} ships pages in place beyond the home page and the 404: ${sourcePages.join(", ")}`);
+    const examples = readdirSync(join(site, "_examples")).sort();
+    if (examples.join(",") !== Object.keys(EXAMPLE_HOMES[name]).sort().join(",")) throw new Error(`${name}'s examples are ${examples.join(", ")}; this test knows ${Object.keys(EXAMPLE_HOMES[name]).join(", ")}`);
+
+    // ---- unify.yaml: the template ships its own copy only when a page needs a flag live (docs, blog); otherwise
+    // init wrote the registry's file, and a line the site uncomments is never in update's list.
+    const yaml = readFileSync(join(tmp, "unify.yaml"), "utf8");
+    if (!yaml.includes("# pretty-urls: true")) throw new Error(`${name}: the scaffolded unify.yaml lacks the commented pretty-urls line this test uncomments`);
+    writeFileSync(join(tmp, "unify.yaml"), yaml.replace("# pretty-urls: true", "pretty-urls: true"));
+    const edited = await runCli(["update", "--dry-run"], tmp);
+    if (edited.exit !== 0) throw new Error(`${name}: update --dry-run exited ${edited.exit}\n${edited.stdout}${edited.stderr}`);
+    const shipsYaml = name === "docs" || name === "blog";
+    if (shipsYaml && !edited.stdout.includes("would overwrite unify.yaml")) throw new Error(`${name} ships a unify.yaml (its page needs a flag live), so an edited copy is in the list:\n${edited.stdout}`);
+    if (!shipsYaml && !edited.stdout.includes("nothing to do")) throw new Error(`${name} ships no unify.yaml, so the site's edits to it are never in the list:\n${edited.stdout}`);
+    writeFileSync(join(tmp, "unify.yaml"), yaml);
+
+    // ---- a build emits nothing from _examples/
+    const built = await runCli(["build"], tmp);
+    if (built.exit !== 0) throw new Error(`unify build exited ${built.exit} for ${name}: ${built.stderr}`);
+    if (existsSync(join(tmp, "dist", "_examples"))) throw new Error(`${name}: dist/_examples/ exists — the examples published`);
+
+    // ---- copy every example where it says it belongs, link the new pages from the nav, and the site builds and audits clean
+    for (const [example, home] of Object.entries(EXAMPLE_HOMES[name])) {
+      mkdirSync(dirname(join(site, ...home.split("/"))), { recursive: true });
+      copyFileSync(join(site, "_examples", example), join(site, ...home.split("/")));
+    }
+    // Every copied page gets a nav link except the ones another copy already links: a post from the generated
+    // listing, a project from the work page.
+    const linked = Object.values(EXAMPLE_HOMES[name]).filter((home) => /\.(html|md)$/.test(home) && !/^(posts|projects)\//.test(home));
+    const nav = readFileSync(join(site, "_includes", "nav.html"), "utf8");
+    writeFileSync(join(site, "_includes", "nav.html"), nav.replace("</nav>", linked.map((home) => ` <a href="/${home.replace(/\.md$/, ".html")}">${home}</a>`).join("") + "</nav>"));
+    for (const args of [["build", "--dry-run", "--strict"], ["audit", "--strict"]]) {
+      const r = await runCli(args, tmp);
+      if (r.exit !== 0) throw new Error(`${name} with its examples copied into place: unify ${args.join(" ")} exited ${r.exit}\n${r.stdout}${r.stderr}`);
+    }
+    const rebuilt = await runCli(["build"], tmp);
+    if (rebuilt.exit !== 0) throw new Error(`unify build exited ${rebuilt.exit} for ${name} with its examples in place: ${rebuilt.stderr}`);
+    for (const home of Object.values(EXAMPLE_HOMES[name]).filter((h) => /\.(html|md)$/.test(h))) {
+      if (!existsSync(join(tmp, "dist", ...home.replace(/\.md$/, ".html").split("/")))) throw new Error(`${name}: the copy of an example at ${home} did not publish`);
+    }
+    if (name === "blog" && !readFileSync(join(tmp, "dist", "blog.html"), "utf8").includes('href="/posts/hello-world.html"')) throw new Error("the blog listing does not list the copied post");
+
+    // ---- the copies are the site's: a path the template does not ship is never visited. The one file in the list is
+    // the nav the pages were linked from — the template ships it, and the site edited it.
+    const again = await runCli(["update", "--dry-run"], tmp);
+    const listed = again.stdout.split("\n").filter((l) => /^would (overwrite|add) /.test(l));
+    if (again.exit !== 0 || listed.join("|") !== "would overwrite site/_includes/nav.html") throw new Error(`${name}: with every example copied into place, update may list only the edited nav, got:\n${again.stdout}${again.stderr}`);
+
+    covers("SCF-16");
+  }, TEST_MS * 2);
+}
+
 // ------------------------------------------------------- SCF-15 / UPD-01..03
 
-test("scaffold: SCF-15 + UPD-01..03 — init records the template; update brings a git template's next commit in three-way, through the real CLI", async () => {
-  // A template repository at v1: a project laid out as init lays one out,
-  // with a manifest naming the files a site owns.
+/** unify.yaml's record line, or null. */
+function recordOf(tmp) {
+  return readFileSync(join(tmp, "unify.yaml"), "utf8").match(/^template: (.+)$/m)?.[1] ?? null;
+}
+
+test("scaffold: SCF-15 + UPD-01..03 — init records the source as typed in unify.yaml; update fetches a git template again, lists what it would overwrite, asks, and copies on y, through the real CLI", async () => {
+  // A template repository at v1: a project laid out as init lays one out.
   const host = mkTmp();
   const v1 = {
     "site/_layout.html": '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><title>Lab</title><meta name="description" content="lab reports"></head><body><main></main></body></html>\n',
     "site/index.html": "<!doctype html>\n<html><head><title>Home</title><meta name=\"description\" content=\"home\"></head><body><main><h1>v1</h1></main></body></html>\n",
     "site/config.json": '{"lab": "CHANGE ME"}\n',
     "AGENTS.md": "# agents v1\n",
-    "unify.template.json": '{"owned": ["site/config.json", "site/reports/**"]}\n',
   };
   for (const [rel, text] of Object.entries(v1)) { mkdirSync(join(host, rel, ".."), { recursive: true }); writeFileSync(join(host, rel), text); }
   git(host, "init", "-q", "-b", "main");
   git(host, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "add", "-A");
   git(host, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", "v1");
+  git(host, "tag", "v1");
   const bare = `${host}.git`;
   git(host, "clone", "-q", "--bare", host, bare);
   const url = `file://${bare}`;
+  const release = (msg) => {
+    git(host, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "add", "-A");
+    git(host, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", msg);
+    git(host, "push", "-q", bare, "main");
+  };
 
-  // ---- init records source, revision and hashes; the record never ships (SCF-15)
+  // ---- init records ONE line: the source as typed, and nothing else (SCF-15)
   const tmp = mkTmp();
   const r = await runCli(["init", url], tmp);
   if (r.exit !== 0) throw new Error(`unify init <git url> exited ${r.exit}:\n${r.stderr}`);
-  if (!r.stdout.includes("recorded the template in unify.template.json")) throw new Error(`init must say it recorded the template:\n${r.stdout}`);
-  const record = JSON.parse(readFileSync(join(tmp, "unify.template.json"), "utf8"));
-  if (record.schemaVersion !== 1 || record.source !== url || record.sourceDir !== "site") throw new Error(`record is wrong: ${JSON.stringify(record)}`);
-  if (!/^[0-9a-f]{40}$/.test(record.revision)) throw new Error(`a git template's revision must be the commit, got ${record.revision}`);
-  if (JSON.stringify(record.owned) !== JSON.stringify(["site/config.json", "site/reports/**"])) throw new Error(`owned must come from the template's manifest: ${JSON.stringify(record.owned)}`);
-  if (Object.keys(record.files).sort().join(",") !== "AGENTS.md,site/_layout.html,site/config.json,site/index.html") throw new Error(`record.files: ${Object.keys(record.files)}`);
-  if (existsSync(join(tmp, "site", "unify.template.json"))) throw new Error("the template's manifest was copied as content");
+  if (!r.stdout.includes(`recorded template: ${url} in unify.yaml`)) throw new Error(`init must say what it recorded:\n${r.stdout}`);
+  if (recordOf(tmp) !== url) throw new Error(`unify.yaml must carry template: ${url}, has ${recordOf(tmp)}`);
+  if (existsSync(join(tmp, "unify.template.json"))) throw new Error("no record file: the record is the one line in unify.yaml");
+  if (readdirSync(tmp).sort().join(",") !== "AGENTS.md,site,unify.yaml") throw new Error(`init writes the template and unify.yaml, nothing else: ${readdirSync(tmp).join(", ")}`);
   const dry = await runCli(["build", "--dry-run", "--strict"], tmp);
   if (dry.exit !== 0) throw new Error(`build --dry-run --strict exited ${dry.exit}\n${dry.stdout}${dry.stderr}`);
-  if (/unify\.template\.json/.test(dry.stdout)) throw new Error(`the record must never publish:\n${dry.stdout}`);
-  // The same version is a no-op (UPD-02).
+  // The same template is a no-op, and nothing asks (UPD-02).
   const same = await runCli(["update"], tmp);
-  if (same.exit !== 0 || !same.stdout.includes("nothing to do")) throw new Error(`same version must be a no-op: exit ${same.exit}\n${same.stdout}${same.stderr}`);
+  if (same.exit !== 0 || !same.stdout.includes("nothing to do") || same.stderr.includes("[y/N]")) throw new Error(`the same template must be a no-op: exit ${same.exit}\n${same.stdout}${same.stderr}`);
 
   // ---- the site configures and authors; the template moves to v2
   writeFileSync(join(tmp, "site", "config.json"), '{"lab": "Mine"}\n');
@@ -1659,69 +1763,90 @@ test("scaffold: SCF-15 + UPD-01..03 — init records the template; update brings
   writeFileSync(join(host, "site", "reports", "seed.md"), "---\ntitle: Seed\ndescription: d\n---\n# Seed\n");
   rmSync(join(host, "AGENTS.md"));
   writeFileSync(join(host, "DEPLOY.md"), "# deploy v2\n");
-  git(host, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "add", "-A");
-  git(host, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", "v2");
-  git(host, "push", "-q", bare, "main");
+  release("v2");
 
-  // ---- preview writes nothing (UPD-02)
+  // ---- preview: the list, with "would", and nothing written or asked (UPD-02)
   const preview = await runCli(["update", "--dry-run"], tmp);
-  if (preview.exit !== 1) throw new Error(`a preview with a conflict exits 1, got ${preview.exit}\n${preview.stdout}${preview.stderr}`);
-  for (const line of ["would update site/index.html", "would add site/reports/seed.md", "would add DEPLOY.md", "would remove AGENTS.md", "conflict site/_layout.html: changed locally and in the template"]) {
+  if (preview.exit !== 0) throw new Error(`a preview exits 0, got ${preview.exit}\n${preview.stdout}${preview.stderr}`);
+  for (const line of ["would overwrite site/_layout.html", "would overwrite site/config.json", "would overwrite site/index.html", "would add site/reports/seed.md", "would add DEPLOY.md", "update: would overwrite 3, add 2"]) {
     if (!preview.stdout.includes(line)) throw new Error(`preview lacks "${line}":\n${preview.stdout}`);
   }
-  if (preview.stdout.includes("config.json")) throw new Error(`an owned file is never reported:\n${preview.stdout}`);
+  if (/AGENTS\.md|2026-01|\.env/.test(preview.stdout)) throw new Error(`a file the template dropped, or the site's own, is never mentioned:\n${preview.stdout}`);
+  if (preview.stderr.includes("[y/N]")) throw new Error("--dry-run must not ask");
   if (!readFileSync(join(tmp, "site", "index.html"), "utf8").includes("v1") || existsSync(join(tmp, "DEPLOY.md"))) throw new Error("--dry-run wrote");
-  if (JSON.parse(readFileSync(join(tmp, "unify.template.json"), "utf8")).revision !== record.revision) throw new Error("--dry-run rewrote the record");
 
-  // ---- apply (UPD-02): unchanged files update, owned and authored files are byte-identical, the edit is a conflict
-  const applied = await runCli(["update"], tmp);
-  if (applied.exit !== 1) throw new Error(`an update with a conflict exits 1, got ${applied.exit}\n${applied.stdout}${applied.stderr}`);
-  if (!readFileSync(join(tmp, "site", "index.html"), "utf8").includes("v2")) throw new Error("index.html was not updated");
-  if (readFileSync(join(tmp, "DEPLOY.md"), "utf8") !== "# deploy v2\n") throw new Error("DEPLOY.md was not added");
-  if (readFileSync(join(tmp, "site", "reports", "seed.md"), "utf8") !== "---\ntitle: Seed\ndescription: d\n---\n# Seed\n") throw new Error("an owned seed the site lacks is added once");
-  if (existsSync(join(tmp, "AGENTS.md"))) throw new Error("AGENTS.md, untouched locally and gone upstream, must be removed");
-  for (const [rel, text] of [["site/config.json", '{"lab": "Mine"}\n'], ["site/reports/2026-01.md", "---\ntitle: Jan\ndescription: d\n---\n# Jan\n"], [".env", "SECRET=1\n"]]) {
-    if (readFileSync(join(tmp, rel), "utf8") !== text) throw new Error(`${rel} must be byte-identical after an update`);
+  // ---- the question (UPD-02): no stdin, or anything but y, writes nothing and exits 1
+  for (const [answer, input] of [["closed stdin", undefined], ["n", "n\n"], ["a blank line", "\n"]]) {
+    const declined = await runCli(["update"], tmp, {}, input);
+    if (declined.exit !== 1) throw new Error(`${answer} must decline with exit 1, got ${declined.exit}\n${declined.stdout}${declined.stderr}`);
+    if (!declined.stderr.includes("overwrite 3 file(s)? [y/N]")) throw new Error(`the question names the count:\n${declined.stderr}`);
+    if (!declined.stdout.includes("overwrite site/_layout.html") || !declined.stdout.includes("nothing written") || !declined.stdout.includes("--yes")) throw new Error(`a declined run lists the files, says nothing was written and names --yes:\n${declined.stdout}`);
+    if (!readFileSync(join(tmp, "site", "index.html"), "utf8").includes("v1") || existsSync(join(tmp, "DEPLOY.md")) || existsSync(join(tmp, "site", "reports", "seed.md"))) throw new Error(`${answer}: something was written`);
   }
-  if (!readFileSync(join(tmp, "site", "_layout.html"), "utf8").includes("my theme")) throw new Error("a conflicting file must keep the site's bytes");
-  const after = JSON.parse(readFileSync(join(tmp, "unify.template.json"), "utf8"));
-  if (after.revision === record.revision || !/^[0-9a-f]{40}$/.test(after.revision)) throw new Error("the record must move to the new commit");
-  if (after.files["site/_layout.html"] !== record.files["site/_layout.html"]) throw new Error("a conflicting file keeps its old baseline hash");
-  if ("AGENTS.md" in after.files || !("DEPLOY.md" in after.files)) throw new Error(`record.files not updated: ${Object.keys(after.files)}`);
 
-  // ---- again: the conflict is still visible, nothing else changes; taking the template's version resolves it
+  // ---- y (UPD-01/UPD-02): the listed files are overwritten and added, nothing is removed, nothing else is visited
+  const applied = await runCli(["update"], tmp, {}, "y\n");
+  if (applied.exit !== 0) throw new Error(`y applies, exit ${applied.exit}\n${applied.stdout}${applied.stderr}`);
+  if (!applied.stdout.includes("update: overwrote 3, added 2")) throw new Error(`the summary counts what was written:\n${applied.stdout}`);
+  if (!readFileSync(join(tmp, "site", "index.html"), "utf8").includes("v2")) throw new Error("index.html was not overwritten");
+  const layout = readFileSync(join(tmp, "site", "_layout.html"), "utf8");
+  if (!layout.includes("Lab Reports") || layout.includes("my theme")) throw new Error("a listed, confirmed file takes the template's bytes");
+  if (readFileSync(join(tmp, "site", "config.json"), "utf8") !== '{"lab": "NEW SEED"}\n') throw new Error("config.json was listed and confirmed, so it is the template's");
+  if (readFileSync(join(tmp, "DEPLOY.md"), "utf8") !== "# deploy v2\n" || !existsSync(join(tmp, "site", "reports", "seed.md"))) throw new Error("new files are added");
+  if (!existsSync(join(tmp, "AGENTS.md"))) throw new Error("nothing is removed: a file the template dropped stays");
+  for (const [rel, text] of [["site/reports/2026-01.md", "---\ntitle: Jan\ndescription: d\n---\n# Jan\n"], [".env", "SECRET=1\n"]]) {
+    if (readFileSync(join(tmp, rel), "utf8") !== text) throw new Error(`${rel} is the site's own and must be byte-identical after an update`);
+  }
+  if (recordOf(tmp) !== url) throw new Error(`the line stays ${url}, has ${recordOf(tmp)}`);
   const again = await runCli(["update"], tmp);
-  if (again.exit !== 1 || !again.stdout.includes("conflict site/_layout.html") || /^(update|add|remove) /m.test(again.stdout)) throw new Error(`re-running must show only the conflict:\n${again.stdout}`);
-  writeFileSync(join(tmp, "site", "_layout.html"), readFileSync(join(host, "site", "_layout.html")));
-  const resolved = await runCli(["update"], tmp);
-  if (resolved.exit !== 0 || !resolved.stdout.includes("nothing to do")) throw new Error(`taking the template's version resolves the conflict: exit ${resolved.exit}\n${resolved.stdout}`);
-  // The updated project still builds as a site, and the record still never publishes.
+  if (again.exit !== 0 || !again.stdout.includes("nothing to do")) throw new Error(`re-running is a no-op:\n${again.stdout}${again.stderr}`);
   const rebuilt = await runCli(["build", "--dry-run", "--strict"], tmp);
-  if (rebuilt.exit !== 0 || /unify\.template\.json/.test(rebuilt.stdout)) throw new Error(`the updated site must build clean without publishing the record: exit ${rebuilt.exit}\n${rebuilt.stdout}${rebuilt.stderr}`);
+  if (rebuilt.exit !== 0) throw new Error(`the updated site must build clean: exit ${rebuilt.exit}\n${rebuilt.stdout}${rebuilt.stderr}`);
 
-  // ---- safety (UPD-03): a symlink is refused, an unreachable source changes nothing
+  // ---- --yes answers for a script; a named source (here, the v1 tag) replaces the line and its #ref is honored (UPD-01/UPD-02)
+  writeFileSync(join(host, "site", "index.html"), v1["site/index.html"].replace("v1", "v3"));
+  release("v3");
+  const yes = await runCli(["update", "--yes"], tmp);
+  if (yes.exit !== 0 || yes.stderr.includes("[y/N]") || !readFileSync(join(tmp, "site", "index.html"), "utf8").includes("v3")) throw new Error(`--yes must overwrite without asking: exit ${yes.exit}\n${yes.stdout}${yes.stderr}`);
+  const tagged = await runCli(["update", `${url}#v1`, "-y"], tmp);
+  if (tagged.exit !== 0 || !readFileSync(join(tmp, "site", "index.html"), "utf8").includes("v1")) throw new Error(`a named source is fetched at its ref: exit ${tagged.exit}\n${tagged.stdout}${tagged.stderr}`);
+  if (recordOf(tmp) !== `${url}#v1`) throw new Error(`the line follows a named source, has ${recordOf(tmp)}`);
+  const back = await runCli(["update", url, "-y"], tmp);
+  if (back.exit !== 0 || !readFileSync(join(tmp, "site", "index.html"), "utf8").includes("v3") || recordOf(tmp) !== url) throw new Error(`naming the default branch again moves back: exit ${back.exit}\n${back.stdout}${back.stderr}`);
+
+  // ---- safety (UPD-03): a symlink is skipped, never followed or replaced; an unreachable source changes nothing
   const elsewhere = mkTmp();
   writeFileSync(join(elsewhere, "target"), "outside\n");
   rmSync(join(tmp, "site", "index.html"));
   symlinkSync(join(elsewhere, "target"), join(tmp, "site", "index.html"));
-  writeFileSync(join(host, "site", "index.html"), v1["site/index.html"].replace("v1", "v3"));
-  git(host, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-am", "v3");
-  git(host, "push", "-q", bare, "main");
-  const sym = await runCli(["update"], tmp);
-  if (sym.exit !== 1 || !sym.stdout.includes("conflict site/index.html: it is a symlink")) throw new Error(`a symlink must be a conflict:\n${sym.stdout}${sym.stderr}`);
-  if (readFileSync(join(elsewhere, "target"), "utf8") !== "outside\n") throw new Error("the symlink was followed");
+  writeFileSync(join(host, "site", "index.html"), v1["site/index.html"].replace("v1", "v4"));
+  release("v4");
+  const sym = await runCli(["update", "-y"], tmp);
+  if (sym.exit !== 0 || !sym.stdout.includes("skip site/index.html: it is a symlink") || !sym.stdout.includes("1 skipped")) throw new Error(`a symlink must be skipped and reported:\n${sym.stdout}${sym.stderr}`);
+  if (readFileSync(join(elsewhere, "target"), "utf8") !== "outside\n" || !lstatSync(join(tmp, "site", "index.html")).isSymbolicLink()) throw new Error("the symlink was followed or replaced");
   const unreachable = await runCli(["update", `file://${mkTmp()}/missing.git`], tmp);
   if (unreachable.exit !== 2 || !/git clone failed/.test(unreachable.stderr)) throw new Error(`an unreachable source is a usage error: ${unreachable.exit}\n${unreachable.stderr}`);
+  if (recordOf(tmp) !== url) throw new Error("a failed fetch must not move the line");
+  rmSync(join(tmp, "site", "index.html"));
+  writeFileSync(join(tmp, "site", "index.html"), readFileSync(join(host, "site", "index.html")));
 
-  // ---- recovery (UPD-01): no record → exit 2 naming --adopt; --adopt at the installed commit restores the baseline
-  rmSync(join(tmp, "unify.template.json"));
+  // ---- the record (UPD-01): no template: line → exit 2 naming the line; a 0.11.2 record file yields the exact line; the line added by hand works
+  const lines = readFileSync(join(tmp, "unify.yaml"), "utf8").split("\n").filter((l) => !/^template:/.test(l));
+  writeFileSync(join(tmp, "unify.yaml"), lines.join("\n"));
   const missing = await runCli(["update"], tmp);
-  if (missing.exit !== 2 || !missing.stderr.includes("unify update --adopt <source>")) throw new Error(`a missing record is a usage error naming --adopt: ${missing.exit}\n${missing.stderr}`);
-  const adopt = await runCli(["update", "--adopt", `${url}#${after.revision}`], tmp);
-  if (adopt.exit !== 0 || !adopt.stdout.includes("no file was changed")) throw new Error(`--adopt: exit ${adopt.exit}\n${adopt.stdout}${adopt.stderr}`);
-  if (JSON.parse(readFileSync(join(tmp, "unify.template.json"), "utf8")).revision !== after.revision) throw new Error("--adopt must record the commit named");
-  const adoptElsewhere = await runCli(["init", "--adopt", "basic"], mkTmp());
-  if (adoptElsewhere.exit !== 2) throw new Error("--adopt belongs to update alone");
+  if (missing.exit !== 2 || !missing.stderr.includes("no template recorded") || !missing.stderr.includes("template: <source>")) throw new Error(`a missing record is a usage error naming the line: ${missing.exit}\n${missing.stderr}`);
+  writeFileSync(join(tmp, "unify.template.json"), JSON.stringify({ schemaVersion: 1, source: url, revision: "abc", files: {} }));
+  const legacy = await runCli(["update"], tmp);
+  if (legacy.exit !== 2 || !legacy.stderr.includes(`template: ${url}`)) throw new Error(`a 0.11.2 record file must yield the exact line to add:\n${legacy.stderr}`);
+  rmSync(join(tmp, "unify.template.json"));
+  writeFileSync(join(tmp, "unify.yaml"), `${lines.join("\n")}\ntemplate: ${url}\n`);
+  const byHand = await runCli(["update"], tmp);
+  if (byHand.exit !== 0 || !byHand.stdout.includes("nothing to do")) throw new Error(`the hand-written line is the record: exit ${byHand.exit}\n${byHand.stdout}${byHand.stderr}`);
+  // There is no --owned and no --adopt: the line and the question are the whole mechanism.
+  for (const flag of ["--owned", "--adopt"]) {
+    const gone = await runCli(["update", flag, url], mkTmp());
+    if (gone.exit !== 2 || !/unknown option/.test(gone.stderr)) throw new Error(`${flag} must not exist`);
+  }
 
   covers("SCF-15", "UPD-01", "UPD-02", "UPD-03");
 }, TEST_MS * 3);

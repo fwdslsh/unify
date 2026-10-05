@@ -36,10 +36,12 @@ Eleventy, and the `unify` binary the four scripts call (`node_modules/.bin/unify
 resolved from the pinned `@fwdslsh/unify` devDependency). Use `npm ci` if you want the
 committed `package-lock.json` enforced exactly.
 
-**The pinned devDependency is `^0.10.0`** because the project-root `unify.yaml` and
-the `site/` default are 0.10 features. The generator-context file (`scripts/eleventy.mjs`'s
-`process.argv[4]`, conformance-spec §33.2) needs 0.9 or later; without it `context` is
-`null` and the `og:url` tag is omitted. To run this checkout instead of the pinned release,
+**The pinned devDependency is `^0.11.4`**, the release this example was last run against;
+the project-root `unify.yaml` and the `site/` default need 0.10 or later, and the
+generator-context file (`scripts/eleventy.mjs`'s `process.argv[4]`, conformance-spec §33.2)
+0.9 or later — without it `context` is `null` and the `og:url` tag is omitted. `npm run build`
+is the release gate, `unify build --clean --audit --strict`: the build, every check and the
+audit, publishing only if all of it passes. To run this checkout instead of the pinned release,
 use `bun ../../src/cli.js` / `node ../../src/cli.js` (below).
 
 **On Bun, a missing `node_modules/` is not an error.** Bun's default `--install=auto`

@@ -46,7 +46,7 @@ unify dev       # build, watch, serve, reload — http://localhost:3000
 unify build     # write the final site to dist/ — upload it anywhere
 ```
 
-`unify init` scaffolds a complete site into `site/` — a layout, a nav include, HTML and Markdown pages, CSS, and a `robots.txt` — plus four files at the project root, outside `site/` so they can never publish: **`AGENTS.md`**, guidance for whoever (or whatever) edits the site next, **`DEPLOY.md`**, the deployment recipe, **`unify.template.json`**, the record of the template it came from (what `unify update` reads to bring a later version in without touching your edits), and a **`unify.yaml`** listing every build flag, described and commented out, so you uncomment only what differs from the default. Five templates: `default`, `basic`, `blog`, `docs`, `portfolio`. Every scaffold passes `unify build --dry-run --strict` and `unify audit --strict` out of the box.
+`unify init` scaffolds a complete site into `site/` — a layout, a nav include, a home page, CSS, a `robots.txt`, and ready-to-copy example pages under `site/_examples/` that never publish — plus three files at the project root, outside `site/` so they can never publish: **`AGENTS.md`**, guidance for whoever (or whatever) edits the site next, **`DEPLOY.md`**, the deployment recipe, and a **`unify.yaml`** listing every build flag, described and commented out, so you uncomment only what differs from the default — with one line live, `template:`, the template this site came from, which `unify update` fetches again to copy its changed files over the site — after showing you the list and asking. Five templates: `default`, `basic`, `blog`, `docs`, `portfolio`. Every scaffold passes `unify build --dry-run --strict` and `unify audit --strict` out of the box.
 
 New here? The tutorial is **[Getting Started](docs/getting-started.md)**.
 
@@ -101,7 +101,7 @@ unify audit              evaluate the site the build would publish — writes no
 unify dev                build, watch, serve, and reload — the inner loop
 unify watch              build + rebuild on change, no server
 unify init [template]    scaffold a starter site — a built-in name, a directory, a git repository (URL/<subdirectory>#ref), or an npm package named unify-<name>-template
-unify update [template]  bring the template's later version in: unchanged files update, your edits are kept and reported, --dry-run previews
+unify update [template]  fetch the template again and copy its changed files over the site: the files it would overwrite are listed and confirmed first (--yes answers, --dry-run previews)
 ```
 
 `unify --help` lists every option — among them `--pretty-urls`, `--base-url` (which also generates `sitemap.xml`, and `feed.xml` once a page declares `schema: Article`/`BlogPosting`), `--canonical none` (completion is on once `--base-url` is set), `--catalog`, `--search-corpus`, `--dry-run`, and `--strict`. The **[CLI Reference](docs/cli-reference.md)** documents every command, option, and exit code — there are no others. An optional `unify.yaml` at the project root holds saved flags and nothing more — only what differs from the defaults; `unify init` writes one with every option described and commented out, and `unify build --save-config` fills it from the flags you pass.
@@ -117,7 +117,7 @@ unify update [template]  bring the template's later version in: unchanged files 
 - **[Getting Started](docs/getting-started.md)** — the tutorial.
 - **[Authoring Rules](docs/authoring-rules.md)** — the complete authoring surface, in under sixty lines.
 - **[CLI Reference](docs/cli-reference.md)** — every command, option, and exit code.
-- **[Templates](docs/templates.md)** — scaffold from a built-in, a directory, a git repository or an npm package; keep the site current with `unify update` without losing your changes; publish a template of your own.
+- **[Templates](docs/templates.md)** — scaffold from a built-in, a directory, a git repository or an npm package; keep the site current with `unify update`, which lists what it would overwrite and asks; publish a template of your own.
 - **[Integrations](docs/integrations.md)** — the compile-to-asset pattern: Svelte, TypeScript, or anything with a compiler, without adopting a framework.
 - **[Eleventy + htmx](docs/guides/eleventy-htmx.md)** — the advanced stack: another generator produces data-driven pages, unify composes them, htmx enhances them. Optional layers, and when not to reach for them.
 - **[Catalog and Search](docs/guides/catalog-and-search.md)** — a blog list, facets, and a search box built client-side from the two files `--catalog`/`--search-corpus` write.

@@ -8,6 +8,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.5] - 2026-10-05
+
+The template record is one line in `unify.yaml`, and `unify update` is a copy you confirm; `unify.template.json` is gone.
+
+### Changed
+
+- **The record `init` leaves is `template: <source>` in `unify.yaml`** — the source as you typed it
+  (`blog`, `unify-shop-template`, `https://…/templates/shop#v2`, `../shop`). Nothing else is recorded: no
+  version, no file list, no hashes. `--template <source>` is the positional as an option.
+- **`unify update` fetches the template again and copies its changed files over the project** (spec §19.10).
+  It lists every file it would overwrite and add, asks `overwrite N file(s)? [y/N]` when at least one file
+  would be overwritten, and writes nothing on any answer but `y` (exit 1). `--yes`/`-y` answers for a
+  script; `--dry-run` lists and never asks. Nothing is removed, nothing outside the template's paths is
+  visited, and nothing merges. `unify update <source>` moves the project to another source and the line
+  follows.
+- **The blog template's generator reads unify's source inventory** (`generator-context.json`'s
+  `inputs.sourcePages`, §33.7) instead of parsing frontmatter itself, writes only the listing, and leaves the
+  feed to unify: with `--base-url` the posts' `schema: BlogPosting` activates `feed.xml` (§29), so the script
+  writes no RSS and the scaffold links no feed it does not have yet (DEPLOY.md says where to add the link).
+- **The scaffolds' AGENTS.md and DEPLOY.md** name `unify build --audit --strict` as the one-command release gate
+  and point at `/_unify/preview/` and the dev chrome.
+- **Examples brought up to date**: htmx 2.0.11 vendored in `htmx-fragments` and `eleventy-htmx`; `eleventy-htmx`
+  pins `@fwdslsh/unify ^0.11.4` and its `npm run build` is the full gate; `forge-svelte` moves to Svelte 5.57.1,
+  gets a `unify.yaml`, generates its course-notes index through `generate:` from the source inventory instead of
+  a hand-run script writing into `site/`, and now audits clean; `seed-library` builds its seasonal-notes index
+  from the inventory too, byte-identical to before.
+
+### Removed
+
+- **`unify.template.json`** (the record and the manifest), **`unify update --adopt`**, and the per-file
+  conflict logic. A project that still has the 0.11.2 file is told the exact `template:` line to add.
+
+### Added
+
+- **A template-authoring convention, and the built-in templates follow it** (`docs/templates.md` §3, spec §19.11):
+  tooling ships in place and everything a site fills in ships only as examples under `site/_examples/`, which the
+  default `_*` exclusion keeps out of the build — copy one into place, edit the copy, and `unify update` never lists
+  it. The five built-ins now ship `index.html`, `404.html`, the layout, the nav, the stylesheet and `robots.txt` in
+  place (plus the docs template's "All pages" starter and the blog's generator), and their pages, posts, guide pages,
+  project pages and the blog's authors file as examples. Only `docs` (`catalog: true`) and `blog`
+  (`generate: scripts/gen.mjs`) ship a `unify.yaml`; `init` writes the all-commented file for the others, and it is
+  then the site's. The blog generator writes an empty listing and feed for a scaffold with no posts yet.
+
 ## [0.11.4] - 2026-10-05
 
 ### Changed
@@ -176,6 +219,7 @@ site/                  # the source root: pages, assets, _layout.html, _includes
   directory down), so any of them opened straight from the folder shows styled; unify
   rewrites the link for every page at every depth, and the head merge keeps one copy per
   built page.
+
 - **The blog template's generator runs through `--generate`.** It moves from
   `src/_scripts/gen.mjs` to `scripts/gen.mjs` at the project root, the template's
   `unify.yaml` names it, and it writes `blog.html` and `feed.xml` into the build's overlay

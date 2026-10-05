@@ -1,50 +1,34 @@
-// Regenerates site/notes/index.html from the frontmatter of site/notes/*.md,
-// newest first. Instructors add notes; nobody has to remember to list them.
-// Re-run after adding or editing a note, then run `unify build`.
-import { readdir, readFile, writeFile } from "node:fs/promises";
+// Writes notes/index.html — the course notes, newest first — into the overlay
+// unify hands it. unify runs this before every build, dev rebuild and audit
+// (`generate: scripts/gen-notes-index.mjs` in unify.yaml): argv[3] is the
+// overlay directory, argv[4] generator-context.json, whose inputs.sourcePages
+// names the source page list unify has already read — every page's title,
+// date and <meta> records — so nothing here parses frontmatter, and nothing
+// is written into site/. Instructors add notes; nobody has to remember to
+// list them, and nobody commits the list.
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 
-const NOTES_DIR = new URL("../site/notes/", import.meta.url);
+const [, , , overlay, contextPath] = process.argv;
+if (!overlay || !contextPath) {
+  throw new Error("gen-notes-index.mjs: unify runs this (generate: scripts/gen-notes-index.mjs in unify.yaml); run unify build to see its output");
+}
+const context = JSON.parse(readFileSync(contextPath, "utf8"));
+const inventory = JSON.parse(readFileSync(context.inputs.sourcePages, "utf8"));
 
-function parseFrontmatter(raw) {
-  const match = raw.match(/^---\n([\s\S]*?)\n---/);
-  const fields = {};
-  if (!match) return fields;
-  for (const line of match[1].split("\n")) {
-    const m = line.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
-    if (!m) continue;
-    let value = m[2].trim();
-    if (
-      (value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1);
+// A note is a Markdown page under notes/. `instructor` is the one <meta> its
+// frontmatter synthesizes beyond the title, description and date unify reads.
+const notes = inventory.pages
+  .filter((p) => p.source.startsWith("notes/") && p.source.endsWith(".md"))
+  .map((p) => {
+    if (!p.date || !p.title) {
+      // A located failure: unify stops the build and publishes nothing.
+      console.error(`gen-notes-index.mjs: ${p.source} needs both "title" and "date" in frontmatter`);
+      process.exit(1);
     }
-    fields[m[1]] = value;
-  }
-  return fields;
-}
-
-const files = (await readdir(NOTES_DIR)).filter(
-  (f) => f.endsWith(".md") && !f.startsWith("_"),
-);
-
-const notes = [];
-for (const file of files) {
-  const raw = await readFile(new URL(file, NOTES_DIR), "utf8");
-  const fm = parseFrontmatter(raw);
-  if (!fm.date || !fm.title) {
-    throw new Error(`${file}: notes need both "title" and "date" in frontmatter`);
-  }
-  notes.push({
-    file,
-    href: `/notes/${file.replace(/\.md$/, ".html")}`,
-    title: fm.title,
-    date: fm.date,
-    instructor: fm.instructor || "",
-  });
-}
-
-notes.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+    return { href: p.href, title: p.title, date: p.date, instructor: p.meta.find((m) => m.name === "instructor")?.content ?? "" };
+  })
+  .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
 
 const escapeHtml = (s) =>
   s
@@ -89,5 +73,6 @@ ${items}
 </html>
 `;
 
-await writeFile(new URL("index.html", NOTES_DIR), html);
-console.log(`wrote site/notes/index.html with ${notes.length} note(s)`);
+mkdirSync(join(overlay, "notes"), { recursive: true });
+writeFileSync(join(overlay, "notes", "index.html"), html);
+console.log(`gen-notes-index.mjs: wrote notes/index.html from ${notes.length} note(s)`);

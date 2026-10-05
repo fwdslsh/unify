@@ -38,8 +38,8 @@ describe("init()", () => {
     const root = tempDir();
     const code = await init({ projectRoot: root, sourceRoot: root, sourceDefaulted: true, template: undefined, reporter: silentReporter() });
     expect(code).toBe(0);
-    // about.md is unique to the default template (see templates.test.js).
-    expect(existsSync(join(root, "site", "about.md"))).toBe(true);
+    // the about.md example is unique to the default template (see templates.test.js).
+    expect(existsSync(join(root, "site", "_examples", "about.md"))).toBe(true);
   });
 
   test("scaffolds into <sourceRoot>/site when the source root defaulted to the working directory", async () => {
@@ -94,14 +94,15 @@ describe("init()", () => {
     // "init writes nothing when any file it would create already exists"
     // covered leaf paths only: `src/posts` as a plain file passed the check and
     // mkdirSync then failed mid-loop, leaving nine template files on disk that
-    // the same check refused to complete on every later run.
+    // the same check refused to complete on every later run. (`_examples` is
+    // the directory every template needs today, §19.11.)
     const root = tempDir();
     mkdirSync(join(root, "site"), { recursive: true });
-    writeFileSync(join(root, "site", "posts"), "not a directory\n");
+    writeFileSync(join(root, "site", "_examples"), "not a directory\n");
     await expect(
       init({ projectRoot: root, sourceRoot: root, sourceDefaulted: true, template: "blog", reporter: silentReporter() }),
     ).rejects.toThrow(UsageError);
-    expect(readdirSync(join(root, "site"))).toEqual(["posts"]);
+    expect(readdirSync(join(root, "site"))).toEqual(["_examples"]);
     expect(readdirSync(root)).toEqual(["site"]);
   });
 
@@ -154,12 +155,13 @@ describe("init()", () => {
     expect(existsSync(join(root, "src", "_layout.html"))).toBe(true);
   });
 
-  test("writes unify.yaml at the project root for every template, all commented out except docs' catalog: true and blog's generate: (§18, §19.6, §19.8)", async () => {
+  test("writes unify.yaml at the project root for every template, all commented out except docs' catalog: true, blog's generate:, and the template: record (§18, §19.6, §19.8, §19.10)", async () => {
     for (const name of Object.keys(TEMPLATES)) {
       const root = tempDir();
       await init({ projectRoot: root, sourceRoot: root, sourceDefaulted: true, template: name, reporter: silentReporter() });
       const live = readFileSync(join(root, "unify.yaml"), "utf8").split("\n").filter((l) => /^[a-z]/.test(l));
-      expect(live).toEqual({ docs: ["catalog: true"], blog: ["generate: scripts/gen.mjs"] }[name] ?? []);
+      // §19.10 — a built-in is recorded by its name, in the key's own place in the file.
+      expect(live).toEqual([...({ docs: ["catalog: true"], blog: ["generate: scripts/gen.mjs"] }[name] ?? []), `template: ${name}`]);
       expect(existsSync(join(root, "site", "unify.yaml"))).toBe(false);
     }
   });

@@ -11,16 +11,14 @@ and the ones a build never corrects are the ones that publish it anyway — so t
 one of them rather than the first:
 
 - **the site's name and byline** — `site/_layout.html` (the title suffix and the footer), and then
-  `site/index.html`, `site/404.html` and `site/contact.html`, which each write it into their own
-  visible text and their own `description`. Grep the scaffolded name once and you will find them
-  all: `grep -rn 'My Site' site/`, with whichever name your template shipped;
-- **the contact details** on `site/contact.html` — a reserved `example.com` address, and no postal
-  address at all, because a plausible street address in a scaffold is one an author publishes;
+  `site/index.html` and `site/404.html`, which each write it into their own visible text and their own
+  `description`, as does every page you copy out of `site/_examples/`. Grep the scaffolded name once
+  and you will find them all: `grep -rn 'My Site' site/`, with whichever name your template shipped;
+- **the contact details** — the reserved `example.com` mailbox in `site/index.html`'s footer line and
+  in `site/_examples/contact.html`, and no postal address at all, because a plausible street address
+  in a scaffold is one an author publishes;
 - **a generator's own constants**, if your project has one. The blog template's
-  `scripts/gen.mjs` opens with `SITE_NAME` and `LISTING_DESCRIPTION`. Its feed's links are
-  **absolute** and take the `--base-url` you build with (step 3); until you pass one they name
-  the placeholder `https://you.example`, which unify never rewrites or checks, because the feed
-  is a mirror-copied asset. Build with your address and the feed follows;
+  `scripts/gen.mjs` opens with `SITE_NAME` and `LISTING_DESCRIPTION`;
 - `site/assets/share-placeholder.png` — a flat 1200×630 placeholder card, not a photograph. It is
   the image social crawlers show. Replace the file, and **if your image is a different size,
   correct `og:image:width` and `og:image:height` in `site/_layout.html` to match it**: a declared
@@ -30,10 +28,11 @@ one of them rather than the first:
 
 ## 2. Check before you publish
 
-    unify build --dry-run --strict    # the whole build and every check, writing nothing
-    unify audit --strict              # what a reader or a crawler would find missing
+    unify build --audit --strict      # the whole build, every check and the audit; publishes only if all of it passes
+    unify build --dry-run --audit --strict   # the same, writing nothing
 
-A fresh scaffold passes both. Keep it that way as you add pages: every page wants its own title,
+The audit is what a reader or a crawler would find missing (`unify audit --strict` runs it alone).
+A fresh scaffold passes. Keep it that way as you add pages: every page wants its own title,
 description, and single `<h1>`, and a link in from somewhere.
 
 ## 3. Build with your address
@@ -45,6 +44,12 @@ own final URL (`--canonical none` switches that off); an authored canonical alwa
 
 Hosting the site under a subpath? Name the whole thing, trailing slash included:
 `--base-url https://you.example/handbook/`.
+
+A site whose pages declare `schema: Article` or `schema: BlogPosting` — the blog template's example
+post does — also gets `feed.xml`, an Atom feed of those pages, with nothing to run. Link it from
+`site/_layout.html` once you build this way (`<link rel="alternate" type="application/atom+xml"
+title="Posts" href="/feed.xml">`): a fresh scaffold has no feed to link yet, and the build says so
+if the link comes first.
 
 If your project has a generator — the blog template's `scripts/gen.mjs`, named in `unify.yaml` —
 unify runs it as part of every build, so the derived pages are current by construction. Every
