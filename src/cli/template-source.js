@@ -6,8 +6,8 @@
  * repository (a URL, a `git@host:` address, or a `.git` segment, with an
  * optional subdirectory and `#ref`), a directory on disk (which must exist),
  * or else an npm package — ANY package, named as published, optionally with
- * `@version` or `@tag`. The `unify-<name>-template` convention exists so a
- * template can be found on npm; it is not what makes a package a template.
+ * `@version` or `@tag`. The `unify-template` keyword is what makes a template
+ * findable on npm; it is not what makes a package a template.
  * `--audit` is: it keeps a scaffold only if it audits clean. The cost of the
  * open form is that a misspelled directory name reaches npm and fails there,
  * with npm's own message; an argument that is no form at all (a space in it,
@@ -127,9 +127,8 @@ export function recordSource(source, label, configDir) {
  * `@version` or `@tag`. Anchored and lower-case, as npm names are, and the
  * version part keeps to the characters a version or dist-tag can hold —
  * which is also what keeps the one argument that reaches a shell (npm on
- * Windows, below) free of metacharacters. `unify-<name>-template` is the
- * convention that makes a template findable on npm (§19.9); nothing here
- * requires it.
+ * Windows, below) free of metacharacters. The `unify-template` keyword is
+ * what makes a template findable on npm (§19.9); nothing here requires it.
  */
 export const NPM_SPEC = /^(@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*(@[A-Za-z0-9._^~-]+)?$/;
 

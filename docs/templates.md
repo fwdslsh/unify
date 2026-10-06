@@ -15,8 +15,8 @@ unify init ../our-house-template # a directory on disk
 unify init https://github.com/fwdslsh/unify/templates/blog      # a git repository, one subdirectory of it
 unify init https://github.com/acme/site-templates/tree/v2/shop  # the URL your browser shows, ref included
 unify init git@github.com:acme/templates.git/shop#v2            # an SSH address, a subdirectory, a tag
-unify init unify-shop-template                                  # an npm package — any package; this is the searchable name
-unify init @acme/unify-shop-template@1.4.0                      # the same under an organization, at a version
+unify init shop-template                                        # an npm package — any package
+unify init @acme/shop-template@1.4.0                            # the same under an organization, at a version
 ```
 
 What each form does:
@@ -24,7 +24,7 @@ What each form does:
 - **A built-in** is a directory of the unify repository, `templates/<name>/`, embedded in the CLI. It needs no network and no git; the name is a shortcut to that directory at the version of unify you are running.
 - **A directory** must exist. Nothing is fetched.
 - **A git repository** is cloned with your own `git`, so your SSH keys and credential helper apply and nothing prompts. The repository ends at the `.git` segment where there is one, else at `host/owner/repo`; what follows is a **subdirectory**, so one repository can host many templates. `#ref` names a branch, a tag or a commit.
-- **An npm package** is fetched with your own `npm pack`, so your `.npmrc`, registry and tokens apply. Any package can be one: a bare word that is neither a built-in nor an existing directory is read as a package name (`name` or `@scope/name`, optionally `@version` or `@tag`). Naming a template `unify-<name>-template` is a convention for finding it on npm, not a requirement; `--audit` is what tells a template from a package that is not one. The cost is that a misspelled directory name reaches npm and fails there, with npm's own message.
+- **An npm package** is fetched with your own `npm pack`, so your `.npmrc`, registry and tokens apply. Any package can be one: a bare word that is neither a built-in nor an existing directory is read as a package name (`name` or `@scope/name`, optionally `@version` or `@tag`). A template published to npm carries `unify-template` in its `keywords`, which is how it is found (§3), not a requirement of the form; `--audit` is what tells a template from a package that is not one. The cost is that a misspelled directory name reaches npm and fails there, with npm's own message.
 
 An argument that is no form at all — a space in it, a `/`-path that names no directory — exits 2 and lists the four forms.
 
@@ -173,7 +173,7 @@ A fresh scaffold has to build — `unify audit --strict` must pass on it, since 
 2. **Make it audit clean**: `unify audit --strict` must exit 0 from a fresh scaffold, with no flags and nothing edited. That is what `--audit` checks on the receiving side, and what the built-ins guarantee. Examples under `_examples/` are never built, so they cannot fail it.
 3. **Host it** wherever its users can fetch it:
    - **One or many in a git repository**: `templates/shop/`, `templates/docs/` and so on — users write `https://github.com/acme/templates/templates/shop`, and `#v2` names a tag. Tag releases, so a user can stay on a version by name.
-   - **On npm**: any package works (`unify init <name>`), and naming it `unify-<name>-template` (or `@acme/unify-<name>-template`) is the convention that lets a search for `unify-` `-template` list it beside the others. `package.json` and lockfiles are never scaffolded, so the package can carry whatever metadata it needs. Publish versions as usual; users name one with `@version`. The five built-ins are published this way — `unify-default-template`, `unify-basic-template`, `unify-blog-template`, `unify-docs-template` and `unify-portfolio-template` — each from the `package.json` in its `templates/<name>/` directory, by `.github/workflows/publish-templates.yml` whenever a template's version changes on `main`; `README.md` is both the guidance the scaffold lands at the project root and the package's page on npm.
+   - **On npm**: any package works (`unify init <name>`), under any name. Put `unify-template` in the `keywords` of its `package.json`: a search for that keyword (`npm search keywords:unify-template`, and the template list on fwdslsh.dev) is how a template is found beside the others, and a package without it is not listed. `package.json` and lockfiles are never scaffolded, so the package can carry whatever other metadata it needs. Publish versions as usual; users name one with `@version`. The five built-ins are published this way — `unify-default-template`, `unify-basic-template`, `unify-blog-template`, `unify-docs-template` and `unify-portfolio-template` — each from the `package.json` in its `templates/<name>/` directory, by `.github/workflows/publish-templates.yml` whenever a template's version changes on `main`; `README.md` is both the guidance the scaffold lands at the project root and the package's page on npm.
    - **As a directory**, for a template that lives beside the sites it serves.
 4. **Release updates** with the copy in mind: change the tooling and the examples freely — a site that followed the convention has edited neither — and leave the few files from the section above alone. A file you remove stays in every site.
 

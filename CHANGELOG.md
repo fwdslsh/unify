@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **A template is found on npm by keyword, not by name.** A template published to npm carries
+  `unify-template` in its `keywords`, as the five built-ins do, and that keyword is what npm searches and the
+  template list on fwdslsh.dev match. The `unify-<name>-template` naming convention is no longer documented;
+  `unify init` takes any package name as before (spec §19.9).
+
 ## [0.11.7] - 2026-10-06
 
 ### Changed
