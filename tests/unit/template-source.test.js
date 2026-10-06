@@ -47,7 +47,7 @@ describe("classifyTemplateSource()", () => {
     expect(classifyTemplateSource("./blog", BUILT_INS, cwd)).toEqual({ kind: "dir", path: join(cwd, "blog") });
   });
 
-  test("an npm package is any name as published, scoped or not, optionally @version or @tag — the unify-<name>-template convention is not required", () => {
+  test("an npm package is any name as published, scoped or not, optionally @version or @tag — no naming convention is required", () => {
     const cwd = tempDir();
     for (const spec of ["unify-shop-template", "@fwdslsh/unify-shop-template", "@fwdslsh/unify-shop-template@1.2.0", "unify-shop-template@next", "shop-template", "some-theme", "@acme/site", "a.b_c@1.x", "site@^2.0.0"]) {
       expect(classifyTemplateSource(spec, BUILT_INS, cwd)).toEqual({ kind: "npm", spec });
