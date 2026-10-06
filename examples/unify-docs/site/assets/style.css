@@ -183,12 +183,14 @@ a:focus-visible, .skip:focus { outline: 2px solid var(--green); outline-offset: 
 /* The bar must fit every width without wrapping or spilling: the two
    far links go first, then the pill. Measured, not guessed. */
 @media (max-width: 40rem) {
-  .head-links { gap: 1.25rem; }
-  .head-links .head-far { display: none; }
+  /* The row never clips: it shrinks a step, and scrolls sideways before it would. */
+  .head-links { gap: 0.875rem; min-width: 0; overflow-x: auto; }
+  .head-links a { font-size: 0.75rem; white-space: nowrap; }
+  .head-links .head-far, .head-pill { display: none; }
+  .site-head-bar { padding: 0 1rem; }
 }
 @media (max-width: 22.5rem) {
-  .head-pill { display: none; }
-  .site-head-bar { padding: 0 1rem; gap: 0.5rem; }
+  .site-head-bar { gap: 0.5rem; }
 }
 
 /* ------------------------------------------------------------------ shell */
@@ -669,6 +671,58 @@ body.examples main > * { max-width: none; }
    of letting the type selector on `a` (above) paint it the same green as a
    real link. */
 .card-links a:not([href]) { color: var(--dim); cursor: default; }
+
+/* -------------------------------------------------------- templates page */
+
+/* Each template is a <details> card: the summary is the card face, and
+   opening it shows the command that scaffolds a site from the template. */
+/* A closed card keeps its own height instead of stretching to an open neighbour's. */
+.card.template { padding: 0; align-self: start; }
+.card.template summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1.75rem 1.625rem;
+  cursor: pointer;
+  list-style: none;
+}
+.card.template summary::-webkit-details-marker { display: none; }
+.card.template summary h3 { display: flex; align-items: center; gap: 0.75rem; overflow-wrap: anywhere; }
+.card.template .template-desc { font-size: 0.875rem; line-height: 1.65; color: var(--dim); }
+.card.template .template-meta { font-family: var(--mono); font-size: 0.75rem; color: var(--dim); overflow-wrap: anywhere; }
+
+.badge {
+  margin-left: auto;
+  padding: 0.125rem 0.5rem;
+  border: 1px solid var(--green);
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 0.6875rem;
+  font-weight: 400;
+  line-height: 1.6;
+  color: var(--green);
+  white-space: nowrap;
+}
+
+.template-cmd {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0 1.625rem 1.5rem;
+  border-top: 1px solid var(--border-faint);
+}
+.template-cmd .term-body { padding: 1rem 0 0; line-height: 1.6; }
+.card button.more {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--green);
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.card button.more:hover { color: var(--green-bright); }
 
 /* ----------------------------------------------------------------- footer */
 

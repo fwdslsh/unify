@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>Templates</title>
+    <meta name="description" content="Every template a unify site can start from, the five built into the CLI and every package on npm with the unify-template keyword, each with the command that scaffolds it.">
+    <meta name="schema" content="WebPage">
+  </head>
+  <body class="examples">
+    <main>
+      <section class="examples-head">
+        <h1>Templates</h1>
+        <p class="lede">Every template you can start a site from. The five built into the CLI need
+        no network; they are also on npm, beside every template published with the
+        <code>unify-template</code> keyword. Click a template for the command that scaffolds a
+        site from it. <a href="/docs/templates.html">The templates guide</a> covers starting from
+        one, staying current with <code>unify update</code>, and publishing your own.</p>
+        <p class="note" id="templates-status" role="status" aria-live="polite">Searching npm for templates…</p>
+        <noscript>
+          <p class="note">JavaScript is off, so only the built-in templates are listed;
+          <a href="https://www.npmjs.com/search?q=keywords:unify-template">search npm</a> for the rest.</p>
+        </noscript>
+      </section>
+
+      <section class="examples-section">
+        <!-- The five built-ins are written here so the page is complete without a script: each
+             card opens to its command. The script below adds each one's npm version and a card
+             for every other package published with the unify-template keyword. -->
+        <div class="card-grid" id="templates">
+          <details class="card template" data-package="unify-default-template">
+            <summary>
+              <h3>default <span class="badge">built in</span></h3>
+              <span class="template-desc">What <code>unify init</code> writes with no argument: a layout, a nav, a 404 page, and example about and contact pages to copy.</span>
+              <span class="template-meta">unify-default-template</span>
+            </summary>
+            <div class="template-cmd">
+              <pre class="term-body"><code><span class="prompt">$</span> <span class="cmd">unify init</span></code></pre>
+              <div class="card-links">
+                <button type="button" class="more" data-copy="unify init">Copy command</button>
+                <a class="more" href="https://github.com/fwdslsh/unify/blob/main/templates/default/README.md">README →</a>
+              </div>
+            </div>
+          </details>
+          <details class="card template" data-package="unify-basic-template">
+            <summary>
+              <h3>basic <span class="badge">built in</span></h3>
+              <span class="template-desc">The smallest start: a layout, a nav, a home page and a 404 page, with a contact page as the example.</span>
+              <span class="template-meta">unify-basic-template</span>
+            </summary>
+            <div class="template-cmd">
+              <pre class="term-body"><code><span class="prompt">$</span> <span class="cmd">unify init basic</span></code></pre>
+              <div class="card-links">
+                <button type="button" class="more" data-copy="unify init basic">Copy command</button>
+                <a class="more" href="https://github.com/fwdslsh/unify/blob/main/templates/basic/README.md">README →</a>
+              </div>
+            </div>
+          </details>
+          <details class="card template" data-package="unify-blog-template">
+            <summary>
+              <h3>blog <span class="badge">built in</span></h3>
+              <span class="template-desc">Posts in Markdown, with a post index and an Atom feed written by a generator, and an example post and authors file to copy into place.</span>
+              <span class="template-meta">unify-blog-template</span>
+            </summary>
+            <div class="template-cmd">
+              <pre class="term-body"><code><span class="prompt">$</span> <span class="cmd">unify init blog</span></code></pre>
+              <div class="card-links">
+                <button type="button" class="more" data-copy="unify init blog">Copy command</button>
+                <a class="more" href="https://github.com/fwdslsh/unify/blob/main/templates/blog/README.md">README →</a>
+              </div>
+            </div>
+          </details>
+          <details class="card template" data-package="unify-docs-template">
+            <summary>
+              <h3>docs <span class="badge">built in</span></h3>
+              <span class="template-desc">A documentation site with an all-pages index, and an example guide page to copy.</span>
+              <span class="template-meta">unify-docs-template</span>
+            </summary>
+            <div class="template-cmd">
+              <pre class="term-body"><code><span class="prompt">$</span> <span class="cmd">unify init docs</span></code></pre>
+              <div class="card-links">
+                <button type="button" class="more" data-copy="unify init docs">Copy command</button>
+                <a class="more" href="https://github.com/fwdslsh/unify/blob/main/templates/docs/README.md">README →</a>
+              </div>
+            </div>
+          </details>
+          <details class="card template" data-package="unify-portfolio-template">
+            <summary>
+              <h3>portfolio <span class="badge">built in</span></h3>
+              <span class="template-desc">A portfolio with example work and project pages to copy.</span>
+              <span class="template-meta">unify-portfolio-template</span>
+            </summary>
+            <div class="template-cmd">
+              <pre class="term-body"><code><span class="prompt">$</span> <span class="cmd">unify init portfolio</span></code></pre>
+              <div class="card-links">
+                <button type="button" class="more" data-copy="unify init portfolio">Copy command</button>
+                <a class="more" href="https://github.com/fwdslsh/unify/blob/main/templates/portfolio/README.md">README →</a>
+              </div>
+            </div>
+          </details>
+        </div>
+      </section>
+    </main>
+
+    <!-- The templates on npm: every package published with the unify-template keyword, which
+         the registry matches exactly. A built-in already on the page gets its npm version; any
+         other package gets a card of its own. The copy buttons use the clipboard where it is
+         available; the command is plain text on the page either way. -->
+    <script>
+      document.addEventListener("DOMContentLoaded", async () => {
+        const status = document.getElementById("templates-status");
+        const grid = document.getElementById("templates");
+        const escape = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({
+          "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+        })[c]);
+        const when = (iso) => new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+        const meta = (pkg) => `v${escape(pkg.version)}${pkg.date ? ` · ${when(pkg.date)}` : ""}`;
+        const card = (pkg) => `<details class="card template">
+          <summary>
+            <h3>${escape(pkg.name)}</h3>
+            <span class="template-desc">${escape(pkg.description || "No description yet.")}</span>
+            <span class="template-meta">${meta(pkg)}</span>
+          </summary>
+          <div class="template-cmd">
+            <pre class="term-body"><code><span class="prompt">$</span> <span class="cmd">unify init ${escape(pkg.name)}</span></code></pre>
+            <div class="card-links">
+              <button type="button" class="more" data-copy="unify init ${escape(pkg.name)}">Copy command</button>
+              <a class="more" href="https://www.npmjs.com/package/${escape(pkg.name)}">README on npm →</a>
+            </div>
+          </div>
+        </details>`;
+
+        grid.addEventListener("click", async (event) => {
+          const button = event.target.closest("button[data-copy]");
+          if (!button) return;
+          try {
+            await navigator.clipboard.writeText(button.dataset.copy);
+            button.textContent = "Copied";
+          } catch {
+            button.textContent = "Select the command above";
+          }
+          setTimeout(() => { button.textContent = "Copy command"; }, 1500);
+        });
+
+        try {
+          const page = async (from) => {
+            const response = await fetch(`https://registry.npmjs.org/-/v1/search?text=keywords:unify-template&size=250&from=${from}`);
+            if (!response.ok) throw new Error(`npm answered ${response.status}`);
+            return response.json();
+          };
+          const first = await page(0);
+          const pages = Math.min(Math.ceil(first.total / 250), 20);
+          const rest = await Promise.all(Array.from({ length: pages - 1 }, (_, i) => page((i + 1) * 250)));
+          const found = [first, ...rest].flatMap((result) => result.objects.map((entry) => entry.package));
+          const templates = [...new Map(found.map((pkg) => [pkg.name, pkg])).values()]
+            .sort((a, b) => a.name.localeCompare(b.name));
+          let added = 0;
+          for (const pkg of templates) {
+            const known = grid.querySelector(`[data-package="${pkg.name}"] .template-meta`);
+            if (known) known.insertAdjacentHTML("beforeend", ` · ${meta(pkg)}`);
+            else { grid.insertAdjacentHTML("beforeend", card(pkg)); added++; }
+          }
+          const builtIn = grid.querySelectorAll("[data-package]").length;
+          status.textContent = `${builtIn + added} templates · ${builtIn} built into the CLI · ${templates.length} on npm`;
+        } catch {
+          status.innerHTML = 'Could not reach npm, so only the built-ins are listed. <a href="https://www.npmjs.com/search?q=keywords:unify-template">Search npm directly</a>.';
+        }
+      });
+    </script>
+  </body>
+</html>
