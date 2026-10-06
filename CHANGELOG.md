@@ -19,8 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The scaffold's guidance file is `README.md`.** The file every template placed at the project root as
   `AGENTS.md` is now `README.md` — the same content, under the name npm shows as a package's page and a
   repository shows first — so `unify init` writes `README.md`, `DEPLOY.md` and `unify.yaml` beside `site/`,
-  and refuses, as before, when a `README.md` already exists where it would write one (spec §19.4, product-spec
-  §6.7, rule SCF-09).
+  and keeps a `README.md` that already exists there as it is — the one file an existing copy of does not refuse
+  the scaffold, since a project usually has a README before it has a site (spec §19.4, product-spec §6.7, rule
+  SCF-09).
 
 ## [0.11.6] - 2026-10-05
 

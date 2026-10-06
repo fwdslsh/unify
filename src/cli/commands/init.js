@@ -152,16 +152,21 @@ export async function init({ sourceRoot, sourceDefaulted, template, reporter, au
     );
   }
 
+  // A README.md the author already has stays theirs: a repository usually has
+  // one before it has a site, so the template's copy is skipped, never written
+  // and never refused over. It is the one file treated this way — DEPLOY.md,
+  // unify.yaml and everything under the source root still refuse below.
+  const kept = "README.md" in rootFiles && existsSync(join(projectRoot, "README.md")) ? ["README.md"] : [];
   const writes = [
     ...Object.entries(files).map(([relPath, content]) => [join(target, ...relPath.split("/")), content]),
-    ...Object.entries(rootFiles).map(([relPath, content]) => [join(projectRoot, ...relPath.split("/")), content]),
+    ...Object.entries(rootFiles).filter(([relPath]) => !kept.includes(relPath)).map(([relPath, content]) => [join(projectRoot, ...relPath.split("/")), content]),
   ];
 
   // §19 doesn't say what happens when the target already has files; the
   // conservative, spec-silent-safe default is to refuse rather than risk
   // clobbering something the author wrote (see the implementation report).
-  // §19.4 puts the project-root pair under the same refusal: an README.md the
-  // author already wrote is exactly the file this must not overwrite.
+  // §19.4 puts DEPLOY.md under the same refusal; an existing README.md was
+  // taken out of the write set above, so it is neither overwritten nor refused.
   const collisions = writes.map(([absPath]) => absPath).filter((absPath) => existsSync(absPath));
 
   // "Writes nothing" has to cover the directories the writes IMPLY, not only
@@ -205,7 +210,7 @@ export async function init({ sourceRoot, sourceDefaulted, template, reporter, au
     // Name the files, not a directory. Since §19.4 the write set spans TWO
     // directories — the source root and the project root — so "already exist
     // in <source root>" was a false sentence for exactly the collision that
-    // section added: an author's own README.md, which is not in the source
+    // section added: an author's own DEPLOY.md, which is not in the source
     // root at all. §14.1's wording is prose; where a diagnostic points is not.
     const named = collisions.map((absPath) => toRelative(projectRoot, absPath) || absPath).sort();
     const listed = named.slice(0, 3).join(", ") + (named.length > 3 ? `, and ${named.length - 3} more` : "");
@@ -236,8 +241,10 @@ export async function init({ sourceRoot, sourceDefaulted, template, reporter, au
   const restoreConfig = () => (priorConfig === null ? rmSync(configFile, { force: true }) : writeFileSync(configFile, priorConfig));
 
   const shown = toRelative(projectRoot, target) || ".";
-  const atRoot = rootNames.length === 0 ? "" : `, ${rootNames.length === 2 ? rootNames.join(" and ") : rootNames.join(", ")} at the project root`;
-  reporter.summary(`scaffolded ${label} (${writes.length} files): ${Object.keys(files).length} into ${shown}${atRoot}`);
+  const written = rootNames.filter((name) => !kept.includes(name));
+  const atRoot = written.length === 0 ? "" : `, ${written.length === 2 ? written.join(" and ") : written.join(", ")} at the project root`;
+  const keptNote = kept.length === 0 ? "" : `; ${kept.join(", ")} already exists and was kept`;
+  reporter.summary(`scaffolded ${label} (${writes.length} files): ${Object.keys(files).length} into ${shown}${atRoot}${keptNote}`);
   reporter.summary(`recorded template: ${recorded} in ${toRelative(projectRoot, configFile) || "unify.yaml"} — unify update fetches it again`);
 
   if (audit) {

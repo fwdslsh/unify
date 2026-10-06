@@ -222,15 +222,25 @@ describe("init()", () => {
     }
   });
 
-  test("an existing README.md refuses the whole scaffold, and nothing at all is written", async () => {
+  test("an existing README.md is kept as it is, and the rest of the scaffold is written", async () => {
     const root = tempDir();
     writeFileSync(join(root, "README.md"), "# my own guidance\n");
+    const code = await init({ projectRoot: root, sourceRoot: root, sourceDefaulted: true, template: "basic", reporter: silentReporter() });
+    expect(code).toBe(0);
+    expect(readFileSync(join(root, "README.md"), "utf8")).toBe("# my own guidance\n");
+    expect(existsSync(join(root, "site", "index.html"))).toBe(true);
+    expect(existsSync(join(root, "DEPLOY.md"))).toBe(true);
+  });
+
+  test("an existing DEPLOY.md refuses the whole scaffold, and nothing at all is written", async () => {
+    const root = tempDir();
+    writeFileSync(join(root, "DEPLOY.md"), "# my own recipe\n");
     await expect(
       init({ projectRoot: root, sourceRoot: root, sourceDefaulted: true, template: "basic", reporter: silentReporter() }),
     ).rejects.toThrow(UsageError);
-    expect(readFileSync(join(root, "README.md"), "utf8")).toBe("# my own guidance\n");
+    expect(readFileSync(join(root, "DEPLOY.md"), "utf8")).toBe("# my own recipe\n");
     expect(existsSync(join(root, "site"))).toBe(false);
-    expect(existsSync(join(root, "DEPLOY.md"))).toBe(false);
+    expect(existsSync(join(root, "README.md"))).toBe(false);
   });
 
   test("the scaffolded-file count includes the project-root files", async () => {

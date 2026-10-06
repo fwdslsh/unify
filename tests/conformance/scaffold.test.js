@@ -188,18 +188,28 @@ test("scaffold: SCF-10 — the share image scaffolds as raw bytes, and its own I
   covers("SCF-10");
 }, TEST_MS);
 
-test("scaffold: SCF-09 — the project-root files participate in init's refusal; nothing is written", async () => {
-  // §19.4: "Both participate in the existing refusal: init writes nothing
-  // when any file it would create already exists." An README.md the author
-  // wrote themselves is exactly the file that must not be overwritten.
+test("scaffold: SCF-09 — an existing README.md is kept; DEPLOY.md participates in init's refusal and nothing is written", async () => {
+  // §19.4: a README.md the author already has is kept, never overwritten and
+  // never refused over — a repository usually has one before it has a site.
+  {
+    const tmp = mkTmp();
+    writeFileSync(join(tmp, "README.md"), "# my own guidance\n");
+    const r = await runCli(["init", "blog"], tmp);
+    if (r.exit !== 0) throw new Error(`unify init with an existing README.md exited ${r.exit}, expected 0\nstderr:\n${r.stderr}`);
+    if (readFileSync(join(tmp, "README.md"), "utf8") !== "# my own guidance\n") throw new Error("init overwrote the author's README.md");
+    if (!existsSync(join(tmp, "site", "index.html")) || !existsSync(join(tmp, "DEPLOY.md"))) throw new Error("init kept README.md but did not scaffold the rest");
+    if (!/README\.md already exists and was kept/.test(r.stdout)) throw new Error(`the summary must say README.md was kept:\n${r.stdout}`);
+  }
+  // "DEPLOY.md participates in the existing refusal: init writes nothing
+  // when any file it would create already exists."
   const tmp = mkTmp();
-  writeFileSync(join(tmp, "README.md"), "# my own guidance\n");
+  writeFileSync(join(tmp, "DEPLOY.md"), "# my own recipe\n");
 
   const r = await runCli(["init", "blog"], tmp);
-  if (r.exit !== 2) throw new Error(`unify init with an existing README.md exited ${r.exit}, expected the usage refusal (2)\nstderr:\n${r.stderr}`);
-  if (readFileSync(join(tmp, "README.md"), "utf8") !== "# my own guidance\n") throw new Error("init overwrote the author's README.md");
+  if (r.exit !== 2) throw new Error(`unify init with an existing DEPLOY.md exited ${r.exit}, expected the usage refusal (2)\nstderr:\n${r.stderr}`);
+  if (readFileSync(join(tmp, "DEPLOY.md"), "utf8") !== "# my own recipe\n") throw new Error("init overwrote the author's DEPLOY.md");
   if (existsSync(join(tmp, "site"))) throw new Error("init refused but still created site/ — the refusal must write nothing at all");
-  if (existsSync(join(tmp, "DEPLOY.md"))) throw new Error("init refused but still wrote DEPLOY.md");
+  if (existsSync(join(tmp, "README.md"))) throw new Error("init refused but still wrote README.md");
 
   covers("SCF-09");
 }, TEST_MS);
