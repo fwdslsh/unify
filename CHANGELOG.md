@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.7] - 2026-10-06
+
 ### Changed
 
 - **Every built-in template is an npm package.** `templates/<name>/` carries a `package.json` naming it
@@ -925,7 +927,10 @@ with generated compare-link notes only. Their diffs are on the
 [releases page](https://github.com/fwdslsh/unify/releases). Nothing here
 retroactively reconstructs detail those notes never carried.
 
-[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.11.4...HEAD
+[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.11.7...HEAD
+[0.11.7]: https://github.com/fwdslsh/unify/compare/v0.11.6...v0.11.7
+[0.11.6]: https://github.com/fwdslsh/unify/compare/v0.11.5...v0.11.6
+[0.11.5]: https://github.com/fwdslsh/unify/compare/v0.11.4...v0.11.5
 [0.11.4]: https://github.com/fwdslsh/unify/compare/v0.11.3...v0.11.4
 [0.11.3]: https://github.com/fwdslsh/unify/compare/v0.11.2...v0.11.3
 [0.11.2]: https://github.com/fwdslsh/unify/compare/v0.11.1...v0.11.2
