@@ -29,7 +29,7 @@ Upload `dist/` anywhere: GitHub Pages, Netlify, any static host.
 
 ```
 my-site/
-├── AGENTS.md             # notes for whoever edits this site next — outside site/, so it never publishes
+├── README.md             # notes for whoever edits this site next — outside site/, so it never publishes
 ├── DEPLOY.md             # how to publish it, ending in the two commands that carry your address
 ├── unify.yaml            # every build flag, described and commented out — uncomment what differs from the default; live: template:, where this came from for `unify update` and, under it, keep:, the files it never overwrites
 └── site/                 # the source root — everything here ships

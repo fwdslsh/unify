@@ -23,7 +23,7 @@
  *
  * A template is a PROJECT laid out the way `init` lays one out (§19.4): a
  * source tree — `site/`, or `src/`, found by the same walk `unify build` uses
- * — beside whatever belongs at the project root (`AGENTS.md`, `DEPLOY.md`,
+ * — beside whatever belongs at the project root (`README.md`, `DEPLOY.md`,
  * `unify.yaml`, a generator in `scripts/`). A template with neither directory
  * is a bare source tree and everything in it is content. What a template's own
  * packaging needed is never copied: `.git/`, `node_modules/`, `package.json`
@@ -247,7 +247,7 @@ export function readTemplateTree(root, label) {
   }
   if (Object.keys(files).length === 0) {
     throw new UsageError(`template ${label} has no source files`, [
-      "a template is a project laid out like unify init's own: a site/ (or src/) directory beside AGENTS.md, DEPLOY.md and unify.yaml",
+      "a template is a project laid out like unify init's own: a site/ (or src/) directory beside README.md, DEPLOY.md and unify.yaml",
       "a directory with neither site/ nor src/ is read as a bare source tree, so it must hold at least one file",
     ]);
   }

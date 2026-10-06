@@ -2,7 +2,7 @@
 
 **Role**: The guide to unify's template features — scaffolding a site from a built-in, a directory, a git repository or an npm package, keeping that site current with `unify update`, and publishing a template for others. The normative rules are in [`conformance-spec.md`](conformance-spec.md) §19.9 and §19.10; every command and flag is in [`cli-reference.md`](cli-reference.md). Read [`getting-started.md`](getting-started.md) first if you have never run `unify init`.
 
-A template is nothing more than a unify project: a `site/` directory beside the files that belong at the project root (`AGENTS.md`, `DEPLOY.md`, `unify.yaml`, perhaps a generator in `scripts/`). That is what `unify init` writes, and it is also what `unify init` reads. There is no template language, no manifest, no file list, and nothing a template can execute on your machine.
+A template is nothing more than a unify project: a `site/` directory beside the files that belong at the project root (`README.md`, `DEPLOY.md`, `unify.yaml`, perhaps a generator in `scripts/`). That is what `unify init` writes, and it is also what `unify init` reads. There is no template language, no manifest, no file list, and nothing a template can execute on your machine.
 
 ## 1. Scaffold from a template
 
@@ -123,7 +123,7 @@ A template is a project, so the way to make one is to make a site and strip it t
 
 ### Tooling in place, examples to copy
 
-A site is two kinds of file. The **tooling** — layout, includes, stylesheet, scripts, the deployment recipe, `AGENTS.md` — is yours as the template's author: sites take it as is, and every improvement you release should reach them. The **content and configuration** — pages, posts, data files, a settings file — is the site's: its author rewrites it on day one and never wants it back. Ship the first kind in place, and the second kind only as **examples**, under a path the build never publishes:
+A site is two kinds of file. The **tooling** — layout, includes, stylesheet, scripts, the deployment recipe, `README.md` — is yours as the template's author: sites take it as is, and every improvement you release should reach them. The **content and configuration** — pages, posts, data files, a settings file — is the site's: its author rewrites it on day one and never wants it back. Ship the first kind in place, and the second kind only as **examples**, under a path the build never publishes:
 
 ```
 site/
@@ -136,12 +136,12 @@ site/
     post.md             examples: copied into place, then edited — never edited where they are
     author.json
     landing-page.html
-AGENTS.md               tooling: tells the author (or their agent) to copy from _examples/
+README.md               tooling: tells the author (or their agent) to copy from _examples/
 DEPLOY.md
 unify.yaml              its template: block keeps unify.yaml and site/assets/theme.css — the files update never overwrites
 ```
 
-The underscore does the work. `_examples/` is excluded from the build by the default `_*` rule, so the examples ship with the template, land in every site, and never publish. The site's author copies `_examples/post.md` to `posts/first-post.md` and edits the copy. The copy is a path the template does not ship, so `update` never visits it; `_examples/post.md` itself is never edited, so it updates cleanly whenever you improve it. Convention over configuration: nothing is declared anywhere, and the path alone says whose a file is. Say so in the template's `AGENTS.md`, which is where an author or an agent looks first.
+The underscore does the work. `_examples/` is excluded from the build by the default `_*` rule, so the examples ship with the template, land in every site, and never publish. The site's author copies `_examples/post.md` to `posts/first-post.md` and edits the copy. The copy is a path the template does not ship, so `update` never visits it; `_examples/post.md` itself is never edited, so it updates cleanly whenever you improve it. Convention over configuration: nothing is declared anywhere, and the path alone says whose a file is. Say so in the template's `README.md`, which is where an author or an agent looks first.
 
 The five built-ins are laid out this way: `unify init blog`, for instance, ships `_examples/post.md` and `_examples/authors.json`, and its generator writes a listing that says there are no posts yet until the first one is copied into place.
 
@@ -169,15 +169,15 @@ A fresh scaffold has to build — `unify audit --strict` must pass on it, since 
 
 ### Make it audit clean, then host it
 
-1. **Lay it out as `init` does**: `site/` beside `AGENTS.md`, `DEPLOY.md` (and `scripts/gen.mjs` if the site needs a generator). The easiest start is `unify init` itself.
+1. **Lay it out as `init` does**: `site/` beside `README.md`, `DEPLOY.md` (and `scripts/gen.mjs` if the site needs a generator). The easiest start is `unify init` itself.
 2. **Make it audit clean**: `unify audit --strict` must exit 0 from a fresh scaffold, with no flags and nothing edited. That is what `--audit` checks on the receiving side, and what the built-ins guarantee. Examples under `_examples/` are never built, so they cannot fail it.
 3. **Host it** wherever its users can fetch it:
    - **One or many in a git repository**: `templates/shop/`, `templates/docs/` and so on — users write `https://github.com/acme/templates/templates/shop`, and `#v2` names a tag. Tag releases, so a user can stay on a version by name.
-   - **On npm**: any package works (`unify init <name>`), and naming it `unify-<name>-template` (or `@acme/unify-<name>-template`) is the convention that lets a search for `unify-` `-template` list it beside the others. `package.json` and lockfiles are never scaffolded, so the package can carry whatever metadata it needs. Publish versions as usual; users name one with `@version`.
+   - **On npm**: any package works (`unify init <name>`), and naming it `unify-<name>-template` (or `@acme/unify-<name>-template`) is the convention that lets a search for `unify-` `-template` list it beside the others. `package.json` and lockfiles are never scaffolded, so the package can carry whatever metadata it needs. Publish versions as usual; users name one with `@version`. The five built-ins are published this way — `unify-default-template`, `unify-basic-template`, `unify-blog-template`, `unify-docs-template` and `unify-portfolio-template` — each from the `package.json` in its `templates/<name>/` directory, by `.github/workflows/publish-templates.yml` whenever a template's version changes on `main`; `README.md` is both the guidance the scaffold lands at the project root and the package's page on npm.
    - **As a directory**, for a template that lives beside the sites it serves.
 4. **Release updates** with the copy in mind: change the tooling and the examples freely — a site that followed the convention has edited neither — and leave the few files from the section above alone. A file you remove stays in every site.
 
-Nothing a template ships is ever executed by `init` or `update`. A template that needs a setup step documents it in its `AGENTS.md` or `DEPLOY.md`, exactly as the built-ins do.
+Nothing a template ships is ever executed by `init` or `update`. A template that needs a setup step documents it in its `README.md` or `DEPLOY.md`, exactly as the built-ins do.
 
 ## 4. Where to look next
 

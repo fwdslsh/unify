@@ -4,7 +4,7 @@
  * snapshot in step (conformance-spec §19.5, §19.9).
  *
  * `templates/<name>/` is the source of truth for a built-in template: a
- * complete project — `site/` beside `AGENTS.md`, `DEPLOY.md` (and the blog's
+ * complete project — `site/` beside `README.md`, `DEPLOY.md` (and the blog's
  * `scripts/gen.mjs`, and a `unify.yaml` with the lines the template needs
  * live — `keep:` under `template:` in every built-in, §19.11) — laid out
  * exactly as `unify init`

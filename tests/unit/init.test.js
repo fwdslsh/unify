@@ -17,7 +17,7 @@ import { Reporter, UsageError } from "../../src/core/diagnostics.js";
 import { TEMPLATES, TEMPLATE_ROOT_FILES } from "../../src/templates/index.js";
 
 /** The project-root files every built-in shares (§19.4). */
-const ROOT_FILES = Object.fromEntries(["AGENTS.md", "DEPLOY.md", "unify.yaml"].map((f) => [f, TEMPLATE_ROOT_FILES.default[f]]));
+const ROOT_FILES = Object.fromEntries(["README.md", "DEPLOY.md", "unify.yaml"].map((f) => [f, TEMPLATE_ROOT_FILES.default[f]]));
 
 const dirs = [];
 function tempDir() {
@@ -61,11 +61,11 @@ describe("init()", () => {
     expect(code).toBe(0);
     expect(existsSync(join(site, "index.html"))).toBe(true);
     expect(existsSync(join(site, "src"))).toBe(false);
-    expect(existsSync(join(root, "AGENTS.md"))).toBe(true);
+    expect(existsSync(join(root, "README.md"))).toBe(true);
   });
 
   test("refuses (exit 2) when the project root IS the source root — the two files could only publish", async () => {
-    // This case used to scaffold, and the tree it produced published AGENTS.md
+    // This case used to scaffold, and the tree it produced published README.md
     // and DEPLOY.md as pages: §19.4's placement rule and its "neither can
     // publish" property cannot both hold when the working directory and the
     // source root are one directory, and the section now says which way that
@@ -75,7 +75,7 @@ describe("init()", () => {
       init({ projectRoot: root, sourceRoot: root, sourceDefaulted: false, template: "basic", reporter: silentReporter() }),
     ).rejects.toThrow(UsageError);
     expect(existsSync(join(root, "index.html"))).toBe(false);
-    expect(existsSync(join(root, "AGENTS.md"))).toBe(false);
+    expect(existsSync(join(root, "README.md"))).toBe(false);
     expect(readdirSync(root)).toEqual([]);
   });
 
@@ -192,7 +192,7 @@ describe("init()", () => {
   // ---- §19.4 — the two project-root files (SCF-09's unit half; the e2e
   // half, which drives the real CLI, lives in tests/conformance/scaffold.test.js)
 
-  test("writes AGENTS.md and DEPLOY.md at the project root, outside the source root", async () => {
+  test("writes README.md and DEPLOY.md at the project root, outside the source root", async () => {
     for (const name of Object.keys(TEMPLATES)) {
       const root = tempDir();
       await init({ projectRoot: root, sourceRoot: root, sourceDefaulted: true, template: name, reporter: silentReporter() });
@@ -222,15 +222,25 @@ describe("init()", () => {
     }
   });
 
-  test("an existing AGENTS.md refuses the whole scaffold, and nothing at all is written", async () => {
+  test("an existing README.md is kept as it is, and the rest of the scaffold is written", async () => {
     const root = tempDir();
-    writeFileSync(join(root, "AGENTS.md"), "# my own guidance\n");
+    writeFileSync(join(root, "README.md"), "# my own guidance\n");
+    const code = await init({ projectRoot: root, sourceRoot: root, sourceDefaulted: true, template: "basic", reporter: silentReporter() });
+    expect(code).toBe(0);
+    expect(readFileSync(join(root, "README.md"), "utf8")).toBe("# my own guidance\n");
+    expect(existsSync(join(root, "site", "index.html"))).toBe(true);
+    expect(existsSync(join(root, "DEPLOY.md"))).toBe(true);
+  });
+
+  test("an existing DEPLOY.md refuses the whole scaffold, and nothing at all is written", async () => {
+    const root = tempDir();
+    writeFileSync(join(root, "DEPLOY.md"), "# my own recipe\n");
     await expect(
       init({ projectRoot: root, sourceRoot: root, sourceDefaulted: true, template: "basic", reporter: silentReporter() }),
     ).rejects.toThrow(UsageError);
-    expect(readFileSync(join(root, "AGENTS.md"), "utf8")).toBe("# my own guidance\n");
+    expect(readFileSync(join(root, "DEPLOY.md"), "utf8")).toBe("# my own recipe\n");
     expect(existsSync(join(root, "site"))).toBe(false);
-    expect(existsSync(join(root, "DEPLOY.md"))).toBe(false);
+    expect(existsSync(join(root, "README.md"))).toBe(false);
   });
 
   test("the scaffolded-file count includes the project-root files", async () => {
@@ -266,7 +276,7 @@ describe("init()", () => {
   });
 
   test("an existing DEPLOY.md refuses too, even when the source root is somewhere else entirely", async () => {
-    // The AGENTS.md case above uses a defaulted source root, where the
+    // The README.md case above uses a defaulted source root, where the
     // colliding path sits directly above the write target. This is the other
     // file and the other source mode: the collision is outside the directory
     // init was told to write into, which an implementation that only checked
@@ -279,7 +289,7 @@ describe("init()", () => {
       init({ projectRoot: cwd, sourceRoot: elsewhere, sourceDefaulted: false, template: "blog", reporter: silentReporter() }),
     ).rejects.toThrow(UsageError);
     expect(readFileSync(join(cwd, "DEPLOY.md"), "utf8")).toBe("# how WE deploy\n");
-    expect(existsSync(join(cwd, "AGENTS.md"))).toBe(false);
+    expect(existsSync(join(cwd, "README.md"))).toBe(false);
     expect(readdirSync(elsewhere)).toEqual([]);
   });
 

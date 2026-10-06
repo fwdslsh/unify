@@ -1,5 +1,7 @@
 # Working on this site
 
+This site was scaffolded from unify's **`default`** template — a layout, a nav include, a home page, and example pages to copy into place. `unify init default` scaffolds it from the copy built into the CLI, `unify init unify-default-template` from npm (where this file is the package's README), and `unify update` fetches it again later.
+
 This site is built by [unify](https://github.com/fwdslsh/unify): plain HTML composed at build time.
 No template language, no variables, no loops, no config — if you reach for `{{ }}`, `{% %}`, props,
 or a config key, the answer here is a different shape.

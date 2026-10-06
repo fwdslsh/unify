@@ -8,6 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.7] - 2026-10-06
+
+### Changed
+
+- **Every built-in template is an npm package.** `templates/<name>/` carries a `package.json` naming it
+  `unify-<name>-template` — `unify-default-template`, `unify-basic-template`, `unify-blog-template`,
+  `unify-docs-template`, `unify-portfolio-template` — and `.github/workflows/publish-templates.yml` publishes
+  each whose version is not on npm yet, after packing it and scaffolding a site from the tarball with
+  `unify init <dir> --audit`. `unify init unify-blog-template` (or `@<version>`) now scaffolds the same
+  project as `unify init blog`; `package.json` is never scaffolded (§19.9), so nothing changes in a site.
+- **The scaffold's guidance file is `README.md`.** The file every template placed at the project root as
+  `AGENTS.md` is now `README.md` — the same content, under the name npm shows as a package's page and a
+  repository shows first — so `unify init` writes `README.md`, `DEPLOY.md` and `unify.yaml` beside `site/`,
+  and keeps a `README.md` that already exists there as it is — the one file an existing copy of does not refuse
+  the scaffold, since a project usually has a README before it has a site (spec §19.4, product-spec §6.7, rule
+  SCF-09).
+
 ## [0.11.6] - 2026-10-05
 
 ### Changed
@@ -910,7 +927,10 @@ with generated compare-link notes only. Their diffs are on the
 [releases page](https://github.com/fwdslsh/unify/releases). Nothing here
 retroactively reconstructs detail those notes never carried.
 
-[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.11.4...HEAD
+[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.11.7...HEAD
+[0.11.7]: https://github.com/fwdslsh/unify/compare/v0.11.6...v0.11.7
+[0.11.6]: https://github.com/fwdslsh/unify/compare/v0.11.5...v0.11.6
+[0.11.5]: https://github.com/fwdslsh/unify/compare/v0.11.4...v0.11.5
 [0.11.4]: https://github.com/fwdslsh/unify/compare/v0.11.3...v0.11.4
 [0.11.3]: https://github.com/fwdslsh/unify/compare/v0.11.2...v0.11.3
 [0.11.2]: https://github.com/fwdslsh/unify/compare/v0.11.1...v0.11.2

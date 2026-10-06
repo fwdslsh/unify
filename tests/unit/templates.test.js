@@ -491,10 +491,10 @@ describe("the embedded snapshot and templates/ agree", () => {
     }
   });
 
-  test("every template is a complete project: site/ beside AGENTS.md and DEPLOY.md, and all five ship the same share image", () => {
+  test("every template is a complete project: site/ beside README.md and DEPLOY.md, and all five ship the same share image", () => {
     const png = TEMPLATES.default["assets/share-placeholder.png"];
     for (const name of Object.keys(TEMPLATES)) {
-      for (const rootFile of ["AGENTS.md", "DEPLOY.md"]) expect(`${name}/${rootFile}`).toBe(`${name}/${rootFile}`.replace(/.*/, (m) => (rootFile in TEMPLATE_ROOT_FILES[name] ? m : `${m} missing`)));
+      for (const rootFile of ["README.md", "DEPLOY.md"]) expect(`${name}/${rootFile}`).toBe(`${name}/${rootFile}`.replace(/.*/, (m) => (rootFile in TEMPLATE_ROOT_FILES[name] ? m : `${m} missing`)));
       expect(Buffer.from(TEMPLATES[name]["assets/share-placeholder.png"]).equals(Buffer.from(png))).toBe(true);
     }
   });
