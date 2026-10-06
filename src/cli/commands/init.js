@@ -76,7 +76,7 @@ const DEFAULT_TEMPLATE = "default";
  *   result passes `unify audit --strict`
  * @param {import('../../core/diagnostics.js').Reporter} context.reporter
  * @param {string} [context.projectRoot] - §19.4's project root: **the working
- *   directory the command ran in**, which is where AGENTS.md and DEPLOY.md
+ *   directory the command ran in**, which is where README.md and DEPLOY.md
  *   land. A parameter rather than a bare `process.cwd()` call for the same
  *   reason `resolveSource(flag, cwd)` and `cleanRefusalReason(out, src, cwd)`
  *   take one — a test may name a directory without moving the process into it
@@ -90,7 +90,7 @@ export async function init({ sourceRoot, sourceDefaulted, template, reporter, au
   const label = template ?? DEFAULT_TEMPLATE;
   const source = classifyTemplateSource(label, Object.keys(TEMPLATES), projectRoot);
   // §19.4/§19.6/§19.8 — a built-in's source tree and project-root files
-  // (AGENTS.md, DEPLOY.md, the all-commented unify.yaml, the blog's
+  // (README.md, DEPLOY.md, the all-commented unify.yaml, the blog's
   // scripts/gen.mjs) come from the registry; every other source is fetched
   // and read into the same two maps (§19.9).
   const fetched = await fetchTemplate(source, label);
@@ -106,7 +106,7 @@ export async function init({ sourceRoot, sourceDefaulted, template, reporter, au
   const target = sourceDefaulted ? join(sourceRoot, "site") : sourceRoot;
 
   // §19.4 — two files scaffold at the PROJECT ROOT, deliberately outside the
-  // source root so that neither can publish: AGENTS.md (product-spec §6.7's
+  // source root so that neither can publish: README.md (product-spec §6.7's
   // repository-local guidance) and DEPLOY.md (the deployment recipe §19.2's
   // items 4 and 7 both defer to). "Project root" has one answer and it is not
   // a guess: the working directory the command ran in. In the fresh-project
@@ -135,7 +135,7 @@ export async function init({ sourceRoot, sourceDefaulted, template, reporter, au
   // guarantee on a scaffold the author has not touched. Refusing is the one
   // repair a scaffolding command actually has: inferring a parent is what
   // §19.4 rules out, renaming defeats the files' purpose, and §4.3 is literal
-  // and would make AGENTS.md unpublishable on every site. This is `init`'s
+  // and would make README.md unpublishable on every site. This is `init`'s
   // rule alone — `unify build --source .` on a tree the author arranged that
   // way is untouched.
   //
@@ -160,7 +160,7 @@ export async function init({ sourceRoot, sourceDefaulted, template, reporter, au
   // §19 doesn't say what happens when the target already has files; the
   // conservative, spec-silent-safe default is to refuse rather than risk
   // clobbering something the author wrote (see the implementation report).
-  // §19.4 puts the project-root pair under the same refusal: an AGENTS.md the
+  // §19.4 puts the project-root pair under the same refusal: an README.md the
   // author already wrote is exactly the file this must not overwrite.
   const collisions = writes.map(([absPath]) => absPath).filter((absPath) => existsSync(absPath));
 
@@ -205,7 +205,7 @@ export async function init({ sourceRoot, sourceDefaulted, template, reporter, au
     // Name the files, not a directory. Since §19.4 the write set spans TWO
     // directories — the source root and the project root — so "already exist
     // in <source root>" was a false sentence for exactly the collision that
-    // section added: an author's own AGENTS.md, which is not in the source
+    // section added: an author's own README.md, which is not in the source
     // root at all. §14.1's wording is prose; where a diagnostic points is not.
     const named = collisions.map((absPath) => toRelative(projectRoot, absPath) || absPath).sort();
     const listed = named.slice(0, 3).join(", ") + (named.length > 3 ? `, and ${named.length - 3} more` : "");

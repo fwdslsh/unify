@@ -1,5 +1,7 @@
 # Working on this site
 
+This site was scaffolded from unify's **`portfolio`** template — a portfolio: project pages and a work index. `unify init portfolio` scaffolds it from the copy built into the CLI, `unify init unify-portfolio-template` from npm (where this file is the package's README), and `unify update` fetches it again later.
+
 This site is built by [unify](https://github.com/fwdslsh/unify): plain HTML composed at build time.
 No template language, no variables, no loops, no config — if you reach for `{{ }}`, `{% %}`, props,
 or a config key, the answer here is a different shape.

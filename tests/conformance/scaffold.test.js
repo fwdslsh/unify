@@ -86,10 +86,10 @@ for (const name of TEMPLATES) {
       throw new Error(`assets/style.css is missing the design-time preview rule "slot { display: contents }":\n${styleCss}`);
     }
 
-    // ---- SCF-09: AGENTS.md and DEPLOY.md at the PROJECT ROOT — the working
+    // ---- SCF-09: README.md and DEPLOY.md at the PROJECT ROOT — the working
     // directory `unify init` ran in — and outside the source root, so that
     // neither can publish (§19.4). -----------------------------------------
-    for (const rootFile of ["AGENTS.md", "DEPLOY.md"]) {
+    for (const rootFile of ["README.md", "DEPLOY.md"]) {
       if (!existsSync(join(tmp, rootFile))) {
         throw new Error(`unify init ${name} did not write ${rootFile} at the project root (${tmp})`);
       }
@@ -97,12 +97,12 @@ for (const name of TEMPLATES) {
         throw new Error(`${rootFile} landed inside the source root — a .md file there is a page and would publish`);
       }
     }
-    const agentsMd = readFileSync(join(tmp, "AGENTS.md"), "utf8");
+    const agentsMd = readFileSync(join(tmp, "README.md"), "utf8");
     // The high-conflict rules §19.4 enumerates, by the token an author greps
     // for. The rule set is the author-facing documents' — this asserts the
     // guide repeats them, not that it invents a variant.
     for (const rule of ["data-layout", "--base-url", "draft", "permalink", "slug", "<include", "schema", "unify audit", "--dry-run"]) {
-      if (!agentsMd.includes(rule)) throw new Error(`AGENTS.md never mentions ${rule} — §19.4 lists it among the rules it repeats`);
+      if (!agentsMd.includes(rule)) throw new Error(`README.md never mentions ${rule} — §19.4 lists it among the rules it repeats`);
     }
     const deployMd = readFileSync(join(tmp, "DEPLOY.md"), "utf8");
     // §19.2 items 4 and 7 both defer here: the two commands that carry the
@@ -137,7 +137,7 @@ for (const name of TEMPLATES) {
       if (text.includes("<slot")) throw new Error(`built page still contains a <slot> element: ${htmlFile}`);
     }
     // SCF-09's other half: outside the source root means it cannot publish.
-    for (const rootFile of ["AGENTS.md", "DEPLOY.md"]) {
+    for (const rootFile of ["README.md", "DEPLOY.md"]) {
       if (existsSync(join(distDir, rootFile))) throw new Error(`${rootFile} published to dist/ — §19.4 puts it outside the source root exactly so it cannot`);
     }
 
@@ -190,14 +190,14 @@ test("scaffold: SCF-10 — the share image scaffolds as raw bytes, and its own I
 
 test("scaffold: SCF-09 — the project-root files participate in init's refusal; nothing is written", async () => {
   // §19.4: "Both participate in the existing refusal: init writes nothing
-  // when any file it would create already exists." An AGENTS.md the author
+  // when any file it would create already exists." An README.md the author
   // wrote themselves is exactly the file that must not be overwritten.
   const tmp = mkTmp();
-  writeFileSync(join(tmp, "AGENTS.md"), "# my own guidance\n");
+  writeFileSync(join(tmp, "README.md"), "# my own guidance\n");
 
   const r = await runCli(["init", "blog"], tmp);
-  if (r.exit !== 2) throw new Error(`unify init with an existing AGENTS.md exited ${r.exit}, expected the usage refusal (2)\nstderr:\n${r.stderr}`);
-  if (readFileSync(join(tmp, "AGENTS.md"), "utf8") !== "# my own guidance\n") throw new Error("init overwrote the author's AGENTS.md");
+  if (r.exit !== 2) throw new Error(`unify init with an existing README.md exited ${r.exit}, expected the usage refusal (2)\nstderr:\n${r.stderr}`);
+  if (readFileSync(join(tmp, "README.md"), "utf8") !== "# my own guidance\n") throw new Error("init overwrote the author's README.md");
   if (existsSync(join(tmp, "site"))) throw new Error("init refused but still created site/ — the refusal must write nothing at all");
   if (existsSync(join(tmp, "DEPLOY.md"))) throw new Error("init refused but still wrote DEPLOY.md");
 
@@ -259,7 +259,7 @@ test("scaffold/blog: SCF-03 — the scaffold's one shown command is `unify build
   const initR = await runCli(["init", "blog"], tmp);
   if (initR.exit !== 0) throw new Error(`unify init blog exited ${initR.exit}: ${initR.stderr}`);
 
-  for (const rel of ["AGENTS.md", "DEPLOY.md", "site/index.html", "site/_examples/post.md", "scripts/gen.mjs"]) {
+  for (const rel of ["README.md", "DEPLOY.md", "site/index.html", "site/_examples/post.md", "scripts/gen.mjs"]) {
     const text = readFileSync(join(tmp, ...rel.split("/")), "utf8");
     if (/node\s+\S*gen\.mjs\s+&(?:amp;)?&/.test(text)) throw new Error(`${rel} still shows the pre-0.10 \`node …/gen.mjs && unify build\` recipe; the generator runs through unify.yaml now`);
   }
@@ -804,13 +804,13 @@ test("scaffold: SCF-09 — the project root is the working directory, in the fre
   const fresh = mkTmp();
   const freshInit = await runCli(["init", "portfolio"], fresh);
   if (freshInit.exit !== 0) throw new Error(`unify init portfolio exited ${freshInit.exit}: ${freshInit.stderr}`);
-  for (const rootFile of ["AGENTS.md", "DEPLOY.md"]) {
+  for (const rootFile of ["README.md", "DEPLOY.md"]) {
     if (!existsSync(join(fresh, rootFile))) throw new Error(`${rootFile} is not at the working directory unify init ran in`);
     if (existsSync(join(fresh, "site", rootFile))) throw new Error(`${rootFile} landed inside the source root — a .md file there is a page and would publish`);
   }
   const freshBuild = await runCli(["build"], fresh);
   if (freshBuild.exit !== 0) throw new Error(`unify build exited ${freshBuild.exit}: ${freshBuild.stderr}`);
-  for (const rootFile of ["AGENTS.md", "DEPLOY.md"]) {
+  for (const rootFile of ["README.md", "DEPLOY.md"]) {
     if (existsSync(join(fresh, "dist", rootFile))) throw new Error(`${rootFile} published to dist/ — §19.4 puts it outside the source root exactly so it cannot`);
     if (existsSync(join(fresh, "dist", rootFile.replace(/\.md$/, ".html")))) throw new Error(`${rootFile} composed and published as a page — it is inside the source root`);
   }
@@ -824,14 +824,14 @@ test("scaffold: SCF-09 — the project root is the working directory, in the fre
   if (namedInit.exit !== 0) throw new Error(`unify init docs --source a/b exited ${namedInit.exit}: ${namedInit.stderr}`);
   if (!existsSync(join(named, "a", "b", "_layout.html"))) throw new Error("unify init --source a/b did not scaffold into the directory it was given");
   if (existsSync(join(named, "a", "b", "site"))) throw new Error("an explicit --source must be the scaffold target itself, not a parent of a new src/");
-  for (const rootFile of ["AGENTS.md", "DEPLOY.md"]) {
+  for (const rootFile of ["README.md", "DEPLOY.md"]) {
     if (!existsSync(join(named, rootFile))) throw new Error(`${rootFile} is not at the working directory — §19.4: they land where the author was standing`);
     if (existsSync(join(named, "a", "b", rootFile))) throw new Error(`${rootFile} landed inside the named source root, where it would publish`);
     if (existsSync(join(named, "a", rootFile))) throw new Error(`${rootFile} landed in the PARENT of the named source root — §19.4: unify does not infer a project root from --source, because walking to a parent would write outside the tree the author named`);
   }
   const namedBuild = await runCli(["build", "--source", "a/b"], named);
   if (namedBuild.exit !== 0) throw new Error(`unify build --source a/b exited ${namedBuild.exit}: ${namedBuild.stderr}`);
-  for (const rootFile of ["AGENTS.md", "DEPLOY.md", "AGENTS.html", "DEPLOY.html"]) {
+  for (const rootFile of ["README.md", "DEPLOY.md", "README.html", "DEPLOY.html"]) {
     if (existsSync(join(named, "dist", rootFile))) throw new Error(`${rootFile} reached dist/ from an explicit --source build`);
   }
 
@@ -839,7 +839,7 @@ test("scaffold: SCF-09 — the project root is the working directory, in the fre
 }, TEST_MS);
 
 test("scaffold: SCF-09 — either project-root file already existing refuses the whole scaffold, under an explicit --source too", async () => {
-  // §19.4: "Both participate in the existing refusal." The AGENTS.md case is
+  // §19.4: "Both participate in the existing refusal." The README.md case is
   // proved above with a defaulted source; this is the other file and the other
   // source mode, where the colliding path is not under the target directory at
   // all — the case an implementation that only checked its write target would
@@ -852,7 +852,7 @@ test("scaffold: SCF-09 — either project-root file already existing refuses the
   if (r.exit !== 2) throw new Error(`unify init with an existing DEPLOY.md exited ${r.exit}, expected the usage refusal (2)\nstderr:\n${r.stderr}`);
   if (!r.stderr.includes("DEPLOY.md")) throw new Error(`the refusal does not name the file that collided:\n${r.stderr}`);
   if (readFileSync(join(tmp, "DEPLOY.md"), "utf8") !== "# how WE deploy\n") throw new Error("init overwrote the author's DEPLOY.md");
-  if (existsSync(join(tmp, "AGENTS.md"))) throw new Error("init refused but still wrote AGENTS.md");
+  if (existsSync(join(tmp, "README.md"))) throw new Error("init refused but still wrote README.md");
   if (readdirSync(join(tmp, "site")).length !== 0) throw new Error(`init refused but still wrote into the source root: ${readdirSync(join(tmp, "site")).join(", ")}`);
 
   covers("SCF-09");
@@ -863,14 +863,14 @@ test("scaffold: SCF-09 — init refuses, writing nothing, when the working direc
   // and "written to the working directory the command ran in" — are jointly
   // unsatisfiable for exactly this shape of invocation, and the section now
   // says which way it resolves. Before the refusal existed, `init --source .`
-  // scaffolded happily and the pair composed as pages: `dist/AGENTS.html` and
+  // scaffolded happily and the pair composed as pages: `dist/README.html` and
   // `dist/DEPLOY.html` shipped, and `unify audit --strict` exited 1 with
   // description-missing and page-orphan on each of them — §19.3's second
   // guarantee broken on a scaffold the author had not touched.
   //
   // `--source .` puts the two directories on top of each other; `--source ..`
   // is the sharper form, where the pair would land in a SUBDIRECTORY of the
-  // source root and publish at `inner/AGENTS.html`.
+  // source root and publish at `inner/README.html`.
   for (const [label, args, dir] of [
     ["--source .", ["init", "--source", "."], ""],
     ["--source ..", ["init", "basic", "--source", ".."], "inner"],
@@ -882,7 +882,7 @@ test("scaffold: SCF-09 — init refuses, writing nothing, when the working direc
     const r = await runCli(args, cwd);
     if (r.exit !== 2) throw new Error(`unify init ${label} exited ${r.exit}, expected the usage refusal (2)\nstdout:\n${r.stdout}\nstderr:\n${r.stderr}`);
     if (!/source root/.test(r.stderr)) throw new Error(`the refusal does not name the collision it refused over:\n${r.stderr}`);
-    for (const rootFile of ["AGENTS.md", "DEPLOY.md"]) {
+    for (const rootFile of ["README.md", "DEPLOY.md"]) {
       if (!r.stderr.includes(rootFile)) throw new Error(`the refusal does not name ${rootFile}, the file that would have published:\n${r.stderr}`);
     }
     if (!/fix:/.test(r.stderr)) throw new Error(`the refusal names no fix (§14.1):\n${r.stderr}`);
@@ -1116,7 +1116,7 @@ test("scaffold: the shipped documents' claim about output vocabulary matches the
 // or it is nothing.
 const STANDARD_META_NAMES = ["description", "viewport", "robots", "author", "date", "lastmod", "keywords", "generator", "theme-color", "color-scheme", "referrer"];
 
-test("scaffold: AGENTS.md states no behavior the author-facing documents do not state", async () => {
+test("scaffold: README.md states no behavior the author-facing documents do not state", async () => {
   // §19.4: "It states no behavior the author-facing documents do not state:
   // one rule set, three audiences, never a tool-specific variant", grounded
   // in product-spec §6.7: "no behavior may be documented only in the agent
@@ -1130,7 +1130,7 @@ test("scaffold: AGENTS.md states no behavior the author-facing documents do not 
   // purpose: a behavior spelled only in conformance-spec.md is documented
   // for implementers, which for an author is not documented at all.
   //
-  // Two instances broke it at once, and the first is the worse: AGENTS.md
+  // Two instances broke it at once, and the first is the worse: README.md
   // taught `<meta name="schema">` — the HTML spelling — while both human
   // documents mentioned `schema` only under "## Markdown", as a frontmatter
   // key. Every scaffolded `_layout.html` is an HTML file carrying that meta,
@@ -1142,21 +1142,21 @@ test("scaffold: AGENTS.md states no behavior the author-facing documents do not 
   const tmp = mkTmp();
   const initR = await runCli(["init", "default"], tmp);
   if (initR.exit !== 0) throw new Error(`unify init default exited ${initR.exit}: ${initR.stderr}`);
-  const agents = readFileSync(join(tmp, "AGENTS.md"), "utf8");
+  const agents = readFileSync(join(tmp, "README.md"), "utf8");
   const HUMAN_DOCS = ["README.md", join("docs", "authoring-rules.md"), join("docs", "getting-started.md"), join("docs", "cli-reference.md")];
   const human = HUMAN_DOCS.map((rel) => readFileSync(join(ROOT, rel), "utf8")).join("\n");
 
-  // Mechanical half: every metadata key AGENTS.md spells that is NOT one the
+  // Mechanical half: every metadata key README.md spells that is NOT one the
   // standards define is a key unify invented, and must be spelled the same way
   // for humans. Standard keys are exempt because the author-facing documents
   // legitimately name them in prose.
   const keys = [...new Set([...agents.matchAll(/<meta\s+name="([A-Za-z:-]+)"/g)].map((m) => m[1]))];
-  if (!keys.includes("schema")) throw new Error("AGENTS.md shows no <meta name=\"schema\"> — this test's premise is stale, not the documents");
+  if (!keys.includes("schema")) throw new Error("README.md shows no <meta name=\"schema\"> — this test's premise is stale, not the documents");
   for (const key of keys) {
     if (STANDARD_META_NAMES.includes(key.toLowerCase()) || key.toLowerCase().startsWith("twitter:")) continue;
     if (!human.includes(`name="${key}"`)) {
       throw new Error(
-        `AGENTS.md teaches <meta name="${key}">, a key no standard defines, and no author-facing document spells it (checked: ${HUMAN_DOCS.join(", ")}) — ` +
+        `README.md teaches <meta name="${key}">, a key no standard defines, and no author-facing document spells it (checked: ${HUMAN_DOCS.join(", ")}) — ` +
         "§19.4: one rule set, three audiences, and product-spec §6.7: no behavior may be documented only in the agent guide",
       );
     }
@@ -1164,10 +1164,10 @@ test("scaffold: AGENTS.md states no behavior the author-facing documents do not 
 
   // Targeted half, and stated as targeted: whether two prose paragraphs list
   // the same findings is a reading, not a regex. This pins the one that
-  // diverged — AGENTS.md's audit sentence named duplicate ids and README's
+  // diverged — README.md's audit sentence named duplicate ids and README's
   // list of what audit reports did not.
   if (/duplicate ids/i.test(agents) && !/\bid\b[^.]*\btwice\b|duplicate ids?\b/i.test(human)) {
-    throw new Error("AGENTS.md says `unify audit` reports duplicate ids and no author-facing document does — §19.4's one rule set");
+    throw new Error("README.md says `unify audit` reports duplicate ids and no author-facing document does — §19.4's one rule set");
   }
 }, TEST_MS);
 
@@ -1438,7 +1438,7 @@ function git(cwd, ...args) {
 
 test("scaffold: SCF-13 a template is a directory, a git repository or an npm package, read as a project; a typo is a usage error, not a lookup", async () => {
   // The reference template is what init itself produces: a project with
-  // site/ beside AGENTS.md, DEPLOY.md and unify.yaml (§19.4) — so a scaffold
+  // site/ beside README.md, DEPLOY.md and unify.yaml (§19.4) — so a scaffold
   // from it must reproduce the built-in byte for byte.
   const origin = mkTmp();
   const seed = await runCli(["init", "blog"], origin);
@@ -1506,7 +1506,7 @@ test("scaffold: SCF-13 a template is a directory, a git repository or an npm pac
     mkdirSync(join(host, "templates", "blog", rel, ".."), { recursive: true });
     writeFileSync(join(host, "templates", "blog", rel), bytes);
   }
-  writeFileSync(join(host, "README.md"), "# templates live under templates/\n");
+  writeFileSync(join(host, "CONTRIBUTING.md"), "# templates live under templates/\n");
   git(host, "init", "-q", "-b", "main");
   git(host, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "add", "-A");
   git(host, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", "templates");
@@ -1518,7 +1518,7 @@ test("scaffold: SCF-13 a template is a directory, a git repository or an npm pac
     const r = await runCli(["init", `file://${bare}/templates/blog#release`], tmp);
     if (r.exit !== 0) throw new Error(`unify init <git url>/<subdirectory>#ref exited ${r.exit}:\n${r.stderr}`);
     const got = scaffolded(tmp);
-    if ([...got.keys()].some((k) => k === ".git" || k.startsWith(".git/") || k === "README.md")) throw new Error("the checkout outside the subdirectory leaked into the scaffold");
+    if ([...got.keys()].some((k) => k === ".git" || k.startsWith(".git/") || k === "CONTRIBUTING.md")) throw new Error("the checkout outside the subdirectory leaked into the scaffold");
     for (const [rel, bytes] of expected) {
       if (!got.has(rel) || !got.get(rel).equals(bytes)) throw new Error(`git: ${rel} missing or differs from the template`);
     }
@@ -1563,7 +1563,7 @@ test("scaffold: SCF-13 a template is a directory, a git repository or an npm pac
     const r = await runCli(["init", bare], tmp);
     if (r.exit !== 0) throw new Error(`unify init <bare tree> exited ${r.exit}:\n${r.stderr}`);
     if (!existsSync(join(tmp, "site", "_layout.html"))) throw new Error("a bare tree must land in site/");
-    if (existsSync(join(tmp, "AGENTS.md"))) throw new Error("a bare tree has no project-root files to place");
+    if (existsSync(join(tmp, "README.md"))) throw new Error("a bare tree has no project-root files to place");
     // …but the record still has a home: a fresh all-commented unify.yaml with the one live line (§19.10).
     const fresh = readFileSync(join(tmp, "unify.yaml"), "utf8");
     if (!new RegExp(`^template: ${bare.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "m").test(fresh) || /^(?!template:)[a-z]/m.test(fresh)) throw new Error(`a bare tree's unify.yaml holds the record and nothing else live:\n${fresh}`);

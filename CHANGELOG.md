@@ -8,6 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Every built-in template is an npm package.** `templates/<name>/` carries a `package.json` naming it
+  `unify-<name>-template` — `unify-default-template`, `unify-basic-template`, `unify-blog-template`,
+  `unify-docs-template`, `unify-portfolio-template` — and `.github/workflows/publish-templates.yml` publishes
+  each whose version is not on npm yet, after packing it and scaffolding a site from the tarball with
+  `unify init <dir> --audit`. `unify init unify-blog-template` (or `@<version>`) now scaffolds the same
+  project as `unify init blog`; `package.json` is never scaffolded (§19.9), so nothing changes in a site.
+- **The scaffold's guidance file is `README.md`.** The file every template placed at the project root as
+  `AGENTS.md` is now `README.md` — the same content, under the name npm shows as a package's page and a
+  repository shows first — so `unify init` writes `README.md`, `DEPLOY.md` and `unify.yaml` beside `site/`,
+  and refuses, as before, when a `README.md` already exists where it would write one (spec §19.4, product-spec
+  §6.7, rule SCF-09).
+
 ## [0.11.6] - 2026-10-05
 
 ### Changed

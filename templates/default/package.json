@@ -1,0 +1,31 @@
+{
+  "name": "unify-default-template",
+  "version": "0.1.0",
+  "description": "The default starter site for unify, the HTML-native static site generator \u2014 a layout, a nav include, a home page, and example pages to copy into place. Scaffold it with: unify init unify-default-template",
+  "keywords": [
+    "unify",
+    "unify-template",
+    "static-site-generator",
+    "template",
+    "html"
+  ],
+  "license": "MPL-2.0",
+  "author": "Unify Contributors",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fwdslsh/unify.git",
+    "directory": "templates/default"
+  },
+  "homepage": "https://github.com/fwdslsh/unify/tree/main/templates/default#readme",
+  "bugs": {
+    "url": "https://github.com/fwdslsh/unify/issues"
+  },
+  "files": [
+    "site/",
+    "DEPLOY.md",
+    "unify.yaml"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

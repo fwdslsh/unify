@@ -3,7 +3,7 @@
  *
  * A built-in template IS a directory of this repository: `templates/<name>/`,
  * a complete project laid out as `init` lays one out (§19.4) — `site/` beside
- * `AGENTS.md`, `DEPLOY.md`, `unify.yaml`, the blog's `scripts/gen.mjs` — and
+ * `README.md`, `DEPLOY.md`, `unify.yaml`, the blog's `scripts/gen.mjs` — and
  * usable as a git template on its own (§19.9:
  * `unify init https://github.com/fwdslsh/unify/templates/blog`). The name is a
  * shortcut to that directory, with one difference: it needs no network and no
@@ -44,7 +44,7 @@ export const TEMPLATES = Object.fromEntries(
 
 /**
  * §19.4/§19.6/§19.8 — what each template keeps at the PROJECT ROOT, beside the
- * source tree: AGENTS.md, DEPLOY.md and unify.yaml for every template, plus
+ * source tree: README.md, DEPLOY.md and unify.yaml for every template, plus
  * build material that is not content (the blog's generator in `scripts/`).
  * Keys are project-root-relative.
  * @type {Record<string, Record<string, string|Uint8Array>>}

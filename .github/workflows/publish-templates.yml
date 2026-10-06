@@ -1,0 +1,151 @@
+name: Publish templates
+
+# Every built-in template under templates/<name>/ is also an npm package,
+# `unify-<name>-template` — the package.json beside its site/ names it — so
+# `unify init unify-blog-template` scaffolds the same project as
+# `unify init blog`, at a version a user can pin (docs/templates.md §3).
+#
+# A template is versioned by its own package.json, independently of unify:
+# bump the version there, merge to main, and this workflow publishes it. A
+# template whose version is already on npm is skipped, so a run is safe to
+# repeat and a push that touched one template publishes one package.
+#
+# Before anything is published, the tarball npm would ship is unpacked and
+# scaffolded with `unify init <dir> --audit`: that is the same reader a user's
+# `unify init <package>` runs, so a file missing from package.json's `files`
+# fails here, not on their machine.
+#
+# Credentials: trusted publishing (OIDC, as release.yml does for @fwdslsh/unify)
+# when a package is configured for it on npmjs.com with this repository and
+# this workflow filename; otherwise the NPM_TOKEN secret, if it is set. npm
+# only lets an existing package enrol in trusted publishing, so a template's
+# FIRST publish needs the token (or a manual `npm publish` from its directory).
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'templates/**'
+      - '.github/workflows/publish-templates.yml'
+  workflow_dispatch:
+    inputs:
+      template:
+        description: 'One template to publish (default, basic, blog, docs, portfolio) — leave blank for all'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  id-token: write # npm trusted publishing (OIDC)
+
+jobs:
+  templates:
+    name: List the templates
+    runs-on: ubuntu-latest
+    outputs:
+      list: ${{ steps.list.outputs.list }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: list
+        env:
+          ONLY: ${{ inputs.template }}
+        run: |
+          set -euo pipefail
+          if [ -n "$ONLY" ]; then
+            [ -f "templates/$ONLY/package.json" ] || { echo "::error::templates/$ONLY/package.json does not exist"; exit 1; }
+            list="$(printf '%s' "$ONLY" | jq -R . | jq -cs .)"
+          else
+            list="$(for f in templates/*/package.json; do basename "$(dirname "$f")"; done | jq -R . | jq -cs .)"
+          fi
+          echo "templates: $list"
+          echo "list=$list" >> "$GITHUB_OUTPUT"
+
+  publish:
+    name: ${{ matrix.template }}
+    needs: templates
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        template: ${{ fromJSON(needs.templates.outputs.list) }}
+    env:
+      TEMPLATE: ${{ matrix.template }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # The embedded copy `unify init <name>` scaffolds must be the directory
+      # being published: the two are one template, and the suite fails when
+      # they disagree (tests/unit/templates.test.js).
+      - name: Snapshot in step with templates/
+        run: |
+          bun scripts/sync-templates.mjs
+          git diff --exit-code -- templates src/templates || { echo "::error::src/templates/snapshot.js is out of date — run bun scripts/sync-templates.mjs and commit"; exit 1; }
+
+      - name: Resolve the package, and skip a version npm already has
+        id: pkg
+        run: |
+          set -euo pipefail
+          name="$(jq -r .name "templates/$TEMPLATE/package.json")"
+          version="$(jq -r .version "templates/$TEMPLATE/package.json")"
+          [ "$name" = "unify-$TEMPLATE-template" ] || { echo "::error::templates/$TEMPLATE/package.json is named $name, expected unify-$TEMPLATE-template"; exit 1; }
+          # `npm view` exits 0 with empty output for a missing version of an
+          # existing package, so the answer is in the output, not the exit code.
+          if [ -n "$(npm view "$name@$version" version 2>/dev/null)" ]; then
+            echo "$name@$version is already on npm — nothing to publish"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "publishing $name@$version"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "spec=$name@$version" >> "$GITHUB_OUTPUT"
+
+      # What npm would ship, read the way a user's `unify init` reads it: pack,
+      # unpack, scaffold from the directory, and require the scaffold to audit
+      # clean (--audit removes it otherwise) and to build under --strict.
+      - name: Pack the tarball and scaffold a site from it
+        if: steps.pkg.outputs.skip == 'false'
+        run: |
+          set -euo pipefail
+          scratch="$(mktemp -d)"
+          tgz="$(cd "templates/$TEMPLATE" && npm pack --ignore-scripts --pack-destination "$scratch" --loglevel=error | tail -n1)"
+          tar -xzf "$scratch/$tgz" -C "$scratch"
+          echo "── $tgz"
+          (cd "$scratch/package" && find . -type f | sort)
+          site="$(mktemp -d)"
+          cd "$site"
+          bun "$GITHUB_WORKSPACE/src/cli.js" init "$scratch/package" --audit
+          bun "$GITHUB_WORKSPACE/src/cli.js" build --dry-run --strict
+          for f in README.md DEPLOY.md unify.yaml site/index.html; do
+            [ -f "$f" ] || { echo "::error::the packed template scaffolds no $f"; exit 1; }
+          done
+          [ ! -e package.json ] || { echo "::error::package.json was scaffolded — it is the template's packaging, never the site's"; exit 1; }
+          grep -q "^template:" unify.yaml || { echo "::error::unify.yaml records no template: source"; exit 1; }
+
+      - name: Publish to npm
+        if: steps.pkg.outputs.skip == 'false'
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Trusted publishing needs npm >= 11.5.1; the runner's npm is older.
+          npm install -g npm@latest
+          npm --version
+          # A token, when the secret is set; otherwise nothing is written and
+          # npm exchanges this job's OIDC identity for a short-lived credential.
+          if [ -n "$NPM_TOKEN" ]; then
+            echo "//registry.npmjs.org/:_authToken=\${NPM_TOKEN}" > ~/.npmrc
+            echo "publishing with the NPM_TOKEN secret"
+          else
+            echo "no NPM_TOKEN secret — publishing with trusted publishing (OIDC)"
+          fi
+          cd "templates/$TEMPLATE"
+          npm publish --access public
+          echo "published ${{ steps.pkg.outputs.spec }}"
