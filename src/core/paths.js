@@ -139,12 +139,19 @@ export function toRelative(root, absolutePath) {
  * source root (`unify build` run from inside `src/`), because then it names
  * nothing the source root does not.
  *
+ * **The template a site extends is the very last root** (§34.2): below the
+ * project root, so anything the site has — written, generated, or kept beside
+ * `package.json` — wins over the template's file at the same path. Unlike the
+ * project root it IS scanned, so its pages and assets publish where the site
+ * has nothing of its own at the same path or output path.
+ *
  * @param {string} sourceRoot
  * @param {string|null} [overlayDir] - §33.3's generated directory, when one exists
  * @param {string|null} [projectRoot] - §4.5's project root (the working directory), when known
+ * @param {string|null} [templateRoot] - §34's template source tree, when the site extends one
  * @returns {string[]} absolute roots, in precedence order (source root first)
  */
-export function resolutionRoots(sourceRoot, overlayDir = null, projectRoot = null) {
+export function resolutionRoots(sourceRoot, overlayDir = null, projectRoot = null, templateRoot = null) {
   const roots = [resolve(sourceRoot)];
   if (overlayDir !== null && overlayDir !== undefined && overlayDir !== "") {
     const overlay = resolve(overlayDir);
@@ -154,6 +161,7 @@ export function resolutionRoots(sourceRoot, overlayDir = null, projectRoot = nul
     const project = resolve(projectRoot);
     if (!contains(roots[0], project) && !roots.includes(project)) roots.push(project);
   }
+  if (templateRoot !== null && templateRoot !== undefined && templateRoot !== "") roots.push(resolve(templateRoot));
   return roots;
 }
 

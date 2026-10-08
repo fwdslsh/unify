@@ -280,6 +280,7 @@ Options:
       --include-noindex    list noindex pages in the catalog and search corpus (needs one of them)
       --generate <path>    run one JavaScript file from your source tree before the build
       --source-inventory   give that file source-pages.json: every source page's authored title, description, date, meta and links (on by default with --generate; source-inventory: false in unify.yaml turns it off)
+      --extends <source>   build on a template without copying it (any form init takes): its layouts, includes, assets and pages sit beneath the site's, and a file of the site's at the same path or output path wins; a pinned version or commit is fetched once and cached
       --dry-run            run the full build and every check, print the report, write nothing
       --audit              `build` only: audit the composed site before publishing; publish only if `unify audit` would exit 0
       --save-config        `build` only: write the saveable options given here into unify.yaml (after a good build)
@@ -347,7 +348,7 @@ This layer should make the site **production-ready, inspectable, and discoverabl
 - Composition, generation, and evaluation stay separate: `build` produces and verifies the site, an explicit generator may supply a temporary source overlay before that build, and `audit` evaluates the prospective final output without publishing it.
 - Generated discovery data comes from the final public pages, after composition and URL rewriting. There is one shared interpretation of a page's URL and metadata, not separate sitemap, feed, and audit implementations that can disagree.
 - Automation never invents claims. Authored canonical tags and JSON-LD win; generated structured data uses only explicit metadata and visible page content; missing facts produce findings rather than guesses.
-- unify-owned build behavior remains offline and deterministic. Network checks are explicit audit operations, never a hidden dependency of `build` or `dev`; an explicitly selected author-owned generator is responsible for its own inputs and side effects.
+- unify-owned build behavior remains offline and deterministic. Network checks are explicit audit operations, never a hidden dependency of `build` or `dev`; an explicitly selected author-owned generator is responsible for its own inputs and side effects. The one fetch a build makes is the template a site names with `extends` (conformance-spec §34), and only when that template is not already on disk: a pinned version or commit is fetched once and read from the user's cache after that, offline, and an unpinned one is fetched once per run.
 - SEO guidance reports concrete, fixable facts. unify does not assign an SEO score, measure keyword density, rewrite prose, promise rankings, or fail content on arbitrary character-count rules.
 - New behavior must still be explainable in one sentence and keep the core authoring rules on one screen. Anything that would write published output must preserve transactional publishing and appear in `--dry-run`; evaluation commands remain read-only.
 

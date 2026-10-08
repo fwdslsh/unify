@@ -61,6 +61,8 @@ import { stripBaseUrl, resolveReference } from "./references.js";
  * @property {string} source.path - source-root-relative path
  * @property {boolean} source.generated - §33.4 — true when the page came
  *   from the `--generate` overlay rather than the source tree
+ * @property {boolean} source.template - §34.4 — true when the page came from
+ *   the template the site extends
  * @property {string[]} source.includes - §20.3 — the source-root-relative
  *   paths of every other file that authored a byte of this page (fragments
  *   included by the page, by its layout, and transitively), sorted; `[]` when none
@@ -118,6 +120,10 @@ function extract(page, base) {
     source: {
       path: page.sourcePath,
       generated: page.generated === true,
+      // §34.4 — true when the page came from the template the site extends.
+      // Read by the human audit report's marker; the JSON and SARIF shapes
+      // (§31) are unchanged.
+      template: page.template === true,
       // §20.3 — the layout this page composed with, or `null` when it
       // composed with none. The one other field, with `generated`, that is
       // PROVENANCE rather than a reading of the emitted text: composition

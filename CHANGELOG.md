@@ -8,6 +8,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.8] - 2026-10-08
+
+### Added
+
+- **`extends`: build on a template without copying it** ([#118](https://github.com/fwdslsh/unify/issues/118)).
+  `extends: <source>` in `unify.yaml`, or `--extends <source>`, names a template — any form `unify init` takes:
+  a built-in, a directory, a git repository, an npm package — that `build`, `audit`, `dev` and `watch` read as
+  the lowest layer of the site. Its source tree's layouts and includes resolve where the site has none, and its
+  pages and assets publish where the site has nothing at the same path or output path: **the site's own file
+  always wins**, so `index.md` replaces the template's `index.html` and `assets/theme.css` replaces its theme.
+  Only the template's `site/` (or `src/`) is read — never its `unify.yaml`, generator or README, and nothing in
+  it runs. A pinned source (`name@1.2.3`, `#<commit>`, a built-in) is fetched once into
+  `~/.cache/unify/templates/` (`$XDG_CACHE_HOME`, `%LOCALAPPDATA%` on Windows) and built offline after that; an
+  unpinned one is fetched once per run; a directory is read in place. An unreachable source exits 2 and writes
+  nothing. `--dry-run`, diagnostics and `unify audit` mark what came from the template. A repository whose
+  documentation is `docs/**` can now publish it with a published template and one `unify.yaml`, with no
+  vendored files and no fetch script. `template:` is unchanged: it is still the record `unify update` fetches,
+  and no build reads it (spec §34, rules EXT-01 to EXT-07; product-spec §6.1 names the fetch as the one network
+  access a build makes).
+- The five template packages are `0.1.2`: their `unify.yaml` lists the new key, commented out.
+
 ### Changed
 
 - **A template is found on npm by keyword, not by name.** A template published to npm carries
@@ -934,7 +955,8 @@ with generated compare-link notes only. Their diffs are on the
 [releases page](https://github.com/fwdslsh/unify/releases). Nothing here
 retroactively reconstructs detail those notes never carried.
 
-[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.11.7...HEAD
+[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.11.8...HEAD
+[0.11.8]: https://github.com/fwdslsh/unify/compare/v0.11.7...v0.11.8
 [0.11.7]: https://github.com/fwdslsh/unify/compare/v0.11.6...v0.11.7
 [0.11.6]: https://github.com/fwdslsh/unify/compare/v0.11.5...v0.11.6
 [0.11.5]: https://github.com/fwdslsh/unify/compare/v0.11.4...v0.11.5

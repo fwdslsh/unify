@@ -1,6 +1,6 @@
 {
   "name": "unify-basic-template",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "The basic starter site for unify, the HTML-native static site generator \u2014 the smallest starter: a layout, a nav include and a home page. Scaffold it with: unify init unify-basic-template",
   "keywords": [
     "unify",

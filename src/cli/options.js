@@ -64,6 +64,12 @@ const OPTIONS = {
   // exist, one path per item, relative to the file. `templateLines` renders
   // both spellings and `parseConfig` reads both.
   template: { kind: "value", example: "unify-shop-template", about: "the template this project was scaffolded from, which unify update fetches again — as the value, or as source: under it beside keep:, the files update never overwrites once they exist, one path per item, relative to this file", default: "none", save: "template:\n  source: unify-shop-template\n  keep:\n    - site/assets/theme.css" },
+  // §34 — build on a template without scaffolding it: the template's source
+  // tree joins the build beneath the site's own (§34.2), fetched by the same
+  // resolver `init` uses (§19.9). A key of its own, not `template:`, which
+  // stays the record `update` fetches: a scaffolded project owns a copy, a
+  // project that extends a template owns none. Relative to this file.
+  extends: { kind: "value", example: "unify-docs-template@0.1.1", about: "a template this site builds on without copying it: its layouts, includes, assets and pages sit beneath yours, and a file of yours at the same path wins", default: "none", save: "extends: unify-docs-template@0.1.1" },
   // §19.10 — `update` only: `--keep <path>`, repeatable, relative to the
   // working directory, replacing the file's `keep:` list for the run the way
   // `--exclude` replaces `exclude:`. Not a key of its own in unify.yaml — the
@@ -95,7 +101,7 @@ const OPTIONS = {
 };
 
 /** Keys `unify.yaml` may carry — the long option names, minus the ones that make no sense to save. */
-export const CONFIG_KEYS = ["source", "output", "clean", "exclude", "pretty-urls", "base-url", "canonical", "feed-full", "catalog", "search-corpus", "include-noindex", "strict", "audit", "port", "generate", "source-inventory", "template"];
+export const CONFIG_KEYS = ["source", "output", "clean", "exclude", "pretty-urls", "base-url", "canonical", "feed-full", "catalog", "search-corpus", "include-noindex", "strict", "audit", "port", "generate", "source-inventory", "template", "extends"];
 
 /**
  * §18/§19.8 — the `unify.yaml` that `init` writes at the project root: every
