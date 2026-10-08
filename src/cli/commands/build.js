@@ -331,6 +331,10 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
     composedPages.map((p) => collisions.computeOutputPath({ path: p.relPath, kind: "page" }, { prettyUrls: false })),
   );
 
+  // §11.1b — the source paths of the Markdown pages that were emitted, which a
+  // link may name as written (`guide/start.md`).
+  const markdownSources = new Set(composedPages.filter((p) => /\.md$/i.test(p.relPath)).map((p) => p.relPath));
+
   /** @type {Map<string, string|Buffer>} */
   const tempFiles = new Map();
   // Real per-output-file provenance spans (§12/§14.1 R3), keyed by the SAME
@@ -359,6 +363,7 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
       pageOutputPath,
       prettyUrls: settings.prettyUrls,
       emittedHtmlPaths,
+      markdownSources,
       base: baseConfig,
       shifts: urlShifts,
     });

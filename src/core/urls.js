@@ -811,6 +811,60 @@ function pageForLinkPath(resolved, emittedHtmlPaths) {
  * @returns {string}
  */
 export function applyPrettyLinks(html, { pageOutputPath, emittedHtmlPaths, shifts = null }) {
+  return rewriteInternalLinks(html, pageOutputPath, shifts, (resolved, query, fragment) => {
+    const page = pageForLinkPath(resolved, emittedHtmlPaths);
+    if (page === null) return null; // URL-09: not a page — preserved untouched
+    return prettyLinkTarget(page) + query + fragment;
+  });
+}
+
+/**
+ * §11.1b — a link may name a Markdown page by its SOURCE path. `guide/start.md`
+ * is the file an author sees, in a repository browser as much as in their
+ * editor, and a link spelled that way works there and nowhere else: the build
+ * publishes `guide/start.html`. Before 0.11.9 the spelling reached §12
+ * unrewritten and failed as an unresolvable reference, so a repository whose
+ * Markdown already linked itself that way (fhold's `docs/**`) had to rewrite
+ * every link or fail the build.
+ *
+ * The rewrite is the §11 shape: resolve against provenance, test against the
+ * emitted set, transform. A URL ending `.md` whose resolved path is a Markdown
+ * SOURCE page that was emitted is emitted with `.html` in its place, keeping
+ * every other part of the spelling (relative stays relative, query and
+ * fragment survive), and §11.2 then turns it into the pretty URL under
+ * `--pretty-urls` exactly as it would for a link written `.html`. A `.md` path
+ * naming no emitted Markdown page is preserved untouched, so a typo, a link to
+ * an excluded page, or a link to a `.md` the build ships as a plain file still
+ * fails loudly in §12.
+ *
+ * @param {string} html
+ * @param {object} args
+ * @param {string} args.pageOutputPath - this page's own (pre-move) `.html` output path
+ * @param {Set<string>} args.markdownSources - source-root-relative path of every emitted Markdown page
+ * @returns {string}
+ */
+export function applySourceLinks(html, { pageOutputPath, markdownSources, shifts = null }) {
+  return rewriteInternalLinks(html, pageOutputPath, shifts, (resolved, query, fragment, written) => {
+    if (!/\.md$/i.test(resolved) || !markdownSources.has(resolved)) return null;
+    return written.replace(/\.md$/i, ".html") + query + fragment;
+  });
+}
+
+/**
+ * The walk §11.2 and §11.1b share: every internal URL in `href`/`src`/`poster`,
+ * `srcset`, the URL-valued og:/twitter: metas and a refresh URL, resolved
+ * against the page and handed to `target`, which returns the replacement path
+ * (with query and fragment reattached) or null to leave the URL as written.
+ *
+ * @param {string} html
+ * @param {string} pageOutputPath
+ * @param {object[]|null} shifts
+ * @param {(resolved: string, query: string, fragment: string, written: string) => string|null} target -
+ *   `resolved` is the decoded, normalized, source-root-relative path; `written`
+ *   is the path part exactly as authored
+ * @returns {string}
+ */
+function rewriteInternalLinks(html, pageOutputPath, shifts, target) {
   const pageDir = posix.dirname(pageOutputPath);
   const { root } = parse(html);
   const edits = [];
@@ -832,9 +886,8 @@ export function applyPrettyLinks(html, { pageOutputPath, emittedHtmlPaths, shift
     const resolved = decoded.startsWith("/")
       ? posix.normalize(decoded).slice(1)
       : posix.normalize(posix.join(pageDir, decoded));
-    const page = pageForLinkPath(resolved, emittedHtmlPaths);
-    if (page === null) return null; // URL-09: not a page — preserved untouched
-    return prettyLinkTarget(page) + query + fragment;
+    const next = target(resolved, query, fragment, path);
+    return next;
   };
 
   for (const el of findAll(root, (n) => n.type === "element")) {
@@ -1060,7 +1113,7 @@ export function applyBaseUrl(html, base, { shifts = null } = {}) {
  * @param {BaseUrlConfig|null} [args.base]
  * @returns {string}
  */
-export function rewriteUrls(composedHtml, { provenanceOf, pageFile, pageOutputPath, prettyUrls = false, emittedHtmlPaths, base = null, shifts = null }) {
+export function rewriteUrls(composedHtml, { provenanceOf, pageFile, pageOutputPath, prettyUrls = false, emittedHtmlPaths, markdownSources = null, base = null, shifts = null }) {
   // Each stage's shifts are measured in the text THAT stage received, so they
   // are collected per stage and stacked most-recent-first — the order
   // `unshiftUrlRewrites` has to undo them in. Passing one flat array instead
@@ -1076,6 +1129,11 @@ export function rewriteUrls(composedHtml, { provenanceOf, pageFile, pageOutputPa
     shifts: s1,
   });
   if (s1) collect(s1);
+  if (markdownSources && markdownSources.size > 0) {
+    const s1b = shifts ? [] : null;
+    out = applySourceLinks(out, { pageOutputPath, markdownSources, shifts: s1b });
+    if (s1b) collect(s1b);
+  }
   if (prettyUrls) {
     const s2 = shifts ? [] : null;
     out = applyPrettyLinks(out, { pageOutputPath, emittedHtmlPaths, shifts: s2 });

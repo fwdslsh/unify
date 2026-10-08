@@ -8,6 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.9] - 2026-10-08
+
+### Fixed
+
+- **A link to a Markdown page by its source path builds.** `[the guide](guide/start.md)` is the link that works
+  in an editor and a repository browser, and it failed the build as an unresolvable reference because only the
+  published `guide/start.html` exists. A link in `href`, `src`, `srcset`, `poster`, a URL-valued meta or a refresh
+  URL whose path ends `.md` and names an emitted Markdown page now has `.html` swapped in, keeping the rest of its
+  spelling (relative stays relative, query and fragment survive); `--pretty-urls` and `--base-url` then treat it
+  like any link written `.html`, so it ships as `/guide/start/`. A `.md` link naming anything else — a typo, a page
+  held back by an underscore or `--exclude`, or an `.html` page of the same name — is untouched and still fails the
+  reference check. This is what a repository whose docs already link themselves with `.md` needs to publish them
+  with `extends:` (spec §11.1b, rule URL-16).
+
 ## [0.11.8] - 2026-10-08
 
 ### Added
@@ -955,7 +969,8 @@ with generated compare-link notes only. Their diffs are on the
 [releases page](https://github.com/fwdslsh/unify/releases). Nothing here
 retroactively reconstructs detail those notes never carried.
 
-[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.11.8...HEAD
+[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.11.9...HEAD
+[0.11.9]: https://github.com/fwdslsh/unify/compare/v0.11.8...v0.11.9
 [0.11.8]: https://github.com/fwdslsh/unify/compare/v0.11.7...v0.11.8
 [0.11.7]: https://github.com/fwdslsh/unify/compare/v0.11.6...v0.11.7
 [0.11.6]: https://github.com/fwdslsh/unify/compare/v0.11.5...v0.11.6

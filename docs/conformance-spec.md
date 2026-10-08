@@ -806,6 +806,16 @@ A refresh URL is on that list for the reason the metas are: it is an address in 
 
 Fixture: `src/_includes/nav.html` contains `<img src="logo.png">` and `<a href="/about.html">`. Included (via the layout) into `src/deep/page.html`, the output contains `<img src="/_includes/logo.png">` and `<a href="/about.html">`. (And `/_includes/logo.png` is excluded by default, so the reference check then reports it — an image stranded in an underscore folder fails loudly, §12.)
 
+### 11.1b Links by source path
+
+A link may name a Markdown page by its **source path**: `guide/start.md`, the file an author sees in an editor and a repository browser, where a link spelled that way is the one that works. The build publishes `guide/start.html`, so after §11.1 (resolve against provenance) a URL in the same list §11.1 reads — `href`, `src`, `srcset`, `poster`, the URL-valued metas, a refresh URL — whose path ends `.md` and **resolves to the source path of a Markdown page that was emitted** is rewritten with `.html` in place of `.md`. Nothing else in the spelling changes: a relative URL stays relative, a root-relative one stays root-relative, and the query and fragment survive (`guide/start.md#next` → `guide/start.html#next`). §11.2 and §11.3 then apply to the result as to any link written `.html`, so under `--pretty-urls` it comes out as `/guide/start/` and under `--base-url` it carries the prefix. This is the whole of the rule:
+
+- **Only an emitted Markdown page.** A `.md` URL naming a path that is not a Markdown source page of the build — a typo, a page held back by an underscore or `--exclude`, a page that failed to compose — is preserved untouched and §12 reports it unchanged, so a wrong link still fails loudly. A `.md` URL does not reach an `.html` page of the same name: `about.md` names `about.md` and never a hand-written `about.html`.
+- **Resolved like every other link.** A relative URL is measured from the file that wrote it (§11.1), so a `.md` link in an include or layout means the file beside **that**, and the same spelling in a page means the file beside the page.
+- **Not a new authoring surface.** The documented spelling stays the `.html` filename (authoring rules); this makes the other spelling a Markdown repository already contains publishable, instead of a build failure with the spelling right.
+
+Before 0.11.9 the `.md` spelling reached §12 unrewritten and failed there as an unresolvable reference.
+
 ### 11.2 `--pretty-urls`
 
 **Files**: every page output `X.html` moves to `X/index.html`, except any `index.html` (already pretty) and the root `404.html` (hosts require that exact path). `about.md` → `about.html` → `about/index.html`.
@@ -839,7 +849,7 @@ The metas were added to that list once §12 began checking their relative spelli
 
 A bare path (`--base-url /repo-name/`) is a **usage error** (exit 2) naming the full form. It was accepted until 2026-08-13, prefixing links correctly while leaving og:/twitter:/canonical root-relative — which the rationale above makes unusable, since a crawler fetches those with no page address to resolve them against. Ratification made the cost measurable: seventeen of eighteen samples handed a full deploy address chose the bare path anyway, and five of five then published dead preview images with a green build and a report claiming the sharing requirement verified. A diagnostic was tried first (advisory A15, retired the same day it was added); deleting the weaker form is the repair that leaves nothing to warn about.
 
-Order within the pipeline: §11.1 → §11.2 → §11.3.
+Order within the pipeline: §11.1 → §11.1b → §11.2 → §11.3.
 
 ---
 

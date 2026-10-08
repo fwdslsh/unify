@@ -151,7 +151,7 @@ unify build --exclude '_*.html' --exclude '_*.md' --exclude '_includes' --exclud
 
 ### `--pretty-urls`
 
-Moves every page `X.html` to `X/index.html` — except `index.html` files (already pretty) and the root `404.html` (hosts require that exact path) — and rewrites every internal link to match (`/about.html` → `/about/`, queries and fragments preserved; links to assets and external URLs untouched), including a page-targeting `og:`/`twitter:` meta value and a `<meta http-equiv="refresh">` URL, exactly like the matching `href`. Relative asset references inside moved pages are re-emitted root-relative so they keep working. Author pages always link the real file (`about.html`); this flag owns the pretty form.
+Moves every page `X.html` to `X/index.html` — except `index.html` files (already pretty) and the root `404.html` (hosts require that exact path) — and rewrites every internal link to match (`/about.html` → `/about/`, queries and fragments preserved; links to assets and external URLs untouched), including a page-targeting `og:`/`twitter:` meta value and a `<meta http-equiv="refresh">` URL, exactly like the matching `href`. Relative asset references inside moved pages are re-emitted root-relative so they keep working. Author pages always link the real file (`about.html`); this flag owns the pretty form. A link to a Markdown page by its source path (`guide/start.md`) is the same link: unify swaps in `.html` first ([`conformance-spec.md`](conformance-spec.md) §11.1b), so a repository whose Markdown already links itself that way builds, with or without this flag; a `.md` link naming no emitted Markdown page still fails the reference check.
 
 ### `--base-url <url>`
 
