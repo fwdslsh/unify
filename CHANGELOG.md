@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.11] - 2026-10-08
+
+### Changed
+
+- **`unify audit` no longer compares a page that only redirects.** A page whose first `<meta http-equiv="refresh">`
+  is immediate (`content="0; url=…"`) sends its reader on before the page is seen: it is a stub that keeps an old
+  address working. `page-orphan`, `title-duplicate`, `description-duplicate` and `text-duplicate` now skip it, and the
+  duplicate grouping leaves it out, so a stub never makes the page it redirects to a duplicate of it. A site that
+  kept a stub at every moved address (akm.fwdslsh.dev, with 97 such pages) no longer reports a finding for each. A
+  delayed refresh is an ordinary page and is compared as one; every other finding, `redirect-loop` included, still
+  applies to a redirecting page (spec §24.4, rule AUD-18).
+
 ## [0.11.10] - 2026-10-08
 
 ### Changed
@@ -998,7 +1010,8 @@ with generated compare-link notes only. Their diffs are on the
 [releases page](https://github.com/fwdslsh/unify/releases). Nothing here
 retroactively reconstructs detail those notes never carried.
 
-[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.11.10...HEAD
+[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.11.11...HEAD
+[0.11.11]: https://github.com/fwdslsh/unify/compare/v0.11.10...v0.11.11
 [0.11.10]: https://github.com/fwdslsh/unify/compare/v0.11.9...v0.11.10
 [0.11.9]: https://github.com/fwdslsh/unify/compare/v0.11.8...v0.11.9
 [0.11.8]: https://github.com/fwdslsh/unify/compare/v0.11.7...v0.11.8

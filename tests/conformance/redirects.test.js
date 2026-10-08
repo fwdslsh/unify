@@ -282,3 +282,53 @@ test("AUD-13 — --strict gates on a redirect loop", async () => {
   expectExit(r, 1, "--strict is the opt-in gate on any finding");
   covers("AUD-13");
 }, TEST_MS);
+
+// ------------------------------------------------------------------ AUD-18
+
+/** A moved page's stub: the old address, an immediate refresh, and the new page's own title. */
+const stub = (title, target, seconds = 0) => `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>${title}</title><meta name="description" content="${title} moved."><meta http-equiv="refresh" content="${seconds}; url=${target}"></head>
+<body><main><h1>${title}</h1><p><a href="${target}">${title} moved here</a>.</p></main></body></html>
+`;
+
+test("AUD-18 — a page that only redirects is not an orphan and is not compared, and never makes its target a duplicate", async () => {
+  const dir = mkTmp();
+  writeTree(dir, {
+    "src/index.html": page("Home", { body: '<nav><a href="/new.html">new</a> <a href="/kiosk-a.html">a</a> <a href="/kiosk-b.html">b</a></nav>' }),
+    "src/new.html": page("Same name"),
+    // Nothing links to it, and it shares its title, its description and its text with the page it redirects to.
+    "src/old.html": page("Same name", { head: refresh("0; url=/new.html") }),
+    // A delayed refresh is an ordinary page, compared as one: it shares a title with its sibling.
+    "src/kiosk-a.html": page("Kiosk", { head: refresh("30; url=/kiosk-b.html") }),
+    "src/kiosk-b.html": page("Kiosk", { head: refresh("30; url=/kiosk-a.html") }),
+  });
+  const r = await runCli(["audit", "-s", "src"], dir);
+  expectExit(r, 0, "findings never block without --strict");
+  for (const id of ["page-orphan", "title-duplicate", "description-duplicate", "text-duplicate"]) {
+    if (idsFor(r.stdout, "old.html").includes(id)) throw new Error(`a redirecting page reports no ${id}\n${r.stdout}`);
+    if (idsFor(r.stdout, "new.html").includes(id)) throw new Error(`a stub never makes its target a ${id}\n${r.stdout}`);
+  }
+  for (const f of ["kiosk-a.html", "kiosk-b.html"]) {
+    if (!idsFor(r.stdout, f).includes("title-duplicate")) throw new Error(`a delayed refresh is compared as an ordinary page (${f})\n${r.stdout}`);
+  }
+  covers("AUD-18");
+}, TEST_MS);
+
+test("AUD-18 — a site that kept a stub at every moved address reports none of them, and a stub on a loop still reports the loop", async () => {
+  const dir = mkTmp();
+  const files = { "src/index.html": page("Home", { body: Array.from({ length: 5 }, (_, i) => `<a href="/doc-${i}.html">d${i}</a>`).join(" ") }) };
+  for (let i = 0; i < 5; i++) {
+    files[`src/doc-${i}.html`] = page(`Doc ${i}`);
+    files[`src/old/doc-${i}.html`] = stub("Moved", `/doc-${i}.html`);
+  }
+  files["src/loop-a.html"] = stub("Loop", "/loop-b.html");
+  files["src/loop-b.html"] = stub("Loop", "/loop-a.html");
+  writeTree(dir, files);
+  const r = await runCli(["audit", "-s", "src"], dir);
+  const reported = ids(r.stdout);
+  for (const id of ["page-orphan", "title-duplicate", "description-duplicate", "text-duplicate"]) {
+    if (reported.includes(id)) throw new Error(`no ${id} anywhere on this site\n${r.stdout}`);
+  }
+  if (reported.filter((id) => id === "redirect-loop").length !== 2) throw new Error(`the loop is still reported on both stubs\n${r.stdout}`);
+  covers("AUD-18");
+}, TEST_MS);

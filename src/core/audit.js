@@ -264,9 +264,22 @@ export function auditManifest({
     });
 
   // ---- cross-page groupings, computed once ---------------------------------
+  // §24.4 — a page that only redirects is nobody's reading: an immediate
+  // refresh (`seconds === 0`, §20.11) sends the reader on before the page is
+  // seen, so its title, description and text are a stub's, not a claim about
+  // content, and nothing is expected to link to it — it exists so an old
+  // address keeps working. Such a page is neither reported by the four
+  // findings below that compare pages or count links to them, nor is it
+  // compared against, so a stub titled like the page it redirects to never
+  // makes the real page a duplicate.
+  const redirects = new Set(documents.filter((d) => {
+    const refresh = refreshOf(d);
+    return refresh !== null && refresh.seconds === 0;
+  }));
   const group = (pick) => {
     const m = new Map();
     for (const d of documents) {
+      if (redirects.has(d)) continue;
       const key = pick(d);
       if (key === null || key === "") continue;
       if (!m.has(key)) m.set(key, []);
@@ -295,7 +308,7 @@ export function auditManifest({
         "the emitted <head> declares no <title>",
         "add a <title> to the page, or to its layout for a site-wide suffix");
     } else {
-      const dupes = others(byTitle, title);
+      const dupes = redirects.has(doc) ? [] : others(byTitle, title);
       if (dupes.length) {
         add(doc, "title-duplicate", "incomplete",
           `the title ${JSON.stringify(title)} is also used by ${listPaths(dupes)}`,
@@ -309,7 +322,7 @@ export function auditManifest({
         "the emitted <head> declares no <meta name=\"description\">",
         "add a description describing this page; a layout-wide one repeats on every page");
     } else {
-      const dupes = others(byDescription, description);
+      const dupes = redirects.has(doc) ? [] : others(byDescription, description);
       if (dupes.length) {
         add(doc, "description-duplicate", "incomplete",
           `the description ${JSON.stringify(truncate(description))} is also used by ${listPaths(dupes)}`,
@@ -362,7 +375,7 @@ export function auditManifest({
     // nothing else links to unreportable — contradicting this finding's own
     // evidence line, which has always said "no OTHER page links to this one".
     const linksInFromElsewhere = doc.analysis.linksIn.filter((p) => p !== doc.outputPath);
-    if (linksInFromElsewhere.length === 0 && doc.outputPath !== "index.html" && doc.outputPath !== "404.html") {
+    if (linksInFromElsewhere.length === 0 && doc.outputPath !== "index.html" && doc.outputPath !== "404.html" && !redirects.has(doc)) {
       add(doc, "page-orphan", "incomplete",
         "no other page links to this one",
         // §33.4 — the source-tree advice is wrong for a generated page: there
@@ -716,7 +729,7 @@ export function auditManifest({
     // ---- duplicated visible text -------------------------------------------
     // IDENTICAL, not "substantially similar". A similarity threshold is a
     // number nobody can justify, so unify does not have one.
-    if (doc.analysis.visibleText !== "") {
+    if (doc.analysis.visibleText !== "" && !redirects.has(doc)) {
       const dupes = (byText.get(foldSpaces(doc.analysis.visibleText)) ?? []).filter((d) => d !== doc);
       if (dupes.length) {
         add(doc, "text-duplicate", "incomplete",
