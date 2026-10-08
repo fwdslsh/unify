@@ -1,3 +1,7 @@
+---
+description: "A blog index sorted newest-first with tag facets, and a search box, built from the catalog and the search corpus with a script you own."
+---
+
 # A blog list and search, from `catalog.json` and `search-corpus.json`
 
 **Role**: The recipe for the two most common things people reach for a "collections

@@ -57,7 +57,23 @@ const page = (path, { h1, title } = {}) => ({
 describe("pure functions in the scaffolded assets/all-pages.js", () => {
   test("importing it without a document has no side effects", async () => {
     const { mod } = await scaffold();
-    expect(Object.keys(mod).sort()).toEqual(["addressOf", "countMessage", "entriesOf", "filterEntries", "groupEntries", "labelOf", "prefixOf", "sectionOf"]);
+    expect(Object.keys(mod).sort()).toEqual(["addressOf", "countMessage", "entriesOf", "filterEntries", "groupEntries", "labelOf", "prefixOf", "sectionHeading", "sectionOf"]);
+  });
+
+  test("a tree published under docs/ is grouped by the folder below it, and a section heading reads as words", async () => {
+    const { mod } = await scaffold();
+    expect(mod.sectionOf("/docs/guides/start.html")).toBe("guides");
+    expect(mod.sectionOf("/docs/release-notes/1.0/")).toBe("release-notes");
+    expect(mod.sectionOf("/docs/README.html")).toBe("docs");
+    expect(mod.sectionOf("/guide/intro.html")).toBe("guide");
+    expect(mod.sectionHeading("release-notes")).toBe("Release notes");
+    expect(mod.sectionHeading("")).toBe("Top level");
+  });
+
+  test("a title without a heading is shown without the layout's \" · Site\" suffix", async () => {
+    const { mod } = await scaffold();
+    expect(mod.labelOf(page("/a.html", { title: "Useful topic · Project Docs" }))).toBe("Useful topic");
+    expect(mod.labelOf(page("/b.html", { title: " · Project Docs" }))).toBe("/b.html");
   });
 
   test("groups by first path segment, top level first, titles sorted within a group", async () => {

@@ -8,6 +8,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.10] - 2026-10-08
+
+### Changed
+
+- **A repeated heading's id follows GitHub: `setup`, `setup-1`, `setup-2`.** A Markdown heading that repeats
+  within a page took `-2` first, so every anchor written against a document's GitHub view (`#setup-1`) missed
+  the published heading and failed the reference check; documentation sites renamed their repeated headings to
+  dodge it. A repeat now takes the first `-N` from 1 that no earlier heading on the page produced, GitHub's
+  slugger exactly. A site whose links already name `-2` for a second heading needs them changed to `-1`
+  (spec §10.4, rule MD-16).
+- **The docs template is the fwdslsh documentation look, built to be extended.** `templates/docs`
+  (`unify-docs-template` 0.2.0) is now the design unify.fwdslsh.dev uses — masthead, sticky sidebar, footer,
+  the dark palette with a green accent as `assets/theme.css` custom properties (`--accent` and kin), and
+  landing-page components (`.hero`, `.card-grid`, `.term`, `.btn`) — with everything that names the site in
+  four includes: `_includes/head.html`, `nav.html`, `docnav.html` and `footer.html`. A site that builds on it
+  with `extends:` writes those four files and its pages, and nothing else. It ships
+  `scripts/import-docs.mjs`, a library a generator calls to publish a repository's `docs/` folder at every
+  build (each document to `docs/<its path>`, a missing title or description filled in, a link leaving the
+  folder sent to GitHub). The All-pages directory groups a tree under `docs/` by its own folders. The fonts
+  are opt-in (system fonts until `head.html` loads them), so a scaffold asks nothing of a third party. A site
+  scaffolded from an earlier docs template keeps its own `theme.css`, whose old properties no longer apply;
+  `unify update` lists the new stylesheet and includes before writing them.
+- **A template may use as many includes, slots and opted-out pages as its design needs.** Spec §19.1 required
+  every template to exercise each primitive exactly once; that constraint is gone (rule SCF-01 now asks only
+  for the layout and `_includes/`).
+- **unify's documentation site extends the docs template**, read in place from the repository, and publishes
+  `docs/` through the importer; each document in `docs/` carries its own `description:` frontmatter. The two
+  guides under `docs/guides/` are now published too, where links to them used to go to a broken GitHub path.
+
 ## [0.11.9] - 2026-10-08
 
 ### Fixed
@@ -969,7 +998,8 @@ with generated compare-link notes only. Their diffs are on the
 [releases page](https://github.com/fwdslsh/unify/releases). Nothing here
 retroactively reconstructs detail those notes never carried.
 
-[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.11.9...HEAD
+[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.11.10...HEAD
+[0.11.10]: https://github.com/fwdslsh/unify/compare/v0.11.9...v0.11.10
 [0.11.9]: https://github.com/fwdslsh/unify/compare/v0.11.8...v0.11.9
 [0.11.8]: https://github.com/fwdslsh/unify/compare/v0.11.7...v0.11.8
 [0.11.7]: https://github.com/fwdslsh/unify/compare/v0.11.6...v0.11.7

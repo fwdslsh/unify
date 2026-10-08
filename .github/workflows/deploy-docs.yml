@@ -25,6 +25,9 @@ on:
       # (see the "Assemble example galleries" steps below), so an edit
       # anywhere under examples/ can change what ships and must redeploy it.
       - "examples/**"
+      # The site extends the docs template in place (examples/unify-docs/unify.yaml),
+      # so a template change is a change to every page of this site.
+      - "templates/docs/**"
       - ".github/workflows/deploy-docs.yml"
       # The site is rendered BY src/ as much as FROM docs/: an engine change
       # can alter every emitted page with no docs/ edit at all. v0.8.3 proved

@@ -1,3 +1,7 @@
+---
+description: "The unify tutorial: install, scaffold a site, compose pages with includes, layouts and slots, and publish."
+---
+
 # Getting started with unify
 
 unify turns a folder of plain HTML (and Markdown) into a finished site with shared navs, headers, and footers — no templating language, no JavaScript framework, no configuration. If you can write HTML and CSS, you already know almost everything unify does.

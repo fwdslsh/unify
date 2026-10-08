@@ -1,3 +1,7 @@
+---
+description: "How to validate the authoring rules empirically, by having agents author from them in isolation, and how to triage what fails."
+---
+
 # Ratification: dialling in the rules with micro-experiments
 
 `docs/authoring-rules.md` claims to be the complete authoring surface in 60 lines — learnable in one sitting, or pasteable into a prompt. This document is the procedure that tests that claim instead of asserting it, and the decision framework for acting on what the tests find.

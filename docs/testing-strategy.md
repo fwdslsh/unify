@@ -1,3 +1,7 @@
+---
+description: "The testing contract: what fully and correctly implemented means as machine-checkable conditions, and the tiers and gates that check them."
+---
+
 # unify — Testing Strategy
 
 **Status**: normative for the test suite

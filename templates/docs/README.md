@@ -67,6 +67,45 @@ published** and the previous `dist/` is untouched — never report success on a 
   yours for good; the examples and the tooling (`_layout.html`, `_includes/`, `assets/style.css`,
   `scripts/`) take the template's new version when you say yes.
 
+## This template: what names the site, the fonts, and importing docs
+
+**Four small files hold everything that names the site**, and the layout includes each of them:
+`site/_includes/head.html` (the title suffix, description, `og:site_name` and icon),
+`site/_includes/nav.html` (the masthead: wordmark and links), `site/_includes/docnav.html` (the
+sidebar) and `site/_includes/footer.html` (the byline, which a page can replace by filling the
+`footer` slot). The layout, the stylesheet and the All-pages directory are the template's.
+
+**The fonts.** `site/assets/theme.css` names Inter, JetBrains Mono and Protest Revolution, each
+falling back to a system font, so a fresh site loads nothing from a third party. To load them, add
+these three lines to `site/_includes/head.html`:
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=Protest+Revolution&display=swap">
+
+A page without the sidebar (a landing page) puts `class="home"` or `class="wide"` on its `<body>`;
+the stylesheet's `.hero`, `.card-grid`/`.card`, `.term` and `.btn` classes are there to build one.
+
+**Building on this template instead of copying it.** A project that should own none of these files
+names the template in its own `unify.yaml` — `extends: unify-docs-template@<version>` — and keeps
+only what is its own: the four files above, `assets/theme.css`, and its pages. Each of its files
+replaces the template's at the same path (unify's `extends`, spec §34).
+
+**Publishing a docs/ folder.** `scripts/import-docs.mjs` brings a repository's folder of Markdown
+into the build at every run, so the site cannot drift from the documents: each one is copied to
+`docs/<its path>`, a missing `title:` or `description:` is filled in from its first heading and
+paragraph, and a link that leaves the folder goes to the same file on GitHub. Call it from your
+generator, the script `unify.yaml` names under `generate:`:
+
+    // scripts/gen.mjs
+    import { importDocs } from "./import-docs.mjs";   // from "unify-docs-template/scripts/import-docs.mjs" when you extend the template
+    const [, , , overlay] = process.argv;
+    importDocs({
+      from: new URL("../docs/", import.meta.url),      // the folder to publish
+      into: overlay,
+      github: "https://github.com/you/project/blob/main/docs",
+    });
+
 ## Composition
 
 - Every page is wrapped by the nearest `_layout.html` — its own folder, then each parent. Choose a

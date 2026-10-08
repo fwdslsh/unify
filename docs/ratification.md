@@ -1,3 +1,7 @@
+---
+description: "The evidence behind the authoring rules: each ratification round, what it found, and what it changed in the docs, the spec and the code."
+---
+
 # Ratification — what the agent-experiment rounds changed
 
 **Status**: v0.7.0, historical record and argument

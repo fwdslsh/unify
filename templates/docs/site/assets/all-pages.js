@@ -18,16 +18,32 @@ export function addressOf(path, prefix) {
   return path.startsWith(prefix) ? "/" + path.slice(prefix.length) : path;
 }
 
-/** The section a page is listed under: the first segment of its address, or "" for a page at the top level. */
+/**
+ * The section a page is listed under: the first directory of its address, or
+ * "" for a page at the top level. A documentation tree published under docs/
+ * is listed by the directory below that, so /docs/guides/x.html is under
+ * "guides" rather than every page sitting under "docs".
+ */
 export function sectionOf(address) {
   const segments = String(address).split("/").filter(Boolean);
+  if (segments[0] === "docs" && segments.length > 2) return segments[1];
   return segments.length > 1 ? segments[0] : "";
 }
 
-/** The name shown for a page: its first <h1>, else its <title>, else its address. */
+/** A section's heading: its directory name with hyphens as spaces and a capital first letter. */
+export function sectionHeading(section) {
+  if (section === "") return "Top level";
+  const words = section.replaceAll("-", " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/**
+ * The name shown for a page: its first <h1>, else its <title> without the
+ * layout's " · Site name" suffix, else its address.
+ */
 export function labelOf(page) {
   const h1 = ((page.body && page.body.headings) || []).find((h) => h.level === 1 && h.text);
-  const title = page.head && page.head.title;
+  const title = ((page.head && page.head.title) || "").replace(/\s*·[^·]*$/, "").trim();
   return (h1 && h1.text) || title || page.path;
 }
 
@@ -43,7 +59,7 @@ export function entriesOf(catalog) {
 
 /** Entries whose title or address contains every word of the query (case-insensitive). */
 export function filterEntries(entries, query) {
-  const words = String(query).toLowerCase().split(" ").filter(Boolean);
+  const words = String(query).toLowerCase().split(/\s+/).filter(Boolean);
   if (words.length === 0) return entries;
   return entries.filter((entry) => {
     const haystack = (entry.label + " " + entry.address).toLowerCase();
@@ -110,7 +126,7 @@ async function start(doc) {
     for (const group of groupEntries(shown)) {
       const section = doc.createElement("section");
       const heading = doc.createElement("h2");
-      heading.textContent = group.section === "" ? "Top level" : group.section;
+      heading.textContent = sectionHeading(group.section);
       const items = doc.createElement("ul");
       for (const entry of group.entries) {
         const item = doc.createElement("li");
