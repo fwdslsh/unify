@@ -1,3 +1,7 @@
+---
+description: "The shipped product contract: what unify is, who it serves, the composition model, the CLI and the boundaries future work must keep."
+---
+
 # unify — Product Specification
 
 **Status**: Shipped contract — the composition core plus the production-and-discovery layer; §6 is that layer's design record

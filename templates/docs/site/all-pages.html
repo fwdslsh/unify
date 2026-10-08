@@ -8,7 +8,8 @@
     <meta property="og:description" content="Every page on the site in one searchable list, grouped by section.">
     <style>
       .all-pages-search label { display: block; font-weight: bold; }
-      .all-pages-search input { box-sizing: border-box; width: 100%; max-width: 24rem; padding: 0.4rem; font: inherit; }
+      .all-pages-search input { box-sizing: border-box; width: 100%; max-width: 24rem; padding: 0.65rem; font: inherit; color: var(--text); background: var(--bg-card); border: 1px solid var(--border); border-radius: 0.4rem; }
+      .all-pages-search input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
       .all-pages-count { min-height: 1.5em; }
       .all-pages-list h2 { margin-bottom: 0.25rem; text-transform: none; }
       .all-pages-list ul { margin-top: 0; padding-left: 1.25rem; }
@@ -38,12 +39,6 @@
       </div>
       <div class="all-pages-list" id="all-pages-list"></div>
 
-      <h2>What is listed</h2>
-      <p>The catalog lists the pages a search engine could index: not <code>noindex</code>, not
-      <code>404.html</code>, and not a page whose canonical points somewhere else. For a private site
-      that marks every page <code>noindex</code>, build with <code>--include-noindex</code> as well so
-      the directory is not empty. <code>noindex</code> is a request to crawlers, not access control:
-      anything in the catalog is a public file. Edit or delete this paragraph once you have decided.</p>
     </main>
   </body>
 </html>

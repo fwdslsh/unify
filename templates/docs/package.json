@@ -1,7 +1,7 @@
 {
   "name": "unify-docs-template",
-  "version": "0.1.2",
-  "description": "The docs starter site for unify, the HTML-native static site generator \u2014 a documentation site, with a catalog-driven directory of every page. Scaffold it with: unify init unify-docs-template",
+  "version": "0.2.0",
+  "description": "The docs template for unify, the HTML-native static site generator: a documentation site in the fwdslsh family's look, with a sidebar, a catalog-driven directory of every page, and an importer that publishes a repository's docs/ folder. Scaffold it with: unify init unify-docs-template, or build on it with extends: unify-docs-template",
   "keywords": [
     "unify",
     "unify-template",
@@ -22,6 +22,7 @@
   },
   "files": [
     "site/",
+    "scripts/",
     "DEPLOY.md",
     "unify.yaml"
   ],

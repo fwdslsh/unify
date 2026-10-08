@@ -1,3 +1,7 @@
+---
+description: "What each of unify's GitHub Actions workflows runs, and what a green or red job is allowed to mean."
+---
+
 # CI/CD workflows
 
 What actually runs, and what each job is allowed to mean. Three workflow files exist:

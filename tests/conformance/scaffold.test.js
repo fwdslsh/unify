@@ -45,7 +45,7 @@ function findHtmlFiles(dir) {
 }
 
 for (const name of TEMPLATES) {
-  test(`scaffold/${name}: SCF-01 primitives, SCF-02 layout/stylesheet/no-<slot>-in-output, SCF-04/DIA-10 advisory discipline`, async () => {
+  test(`scaffold/${name}: SCF-01 layout and _includes/, SCF-02 layout/stylesheet/no-<slot>-in-output, SCF-04/DIA-10 advisory discipline`, async () => {
     const tmp = mkTmp();
 
     const initR = await runCli(["init", name], tmp);
@@ -54,25 +54,11 @@ for (const name of TEMPLATES) {
     const srcDir = join(tmp, "site");
     if (!existsSync(srcDir)) throw new Error(`unify init ${name} did not scaffold into site/`);
 
-    // ---- SCF-01: each primitive exactly once. ------------------------------
+    // ---- SCF-01: the chrome in the automatic layout, fragments under _includes/. --
     const layoutPath = join(srcDir, "_layout.html");
     if (!existsSync(layoutPath)) throw new Error("missing the automatic _layout.html");
     const layoutText = readFileSync(layoutPath, "utf8");
-
-    if (!layoutText.includes('<include src="/_includes/nav.html">')) {
-      throw new Error(`_layout.html does not include the nav via <include>:\n${layoutText}`);
-    }
-    if (!existsSync(join(srcDir, "_includes", "nav.html"))) throw new Error("missing _includes/nav.html — the underscore convention primitive");
-
-    if (!layoutText.includes('<slot name="footer">')) throw new Error(`_layout.html is missing the named "footer" slot with a fallback:\n${layoutText}`);
-    if (!readFileSync(join(srcDir, "index.html"), "utf8").includes('slot="footer"')) {
-      throw new Error("missing a page filling the footer slot (index.html with slot=\"footer\" — the one page every scaffold ships, §19.11)");
-    }
-
-    const notFoundPath = join(srcDir, "404.html");
-    if (!existsSync(notFoundPath) || !readFileSync(notFoundPath, "utf8").includes('data-layout="none"')) {
-      throw new Error("missing 404.html with data-layout=\"none\"");
-    }
+    if (!existsSync(join(srcDir, "_includes"))) throw new Error("missing _includes/ — the underscore convention");
 
     // ---- SCF-02: charset, a plain comment above each <slot>, the preview
     // CSS rule, and (checked further down, after a real build) no <slot> in
@@ -1196,11 +1182,15 @@ for (const name of TEMPLATES) {
     const initR = await runCli(["init", name], tmp);
     if (initR.exit !== 0) throw new Error(`unify init ${name} exited ${initR.exit}: ${initR.stderr}`);
 
-    // The scaffolded site name is whatever the layout's <title> suffix says,
-    // read out of the artifact rather than hard-coded per template.
+    // The scaffolded site name is whatever the layout's <title> suffix says —
+    // in the layout itself, or in the include the layout puts in its <head>
+    // (the docs template's _includes/head.html) — read out of the artifact
+    // rather than hard-coded per template.
     const layout = readFileSync(join(tmp, "site", "_layout.html"), "utf8");
-    const siteName = (layout.match(/<title>\s*—\s*([^<]+?)\s*<\/title>/) ?? [])[1];
-    if (!siteName) throw new Error(`${name}: could not read the scaffolded site name out of site/_layout.html's <title>`);
+    const titleFile = /<title>/.test(layout) ? "site/_layout.html" : "site/_includes/head.html";
+    const titled = readFileSync(join(tmp, ...titleFile.split("/")), "utf8");
+    const siteName = (titled.match(/<title>\s*[—·]\s*([^<]+?)\s*<\/title>/) ?? [])[1];
+    if (!siteName) throw new Error(`${name}: could not read the scaffolded site name out of ${titleFile}'s <title>`);
 
     // Step 1 of DEPLOY.md, mechanically: every `site/...` path it names gets
     // the site name replaced, and the generator constants it names get the
@@ -1208,7 +1198,7 @@ for (const name of TEMPLATES) {
     // is the whole point of the check.
     const deploy = readFileSync(join(tmp, "DEPLOY.md"), "utf8");
     const step1 = deploy.slice(deploy.indexOf("## 1."), deploy.indexOf("## 2."));
-    if (!step1.includes("site/_layout.html")) throw new Error("DEPLOY.md step 1 does not name site/_layout.html — this test's reading of the recipe is stale");
+    if (!step1.includes(titleFile)) throw new Error(`DEPLOY.md step 1 does not name ${titleFile}, which holds the title suffix — this test's reading of the recipe is stale`);
     const listed = [...new Set([...step1.matchAll(/`((?:site|scripts)\/[A-Za-z0-9._/-]+)`/g)].map((m) => m[1]))];
 
     let edited = 0;
@@ -1718,8 +1708,9 @@ for (const name of TEMPLATES) {
     // and unify.yaml keeps it (§19.11). Edited here, so the published file must carry the site's value.
     const theme = join(site, "assets", "theme.css");
     const themeText = readFileSync(theme, "utf8");
-    if (!themeText.includes("--measure: 42rem;")) throw new Error(`${name}: assets/theme.css does not expose --measure at its default`);
-    writeFileSync(theme, themeText.replace("--measure: 42rem;", "--measure: 60rem;"));
+    const measure = themeText.match(/--measure: [^;]+;/)?.[0];
+    if (!measure) throw new Error(`${name}: assets/theme.css does not expose --measure at its default`);
+    writeFileSync(theme, themeText.replace(measure, "--measure: 60rem;"));
     const nav = readFileSync(join(site, "_includes", "nav.html"), "utf8");
     writeFileSync(join(site, "_includes", "nav.html"), nav.replace("</nav>", linked.map((home) => ` <a href="/${home.replace(/\.md$/, ".html")}">${home}</a>`).join("") + "</nav>"));
     for (const args of [["build", "--dry-run", "--strict"], ["audit", "--strict"]]) {

@@ -82,33 +82,6 @@ describe.each(TEMPLATE_NAMES)('template "%s" — SCF-01/SCF-02 structure (in-mem
     expect(paths.some((p) => p.startsWith("_includes/"))).toBe(true);
   });
 
-  test("SCF-01: exactly one <include> across the whole template", () => {
-    const count = (wholeSource.match(/<include\b/gi) || []).length;
-    expect(count).toBe(1);
-  });
-
-  test("SCF-01: exactly one _layout.html (the automatic layout, discovered by name)", () => {
-    const layouts = paths.filter((p) => p.split("/").pop() === "_layout.html");
-    expect(layouts).toEqual(["_layout.html"]);
-  });
-
-  test('SCF-01: exactly one data-layout="none" page (404.html)', () => {
-    const optedOut = paths.filter((p) => isPage(p) && !isUnderscored(p) && /data-layout\s*=\s*["']none["']/.test(files[p]));
-    expect(optedOut).toEqual(["404.html"]);
-  });
-
-  test("SCF-01: exactly one named <slot> in the layout, with a fallback", () => {
-    const { root } = parse(files["_layout.html"]);
-    const namedSlots = findAll(root, (n) => n.type === "element" && n.tag.toLowerCase() === "slot" && getAttr(n, "name"));
-    expect(namedSlots.length).toBe(1);
-    expect(namedSlots[0].endTagStart).not.toBeNull(); // has a closing tag, i.e. can carry fallback content
-  });
-
-  test("SCF-01: exactly one page fills the named slot (slot=\"footer\" on a top-level element)", () => {
-    const fillers = paths.filter((p) => isPage(p) && !isUnderscored(p) && /\sslot\s*=\s*["']footer["']/.test(files[p]));
-    expect(fillers.length).toBe(1);
-  });
-
   test('SCF-02: the layout declares <meta charset="utf-8"> first in <head>', () => {
     const { root } = parse(files["_layout.html"]);
     const head = findAll(root, (n) => n.type === "element" && n.tag.toLowerCase() === "head")[0];

@@ -10,13 +10,14 @@ Nothing a scaffold writes is a fact about you. **The site's name is written in m
 and the ones a build never corrects are the ones that publish it anyway — so this list names every
 one of them rather than the first:
 
-- **the site's name and byline** — `site/_layout.html` (the title suffix and the footer), and then
-  `site/index.html` and `site/404.html`, which each write it into their own visible text and their own
-  `description`, as does every page you copy out of `site/_examples/`. Grep the scaffolded name once
-  and you will find them all: `grep -rn 'My Site' site/`, with whichever name your template shipped;
-- **the contact details** — the reserved `example.com` mailbox in `site/index.html`'s footer line and
-  in `site/_examples/contact.html`, and no postal address at all, because a plausible street address
-  in a scaffold is one an author publishes;
+- **the site's name and byline** — the four files the layout includes: `site/_includes/head.html`
+  (the title suffix, the description and `og:site_name`), `site/_includes/nav.html` (the wordmark and
+  the links across the top), `site/_includes/docnav.html` (the sidebar) and `site/_includes/footer.html`
+  (the byline), and then `site/index.html`, which writes it into its own visible text, as does every page
+  you copy out of `site/_examples/`. Grep the scaffolded name once and you will find them all:
+  `grep -rni 'Project Docs' site/`;
+- **the contact details** — the reserved `example.com` mailbox in `site/_examples/contact.html`, and no
+  postal address at all, because a plausible street address in a scaffold is one an author publishes;
 - **a generator's own constants**, if your project has one. The blog template's
   `scripts/gen.mjs` opens with `SITE_NAME` and `LISTING_DESCRIPTION`;
 - `site/assets/share-placeholder.png` — a flat 1200×630 placeholder card, not a photograph. It is

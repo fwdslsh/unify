@@ -195,7 +195,7 @@ const HEAD_TAG_RE = /<\/?head(?=[\s>/]|$)/i;
  * nesting as open/close markers in one array, so this also sees headings and
  * html blocks inside blockquotes/lists without extra work):
  *   - assigns every heading without an explicit id one derived from its text
- *     (§10.4), tracking per-call dedup counts (`-2`, `-3`, …) — scoped to
+ *     (§10.4), tracking per-call dedup counts (`-1`, `-2`, …, GitHub's scheme) — scoped to
  *     this one conversion, which is the only meaning "within the page" can
  *     have when a Markdown *fragment* is converted in isolation (see
  *     `convertFragment`);
@@ -220,10 +220,18 @@ function annotateHeadingsAndFindHeadElements(tokens) {
       const inline = tokens[i + 1];
       const text = inlinePlainText(inline?.children);
       if (!token.attrGet("id")) {
+        // GitHub's slugger (github-slugger), so an anchor written against the
+        // repository view — `#setup-1` for the second `Setup` — reaches the
+        // same heading here: the first keeps the bare slug, each repeat takes
+        // the next `-N` from 1 that no earlier heading already produced.
         const base = slugify(text);
-        const count = seen.get(base) ?? 0;
-        seen.set(base, count + 1);
-        token.attrSet("id", count === 0 ? base : `${base}-${count + 1}`);
+        let id = base;
+        while (seen.has(id)) {
+          seen.set(base, seen.get(base) + 1);
+          id = `${base}-${seen.get(base)}`;
+        }
+        seen.set(id, 0);
+        token.attrSet("id", id);
       }
       if (token.tag === "h1" && firstH1 === undefined) firstH1 = text;
       continue;

@@ -3,11 +3,23 @@
    names it under keep: in its template: block, so unify update never
    overwrites it; a property you delete keeps the stylesheet's default. */
 :root {
-  --font-body: 100%/1.5 system-ui, sans-serif;
-  --color-text: canvastext;
-  --color-background: canvas;
-  --color-link: linktext;
-  --color-rule: #88888880;
-  --measure: 42rem;
-  --space: 1.5rem;
+  --bg: #0a0e0a;
+  --bg-panel: #0d1117;
+  --bg-card: #161b22;
+  --border: #30363d;
+  --border-faint: #21262d;
+  --text: #e6edf3;
+  --text-2: #c9d1d9;
+  --dim: #8b949e;
+  --accent: #3fb950;
+  --accent-bright: #00ff41;
+  --accent-tint: rgba(63, 185, 80, 0.08);
+  --code: #79c0ff;
+  --code-bg: rgba(110, 118, 129, 0.2);
+  --gradient: linear-gradient(135deg, #00ff41 0%, #00cc33 100%);
+  --sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --display: "Protest Revolution", "Arial Black", sans-serif;
+  --measure: 47rem;
+  --head-h: 4rem;
 }

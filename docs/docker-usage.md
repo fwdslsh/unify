@@ -1,3 +1,7 @@
+---
+description: "The unify container image: what it contains, and how to build a site with it."
+---
+
 # Docker Usage Guide
 
 This repository ships **one** container image: the unify CLI, built from [`docker/Dockerfile`](../docker/Dockerfile). Use it to build a site in a pipeline or on a machine that has no unify install. It is a build tool, not a web server — serving the built site is the job of whatever host or server you deploy `dist/` to.

@@ -1,3 +1,7 @@
+---
+description: "Keeping a generator you already have, Eleventy here, and letting unify own every page's chrome, head, URLs and checks."
+---
+
 # Eleventy inside `--generate`, htmx on top
 
 **Role**: The advanced recipe for keeping a generator you already have — Eleventy here,

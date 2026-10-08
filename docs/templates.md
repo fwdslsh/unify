@@ -1,3 +1,7 @@
+---
+description: "Scaffolding a site from a template, keeping it current with unify update, publishing your own, and building on one with extends."
+---
+
 # Templates: start from one, stay current with it, publish your own
 
 **Role**: The guide to unify's template features — scaffolding a site from a built-in, a directory, a git repository or an npm package, keeping that site current with `unify update`, publishing a template for others, and building on a template without copying it (`extends:`). The normative rules are in [`conformance-spec.md`](conformance-spec.md) §19.9 and §19.10; every command and flag is in [`cli-reference.md`](cli-reference.md). Read [`getting-started.md`](getting-started.md) first if you have never run `unify init`.
@@ -195,6 +199,27 @@ base-url: https://owner.github.io/repo/
 `unify build` (and `audit`, `dev`, `watch`) then reads the template's `site/` as if it lay beneath `docs/`. Its `_layout.html` wraps your pages, its `_includes/` resolve, and its stylesheet, scripts and pages publish. **Anything you write wins**: a file of yours at the same path, or one that publishes to the same address, replaces the template's. Your `index.md` is the home page instead of the template's `index.html`. Your `assets/theme.css` is the theme. Your `_includes/nav.html` is the nav every layout includes. A template page you don't want is left out with `exclude:` (list `_*` and that page's path). Nothing else of the template's is used: its `unify.yaml`, generator and README are never read, and nothing in it runs.
 
 Pin the version. A pinned source (`@1.2.3` on npm, `#<commit>` on git, or a built-in name) is fetched once into your cache directory, and every later build, in any project, reads it from there without the network. An unpinned one is fetched on every run, and its next release can change your site without a commit of yours. Bumping the pin is how you take a template's new release, and your files never need copying back. `unify build --dry-run` marks every file that came from the template `(template)`, so you can see exactly what you are using and what you have replaced.
+
+The docs template is built for this. Its masthead, sidebar, footer and `<head>` identity are four small includes (`_includes/head.html`, `nav.html`, `docnav.html`, `footer.html`), so a site that extends it writes those four files, its `assets/theme.css` if it changes the look, and its pages. And it ships `scripts/import-docs.mjs`, a library your generator calls to publish a folder of Markdown at every build: each document is copied to `docs/<its path>`, a missing `title:` or `description:` is filled in from its first heading and paragraph, and a link leaving the folder goes to the same file on GitHub. Add the template to your project's dev dependencies (`npm install -D unify-docs-template`), and both the layer and the library come from the one installed copy:
+
+```yaml
+# unify.yaml
+source: site                                  # your pages and the four identity files
+extends: node_modules/unify-docs-template     # a directory: the installed package, its version pinned by your lockfile
+generate: scripts/gen.mjs
+```
+
+```js
+// scripts/gen.mjs
+import { importDocs } from "unify-docs-template/scripts/import-docs.mjs";
+importDocs({
+  from: new URL("../docs/", import.meta.url),
+  into: process.argv[3],                       // the overlay unify hands every generator
+  github: "https://github.com/you/project/blob/main/docs",
+});
+```
+
+unify's own documentation site (`examples/unify-docs`) and akm.fwdslsh.dev are built this way.
 
 `extends:` and `template:` don't interact. A project uses one or the other: `template:` is for a project that owns a copy and keeps it current with `update`, and `extends:` is for a project that owns no copy at all. The exact rules are in [`conformance-spec.md`](conformance-spec.md) §34.
 

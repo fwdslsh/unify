@@ -1,6 +1,10 @@
 # The flags this site's documented build uses; everything else is a default.
 # Where the generator lives, relative to this file.
 generate: scripts/gen.mjs
+# The docs template this site builds on, read in place from this repository:
+# its layout, stylesheet and All-pages directory; this site keeps only its own pages and the
+# four identity files under _includes/.
+extends: ../../templates/docs
 # Directory-style URLs: /docs/getting-started/ instead of .html.
 pretty-urls: true
 # Absolute origin for sitemap.xml, canonical links and feed URLs.

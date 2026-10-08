@@ -1,3 +1,7 @@
+---
+description: "Using a component framework, Svelte here, on a unify site by compiling it to an asset, without adopting a framework for the site."
+---
+
 # Integrating compiled components: the compile-to-asset pattern
 
 **Role**: The recipe for using a component framework — Svelte here, but the shape is the

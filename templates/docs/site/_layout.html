@@ -3,29 +3,30 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>— Project Docs</title>
-    <!-- relative, not /assets/…: open this file straight from the folder and
-         the styles apply; unify rewrites it for every page at every depth. -->
+    <!-- the site's name, description and icon: _includes/head.html -->
+    <include src="/_includes/head.html"></include>
     <link rel="stylesheet" href="assets/style.css">
-    <!-- share card: assets/share-placeholder.png is a PLACEHOLDER, a flat
-         1200×630 image. Replace the file, and correct these two numbers
-         if yours is a different size — they must match it (see DEPLOY.md). -->
+    <!-- share card: 1200×630; a site replaces the image file (DEPLOY.md) -->
     <meta property="og:type" content="website">
     <meta property="og:image" content="/assets/share-placeholder.png">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
-    <!-- schema: unify writes each page's JSON-LD from what that page itself
-         declares. Delete this line and none is written; write your own
-         <script type="application/ld+json"> and yours wins. -->
+    <!-- schema: each page's JSON-LD, written from what the page declares -->
     <meta name="schema" content="WebPage">
   </head>
   <body>
+    <a class="skip" href="#content">Skip to content</a>
     <include src="/_includes/nav.html"></include>
-    <!-- main: everything a page did not address to a named slot -->
-    <main><slot></slot></main>
-    <footer class="site-footer">
-      <!-- footer: the site byline, or whatever a page puts here instead -->
-      <slot name="footer"><p>© Project Docs</p></slot>
+    <div class="shell">
+      <!-- main: everything a page did not address to a named slot -->
+      <main id="content"><slot></slot></main>
+      <include src="/_includes/docnav.html"></include>
+    </div>
+    <footer class="site-foot">
+      <div class="inner">
+        <!-- footer: _includes/footer.html, or whatever a page puts here instead -->
+        <slot name="footer"><include src="/_includes/footer.html"></include></slot>
+      </div>
     </footer>
   </body>
 </html>

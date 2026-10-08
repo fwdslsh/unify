@@ -8,10 +8,13 @@ a documentation site, using nothing but the five authoring primitives.
 custom domain, DNS-verified and configured as this repository's Pages domain in
 Settings > Pages.
 
-The look matches [fwdslsh.dev](https://fwdslsh.dev/), the family site: GitHub-dark
-surfaces, the fwdslsh green, Protest Revolution for the wordmark, Inter for prose,
-JetBrains Mono for anything the terminal would say. One hand-written stylesheet and no
-build step. The only client JavaScript on the site is the few lines on `/examples/` that
+The look is the docs template's (`templates/docs`), which this site **extends** rather
+than copies (`extends: ../../templates/docs` in `unify.yaml`): the layout, the stylesheet
+and the All-pages directory are the template's, read in place from this repository, and
+akm.fwdslsh.dev extends the same template from npm. What is this site's own is small:
+the four files that name it (`site/_includes/head.html`, `nav.html` and `footer.html`, and
+the sidebar the generator writes), its own pages (`index.html`, `examples/`, `templates/`),
+`assets/site.css` for those pages, and its share card. The only client JavaScript on the site is the few lines on `/examples/` that
 resolve the "View live" addresses — see the comment in `site/examples/index.html` for why
 they cannot be plain hrefs.
 
@@ -37,64 +40,29 @@ file:
 
 ```bash
 unify build -s examples/unify-docs/site -o examples/unify-docs/dist \
-  --generate ../scripts/gen.mjs --pretty-urls \
+  --generate ../scripts/gen.mjs --extends templates/docs --pretty-urls \
   --base-url https://unify.fwdslsh.dev/ --canonical auto --catalog --search-corpus
 ```
 
-21 files: 12 documentation pages, an index, a front page, the examples gallery, a 404,
-the stylesheet, the favicon, `sitemap.xml`, `assets/unify/catalog.json`, and
-`assets/unify/search-corpus.json`.
-
 ## It renders the real docs, not a copy
 
-`scripts/gen.mjs` reads the repository's `docs/` (found relative to the script) (the repository's actual documentation) and
-writes one page per file into the `--generate` overlay. **Nothing is copied into this
-example.** Edit `docs/authoring-rules.md` and this site changes on the next build; there is
-no second copy to drift.
+`scripts/gen.mjs` publishes the repository's `docs/` at every build through the docs
+template's importer (`templates/docs/scripts/import-docs.mjs`): every document lands at
+`docs/<its path>`, keeps its links (unify resolves a `.md` link to the page it publishes,
+and `#anchor` to the heading GitHub would), and a link to a repository file the site does
+not publish goes to GitHub. **Nothing is copied into this example.** Edit
+`docs/authoring-rules.md` and this site changes on the next build; there is no second copy
+to drift. Each document carries its own `description:` in frontmatter, which is what the
+page and the index show.
 
-That is also the one thing to know before copying this example elsewhere: it is deliberately
-*not* self-contained. It only builds inside a unify checkout, and says so with a located
-error if `docs/` is missing.
+What the generator still does itself is the one thing no folder listing can know: this
+site's reading order. It groups the documents (Guides, Reference, Project, and More for
+anything new) and writes them as the sidebar (`_includes/docnav.html`, which replaces the
+template's) and as the docs index (`docs/index.md`), so a new document cannot be published
+unreachable.
 
-## What each primitive is doing here
-
-| Primitive | Where |
-|---|---|
-| `<include src>` | the masthead, hand-authored in `site/_includes/`; the sidebar, generated into the overlay's `_includes/` |
-| Layout | one `site/_layout.html` wraps every page, generated ones included; discovery is automatic and no page names it |
-| Named slot | the footer, with fallback content the pages don't override |
-| Underscore | `_includes/` is read by the build and never ships; `scripts/` and `unify.yaml` sit outside `site/`, so they never ship either |
-| `data-layout="none"` | `site/404.html` opts out of the chrome entirely |
-
-Plus the production layer: `--pretty-urls`, `--base-url`, `--canonical auto`,
-`sitemap.xml`, `--catalog`, `--search-corpus`, and `schema: WebPage` on every generated
-page. The front
-page also demonstrates root-attribute merging: `site/index.html` declares
-`<body class="home">`, the union with the layout's `<body>` carries it into the output,
-and the stylesheet uses it to swap the sidebar shell for the full-width hero.
-
-## The generator
-
-`generate:` (`--generate`) names one file and hands it two arguments: the source root and an empty
-overlay directory. `gen.mjs` uses them to do four things:
-
-1. **One page per doc**, with `title`, `description` and `schema` frontmatter derived
-   from the document itself (the title from its `# Heading`, the description from its
-   `**Role**:` line).
-2. **Rewrite every internal link** so it resolves in the built site: `authoring-rules.md`
-   becomes `/docs/authoring-rules.html`, and anything naming a repository file the site
-   does not publish becomes a GitHub URL. unify's reference check audits generated pages
-   exactly like hand-authored ones, so a link left unrewritten is a build failure, not a
-   404 a reader finds later.
-3. **Disambiguate repeated headings**, because heading ids are slugs and two identical
-   headings in one document would collide into a duplicate id.
-4. **Generate the sidebar**, grouped (Guides, Reference, Project, and More for anything
-   uncurated) with short labels, from the same list the pages came from, so a new document
-   cannot be published unreachable. It is written to the overlay's `_includes/docnav.html`
-   and picked up by `_layout.html`'s ordinary `<include src="/_includes/docnav.html">`: the
-   overlay and `site/` share one path space, so an include resolves across the boundary in
-   either direction. It was hand-authored with a completeness assertion standing in for
-   this until issue #55 was fixed; see `FINDINGS.md`, finding 2.
+It is deliberately *not* self-contained: it only builds inside a unify checkout, because
+the documents and the template are both read from the repository.
 
 ## What it found
 

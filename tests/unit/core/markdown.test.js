@@ -57,14 +57,22 @@ describe("slugify (§10.4)", () => {
 });
 
 describe("heading ids assigned during conversion", () => {
-  test("duplicate headings get -2, -3 suffixes, scoped to one conversion", () => {
+  test("duplicate headings get GitHub's -1, -2 suffixes, scoped to one conversion", () => {
     const { out } = (() => {
       const r = reporter();
       return { out: convert("# Setup\n\na\n\n# Setup\n\nb\n\n# Setup\n\nc\n", { path: "/s/x.md", sourceRoot: "/s", reporter: r }) };
     })();
     expect(out.html).toContain('<h1 id="setup">Setup</h1>');
+    expect(out.html).toContain('<h1 id="setup-1">Setup</h1>');
     expect(out.html).toContain('<h1 id="setup-2">Setup</h1>');
-    expect(out.html).toContain('<h1 id="setup-3">Setup</h1>');
+  });
+
+  test("a repeat skips a suffix an earlier heading already produced, as GitHub's slugger does", () => {
+    const r = reporter();
+    const out = convert("# Setup\n\n# Setup 1\n\n# Setup\n", { path: "/s/x.md", sourceRoot: "/s", reporter: r });
+    expect(out.html).toContain('<h1 id="setup">Setup</h1>');
+    expect(out.html).toContain('<h1 id="setup-1">Setup 1</h1>');
+    expect(out.html).toContain('<h1 id="setup-2">Setup</h1>');
   });
 
   test("setext headings get ids too", () => {
@@ -546,7 +554,7 @@ describe("exact fixture regressions", () => {
       '<meta property="og:image" content="/assets/team.jpg">',
     );
     expect(out.html).toBe(
-      '<h1 id="about">About</h1>\n<p>Text here.</p>\n<h1 id="about-2">About</h1>\n<p>More.</p>\n',
+      '<h1 id="about">About</h1>\n<p>Text here.</p>\n<h1 id="about-1">About</h1>\n<p>More.</p>\n',
     );
   });
 

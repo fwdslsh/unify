@@ -1,0 +1,88 @@
+/* unify docs: the styles only this site's own pages need — the examples and
+   templates pages. Everything else is the docs template's stylesheet, which
+   this site extends (unify.yaml); _includes/head.html links this file after it. */
+
+/* --------------------------------------------------------- examples page */
+
+.examples-head {
+  max-width: 72.5rem;
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem 0.5rem;
+}
+.examples-head h1 { margin-top: 0; }
+.examples-head .lede { max-width: 42rem; }
+
+.note {
+  margin: 1rem 0 0;
+  max-width: 42rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-card);
+  font-size: 0.8125rem;
+  color: var(--dim);
+}
+
+.examples-section { padding: 1.5rem 1.5rem 2.5rem; max-width: 72.5rem; margin: 0 auto; }
+.examples-section h2 { margin: 0 0 0.5rem; padding: 0; border: 0; font-size: 1.375rem; }
+.examples-section > p { margin: 0 0 1.5rem; color: var(--dim); font-size: 0.9375rem; max-width: 42rem; }
+
+.card-links { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; }
+
+/* With JavaScript off, the "View live" anchors never get an href (see the
+   comment in site/examples/index.html) — style that state as inert instead
+   of letting the type selector on `a` (above) paint it the same green as a
+   real link. */
+.card-links a:not([href]) { color: var(--dim); cursor: default; }
+
+/* -------------------------------------------------------- templates page */
+
+/* Each template is a <details> card: the summary is the card face, and
+   opening it shows the command that scaffolds a site from the template. */
+/* A closed card keeps its own height instead of stretching to an open neighbour's. */
+.card.template { padding: 0; align-self: start; }
+.card.template summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1.75rem 1.625rem;
+  cursor: pointer;
+  list-style: none;
+}
+.card.template summary::-webkit-details-marker { display: none; }
+.card.template summary h3 { display: flex; align-items: center; gap: 0.75rem; overflow-wrap: anywhere; }
+.card.template .template-desc { font-size: 0.875rem; line-height: 1.65; color: var(--dim); }
+.card.template .template-meta { font-family: var(--mono); font-size: 0.75rem; color: var(--dim); overflow-wrap: anywhere; }
+
+.badge {
+  margin-left: auto;
+  padding: 0.125rem 0.5rem;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 0.6875rem;
+  font-weight: 400;
+  line-height: 1.6;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.template-cmd {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0 1.625rem 1.5rem;
+  border-top: 1px solid var(--border-faint);
+}
+.template-cmd .term-body { padding: 1rem 0 0; line-height: 1.6; }
+.card button.more {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.card button.more:hover { color: var(--accent-bright); }

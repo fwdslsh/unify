@@ -1,3 +1,7 @@
+---
+description: "How the v0.6 test tree and codebase were migrated to the suite the testing strategy defines, and the gates that kept it honest."
+---
+
 # unify — Test-Suite and Codebase Migration Plan (v0.6 → v0.7.0)
 
 **Status**: v0.7.0, normative for the migration
