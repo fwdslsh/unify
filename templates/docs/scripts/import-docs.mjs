@@ -24,7 +24,8 @@
  *   `base` says otherwise), and every other file in the folder (an image, a
  *   diagram) is copied beside it.
  * - **A missing title or description is filled in** from the document itself
- *   (its first heading; its first paragraph, cut to one sentence) and written
+ *   (its first heading, or its opening line when it has none; its first
+ *   paragraph, cut to one sentence) and written
  *   as frontmatter, and a document with no `# heading` gets one from the title.
  *   An authored `title:` or `description:` is never replaced: frontmatter in
  *   the source is the convention, and this is the fallback for documents that
@@ -94,10 +95,11 @@ export function importDocs({ from, into, base = "docs", github, rename = (p) => 
     if (resolved === ".." || resolved.startsWith("../")) return new URL(`${path}${suffix}`, new URL(posix.dirname(docRel) + "/", githubDir)).href;
     const doc = documentAt(resolved);
     if (doc === null) return null; // unify's reference check reports it
-    const target = sitePath(doc);
-    // Unchanged unless the target moved or the link named a folder.
-    if (doc === resolved && target === (base ? `${base}/${resolved}` : resolved)) return null;
-    return `/${target}${suffix}`;
+    // Unchanged unless the target moved, the document holding the link moved
+    // (its relative links would then point from the wrong folder), or the
+    // link named a folder.
+    if (doc === resolved && rename(doc) === doc && rename(docRel) === docRel) return null;
+    return `/${sitePath(doc)}${suffix}`;
   }
 
   /** The file a resolved path names: itself, or a folder's README.md / index.md. */
@@ -122,7 +124,7 @@ export function importDocs({ from, into, base = "docs", github, rename = (p) => 
     const text = transform(rel, readFileSync(join(root, ...rel.split("/")), "utf8"));
     const { front, body } = splitFrontmatter(text);
     const linked = mapProse(body, (line) => relinkLine(line, (url) => relink(url, rel)));
-    const title = scalar(front, "title") ?? firstHeading(linked) ?? posix.basename(rel, ".md").replaceAll("-", " ");
+    const title = scalar(front, "title") ?? firstHeading(linked) ?? firstLine(linked) ?? posix.basename(rel, ".md").replaceAll("-", " ");
     const description = scalar(front, "description") ?? firstSentence(linked) ?? `${title}.`;
     const added = [
       scalar(front, "title") === null ? `title: ${quote(title)}` : null,
@@ -237,6 +239,13 @@ function firstHeading(text) {
   const lines = proseLines(text);
   const h = lines.find((l) => /^#\s+\S/.test(l)) ?? lines.find((l) => /^#{2,6}\s+\S/.test(l));
   return h ? plain(h.replace(/^#{1,6}\s+/, "").replace(/\s+#+\s*$/, "")) : null;
+}
+
+/** A document with no heading at all: its opening line of prose, when it is short enough to be one. */
+function firstLine(text) {
+  const line = proseLines(text).map((l) => l.trim()).find((l) => l && !/^(\||<|>|[-*+]\s|\d+\.\s|!\[|---|===)/.test(l));
+  const flat = line ? plain(line).replace(/[.:]$/, "") : "";
+  return flat && flat.length <= 100 ? flat : null;
 }
 
 /** The first sentence of the first paragraph of prose, at most 240 characters. */

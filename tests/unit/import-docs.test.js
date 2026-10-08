@@ -57,7 +57,7 @@ describe("importDocs", () => {
     });
     expect(read("docs/plain.md")).toBe('---\ntitle: "Plain heading"\ndescription: "The first sentence."\n---\n# Plain heading\n\nThe first sentence. The second one.\n');
     expect(read("docs/authored.md")).toBe('---\ntitle: Authored\ndescription: "Written: by hand."\n---\n# Another heading\n\nBody text.\n');
-    expect(read("docs/headless.md")).toBe('---\ntitle: "headless"\ndescription: "Release notes for 1.0."\n---\n# headless\n\nRelease notes for 1.0.\n\n- a change\n');
+    expect(read("docs/headless.md")).toBe('---\ntitle: "Release notes for 1.0"\ndescription: "Release notes for 1.0."\n---\n# Release notes for 1.0\n\nRelease notes for 1.0.\n\n- a change\n');
     expect(pages.find((p) => p.source === "authored.md")).toMatchObject({ title: "Authored", description: "Written: by hand." });
   });
 
@@ -106,7 +106,7 @@ describe("importDocs", () => {
   test("rename moves a document and links to it follow; transform patches the text first", () => {
     const { pages, read, into } = run(
       {
-        "architecture/design.md": "# Design\n\nInternals.\n",
+        "architecture/design.md": "# Design\n\nInternals. Go [back](../guide.md).\n",
         "guide.md": "# Guide\n\nRead [the design](architecture/design.md).\n",
       },
       {
@@ -117,6 +117,8 @@ describe("importDocs", () => {
     expect(existsSync(join(into, "docs", "maintainers", "architecture", "design.md"))).toBe(true);
     expect(read("docs/guide.md")).toContain("Then read [the design](/docs/maintainers/architecture/design.md).");
     expect(pages.map((p) => p.path)).toContain("docs/maintainers/architecture/design.md");
+    // A moved document's own relative links still reach their targets from its new folder.
+    expect(read("docs/maintainers/architecture/design.md")).toContain("[back](/docs/guide.md)");
   });
 
   test("a folder that does not exist is an error naming it", () => {
