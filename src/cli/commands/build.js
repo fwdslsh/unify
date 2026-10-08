@@ -53,7 +53,9 @@ import * as html from "../../core/html.js";
 import * as includes from "../../core/includes.js";
 import * as layout from "../../core/layout.js";
 import * as markdown from "../../core/markdown.js";
-import { contains, isExcluded, isNeverShipped, locateVirtual, nameOf, resolutionRoots, toRelative } from "../../core/paths.js";
+import { contains, isExcluded, isNeverShipped, locateExisting, locateVirtual, nameOf, resolutionRoots, toRelative } from "../../core/paths.js";
+import { UsageError } from "../../core/diagnostics.js";
+import { templateLayer } from "../template-source.js";
 import * as publishModule from "../../core/publish.js";
 import * as references from "../../core/references.js";
 import * as urls from "../../core/urls.js";
@@ -98,6 +100,12 @@ import { buildSourceInventory } from "../../core/source-inventory.js";
  * between the two that reaches a rebuild.
  */
 export async function build({ sourceRoot, output, settings, reporter, sourceDefaulted = false, command = "build" }) {
+  // ---- §34 — the template this site extends, BEFORE anything else ----------
+  // Fetched (or found in the cache, or read in place) before the generator
+  // runs and before anything is scanned, so a source that cannot be reached
+  // is a usage error that has written nothing and moved nothing (§34.3).
+  const layer = settings.extends ? await extendedTemplate(settings.extends, sourceRoot, output) : null;
+
   // ---- §33 — the generator seam, BEFORE §2 step 1 --------------------------
   // It runs before the scan on purpose (§33.5): it sees the source tree as it
   // is on disk and nothing else — no manifest, no composed pages, no output —
@@ -170,14 +178,14 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
       }
     }
 
-    return await runBuild({ sourceRoot, output, settings, reporter, sourceDefaulted, overlayDir });
+    return await runBuild({ sourceRoot, output, settings, reporter, sourceDefaulted, overlayDir, layer });
   } finally {
     if (overlayDir !== null) generate.removeOverlayDir(overlayDir);
   }
 }
 
 /** The build proper, with §33's overlay already produced (or absent). */
-async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulted, overlayDir }) {
+async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulted, overlayDir, layer }) {
   // §33.3 — THE RESOLUTION NAMESPACE, computed once and threaded everywhere a
   // path is resolved or named. The overlay joins the scan (below) and this: a
   // generated page walks for `_layout.html` and an `<include src>` finds a
@@ -185,8 +193,14 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
   // §4.5 — the project root (the working directory) joins the namespace last,
   // for layouts and includes kept beside package.json; it is never scanned,
   // so nothing there publishes.
-  const roots = resolutionRoots(sourceRoot, overlayDir, process.cwd());
-  const files = scanSourceTree(sourceRoot, output, settings.exclude, reporter, overlayDir);
+  // §34.2 — the template a site extends is the last root, and it is scanned
+  // too; `shadowTemplateFiles` drops every template file the site already has
+  // an answer for, by path or by output path, before anything is composed.
+  const roots = resolutionRoots(sourceRoot, overlayDir, process.cwd(), layer?.root ?? null);
+  const files = shadowTemplateFiles(
+    scanSourceTree(sourceRoot, output, settings.exclude, reporter, overlayDir, layer?.root ?? null),
+    settings.prettyUrls,
+  );
 
   // §6.3/P08 — every .html/.md source file, excluded or not (§1: a "page" by
   // extension; only the never-shipped list, already applied in the scan,
@@ -243,7 +257,7 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
       // the include's own already-reported problem.
       const hadNewProblem = reporter.problemsReported > problemsBefore;
       if (composed !== null && !hadNewProblem) {
-        composedPages.push({ relPath: page.relPath, html: composed.text, spans: composed.spans, layoutFile: composed.layoutFile, generated: page.generated === true });
+        composedPages.push({ relPath: page.relPath, html: composed.text, spans: composed.spans, layoutFile: composed.layoutFile, generated: page.generated === true, template: page.template === true });
       }
     } catch (err) {
       // Best-effort composition (PIP-02): one page's failure must not stop
@@ -285,10 +299,12 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
   // to name which is which: "index.html and index.html both produce
   // index.html" tells an author nothing. `label` is display-only, so §13's
   // keying and every downstream consumer are untouched.
-  const label = (rel, generated) => (generated ? `${rel} (generated)` : rel);
+  // §34.2 — likewise a template file, which can only collide with another
+  // template file (the site's own shadow it before this point).
+  const label = (f) => (f.generated ? `${f.relPath} (generated)` : f.template ? `${f.relPath} (template)` : f.relPath);
   const entries = [
-    ...composedPages.map((p) => ({ path: p.relPath, kind: "page", label: label(p.relPath, p.generated) })),
-    ...assetFiles.map((a) => ({ path: a.relPath, kind: "asset", label: label(a.relPath, a.generated) })),
+    ...composedPages.map((p) => ({ path: p.relPath, kind: "page", label: label(p) })),
+    ...assetFiles.map((a) => ({ path: a.relPath, kind: "asset", label: label(a) })),
   ];
   const resolved = collisions.resolveOutputPaths({ entries, prettyUrls: settings.prettyUrls, reporter });
   const outputPathOf = new Map(resolved.map((r) => [r.source.path, r.outputPath]));
@@ -372,6 +388,7 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
       outputPath: finalOutputPath,
       html: rewritten,
       generated: p.generated === true,
+      template: p.template === true,
       layout: p.layoutFile ?? null,
       includes,
     });
@@ -732,7 +749,7 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
     ),
   });
 
-  relocateDiagnosticsToCwd(reporter, sourceRoot);
+  relocateDiagnosticsToCwd(reporter, sourceRoot, layer && { ...layer, roots });
   reporter.flush();
 
   // §4.4 — the defaulted-source notice: stdout summary text, never a
@@ -831,6 +848,9 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
   // report's own contract (publish.js's DryRunRow doc comment) is to show
   // "whatever the configured --output directory name is", not an absolute path.
   if (settings.dryRun) {
+    /** §34.4 — a file the namespace finds in the extended template, marked as such. */
+    const fromLayer = (name, isTemplate) =>
+      (isTemplate ?? (layer !== null && contains(layer.root, locateVirtual(roots, name)))) ? `${name} (template)` : name;
     const outputFiles = await publishModule.snapshotDirectory(output);
     const plan = publishModule.planPublish({ tempFiles, outputFiles });
     const displayOutput = String(settings.output).replace(/\/+$/, "");
@@ -843,9 +863,11 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
         // §33.3 — a generated row says so. It must: a file in dist/ with no
         // source file behind it is otherwise unexplainable to a reader of
         // this report, which is the one place §33's overlay is visible.
+        // §34.4 — and a row from the extended template names it, for the page
+        // and for the layout alike: neither file is in the site's tree.
         from: p.generated
-          ? (p.layoutFile ? `generated + ${p.layoutFile}` : "generated")
-          : (p.layoutFile ? `${p.relPath} + ${p.layoutFile}` : `${p.relPath} (no layout)`),
+          ? (p.layoutFile ? `generated + ${fromLayer(p.layoutFile)}` : "generated")
+          : (p.layoutFile ? `${fromLayer(p.relPath, p.template)} + ${fromLayer(p.layoutFile)}` : `${fromLayer(p.relPath, p.template)} (no layout)`),
       })),
       ...assetFiles.map((a) => ({
         action: "copy",
@@ -855,7 +877,7 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
         // source file behind it either, and naming its overlay-relative path
         // pointed the reader at something that does not exist in src/. The
         // vendoring recipe (integrations.md) makes this the common case.
-        from: a.generated ? "generated" : a.relPath,
+        from: a.generated ? "generated" : fromLayer(a.relPath, a.template),
       })),
       // §21.1 — a generated artifact is a write like any other, so it carries
       // the same address the report gives every other row. `from` names what
@@ -1342,14 +1364,71 @@ function loadLayout(absPath, { sourceRoot, roots, reporter, convertMarkdown, lay
  * include-cycle chain's own embedded file list, for instance, stays
  * source-root-relative, matching the spec's own cycle example verbatim).
  */
-function relocateDiagnosticsToCwd(reporter, sourceRoot) {
+function relocateDiagnosticsToCwd(reporter, sourceRoot, layer = null) {
   const cwd = process.cwd();
   for (const d of reporter.diagnostics) {
+    // §34.4 — a file the namespace finds only in the extended template is
+    // named where it is: its path, for a directory source, else the source
+    // as written followed by the file's path inside the template.
+    const abs = layer && d.file ? locateExisting(layer.roots, d.file) : null;
+    if (abs !== null && contains(layer.root, abs)) {
+      d.file = layer.inPlace ? toRelative(cwd, abs) : `${layer.label}/${d.file}`;
+      continue;
+    }
     d.file = toRelative(cwd, resolve(sourceRoot, d.file));
   }
 }
 
+/**
+ * §34.3 — the template a site extends, on disk: fetched, cached or read in
+ * place by `templateLayer`, then checked against the two directories the
+ * build owns. Its source tree must sit apart from both: inside the source
+ * root its files would be scanned twice, as the site's and as the template's,
+ * and holding the source root or the output directory it would scan the site
+ * or the build's own output as template material.
+ *
+ * @param {{label: string, base: string}} spec
+ * @param {string} sourceRoot
+ * @param {string} output
+ * @returns {Promise<{root: string, label: string, inPlace: boolean}>}
+ */
+async function extendedTemplate(spec, sourceRoot, output) {
+  const { root, inPlace } = await templateLayer(spec);
+  for (const [name, dir] of [["the source root", sourceRoot], ["the output directory", output]]) {
+    if (contains(dir, root) || contains(root, dir)) {
+      throw new UsageError(`extends: ${spec.label} overlaps ${name} (${toRelative(process.cwd(), dir) || "."})`, [
+        "a template the site extends is kept apart from the site: name a directory beside the source root, or a package or repository",
+      ]);
+    }
+  }
+  return { root, label: spec.label, inPlace };
+}
+
 // ------------------------------------------------------------------ scanning
+
+/**
+ * §34.2 — the site wins. A template file is left out of the build when the
+ * site has a file at the same path (written or generated, published or not),
+ * or publishes a file at the same output path: the site's `index.md` replaces
+ * the template's `index.html`, and its `_layout.html` the template's. What is
+ * left fills the gaps — a layout, an include, a stylesheet or a page the site
+ * has none of — and is checked like every other file. Nothing is reported for
+ * a file left out: replacing a template's file is what writing one at its path
+ * is for, and the template's copy is not content the author wrote.
+ *
+ * @template {{relPath: string, isPage: boolean, excluded: boolean, template?: boolean}} F
+ * @param {F[]} files - the scan, template files included
+ * @param {boolean} prettyUrls
+ * @returns {F[]}
+ */
+function shadowTemplateFiles(files, prettyUrls) {
+  if (!files.some((f) => f.template)) return files;
+  const outputOf = (f) => collisions.computeOutputPath({ path: f.relPath, kind: f.isPage ? "page" : "asset" }, { prettyUrls });
+  const site = files.filter((f) => !f.template);
+  const paths = new Set(site.map((f) => f.relPath));
+  const outputs = new Set(site.filter((f) => !f.excluded).map(outputOf));
+  return files.filter((f) => !f.template || (!paths.has(f.relPath) && (f.excluded || !outputs.has(outputOf(f)))));
+}
 
 /**
  * §2 step 1 (scan) + §4 (classification) + §4.1 (exclusion), the minimum
@@ -1373,10 +1452,10 @@ function relocateDiagnosticsToCwd(reporter, sourceRoot) {
  * @param {import('../../core/diagnostics.js').Reporter} reporter
  * @returns {{absPath: string, relPath: string, isPage: boolean, excluded: boolean}[]} sorted by relPath (determinism, DIA-05)
  */
-function scanSourceTree(sourceRoot, output, excludePatterns, reporter, overlayDir = null) {
+function scanSourceTree(sourceRoot, output, excludePatterns, reporter, overlayDir = null, templateRoot = null) {
   let root = resolve(sourceRoot);
   const outputAbs = resolve(output);
-  /** @type {{absPath: string, relPath: string, isPage: boolean, excluded: boolean, generated: boolean}[]} */
+  /** @type {{absPath: string, relPath: string, isPage: boolean, excluded: boolean, generated: boolean, template: boolean}[]} */
   const files = [];
   // §33.3 — files in the generated directory are scanned EXACTLY as source
   // files are: pages by extension, mirror copy for everything else, the
@@ -1385,11 +1464,20 @@ function scanSourceTree(sourceRoot, output, excludePatterns, reporter, overlayDi
   // because a file in dist/ with no source file behind it is otherwise
   // unexplainable to a reader of the report.
   let generated = false;
+  // §34.2 — and the template a site extends is scanned the same way again,
+  // marked so `shadowTemplateFiles` can drop what the site already has.
+  let template = false;
 
   walk(root);
   if (overlayDir !== null) {
     root = resolve(overlayDir);
     generated = true;
+    walk(root);
+  }
+  if (templateRoot !== null) {
+    root = resolve(templateRoot);
+    generated = false;
+    template = true;
     walk(root);
   }
   files.sort((a, b) => (a.relPath < b.relPath ? -1 : a.relPath > b.relPath ? 1 : 0));
@@ -1402,7 +1490,7 @@ function scanSourceTree(sourceRoot, output, excludePatterns, reporter, overlayDi
     // embed, or fetch. Everything downstream keys off this one classification.
     const ext = extname(rel);
     const isPage = (ext === ".html" || ext === ".md") && !rel.endsWith(".fragment.html");
-    files.push({ absPath: abs, relPath: rel, isPage, excluded: isExcluded(rel, excludePatterns), generated });
+    files.push({ absPath: abs, relPath: rel, isPage, excluded: isExcluded(rel, excludePatterns), generated, template });
   }
 
   function walk(dir) {

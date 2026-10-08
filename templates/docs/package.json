@@ -1,6 +1,6 @@
 {
   "name": "unify-docs-template",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "The docs starter site for unify, the HTML-native static site generator \u2014 a documentation site, with a catalog-driven directory of every page. Scaffold it with: unify init unify-docs-template",
   "keywords": [
     "unify",

@@ -50,13 +50,15 @@
  * path. Nothing here writes outside a temporary directory of its own.
  */
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { gunzipSync } from "node:zlib";
 import { UsageError } from "../core/diagnostics.js";
 import { resolveSource, toRelative } from "../core/paths.js";
 import { TEMPLATES, TEMPLATE_ROOT_FILES } from "../templates/index.js";
+import pkg from "../../package.json" with { type: "json" };
 
 /** A git commit id, 7 to 40 hex digits: a ref `git clone --branch` cannot take. */
 const COMMIT = /^[0-9a-f]{7,40}$/;
@@ -223,6 +225,104 @@ export async function fetchTemplate(source, label) {
   } finally {
     rmSync(scratch, { recursive: true, force: true });
   }
+}
+
+// ------------------------------------------------- §34 — building on a template
+
+/** §34.3 — one fetch per source per process: a watch rebuild never fetches again. */
+const LAYERS = new Map();
+
+/**
+ * §34.3 — the directory holding the source tree of the template a site
+ * extends, on disk, for the build to read as the lowest root of its
+ * namespace (§34.2).
+ *
+ * A directory source is read where it is — its `site/` or `src/`, else the
+ * directory itself, the walk `readTemplateTree` uses — so an edit to it shows
+ * on the next build. Every other source is fetched through `fetchTemplate`,
+ * exactly as `init` fetches it, and only its source tree is written out:
+ * the template's `unify.yaml`, generator, README and packaging are never read
+ * by the build (§34.1). A PINNED source — an npm package at an exact version,
+ * a git commit, a built-in of this unify version — cannot change, so it is
+ * written once to the user's cache directory and read from there by every
+ * later build, offline. Anything else may change between two builds, so it
+ * is fetched once per process into a temporary directory removed at exit,
+ * and never shared.
+ *
+ * @param {{label: string, base: string}} spec - the source as written, and the directory a relative directory is read against
+ * @returns {Promise<{root: string, inPlace: boolean}>} the absolute path of the
+ *   template's source tree, and whether that is where the author keeps it
+ *   (a directory source) rather than a copy unify made
+ */
+export async function templateLayer({ label, base }) {
+  const source = classifyTemplateSource(label, Object.keys(TEMPLATES), base);
+  if (source.kind === "dir") return { root: resolveSource(undefined, source.path).root, inPlace: true };
+
+  const key = JSON.stringify(source.kind === "builtin" ? { ...source, unify: pkg.version } : source);
+  if (LAYERS.has(key)) return { root: LAYERS.get(key), inPlace: false };
+  const pinned = isPinned(source);
+  const target = pinned ? join(cacheRoot(), createHash("sha256").update(key).digest("hex").slice(0, 32)) : null;
+  if (target !== null && existsSync(target)) {
+    LAYERS.set(key, target);
+    return { root: target, inPlace: false };
+  }
+
+  const { files } = await fetchTemplate(source, label);
+  const parent = pinned ? cacheRoot() : tmpdir();
+  mkdirSync(parent, { recursive: true });
+  const staging = mkdtempSync(join(parent, pinned ? ".partial-" : "unify-extends-"));
+  for (const [rel, data] of Object.entries(files)) {
+    const abs = join(staging, ...rel.split("/"));
+    mkdirSync(dirname(abs), { recursive: true });
+    writeFileSync(abs, data);
+  }
+  let dir = staging;
+  if (pinned) {
+    // A rename is atomic, so a cache entry that exists is a whole one. Two
+    // builds fetching the same pinned source at once write the same bytes;
+    // the second rename finds the first's entry and discards its own copy.
+    try {
+      renameSync(staging, target);
+    } catch (err) {
+      rmSync(staging, { recursive: true, force: true });
+      if (!existsSync(target)) throw err;
+    }
+    dir = target;
+  } else {
+    process.once("exit", () => rmSync(staging, { recursive: true, force: true }));
+  }
+  LAYERS.set(key, dir);
+  return { root: dir, inPlace: false };
+}
+
+/**
+ * §34.3 — can this source change between two builds? An npm package at an
+ * exact version, a git commit, and a built-in (the copy this unify carries)
+ * cannot; a dist-tag, a range, a bare name, a branch and a tag can.
+ * @param {TemplateSource} source
+ * @returns {boolean}
+ */
+export function isPinned(source) {
+  if (source.kind === "builtin") return true;
+  if (source.kind === "git") return source.ref !== null && COMMIT.test(source.ref);
+  if (source.kind === "npm") {
+    const at = source.spec.lastIndexOf("@");
+    return at > 0 && /^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$/.test(source.spec.slice(at + 1));
+  }
+  return false;
+}
+
+/**
+ * §34.3 — where pinned templates are kept: `unify/templates/` in the user's
+ * cache directory — `XDG_CACHE_HOME` where it is set, else `LOCALAPPDATA` on
+ * Windows, else `~/.cache`. Never inside the project.
+ * @returns {string}
+ */
+export function cacheRoot() {
+  const base = process.env.XDG_CACHE_HOME
+    || (process.platform === "win32" ? process.env.LOCALAPPDATA : undefined)
+    || join(homedir(), ".cache");
+  return join(base, "unify", "templates");
 }
 
 /**

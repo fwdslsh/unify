@@ -259,7 +259,7 @@ export function auditManifest({
   const out = [];
   const add = (doc, id, severity, evidence, fix, distinguisher = "") =>
     out.push({
-      id, severity, file: doc.source.path, generated: doc.source.generated,
+      id, severity, file: doc.source.path, generated: doc.source.generated, template: doc.source.template === true,
       outputPath: doc.outputPath, url: doc.document.url, distinguisher, evidence, fix,
     });
 
@@ -370,7 +370,11 @@ export function auditManifest({
         // where it comes from and where it stops coming from.
         doc.source.generated
           ? "link to it from a page that is reachable, or stop writing it in your --generate script"
-          : "link to it from a page that is reachable, or exclude it with a leading underscore");
+          : doc.source.template
+            // §34.4 — likewise for a page from the template the site extends:
+            // there is no file of the site's to rename; --exclude leaves it out.
+            ? `link to it from a page that is reachable, or leave it out with exclude: ${doc.source.path} beside _* in unify.yaml`
+            : "link to it from a page that is reachable, or exclude it with a leading underscore");
     }
 
     // ---- ids and fragments -------------------------------------------------
@@ -795,7 +799,7 @@ export function formatFindings(findings, problemCount = 0) {
     // The same `(generated)` marker §33.4 already uses in the collision
     // report and the --dry-run rows, for the same reason: a reader who
     // greps their source tree for this path must not come up empty.
-    const where = f.generated === true ? `${f.file} (generated)` : f.file;
+    const where = f.generated === true ? `${f.file} (generated)` : f.template === true ? `${f.file} (template)` : f.file;
     lines.push(`${where}: ${f.severity}: ${f.evidence} [${f.id}]`);
     lines.push(`  fix: ${f.fix}`);
   }

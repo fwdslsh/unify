@@ -1,6 +1,6 @@
 {
   "name": "unify-portfolio-template",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "The portfolio starter site for unify, the HTML-native static site generator \u2014 a portfolio: project pages and a work index. Scaffold it with: unify init unify-portfolio-template",
   "keywords": [
     "unify",

@@ -30,12 +30,12 @@ bun run build:windows                      # Windows x64 binary
 bun src/cli.js build  [-s src] [-o dist] [--clean] [--exclude <glob>]... \
                       [--pretty-urls] [--base-url <url>] [--canonical auto] \
                       [--feed-full] [--catalog] [--search-corpus] [--include-noindex] \
-                      [--generate <path>] [--source-inventory] \
-                      [--dry-run] [--strict] [--audit] [--save-config]  # --save-config: build only; upserts unify.yaml after an exit-0 build or dry run
+                      [--generate <path>] [--source-inventory] [--extends <source>] \
+                      [--dry-run] [--strict] [--audit] [--save-config]  # --save-config: build only; upserts unify.yaml after an exit-0 build or dry run; --extends (build/audit/dev/watch): build on a template without copying it — its source tree is the namespace's last root, scanned, and the site's file at the same path or output path wins; pinned sources cached in ~/.cache/unify/templates (§34)
 bun src/cli.js audit  [-s src] [-o dist] [--exclude <glob>]... [--pretty-urls] \
                       [--base-url <url>] [--canonical auto] [--catalog] [--search-corpus] \
                       [--include-noindex] \
-                      [--generate <path>] [--source-inventory] [--strict] [--format human|json|sarif] \
+                      [--generate <path>] [--source-inventory] [--extends <source>] [--strict] [--format human|json|sarif] \
                       [--external]  # evaluate, write nothing
 bun src/cli.js dev    [-p 3000]            # build + watch + serve + reload
 bun src/cli.js watch                       # build + rebuild on change, no server

@@ -103,6 +103,12 @@ export function resolveSettings(flags, cwd = process.cwd()) {
       template: flags.template,
       recordedTemplate: typeof record.source === "string" ? record.source : undefined,
       yes: flags.yes === true,
+      // §34.1 — the template this site builds on, as written, with the
+      // directory a relative directory source is read against: this file's
+      // for the saved key, the working directory's for the flag.
+      extends: typeof settings.extends === "string"
+        ? { label: settings.extends, base: flags.extends === undefined ? configDir : cwd }
+        : null,
       // §19.10 — the files `update` never overwrites once they exist, as absolute
       // paths: the file's list is relative to the file (resolved above), a --keep
       // to the working directory, and the flag replaces the list like --exclude.

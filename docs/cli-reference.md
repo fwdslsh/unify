@@ -26,6 +26,7 @@ Options:
       --include-noindex    list noindex pages in the catalog and search corpus (needs one of them)
       --generate <path>    run one JavaScript file before the build (relative to the source root, or absolute)
       --source-inventory   give that file source-pages.json: every source page's authored title, description, date, meta and links (on by default with --generate; source-inventory: false in unify.yaml turns it off)
+      --extends <source>   build on a template without copying it (any form init takes): its layouts, includes, assets and pages sit beneath yours, and a file of yours at the same path or output path wins
       --dry-run            run the full build and every check, print the report, write nothing
       --audit              `build` only: audit the composed site before publishing; publish only if `unify audit` would exit 0
       --save-config        `build` only: write the saveable options given here into unify.yaml (after a good build)
@@ -382,6 +383,25 @@ canonical completion: 5 pages would gain a canonical link
 structured data: 3 pages would gain a JSON-LD block
 ```
 
+### `--extends <source>`
+
+Build on a template without copying it into the project ([`conformance-spec.md`](conformance-spec.md) §34). `build`, `audit`, `dev` and `watch` read it; the source is any form `unify init` takes — a built-in name, a directory, a git repository (`URL[/subdirectory][#ref]`), or an npm package (`name`, `@scope/name`, optionally `@version` or `@tag`). Saved as `extends:` in `unify.yaml`, where a relative directory is relative to the file.
+
+The template's source tree (its `site/`, else `src/`, else the whole directory) sits beneath yours. Its layouts and includes resolve when you have none at that path, and its pages and assets publish when you have nothing at the same path or output path. **Your file always wins**: write `index.md` and the template's `index.html` is left out; write `assets/theme.css` and yours is the theme; write `_includes/nav.html` and every layout includes yours. To leave out a template page you don't want, use `--exclude` (`exclude:` listing `_*` and the page). Nothing else in the template is read: not its `unify.yaml` (your own settings decide everything), not its generator, and nothing it ships executes. `--dry-run` marks every row that comes from the template `(template)`, and a diagnostic in a template file names it where it is (`unify-docs-template@0.1.1/_layout.html`).
+
+The template is fetched before anything else runs. A source that cannot be reached exits `2` and writes nothing. A **pinned** source (an npm package at an exact version, a git commit, a built-in) is fetched once into `unify/templates/` in your cache directory (`$XDG_CACHE_HOME`, else `%LOCALAPPDATA%` on Windows, else `~/.cache`), and every later build reads it from there, offline. Anything else (a bare name, a tag, a branch) is fetched once per run. A directory is read where it is, every build.
+
+```yaml
+# unify.yaml — a repository whose Markdown lives in docs/
+source: docs
+extends: unify-docs-template@0.1.1
+catalog: true
+pretty-urls: true
+base-url: https://owner.github.io/repo/
+```
+
+`extends:` and `template:` are independent: `template:` is the record `unify update` fetches into a scaffolded project, and no build reads it; `extends:` is read by the build, and `update` never reads it.
+
 ### `--template <source>` (init and update)
 
 The template, the same as the positional. Saved in `unify.yaml` by `init` as typed — `template: <source>`, or `source:` under `template:` when the file carries a `keep:` list; `unify update` fetches the saved source — or the flag or positional, which then replaces it.
@@ -439,7 +459,7 @@ Cycle and depth errors print the full chain (`_layout.html → _includes/nav.htm
 
 ## `unify.yaml`
 
-Optional: saved flags, nothing more. It lives beside `package.json` at the project root (the directory you run `unify` from), or in the source root; the source root's copy wins if both exist. A relative path in the file resolves against the file's own directory, so a project-root file says `source: site` and `generate: scripts/gen.mjs`, naming the directories beside it; a repository can keep its content in `site/`, `pages/` or whatever you like, with the config at the top. Keys are the long option names (`source`, `output`, `clean`, `exclude` — a list, `pretty-urls`, `base-url`, `canonical`, `feed-full`, `catalog`, `search-corpus`, `include-noindex`, `strict`, `audit`, `port`, `generate`, `source-inventory`, and `template` — the one key that takes a block: the template's source as its value, or `source:` and `keep:` under it, the files `unify update` never overwrites); CLI flags win on conflict. No behavior exists that only the file can express; the file itself never ships. **Write only what differs from the defaults**: a file that spells out `output: dist` or `exclude: [_*]` builds exactly as no file would. `unify init` writes one with every key listed, described and commented out, so you uncomment what you need; `unify build ... --save-config` writes or updates it for you, taking a commented line's place when there is one.
+Optional: saved flags, nothing more. It lives beside `package.json` at the project root (the directory you run `unify` from), or in the source root; the source root's copy wins if both exist. A relative path in the file resolves against the file's own directory, so a project-root file says `source: site` and `generate: scripts/gen.mjs`, naming the directories beside it; a repository can keep its content in `site/`, `pages/` or whatever you like, with the config at the top. Keys are the long option names (`source`, `output`, `clean`, `exclude` — a list, `pretty-urls`, `base-url`, `canonical`, `feed-full`, `catalog`, `search-corpus`, `include-noindex`, `strict`, `audit`, `port`, `generate`, `source-inventory`, `extends` — the template the site builds on, and `template` — the one key that takes a block: the template's source as its value, or `source:` and `keep:` under it, the files `unify update` never overwrites); CLI flags win on conflict. No behavior exists that only the file can express; the file itself never ships. **Write only what differs from the defaults**: a file that spells out `output: dist` or `exclude: [_*]` builds exactly as no file would. `unify init` writes one with every key listed, described and commented out, so you uncomment what you need; `unify build ... --save-config` writes or updates it for you, taking a commented line's place when there is one.
 
 ```yaml
 # unify.yaml — the committed invocation

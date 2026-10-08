@@ -58,3 +58,6 @@ template:
   keep:
     - unify.yaml
     - site/assets/theme.css
+
+# a template this site builds on without copying it: its layouts, includes, assets and pages sit beneath yours, and a file of yours at the same path wins (default: none)
+# extends: unify-docs-template@0.1.1

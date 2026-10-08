@@ -1,6 +1,6 @@
 {
   "name": "unify-default-template",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "The default starter site for unify, the HTML-native static site generator \u2014 a layout, a nav include, a home page, and example pages to copy into place. Scaffold it with: unify init unify-default-template",
   "keywords": [
     "unify",

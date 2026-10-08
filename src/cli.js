@@ -26,6 +26,8 @@ import { cleanRefusalReason, resolveSource } from "./core/paths.js";
 import { configPath, parseArgs } from "./cli/options.js";
 import { resolveSettings } from "./cli/settings.js";
 import { saveEntries, writeConfig } from "./cli/save-config.js";
+import { classifyTemplateSource } from "./cli/template-source.js";
+import { TEMPLATES } from "./templates/index.js";
 
 const HELP = `unify — HTML-native composition: no expression language, no client runtime.
 
@@ -50,6 +52,7 @@ Options:
       --include-noindex    list noindex pages in the catalog and search corpus (needs one of them)
       --generate <path>    run one JavaScript file before the build (a relative path is from the source root)
       --source-inventory   give that file source-pages.json: every source page's authored title, description, date, meta and links (on by default with --generate; source-inventory: false in unify.yaml turns it off)
+      --extends <source>   build on a template without copying it — a built-in name, a directory, a git repository or an npm package, as init takes it: its layouts, includes, assets and pages sit beneath the site's, and a file of the site's at the same path or output path wins (a pinned version or commit is fetched once and cached)
       --dry-run            run the full build and every check, print the report, write nothing (with \`update\`: list the files it would write, write nothing)
       --audit              \`build\`: audit the composed site before publishing; publish only if \`unify audit\` would exit 0. \`init\`: keep the scaffold only if \`unify audit --strict\` passes on it
       --save-config        \`build\` only: write the saveable options given here into unify.yaml (after a good build)
@@ -230,6 +233,12 @@ export async function run(argv) {
     if (entries.has("generate")) {
       const abs = isAbsolute(options.generate) ? resolve(options.generate) : resolve(sourceRoot, options.generate);
       entries.set("generate", [`generate: ${rel(abs)}`]);
+    }
+    // §34.1 — likewise a directory `--extends`, given from the working
+    // directory, saved relative to the file; any other source is saved as typed.
+    if (entries.has("extends")) {
+      const source = classifyTemplateSource(options.extends, Object.keys(TEMPLATES));
+      if (source.kind === "dir") entries.set("extends", [`extends: ${rel(source.path)}`]);
     }
     if (options.source !== undefined && resolve(dir) !== resolve(sourceRoot)) {
       entries.set("source", [`source: ${rel(resolve(sourceRoot))}`]);

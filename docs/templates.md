@@ -1,6 +1,6 @@
 # Templates: start from one, stay current with it, publish your own
 
-**Role**: The guide to unify's template features — scaffolding a site from a built-in, a directory, a git repository or an npm package, keeping that site current with `unify update`, and publishing a template for others. The normative rules are in [`conformance-spec.md`](conformance-spec.md) §19.9 and §19.10; every command and flag is in [`cli-reference.md`](cli-reference.md). Read [`getting-started.md`](getting-started.md) first if you have never run `unify init`.
+**Role**: The guide to unify's template features — scaffolding a site from a built-in, a directory, a git repository or an npm package, keeping that site current with `unify update`, publishing a template for others, and building on a template without copying it (`extends:`). The normative rules are in [`conformance-spec.md`](conformance-spec.md) §19.9 and §19.10; every command and flag is in [`cli-reference.md`](cli-reference.md). Read [`getting-started.md`](getting-started.md) first if you have never run `unify init`.
 
 A template is nothing more than a unify project: a `site/` directory beside the files that belong at the project root (`README.md`, `DEPLOY.md`, `unify.yaml`, perhaps a generator in `scripts/`). That is what `unify init` writes, and it is also what `unify init` reads. There is no template language, no manifest, no file list, and nothing a template can execute on your machine.
 
@@ -179,8 +179,27 @@ A fresh scaffold has to build — `unify audit --strict` must pass on it, since 
 
 Nothing a template ships is ever executed by `init` or `update`. A template that needs a setup step documents it in its `README.md` or `DEPLOY.md`, exactly as the built-ins do.
 
-## 4. Where to look next
+## 4. Build on a template without copying it
 
-- [`cli-reference.md`](cli-reference.md) — `unify init`, `unify update`, `--audit`, `--template`, `--yes`, `--dry-run` in full
-- [`conformance-spec.md`](conformance-spec.md) §19.9 and §19.10 — the exact source forms, the three outcomes per file, and the safety rules
+Sections 1 and 2 give your project a copy of the template, which you then own and edit. Sometimes the content already exists and the project should own nothing but that content: a repository whose documentation is `docs/**` in Markdown, for example, that wants a published docs template's look without vendoring its files or keeping a script that fetches them. For that, name the template with `extends:` instead of scaffolding from it:
+
+```yaml
+# unify.yaml, at the repository root
+source: docs
+extends: unify-docs-template@0.1.1
+catalog: true          # the docs template's "All pages" reads the catalog; extends never copies the template's own settings
+pretty-urls: true
+base-url: https://owner.github.io/repo/
+```
+
+`unify build` (and `audit`, `dev`, `watch`) then reads the template's `site/` as if it lay beneath `docs/`. Its `_layout.html` wraps your pages, its `_includes/` resolve, and its stylesheet, scripts and pages publish. **Anything you write wins**: a file of yours at the same path, or one that publishes to the same address, replaces the template's. Your `index.md` is the home page instead of the template's `index.html`. Your `assets/theme.css` is the theme. Your `_includes/nav.html` is the nav every layout includes. A template page you don't want is left out with `exclude:` (list `_*` and that page's path). Nothing else of the template's is used: its `unify.yaml`, generator and README are never read, and nothing in it runs.
+
+Pin the version. A pinned source (`@1.2.3` on npm, `#<commit>` on git, or a built-in name) is fetched once into your cache directory, and every later build, in any project, reads it from there without the network. An unpinned one is fetched on every run, and its next release can change your site without a commit of yours. Bumping the pin is how you take a template's new release, and your files never need copying back. `unify build --dry-run` marks every file that came from the template `(template)`, so you can see exactly what you are using and what you have replaced.
+
+`extends:` and `template:` don't interact. A project uses one or the other: `template:` is for a project that owns a copy and keeps it current with `update`, and `extends:` is for a project that owns no copy at all. The exact rules are in [`conformance-spec.md`](conformance-spec.md) §34.
+
+## 5. Where to look next
+
+- [`cli-reference.md`](cli-reference.md) — `unify init`, `unify update`, `--extends`, `--audit`, `--template`, `--yes`, `--dry-run` in full
+- [`conformance-spec.md`](conformance-spec.md) §19.9 and §19.10 — the exact source forms, the three outcomes per file, and the safety rules; §34 — `extends`
 - [`getting-started.md`](getting-started.md) — the tutorial, from `unify init` to a published site
