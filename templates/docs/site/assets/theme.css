@@ -3,23 +3,49 @@
    names it under keep: in its template: block, so unify update never
    overwrites it; a property you delete keeps the stylesheet's default. */
 :root {
+  /* palette: surfaces */
   --bg: #0a0e0a;
-  --bg-panel: #0d1117;
-  --bg-card: #161b22;
-  --border: #30363d;
-  --border-faint: #21262d;
+  --bg-panel: #0d120e;
+  --bg-card: #141a15;
+  --border: #2c3a2c;
+  --border-faint: #1f2a1f;
+  --border-strong: #56695a;
+  /* palette: text */
   --text: #e6edf3;
-  --text-2: #c9d1d9;
-  --dim: #8b949e;
+  --text-2: #c2cbc4;
+  --dim: #929e94;
+  /* palette: accents — the primary for links and titles, the secondary for code and badges */
   --accent: #3fb950;
   --accent-bright: #00ff41;
-  --accent-tint: rgba(63, 185, 80, 0.08);
-  --code: #79c0ff;
-  --code-bg: rgba(110, 118, 129, 0.2);
+  --accent-tint: rgb(63 185 80 / 0.08);
+  --accent-2: #79c0ff;
+  --code: var(--accent-2);
+  --code-bg: rgb(110 118 129 / 0.2);
+  --focus: var(--accent-bright);
   --gradient: linear-gradient(135deg, #00ff41 0%, #00cc33 100%);
+  /* page background: none and transparent turn these off */
+  --glow: radial-gradient(1200px 600px at 15% -10%, rgb(63 185 80 / 0.08), transparent 60%);
+  --grid-lines: rgb(63 185 80 / 0.06);
+  /* type: --h1-font is page titles, --heading-font the rest */
   --sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --display: "Protest Revolution", "Arial Black", sans-serif;
-  --measure: 47rem;
+  --h1-font: var(--display);
+  --heading-font: var(--mono);
+  --text-size: 1.0625rem;
+  --leading: 1.65;
+  /* layout: --measure is prose, --measure-wide code and tables */
+  --site: 72.5rem;
+  --gutter: clamp(1rem, 4vw, 1.5rem);
+  --measure: 42rem;
+  --measure-wide: 52rem;
+  --sidebar: 15.5rem;
   --head-h: 4rem;
+  /* shape and motion */
+  --radius-sm: 4px;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 999px;
+  --dur: 150ms;
+  --shadow-pop: 0 12px 32px rgb(0 0 0 / 0.45);
 }

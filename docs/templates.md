@@ -190,7 +190,7 @@ Sections 1 and 2 give your project a copy of the template, which you then own an
 ```yaml
 # unify.yaml, at the repository root
 source: docs
-extends: unify-docs-template@0.1.1
+extends: unify-docs-template@0.3.0
 catalog: true          # the docs template's "All pages" reads the catalog; extends never copies the template's own settings
 pretty-urls: true
 base-url: https://owner.github.io/repo/

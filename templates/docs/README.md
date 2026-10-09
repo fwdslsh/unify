@@ -53,9 +53,9 @@ published** and the previous `dist/` is untouched — never report success on a 
 ## Adding pages and changing the look
 
 - `site/_examples/` holds a copy-ready version of each kind of file this template expects you to
-  add — a page, a post, a data file. **Copy one into place and edit the copy.** Never edit an
+  add — a guide page and a contact page. **Copy one into place and edit the copy.** Never edit an
   example where it is, and never link to one: the folder starts with `_`, so nothing in it ships.
-- Each example says where its copy belongs (`site/contact.html`, `site/posts/<slug>.md`). Once it
+- Each example says where its copy belongs (`site/contact.html`, `site/guide/<slug>.md`). Once it
   is in place, link the new page from `site/_includes/nav.html` or from another page — `unify audit`
   reports a page nothing links to.
 - `site/assets/theme.css` is the look: the custom properties the stylesheet reads, each at the template's
@@ -83,13 +83,25 @@ these three lines to `site/_includes/head.html`:
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=Protest+Revolution&display=swap">
 
-A page without the sidebar (a landing page) puts `class="home"` or `class="wide"` on its `<body>`;
-the stylesheet's `.hero`, `.card-grid`/`.card`, `.term` and `.btn` classes are there to build one.
+A page without the sidebar puts `class="wide"` on its `<body>` for one column at the site's width,
+or `class="home"` for a front page of full-bleed sections (`<section class="home-section"><div
+class="inner">`); the stylesheet's `.hero`, `.cta-row`, `.card-grid`/`.card`, `.badge`, `.term` and
+`.btn-primary`/`.btn-secondary` classes are there to build one.
+
+**The theme.** This is the look every fwdslsh.dev site shares, and `site/assets/theme.css` lists every
+property it reads, grouped: the palette (surfaces, text, the green `--accent` for links and titles, the
+blue `--accent-2` for code and badges, the page's `--glow` and `--grid-lines`), the type (`--sans`,
+`--mono`, `--display`, with `--h1-font` and `--heading-font` choosing among them, `--text-size`,
+`--leading`), the layout (`--site`, `--gutter`, `--measure` for prose, `--measure-wide` for code and
+tables, `--sidebar`, `--head-h`) and the shape (`--radius-sm`/`--radius`/`--radius-lg`, `--dur`).
+Change a value there and every page follows; delete a line and the default comes back.
 
 **Building on this template instead of copying it.** A project that should own none of these files
 names the template in its own `unify.yaml` — `extends: unify-docs-template@<version>` — and keeps
 only what is its own: the four files above, `assets/theme.css`, and its pages. Each of its files
-replaces the template's at the same path (unify's `extends`, spec §34).
+replaces the template's at the same path (unify's `extends`, spec §34). A project whose generator
+imports `scripts/import-docs.mjs` installs the template instead (`npm install -D unify-docs-template`)
+and says `extends: node_modules/unify-docs-template`, so the build and the import read the same copy.
 
 **Publishing a docs/ folder.** `scripts/import-docs.mjs` brings a repository's folder of Markdown
 into the build at every run, so the site cannot drift from the documents: each one is copied to
@@ -114,8 +126,9 @@ generator, the script `unify.yaml` names under `generate:`:
   a bare name like `default` is an error — and they do not chain: `data-layout` on a layout is an
   error, because a section layout is a complete standalone page.
 - `<include src="/_includes/nav.html"></include>` splices a file in verbatim, always with the
-  closing tag. **Never put content between the tags**: an include is not a component, takes no
-  props, and merges no attributes.
+  closing tag. Empty, it splices the file in verbatim; content between the tags fills the slots of
+  a `*.fragment.html` that declares them, exactly as a page fills a layout's. An include is still
+  not a component: it takes no props and merges no attributes.
 - The layout's bare `<slot></slot>` — usually inside its `<main>` — receives everything the page
   did not address elsewhere. A `<main>` you wrote is unwrapped and its children used, so write
   complete semantic documents.

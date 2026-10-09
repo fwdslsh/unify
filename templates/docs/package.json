@@ -1,6 +1,6 @@
 {
   "name": "unify-docs-template",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "The docs template for unify, the HTML-native static site generator: a documentation site in the fwdslsh family's look, with a sidebar, a catalog-driven directory of every page, and an importer that publishes a repository's docs/ folder. Scaffold it with: unify init unify-docs-template, or build on it with extends: unify-docs-template",
   "keywords": [
     "unify",

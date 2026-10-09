@@ -8,6 +8,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.12] - 2026-10-09
+
+### Changed
+
+- **`unify-docs-template` 0.3.0: one theme for every fwdslsh.dev site.** fwdslsh.dev, unify.fwdslsh.dev and
+  akm.fwdslsh.dev now share the docs template's stylesheet. The template's look takes the parts of each that
+  hold up best. From fwdslsh.dev: green-neutral surfaces in one hue, a 17px body, monospace section headings
+  opened by the `/` motif, Protest Revolution page titles, underlined links, a focus ring on every focusable
+  element, 44px targets and the faint page grid. From the docs sites: the blue secondary accent (`--accent-2`)
+  for inline code and badges, the gradient wordmark tile and the buttons. `theme.css` now lists every property
+  the stylesheet reads, grouped into palette, type, layout and shape. The new ones include `--border-strong`,
+  `--accent-2`, `--focus`, `--glow`, `--grid-lines`, `--h1-font`, `--heading-font`, `--text-size`, `--leading`,
+  `--site`, `--gutter`, `--measure-wide`, `--sidebar`, the radius scale and `--dur`. Prose keeps a 42rem measure
+  and code and tables get 52rem. The masthead is sticky at every width, except above a phone's docs-page
+  shortcut row.
+- **Inline code stays whole.** A token such as `--search-corpus` moves to the next line instead of splitting
+  at its hyphen, and in a table cell it never wraps; only a token longer than a whole line still breaks.
+  Previously, `overflow-wrap: anywhere` let a table squeeze a column until tokens broke mid-word on phones.
+- Renamed in the template: `.skip` is `.skip-link`, `.btn-ghost` is `.btn-secondary`, and the wordmark tile's
+  slash is an SVG, so it renders before any font loads. `body.wide` now keeps the site's width and gutter;
+  `body.home` remains the full-bleed front page.
+- The built-in templates' READMEs describe slotted includes instead of forbidding content between `<include>`
+  tags (`unify-default-template`, `-basic-`, `-blog-` and `-portfolio-` 0.1.3), and the `extends:` example names
+  `unify-docs-template@0.3.0`.
+
 ## [0.11.11] - 2026-10-08
 
 ### Changed
@@ -1010,7 +1035,8 @@ with generated compare-link notes only. Their diffs are on the
 [releases page](https://github.com/fwdslsh/unify/releases). Nothing here
 retroactively reconstructs detail those notes never carried.
 
-[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.11.11...HEAD
+[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.11.12...HEAD
+[0.11.12]: https://github.com/fwdslsh/unify/compare/v0.11.11...v0.11.12
 [0.11.11]: https://github.com/fwdslsh/unify/compare/v0.11.10...v0.11.11
 [0.11.10]: https://github.com/fwdslsh/unify/compare/v0.11.9...v0.11.10
 [0.11.9]: https://github.com/fwdslsh/unify/compare/v0.11.8...v0.11.9
