@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.13] - 2026-10-09
+
+### Changed
+
+- **`unify-docs-template` 0.4.0: syntax colours and a copy button on every fenced code block.** fwdslsh.dev had
+  both, from a script of its own; the docs sites built on the template showed plain code. The template now ships
+  `assets/code.js`, which its layout loads: it wraps each `<pre><code>` in a page's content with a copy button and
+  colours it with the vendored [speed-highlight](https://github.com/speed-highlight/core) (CC0, under
+  `assets/vendor/`), the same library fwdslsh.dev used. The colours are new `theme.css` properties, `--syn-cmnt`,
+  `--syn-str`, `--syn-kwd`, `--syn-num`, `--syn-class` and `--syn-func`. A page reads the same without the script,
+  and a hand-written `<pre>` without `<code>` (a `.term-body` transcript) is left as written.
+
 ## [0.11.12] - 2026-10-09
 
 ### Changed
@@ -1035,7 +1047,8 @@ with generated compare-link notes only. Their diffs are on the
 [releases page](https://github.com/fwdslsh/unify/releases). Nothing here
 retroactively reconstructs detail those notes never carried.
 
-[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.11.12...HEAD
+[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.11.13...HEAD
+[0.11.13]: https://github.com/fwdslsh/unify/compare/v0.11.12...v0.11.13
 [0.11.12]: https://github.com/fwdslsh/unify/compare/v0.11.11...v0.11.12
 [0.11.11]: https://github.com/fwdslsh/unify/compare/v0.11.10...v0.11.11
 [0.11.10]: https://github.com/fwdslsh/unify/compare/v0.11.9...v0.11.10

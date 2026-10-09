@@ -97,7 +97,11 @@ function srcFiles(dir) {
   }
   return out;
 }
-for (const f of srcFiles(SRC)) {
+// src/templates/snapshot.js is generated (scripts/sync-templates.mjs): it embeds
+// the built-in templates' files as data, a vendored library's keyword list
+// included, and no one edits it by hand, so no probe can be left in it.
+const GENERATED = join(SRC, "templates", "snapshot.js");
+for (const f of srcFiles(SRC).filter((p) => p !== GENERATED)) {
   const src = readFileSync(f, "utf8");
   for (const [i, line] of src.split("\n").entries()) {
     const m = line.match(MARKER);

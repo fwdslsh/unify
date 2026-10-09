@@ -96,6 +96,12 @@ blue `--accent-2` for code and badges, the page's `--glow` and `--grid-lines`), 
 tables, `--sidebar`, `--head-h`) and the shape (`--radius-sm`/`--radius`/`--radius-lg`, `--dur`).
 Change a value there and every page follows; delete a line and the default comes back.
 
+**Code blocks.** `site/assets/code.js`, which the layout loads, gives every fenced block a copy button and
+syntax colours, from the vendored [speed-highlight](https://github.com/speed-highlight/core) (public domain, CC0, its two files in
+`site/assets/vendor/`); the colours are the `--syn-*` properties in `theme.css`. A page reads the same
+without the script, and a `<pre>` written by hand without `<code>` inside, such as a `.term-body`, is left
+alone.
+
 **Building on this template instead of copying it.** A project that should own none of these files
 names the template in its own `unify.yaml` — `extends: unify-docs-template@<version>` — and keeps
 only what is its own: the four files above, `assets/theme.css`, and its pages. Each of its files
