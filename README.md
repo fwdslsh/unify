@@ -112,6 +112,8 @@ unify update [template]  fetch the template again and copy its changed files ove
 
 ## Documentation
 
+Everything below is published at **[unify.fwdslsh.dev](https://unify.fwdslsh.dev/)**, built from [`docs/`](docs/) by unify itself.
+
 **Using unify**
 
 - **[Getting Started](docs/getting-started.md)** — the tutorial.
