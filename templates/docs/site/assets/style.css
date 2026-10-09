@@ -58,6 +58,13 @@
     --radius-pill: 999px;
     --dur: 150ms;
     --shadow-pop: 0 12px 32px rgb(0 0 0 / 0.45);
+    /* syntax colours, which assets/code.js applies to fenced code */
+    --syn-cmnt: var(--dim);
+    --syn-str: #9ee6a8;
+    --syn-kwd: #ff8b7e;
+    --syn-num: var(--accent-2);
+    --syn-class: #ffc27a;
+    --syn-func: #d6b4ff;
 
     color-scheme: dark;
   }
@@ -289,7 +296,7 @@
      a page already contains: prose at a reading measure, code and tables a
      little wider. */
   main > :is(p, ul, ol, dl, blockquote, h1, h2, h3, h4, h5, h6) { max-width: var(--measure); }
-  main > :is(pre, table, .term) { max-width: var(--measure-wide); }
+  main > :is(pre, table, .term, .code-wrap) { max-width: var(--measure-wide); }
 
   @media (min-width: 60rem) {
     .shell {
@@ -475,10 +482,45 @@
     font-size: inherit;
   }
 
+  /* assets/code.js wraps each fenced block to give it a copy button. */
+  .code-wrap { position: relative; margin: 0 0 1.25rem; }
+  .code-wrap > pre { margin: 0; }
+
+  .copy-btn {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font: 400 0.75rem var(--mono);
+    color: var(--dim);
+    background: var(--bg-card);
+    border: 1px solid var(--border-faint);
+    border-radius: var(--radius-sm);
+    padding: 2px 0.5rem;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity var(--dur), color var(--dur), border-color var(--dur);
+  }
+  .copy-btn svg { width: 12px; height: 12px; }
+  .code-wrap:hover .copy-btn, .copy-btn:focus-visible { opacity: 1; }
+  .copy-btn:hover, .copy-btn[data-copied] { color: var(--accent); border-color: var(--accent); opacity: 1; }
+
+  .shj-syn-cmnt { color: var(--syn-cmnt); font-style: italic; }
+  .shj-syn-str, .shj-syn-insert { color: var(--syn-str); }
+  .shj-syn-kwd, .shj-syn-err, .shj-syn-deleted { color: var(--syn-kwd); }
+  .shj-syn-num, .shj-syn-bool, .shj-syn-type, .shj-syn-oper, .shj-syn-var, .shj-syn-section { color: var(--syn-num); }
+  .shj-syn-class { color: var(--syn-class); }
+  .shj-syn-func { color: var(--syn-func); }
+
   /* On a phone a code block runs edge to edge, for the width code needs. */
   @media (max-width: 48rem) {
-    main > pre {
+    main > :is(pre, .code-wrap) {
       margin-inline: calc(-1 * var(--gutter));
+      max-width: none;
+    }
+    main > pre, main > .code-wrap > pre {
       border-radius: 0;
       border-inline: 0;
     }
@@ -871,7 +913,7 @@
       --glow: none !important;
       --grid-lines: transparent !important;
     }
-    .site-head, .subnav, .docnav, .site-foot, .skip-link { display: none; }
+    .site-head, .subnav, .docnav, .site-foot, .skip-link, .copy-btn { display: none; }
     .shell { display: block; padding: 0; }
     a { color: var(--text); }
     .hero h1 { -webkit-text-fill-color: currentColor; background: none; }

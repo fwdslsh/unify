@@ -48,4 +48,11 @@
   --radius-pill: 999px;
   --dur: 150ms;
   --shadow-pop: 0 12px 32px rgb(0 0 0 / 0.45);
+  /* syntax colours for fenced code */
+  --syn-cmnt: var(--dim);
+  --syn-str: #9ee6a8;
+  --syn-kwd: #ff8b7e;
+  --syn-num: var(--accent-2);
+  --syn-class: #ffc27a;
+  --syn-func: #d6b4ff;
 }

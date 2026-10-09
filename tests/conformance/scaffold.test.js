@@ -1374,16 +1374,21 @@ for (const name of TEMPLATES) {
       }
     }
     // ...and from the emitted stylesheets, which §12 reads the same way: a `url()` or a bare `@import "…"` in a
-    // published CSS file is a reference too, relative to that file (assets/style.css importing theme.css).
+    // published CSS file is a reference too, relative to that file (assets/style.css importing theme.css). A
+    // published script's module imports are references the same way (assets/code.js importing its vendored
+    // highlighter), relative to the script.
     let grew = true;
     while (grew) {
       grew = false;
-      for (const asUrl of [...referenced].filter((p) => p.endsWith(".css"))) {
-        const css = published.get(asUrl.split("/").join(sep));
-        if (css === undefined) continue;
+      for (const asUrl of [...referenced].filter((p) => p.endsWith(".css") || p.endsWith(".js"))) {
+        const file = published.get(asUrl.split("/").join(sep));
+        if (file === undefined) continue;
         const dir = asUrl.includes("/") ? asUrl.slice(0, asUrl.lastIndexOf("/") + 1) : "";
-        for (const m of css.toString("utf8").matchAll(/url\(\s*["']?([^"')\s]+)["']?\s*\)|@import\s+["']([^"']+)["']/gi)) {
-          const value = m[1] ?? m[2];
+        const pattern = asUrl.endsWith(".css")
+          ? /url\(\s*["']?([^"')\s]+)["']?\s*\)|@import\s+["']([^"']+)["']/gi
+          : /\bimport\(\s*["'](\.{1,2}\/[^"']+)["']\s*\)|\bfrom\s*["'](\.{1,2}\/[^"']+)["']/g;
+        for (const m of file.toString("utf8").matchAll(pattern)) {
+          const value = (m[1] ?? m[2]).replace(/^\.\//, "");
           if (/^(?:[a-z]+:|\/\/|#)/i.test(value)) continue;
           const target = value.startsWith("/") ? value.slice(1) : `${dir}${value}`;
           if (!referenced.has(target)) { referenced.add(target); grew = true; }
