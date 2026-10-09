@@ -39,7 +39,7 @@ bun src/cli.js audit  [-s src] [-o dist] [--exclude <glob>]... [--pretty-urls] \
                       [--external]  # evaluate, write nothing
 bun src/cli.js dev    [-p 3000]            # build + watch + serve + reload
 bun src/cli.js watch                       # build + rebuild on change, no server
-bun src/cli.js init [template] [--template <source>] [--audit]   # default | basic | blog | docs | portfolio — or a directory, a git URL (optionally /<subdirectory> and #ref), or any npm package (found on npm by the unify-template keyword, not by name); scaffolds site/ beside AGENTS.md, DEPLOY.md (and scripts/gen.mjs for blog); --audit removes the scaffold unless `unify audit --strict` passes on it
+bun src/cli.js init [template] [--template <source>] [--audit]   # default | basic | blog | docs | portfolio — or a directory, a git URL (optionally /<subdirectory> and #ref), or any npm package (found on npm by the unify-template keyword, not by name); scaffolds site/ beside README.md (an existing one is kept), DEPLOY.md (and scripts/gen.mjs for blog); --audit removes the scaffold unless `unify audit --strict` passes on it
 bun src/cli.js update [template] [--template <source>] [-y|--yes] [--dry-run] [--keep <path>]...  # fetch the template unify.yaml's `template:` line records (or the one named, which then replaces the line) and copy its changed files over the project: the files that would be overwritten are listed and confirmed first (--yes answers, --dry-run lists only); a file named under keep: in unify.yaml's template: block (or --keep, repeatable) is never overwritten once it exists; nothing is removed
 bun src/cli.js --version | --help          # -v | -h
 ```

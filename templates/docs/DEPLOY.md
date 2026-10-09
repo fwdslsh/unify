@@ -18,8 +18,8 @@ one of them rather than the first:
   `grep -rni 'Project Docs' site/`;
 - **the contact details** — the reserved `example.com` mailbox in `site/_examples/contact.html`, and no
   postal address at all, because a plausible street address in a scaffold is one an author publishes;
-- **a generator's own constants**, if your project has one. The blog template's
-  `scripts/gen.mjs` opens with `SITE_NAME` and `LISTING_DESCRIPTION`;
+- **a generator's own constants**, if your project has one — the `github:` link a
+  `scripts/gen.mjs` passes to `scripts/import-docs.mjs`, for one;
 - `site/assets/share-placeholder.png` — a flat 1200×630 placeholder card, not a photograph. It is
   the image social crawlers show. Replace the file, and **if your image is a different size,
   correct `og:image:width` and `og:image:height` in `site/_layout.html` to match it**: a declared
@@ -46,8 +46,8 @@ own final URL (`--canonical none` switches that off); an authored canonical alwa
 Hosting the site under a subpath? Name the whole thing, trailing slash included:
 `--base-url https://you.example/handbook/`.
 
-A site whose pages declare `schema: Article` or `schema: BlogPosting` — the blog template's example
-post does — also gets `feed.xml`, an Atom feed of those pages, with nothing to run. Link it from
+A site whose pages declare `schema: Article` or `schema: BlogPosting` — a release-notes page, say —
+also gets `feed.xml`, an Atom feed of those pages, with nothing to run. Link it from
 `site/_layout.html` once you build this way (`<link rel="alternate" type="application/atom+xml"
 title="Posts" href="/feed.xml">`): a fresh scaffold has no feed to link yet, and the build says so
 if the link comes first.

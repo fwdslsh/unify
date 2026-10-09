@@ -75,8 +75,9 @@ published** and the previous `dist/` is untouched — never report success on a 
   a bare name like `default` is an error — and they do not chain: `data-layout` on a layout is an
   error, because a section layout is a complete standalone page.
 - `<include src="/_includes/nav.html"></include>` splices a file in verbatim, always with the
-  closing tag. **Never put content between the tags**: an include is not a component, takes no
-  props, and merges no attributes.
+  closing tag. Empty, it splices the file in verbatim; content between the tags fills the slots of
+  a `*.fragment.html` that declares them, exactly as a page fills a layout's. An include is still
+  not a component: it takes no props and merges no attributes.
 - The layout's bare `<slot></slot>` — usually inside its `<main>` — receives everything the page
   did not address elsewhere. A `<main>` you wrote is unwrapped and its children used, so write
   complete semantic documents.

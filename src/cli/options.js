@@ -69,7 +69,7 @@ const OPTIONS = {
   // resolver `init` uses (§19.9). A key of its own, not `template:`, which
   // stays the record `update` fetches: a scaffolded project owns a copy, a
   // project that extends a template owns none. Relative to this file.
-  extends: { kind: "value", example: "unify-docs-template@0.1.1", about: "a template this site builds on without copying it: its layouts, includes, assets and pages sit beneath yours, and a file of yours at the same path wins", default: "none", save: "extends: unify-docs-template@0.1.1" },
+  extends: { kind: "value", example: "unify-docs-template@0.3.0", about: "a template this site builds on without copying it: its layouts, includes, assets and pages sit beneath yours, and a file of yours at the same path wins", default: "none", save: "extends: unify-docs-template@0.3.0" },
   // §19.10 — `update` only: `--keep <path>`, repeatable, relative to the
   // working directory, replacing the file's `keep:` list for the run the way
   // `--exclude` replaces `exclude:`. Not a key of its own in unify.yaml — the

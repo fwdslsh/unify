@@ -1,10 +1,11 @@
 /* The template's stylesheet: tooling, kept current by unify update. Its look is
-   the custom properties set in :root below — the fwdslsh family's palette:
-   dark surfaces, a green accent, Inter for prose, JetBrains Mono for anything
-   a terminal would say, Protest Revolution for the wordmark — and the site's
-   own values for them live in theme.css beside this file, a file unify update
-   never overwrites (keep: in unify.yaml's template: block). The import puts it
-   in the theme layer, which wins over the base layer whatever the order, so a
+   the custom properties set in :root below — the fwdslsh family's theme: dark
+   green-neutral surfaces, a green accent, a blue secondary accent for code,
+   Inter for prose, JetBrains Mono for anything a terminal would say, Protest
+   Revolution for the wordmark and page titles — and the site's own values for
+   them live in theme.css beside this file, a file unify update never
+   overwrites (keep: in unify.yaml's template: block). The import puts it in
+   the theme layer, which wins over the base layer whatever the order, so a
    value set there wins and a property left out keeps its default here. The
    fonts themselves are loaded by _includes/head.html. */
 @layer base, theme;
@@ -12,41 +13,92 @@
 
 @layer base {
   :root {
+    /* palette: surfaces, one green-neutral hue */
     --bg: #0a0e0a;
-    --bg-panel: #0d1117;
-    --bg-card: #161b22;
-    --border: #30363d;
-    --border-faint: #21262d;
+    --bg-panel: #0d120e;
+    --bg-card: #141a15;
+    --border: #2c3a2c;
+    --border-faint: #1f2a1f;
+    --border-strong: #56695a;
+    /* palette: text (contrast on --bg: 16.4, 11.7, 7.0) */
     --text: #e6edf3;
-    --text-2: #c9d1d9;
-    --dim: #8b949e;
+    --text-2: #c2cbc4;
+    --dim: #929e94;
+    /* palette: accents */
     --accent: #3fb950;
     --accent-bright: #00ff41;
-    --accent-tint: rgba(63, 185, 80, 0.08);
-    --code: #79c0ff;
-    --code-bg: rgba(110, 118, 129, 0.2);
+    --accent-tint: rgb(63 185 80 / 0.08);
+    --accent-2: #79c0ff;
+    --code: var(--accent-2);
+    --code-bg: rgb(110 118 129 / 0.2);
+    --focus: var(--accent-bright);
     --gradient: linear-gradient(135deg, #00ff41 0%, #00cc33 100%);
+    /* page background: a glow and a fading grid; none / transparent turn them off */
+    --glow: radial-gradient(1200px 600px at 15% -10%, rgb(63 185 80 / 0.08), transparent 60%);
+    --grid-lines: rgb(63 185 80 / 0.06);
+    /* type */
     --sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     --display: "Protest Revolution", "Arial Black", sans-serif;
-    --measure: 47rem;
+    --h1-font: var(--display);
+    --heading-font: var(--mono);
+    --text-size: 1.0625rem;
+    --leading: 1.65;
+    /* layout */
+    --site: 72.5rem;
+    --gutter: clamp(1rem, 4vw, 1.5rem);
+    --measure: 42rem;
+    --measure-wide: 52rem;
+    --sidebar: 15.5rem;
     --head-h: 4rem;
+    /* shape and motion */
+    --radius-sm: 4px;
+    --radius: 8px;
+    --radius-lg: 12px;
+    --radius-pill: 999px;
+    --dur: 150ms;
+    --shadow-pop: 0 12px 32px rgb(0 0 0 / 0.45);
+
+    color-scheme: dark;
   }
 
-  * { box-sizing: border-box; }
+  *, *::before, *::after { box-sizing: border-box; }
 
   /* overflow-x: clip is the page-level guarantee: wide content scrolls inside
      its own container (pre, table, terminal) and the page itself never scrolls
      sideways. clip, not hidden, so no scroll container is created and the
-     sticky sidebar keeps working. */
-  html { -webkit-text-size-adjust: 100%; overflow-x: clip; }
+     sticky header and sidebar keep working. Headings carry slug ids, so every
+     one is a deep link; the sticky header must not cover the target. */
+  html {
+    -webkit-text-size-adjust: 100%;
+    overflow-x: clip;
+    scroll-padding-top: calc(var(--head-h) + 1rem);
+  }
 
   body {
     margin: 0;
-    background: var(--bg);
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    background: var(--glow), var(--bg);
     color: var(--text-2);
-    font: 1rem/1.7 var(--sans);
+    font: 400 var(--text-size) / var(--leading) var(--sans);
+    -webkit-font-smoothing: antialiased;
     overflow-wrap: break-word;
+  }
+
+  /* A faint terminal grid that fades out below the fold. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image:
+      linear-gradient(var(--grid-lines) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-lines) 1px, transparent 1px);
+    background-size: 32px 32px;
+    mask-image: linear-gradient(to bottom, #000, transparent 70%);
   }
 
   /* Design-time only: a layout's slot fallbacks preview in the browser, and this
@@ -55,36 +107,46 @@
 
   ::selection { background: color-mix(in srgb, var(--accent) 35%, transparent); color: var(--text); }
 
-  a { color: var(--accent); text-underline-offset: 0.18em; }
-  a:hover { color: var(--accent-bright); }
-  a:focus-visible, .skip:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a {
+    color: var(--accent);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.2em;
+    text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent);
+    transition: color var(--dur), text-decoration-color var(--dur);
+  }
+  a:hover { color: var(--accent-bright); text-decoration-color: currentColor; }
 
-  .skip { position: absolute; left: -9999px; }
-  .skip:focus {
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  .skip-link { position: absolute; left: -9999px; }
+  .skip-link:focus {
     left: 0.5rem;
     top: 0.5rem;
     z-index: 30;
     padding: 0.5rem 0.75rem;
     background: var(--accent);
     color: var(--bg);
-    font-family: var(--mono);
-    font-weight: 600;
-    border-radius: 6px;
+    font: 600 0.875rem var(--mono);
+    border-radius: var(--radius);
     text-decoration: none;
   }
 
   /* ---------------------------------------------------------------- masthead */
 
   .site-head {
-    background: color-mix(in srgb, var(--bg) 95%, transparent);
-    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: color-mix(in srgb, var(--bg) 85%, transparent);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border-faint);
   }
 
   .site-head-bar {
-    max-width: 77.5rem;
+    max-width: calc(var(--site) + 2 * var(--gutter));
     height: var(--head-h);
     margin: 0 auto;
-    padding: 0 1.5rem;
+    padding: 0 var(--gutter);
     display: flex;
     align-items: center;
     gap: 0.75rem;
@@ -98,18 +160,16 @@
   }
 
   .wordmark-tile {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 2.125rem;
-    height: 2.125rem;
-    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 2rem;
+    height: 2rem;
+    border-radius: var(--radius);
     background: var(--gradient);
     color: var(--bg);
-    font-family: var(--display);
-    font-size: 1.25rem;
-    line-height: 1;
   }
+  .wordmark-tile svg { width: 100%; height: 100%; }
 
   .wordmark-name {
     font-family: var(--display);
@@ -123,36 +183,43 @@
     font-size: 0.6875rem;
     color: var(--dim);
     border: 1px solid var(--border);
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     padding: 0.1875rem 0.625rem;
   }
 
   .head-links {
-    margin-left: auto;
+    margin: 0 0 0 auto;
+    padding: 0;
+    list-style: none;
     display: flex;
     align-items: center;
-    gap: 1.75rem;
+    gap: 1.5rem;
   }
 
-  .head-links a {
-    font-family: var(--mono);
-    font-size: 0.8125rem;
+  /* Each link reads as a path segment: /docs, /blog. A list of links works
+     too, and whatever a site nests inside an item (a dropdown) is its own. */
+  .head-links li { margin: 0; }
+  .head-links > a, .head-links > li > a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    font: 400 0.875rem var(--mono);
     color: var(--text-2);
     text-decoration: none;
-    padding: 0.375rem 0.125rem;
-    transition: color 0.2s ease, box-shadow 0.2s ease;
+    white-space: nowrap;
   }
-
-  .head-links a:hover { color: var(--accent); }
+  .head-links > a::before, .head-links > li > a::before { content: "/"; color: var(--dim); }
+  .head-links > a:hover, .head-links > li > a:hover,
+  .head-links > a:hover::before, .head-links > li > a:hover::before { color: var(--accent); }
 
   /* The mobile shortcut row: the sidebar sits after the article on small
      screens, so these two anchors are how a phone reaches it. */
   .subnav {
     display: flex;
     gap: 0.5rem;
-    max-width: 77.5rem;
+    max-width: calc(var(--site) + 2 * var(--gutter));
     margin: 0 auto;
-    padding: 0.75rem 1.5rem;
+    padding: 0.75rem var(--gutter);
     border-top: 1px solid var(--border-faint);
   }
 
@@ -160,40 +227,38 @@
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
+    min-height: 2.25rem;
     font-family: var(--mono);
     font-size: 0.75rem;
     color: var(--text-2);
     text-decoration: none;
     background: var(--bg-card);
     border: 1px solid var(--border);
-    border-radius: 999px;
-    padding: 0.4375rem 0.875rem;
+    border-radius: var(--radius-pill);
+    padding: 0 0.875rem;
   }
 
   .subnav a:hover { color: var(--accent); border-color: var(--accent); }
   .subnav svg { stroke: var(--dim); }
 
   @media (min-width: 60rem) {
-    .site-head {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      z-index: 20;
-      backdrop-filter: blur(10px);
-    }
-    body { padding-top: var(--head-h); }
     .subnav { display: none; }
   }
 
-  /* The bar must fit every width without wrapping or spilling: the two
-     far links go first, then the pill. Measured, not guessed. */
+  /* On a phone the shortcut row would make a sticky header too tall: a docs
+     page's header scrolls away with the page instead. */
+  @media (max-width: 59.9375rem) {
+    body:not(.home, .wide) .site-head { position: static; }
+    body:not(.home, .wide) { scroll-padding-top: 1rem; }
+  }
+
+  /* The bar must fit every width without wrapping or spilling: the far links
+     go first, then the pill. */
   @media (max-width: 40rem) {
     /* The row never clips: it shrinks a step, and scrolls sideways before it would. */
     .head-links { gap: 0.875rem; min-width: 0; overflow-x: auto; }
-    .head-links a { font-size: 0.75rem; white-space: nowrap; }
+    .head-links > a, .head-links > li > a { font-size: 0.8125rem; }
     .head-links .head-far, .head-pill { display: none; }
-    .site-head-bar { padding: 0 1rem; }
   }
   @media (max-width: 22.5rem) {
     .site-head-bar { gap: 0.5rem; }
@@ -201,22 +266,34 @@
 
   /* ------------------------------------------------------------------ shell */
 
+  /* The page column: .shell holds main and the docs sidebar; a layout without
+     a sidebar puts main straight in body. */
+  .shell, body > main {
+    width: 100%;
+    max-width: calc(var(--site) + 2 * var(--gutter));
+    margin: 0 auto;
+    padding: 2rem var(--gutter) 4rem;
+    flex: 1;
+  }
+
   .shell {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: 2.5rem;
-    max-width: 77.5rem;
-    margin: 0 auto;
-    padding: 2rem 1.5rem 3rem;
   }
 
   .shell > * { min-width: 0; }
   main { min-width: 0; }
-  main > * { max-width: var(--measure); }
+
+  /* Pages are plain Markdown or HTML with no wrappers, so these rules style what
+     a page already contains: prose at a reading measure, code and tables a
+     little wider. */
+  main > :is(p, ul, ol, dl, blockquote, h1, h2, h3, h4, h5, h6) { max-width: var(--measure); }
+  main > :is(pre, table, .term) { max-width: var(--measure-wide); }
 
   @media (min-width: 60rem) {
     .shell {
-      grid-template-columns: 15.5rem minmax(0, 1fr);
+      grid-template-columns: var(--sidebar) minmax(0, 1fr);
       grid-template-areas: "nav main";
       gap: 3.5rem;
       align-items: start;
@@ -241,12 +318,12 @@
     }
   }
 
-  /* A landing page opts out of the sidebar shell with a body class — home for
-     the front page, wide for any other page with nothing to browse beside it;
-     root-attribute merging (§9) unions it onto the layout's body. */
-  body:is(.home, .wide) .shell { display: block; max-width: none; padding: 0; }
+  /* A page opts out of the sidebar with a body class — wide for one column at
+     the site's width, home for a front page of full-bleed sections, each with
+     its own .inner; root-attribute merging (§9) unions it onto the layout's body. */
+  body:is(.home, .wide) .shell { display: block; }
   body:is(.home, .wide) :is(.docnav, .subnav) { display: none; }
-  body:is(.home, .wide) main > * { max-width: none; }
+  body.home .shell { max-width: none; padding: 0; }
 
   /* ------------------------------------------------------------------- nav */
 
@@ -269,16 +346,18 @@
     border-left: 1px solid var(--border);
   }
 
+  .docnav li { margin: 0; }
+
   .docnav li a {
     display: block;
     padding: 0.375rem 0.75rem;
-    font-size: 0.84375rem;
+    font-size: 0.875rem;
     line-height: 1.45;
     color: var(--text-2);
     text-decoration: none;
     border-left: 2px solid transparent;
     margin-left: -1px;
-    transition: color 0.15s ease, border-color 0.15s ease;
+    transition: color var(--dur), border-color var(--dur);
   }
 
   .docnav li a:hover {
@@ -289,7 +368,7 @@
   .docnav-all {
     margin: 0;
     font-family: var(--mono);
-    font-size: 0.75rem;
+    font-size: 0.8125rem;
   }
   .docnav-all a { color: var(--dim); text-decoration: none; }
   .docnav-all a:hover { color: var(--accent); }
@@ -298,28 +377,39 @@
 
   h1, h2, h3, h4, h5, h6 {
     color: var(--text);
-    line-height: 1.2;
-    letter-spacing: -0.02em;
+    line-height: 1.25;
     margin: 2rem 0 0.75rem;
+    text-wrap: balance;
   }
-  h1 { font-size: 2.375rem; margin-top: 0; }
-  h2 {
-    font-size: 1.4375rem;
+
+  h1 {
+    font: 400 clamp(2.25rem, 5vw, 3.5rem) / 1.05 var(--h1-font);
+    letter-spacing: 0.01em;
+    color: var(--accent);
+    margin: 0 0 1rem;
+  }
+
+  h2, h3, h4, h5, h6 {
+    font-family: var(--heading-font);
     font-weight: 600;
-    padding-top: 1.375rem;
-    border-top: 1px solid var(--border-faint);
+    letter-spacing: -0.01em;
   }
-  h3 { font-size: 1.125rem; font-weight: 600; }
+  h2 { font-size: clamp(1.375rem, 1rem + 1.5vw, 1.625rem); }
+  h3 { font-size: 1.25rem; }
   h4, h5, h6 { font-size: 1rem; }
 
-  /* Headings carry slug ids, so every one is a deep link; the fixed header
-     must not cover the target it jumps to. */
-  h2[id], h3[id], h4[id] { scroll-margin-top: 1rem; }
-  @media (min-width: 60rem) {
-    h2[id], h3[id], h4[id] { scroll-margin-top: calc(var(--head-h) + 1rem); }
+  /* Each section of a page opens with a rule and the slash motif. */
+  main > h2 {
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border-faint);
   }
+  main h2::before { content: "/ "; color: var(--accent); }
 
-  p, ul, ol { margin: 0 0 1rem; }
+  /* The paragraph after the page heading is the page's introduction. */
+  main > h1 + p { font-size: 1.125rem; }
+
+  p, ul, ol, dl { margin: 0 0 1rem; }
   li { margin: 0.25rem 0; }
   li::marker { color: var(--dim); }
 
@@ -330,47 +420,68 @@
     color: var(--accent);
   }
 
-  .lede { font-size: 1.0625rem; color: var(--dim); }
+  .lede { font-size: 1.125rem; color: var(--text-2); }
 
-  strong { color: var(--text); }
+  strong { color: var(--text); font-weight: 600; }
 
-  /* Blockquotes render as the family's callout: the accent bar and tint that
-     fwdslsh.dev uses for "worth knowing". */
+  /* Blockquotes render as the family's callout: the accent bar and tint for
+     "worth knowing". */
   blockquote {
     margin: 0 0 1.25rem;
     padding: 0.875rem 1.25rem;
     border-left: 4px solid var(--accent);
-    border-radius: 0 8px 8px 0;
+    border-radius: 0 var(--radius) var(--radius) 0;
     background: var(--accent-tint);
     color: var(--text-2);
   }
   blockquote > :last-child { margin-bottom: 0; }
 
+  code, kbd, pre { font-family: var(--mono); }
+
   code {
-    font-family: var(--mono);
-    font-size: 0.855em;
+    font-size: 0.875em;
     color: var(--code);
     background: var(--code-bg);
-    padding: 0.1em 0.4em;
-    border-radius: 6px;
-    /* Long tokens (paths, URLs) break rather than push the page sideways. */
-    overflow-wrap: anywhere;
+    padding: 0.1em 0.35em;
+    border-radius: var(--radius-sm);
   }
+  /* Inline code moves to the next line whole rather than split at a hyphen
+     (--search-corpus, search-corpus.json); only a token longer than a whole
+     line breaks, rather than push the page sideways. */
+  :not(pre) > code {
+    display: inline-block;
+    max-width: 100%;
+    overflow-wrap: break-word;
+  }
+  /* In a table a token stays whole; the table scrolls instead. */
+  :is(td, th) code { white-space: nowrap; }
 
   pre {
-    max-width: 100%;
     overflow-x: auto;
+    margin: 0 0 1.25rem;
+    padding: 1rem 1.25rem;
     background: var(--bg-panel);
     border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 1rem 1.25rem;
-    line-height: 1.75;
+    border-radius: var(--radius);
+    font-size: 0.875rem;
+    line-height: 1.7;
+    tab-size: 2;
   }
   pre code {
     background: none;
     padding: 0;
-    color: var(--text-2);
-    font-size: 0.84375rem;
+    border-radius: 0;
+    color: var(--text);
+    font-size: inherit;
+  }
+
+  /* On a phone a code block runs edge to edge, for the width code needs. */
+  @media (max-width: 48rem) {
+    main > pre {
+      margin-inline: calc(-1 * var(--gutter));
+      border-radius: 0;
+      border-inline: 0;
+    }
   }
 
   /* Specs are full of wide tables; let them scroll rather than break the page. */
@@ -381,8 +492,8 @@
     border-collapse: separate;
     border-spacing: 0;
     border: 1px solid var(--border);
-    border-radius: 8px;
-    font-size: 0.875rem;
+    border-radius: var(--radius);
+    font-size: 0.9375rem;
     margin: 0 0 1.25rem;
   }
   th, td {
@@ -393,32 +504,60 @@
   th {
     background: var(--bg-card);
     color: var(--text);
-    font-family: var(--mono);
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+    font: 600 0.8125rem var(--mono);
     border-bottom: 1px solid var(--border-faint);
   }
-  th:first-child { border-top-left-radius: 7px; }
-  th:last-child { border-top-right-radius: 7px; }
   td { border-bottom: 1px solid var(--border-faint); color: var(--text-2); }
   tr:last-child td { border-bottom: none; }
-  tbody tr:hover td { background: rgba(110, 118, 129, 0.08); }
+  tbody tr:hover td { background: rgb(110 118 129 / 0.08); }
+  @media (max-width: 48rem) {
+    th, td { padding: 0.5rem 0.75rem; }
+  }
 
   hr { border: 0; border-top: 1px solid var(--border-faint); margin: 2.5rem 0; }
 
   img { max-width: 100%; height: auto; }
 
-  /* ------------------------------------------------------- home page: hero */
+  /* ------------------------------------------------------------------- hero */
 
+  /* A page's opening: its h1 in the display face, the gradient where the
+     browser draws it, then the introduction and the calls to action. On a
+     front page of full-bleed sections, .hero-grid centres it beside a demo. */
   .hero {
-    padding: 4.5rem 1.5rem 3rem;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.25rem;
+    padding-block: 4rem 2rem;
+  }
+  .hero > * { max-width: var(--measure); margin: 0; }
+  /* Full-bleed, it gets a tint of its own; in a column, the page's glow is enough. */
+  body.home .hero {
+    padding: 4.5rem var(--gutter) 3rem;
     background: radial-gradient(43.75rem 21.25rem at 50% 0%, var(--accent-tint), transparent);
+  }
+  body.home .hero > * { max-width: var(--site); margin-inline: auto; }
+
+  .hero h1 {
+    margin: 0;
+    font-family: var(--display);
+    font-size: clamp(3rem, 7vw, 5.25rem);
+    line-height: 1.05;
+    max-width: none;
+  }
+  @media (forced-colors: none) {
+    @supports ((-webkit-background-clip: text) or (background-clip: text)) {
+      .hero h1 {
+        background: var(--gradient);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+    }
   }
 
   .hero-grid {
-    max-width: 72.5rem;
+    width: 100%;
+    max-width: var(--site);
     margin: 0 auto;
     display: flex;
     align-items: center;
@@ -433,25 +572,7 @@
     gap: 1.25rem;
   }
 
-  .hero-copy h1 {
-    margin: 0;
-    font-family: var(--display);
-    font-weight: 400;
-    font-size: clamp(3.5rem, 7vw, 5.25rem);
-    line-height: 1.05;
-    letter-spacing: 0.01em;
-    color: var(--accent);
-  }
-  @supports ((-webkit-background-clip: text) or (background-clip: text)) {
-    .hero-copy h1 {
-      background: var(--gradient);
-      -webkit-background-clip: text;
-      background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-  }
-
-  .hero-copy .tagline {
+  .hero .tagline {
     margin: 0;
     font-family: var(--mono);
     font-size: 1.1875rem;
@@ -459,51 +580,59 @@
     color: var(--text-2);
   }
 
-  .hero-copy .lede { margin: 0; max-width: 32.5rem; }
+  .hero .lede { margin: 0; max-width: 34rem; }
 
   .hero-demo { flex: 1; min-width: 0; }
 
-  .cta-row { display: flex; flex-wrap: wrap; gap: 0.875rem; margin-top: 0.5rem; }
+  .cta-row { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 0.5rem; }
+
+  @media (max-width: 60rem) {
+    body.home .hero { padding-top: 3rem; }
+    .hero-grid { flex-direction: column; gap: 2.5rem; }
+    .hero-copy { text-align: center; align-items: center; }
+    .hero-copy .cta-row { justify-content: center; }
+    .hero-demo { width: 100%; max-width: 34rem; }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    html { scroll-behavior: smooth; }
+    .hero, main > h1 { animation: rise 0.4s ease-out both; }
+  }
+
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: none; }
+  }
+
+  /* ---------------------------------------------------------------- buttons */
 
   .btn {
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.8125rem 1.625rem;
-    border-radius: 8px;
-    font-family: var(--mono);
-    font-size: 0.875rem;
-    font-weight: 600;
+    min-height: 44px;
+    padding: 0 1.5rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    font: 600 0.9375rem var(--mono);
     text-decoration: none;
-    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+    transition: background-color var(--dur), border-color var(--dur), color var(--dur), filter var(--dur);
   }
 
   .btn-primary { background: var(--gradient); color: var(--bg); }
-  .btn-primary:hover {
-    color: var(--bg);
-    transform: translateY(-2px);
-    box-shadow: 0 10px 20px color-mix(in srgb, var(--accent-bright) 25%, transparent);
-  }
+  .btn-primary:hover { color: var(--bg); filter: brightness(0.9); }
 
-  .btn-ghost { border: 2px solid var(--border); color: var(--text); }
-  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-2px); }
-
-  @media (max-width: 60rem) {
-    .hero { padding-top: 3rem; }
-    .hero-grid { flex-direction: column; gap: 2.5rem; }
-    .hero-copy { text-align: center; align-items: center; }
-    .cta-row { justify-content: center; }
-    .hero-demo { width: 100%; max-width: 34rem; }
-  }
+  .btn-secondary { border-color: var(--border-strong); color: var(--text); }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
 
   /* -------------------------------------------------------------- terminal */
 
   .term {
     background: var(--bg-panel);
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: var(--radius-lg);
     overflow: hidden;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    box-shadow: var(--shadow-pop);
   }
 
   .term-head {
@@ -542,7 +671,7 @@
   .term .prompt { color: var(--accent); font-weight: 600; }
   .term .cmd { color: var(--text); }
   .term .out { color: var(--dim); }
-  .term .url { color: var(--code); }
+  .term .url { color: var(--accent-2); }
 
   /* On a phone the longest transcript line fits without even the inner
      scroll kicking in. */
@@ -552,15 +681,15 @@
 
   /* ---------------------------------------------------- home page: sections */
 
-  .home-section { padding: 1.5rem 1.5rem 3rem; }
+  .home-section { padding: 1.5rem var(--gutter) 3rem; }
   .home-section > .inner {
-    max-width: 72.5rem;
+    max-width: var(--site);
     margin: 0 auto;
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
   }
-  .home-section h2 { margin: 0; padding: 0; border: 0; font-size: 1.5rem; font-weight: 700; }
+  .home-section h2 { margin: 0; }
 
   .chip-row { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
 
@@ -576,20 +705,23 @@
   .chip {
     font-family: var(--mono);
     font-size: 0.8125rem;
-    color: var(--code);
+    color: var(--accent-2);
     background: var(--bg-card);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     padding: 0.375rem 0.75rem;
     white-space: nowrap;
   }
 
   .chip-row .aside { font-size: 0.8125rem; color: var(--dim); }
 
+  /* ------------------------------------------------------------------ cards */
+
   .card-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
-    gap: 1.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    gap: 1rem;
+    margin-block: 1.5rem;
   }
 
   .card {
@@ -597,61 +729,82 @@
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
-    background: linear-gradient(135deg, var(--bg-panel) 0%, var(--bg-card) 100%);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 1.75rem 1.625rem;
+    min-width: 0;
+    padding: 1.5rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border-faint);
+    border-radius: var(--radius-lg);
     overflow: hidden;
-    transition: transform 0.2s ease, border-color 0.2s ease;
+    transition: border-color var(--dur);
   }
 
   .card::before {
     content: "";
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
+    inset: 0 0 auto;
     height: 2px;
     background: var(--gradient);
     transform: scaleX(0);
-    transition: transform 0.25s ease;
+    transform-origin: left;
+    transition: transform 0.2s ease-out;
   }
 
-  .card:hover { transform: translateY(-3px); border-color: var(--accent); }
+  .card:hover { border-color: var(--border-strong); }
   .card:hover::before { transform: scaleX(1); }
 
   .card.featured { border-color: var(--accent); }
   .card.featured::before { transform: scaleX(1); }
 
+  a.card { color: inherit; text-decoration: none; }
+  a.card:hover h3 { color: var(--accent); }
+
   .card h3 {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
     margin: 0;
-    font-family: var(--mono);
     font-size: 1.0625rem;
-    font-weight: 600;
-    letter-spacing: 0;
   }
+  .card h3 a { color: inherit; text-decoration: none; }
+  .card h3 a:hover { color: var(--accent); }
 
-  .card p { margin: 0; font-size: 0.875rem; line-height: 1.65; color: var(--dim); flex: 1; }
+  .card p { margin: 0; font-size: 0.9375rem; color: var(--text-2); }
 
-  .card .more {
+  .card .more, .card-links {
     font-family: var(--mono);
     font-size: 0.8125rem;
     font-weight: 600;
-    text-decoration: none;
+  }
+  .card .more { text-decoration: none; }
+
+  .card-links { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; }
+  .card-links a { text-decoration: none; }
+  .card-links a:hover { text-decoration: underline; }
+
+  .card-meta { margin: 0; font: 400 0.8125rem var(--mono); color: var(--dim); overflow-wrap: anywhere; }
+
+  .badge {
+    margin-left: auto;
+    padding: 0.125rem 0.5rem;
+    border: 1px solid currentColor;
+    border-radius: var(--radius-sm);
+    font: 400 0.6875rem / 1.6 var(--mono);
+    color: var(--accent-2);
+    white-space: nowrap;
   }
 
   /* ----------------------------------------------------------------- footer */
 
   .site-foot {
-    border-top: 1px solid var(--border);
+    border-top: 1px solid var(--border-faint);
     background: var(--bg-panel);
     margin-top: 3rem;
-    padding: 2.5rem 1.5rem 2.75rem;
+    padding: 2.5rem var(--gutter) 2.75rem;
     text-align: center;
   }
 
   .site-foot .inner {
-    max-width: 72.5rem;
+    max-width: var(--site);
     margin: 0 auto;
     display: flex;
     flex-direction: column;
@@ -659,8 +812,11 @@
     gap: 0.875rem;
   }
 
-  .foot-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 2rem; }
+  .foot-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.25rem 2rem; }
   .foot-links a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
     font-family: var(--mono);
     font-size: 0.8125rem;
     color: var(--text-2);
@@ -676,15 +832,12 @@
   /* --------------------------------------------- 404 and other plain pages */
 
   body.plain {
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
     justify-content: center;
-    padding: 3rem 1.5rem;
+    align-items: center;
+    padding: 3rem var(--gutter);
     text-align: center;
   }
-  body.plain main { max-width: var(--measure); }
+  body.plain main { max-width: var(--measure); flex: 0; padding: 0; }
   body.plain .kicker { font-size: 1rem; }
 
   /* Scaffolded copy nobody should publish: conspicuous on purpose, so a reader
@@ -711,17 +864,20 @@
       --text: #1f2328 !important;
       --text-2: #1f2328 !important;
       --dim: #57606a !important;
+      --accent: #1a7f37 !important;
       --code: #0550ae !important;
       --code-bg: #f6f8fa !important;
       --accent-tint: #f6f8fa !important;
+      --glow: none !important;
+      --grid-lines: transparent !important;
     }
-    body { padding-top: 0; }
-    .site-head, .subnav, .docnav, .site-foot, .skip { display: none; }
+    .site-head, .subnav, .docnav, .site-foot, .skip-link { display: none; }
     .shell { display: block; padding: 0; }
     a { color: var(--text); }
+    .hero h1 { -webkit-text-fill-color: currentColor; background: none; }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    * { transition: none !important; }
+    *, *::before, *::after { transition: none !important; animation: none !important; }
   }
 }
