@@ -30,7 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   slash is an SVG, so it renders before any font loads. `body.wide` now keeps the site's width and gutter;
   `body.home` remains the full-bleed front page.
 - The built-in templates' READMEs describe slotted includes instead of forbidding content between `<include>`
-  tags, and the `extends:` example names `unify-docs-template@0.3.0`.
+  tags (`unify-default-template`, `-basic-`, `-blog-` and `-portfolio-` 0.1.3), and the `extends:` example names
+  `unify-docs-template@0.3.0`.
 
 ## [0.11.11] - 2026-10-08
 
