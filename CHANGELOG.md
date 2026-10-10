@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.14] - 2026-10-10
+
 ### Fixed
 
 - **A generator's warnings reach the build log.** unify passed a `--generate` script's stdout through but kept its stderr unless the script failed, so `console.warn("skipped …")` from a generator that exited 0 never appeared anywhere — fwdslsh.dev's generator skipped an unreachable article source for a whole deploy without a word in CI. A successful generator's stderr is now passed through as its stdout is; a failing one is still reported as P29 with its own message (§33.2, GEN-03).
@@ -1051,7 +1053,8 @@ with generated compare-link notes only. Their diffs are on the
 [releases page](https://github.com/fwdslsh/unify/releases). Nothing here
 retroactively reconstructs detail those notes never carried.
 
-[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.11.13...HEAD
+[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.11.14...HEAD
+[0.11.14]: https://github.com/fwdslsh/unify/compare/v0.11.13...v0.11.14
 [0.11.13]: https://github.com/fwdslsh/unify/compare/v0.11.12...v0.11.13
 [0.11.12]: https://github.com/fwdslsh/unify/compare/v0.11.11...v0.11.12
 [0.11.11]: https://github.com/fwdslsh/unify/compare/v0.11.10...v0.11.11
