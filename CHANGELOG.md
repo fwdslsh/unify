@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A generator's warnings reach the build log.** unify passed a `--generate` script's stdout through but kept its stderr unless the script failed, so `console.warn("skipped …")` from a generator that exited 0 never appeared anywhere — fwdslsh.dev's generator skipped an unreachable article source for a whole deploy without a word in CI. A successful generator's stderr is now passed through as its stdout is; a failing one is still reported as P29 with its own message (§33.2, GEN-03).
+
 ## [0.11.13] - 2026-10-09
 
 ### Changed
