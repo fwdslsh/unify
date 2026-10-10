@@ -415,12 +415,17 @@ export async function runGenerator({ generatorAbs, sourceRoot, overlayDir, conte
     stdio: ["ignore", "pipe", "pipe"],
   });
   const { out, err, code } = await collect(proc);
-  // A generator's own stdout is its business and is passed through, so a
+  // A generator's own output is its business and is passed through, so a
   // script that logs its progress still does (§33.6: unify runs the file the
-  // author named and does not police it).
+  // author named and does not police it). Its stderr too, when it succeeds: a
+  // generator that skips a source it could not reach and says so on stderr
+  // would otherwise be silent in the build log, which is the silent failure
+  // the warning exists to prevent. A failure's stderr is P29's detail instead.
   if (out) process.stdout.write(out);
-
-  if (code === 0) return true;
+  if (code === 0) {
+    if (err) process.stderr.write(err);
+    return true;
+  }
 
   // P29. Located at the generator's path with no line: the failure may come
   // from anywhere in its own call graph — or from a module it imported — and
