@@ -231,12 +231,12 @@ test("GEN-03 — a generator that calls process.exit() ends the build", async ()
 
 test("GEN-03 — a generator that succeeds is heard on stderr as well as stdout", async () => {
   // A generator that skips something it could not reach and warns about it
-  // on stderr, as console.warn does, must not be silenced by exiting 0: the
-  // build log is the only place an author running CI would see the warning.
+  // on stderr must not be silenced by exiting 0: the build log is the only
+  // place an author running CI would see the warning.
   const tmp = mkTmp();
   writeTree(join(tmp, "src"), {
     "index.html": doc("Home", "<h1>Home</h1>"),
-    "_scripts/warn.mjs": 'console.log("gen: progress on stdout");\nconsole.warn("gen: skipped a source on stderr");\n',
+    "_scripts/warn.mjs": 'console.log("gen: progress on stdout");\nprocess.stderr.write("gen: skipped a source on stderr\\n");\n',
   });
   const r = await runCli(["build", "-s", "src", "-o", "dist", "--generate", "_scripts/warn.mjs"], tmp);
   expectExit(r, 0, "a generator that warns and exits 0 is a successful build");
