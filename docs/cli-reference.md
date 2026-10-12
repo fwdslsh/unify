@@ -220,7 +220,7 @@ src/posts/hello.md: advisory: date is "2026-01-02", which names a day rather tha
 
 Each entry's `<id>` and `<link>` are the page's own canonical (authored, or completed by `--canonical auto`), never a second address; `<updated>` prefers `dateModified` over `datePublished` when it carries a time. `--feed-full` additionally puts each entry's rendered `<main>` into `<content type="html">` — without it, every entry carries a plain-text `<summary>`. Every internal URL the feed emits is checked exactly as a broken link would be, so a target the site does not emit blocks the publish rather than shipping a feed reader will 404 on.
 
-If your source tree already contains a `feed.xml`, that file **is** the site's feed: unify ships it untouched and generates nothing, exactly as it treats an authored `sitemap.xml`. The `blog` template's own generator writes one for this reason.
+If your source tree already contains a `feed.xml`, that file **is** the site's feed: unify ships it untouched and generates nothing, exactly as it treats an authored `sitemap.xml`, and a `feed.xml` your generator writes counts the same way. For RSS, or a feed that lists day-dated posts, write it yourself from the source inventory: [the generator recipes](guides/generator-recipes.md#an-rss-feed) do it as `rss.xml` beside this feed, or as `feed.xml` in place of it.
 
 ## Catalog (`catalog.json`)
 
@@ -287,7 +287,7 @@ Same membership as the catalog, same author-wins rule: a `src/assets/unify/searc
 
 Runs one JavaScript file from your source tree before the build scans anything. `build`, `watch`, `dev`, and `audit` all take it, because all four scan the source tree.
 
-It names a **file**, never a command. There is no shell, no argument list, and no way to say "and then run this other thing" — a path is something you wrote and can read. A relative path resolves against the source root and an absolute path is taken as written; the file can live anywhere — `_scripts/gen.mjs` inside `src/`, `../scripts/gen.mjs` beside it at the project root, or an absolute path — and is never published, because only the source tree and the generated directory are scanned. (One thing to know: `unify dev` watches the source tree, so editing a generator that lives outside it does not trigger a rebuild on its own.) There is one generator per build: giving `--generate` twice on the command line is a usage error (exit 2), so put several tasks inside the one file and have it import and call the others. A `generate:` saved in `unify.yaml` plus one `--generate` is fine; the command line wins.
+It names a **file**, never a command. There is no shell, no argument list, and no way to say "and then run this other thing" — a path is something you wrote and can read. A relative path resolves against the source root and an absolute path is taken as written; the file can live anywhere — `_scripts/gen.mjs` inside `src/`, `../scripts/gen.mjs` beside it at the project root, or an absolute path — and is never published, because only the source tree and the generated directory are scanned. (`unify dev` and `watch` watch the project root as well as the source tree: its own files, and every directory directly under it that exists at startup, recursively — so saving `scripts/gen.mjs` rebuilds. Not watched: `node_modules/`, dot-directories such as `.git/`, the output directory, `unify.yaml`, and a generator, or a file it reads, outside the project root. [The Eleventy + htmx guide](guides/eleventy-htmx.md#what-re-runs-measured) measures it edit by edit.) There is one generator per build: giving `--generate` twice on the command line is a usage error (exit 2), so put several tasks inside the one file and have it import and call the others. A `generate:` saved in `unify.yaml` plus one `--generate` is fine; the command line wins.
 
 The whole interface is three positional arguments:
 
@@ -363,7 +363,7 @@ The working directory is the source root, so `readFileSync("_data/authors.json")
 
 It runs on **every** build, including every rebuild under `watch` and `dev` — a generator that ran once would leave watch output stale while the build reported success. A non-zero exit is a located problem: nothing publishes, and the previous `dist/` is untouched.
 
-unify runs the file you named. It does not sandbox it, restrict what it reads or writes, or check its output for anything an ordinary build would not. What it does guarantee is that nothing the generator produces skips a check, and that a generator's failure is a build failure. `docs/integrations.md` works the common shapes — a data-driven index, image derivatives, a CMS pulled to disk.
+unify runs the file you named. It does not sandbox it, restrict what it reads or writes, or check its output for anything an ordinary build would not. What it does guarantee is that nothing the generator produces skips a check, and that a generator's failure is a build failure. `docs/integrations.md` works the common shapes — a data-driven index, image derivatives, a CMS pulled to disk — and [the generator recipes](guides/generator-recipes.md) add two small ones: a content hash in an asset's URL, and an RSS feed.
 
 ### `--dry-run`
 

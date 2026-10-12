@@ -123,6 +123,7 @@ Everything below is published at **[unify.fwdslsh.dev](https://unify.fwdslsh.dev
 - **[Integrations](docs/integrations.md)** — the compile-to-asset pattern: Svelte, TypeScript, or anything with a compiler, without adopting a framework.
 - **[Eleventy + htmx](docs/guides/eleventy-htmx.md)** — the advanced stack: another generator produces data-driven pages, unify composes them, htmx enhances them. Optional layers, and when not to reach for them.
 - **[Catalog and Search](docs/guides/catalog-and-search.md)** — a blog list, facets, and a search box built client-side from the two files `--catalog`/`--search-corpus` write.
+- **[Generator Recipes](docs/guides/generator-recipes.md)** — a content hash in an asset's URL, and an RSS feed with day-only dates handled your way, each in a screenful of `--generate`.
 - **[Docker Usage](docs/docker-usage.md)** — running the CLI in a container.
 - **[Examples](examples/README.md)** — eight complete sites and the patterns they demonstrate.
 
