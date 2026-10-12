@@ -104,6 +104,27 @@ describe("title extraction", () => {
     expect(a.titleTexts).toEqual([]);
     expect(a.strayMetadata).toEqual([{ tag: "title", key: null }]);
   });
+
+  test("an SVG <title> is the graphic's own: not the title, not stray, its id still counted", () => {
+    const html = doc("", '<svg><title id="t">Logo</title><g><svg><title>Inner</title></svg></g></svg>');
+    const d = snap(html);
+    const a = analysis(html);
+    expect(d.head.title).toBeNull();
+    expect(a.titleTexts).toEqual([]);
+    expect(a.strayMetadata).toEqual([]);
+    expect(a.ids).toEqual(["t"]);
+  });
+
+  test("HTML inside <foreignObject> is HTML again: its <title> is stray, SVG nested in it is not", () => {
+    const html = doc("", "<svg><foreignObject><title>H</title><div><svg><title>S</title></svg></div></foreignObject></svg>");
+    expect(analysis(html).strayMetadata).toEqual([{ tag: "title", key: null }]);
+  });
+
+  test("with no <head> an SVG <title> neither becomes the title nor joins the real one", () => {
+    const html = `<html><body><svg><title>Logo</title></svg><title>Real</title></body></html>`;
+    expect(snap(html).head.title).toBe("Real");
+    expect(analysis(html).titleTexts).toEqual(["Real"]);
+  });
 });
 
 // --------------------------------------------------------------- meta

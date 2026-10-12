@@ -109,6 +109,21 @@ function textContent(el, extraInvisible) {
   return readText(out);
 }
 
+/**
+ * §20.3's reading of `<title>`: an element in an `<svg>` graphic is that
+ * graphic's accessible name (SVG 2 §5.10), not document metadata. The parser
+ * tracks no namespaces, so this is the ancestor question a browser answers by
+ * namespace: the nearest `<svg>`/`<foreignObject>` ancestor decides, because
+ * HTML inside a `<foreignObject>` is HTML again.
+ */
+function inSvg(node) {
+  for (let p = node.parent; p && p.type !== "root"; p = p.parent) {
+    if (isElement(p, "foreignObject")) return false;
+    if (isElement(p, "svg")) return true;
+  }
+  return false;
+}
+
 /** Collapse every run of ASCII whitespace to one space and trim (§20.3). */
 function collapse(s) {
   return s.replace(/[ \t\n\r\f]+/g, " ").trim();
@@ -282,6 +297,7 @@ export function extractDocument(html, { path = null, url = null } = {}) {
     }
 
     if (tag === "title") {
+      if (inSvg(node)) continue;
       if (inHead) {
         const text = orNull(readText(innerText(html, node)));
         if (text !== null) {
