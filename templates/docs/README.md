@@ -149,7 +149,9 @@ is added. A listed document the importer did not produce, or one listed twice, s
 naming it. `index: { title, description, intro }` sets the index page's text; `base` is the one you gave `importDocs`.
 The generated sidebar replaces the template's include, so your own `site/` must not keep an
 `_includes/docnav.html` of its own: a site that extends the template has none, and a site that copied
-it deletes its copy.
+it deletes its copy. Left in place it is a collision, not a quiet winner: the build stops with a
+problem naming both the file and the generated one (the same path in the source tree and the
+generator's directory is refused whether or not it publishes).
 
 ## Composition
 

@@ -295,7 +295,7 @@ The whole interface is three positional arguments:
 const [, , sourceRoot, generatedDir, contextPath] = process.argv;
 ```
 
-`sourceRoot` is your source tree; `generatedDir` is an empty directory that exists only for this build. Files written into `generatedDir` join the build as an overlay — scanned, composed, checked, published, and colliding with a same-named source file exactly like any other page. Files written anywhere else are your own business. There is no unify module to import, no object passed in, and no return value read.
+`sourceRoot` is your source tree; `generatedDir` is an empty directory that exists only for this build. Files written into `generatedDir` join the build as an overlay — scanned, composed, checked, published, and colliding with a same-named source file exactly like any other page (a same-named file that never publishes, such as an `_includes/` fragment, collides too). Files written anywhere else are your own business. There is no unify module to import, no object passed in, and no return value read.
 
 `contextPath` is new in 0.9 and additive: a generator written before it existed, reading only `sourceRoot`/`generatedDir`, keeps working exactly as it did. It names a JSON file — read-only, yours to consult or ignore — that tells you the handful of build facts unify is willing to promise as a stable contract:
 
@@ -355,7 +355,7 @@ The pages are exactly the ones the build would treat as pages in your source tre
 
 - A generated page finds a layout by the ordinary walk. `docs/api.md` looks for `docs/_layout.html`, then `_layout.html` — in either tree — with no `layout:` line of its own. Writing one is still allowed and still means what it says.
 - `<include src="/_includes/nav.html">` in a hand-written layout finds the fragment your generator wrote, and `<include src="./sibling.html">` in a generated page finds the file you wrote. Relative paths count from the page's own place in the tree, which is where you put it in `generatedDir`.
-- Where the same path exists in both, **your file wins** — a generator cannot quietly replace something you wrote. That only comes up for files that never publish, like a fragment under `_includes/`: when a *page* exists in both trees, the build stops and names both (neither one silently wins). Nearest still beats everything in the layout walk, so a `docs/_layout.html` your generator wrote is the layout for `docs/`, including for pages you hand-wrote there.
+- Where the same path exists in both, **neither wins: the build stops and names both** — a generator cannot quietly replace something you wrote, and your file cannot quietly hide one the generator wrote. That holds for every kind of file, not only pages: an `_includes/nav.html`, a `_layout.html`, a `_data/` file, an asset and a `.fragment.html` in both trees are each one problem, located at your file with the generated one marked `(generated)`. To let the generator supply a path, delete your file; to keep yours, stop the generator writing it. (A generated file at the path of a file beside `package.json`, or of one in a template the site `extends`, replaces it: those sit behind the site, and only the source tree and the generated directory collide.) Nearest still decides the layout walk, so a `docs/_layout.html` your generator wrote is the layout for `docs/`, including for pages you hand-wrote there.
 
 The working directory is the source root, so `readFileSync("_data/authors.json")` means what you would expect.
 

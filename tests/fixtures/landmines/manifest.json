@@ -1811,7 +1811,39 @@
       "diagnosticsExhaustive": true,
       "note": "\u00a733.4 survives \u00a733.3: unifying the RESOLUTION namespace must not unify the OUTPUT. A virtual path present in both trees is still P12 naming both \u2014 the source file by its source path, the generated one as generated \u2014 neither wins, and nothing publishes. This case is the guard on that boundary: it passes before the namespace change and must keep passing after."
     },
-    "overlay-namespace-precedence": {
+    "overlay-underscore-collision": {
+      "rules": [
+        "GEN-05",
+        "P12"
+      ],
+      "flags": [
+        "--generate",
+        "_scripts/gen.mjs"
+      ],
+      "exit": 1,
+      "published": false,
+      "diagnostics": [
+        {
+          "file": "src/_includes/badge.html",
+          "line": null,
+          "severity": "problem",
+          "containsAll": [
+            "_includes/badge.html and _includes/badge.html (generated)"
+          ]
+        },
+        {
+          "file": "src/_layout.html",
+          "line": null,
+          "severity": "problem",
+          "containsAll": [
+            "_layout.html and _layout.html (generated)"
+          ]
+        }
+      ],
+      "diagnosticsExhaustive": true,
+      "note": "\u00a733.4 holds for a path that never publishes. `_includes/badge.html` and `_layout.html` exist in BOTH trees and neither has an output path to share, so \u00a713's \"both produce\" cannot name them \u2014 yet each is the same silent overwrite \u00a713 exists to forbid. The build used to resolve the pair by precedence: the source file won, the generator's vanished, and the build exited 0. Now it is P12 naming both, the generated one as generated, located at the source file, and nothing publishes."
+    },
+    "overlay-namespace-nearest": {
       "rules": [
         "GEN-09"
       ],
@@ -1824,7 +1856,7 @@
       "diagnostics": [],
       "diagnosticsExhaustive": true,
       "expectedTree": "expected",
-      "note": "Both halves of \u00a733.3's precedence rule at once. `_includes/badge.html` exists in both trees and never publishes, so P12 cannot arbitrate: the SOURCE file resolves and \"Source badge.\" ships \u2014 a generator that could shadow a file the author wrote would be the silent overwrite \u00a713 exists to forbid. And `docs/_layout.html`, written only by the generator, is taken by BOTH pages in `docs/` \u2014 the generated `api.md` and the hand-authored `guide.md` \u2014 because nearest beats precedence: the namespace merges one directory at a time, not one tree at a time."
+      "note": "Nearest decides the walk, because the namespace merges one DIRECTORY at a time, not one TREE at a time. `docs/_layout.html`, written only by the generator, is taken by BOTH pages in `docs/` \u2014 the generated `api.md` and the hand-authored `guide.md` \u2014 while the root `_layout.html` the author wrote serves everything else, and its `_includes/badge.html` (held by the source tree alone) resolves. There is no source-versus-generated precedence to observe: a path in both trees is P12 (\u00a733.4; see overlay-underscore-collision)."
     },
     "include-inert-in-pre": {
       "rules": [

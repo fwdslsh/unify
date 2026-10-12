@@ -1,16 +1,12 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-// Two claims in one overlay: a `_includes/badge.html` that must LOSE to the
-// author's file of the same virtual path, and a `docs/_layout.html` that must
-// WIN for everything in `docs/` — nearest beats precedence, because the
-// namespace merges one directory at a time, not one tree at a time.
+// A `docs/_layout.html` that must WIN for everything in `docs/` — nearest
+// decides the walk, because the namespace merges one directory at a time, not
+// one tree at a time. The source tree holds `_includes/badge.html` and the
+// overlay does not: the two trees never hold the same path (§33.4).
 const out = process.argv[3];
-mkdirSync(join(out, "_includes"), { recursive: true });
 mkdirSync(join(out, "docs"), { recursive: true });
-
-writeFileSync(join(out, "_includes", "badge.html"),
-  `<p class="badge">Generated badge.</p>\n`);
 
 writeFileSync(join(out, "docs", "_layout.html"), `<!doctype html>
 <html lang="en">

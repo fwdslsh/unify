@@ -194,6 +194,7 @@ documentation, and finding 1 argues it should be missing from the implementation
 **Resolved that way.** PR #61 unified the namespace rather than documenting the gap: the
 overlay and the source tree are one path space, so layout discovery and `<include>` see
 across the boundary in both directions. Conformance spec §33.3 now states the rule, its
-precedence (the source tree wins a tie; nearest still wins the walk), and the two failures
-its absence produced. This example is the proof — both workarounds below are gone from
+precedence (then: the source tree wins a tie, nearest still wins the walk; later a path in both
+trees became P12 instead, so the tie never arises and only nearest remains), and the two
+failures its absence produced. This example is the proof — both workarounds below are gone from
 `gen.mjs`, and the site builds and audits clean without them.

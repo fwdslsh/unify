@@ -8,7 +8,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   KNOWN_DEPLOYMENT_FILES, WORKING_FORMAT_EXTENSIONS, computeOutputPath,
-  deploymentFileDiagnostics, resolveOutputPaths, underscoreGuardDiagnostics,
+  deploymentFileDiagnostics, overlayCollisionDiagnostics, resolveOutputPaths, underscoreGuardDiagnostics,
   workingFormatDiagnostics,
 } from "../../../src/core/collisions.js";
 import { Reporter } from "../../../src/core/diagnostics.js";
@@ -247,5 +247,42 @@ describe("fixture-equivalent: case-twin-outputs (runtime-cases.mjs — About.htm
     expect(reporter.diagnostics[0].file).toBe("About.html");
     expect(reporter.diagnostics[0].message).toContain("about.html");
     expect(results.length).toBe(2);
+  });
+});
+
+// ============================================== §33.4 — the two trees (P12)
+
+describe("overlayCollisionDiagnostics (§33.4 P12 for a path that publishes nothing)", () => {
+  const src = (relPath, excluded = true) => ({ relPath, excluded, generated: false });
+  const gen = (relPath, excluded = true) => ({ relPath, excluded, generated: true });
+  const run = (files) => {
+    const reporter = silentReporter();
+    overlayCollisionDiagnostics(files, reporter);
+    return reporter;
+  };
+
+  test("an excluded path in both trees is one problem naming both, located at the path", () => {
+    const reporter = run([src("_includes/nav.html"), gen("_includes/nav.html")]);
+    expect(reporter.problemCount).toBe(1);
+    const d = reporter.diagnostics[0];
+    expect(d.file).toBe("_includes/nav.html");
+    expect(d.message).toContain("_includes/nav.html and _includes/nav.html (generated)");
+    expect(d.message).not.toContain("both produce"); // it produces no output path
+    expect(d.fixes.length).toBe(1);
+  });
+
+  test("a path held by one tree alone is not a collision, whichever tree it is", () => {
+    expect(run([src("_includes/a.html"), gen("_includes/b.html")]).problemCount).toBe(0);
+    expect(run([src("_layout.html"), gen("docs/_layout.html")]).problemCount).toBe(0); // nearest decides, not this
+  });
+
+  test("a path that publishes is left to the output-path check, not reported twice", () => {
+    expect(run([src("about.html", false), gen("about.html", false)]).problemCount).toBe(0);
+  });
+
+  test("one problem per colliding path", () => {
+    const paths = ["_layout.html", "_data/a.json", "drafts/x.html"];
+    const reporter = run([...paths.map((p) => src(p)), ...paths.map((p) => gen(p))]);
+    expect(reporter.problemCount).toBe(3);
   });
 });
