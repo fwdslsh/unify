@@ -285,7 +285,7 @@ test("AUD-10: an HTML <title> in the body, or in a <foreignObject>, is still rep
       "  <foreignObject><title>Not SVG</title></foreignObject>\n    </svg>"),
   });
   const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
-  expectExit(r, 0, "audit reports, it does not fail");
+  expectExit(r, 1, "a stray <title> in the body (metadata-in-body is broken: §24.6 exits 1 without --strict)");
   const lines = r.stdout.split("\n").filter((l) => l.includes("[metadata-in-body]"));
   const files = lines.map((l) => l.split(":")[0]).sort();
   if (files.join() !== "foreign.html,stray.html") {
