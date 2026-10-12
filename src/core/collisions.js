@@ -255,6 +255,38 @@ export function resolveOutputPaths({ entries, prettyUrls = false, reporter }) {
 }
 
 /**
+ * §33.4 — a relative path present in BOTH the source tree and the generated
+ * directory is P12 whether or not it publishes. `resolveOutputPaths` already
+ * refuses the pair that publishes ("both produce"), because that pair shares
+ * an output path; this reports the rest, the pair that produces none — a
+ * `_includes/` fragment, a `_layout.html`, a `_data/` file, anything the
+ * exclude set holds back. Left unreported, it was resolved by precedence: the
+ * source file won and the generator's file vanished without a word, which is
+ * the silent overwrite §13 exists to forbid read the other way round. Neither
+ * wins, so the build stops and names both.
+ *
+ * Only these two trees collide. The scan it is handed has already dropped every
+ * template file (§34.2) the site has an answer for, generated included, so a
+ * template file that remains shares no path with an overlay file, and the
+ * project root (§4.5) is never scanned.
+ *
+ * @param {{relPath: string, excluded: boolean, generated?: boolean}[]} files - the scan, after `shadowTemplateFiles`
+ * @param {import('./diagnostics.js').Reporter} reporter
+ * @returns {void}
+ */
+export function overlayCollisionDiagnostics(files, reporter) {
+  const sources = new Set(files.filter((f) => !f.generated).map((f) => f.relPath));
+  for (const f of files) {
+    if (!f.excluded || !f.generated || !sources.has(f.relPath)) continue;
+    reporter.problem({
+      file: f.relPath,
+      message: `${f.relPath} and ${f.relPath} (generated) are one path in the source tree and the generated directory — neither wins, though the path is never published`,
+      fixes: ["delete the source file to let the generator supply this path, or change the generator so it does not write it"],
+    });
+  }
+}
+
+/**
  * The paths a collision advisory names BESIDES the one it is located at: the
  * group's remaining entries in path order, reduced to one representative per
  * `key`, with the key `first` itself answers for already spoken for.

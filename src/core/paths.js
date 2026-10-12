@@ -119,14 +119,14 @@ export function toRelative(root, absolutePath) {
  * resolved against the source root alone, so a generated page got no layout
  * (silently) and a generated fragment was invisible to `<include>`.
  *
- * **Precedence is source-first** (`roots[0]` is always the source root). For
- * a path present in both trees and *published*, §33.4's P12 already refuses
- * the build, so precedence is unobservable there. It is observable only for
- * paths that never publish — an underscore-excluded fragment, a
- * `_layout.html` — and there the author's own file must win: a generator that
- * could shadow a file the author wrote would be the silent overwrite §13
- * exists to forbid. The overlay fills gaps in the namespace; it never
- * replaces what is already in it.
+ * **The source tree and the overlay never tie.** A path present in both is
+ * P12 (§33.4) whether or not it publishes — `overlayCollisionDiagnostics`
+ * (collisions.js) refuses the paths that do not, an underscore fragment or a
+ * `_layout.html`, and the output-path check refuses the ones that do — so by
+ * the time anything resolves, at most one of the two holds a given path and
+ * the order of `roots[0]` and `roots[1]` decides nothing. Resolving such a
+ * pair by precedence is what this used to do, and a generator's file vanished
+ * behind the author's with exit 0.
  *
  * **The project root is the last root** (§4.5). Layouts and includes are
  * build material, not content, and an author may keep them beside

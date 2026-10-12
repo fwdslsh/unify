@@ -234,7 +234,7 @@ docsNav({
 });
 ```
 
-The links are ordinary root-relative links to the pages' sources, so `--pretty-urls`, `--base-url` and the reference check treat them like any other. The sidebar replaces the template's include, so your `site/` must not keep an `_includes/docnav.html` of its own: a site that extends the template has none, and a site that copied it deletes its copy.
+The links are ordinary root-relative links to the pages' sources, so `--pretty-urls`, `--base-url` and the reference check treat them like any other. The sidebar replaces the template's include, so your `site/` must not keep an `_includes/docnav.html` of its own: a site that extends the template has none, and a site that copied it deletes its copy. Left in place it is a collision rather than a quiet winner: the build stops with a problem naming both files, because the same path in the source tree and the generator's directory is refused whether or not it publishes (a file of the *extended template's* at that path is simply replaced).
 
 unify's own documentation site (`examples/unify-docs`) and akm.fwdslsh.dev are built this way.
 

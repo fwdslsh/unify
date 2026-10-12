@@ -202,6 +202,12 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
     settings.prettyUrls,
   );
 
+  // §33.4 — a path in both the source tree and the overlay that publishes
+  // nothing (an underscore fragment, a `_layout.html`, an excluded file) is
+  // P12 too; the pairs that publish are refused by the output-path check
+  // below. Here, before composition, so it is never a precedence question.
+  collisions.overlayCollisionDiagnostics(files, reporter);
+
   // §6.3/P08 — every .html/.md source file, excluded or not (§1: a "page" by
   // extension; only the never-shipped list, already applied in the scan,
   // escapes this). Independent of whether the build ever loads a given file

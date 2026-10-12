@@ -15,7 +15,7 @@
  * Real CLI spawns only (hygiene H3); no mocks (H1); no skips (H4).
  */
 import { test } from "bun:test";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { covers, mkTmp, runCli, writeTree } from "./support.mjs";
 
@@ -47,6 +47,19 @@ function expectExit(r, code, what) {
 function expectContains(haystack, needle, what) {
   if (!haystack.includes(needle)) throw new Error(`${what}: expected ${JSON.stringify(needle)} in:\n${haystack}`);
 }
+
+/** A generator that writes each given file (relative path to text) into the overlay it is handed. */
+const writesFiles = (files) => `import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+const [, , , outDir] = process.argv;
+for (const [rel, text] of Object.entries(${JSON.stringify(files)})) {
+  mkdirSync(dirname(join(outDir, rel)), { recursive: true });
+  writeFileSync(join(outDir, rel), text);
+}
+`;
+
+/** The `problem:` lines of a run's stderr. */
+const problemLines = (r) => r.stderr.split("\n").filter((l) => l.includes(": problem:"));
 
 /**
  * A generator that copies its own argv[3] (the overlay directory) and argv[4]
@@ -348,6 +361,110 @@ writeFileSync(join(outDir, "index.html"), '<!doctype html>\\n<html lang="en"><he
   // "index.html and index.html both produce index.html" tells an author
   // nothing; §33.4 requires the generated one be named as generated.
   expectContains(r.stderr, "(generated)", "the message distinguishes the two sources");
+  covers("GEN-05");
+}, TEST_MS);
+
+test("GEN-05 — a path that publishes nothing is P12 too: a generated include is not hidden behind the author's", async () => {
+  // The reported shape. Both trees hold `_includes/nav.html`; it never
+  // publishes, so there is no output path for the pair to share, and the
+  // build used to resolve it by precedence — the source file won, the
+  // generator's vanished, and the build exited 0 with "FROM SOURCE" in
+  // dist/index.html. Under the content-loss law that is a problem.
+  const tmp = mkTmp();
+  writeTree(tmp, {
+    "site/index.html": doc("Home", '<include src="/_includes/nav.html"></include><h1>Hi</h1>'),
+    "site/_includes/nav.html": "<p>FROM SOURCE</p>\n",
+    "scripts/gen.mjs": writesFiles({ "_includes/nav.html": "<p>FROM GENERATOR</p>\n" }),
+  });
+  const args = ["-s", "site", "-o", "dist", "--generate", "../scripts/gen.mjs"];
+
+  const r = await runCli(["build", ...args], tmp);
+  expectExit(r, 1, "neither tree wins, so the build stops");
+  if (existsSync(join(tmp, "dist"))) throw new Error("§15: a collision blocks the publish");
+  const lines = problemLines(r);
+  if (lines.length !== 1) throw new Error(`exactly one problem, not one per consumer or per phase:\n${r.stderr}`);
+  // Located at the source file, naming both, the generated one as generated.
+  expectContains(lines[0], "site/_includes/nav.html: problem:", "located at the source file the author can open");
+  expectContains(lines[0], "_includes/nav.html and _includes/nav.html (generated)", "names both paths");
+  // "both produce <path>" would be false: neither produces an output path.
+  if (lines[0].includes("both produce")) throw new Error(`a path that publishes nothing produces nothing:\n${lines[0]}`);
+  expectContains(r.stderr, "fix:", "the problem names an edit");
+
+  // The same pipeline, so the same answer from the commands that evaluate it.
+  expectExit(await runCli(["build", ...args, "--dry-run"], tmp), 1, "--dry-run reports the collision");
+  expectExit(await runCli(["audit", ...args], tmp), 1, "audit reports the collision");
+
+  // And the fix the message names works: delete the source file and the
+  // generator's supplies the include.
+  rmSync(join(tmp, "site", "_includes", "nav.html"));
+  const fixed = await runCli(["build", ...args], tmp);
+  expectExit(fixed, 0, "with the source file deleted, the generator's include is the only one");
+  expectContains(readFileSync(join(tmp, "dist", "index.html"), "utf8"), "FROM GENERATOR", "the generator's file is what was included");
+  covers("GEN-05", "P12");
+}, TEST_MS);
+
+test("GEN-05 — every kind of file collides: pages, assets, fragments, underscore files and layouts, one problem each", async () => {
+  // §33.4 says "a relative path", not "an output path". The first four
+  // publish and are refused as two sources producing one output path (§13);
+  // the rest publish nothing and are refused for sharing a path.
+  const kinds = [
+    "about.html",
+    "notes.md",
+    "data.json",
+    "bit.fragment.html",
+    "_includes/nav.html",
+    "_layout.html",
+    "docs/_layout.html",
+    "_data/authors.json",
+    "drafts/old.html", // held back by --exclude, not by the underscore
+  ];
+  const source = Object.fromEntries(kinds.map((k) => [`site/${k}`, `source ${k}\n`]));
+  const generated = Object.fromEntries(kinds.map((k) => [k, `generated ${k}\n`]));
+  const layout = (t) => `<!doctype html><html><head><title>${t}</title></head><body><main></main></body></html>\n`;
+  const tmp = mkTmp();
+  writeTree(tmp, {
+    ...source,
+    "site/index.html": doc("Home", "<h1>Home</h1>"),
+    "site/about.html": doc("About", "<h1>About</h1>"),
+    "site/notes.md": "# Notes\n",
+    "site/_layout.html": layout("S"),
+    "scripts/gen.mjs": writesFiles({
+      ...generated,
+      "about.html": doc("About", "<h1>Generated about</h1>"),
+      "notes.md": "# Generated notes\n",
+      "_layout.html": layout("G"),
+    }),
+  });
+  const r = await runCli(
+    ["build", "-s", "site", "-o", "dist", "--exclude", "_*", "--exclude", "drafts/**", "--generate", "../scripts/gen.mjs"],
+    tmp,
+  );
+  expectExit(r, 1, "a path in both trees, of every kind");
+  if (existsSync(join(tmp, "dist"))) throw new Error("§15: a collision blocks the publish");
+  const lines = problemLines(r);
+  for (const k of kinds) {
+    const mine = lines.filter((l) => l.startsWith(`site/${k}: problem:`));
+    if (mine.length !== 1) throw new Error(`${k}: expected exactly one problem located at the source file, got ${mine.length}:\n${r.stderr}`);
+    expectContains(mine[0], `${k} (generated)`, `${k}: the generated one is named as generated`);
+  }
+  if (lines.length !== kinds.length) throw new Error(`one problem per path and nothing else (${kinds.length}), got ${lines.length}:\n${r.stderr}`);
+  covers("GEN-05", "P12");
+}, TEST_MS);
+
+test("GEN-05 — only the source tree and the overlay collide: the project root's file yields to the generator's", async () => {
+  // §4.5's project root is the last root of the namespace, so a generator's
+  // file at the same path as one beside package.json replaces it by design.
+  const tmp = mkTmp();
+  writeTree(tmp, {
+    "_includes/nav.html": "<p>FROM PROJECT ROOT</p>\n",
+    "site/index.html": doc("Home", '<include src="/_includes/nav.html"></include><h1>Hi</h1>'),
+    "scripts/gen.mjs": writesFiles({ "_includes/nav.html": "<p>FROM GENERATOR</p>\n" }),
+  });
+  const r = await runCli(["build", "-s", "site", "-o", "dist", "--generate", "../scripts/gen.mjs", "--strict"], tmp);
+  expectExit(r, 0, "a generated file replacing a project-root file is not a collision");
+  const index = readFileSync(join(tmp, "dist", "index.html"), "utf8");
+  expectContains(index, "FROM GENERATOR", "the generator's file is the one included");
+  if (index.includes("FROM PROJECT ROOT")) throw new Error(`the project root's file must lose:\n${index}`);
   covers("GEN-05");
 }, TEST_MS);
 
