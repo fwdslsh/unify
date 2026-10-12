@@ -1575,12 +1575,12 @@ Two flags describe writing, so `audit` refuses them rather than accepting them i
 
 A finding is not a `problem` and not an `advisory`. It has its own record shape, its own two severities, and its own effect on the exit code, because it answers a different question: §14's diagnostics say whether the build is sound, and a finding says whether the site is complete.
 
-| | severity means | blocks publish |
+| | severity means | `audit` exits |
 |---|---|---|
-| `broken` | the output contradicts itself, or the standard it claims to follow. A fragment naming no id, a duplicated id, JSON-LD that does not parse. Wrong regardless of what the author intended. | never |
-| `incomplete` | something is absent or inconsistent that an author may have chosen. A missing description, an orphan page, two pages sharing a title. | never |
+| `broken` | the output contradicts itself, or the standard it claims to follow. A fragment naming no id, a duplicated id, JSON-LD that does not parse. Wrong regardless of what the author intended. | `1`, with or without `--strict` |
+| `incomplete` | something is absent or inconsistent that an author may have chosen. A missing description, an orphan page, two pages sharing a title. | `0`; `1` only under `--strict` |
 
-Neither severity ever blocks a publish, because `audit` never publishes and `build` never audits. The severity distinction is objective — *is this wrong, or is this merely absent* — and carries no claim about importance.
+Neither severity ever blocks a plain `build`, because `build` never audits (§24.7); the exit column is `audit`'s own (§24.6), which `build --audit` reads as its gate (§24.8). The severity distinction is objective — *is this wrong, or is this merely absent* — and carries no claim about importance. It is also why `broken` can gate on its own: unify has no suppression mechanism, so a gate on a finding an author may have chosen (a deliberate orphan page) could never be switched on, whereas a finding that is wrong whatever the author intended needs no suppression.
 
 ### 24.4 The catalogue
 
@@ -1699,10 +1699,13 @@ Diagnostics keep their own stream. §14's problems and advisories print to stder
 |---|---|
 | invalid usage | 2 |
 | the pipeline raised a problem | 1 |
-| findings, without `--strict` | 0 |
+| any `broken` finding | 1 |
+| `incomplete` findings only, without `--strict` | 0 |
 | any finding, with `--strict` | 1 |
 
-`--strict` is the opt-in CI gate product-spec §6.3.4 describes, and it gates on **any** finding, of either severity. The flag keeps its §14.1 meaning as well — advisories still count — because it means one thing everywhere: *hold this build to the stricter standard*.
+A `broken` finding fails the run **without** `--strict`: it is objective (§24.3), wrong whatever the author intended, so there is nothing for an author to opt out of — and unify has no suppression mechanism to opt out with. An `incomplete` finding may be a choice, so alone it exits `0`; `--strict` is what holds the site to the stricter standard product-spec §6.3.4 describes, and it fails on **any** finding, of either severity. The flag keeps its §14.1 meaning as well — advisories still count — because it means one thing everywhere: *hold this build to the stricter standard*.
+
+Only the exit code depends on severity. The report, in every `--format` (§31.1), lists the complete finding set with the same fingerprints (§31.2) whatever the exit code is.
 
 A pipeline problem exits 1 whether or not `--strict` is set, and whether or not there are findings. Evaluating output that cannot be built is meaningless, and the findings printed alongside it describe a site that would never ship.
 
@@ -1716,7 +1719,7 @@ Nothing, unless it is asked to with `--audit` (§24.8). `build` derives the mani
 
 `--audit` is a boolean flag of `build` and no other command. Today a safe publisher runs `build --dry-run --strict`, `build`, and `audit --strict`: three compositions (and three generator runs, §33), the last of which audits a re-composition rather than the bytes that were published. With `--audit` the pipeline runs **once** — generator (§33), composition, §20 manifest — and the §24.4 evaluator runs over that same in-memory result, the one call site §24.7 already names, not a second checker. The findings print to stdout in §24.5's human format, after the §14 diagnostics, whether or not the gate passes.
 
-**The gate is `audit`'s own exit rule (§24.6), read once:** the build publishes iff `unify audit` with the same flags would exit `0`, which includes the build having no problem and, under `--strict`, no advisory (§14.1) and no finding of either severity. **Without `--strict`, findings block nothing** (§24.6: `audit` exits `0` on them), so `build --audit` alone is publish-as-usual plus the report; the gate has teeth with `--strict`. On a blocked gate the exit code is `1`, nothing is written, and the previous output is byte-for-byte untouched (§15) — the same as a problem. A gate that passes exits `0` and publishes exactly the bytes that were audited. Default `build` (no `--audit`) is unchanged.
+**The gate is `audit`'s own exit rule (§24.6), read once:** the build publishes iff `unify audit` with the same flags would exit `0`, which means no problem, no `broken` finding, and, under `--strict`, no advisory (§14.1) and no `incomplete` finding either. **Without `--strict`, a `broken` finding blocks and an `incomplete` one does not** (§24.6: `audit` exits `1` on the first and `0` on the second), so `build --audit` alone publishes a site whose only findings are absences and still prints them; `--strict` holds it to the stricter standard. On a blocked gate the exit code is `1`, nothing is written, and the previous output is byte-for-byte untouched (§15) — the same as a problem — and the findings still print. A gate that passes exits `0` and publishes exactly the bytes that were audited. Default `build` (no `--audit`) is unchanged.
 
 `--audit --dry-run` evaluates, prints the findings and §17's report, publishes nothing, and exits as the gate would (`1` if it would have blocked, else `0`). `--external` stays `audit`-only: it is not a `build` flag, and `build --audit` never touches the network (§31.3). `--format` is likewise `audit`'s. `unify audit --audit` is redundant and accepted; `dev` and `watch` ignore the flag (§16's error pages, not a gate).
 
@@ -1749,7 +1752,7 @@ This section decides almost nothing of its own. It is a **map**: one row per §6
 
 **A broken fragment is not a 404.** The page loads, the reader arrives, and the only thing that failed is the scroll position the link promised. §12 exists to stop the build publishing an address that fetches nothing; a fragment that names no id fetches the page perfectly well. Making it publish-blocking would mean a site that has always built clean stops publishing over a link that still works — the exact shape of failure §14.1's severity split exists to prevent, and the reason `--strict` moves the exit code without withholding the site. §12 has said so in one clause all along: "`#fragment` targets are not validated against ids — that is a reader's judgment, not a build gate" (REF-06).
 
-But it is a *checkable* judgment, and §20.9 says so in the same breath: the manifest carries `fragmentLinks` beside `ids` precisely so the question is answerable from the manifest itself rather than by re-parsing. That is what a finding is for — §24.3's `broken` means "the output contradicts itself, wrong regardless of what the author intended", which is exactly right for a link naming an id that is not there, and it blocks nothing.
+But it is a *checkable* judgment, and §20.9 says so in the same breath: the manifest carries `fragmentLinks` beside `ids` precisely so the question is answerable from the manifest itself rather than by re-parsing. That is what a finding is for — §24.3's `broken` means "the output contradicts itself, wrong regardless of what the author intended", which is exactly right for a link naming an id that is not there. It is a finding, so it blocks no build; the gate is `unify audit` and `build --audit`, which exit `1` on it (§24.6).
 
 **A duplicate id is the same shape one layer in.** The document is wrong — HTML requires an id to be unique, and every link to a repeated one is ambiguous — but nothing 404s and no address is unreachable. It is not a §13 collision either: §13 ranges over output paths, and two ids inside one page produce one file at one address.
 
@@ -1796,7 +1799,7 @@ The cost is stated rather than hidden. `@graph` is how several widely-deployed C
 
 ### 26.3 Validation findings
 
-These join §24.4's catalogue and obey every rule of it: they are predicates over the §20 manifest, they print in §24.5's format, they never block a publish, and `build` never consults them (§24.7).
+These join §24.4's catalogue and obey every rule of it: they are predicates over the §20 manifest, they print in §24.5's format, they exit by severity as §24.6 says, and `build` never consults them (§24.7).
 
 | id | severity | fires when |
 |---|---|---|
@@ -2369,7 +2372,7 @@ The table above already says what a failed request is, and it says it without re
 
 ### 31.4 SARIF
 
-Product-spec §6.5.3 permits a SARIF serializer **only if it is a mechanical view of the same findings rather than another analysis path**. `--format sarif` is exactly that: the same finding list §31.1 serializes, mapped field for field into SARIF 2.1.0 — `id` to `ruleId`, `file` to the artifact location, `evidence` to the message, `fingerprint` to `partialFingerprints`, and severity to `level` (`broken` to `error`, `incomplete` to `warning`, both of which are SARIF levels and neither of which changes an exit code).
+Product-spec §6.5.3 permits a SARIF serializer **only if it is a mechanical view of the same findings rather than another analysis path**. `--format sarif` is exactly that: the same finding list §31.1 serializes, mapped field for field into SARIF 2.1.0 — `id` to `ruleId`, `file` to the artifact location, `evidence` to the message, `fingerprint` to `partialFingerprints`, and severity to `level` (`broken` to `error`, `incomplete` to `warning`, both of which are SARIF levels, and neither of which is read for an exit code: §24.6 reads the finding's severity, never the format).
 
 Nothing is computed for SARIF that is not computed for `--format json`. If a future field ever needs a SARIF-only derivation, that is the signal this serializer has become an analysis path and must be removed rather than extended.
 
