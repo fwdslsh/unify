@@ -55,7 +55,7 @@ test("MAN-11: metadata in <body> is inert, so the fields it would have supplied 
 `,
   });
   const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
-  expectExit(r, 0, "a page whose metadata sits in the body");
+  expectExit(r, 1, "a page whose metadata sits in the body (metadata-in-body is broken: §24.6 exits 1 without --strict)");
   expectFinding(r, "title-missing", "§20.3: nothing reads a <title> in the body, so the page has none");
   expectFinding(r, "description-missing", "§20.3: same for the description");
   covers("MAN-11");
@@ -203,7 +203,7 @@ test("AUD-10: the closed set is reported, and body-legal elements are not", asyn
     "late.css": "body { margin: 0 }\n",
   });
   const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
-  expectExit(r, 0, "a body full of metadata");
+  expectExit(r, 1, "a body full of metadata (metadata-in-body is broken: §24.6 exits 1 without --strict)");
   const lines = r.stdout.split("\n").filter((l) => l.includes("[metadata-in-body]"));
   if (lines.length !== 2) {
     throw new Error(`§24.4: exactly the og:image meta and the canonical link.\nstdout:\n${r.stdout}`);

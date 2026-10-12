@@ -55,7 +55,7 @@
  */
 import { Reporter, UsageError } from "../../core/diagnostics.js";
 import {
-  consumeLastAuditRun, externalUnreachableFindings, formatFindings, sortFindings,
+  auditExitCode, consumeLastAuditRun, externalUnreachableFindings, formatFindings, sortFindings,
 } from "../../core/audit.js";
 import { collectExternalReferences, probeUrls } from "../../core/external.js";
 import { buildReport, serializeJson, serializeSarif } from "../../core/report.js";
@@ -155,11 +155,13 @@ export async function audit(context) {
   }
 
   // §24.6 — a pipeline problem exits 1 regardless of findings, format, or
-  // --strict: evaluating output that cannot be built is meaningless. This
+  // --strict: evaluating output that cannot be built is meaningless. Past
+  // that, a `broken` finding exits 1 and an `incomplete` one only under
+  // --strict, in every format (the report above is the same either way). This
   // reads `buildReporter` (the capturing instance §14 diagnostics were
   // actually recorded on) rather than trusting `build()`'s own returned
   // number, because that number cannot know about `--external`'s findings,
   // computed after it already returned.
   if (buildReporter.exitCode !== 0) return buildReporter.exitCode;
-  return context.settings.strict && findings.length > 0 ? 1 : 0;
+  return auditExitCode(findings, context.settings.strict);
 }

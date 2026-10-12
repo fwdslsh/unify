@@ -462,7 +462,7 @@ describe("§27 the local audit view", () => {
 
     // The two commands whose output §27.3 says the report carries.
     const audit = await runCli(["audit", "--base-url", BASE], tmp);
-    expect(audit.exit).toBe(0);
+    expect(audit.exit, "AUDITED_SITE carries a broken finding, which §24.6 exits 1 on without --strict").toBe(1);
     const findings = parseFindings(audit.stdout);
     const dry = await runCli(["build", "--dry-run", "--base-url", BASE], tmp);
     expect(dry.exit).toBe(0);
@@ -606,7 +606,7 @@ describe("§27 the local audit view", () => {
     expect(built.exit).toBe(0);
     expect(built.stdout + built.stderr).not.toContain("_unify");
     const audited = await runCli(["audit"], tmp);
-    expect(audited.exit).toBe(0);
+    expect(audited.exit, "AUDITED_SITE carries a broken finding, which §24.6 exits 1 on without --strict").toBe(1);
     expect(audited.stdout + audited.stderr).not.toContain("_unify");
     expect(Object.keys(snapshotBytes(join(tmp, "dist"))).filter((p) => p.includes("_unify"))).toEqual([]);
 
