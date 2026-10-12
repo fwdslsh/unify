@@ -48,9 +48,9 @@
  *     date: `<updated>`/`<published>` are read from `iso` and nothing else.
  *   - Nothing is ever overwritten. An authored `feed.xml` suppresses
  *     generation outright (§29.7, reusing §21.5's rule verbatim, unchanged)
- *     — the blog template's own generator writes one
- *     (templates/blog/scripts/gen.mjs), which makes this the fixture that proves the
- *     suppression rather than a hypothetical.
+ *     — a `feed.xml` authored into the blog scaffold (whose generator writes
+ *     none, §19.6) is the fixture that proves the suppression rather than a
+ *     hypothetical.
  *   - `--feed-full` is the one place this module reads more than `records`.
  *     Atom's `<content type="html">` needs the emitted `<main>`'s inner
  *     MARKUP, and the manifest never carries markup — §20.3's fields are
@@ -570,8 +570,8 @@ export function generateFeed({ documents, base, feedFull = false, pageHtml = nul
  * draws at the Sitemaps protocol's `<loc>`: a file named `feed.xml` that an
  * author wrote in a DIFFERENT wire format (RSS's `<link>` is text content,
  * not an `href`) is checked exactly as far as Atom's vocabulary reaches into
- * it, which may be nowhere. See the implementation report — the blog
- * template's own generator ships exactly such a file.
+ * it, which may be nowhere. docs/guides/generator-recipes.md's RSS recipe
+ * writes exactly such a file when named `feed.xml`.
  *
  * `--feed-full`'s `<content type="html">` is never scanned here: its
  * markup is XML-escaped text (`<` becomes `&lt;`), so a real `<a href>`
