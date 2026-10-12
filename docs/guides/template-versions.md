@@ -85,7 +85,6 @@ Or move the project onto the package, which has versions of its own: `unify upda
 
 ```yaml
 # unify.yaml
-source: docs
 extends: unify-docs-template@0.4.0
 ```
 
