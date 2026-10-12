@@ -52,8 +52,8 @@ unify's own `feed.xml` is Atom, and it leaves out a post whose `date` is a day a
 `scripts/rss.mjs`:
 
 ```js
-import { readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 
 const [, , , overlay, contextPath] = process.argv;
 const context = JSON.parse(readFileSync(contextPath, "utf8"));
@@ -62,7 +62,7 @@ if (!baseUrl) throw new Error("rss.mjs: an RSS link must be absolute, so build w
 const { pages } = JSON.parse(readFileSync(context.inputs.sourcePages, "utf8"));
 
 const SITE = { title: "My Notes", description: "Notes from the workshop." }; // yours to word
-const OUT = "rss.xml"; // "feed.xml" would replace unify's own Atom feed instead
+const OUT = "rss.xml"; // or an endpoint you already have, "news/rss.xml"; "feed.xml" replaces unify's Atom feed
 
 const esc = (s) =>
   String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -96,6 +96,7 @@ const items = pages
   .sort((a, b) => b.date.localeCompare(a.date) || a.source.localeCompare(b.source))
   .map(item);
 
+mkdirSync(dirname(join(overlay, OUT)), { recursive: true }); // the overlay starts empty
 writeFileSync(join(overlay, OUT), `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0">
   <channel>

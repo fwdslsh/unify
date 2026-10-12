@@ -301,6 +301,25 @@ test("rss — the guide's printed feed is exactly what the build writes, shipped
   if (written.includes("lastBuildDate")) throw new Error("the guide says there is no lastBuildDate");
 }, TEST_MS);
 
+test("rss — an existing endpoint below the root: OUT names news/rss.xml and the generator makes its directory", async () => {
+  const tmp = mkTmp();
+  const generator = codeBlock(RSS, "js", 0);
+  if (!generator.includes('const OUT = "rss.xml";')) throw new Error("the guide's generator no longer declares OUT as this test edits it");
+  rssProject(tmp, {
+    generator: generator.replace('const OUT = "rss.xml";', 'const OUT = "news/rss.xml";'),
+    head: ALTERNATE.replace('href="/rss.xml"', 'href="/news/rss.xml"'),
+  });
+  const r = await runCli(["build", "-o", "dist", "--base-url", BASE, "--pretty-urls", "--strict"], tmp);
+  expectExit(r, 0, "the guide's RSS generator writing news/rss.xml");
+  const written = read(tmp, "dist", "news", "rss.xml");
+  const fault = wellFormedFault(written);
+  if (fault) throw new Error(`news/rss.xml is not well-formed: ${fault}\n${written}`);
+  if (JSON.stringify(textsOf(written, "link").slice(1)) !== JSON.stringify([`${BASE}posts/two/`, `${BASE}posts/one/`])) {
+    throw new Error(`a nested endpoint keeps the same absolute item links:\n${written}`);
+  }
+  if (existsSync(join(tmp, "dist", "rss.xml"))) throw new Error("only news/rss.xml is written");
+}, TEST_MS);
+
 test("rss — text is escaped: a title and description full of markup round-trip through the XML", async () => {
   const title = `Tom & Jerry's <b>"bold"</b> ]]> &amp; more`;
   const description = `5 < 6 & 7 > 6, "quoted" &lt;`;

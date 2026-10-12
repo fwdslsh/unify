@@ -148,7 +148,9 @@ export function docsNav({ pages, groups, into, base = "docs", index = {} }) {
       ...(next ? [`  ${anchor(next.path, `<span>Next</span> ${html(next.label)}`, ' class="pager-next" rel="next"')}`] : []),
       "</nav>",
     ].join("\n");
-    writeFileSync(file, `${readFileSync(file, "utf8").trimEnd()}\n\n${pager}\n`);
+    const text = readFileSync(file, "utf8").trimEnd();
+    const close = openFence(text);
+    writeFileSync(file, `${text}${close === null ? "" : `\n${close}`}\n\n${pager}\n`);
   });
 
   return resolved;
@@ -173,6 +175,29 @@ function arrange(pages, groups) {
   const rest = pages.filter((p) => !placed.has(p.source));
   if (rest.length) resolved.push({ label: "More", entries: rest.map((p) => ({ ...p, label: p.title })) });
   return resolved;
+}
+
+/**
+ * The line that closes a fenced code block `text` leaves open at its end, or
+ * null. CommonMark lets an unclosed fence run to the end of the document, and
+ * a pager appended there would be code, not a link. The closer repeats the
+ * opener's fence and indent, so a fence under a list item closes inside it;
+ * the code renders exactly as it did unclosed.
+ */
+function openFence(text) {
+  let open = null;
+  for (const line of text.split("\n")) {
+    const m = /^( {0,3})(`{3,}|~{3,})(.*)$/.exec(line);
+    if (!m) continue;
+    const [, indent, run, rest] = m;
+    if (open === null) {
+      if (run[0] === "`" && rest.includes("`")) continue; // a backtick fence's info string has no backtick
+      open = { indent, run };
+    } else if (run[0] === open.run[0] && run.length >= open.run.length && rest.trim() === "") {
+      open = null;
+    }
+  }
+  return open === null ? null : `${open.indent}${open.run}`;
 }
 
 /** An `<a>` to a site path, root-relative; `inner` is HTML, already escaped. */

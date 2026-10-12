@@ -91,6 +91,23 @@ describe("docsNav", () => {
     );
   });
 
+  test("a code fence the document leaves open at its end is closed before the pager, with the opener's own fence and indent", () => {
+    const tail = (body) => {
+      const { read } = run({ "a.md": `# A\n\nFirst.\n\n${body}`, "b.md": "# B\n\nSecond.\n" }, [{ label: "G", docs: [["a.md"], ["b.md"]] }]);
+      return read("docs/a.md").split("\n\n<nav")[0].split("First.\n\n")[1];
+    };
+    // CommonMark lets a fenced block run to the end of the document; the pager must not join it.
+    expect(tail("```js\nconst answer = 42;\n")).toBe("```js\nconst answer = 42;\n```");
+    expect(tail("~~~\nplain\n")).toBe("~~~\nplain\n~~~");
+    // A shorter run inside a longer fence does not close it; the closer matches the opener's length.
+    expect(tail("````md\n```js\nx\n```\n")).toBe("````md\n```js\nx\n```\n````");
+    // An opener indented under a list item gets a closer at the same indent, so it closes inside the item.
+    expect(tail("- step\n\n  ```sh\n  unify build\n")).toBe("- step\n\n  ```sh\n  unify build\n  ```");
+    // A fence the document closed itself, and a backtick run in an info string, add nothing.
+    expect(tail("```js\nx\n```\n")).toBe("```js\nx\n```");
+    expect(tail("``` not`a fence\n")).toBe("``` not`a fence");
+  });
+
   test("the sidebar is one list per group in order, the unlisted documents under More, then a link to the index", () => {
     const { read } = run(DOCS, GROUPS);
     const item = (path, label) => `      <li><a href="/docs/${path}">${label}</a></li>`;
@@ -241,6 +258,20 @@ describe("as a site's generator, under the real CLI", () => {
     expect(index).toContain("Tools [beta] *new*");
     expect(index).toContain("Q&amp;A &lt;live&gt;");
     expect(index).toContain('<a href="/sub/docs/start/">');
+  });
+
+  test("a document ending inside an unclosed code fence still gets its pager as an element, outside the code block", async () => {
+    const dir = project({
+      groups: [{ label: "Guides", docs: [["start.md"], ["install.md"]] }],
+      files: { ...DOCS, "start.md": "---\ntitle: Start\ndescription: Begin here.\n---\n# Start\n\nExample:\n\n```js\nconst answer = 42;\n" },
+    });
+    const r = await runCli(["build", "--strict", "--pretty-urls"], dir);
+    expect(r.exit, `${r.stdout}${r.stderr}`).toBe(0);
+    const html = readFileSync(join(dir, "dist", "docs", "start", "index.html"), "utf8");
+    expect(pagerOf(html)).toEqual({ next: ["/docs/install/", "Install"] });
+    const code = html.match(/<pre><code[^>]*>([\s\S]*?)<\/code><\/pre>/);
+    expect(code?.[1]).toBe("const answer = 42;\n");
+    expect(html.indexOf('<nav class="pager"')).toBeGreaterThan(html.indexOf("</pre>"));
   });
 
   test("a listed document the folder does not have fails the build, naming it, and publishes nothing", async () => {
