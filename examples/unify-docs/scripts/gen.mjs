@@ -38,6 +38,7 @@ const GROUPS = [
     ["guides/catalog-and-search.md", "Catalog and search"],
     ["guides/eleventy-htmx.md", "Eleventy and htmx"],
     ["guides/generator-recipes.md", "Generator recipes"],
+    ["guides/template-versions.md", "Template versions"],
     ["docker-usage.md", "Docker"],
   ] },
   { label: "Reference", docs: [

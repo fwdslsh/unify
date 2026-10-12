@@ -124,6 +124,7 @@ Everything below is published at **[unify.fwdslsh.dev](https://unify.fwdslsh.dev
 - **[Eleventy + htmx](docs/guides/eleventy-htmx.md)** — the advanced stack: another generator produces data-driven pages, unify composes them, htmx enhances them. Optional layers, and when not to reach for them.
 - **[Catalog and Search](docs/guides/catalog-and-search.md)** — a blog list, facets, and a search box built client-side from the two files `--catalog`/`--search-corpus` write.
 - **[Generator Recipes](docs/guides/generator-recipes.md)** — a content hash in an asset's URL, and an RSS feed with day-only dates handled your way, each in a screenful of `--generate`.
+- **[Template Versions](docs/guides/template-versions.md)** — pin a template to a version, move the pin with `unify update`, pin what `extends:` builds on, and try a template or unify before it ships.
 - **[Docker Usage](docs/docker-usage.md)** — running the CLI in a container.
 - **[Examples](examples/README.md)** — eight complete sites and the patterns they demonstrate.
 
