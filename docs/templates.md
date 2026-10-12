@@ -219,6 +219,23 @@ importDocs({
 });
 ```
 
+A folder has no order a script can discover, so the order is yours to write down once. `scripts/docs-nav.mjs`, beside the importer, takes the pages `importDocs` returns and one list of groups and writes everything that order decides: the sidebar (`_includes/docnav.html`), an index of every document (`docs/index.md`), and a previous/next pair at the foot of each page, in reading order across the groups. Documents no group lists follow in a trailing "More" group; a listed document that was not imported, or one listed twice, fails the build with an error naming it:
+
+```js
+// scripts/gen.mjs, continued
+import { docsNav } from "unify-docs-template/scripts/docs-nav.mjs";
+docsNav({
+  pages,                                       // what importDocs returned
+  into: process.argv[3],
+  groups: [
+    { label: "Guides", docs: [["getting-started.md", "Getting started"], ["guides/deploy.md", "Deploying"]] },
+    { label: "Reference", docs: [["cli.md"]] },   // [source, short label]; the label defaults to the title
+  ],
+});
+```
+
+The links are ordinary root-relative links to the pages' sources, so `--pretty-urls`, `--base-url` and the reference check treat them like any other. The sidebar replaces the template's include, so your `site/` must not keep an `_includes/docnav.html` of its own: a site that extends the template has none, and a site that copied it deletes its copy.
+
 unify's own documentation site (`examples/unify-docs`) and akm.fwdslsh.dev are built this way.
 
 `extends:` and `template:` don't interact. A project uses one or the other: `template:` is for a project that owns a copy and keeps it current with `update`, and `extends:` is for a project that owns no copy at all. The exact rules are in [`conformance-spec.md`](conformance-spec.md) §34.

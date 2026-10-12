@@ -57,9 +57,11 @@ page and the index show.
 
 What the generator still does itself is the one thing no folder listing can know: this
 site's reading order. It groups the documents (Guides, Reference, Project, and More for
-anything new) and writes them as the sidebar (`_includes/docnav.html`, which replaces the
-template's) and as the docs index (`docs/index.md`), so a new document cannot be published
-unreachable.
+anything new) and hands that list to the template's `scripts/docs-nav.mjs`, which writes it as
+the sidebar (`_includes/docnav.html`, which replaces the template's), as the docs index
+(`docs/index.md`) and as previous/next links at the foot of every page, so a new document
+cannot be published unreachable. A document the list names that `docs/` no longer has fails
+the build, naming it.
 
 It is deliberately *not* self-contained: it only builds inside a unify checkout, because
 the documents and the template are both read from the repository.
