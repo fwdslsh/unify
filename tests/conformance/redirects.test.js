@@ -241,7 +241,7 @@ test("MAN-12/AUD-13 — every immediate cycle reports, and nothing else does", a
   const dir = mkTmp();
   writeTree(dir, loopSite);
   const r = await runCli(["audit", "-s", "src"], dir);
-  expectExit(r, 0, "findings never block without --strict");
+  expectExit(r, 1, "a redirect loop is broken, so audit exits 1 without --strict (§24.6)");
 
   const looping = ["a.html", "b.html", "bare.html", "body.html", "self.html"];
   for (const f of looping) {
@@ -275,11 +275,11 @@ test("MAN-12/AUD-13 — every immediate cycle reports, and nothing else does", a
   covers("MAN-12", "AUD-13");
 }, TEST_MS);
 
-test("AUD-13 — --strict gates on a redirect loop", async () => {
+test("AUD-13 — a redirect loop exits 1 with --strict too", async () => {
   const dir = mkTmp();
   writeTree(dir, loopSite);
   const r = await runCli(["audit", "-s", "src", "--strict"], dir);
-  expectExit(r, 1, "--strict is the opt-in gate on any finding");
+  expectExit(r, 1, "a broken finding exits 1 under --strict as it does without it (§24.6)");
   covers("AUD-13");
 }, TEST_MS);
 
@@ -303,7 +303,7 @@ test("AUD-18 — a page that only redirects is not an orphan and is not compared
     "src/kiosk-b.html": page("Kiosk", { head: refresh("30; url=/kiosk-a.html") }),
   });
   const r = await runCli(["audit", "-s", "src"], dir);
-  expectExit(r, 0, "findings never block without --strict");
+  expectExit(r, 0, "incomplete findings alone exit 0 without --strict (§24.6)");
   for (const id of ["page-orphan", "title-duplicate", "description-duplicate", "text-duplicate"]) {
     if (idsFor(r.stdout, "old.html").includes(id)) throw new Error(`a redirecting page reports no ${id}\n${r.stdout}`);
     if (idsFor(r.stdout, "new.html").includes(id)) throw new Error(`a stub never makes its target a ${id}\n${r.stdout}`);

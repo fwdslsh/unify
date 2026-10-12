@@ -27,7 +27,9 @@
  *                  have chosen. A missing description, an orphan page.
  *
  * Findings never block a build. §6.1 keeps subjective judgement out of the
- * publish path; `unify audit --strict` is the opt-in gate.
+ * publish path. The gate is `unify audit` (and `build --audit`, which reads
+ * its exit rule): a `broken` finding fails it on its own, an `incomplete` one
+ * only under `--strict` (§24.6 — `auditExitCode`, below).
  */
 
 import { jsonLdReferences, resolveReference, stripBaseUrl } from "./references.js";
@@ -784,6 +786,23 @@ function listPaths(documents) {
 
 function truncate(s, n = 60) {
   return s.length <= n ? s : `${s.slice(0, n - 1)}…`;
+}
+
+/**
+ * §24.6 — the exit code the findings alone decide, shared by `unify audit` and
+ * `build --audit`'s gate (§24.8) so the two cannot drift apart. A `broken`
+ * finding is objective — the output contradicts itself or a standard — so it
+ * fails the run with or without `--strict`, which is what lets a site hold
+ * the gate without a suppression mechanism unify deliberately lacks. An
+ * `incomplete` finding may be a choice, so it fails the run only under
+ * `--strict`. A pipeline problem is not the findings' to decide: callers
+ * check their reporter's exit code first.
+ * @param {Finding[]} findings
+ * @param {boolean} [strict]
+ * @returns {0|1}
+ */
+export function auditExitCode(findings, strict = false) {
+  return findings.some((f) => strict === true || f.severity === "broken") ? 1 : 0;
 }
 
 /**

@@ -59,7 +59,7 @@ Options:
       --template <source>  \`init\`/\`update\`: the template, the same as the positional; init saves it in unify.yaml
   -y, --yes                \`update\`: overwrite the listed files without asking
       --keep <path>        \`update\`: a file it never overwrites once it exists — the ones you customized (repeatable, relative to the working directory; the file's list is keep: under template: in unify.yaml, relative to the file)
-      --strict             advisories count as problems for the exit code (with \`audit\`, findings too)
+      --strict             advisories count as problems for the exit code (with \`audit\`, \`incomplete\` findings too; \`broken\` ones always exit 1)
       --format <kind>      \`audit\` report shape: human (default), json, or sarif
       --external           \`audit\` only: fetch every off-origin URL the site emits and report the ones that don't resolve
   -p, --port <n>           port for \`unify dev\` (default: 3000)

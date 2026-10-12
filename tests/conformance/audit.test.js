@@ -193,7 +193,7 @@ test("AUD-03: build never audits — the same site is clean and silent under bui
   const audited = mkTmp();
   writeTree(join(audited, "src"), files);
   const a = await runCli(["audit", "-s", "src", "-o", "dist"], audited);
-  expectExit(a, 0, "audit on the same site");
+  expectExit(a, 1, "audit on the same site (broken: §24.6 exits 1 without --strict)");
   for (const id of ["title-missing", "description-missing", "lang-missing", "h1-missing", "page-orphan", "id-duplicate"]) {
     expectFinding(a, id, "§24.4");
   }
@@ -209,7 +209,7 @@ test("AUD-03: severity is objective — wrong output is broken, absent output is
       .replace('<meta name="description" content="The Notes page of the example site.">\n', ""),
   });
   const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
-  expectExit(r, 0, "a site with both severities");
+  expectExit(r, 1, "a site with both severities (broken: §24.6 exits 1 without --strict)");
   const severity = (id) => (new RegExp(`: (broken|incomplete): [^\\n]*\\[${id}\\]$`, "m").exec(r.stdout) ?? [])[1];
   for (const [id, want] of [["fragment-missing", "broken"], ["id-duplicate", "broken"], ["description-missing", "incomplete"]]) {
     if (severity(id) !== want) {
@@ -254,7 +254,7 @@ test("AUD-04: structured data, social image, and duplicated text", async () => {
     "copy.html": page("Copy", "<p>Exactly the same words.</p>").replace("<h1>Copy</h1>", "<h1>Same</h1>"),
   });
   const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
-  expectExit(r, 0, "content findings");
+  expectExit(r, 1, "content findings (broken: §24.6 exits 1 without --strict)");
   expectFinding(r, "jsonld-invalid", "§24.4: a block that does not parse is broken output");
   expectFinding(r, "image-missing-dimensions", "§24.4: og:image with no declared size");
   // An og:image naming NO emitted file is P13 from §12 and never a finding
@@ -342,7 +342,7 @@ test("AUD-04: sitemap disagreement — a listed page that refuses indexing", asy
         + '\n<link rel="canonical" href="https://example.com/about.html">'),
   });
   const r = await runCli(["audit", "-s", "src", "-o", "dist", "--base-url", BASE], tmp);
-  expectExit(r, 0, "an authored sitemap listing a noindex page");
+  expectExit(r, 1, "an authored sitemap listing a noindex page (broken: §24.6 exits 1 without --strict)");
   expectFinding(r, "sitemap-noindex", "§24.4: the sitemap and the page contradict each other");
   // The page's canonical names ITSELF, so there is no disagreement to report.
   // Deriving that from §21.2's membership predicate would be wrong here: a
@@ -472,7 +472,7 @@ test("AUD-06: a self-canonical noindex page is redundant, not contradictory", as
       '<head>\n<meta name="robots" content="noindex">\n<link rel="canonical" href="https://example.com/">'),
   });
   const c = await runCli(["audit", "-s", "src", "-o", "dist", "--base-url", BASE], cross);
-  expectExit(c, 0, "noindex naming another page");
+  expectExit(c, 1, "noindex naming another page (broken: §24.6 exits 1 without --strict)");
   expectFinding(c, "canonical-noindex", "§24.4");
   covers("AUD-06");
 }, TEST_MS);
@@ -563,7 +563,7 @@ test("AUD-07: findings go to stdout, §14 diagnostics keep stderr", async () => 
 
 // ------------------------------------------------------------------- §24.6
 
-test("AUD-08: findings exit 0; --strict makes any finding exit 1", async () => {
+test("AUD-08: incomplete findings alone exit 0 and are still reported; --strict makes any finding exit 1", async () => {
   const files = {
     "index.html": page("Home", '<p>Welcome.</p><a href="/b.html">B</a>'),
     // One `incomplete` finding and nothing else: the weakest thing --strict gates on.
@@ -572,14 +572,72 @@ test("AUD-08: findings exit 0; --strict makes any finding exit 1", async () => {
   const loose = mkTmp();
   writeTree(join(loose, "src"), files);
   const l = await runCli(["audit", "-s", "src", "-o", "dist"], loose);
-  expectExit(l, 0, "findings without --strict");
+  expectExit(l, 0, "an incomplete finding without --strict");
   expectFinding(l, "description-missing", "§24.6");
+  if (!/^audit: 0 broken, 1 incomplete$/m.test(l.stdout)) {
+    throw new Error(`§24.6: exit 0 reports nothing less — the count line is still printed.\nstdout:\n${l.stdout}`);
+  }
 
   const strict = mkTmp();
   writeTree(join(strict, "src"), files);
   const s = await runCli(["audit", "-s", "src", "-o", "dist", "--strict"], strict);
-  expectExit(s, 1, "the same findings with --strict");
+  expectExit(s, 1, "the same incomplete finding with --strict");
   expectFinding(s, "description-missing", "§24.6: --strict changes the exit code, not the report");
+  if (s.stdout !== l.stdout) {
+    throw new Error(`§24.6: --strict changes the exit code, never the report.\nloose:\n${l.stdout}\nstrict:\n${s.stdout}`);
+  }
+  covers("AUD-08");
+}, TEST_MS);
+
+/** A complete site whose only fault is a repeated id: one `broken` finding and nothing `incomplete`. */
+const brokenOnly = () => {
+  const files = linked(["About"]);
+  files["about.html"] = page("About", '<p id="dup">a</p><p id="dup">b</p><a href="/">Home</a>');
+  return files;
+};
+
+test("AUD-08: a broken finding exits 1 with or without --strict, and the report is the same either way", async () => {
+  const loose = mkTmp();
+  writeTree(join(loose, "src"), brokenOnly());
+  const l = await runCli(["audit", "-s", "src", "-o", "dist"], loose);
+  expectExit(l, 1, "a broken finding without --strict");
+  expectFinding(l, "id-duplicate", "§24.6");
+  if (!/^audit: 1 broken, 0 incomplete$/m.test(l.stdout)) {
+    throw new Error(`§24.6: the only finding is the broken one.\nstdout:\n${l.stdout}`);
+  }
+  if (l.stderr !== "") {
+    throw new Error(`§24.6: a finding is not a §14 diagnostic — nothing on stderr.\nstderr:\n${l.stderr}`);
+  }
+
+  const strict = mkTmp();
+  writeTree(join(strict, "src"), brokenOnly());
+  const s = await runCli(["audit", "-s", "src", "-o", "dist", "--strict"], strict);
+  expectExit(s, 1, "the same broken finding with --strict");
+  if (s.stdout !== l.stdout) {
+    throw new Error(`§24.6: --strict changes what else exits 1, never the report.\nloose:\n${l.stdout}\nstrict:\n${s.stdout}`);
+  }
+  covers("AUD-08");
+}, TEST_MS);
+
+test("AUD-08: broken beside incomplete exits 1 without --strict; the same site minus the broken finding exits 0", async () => {
+  const files = brokenOnly();
+  files["about.html"] = files["about.html"].replace('<meta name="description" content="The About page of the example site.">\n', "");
+  const mixed = mkTmp();
+  writeTree(join(mixed, "src"), files);
+  const m = await runCli(["audit", "-s", "src", "-o", "dist"], mixed);
+  expectExit(m, 1, "one broken and one incomplete finding without --strict");
+  expectFinding(m, "id-duplicate", "§24.6");
+  expectFinding(m, "description-missing", "§24.6");
+
+  // Remove only the broken finding: what is left is exactly the incomplete one,
+  // and the same flags now exit 0 — the exit code reads the severity, not the count.
+  files["about.html"] = files["about.html"].replace('<p id="dup">a</p><p id="dup">b</p>', "<p>a</p><p>b</p>");
+  const fixed = mkTmp();
+  writeTree(join(fixed, "src"), files);
+  const f = await runCli(["audit", "-s", "src", "-o", "dist"], fixed);
+  expectExit(f, 0, "the incomplete finding alone without --strict");
+  expectFinding(f, "description-missing", "§24.6");
+  expectNoFinding(f, "id-duplicate", "§24.6");
   covers("AUD-08");
 }, TEST_MS);
 
@@ -626,7 +684,7 @@ test("AUD-04: a sitemap listing a page whose canonical names another page", asyn
 `,
   });
   const r = await runCli(["audit", "-s", "src", "-o", "dist", "--base-url", BASE], tmp);
-  expectExit(r, 0, "a listed page consolidated onto another");
+  expectExit(r, 1, "a listed page consolidated onto another (broken: §24.6 exits 1 without --strict)");
   expectFinding(r, "sitemap-canonical-disagree", "§24.4: the sitemap and the canonical name different pages");
   expectNoFinding(r, "sitemap-noindex", "§24.4: the page is indexable — only the canonical disagrees");
   covers("AUD-04");
@@ -665,7 +723,7 @@ test("AUD-06: an unresolvable canonical is not 'somewhere else' — no finding w
       "<head>", '<head>\n<meta name="robots" content="noindex">\n<link rel="canonical" href="/">'),
   });
   const c = await runCli(["audit", "-s", "src", "-o", "dist"], rel);
-  expectExit(c, 0, "a root-relative cross-canonical with no --base-url");
+  expectExit(c, 1, "a root-relative cross-canonical with no --base-url (broken: §24.6 exits 1 without --strict)");
   expectFinding(c, "canonical-noindex", "§24.4: this one resolves, address or no address");
   covers("AUD-06");
 }, TEST_MS);
@@ -680,7 +738,7 @@ test("AUD-04: contradictory declarations are reported — §20.4's data, rendere
         + '\n<meta name="description" content="A second, different description.">'),
   });
   const r = await runCli(["audit", "-s", "src", "-o", "dist", "--base-url", BASE], tmp);
-  expectExit(r, 0, "a page declaring two canonicals and two descriptions");
+  expectExit(r, 1, "a page declaring two canonicals and two descriptions (broken: §24.6 exits 1 without --strict)");
   const lines = r.stdout.split("\n").filter((l) => l.includes("[metadata-conflict]"));
   if (lines.length !== 2) {
     throw new Error(`§24.4: one finding per conflicting field.\nstdout:\n${r.stdout}`);
@@ -747,7 +805,7 @@ test("AUD-07: no evidence value can break the two-line report", async () => {
     "notes.html": page("Notes", '<p>Words.</p><a href="/">Home</a>'),
   });
   const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
-  expectExit(r, 0, "a multi-line robots value");
+  expectExit(r, 1, "a multi-line robots value (broken: §24.6 exits 1 without --strict)");
   const lines = r.stdout.trimEnd().split("\n");
   const finding = /^[^\n]+: (broken|incomplete): .+ \[[a-z0-9-]+\]$/;
   // Count first, then walk. Walking alone missed a break in the LAST finding's
@@ -836,7 +894,7 @@ test("AUD-04: a fragment written with a character reference matches a literal id
     "notes.html": page("Notes", '<p id="tea">y</p><a href="/">Home</a>'),
   });
   const b = await runCli(["audit", "-s", "src", "-o", "dist"], bad);
-  expectExit(b, 0, "an entity fragment naming nothing");
+  expectExit(b, 1, "an entity fragment naming nothing (broken: §24.6 exits 1 without --strict)");
   expectFinding(b, "fragment-missing", "REF-08: decoding is not excusing");
   covers("AUD-04");
 }, TEST_MS);
@@ -862,7 +920,7 @@ test("AUD-06: with the site's address known, an off-origin canonical IS somewher
 `,
   });
   const r = await runCli(["audit", "-s", "src", "-o", "dist", "--base-url", BASE], tmp);
-  expectExit(r, 0, "off-origin canonicals with the address supplied");
+  expectExit(r, 1, "off-origin canonicals with the address supplied (broken: §24.6 exits 1 without --strict)");
   expectFinding(r, "canonical-noindex", "§24.4: another origin is demonstrably not this page");
   expectFinding(r, "sitemap-canonical-disagree", "§24.4: the sitemap advertises a URL pointing off-site");
 
@@ -912,7 +970,7 @@ test("AUD-04: repeated og:image and a second ld+json block are correct markup", 
       .replace("<head>", '<head>\n<meta name="description" content="A second, different one.">'),
   });
   const b = await runCli(["audit", "-s", "src", "-o", "dist"], bad);
-  expectExit(b, 0, "two descriptions");
+  expectExit(b, 1, "two descriptions (broken: §24.6 exits 1 without --strict)");
   expectFinding(b, "metadata-conflict", "§24.4: a page may declare one description");
   covers("AUD-04");
 }, TEST_MS);
@@ -970,7 +1028,10 @@ test("AUD-06: every spelling of this site's own address is self-canonical", asyn
         .replace("<head>", `<head>\n<meta name="robots" content="noindex">\n<link rel="canonical" href="${href}">`),
     });
     const r = await runCli(["audit", "-s", "src", "-o", "dist", "--base-url", BASE], tmp);
-    expectExit(r, 0, `canonical spelled ${href}`);
+    // The http:// spelling is this page's own address with the wrong scheme —
+    // AUD-12's `broken` finding, a different fault from the one under test, and
+    // the only spelling here that exits 1 (§24.6) without --strict.
+    expectExit(r, href.startsWith("http://") ? 1 : 0, `canonical spelled ${href}`);
     expectNoFinding(r, "canonical-noindex", `§24.4: ${href} is this page`);
   }
 
@@ -984,7 +1045,7 @@ test("AUD-06: every spelling of this site's own address is self-canonical", asyn
         + '\n<link rel="canonical" href="//competitor.example/copy">'),
   });
   const r = await runCli(["audit", "-s", "src", "-o", "dist", "--base-url", BASE], other);
-  expectExit(r, 0, "a protocol-relative canonical on another host");
+  expectExit(r, 1, "a protocol-relative canonical on another host (broken: §24.6 exits 1 without --strict)");
   expectFinding(r, "canonical-noindex", "§24.4: a different host is a different site");
   covers("AUD-06");
 }, TEST_MS);
@@ -1038,7 +1099,7 @@ test("AUD-04: metadata-conflict is exactly the fields HTML restricts to one", as
       .replace("<head>", '<head>\n<meta name="description" content="A second one.">\n<title>A second title</title>'),
   });
   const b = await runCli(["audit", "-s", "src", "-o", "dist"], bad);
-  expectExit(b, 0, "two titles and two descriptions");
+  expectExit(b, 1, "two titles and two descriptions (broken: §24.6 exits 1 without --strict)");
   const fields = b.stdout.split("\n").filter((l) => l.includes("[metadata-conflict]"));
   if (fields.length !== 2) {
     throw new Error(`§24.4: title and description, one finding each.\nstdout:\n${b.stdout}`);
@@ -1468,7 +1529,7 @@ test("AUD-12: an http canonical on an https site — the finding nothing else ra
   }
 
   const r = await runCli(["audit", "-s", "src", "-o", "dist", "--base-url", BASE], tmp);
-  expectExit(r, 0, "the audit of the same site");
+  expectExit(r, 1, "the audit of the same site (broken: §24.6 exits 1 without --strict)");
   expectFinding(r, "canonical-scheme-mismatch", "§24.4");
   const lines = r.stdout.split("\n");
   const i = lines.findIndex((l) => l.includes("[canonical-scheme-mismatch]"));
@@ -1491,7 +1552,7 @@ test("AUD-12: an http canonical on an https site — the finding nothing else ra
       "<head>", '<head>\n<link rel="canonical" href="https://example.com/about.html">'),
   });
   const v = await runCli(["audit", "-s", "src", "-o", "dist", "--base-url", "http://example.com/"], rev);
-  expectExit(v, 0, "an https canonical under an http base url");
+  expectExit(v, 1, "an https canonical under an http base url (broken: §24.6 exits 1 without --strict)");
   expectFinding(v, "canonical-scheme-mismatch", "§24.4: the rule is disagreement, not a preference");
   covers("AUD-12");
 }, TEST_MS);
@@ -1506,7 +1567,7 @@ test("AUD-12: the schemes are parsed — an uppercase scheme and a default port 
       "<head>", '<head>\n<link rel="canonical" href="http://example.com:80/contact.html">'),
   });
   const r = await runCli(["audit", "-s", "src", "-o", "dist", "--base-url", BASE], tmp);
-  expectExit(r, 0, "an uppercase scheme and a default port");
+  expectExit(r, 1, "an uppercase scheme and a default port (broken: §24.6 exits 1 without --strict)");
   const files = r.stdout.split("\n").filter((l) => l.includes("[canonical-scheme-mismatch]"))
     .map((l) => l.split(":")[0]).sort();
   if (files.join(",") !== "about.html,contact.html") {

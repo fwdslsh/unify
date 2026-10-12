@@ -107,9 +107,9 @@ test("RPT-01: --format json's findings match --format human's ids, severities an
   writeTree(join(tmp, "src"), richTree());
 
   const human = await runCli(["audit", "-s", "src", "-o", "dist", "--format", "human"], tmp);
-  expectExit(human, 0, "explicit --format human");
+  expectExit(human, 1, "explicit --format human (richTree draws a broken finding: §24.6 exits 1 without --strict)");
   const noFlag = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
-  expectExit(noFlag, 0, "no --format flag");
+  expectExit(noFlag, 1, "no --format flag (richTree draws a broken finding: §24.6 exits 1 without --strict)");
   if (noFlag.stdout !== human.stdout) {
     throw new Error(
       `§31.1: "--format human is the default and names the existing behaviour" — omitting the flag must print byte-identical stdout.\n--- default ---\n${noFlag.stdout}\n--- explicit human ---\n${human.stdout}`,
@@ -117,7 +117,7 @@ test("RPT-01: --format json's findings match --format human's ids, severities an
   }
 
   const json = await runCli(["audit", "-s", "src", "-o", "dist", "--format", "json"], tmp);
-  expectExit(json, 0, "--format json");
+  expectExit(json, 1, "--format json (richTree draws a broken finding: §24.6 exits 1 without --strict)");
   const data = parseJson(json.stdout, "§31.1: --format json");
 
   const hFindings = humanFindings(human.stdout);
@@ -223,14 +223,18 @@ test("RPT-01: an unrecognized --format value is a usage error naming the accepte
   covers("RPT-01");
 }, TEST_MS);
 
-test("RPT-01: the exit code is identical between --format json and --format human, with and without --strict — for findings alone and for a pipeline problem", async () => {
+test("RPT-01: the exit code is identical between --format json and --format human, with and without --strict — for an incomplete finding, a broken one, and a pipeline problem", async () => {
   const onlyFinding = { "index.html": page({ title: "Home", h1: "Home" }) }; // desc omitted: one incomplete finding, zero problems
   const withProblem = {
     "index.html": page({ title: "Home", desc: "d.", h1: "Home", body: '<a href="/gone.html">gone</a>' }), // clean metadata, but a broken reference (a problem)
   };
+  const withBroken = {
+    "index.html": page({ title: "Home", desc: "d.", h1: "Home", body: '<p id="x">a</p><p id="x">b</p>' }), // one broken finding (id-duplicate), nothing else
+  };
 
   for (const [label, files, exitLoose, exitStrict] of [
-    ["a findings-only tree", onlyFinding, 0, 1],
+    ["an incomplete-only tree", onlyFinding, 0, 1],
+    ["a tree with a broken finding", withBroken, 1, 1],
     ["a tree with a pipeline problem", withProblem, 1, 1],
   ]) {
     for (const strict of [false, true]) {
@@ -249,6 +253,40 @@ test("RPT-01: the exit code is identical between --format json and --format huma
     }
   }
   covers("RPT-01");
+}, TEST_MS);
+
+test("RPT-01/RPT-04: the exit rule changes the exit code and nothing else — the same findings, fingerprints and bytes in json and sarif, broken or incomplete, strict or not", async () => {
+  const incompleteOnly = { "index.html": page({ title: "Home", h1: "Home" }) }; // desc omitted: one incomplete finding
+  for (const [label, files, exitLoose] of [
+    ["an incomplete-only tree", incompleteOnly, 0],
+    ["a tree with a broken finding", richTree(), 1],
+  ]) {
+    const docs = {};
+    for (const format of ["json", "sarif"]) {
+      for (const strict of [false, true]) {
+        const tmp = mkTmp();
+        writeTree(join(tmp, "src"), files);
+        const r = await runCli(["audit", "-s", "src", "-o", "dist", "--format", format, ...(strict ? ["--strict"] : [])], tmp);
+        expectExit(r, strict ? 1 : exitLoose, `${label}, --format ${format}, strict=${strict}`);
+        docs[`${format}/${strict}`] = r.stdout;
+      }
+      if (docs[`${format}/false`] !== docs[`${format}/true`]) {
+        throw new Error(`§24.6/§31.1: --strict moves the exit code, never the document (${label}, ${format}).\nloose:\n${docs[`${format}/false`]}\nstrict:\n${docs[`${format}/true`]}`);
+      }
+    }
+    // The two formats still list the same findings under the same fingerprints.
+    const jsonFindings = parseJson(docs["json/false"], "json").findings;
+    const results = parseJson(docs["sarif/false"], "sarif").runs.flatMap((run) => run.results ?? []);
+    if (jsonFindings.length === 0 || results.length !== jsonFindings.length) {
+      throw new Error(`§31.4: the same finding list in both formats (${label}): json=${jsonFindings.length} sarif=${results.length}`);
+    }
+    jsonFindings.forEach((f, i) => {
+      if (results[i].ruleId !== f.id || !JSON.stringify(results[i].partialFingerprints ?? {}).includes(f.fingerprint)) {
+        throw new Error(`§31.2/§31.4: finding ${i} differs across formats (${label}).\njson: ${f.id} ${f.fingerprint}\nsarif: ${JSON.stringify(results[i])}`);
+      }
+    });
+  }
+  covers("RPT-01", "RPT-04");
 }, TEST_MS);
 
 test("RPT-01: §14 diagnostics stay on stderr under every format; the JSON document never carries their text, only the summary count", async () => {
@@ -305,13 +343,13 @@ ${"\n".repeat(blankLinesAbove)}<p id="${idValue}">Two.</p>
   const tmp = mkTmp();
   writeTree(join(tmp, "src"), { "index.html": idDupPage("dup") });
   const r1 = await runCli(["audit", "-s", "src", "-o", "dist", "--format", "json"], tmp);
-  expectExit(r1, 0, "the original page");
+  expectExit(r1, 1, "the original page (broken: §24.6 exits 1 without --strict)");
   const f1 = parseJson(r1.stdout, "run 1").findings.find((f) => f.id === "id-duplicate");
   if (!f1) throw new Error(`fixture check: expected an id-duplicate finding\nstdout:\n${r1.stdout}`);
 
   writeTree(join(tmp, "src"), { "index.html": idDupPage("dup", 10) });
   const r2 = await runCli(["audit", "-s", "src", "-o", "dist", "--format", "json"], tmp);
-  expectExit(r2, 0, "the same fault, shifted ten lines down by ten blank lines above it");
+  expectExit(r2, 1, "the same fault, shifted ten lines down by ten blank lines above it (broken: §24.6 exits 1 without --strict)");
   const f2 = parseJson(r2.stdout, "run 2").findings.find((f) => f.id === "id-duplicate");
   if (!f2) throw new Error(`fixture check: expected the finding to persist after the shift\nstdout:\n${r2.stdout}`);
   if (f2.fingerprint !== f1.fingerprint) {
@@ -323,7 +361,7 @@ ${"\n".repeat(blankLinesAbove)}<p id="${idValue}">Two.</p>
 
   writeTree(join(tmp, "src"), { "index.html": idDupPage("other") });
   const r3 = await runCli(["audit", "-s", "src", "-o", "dist", "--format", "json"], tmp);
-  expectExit(r3, 0, "a different repeated id — the fault itself changed, not merely its position");
+  expectExit(r3, 1, "a different repeated id — the fault itself changed, not merely its position (broken: §24.6 exits 1 without --strict)");
   const f3 = parseJson(r3.stdout, "run 3").findings.find((f) => f.id === "id-duplicate");
   if (!f3) throw new Error(`fixture check: expected an id-duplicate finding\nstdout:\n${r3.stdout}`);
   if (f3.fingerprint === f1.fingerprint) {
@@ -353,7 +391,7 @@ test("RPT-02: two different id-duplicate findings on the SAME page get different
 `,
   });
   const r = await runCli(["audit", "-s", "src", "-o", "dist", "--format", "json"], tmp);
-  expectExit(r, 0, "a page with two unrelated duplicate ids");
+  expectExit(r, 1, "a page with two unrelated duplicate ids (broken: §24.6 exits 1 without --strict)");
   const data = parseJson(r.stdout, "§31.2");
   const dupes = data.findings.filter((f) => f.id === "id-duplicate");
   if (dupes.length !== 2) {
@@ -533,11 +571,11 @@ test("RPT-04: --format sarif parses as JSON, carries SARIF 2.1.0, and its ruleId
   writeTree(join(tmp, "src"), richTree());
 
   const j = await runCli(["audit", "-s", "src", "-o", "dist", "--format", "json"], tmp);
-  expectExit(j, 0, "--format json");
+  expectExit(j, 1, "--format json (richTree draws a broken finding: §24.6 exits 1 without --strict)");
   const jsonData = parseJson(j.stdout, "--format json");
 
   const s = await runCli(["audit", "-s", "src", "-o", "dist", "--format", "sarif"], tmp);
-  expectExit(s, 0, "--format sarif");
+  expectExit(s, 1, "--format sarif (richTree draws a broken finding: §24.6 exits 1 without --strict)");
   const sarif = parseJson(s.stdout, "§31.4: --format sarif");
 
   if (sarif.version !== "2.1.0") throw new Error(`§31.4: "mapped field for field into SARIF 2.1.0" — expected version "2.1.0", got ${JSON.stringify(sarif.version)}`);
@@ -567,6 +605,9 @@ test("RPT-04: SARIF's level mirrors severity, message mirrors evidence, partialF
   const s = await runCli(["audit", "-s", "src", "-o", "dist", "--format", "sarif"], tmp);
   const sarif = parseJson(s.stdout, "--format sarif");
   if (j.exit !== s.exit) throw new Error(`§31.4: a format flag must not change the exit code. json=${j.exit} sarif=${s.exit}`);
+  // richTree draws a broken finding, and §24.6 exits 1 on it without --strict —
+  // SARIF's `error` level is a rendering of that severity, not a second policy.
+  expectExit(s, 1, "--format sarif on a tree with a broken finding");
 
   const results = sarif.runs.flatMap((run) => run.results ?? []);
   const byRule = new Map(results.map((r) => [r.ruleId, r]));
@@ -618,7 +659,7 @@ test("RPT-02: the SAME fault on two DIFFERENT pages gets two fingerprints", asyn
     "two.html": page({ title: "Two", h1: "Two", ...dup }),
   });
   const r = await runCli(["audit", "-s", "src", "-o", "dist", "--format", "json"], tmp);
-  expectExit(r, 0, "two pages each carrying the same duplicate id");
+  expectExit(r, 1, "two pages each carrying the same duplicate id (broken: §24.6 exits 1 without --strict)");
   const data = parseJson(r.stdout, "§31.2");
   const dupes = data.findings.filter((f) => f.id === "id-duplicate");
 

@@ -34,7 +34,7 @@ Options:
       --dry-run            run the full build and every check, print the report, write nothing
       --audit              `build` only: audit the composed site before publishing; publish only if `unify audit` would exit 0
       --save-config        `build` only: write the saveable options given here into unify.yaml (after a good build)
-      --strict             advisories count as problems for the exit code (with `audit`, findings too)
+      --strict             advisories count as problems for the exit code (with `audit`, `incomplete` findings too; `broken` ones always exit 1)
       --format <kind>      `audit` report shape: human (default), json, or sarif
       --external           `audit` only: fetch every off-origin URL the site emits and report the ones that don't resolve
   -p, --port <n>           port for `unify dev` (default: 3000)
@@ -68,7 +68,7 @@ notes.html: broken: #install in guide.html names no element [fragment-missing]
 audit: 1 broken, 1 incomplete
 ```
 
-Findings never block a build — `unify build` does not run any of these checks (unless you pass `--audit`), so a site full of them still publishes. `unify audit --strict` exits `1` on any finding, of either severity: that is the CI gate, and it is opt-in.
+Findings never block a build — `unify build` does not run any of these checks (unless you pass `--audit`), so a site full of them still publishes. `unify audit` exits `1` on a `broken` finding, with or without `--strict`: broken is objective — wrong whatever you intended — so there is nothing to opt out of. An `incomplete` finding may be a choice (a page nothing links to, on purpose), so on its own it exits `0`; `unify audit --strict` exits `1` on any finding, of either severity, and is the strict CI gate. The report is the same either way, in every `--format`; only the exit code differs.
 
 Worth knowing before you wire it up: **every `init` template passes `unify audit --strict` from the moment it is scaffolded.** `unify init <template> && unify audit --strict` exits `0` for all five, with no `--base-url` and nothing edited, and the conformance suite asserts it per template — so a finding on a fresh scaffold is a regression, and the first finding you see is about something you wrote. It was not always true: each template used to ship between seven and thirteen `incomplete` findings, mostly a missing `lang` or a page without its own description. They were real gaps, and the fix was the templates rather than the gate.
 
@@ -420,7 +420,7 @@ A file `update` never overwrites once it exists — one you customized. Relative
 
 ### `--audit` (build and init)
 
-With `init`: scaffold, audit the result with `unify audit --strict`, keep it only if that passes (see `unify init` above). With `build`: compose once, audit that result, publish only if it passes. The generator (`--generate`) runs once, the site is composed once, and the same findings `unify audit` would print are evaluated over that exact composition, then printed (human format) after the build's diagnostics. The build publishes iff `unify audit` with the same flags would exit `0`: no problems, and with `--strict` also no advisories and no findings. Without `--strict`, findings are reported but block nothing. A blocked gate exits `1` and leaves the previous output untouched. With `--dry-run` it reports and writes nothing, exiting as the gate would. `--external` and `--format` remain `audit`-only. `audit: true` is saveable in `unify.yaml`.
+With `init`: scaffold, audit the result with `unify audit --strict`, keep it only if that passes (see `unify init` above). With `build`: compose once, audit that result, publish only if it passes. The generator (`--generate`) runs once, the site is composed once, and the same findings `unify audit` would print are evaluated over that exact composition, then printed (human format) after the build's diagnostics. The build publishes iff `unify audit` with the same flags would exit `0`: no problems and no `broken` finding, and with `--strict` also no advisories and no `incomplete` findings. Without `--strict`, `incomplete` findings are reported but block nothing, and a `broken` one blocks. A blocked gate exits `1` and leaves the previous output untouched. With `--dry-run` it reports and writes nothing, exiting as the gate would. `--external` and `--format` remain `audit`-only. `audit: true` is saveable in `unify.yaml`.
 
 `unify build --audit --strict` replaces the three-step `build --dry-run --strict && build && audit --strict`.
 
@@ -445,7 +445,7 @@ Nothing else is checked, on purpose. `Disallow: /admin/` on a site with no `/adm
 | Code | Meaning |
 |---|---|
 | `0` | The site was published (with `--dry-run`: would have been). |
-| `1` | Problems found — nothing was published, the previous output is untouched. Under `--strict`, advisories alone also exit `1`, and for `audit` so does any finding. |
+| `1` | Problems found — nothing was published, the previous output is untouched. Under `--strict`, advisories alone also exit `1`. For `audit`, a `broken` finding exits `1` on its own, and under `--strict` so does any finding. |
 | `2` | Invalid usage or fatal environment error (unknown flag, missing source directory, the `--clean` refusal, port in use). |
 
 ## Diagnostics

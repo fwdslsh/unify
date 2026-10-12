@@ -331,7 +331,7 @@ test("AUD-14 — jsonld-url-unprefixed fires only at a subpath address, only on 
   writeTree(dir, logoSite("/img/logo.png", "img/logo.png"));
 
   const subpath = await runCli(["audit", "-s", "src", "--base-url", "https://example.com/repo/"], dir);
-  expectExit(subpath, 0, "a finding never blocks without --strict");
+  expectExit(subpath, 1, "jsonld-url-unprefixed is broken, so audit exits 1 without --strict (§24.6)");
   expectFinding(subpath, "jsonld-url-unprefixed", "a root-relative value at a subpath deploy address");
   expectIncludes(subpath.stdout, 'names "/img/logo.png", which this site publishes at "/repo/img/logo.png"',
     "the evidence quotes both addresses");
