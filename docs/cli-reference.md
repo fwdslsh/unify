@@ -220,7 +220,7 @@ src/posts/hello.md: advisory: date is "2026-01-02", which names a day rather tha
 
 Each entry's `<id>` and `<link>` are the page's own canonical (authored, or completed by `--canonical auto`), never a second address; `<updated>` prefers `dateModified` over `datePublished` when it carries a time. `--feed-full` additionally puts each entry's rendered `<main>` into `<content type="html">` — without it, every entry carries a plain-text `<summary>`. Every internal URL the feed emits is checked exactly as a broken link would be, so a target the site does not emit blocks the publish rather than shipping a feed reader will 404 on.
 
-If your source tree already contains a `feed.xml`, that file **is** the site's feed: unify ships it untouched and generates nothing, exactly as it treats an authored `sitemap.xml`.
+If your source tree already contains a `feed.xml`, that file **is** the site's feed: unify ships it untouched and generates nothing, exactly as it treats an authored `sitemap.xml`, and a `feed.xml` your generator writes counts the same way. For RSS, or a feed that lists day-dated posts, write it yourself from the source inventory: [the generator recipes](guides/generator-recipes.md#an-rss-feed) do it as `rss.xml` beside this feed, or as `feed.xml` in place of it.
 
 ## Catalog (`catalog.json`)
 
@@ -363,7 +363,7 @@ The working directory is the source root, so `readFileSync("_data/authors.json")
 
 It runs on **every** build, including every rebuild under `watch` and `dev` — a generator that ran once would leave watch output stale while the build reported success. A non-zero exit is a located problem: nothing publishes, and the previous `dist/` is untouched.
 
-unify runs the file you named. It does not sandbox it, restrict what it reads or writes, or check its output for anything an ordinary build would not. What it does guarantee is that nothing the generator produces skips a check, and that a generator's failure is a build failure. `docs/integrations.md` works the common shapes — a data-driven index, image derivatives, a CMS pulled to disk.
+unify runs the file you named. It does not sandbox it, restrict what it reads or writes, or check its output for anything an ordinary build would not. What it does guarantee is that nothing the generator produces skips a check, and that a generator's failure is a build failure. `docs/integrations.md` works the common shapes — a data-driven index, image derivatives, a CMS pulled to disk — and [the generator recipes](guides/generator-recipes.md) add two small ones: a content hash in an asset's URL, and an RSS feed.
 
 ### `--dry-run`
 
