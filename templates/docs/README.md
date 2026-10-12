@@ -147,9 +147,9 @@ page, two elsewhere, a `<nav aria-label="Previous and next pages">` the template
 no group lists goes in a trailing "More" group, after the listed ones, so a new document is reachable the day it
 is added. A listed document the importer did not produce, or one listed twice, stops the build with an error
 naming it. `index: { title, description, intro }` sets the index page's text; `base` is the one you gave `importDocs`.
-The generated sidebar replaces the template's include only where your own `site/` has no
-`_includes/docnav.html`, because a file in `site/` wins over a generated one: a site that extends the
-template has none, and a site that copied it deletes its copy.
+The generated sidebar replaces the template's include, so your own `site/` must not keep an
+`_includes/docnav.html` of its own: a site that extends the template has none, and a site that copied
+it deletes its copy.
 
 ## Composition
 

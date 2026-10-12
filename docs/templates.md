@@ -234,7 +234,7 @@ docsNav({
 });
 ```
 
-The links are ordinary root-relative links to the pages' sources, so `--pretty-urls`, `--base-url` and the reference check treat them like any other. The sidebar replaces the template's include only where your `site/` has no `_includes/docnav.html` of its own, because a file in `site/` wins over a generated one.
+The links are ordinary root-relative links to the pages' sources, so `--pretty-urls`, `--base-url` and the reference check treat them like any other. The sidebar replaces the template's include, so your `site/` must not keep an `_includes/docnav.html` of its own: a site that extends the template has none, and a site that copied it deletes its copy.
 
 unify's own documentation site (`examples/unify-docs`) and akm.fwdslsh.dev are built this way.
 
