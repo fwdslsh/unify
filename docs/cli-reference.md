@@ -220,7 +220,7 @@ src/posts/hello.md: advisory: date is "2026-01-02", which names a day rather tha
 
 Each entry's `<id>` and `<link>` are the page's own canonical (authored, or completed by `--canonical auto`), never a second address; `<updated>` prefers `dateModified` over `datePublished` when it carries a time. `--feed-full` additionally puts each entry's rendered `<main>` into `<content type="html">` — without it, every entry carries a plain-text `<summary>`. Every internal URL the feed emits is checked exactly as a broken link would be, so a target the site does not emit blocks the publish rather than shipping a feed reader will 404 on.
 
-If your source tree already contains a `feed.xml`, that file **is** the site's feed: unify ships it untouched and generates nothing, exactly as it treats an authored `sitemap.xml`. The `blog` template's own generator writes one for this reason.
+If your source tree already contains a `feed.xml`, that file **is** the site's feed: unify ships it untouched and generates nothing, exactly as it treats an authored `sitemap.xml`.
 
 ## Catalog (`catalog.json`)
 
