@@ -5,6 +5,11 @@ generate: scripts/gen.mjs
 # its layout, stylesheet and All-pages directory; this site keeps only its own pages and the
 # four identity files under _includes/.
 extends: ../../templates/docs
+# What `unify dev` rebuilds on besides this site's own files: the repository's docs the
+# generator publishes, and the template directory above. Both sit outside this project.
+watch-path:
+  - ../../docs
+  - ../../templates/docs
 # Directory-style URLs: /docs/getting-started/ instead of .html.
 pretty-urls: true
 # Absolute origin for sitemap.xml, canonical links and feed URLs.

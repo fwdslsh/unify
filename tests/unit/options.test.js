@@ -210,4 +210,17 @@ describe("the template block — the one key that takes a block (§18, §19.10)"
   test("--keep repeats into a list, like --exclude", () => {
     expect(parseArgs(["update", "--keep", "site/assets/theme.css", "--keep", "site/_includes/nav.html"]).options.keep).toEqual(["site/assets/theme.css", "site/_includes/nav.html"]);
   });
+
+  test("--watch-path repeats into a list, and unify.yaml takes it as a list or as one value (§16, §18)", () => {
+    expect(parseArgs(["watch", "--watch-path", "../ext/data.txt", "--watch-path=../ext/dir"]).options["watch-path"]).toEqual(["../ext/data.txt", "../ext/dir"]);
+    expect(() => parseArgs(["watch", "--watch-path"])).toThrow(/--watch-path needs a value/);
+    const load = (text) => {
+      const dir = mkdtempSync(join(tmpdir(), "unify-tpl-"));
+      registerTmp(dir);
+      writeFileSync(join(dir, "unify.yaml"), text);
+      return loadConfig(dir);
+    };
+    expect(load("watch-path:\n  - ../ext/data.txt\n  - ../ext/dir\n")["watch-path"]).toEqual(["../ext/data.txt", "../ext/dir"]);
+    expect(load("watch-path: ../ext/data.txt\n")["watch-path"]).toBe("../ext/data.txt");
+  });
 });

@@ -38,7 +38,8 @@ export function resolveSettings(flags, cwd = process.cwd()) {
   // file inside the source root the two readings coincide, so nothing written
   // before 0.10 changes meaning. CLI flags keep their own rules (`--source`
   // from the working directory, `--generate` from the source root).
-  const configDir = dirname(configPath(probe.root, cwd).path);
+  const configFile = configPath(probe.root, cwd).path;
+  const configDir = dirname(configFile);
   for (const key of ["source", "generate"]) {
     if (typeof config[key] === "string" && !isAbsolute(config[key])) config[key] = resolve(configDir, config[key]);
   }
@@ -96,6 +97,12 @@ export function resolveSettings(flags, cwd = process.cwd()) {
       format: settings.format,
       external: settings.external === true,
       port: settings.port === undefined ? 3000 : Number(settings.port),
+      // §16 — read by `dev` and `watch` alone. The flag's paths are relative to
+      // the working directory and replace the file's, which are relative to the
+      // file (§18); `named` is how a diagnostic says which of the two asked.
+      watchPaths: [].concat(settings["watch-path"] ?? []).map((p) => flags["watch-path"] !== undefined
+        ? { path: resolve(cwd, String(p)), named: `--watch-path ${p}` }
+        : { path: resolve(configDir, String(p)), named: `watch-path: ${p} in ${configFile}` }),
       // §19.10 — read by `update` alone. `template` is the --template flag (the
       // positional spelled as an option); `recordedTemplate` is the line
       // unify.yaml carries, kept apart because a named source replaces it;

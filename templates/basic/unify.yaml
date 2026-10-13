@@ -47,6 +47,10 @@
 # the port unify dev serves on (default: 3000)
 # port: 8080
 
+# a file or directory outside the project that dev and watch also rebuild on, one per list item; watched only, never scanned or published (default: none)
+# watch-path:
+#   - ../shared/data
+
 # a JavaScript file unify runs before every build, relative to this file (default: none)
 # generate: scripts/gen.mjs
 

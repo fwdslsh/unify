@@ -96,12 +96,18 @@ const OPTIONS = {
   // unify.yaml. Not itself saveable; cli.js enforces the rest.
   "save-config": { kind: "flag" },
   port: { kind: "string", short: "p", about: "the port unify dev serves on", default: "3000", save: "port: 8080" },
+  // §16 — `dev` and `watch` only (build and audit never watch, and ignore it
+  // the way they ignore --port). A list like --exclude: the flag's paths are
+  // relative to the working directory and replace the file's, which are
+  // relative to the file. settings.js resolves them, cli.js refuses one that
+  // is not there, watch.js hands them to the watcher.
+  "watch-path": { kind: "list", example: "../shared/data", about: "a file or directory outside the project that dev and watch also rebuild on, one per list item; watched only, never scanned or published", default: "none", save: "watch-path:\n  - ../shared/data" },
   version: { kind: "flag", short: "v" },
   help: { kind: "flag", short: "h" },
 };
 
 /** Keys `unify.yaml` may carry — the long option names, minus the ones that make no sense to save. */
-export const CONFIG_KEYS = ["source", "output", "clean", "exclude", "pretty-urls", "base-url", "canonical", "feed-full", "catalog", "search-corpus", "include-noindex", "strict", "audit", "port", "generate", "source-inventory", "template", "extends"];
+export const CONFIG_KEYS = ["source", "output", "clean", "exclude", "pretty-urls", "base-url", "canonical", "feed-full", "catalog", "search-corpus", "include-noindex", "strict", "audit", "port", "watch-path", "generate", "source-inventory", "template", "extends"];
 
 /**
  * §18/§19.8 — the `unify.yaml` that `init` writes at the project root: every

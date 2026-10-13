@@ -295,6 +295,7 @@ Options:
       --format <kind>      `audit` report shape: human (default), json, or sarif
       --external           `audit` only: fetch every off-origin URL the site emits and report the ones that don't resolve
   -p, --port <n>           port for `unify dev` (default: 3000)
+      --watch-path <path>  `dev`/`watch`: a file or directory outside the project to rebuild on when it changes — watched only, never scanned or published (repeatable; relative to the working directory)
   -v, --version            print version
   -h, --help               print help
 ```

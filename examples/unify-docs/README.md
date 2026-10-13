@@ -19,7 +19,9 @@ resolve the "View live" addresses — see the comment in `site/examples/index.ht
 they cannot be plain hrefs.
 
 The build's flags live in `unify.yaml` beside `site/` (generator, pretty URLs, base URL,
-canonical, catalog, search corpus), so the documented build is just:
+canonical, catalog, search corpus, and `watch-path:` naming the repository's `docs/` and the
+template, both outside this project, so `unify dev` rebuilds when either is edited), so the
+documented build is just:
 
 ```bash
 cd examples/unify-docs
