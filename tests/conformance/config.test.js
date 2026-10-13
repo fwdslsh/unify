@@ -542,3 +542,65 @@ test("CFG-09 — only a value that differs from the default needs writing: every
   if (lineOf(after, /^pretty-urls: true$/) !== lineOf(template, /^# pretty-urls: true$/)) throw new Error("the saved key did not take its commented line's place");
   covers("CFG-09");
 }, TEST_MS);
+
+// ------------------------------------------------------------------- CFG-10
+
+test("CFG-10 — watch-path: a missing path is a usage error that names it and what named it; build and audit ignore the option", async () => {
+  const tmp = mkTmp();
+  writeTree(tmp, { "site/index.html": PAGE });
+
+  // The flag, relative to the working directory — for both commands that watch,
+  // and before anything is built.
+  for (const command of ["watch", "dev"]) {
+    const r = await runCli([command, "--watch-path", "nowhere/data.txt"], tmp);
+    if (r.exit !== 2) throw new Error(`${command}: a missing --watch-path is a usage error (exit 2), got ${r.exit}\n${r.stdout}${r.stderr}`);
+    // "not found", not "not readable": a missing path is said to be missing.
+    if (!r.stderr.includes("watch path not found") || !r.stderr.includes(join(tmp, "nowhere", "data.txt")) || !r.stderr.includes("--watch-path nowhere/data.txt")) {
+      throw new Error(`${command}: the error must say the path is missing, name it, and name the flag that named it:\n${r.stderr}`);
+    }
+    if (existsSync(join(tmp, "dist"))) throw new Error(`${command}: nothing is built before the check`);
+  }
+
+  // unify.yaml at the project root: the message names the file and the key.
+  writeTree(tmp, { "unify.yaml": "watch-path:\n  - nowhere\n" });
+  const fromFile = await runCli(["watch"], tmp);
+  if (fromFile.exit !== 2 || !fromFile.stderr.includes(join(tmp, "nowhere")) || !fromFile.stderr.includes(`in ${join(tmp, "unify.yaml")}`)) {
+    throw new Error(`a missing watch-path: in unify.yaml is exit 2 naming the path and the file (got ${fromFile.exit}):\n${fromFile.stderr}`);
+  }
+
+  // build and audit never watch: the saved key and the flag are both inert, and change nothing.
+  const baseline = {};
+  rmSync(join(tmp, "unify.yaml"));
+  for (const command of ["build", "audit"]) baseline[command] = (await runCli([command], tmp)).exit;
+  writeTree(tmp, { "unify.yaml": "watch-path:\n  - nowhere\n" });
+  for (const command of ["build", "audit"]) {
+    for (const args of [[command], [command, "--watch-path", "nowhere"]]) {
+      const r = await runCli(args, tmp);
+      if (r.exit !== baseline[command]) throw new Error(`${args.join(" ")} must ignore watch-path (exit ${baseline[command]}), got ${r.exit}\n${r.stderr}`);
+    }
+  }
+  if (baseline.build !== 0 || !existsSync(join(tmp, "dist", "index.html"))) throw new Error("build publishes as ever with the key present");
+  rmSync(join(tmp, "unify.yaml"));
+
+  // A file in the source root is read from ITS directory: ../missing from site/ is <tmp>/missing,
+  // where the working directory's reading would be above the temp root.
+  writeTree(tmp, { "site/unify.yaml": "watch-path: ../missing\n" });
+  const inside = await runCli(["watch"], tmp);
+  if (inside.exit !== 2 || !inside.stderr.includes(`${join(tmp, "missing")} `)) {
+    throw new Error(`a watch-path in the source root's unify.yaml resolves from that file's directory (got ${inside.exit}):\n${inside.stderr}`);
+  }
+  covers("CFG-10");
+}, TEST_MS);
+
+test("CFG-10 — --save-config writes a --watch-path relative to the file it upserts, and the next run reads it from there", async () => {
+  const tmp = mkTmp();
+  writeTree(tmp, { "site/index.html": PAGE, "site/unify.yaml": "# mine\n" });
+  const r = await runCli(["build", "--watch-path", "ext", "--watch-path", "./ext/inner", "--save-config"], tmp);
+  if (r.exit !== 0) throw new Error(`exit ${r.exit}\n${r.stderr}`);
+  const text = readFileSync(join(tmp, "site", "unify.yaml"), "utf8");
+  if (text !== "# mine\nwatch-path:\n  - ../ext\n  - ../ext/inner\n") throw new Error(`watch-path is saved relative to the file, in order:\n${text}`);
+  // Read back from the file's directory: ../ext from site/ is <tmp>/ext, which does not exist.
+  const again = await runCli(["watch"], tmp);
+  if (again.exit !== 2 || !again.stderr.includes(`${join(tmp, "ext")} `)) throw new Error(`the saved key resolves from the file (got ${again.exit}):\n${again.stderr}`);
+  covers("CFG-10");
+}, TEST_MS);

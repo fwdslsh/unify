@@ -26,6 +26,8 @@
  *     The same loop closes through the build's log: the file this process
  *     writes as its stdout or stderr (`unify watch > watch.log 2>&1`) is
  *     ignored wherever it sits under a watched root (`isOwnOutput`, #136).
+ *     The author may also name extra inputs (`watchPaths`, `--watch-path`):
+ *     each is one more watcher into the same debounce, and nothing else.
  *
  *   - The WCH-04 error-page helpers: `computeErrorPageTargets` maps a failed
  *     rebuild's problem diagnostics to the output page(s) they implicate,
@@ -36,7 +38,7 @@
  */
 import { fstatSync, readdirSync, statSync, watch as fsWatch } from "node:fs";
 import { mkdir, readFile } from "node:fs/promises";
-import { extname, join, resolve, sep } from "node:path";
+import { basename, dirname, extname, join, resolve, sep } from "node:path";
 import * as collisions from "./collisions.js";
 import { Reporter } from "./diagnostics.js";
 import { contains, isNeverShipped, toRelative } from "./paths.js";
@@ -128,9 +130,11 @@ function isOwnOutput(abs) {
  * @param {string[]} [opts.ignoreDirs] - absolute paths; a change under any of these is dropped
  * @param {() => void} opts.onChange - called (debounced) for a change outside the ignore set
  * @param {number} [opts.debounceMs]
+ * @param {string|null} [opts.projectRoot] - the working directory, observed as §4.5 says
+ * @param {string[]} [opts.watchPaths] - explicit extra inputs (§16, `--watch-path`): files or directories that exist
  * @returns {{close(): void}}
  */
-export function watchSource(root, { ignoreDirs = [], onChange, debounceMs = 40, projectRoot = null }) {
+export function watchSource(root, { ignoreDirs = [], onChange, debounceMs = 40, projectRoot = null, watchPaths = [] }) {
   const absRoot = resolve(root);
   const absIgnores = ignoreDirs.map((d) => resolve(d));
   let timer = null;
@@ -191,6 +195,34 @@ export function watchSource(root, { ignoreDirs = [], onChange, debounceMs = 40, 
     }
   }
 
+  // §16 — `--watch-path`: the named paths and nothing else, whatever §4.5 does
+  // or does not already observe. A directory is watched recursively (files
+  // created in it later count), minus the never-shipped names; a file through
+  // its parent directory, filtered to its name, so an editor's
+  // replace-by-rename or a delete and recreate is still that file. The ignore
+  // set holds here too (a path may contain the output directory), and every
+  // watcher feeds the one debounce, so overlapping roots are still one rebuild.
+  for (const named of watchPaths) {
+    const path = resolve(named);
+    if (statSync(path).isDirectory()) {
+      extra.push(fsWatch(path, { recursive: true }, (_event, filename) => {
+        if (!filename) {
+          schedule();
+          return;
+        }
+        const abs = join(path, filename);
+        if (isNeverShipped(filename.split(sep).join("/")) || absIgnores.some((dir) => contains(dir, abs)) || isOwnOutput(abs)) return;
+        schedule();
+      }));
+    } else {
+      const name = basename(path);
+      extra.push(fsWatch(dirname(path), { recursive: false }, (_event, filename) => {
+        if ((filename && String(filename) !== name) || absIgnores.some((dir) => contains(dir, path)) || isOwnOutput(path)) return;
+        schedule();
+      }));
+    }
+  }
+
   return {
     close() {
       if (timer) clearTimeout(timer);
@@ -214,11 +246,13 @@ export function watchSource(root, { ignoreDirs = [], onChange, debounceMs = 40, 
  * @param {() => Promise<void>} args.rebuild
  * @param {AbortSignal} args.signal
  * @param {number} [args.debounceMs]
+ * @param {string|null} [args.projectRoot]
+ * @param {string[]} [args.watchPaths] - see `watchSource`
  * @returns {Promise<void>}
  */
-export function runWatchLoop({ sourceRoot, ignoreDirs = [], rebuild, signal, debounceMs = 40, projectRoot = null }) {
+export function runWatchLoop({ sourceRoot, ignoreDirs = [], rebuild, signal, debounceMs = 40, projectRoot = null, watchPaths = [] }) {
   const coalescer = createCoalescer(rebuild);
-  const fsWatcher = watchSource(sourceRoot, { ignoreDirs, debounceMs, projectRoot, onChange: () => coalescer.trigger() });
+  const fsWatcher = watchSource(sourceRoot, { ignoreDirs, debounceMs, projectRoot, watchPaths, onChange: () => coalescer.trigger() });
   coalescer.trigger(); // the initial build
 
   return new Promise((res) => {

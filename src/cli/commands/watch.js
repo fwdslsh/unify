@@ -101,7 +101,10 @@ export async function watch(context, opts = {}) {
     onRebuild?.({ ok: problems.length === 0, problemCount: problems.length });
   };
 
-  await runWatchLoop({ sourceRoot, ignoreDirs: [resolve(output)], rebuild, signal: effectiveSignal, debounceMs, projectRoot: process.cwd() });
+  await runWatchLoop({
+    sourceRoot, ignoreDirs: [resolve(output)], rebuild, signal: effectiveSignal, debounceMs, projectRoot: process.cwd(),
+    watchPaths: (settings.watchPaths ?? []).map((w) => w.path),
+  });
   return 0;
 }
 
