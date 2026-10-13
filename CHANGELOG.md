@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.16-alpha.1] - 2026-10-13
+
+An alpha of 0.11.16, published to npm under the `next` tag (`npm install @fwdslsh/unify@next`)
+from the `release/0.11.16` branch; 0.11.16 follows once it has been tried. Two watch-mode
+changes, both opt-in or invisible: nothing a build or an audit does is different.
+
 ### Added
 
 - **`--watch-path <path>`: files and directories outside the project that `dev` and `watch` rebuild on (#132).** A generator reading `../external/data.txt` was not rerun when that file changed, because nothing outside the source root and the project root is watched; the next source edit or a restart picked it up. `--watch-path` (repeatable; saved as `watch-path:` in `unify.yaml`, a list or one value) names a file or a directory: an edit to the file, or to anything under the directory, including files created there later, runs the usual debounced full rebuild and reruns the generator. A named file is watched through its parent directory, so an editor's replace-by-rename or a delete and recreate still counts. A watch path is a trigger only — never scanned, included or published — the output directory cannot start a rebuild through one, and overlapping paths still give one rebuild per change. A path is relative to the working directory on the command line and to the file in `unify.yaml`; one that does not exist exits `2` naming the path and what named it, before the first build. `build` and `audit` ignore it, and without it nothing changes; an `extends` directory outside the project is still not watched on its own. unify's own docs site names `../../docs` and `../../templates/docs` (conformance-spec §16).
@@ -1084,7 +1090,8 @@ with generated compare-link notes only. Their diffs are on the
 [releases page](https://github.com/fwdslsh/unify/releases). Nothing here
 retroactively reconstructs detail those notes never carried.
 
-[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.11.15...HEAD
+[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.11.16-alpha.1...HEAD
+[0.11.16-alpha.1]: https://github.com/fwdslsh/unify/compare/v0.11.15...v0.11.16-alpha.1
 [0.11.15]: https://github.com/fwdslsh/unify/compare/v0.11.14...v0.11.15
 [0.11.14]: https://github.com/fwdslsh/unify/compare/v0.11.13...v0.11.14
 [0.11.13]: https://github.com/fwdslsh/unify/compare/v0.11.12...v0.11.13
