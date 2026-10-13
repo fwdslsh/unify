@@ -8,11 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.11.16-alpha.1] - 2026-10-13
+## [0.11.16] - 2026-10-13
 
-An alpha of 0.11.16, published to npm under the `next` tag (`npm install @fwdslsh/unify@next`)
-from the `release/0.11.16` branch; 0.11.16 follows once it has been tried. Two watch-mode
-changes, both opt-in or invisible: nothing a build or an audit does is different.
+Published to npm as `latest`; 0.11.16-alpha.1 on the `next` tag is folded into this entry.
+Two watch-mode changes, both opt-in or invisible: nothing a build or an audit does is different.
 
 ### Added
 
@@ -1090,8 +1089,8 @@ with generated compare-link notes only. Their diffs are on the
 [releases page](https://github.com/fwdslsh/unify/releases). Nothing here
 retroactively reconstructs detail those notes never carried.
 
-[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.11.16-alpha.1...HEAD
-[0.11.16-alpha.1]: https://github.com/fwdslsh/unify/compare/v0.11.15...v0.11.16-alpha.1
+[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.11.16...HEAD
+[0.11.16]: https://github.com/fwdslsh/unify/compare/v0.11.15...v0.11.16
 [0.11.15]: https://github.com/fwdslsh/unify/compare/v0.11.14...v0.11.15
 [0.11.14]: https://github.com/fwdslsh/unify/compare/v0.11.13...v0.11.14
 [0.11.13]: https://github.com/fwdslsh/unify/compare/v0.11.12...v0.11.13
