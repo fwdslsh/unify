@@ -380,6 +380,40 @@
   .docnav-all a { color: var(--dim); text-decoration: none; }
   .docnav-all a:hover { color: var(--accent); }
 
+  /* Previous and next links at the foot of a page, from scripts/docs-nav.mjs:
+     two links, or one at either end of the reading order. */
+  .pager {
+    display: flex;
+    gap: 1rem;
+    max-width: var(--measure);
+    margin: 3rem 0 0;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border-faint);
+  }
+  .pager a {
+    flex: 0 1 calc(50% - 0.5rem);
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    text-decoration: none;
+    transition: color var(--dur), border-color var(--dur);
+  }
+  .pager a:hover { color: var(--accent); border-color: var(--accent); }
+  .pager span {
+    display: block;
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--dim);
+  }
+  .pager-next { margin-left: auto; text-align: right; }
+
+  @media (max-width: 36rem) {
+    .pager { flex-direction: column; }
+    .pager a { flex-basis: auto; }
+    .pager-next { margin-left: 0; text-align: left; }
+  }
+
   /* ------------------------------------------------------------------ prose */
 
   h1, h2, h3, h4, h5, h6 {
@@ -913,7 +947,7 @@
       --glow: none !important;
       --grid-lines: transparent !important;
     }
-    .site-head, .subnav, .docnav, .site-foot, .skip-link, .copy-btn { display: none; }
+    .site-head, .subnav, .docnav, .pager, .site-foot, .skip-link, .copy-btn { display: none; }
     .shell { display: block; padding: 0; }
     a { color: var(--text); }
     .hero h1 { -webkit-text-fill-color: currentColor; background: none; }

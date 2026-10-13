@@ -1173,7 +1173,7 @@ test("SD-03 — jsonld-url-mismatch needs both to resolve; a location the site d
   expectEmitted(tmp, "a.html", "b.html", "c.html", "d.html", "dir/index.html");
 
   const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
-  expectExit(r, 0, "audit over the url fixtures");
+  expectExit(r, 1, "audit over the url fixtures (broken: §24.6 exits 1 without --strict)");
   const ID = "jsonld-url-mismatch";
   expectFires(r, ID, "src/a.html", "broken", "§26.3: two addresses for one page");
   expectSilent(r, ID, "src/b.html", "§26.3: the two resolve to one output path");
@@ -1214,7 +1214,7 @@ test("SD-04 — jsonld-lang-mismatch compares primary subtags, case-insensitivel
   expectEmitted(tmp, "fr.html", "case.html", "refine.html", "refine-rev.html", "nolang.html");
 
   const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
-  expectExit(r, 0, "audit over the language fixtures");
+  expectExit(r, 1, "audit over the language fixtures (broken: §24.6 exits 1 without --strict)");
   const ID = "jsonld-lang-mismatch";
   expectFires(r, ID, "src/fr.html", "broken", "§26.3: en against fr is two answers");
   expectSilent(r, ID, "src/case.html", "§26.3: EN-us and en-US are one tag");
@@ -1260,7 +1260,7 @@ test("SD-05 — jsonld-entity-conflict needs one @id and two types; one finding 
   expectEmitted(tmp, "conflict.html", "two-entities.html", "same-type.html", "pair.html");
 
   const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
-  expectExit(r, 0, "audit over the entity fixtures");
+  expectExit(r, 1, "audit over the entity fixtures (broken: §24.6 exits 1 without --strict)");
   const ID = "jsonld-entity-conflict";
   const one = expectFires(r, ID, "src/conflict.html", "broken", "§26.3: one entity classed two ways");
   if (one.length !== 1) throw new Error(`§26.3: one finding per @id, got ${one.length} on src/conflict.html`);
@@ -1309,7 +1309,7 @@ test("SD-06 — date-unusable quotes the author's own bytes, and the generated b
   }
 
   const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
-  expectExit(r, 0, "audit over the date fixtures");
+  expectExit(r, 1, "audit over the date fixtures (broken: §24.6 exits 1 without --strict)");
   const ID = "date-unusable";
   const bads = expectFires(r, ID, "src/bad.md", "broken", "§26.3: a date no consumer can use");
   if (bads.length !== 1) throw new Error(`§26.3: one finding per field, got ${bads.length} on src/bad.md`);
@@ -1377,7 +1377,7 @@ test("SD-07 — the comparisons §26.3 declines to make: dates at two granularit
   expectEmitted(tmp, "contact.html", "flag.html");
 
   const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
-  expectExit(r, 0, "audit over the uncompared pairs");
+  expectExit(r, 1, "audit over the uncompared pairs (broken: §24.6 exits 1 without --strict)");
 
   // The control fires. Everything below is now a claim about §26.3's choices
   // rather than about whether §26.3 ran.
@@ -1437,7 +1437,7 @@ test("SD-01 — a @graph or an array is several entities, so every §26.3 compar
   expectEmitted(tmp, "single.html", "graph.html", "array.html", "other.html");
 
   const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
-  expectExit(r, 0, "audit over the three shapes");
+  expectExit(r, 1, "audit over the three shapes (broken: §24.6 exits 1 without --strict)");
 
   // The positive control: as a single object, the payload is a subject object
   // and three of the findings fire. Without this the silence below is vacuous.
@@ -1495,7 +1495,7 @@ test("SD-01 — date-unusable reads no block, so a @graph page with a malformed 
   expectEmitted(tmp, "graph.html", "plain.html");
 
   const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
-  expectExit(r, 0, "audit over a @graph page with a malformed date");
+  expectExit(r, 1, "audit over a @graph page with a malformed date (broken: §24.6 exits 1 without --strict)");
   for (const page of ["src/graph.html", "src/plain.html"]) {
     expectFires(r, "date-unusable", page, "broken",
       "§26.3: date-unusable is the one finding here that reads no JSON-LD — a @graph does not silence it");
@@ -1663,7 +1663,7 @@ test("SD-08 — a schema declaration in the body generates nothing, is not P23, 
   }
 
   const r = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
-  expectExit(r, 0, "audit over two body-placed declarations");
+  expectExit(r, 1, "audit over two body-placed declarations (broken: §24.6 exits 1 without --strict)");
   for (const page of ["src/accepted.html", "src/misspelled.html"]) {
     const hits = expectFires(r, "metadata-in-body", page, "broken",
       "§24.4: `schema` is in the closed set — unify's own key, read with the head");

@@ -161,6 +161,43 @@ test("EXT-04 — a template overlapping the source root or the output directory 
   covers("EXT-04");
 }, TEST_MS);
 
+test("EXT-03 — a generator's file replaces the template's at the same path, and is no collision; a source file of the site's own still is", async () => {
+  // §34.2: the overlay is the site, and the template is the last root. This is
+  // how the docs template's `_includes/docnav.html` is replaced by the sidebar
+  // a generator writes (§33.4 refuses only the source tree against the overlay).
+  const tmp = mkTmp();
+  writeTree(join(tmp, "tpl"), TEMPLATE);
+  const gen =
+    'import { mkdirSync, writeFileSync } from "node:fs";\n' +
+    'mkdirSync(process.argv[3] + "/_includes", { recursive: true });\n' +
+    'writeFileSync(process.argv[3] + "/_includes/nav.html", "<nav>generated nav <a href=\\"/index.html\\">home</a> <a href=\\"/about.html\\">about</a></nav>\\n");\n';
+  writeTree(join(tmp, "proj"), {
+    "docs/index.md": md("Home", "Read [about](about.html)."),
+    "scripts/gen.mjs": gen,
+    "unify.yaml": "source: docs\nextends: ../tpl\ngenerate: scripts/gen.mjs\n",
+  });
+  const proj = join(tmp, "proj");
+
+  const r = await runCli(["build", "--strict"], proj);
+  expectExit(r, 0, "a generated include at a template include's path");
+  const index = read(proj, "dist", "index.html");
+  if (!index.includes("generated nav")) throw new Error(`the generator's include replaces the template's:\n${index}`);
+  if (index.includes("template nav")) throw new Error(`the template's include must be left out:\n${index}`);
+  // The template's own pages compose with the generated nav as well.
+  if (!read(proj, "dist", "about.html").includes("generated nav")) throw new Error("the template's about.html gets the generated nav");
+  expectExit(await runCli(["audit", "--strict"], proj), 0, "audit judges the composed site and finds it clean");
+
+  // A site that kept its own copy of that include meets the generator's file:
+  // the site's two trees collide whatever sits behind them.
+  writeTree(proj, { "docs/_includes/nav.html": "<nav>site nav</nav>\n" });
+  const clash = await runCli(["build", "--strict"], proj);
+  expectExit(clash, 1, "the site's own include and the generator's at one path");
+  if (!/_includes\/nav\.html and _includes\/nav\.html \(generated\)/.test(clash.stderr)) {
+    throw new Error(`P12 names both, the second as generated:\n${clash.stderr}`);
+  }
+  covers("EXT-03", "GEN-05");
+}, TEST_MS);
+
 // --------------------------------------------------------------- EXT-05/06
 
 test("EXT-05/EXT-06 — a pinned git commit is fetched once into the cache and built offline after; an unpinned ref is never cached and an unreachable one writes nothing", async () => {

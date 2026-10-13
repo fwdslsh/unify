@@ -123,6 +123,8 @@ Everything below is published at **[unify.fwdslsh.dev](https://unify.fwdslsh.dev
 - **[Integrations](docs/integrations.md)** — the compile-to-asset pattern: Svelte, TypeScript, or anything with a compiler, without adopting a framework.
 - **[Eleventy + htmx](docs/guides/eleventy-htmx.md)** — the advanced stack: another generator produces data-driven pages, unify composes them, htmx enhances them. Optional layers, and when not to reach for them.
 - **[Catalog and Search](docs/guides/catalog-and-search.md)** — a blog list, facets, and a search box built client-side from the two files `--catalog`/`--search-corpus` write.
+- **[Generator Recipes](docs/guides/generator-recipes.md)** — a content hash in an asset's URL, and an RSS feed with day-only dates handled your way, each in a screenful of `--generate`.
+- **[Template Versions](docs/guides/template-versions.md)** — pin a template to a version, move the pin with `unify update`, pin what `extends:` builds on, and try a template or unify before it ships.
 - **[Docker Usage](docs/docker-usage.md)** — running the CLI in a container.
 - **[Examples](examples/README.md)** — eight complete sites and the patterns they demonstrate.
 
@@ -167,7 +169,7 @@ The full list, with the reasoning and the accepted costs, is [Product Specificat
 
 ## Auditing
 
-`unify audit` answers a different question — not *is this build sound?* but *is this site complete?* It runs the same pipeline, publishes nothing, and reports findings: a page with no description, two pages sharing a title, a `#fragment` link that names nothing, duplicate ids, a page nothing links to, structured data that contradicts its page. No score, no grade, no character counts — and `build` never runs any of it, so no finding can hold up a release. `unify audit --strict` is the opt-in CI gate, `--format json|sarif` is the machine-readable mirror, and `--external` checks off-origin links — the one flag in the product that touches the network. While `unify dev` is running, the same findings are a live page at `http://localhost:3000/_unify/`, grouped by page with each page's record beside them.
+`unify audit` answers a different question — not *is this build sound?* but *is this site complete?* It runs the same pipeline, publishes nothing, and reports findings: a page with no description, two pages sharing a title, a `#fragment` link that names nothing, duplicate ids, a page nothing links to, structured data that contradicts its page. No score, no grade, no character counts — and `build` never runs any of it, so no finding can hold up a release. `unify audit` exits `1` on a `broken` finding (output that contradicts itself — wrong whatever you meant), `unify audit --strict` also fails on `incomplete` ones (what you may have chosen) and is the strict CI gate, while `unify build --audit` publishes only if the same audit would pass. `--format json|sarif` is the machine-readable mirror, and `--external` checks off-origin links — the one flag in the product that touches the network. While `unify dev` is running, the same findings are a live page at `http://localhost:3000/_unify/`, grouped by page with each page's record beside them.
 
 ## Contributing
 

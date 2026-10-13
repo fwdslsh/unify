@@ -41,7 +41,7 @@ catalog: true
 # exit 1 on advisories too, not only on problems (default: false)
 # strict: true
 
-# with build, run the audit and publish nothing if it reports a finding; with init, keep the scaffold only if it audits clean (default: false)
+# with build, run the audit and publish nothing if it reports a broken finding (any finding, under strict); with init, keep the scaffold only if it audits clean (default: false)
 # audit: true
 
 # the port unify dev serves on (default: 3000)

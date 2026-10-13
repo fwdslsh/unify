@@ -34,7 +34,7 @@ Options:
       --dry-run            run the full build and every check, print the report, write nothing
       --audit              `build` only: audit the composed site before publishing; publish only if `unify audit` would exit 0
       --save-config        `build` only: write the saveable options given here into unify.yaml (after a good build)
-      --strict             advisories count as problems for the exit code (with `audit`, findings too)
+      --strict             advisories count as problems for the exit code (with `audit`, `incomplete` findings too; `broken` ones always exit 1)
       --format <kind>      `audit` report shape: human (default), json, or sarif
       --external           `audit` only: fetch every off-origin URL the site emits and report the ones that don't resolve
   -p, --port <n>           port for `unify dev` (default: 3000)
@@ -68,7 +68,7 @@ notes.html: broken: #install in guide.html names no element [fragment-missing]
 audit: 1 broken, 1 incomplete
 ```
 
-Findings never block a build — `unify build` does not run any of these checks (unless you pass `--audit`), so a site full of them still publishes. `unify audit --strict` exits `1` on any finding, of either severity: that is the CI gate, and it is opt-in.
+Findings never block a build — `unify build` does not run any of these checks (unless you pass `--audit`), so a site full of them still publishes. `unify audit` exits `1` on a `broken` finding, with or without `--strict`: broken is objective — wrong whatever you intended — so there is nothing to opt out of. An `incomplete` finding may be a choice (a page nothing links to, on purpose), so on its own it exits `0`; `unify audit --strict` exits `1` on any finding, of either severity, and is the strict CI gate. The report is the same either way, in every `--format`; only the exit code differs.
 
 Worth knowing before you wire it up: **every `init` template passes `unify audit --strict` from the moment it is scaffolded.** `unify init <template> && unify audit --strict` exits `0` for all five, with no `--base-url` and nothing edited, and the conformance suite asserts it per template — so a finding on a fresh scaffold is a regression, and the first finding you see is about something you wrote. It was not always true: each template used to ship between seven and thirteen `incomplete` findings, mostly a missing `lang` or a page without its own description. They were real gaps, and the fix was the templates rather than the gate.
 
@@ -115,7 +115,7 @@ A template is a project laid out as `init` lays one out: `site/` (or `src/`) bes
 
 **`--audit`** keeps the scaffold only if it is a proper unify site: after writing, `unify audit --strict` runs over the new project (with its own `unify.yaml`, so the blog's generator and the docs template's `catalog: true` are honored) and prints its report; a finding removes everything `init` wrote and exits `1`. Every built-in passes it.
 
-`init` also writes one line into `unify.yaml`: `template: <source>`, the template as you typed it (a directory relative to the file). That line is the whole record — no version, no file list — and it is what `unify update` reads. `--template <source>` is the positional spelled as an option.
+`init` also writes one line into `unify.yaml`: `template: <source>`, the template as you typed it (a directory relative to the file). That line is the whole record — no version, no file list — and it is what `unify update` reads, so a version in the source (`unify-shop-template@1.4.0`, `…#v2`, a commit) is a pin. `--template <source>` is the positional spelled as an option. Which sources pin, and how to try a version before it ships: [`guides/template-versions.md`](guides/template-versions.md).
 
 ### `unify update [template]`
 
@@ -129,7 +129,7 @@ The command prints every file it would overwrite and add, and when at least one 
 
 The list is the protection for your edits: a file you changed that the template also ships is in it like any other difference, and the answer is yours. Nothing merges and no flag merges. **`keep`** is the one exception, declared in `unify.yaml` (`keep:` under `template:` — a list of paths relative to the file, beside `source:`) or on the command line (`--keep <path>`, repeatable, relative to the working directory, replacing the file's list): a listed file that exists is never overwritten — printed as `keep <path>` when the template's copy differs, counted as kept in the summary, never asked about — and a listed file you do not have yet is added. The built-ins list `unify.yaml` itself and `site/assets/theme.css`; add what you customize, such as `site/_includes/nav.html`. A template built as [`templates.md`](templates.md) §3 recommends ships the files you fill in only as examples under `_examples/`, so its list is tooling and little else. Writes are temp-then-rename beside their target; a symlink, a path that resolves outside the project, or a `..` in a template path is skipped and reported, never written; the fetch happens before any write, so an unreachable source changes nothing; and nothing a template ships is ever executed.
 
-The workflow around these two commands, and how to publish a template, is in [`templates.md`](templates.md).
+The workflow around these two commands, and how to publish a template, is in [`templates.md`](templates.md); moving a pinned source with `unify update <source>` is in [`guides/template-versions.md`](guides/template-versions.md).
 
 A project with no `template:` line (scaffolded before 0.11.5, or the line was lost) has no record: `unify update` exits `2` and names the line to add — or run `unify update <source>` once, which records the source it was given. Where a `unify.template.json` from 0.11.2 to 0.11.4 is still present, the error composes the exact line from it.
 
@@ -220,7 +220,7 @@ src/posts/hello.md: advisory: date is "2026-01-02", which names a day rather tha
 
 Each entry's `<id>` and `<link>` are the page's own canonical (authored, or completed by `--canonical auto`), never a second address; `<updated>` prefers `dateModified` over `datePublished` when it carries a time. `--feed-full` additionally puts each entry's rendered `<main>` into `<content type="html">` — without it, every entry carries a plain-text `<summary>`. Every internal URL the feed emits is checked exactly as a broken link would be, so a target the site does not emit blocks the publish rather than shipping a feed reader will 404 on.
 
-If your source tree already contains a `feed.xml`, that file **is** the site's feed: unify ships it untouched and generates nothing, exactly as it treats an authored `sitemap.xml`. The `blog` template's own generator writes one for this reason.
+If your source tree already contains a `feed.xml`, that file **is** the site's feed: unify ships it untouched and generates nothing, exactly as it treats an authored `sitemap.xml`, and a `feed.xml` your generator writes counts the same way. For RSS, or a feed that lists day-dated posts, write it yourself from the source inventory: [the generator recipes](guides/generator-recipes.md#an-rss-feed) do it as `rss.xml` beside this feed, or as `feed.xml` in place of it.
 
 ## Catalog (`catalog.json`)
 
@@ -287,7 +287,7 @@ Same membership as the catalog, same author-wins rule: a `src/assets/unify/searc
 
 Runs one JavaScript file from your source tree before the build scans anything. `build`, `watch`, `dev`, and `audit` all take it, because all four scan the source tree.
 
-It names a **file**, never a command. There is no shell, no argument list, and no way to say "and then run this other thing" — a path is something you wrote and can read. A relative path resolves against the source root and an absolute path is taken as written; the file can live anywhere — `_scripts/gen.mjs` inside `src/`, `../scripts/gen.mjs` beside it at the project root, or an absolute path — and is never published, because only the source tree and the generated directory are scanned. (One thing to know: `unify dev` watches the source tree, so editing a generator that lives outside it does not trigger a rebuild on its own.) There is one generator per build: giving `--generate` twice on the command line is a usage error (exit 2), so put several tasks inside the one file and have it import and call the others. A `generate:` saved in `unify.yaml` plus one `--generate` is fine; the command line wins.
+It names a **file**, never a command. There is no shell, no argument list, and no way to say "and then run this other thing" — a path is something you wrote and can read. A relative path resolves against the source root and an absolute path is taken as written; the file can live anywhere — `_scripts/gen.mjs` inside `src/`, `../scripts/gen.mjs` beside it at the project root, or an absolute path — and is never published, because only the source tree and the generated directory are scanned. (`unify dev` and `watch` watch the project root as well as the source tree: its own files, and every directory directly under it that exists at startup, recursively — so saving `scripts/gen.mjs` rebuilds. Not watched: `node_modules/`, dot-directories such as `.git/`, the output directory, `unify.yaml`, and a generator, or a file it reads, outside the project root. [The Eleventy + htmx guide](guides/eleventy-htmx.md#what-re-runs-measured) measures it edit by edit.) There is one generator per build: giving `--generate` twice on the command line is a usage error (exit 2), so put several tasks inside the one file and have it import and call the others. A `generate:` saved in `unify.yaml` plus one `--generate` is fine; the command line wins.
 
 The whole interface is three positional arguments:
 
@@ -295,7 +295,7 @@ The whole interface is three positional arguments:
 const [, , sourceRoot, generatedDir, contextPath] = process.argv;
 ```
 
-`sourceRoot` is your source tree; `generatedDir` is an empty directory that exists only for this build. Files written into `generatedDir` join the build as an overlay — scanned, composed, checked, published, and colliding with a same-named source file exactly like any other page. Files written anywhere else are your own business. There is no unify module to import, no object passed in, and no return value read.
+`sourceRoot` is your source tree; `generatedDir` is an empty directory that exists only for this build. Files written into `generatedDir` join the build as an overlay — scanned, composed, checked, published, and colliding with a same-named source file exactly like any other page (a same-named file that never publishes, such as an `_includes/` fragment, collides too). Files written anywhere else are your own business. There is no unify module to import, no object passed in, and no return value read.
 
 `contextPath` is new in 0.9 and additive: a generator written before it existed, reading only `sourceRoot`/`generatedDir`, keeps working exactly as it did. It names a JSON file — read-only, yours to consult or ignore — that tells you the handful of build facts unify is willing to promise as a stable contract:
 
@@ -355,7 +355,7 @@ The pages are exactly the ones the build would treat as pages in your source tre
 
 - A generated page finds a layout by the ordinary walk. `docs/api.md` looks for `docs/_layout.html`, then `_layout.html` — in either tree — with no `layout:` line of its own. Writing one is still allowed and still means what it says.
 - `<include src="/_includes/nav.html">` in a hand-written layout finds the fragment your generator wrote, and `<include src="./sibling.html">` in a generated page finds the file you wrote. Relative paths count from the page's own place in the tree, which is where you put it in `generatedDir`.
-- Where the same path exists in both, **your file wins** — a generator cannot quietly replace something you wrote. That only comes up for files that never publish, like a fragment under `_includes/`: when a *page* exists in both trees, the build stops and names both (neither one silently wins). Nearest still beats everything in the layout walk, so a `docs/_layout.html` your generator wrote is the layout for `docs/`, including for pages you hand-wrote there.
+- Where the same path exists in both, **neither wins: the build stops and names both** — a generator cannot quietly replace something you wrote, and your file cannot quietly hide one the generator wrote. That holds for every kind of file, not only pages: an `_includes/nav.html`, a `_layout.html`, a `_data/` file, an asset and a `.fragment.html` in both trees are each one problem, located at your file with the generated one marked `(generated)`. To let the generator supply a path, delete your file; to keep yours, stop the generator writing it. (A generated file at the path of a file beside `package.json`, or of one in a template the site `extends`, replaces it: those sit behind the site, and only the source tree and the generated directory collide.) Nearest still decides the layout walk, so a `docs/_layout.html` your generator wrote is the layout for `docs/`, including for pages you hand-wrote there.
 
 The working directory is the source root, so `readFileSync("_data/authors.json")` means what you would expect.
 
@@ -363,7 +363,7 @@ The working directory is the source root, so `readFileSync("_data/authors.json")
 
 It runs on **every** build, including every rebuild under `watch` and `dev` — a generator that ran once would leave watch output stale while the build reported success. A non-zero exit is a located problem: nothing publishes, and the previous `dist/` is untouched.
 
-unify runs the file you named. It does not sandbox it, restrict what it reads or writes, or check its output for anything an ordinary build would not. What it does guarantee is that nothing the generator produces skips a check, and that a generator's failure is a build failure. `docs/integrations.md` works the common shapes — a data-driven index, image derivatives, a CMS pulled to disk.
+unify runs the file you named. It does not sandbox it, restrict what it reads or writes, or check its output for anything an ordinary build would not. What it does guarantee is that nothing the generator produces skips a check, and that a generator's failure is a build failure. `docs/integrations.md` works the common shapes — a data-driven index, image derivatives, a CMS pulled to disk — and [the generator recipes](guides/generator-recipes.md) add two small ones: a content hash in an asset's URL, and an RSS feed.
 
 ### `--dry-run`
 
@@ -393,7 +393,7 @@ Build on a template without copying it into the project ([`conformance-spec.md`]
 
 The template's source tree (its `site/`, else `src/`, else the whole directory) sits beneath yours. Its layouts and includes resolve when you have none at that path, and its pages and assets publish when you have nothing at the same path or output path. **Your file always wins**: write `index.md` and the template's `index.html` is left out; write `assets/theme.css` and yours is the theme; write `_includes/nav.html` and every layout includes yours. To leave out a template page you don't want, use `--exclude` (`exclude:` listing `_*` and the page). Nothing else in the template is read: not its `unify.yaml` (your own settings decide everything), not its generator, and nothing it ships executes. `--dry-run` marks every row that comes from the template `(template)`, and a diagnostic in a template file names it where it is (`unify-docs-template@0.1.1/_layout.html`).
 
-The template is fetched before anything else runs. A source that cannot be reached exits `2` and writes nothing. A **pinned** source (an npm package at an exact version, a git commit, a built-in) is fetched once into `unify/templates/` in your cache directory (`$XDG_CACHE_HOME`, else `%LOCALAPPDATA%` on Windows, else `~/.cache`), and every later build reads it from there, offline. Anything else (a bare name, a tag, a branch) is fetched once per run. A directory is read where it is, every build.
+The template is fetched before anything else runs. A source that cannot be reached exits `2` and writes nothing. A **pinned** source (an npm package at an exact version, a git commit, a built-in) is fetched once into `unify/templates/` in your cache directory (`$XDG_CACHE_HOME`, else `%LOCALAPPDATA%` on Windows, else `~/.cache`), and every later build reads it from there, offline. Anything else (a bare name, a tag, a branch) is fetched once per run. A directory is read where it is, every build. Pinning for a reproducible build: [`guides/template-versions.md`](guides/template-versions.md).
 
 ```yaml
 # unify.yaml — a repository whose Markdown lives in docs/
@@ -420,7 +420,7 @@ A file `update` never overwrites once it exists — one you customized. Relative
 
 ### `--audit` (build and init)
 
-With `init`: scaffold, audit the result with `unify audit --strict`, keep it only if that passes (see `unify init` above). With `build`: compose once, audit that result, publish only if it passes. The generator (`--generate`) runs once, the site is composed once, and the same findings `unify audit` would print are evaluated over that exact composition, then printed (human format) after the build's diagnostics. The build publishes iff `unify audit` with the same flags would exit `0`: no problems, and with `--strict` also no advisories and no findings. Without `--strict`, findings are reported but block nothing. A blocked gate exits `1` and leaves the previous output untouched. With `--dry-run` it reports and writes nothing, exiting as the gate would. `--external` and `--format` remain `audit`-only. `audit: true` is saveable in `unify.yaml`.
+With `init`: scaffold, audit the result with `unify audit --strict`, keep it only if that passes (see `unify init` above). With `build`: compose once, audit that result, publish only if it passes. The generator (`--generate`) runs once, the site is composed once, and the same findings `unify audit` would print are evaluated over that exact composition, then printed (human format) after the build's diagnostics. The build publishes iff `unify audit` with the same flags would exit `0`: no problems and no `broken` finding, and with `--strict` also no advisories and no `incomplete` findings. Without `--strict`, `incomplete` findings are reported but block nothing, and a `broken` one blocks. A blocked gate exits `1` and leaves the previous output untouched. With `--dry-run` it reports and writes nothing, exiting as the gate would. `--external` and `--format` remain `audit`-only. `audit: true` is saveable in `unify.yaml`.
 
 `unify build --audit --strict` replaces the three-step `build --dry-run --strict && build && audit --strict`.
 
@@ -445,7 +445,7 @@ Nothing else is checked, on purpose. `Disallow: /admin/` on a site with no `/adm
 | Code | Meaning |
 |---|---|
 | `0` | The site was published (with `--dry-run`: would have been). |
-| `1` | Problems found — nothing was published, the previous output is untouched. Under `--strict`, advisories alone also exit `1`, and for `audit` so does any finding. |
+| `1` | Problems found — nothing was published, the previous output is untouched. Under `--strict`, advisories alone also exit `1`. For `audit`, a `broken` finding exits `1` on its own, and under `--strict` so does any finding. |
 | `2` | Invalid usage or fatal environment error (unknown flag, missing source directory, the `--clean` refusal, port in use). |
 
 ## Diagnostics

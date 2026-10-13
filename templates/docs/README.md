@@ -124,6 +124,35 @@ generator, the script `unify.yaml` names under `generate:`:
       github: "https://github.com/you/project/blob/main/docs",
     });
 
+**Ordering what you publish.** The importer cannot know the order a reader should take a folder in.
+`scripts/docs-nav.mjs` takes the pages it returns and one ordered list of groups, and writes the three
+things that order decides, so they cannot disagree: the sidebar (`_includes/docnav.html`), an index of
+every document (`docs/index.md`), and a pair of previous/next links at the foot of every page.
+
+    // scripts/gen.mjs, after importDocs
+    import { docsNav } from "./docs-nav.mjs";         // from "unify-docs-template/scripts/docs-nav.mjs" when you extend the template
+    const pages = importDocs({ /* as above */ });
+    docsNav({
+      pages,
+      into: overlay,
+      groups: [
+        { label: "Guides", docs: [["getting-started.md", "Getting started"], ["guides/deploy.md", "Deploying"]] },
+        { label: "Reference", docs: [["cli.md"]] },    // the short label is optional: the title is used
+      ],
+    });
+
+A document is named by its path inside the folder. The groups and the documents within them, in the order
+written, are the reading order, and previous/next follow it across groups: one link on the first and last
+page, two elsewhere, a `<nav aria-label="Previous and next pages">` the template's stylesheet styles. A document
+no group lists goes in a trailing "More" group, after the listed ones, so a new document is reachable the day it
+is added. A listed document the importer did not produce, or one listed twice, stops the build with an error
+naming it. `index: { title, description, intro }` sets the index page's text; `base` is the one you gave `importDocs`.
+The generated sidebar replaces the template's include, so your own `site/` must not keep an
+`_includes/docnav.html` of its own: a site that extends the template has none, and a site that copied
+it deletes its copy. Left in place it is a collision, not a quiet winner: the build stops with a
+problem naming both the file and the generated one (the same path in the source tree and the
+generator's directory is refused whether or not it publishes).
+
 ## Composition
 
 - Every page is wrapped by the nearest `_layout.html` — its own folder, then each parent. Choose a

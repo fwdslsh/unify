@@ -428,7 +428,7 @@ test(
     // Not rewritten either: §12 strips the fragment to MATCH, never to edit.
     expectContains(readFileSync(join(ok, "dist", "index.html"), "utf8"), 'href="/notes.html#nowhere"', "the author's bytes");
     const audited = await runCli(["audit", "-s", "src", "-o", "dist"], ok);
-    expectExit(audited, 0, "a finding never changes an exit code without --strict");
+    expectExit(audited, 1, "fragment-missing is broken, so audit exits 1 without --strict (§24.6) — the build above still published");
     expectContains(audited.stdout, "[fragment-missing]", "the judgement is a finding, and §24.4 owns it");
 
     const brokenPath = mkTmp();
@@ -461,7 +461,7 @@ test(
     if (!existsSync(join(tmp, "dist", "notes.html"))) throw new Error("the page must publish");
 
     const audited = await runCli(["audit", "-s", "src", "-o", "dist"], tmp);
-    expectExit(audited, 0, "audit reports without blocking");
+    expectExit(audited, 1, "id-duplicate is broken, so audit exits 1 without --strict (§24.6) — the build above still published");
     const dup = audited.stdout.split("\n").filter((l) => l.includes("[id-duplicate]"));
     if (dup.length !== 1) throw new Error(`expected exactly one id-duplicate, got ${dup.length}:\n${audited.stdout}`);
     expectContains(dup[0], "notes.html: broken:", "located at the page that DECLARES the ids");

@@ -60,7 +60,7 @@ import * as publishModule from "../../core/publish.js";
 import * as references from "../../core/references.js";
 import * as urls from "../../core/urls.js";
 import { buildManifest } from "../../core/manifest.js";
-import { auditManifest, formatFindings } from "../../core/audit.js";
+import { auditExitCode, auditManifest, formatFindings } from "../../core/audit.js";
 import * as sitemap from "../../core/sitemap.js";
 import * as feed from "../../core/feed.js";
 import * as catalog from "../../core/catalog.js";
@@ -201,6 +201,12 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
     scanSourceTree(sourceRoot, output, settings.exclude, reporter, overlayDir, layer?.root ?? null),
     settings.prettyUrls,
   );
+
+  // §33.4 — a path in both the source tree and the overlay that publishes
+  // nothing (an underscore fragment, a `_layout.html`, an excluded file) is
+  // P12 too; the pairs that publish are refused by the output-path check
+  // below. Here, before composition, so it is never a precedence question.
+  collisions.overlayCollisionDiagnostics(files, reporter);
 
   // §6.3/P08 — every .html/.md source file, excluded or not (§1: a "page" by
   // extension; only the never-shipped list, already applied in the scan,
@@ -807,21 +813,22 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
     reporter.summary(formatFindings(findings, reporter.problemCount));
     // §24.6 — a pipeline problem exits 1 regardless: evaluating output that
     // cannot be built is meaningless, and the findings printed beside it
-    // describe a site that would never ship. Otherwise --strict is the gate,
-    // on any finding of either severity.
+    // describe a site that would never ship. Otherwise a `broken` finding
+    // fails the run, and under --strict any finding of either severity does.
     if (reporter.exitCode !== 0) return reporter.exitCode;
-    return settings.strict && findings.length > 0 ? 1 : 0;
+    return auditExitCode(findings, settings.strict);
   }
 
   // ---- §24.8 — `build --audit`: the gate. -----------------------------------
   // The findings above were evaluated over THIS run's manifest — the exact
   // bytes about to be published — so the gate is audit's own §24.6 rule, read
   // once: publish iff `unify audit` with these flags would exit 0. A pipeline
-  // problem (or, under --strict, an advisory) is `reporter.exitCode !== 0`;
-  // under --strict any finding also blocks. Without --strict findings are
-  // reported and block nothing, exactly as `unify audit` exits 0 on them.
+  // problem (or, under --strict, an advisory) is `reporter.exitCode !== 0`; a
+  // `broken` finding also blocks, and under --strict so does any finding.
+  // Without --strict an `incomplete` finding is reported and blocks nothing,
+  // exactly as `unify audit` exits 0 on it.
   const gated = settings.auditGate === true;
-  const gateBlocks = gated && (reporter.exitCode !== 0 || (settings.strict === true && findings.length > 0));
+  const gateBlocks = gated && (reporter.exitCode !== 0 || auditExitCode(findings, settings.strict) !== 0);
   if (gated) reporter.summary(formatFindings(findings, reporter.problemCount));
 
   // ---- §15 — transactional publish. ----------------------------------------
