@@ -38,6 +38,7 @@ Options:
       --format <kind>      `audit` report shape: human (default), json, or sarif
       --external           `audit` only: fetch every off-origin URL the site emits and report the ones that don't resolve
   -p, --port <n>           port for `unify dev` (default: 3000)
+      --watch-path <path>  `dev`/`watch`: a file or directory outside the project to rebuild on when it changes — watched only, never scanned or published (repeatable; relative to the working directory)
   -v, --version            print version
   -h, --help               print help
 ```
@@ -98,7 +99,7 @@ No flag turns it on, off, or moves it; `--port` is the only choice about the ser
 
 ### `unify watch`
 
-The same watch contract as `dev`, no server — for pairing with a server you already run. Saves are coalesced into one full rebuild (a save landing mid-rebuild queues exactly one follow-up); writes are atomic and minimal (unchanged files are not rewritten, deletions are precise), so external tools can consume the output directory safely.
+The same watch contract as `dev`, no server — for pairing with a server you already run. Saves are coalesced into one full rebuild (a save landing mid-rebuild queues exactly one follow-up); writes are atomic and minimal (unchanged files are not rewritten, deletions are precise), so external tools can consume the output directory safely. Inputs outside the project that a rebuild depends on (a generator's data, a template directory) are named with [`--watch-path`](#watch-path-path-dev-and-watch-repeatable). `dev` and `watch` can write their output to a file anywhere, the project root included (`unify watch > watch.log 2>&1 &`): the file the process itself writes as stdout or stderr is never a change. `unify dev | tee dev.log` is the exception, because another process writes that file, so keep such a log outside the project or in a dot-directory, which the watcher skips.
 
 ### `unify init [template]`
 
@@ -287,7 +288,7 @@ Same membership as the catalog, same author-wins rule: a `src/assets/unify/searc
 
 Runs one JavaScript file from your source tree before the build scans anything. `build`, `watch`, `dev`, and `audit` all take it, because all four scan the source tree.
 
-It names a **file**, never a command. There is no shell, no argument list, and no way to say "and then run this other thing" — a path is something you wrote and can read. A relative path resolves against the source root and an absolute path is taken as written; the file can live anywhere — `_scripts/gen.mjs` inside `src/`, `../scripts/gen.mjs` beside it at the project root, or an absolute path — and is never published, because only the source tree and the generated directory are scanned. (`unify dev` and `watch` watch the project root as well as the source tree: its own files, and every directory directly under it that exists at startup, recursively — so saving `scripts/gen.mjs` rebuilds. Not watched: `node_modules/`, dot-directories such as `.git/`, the output directory, `unify.yaml`, and a generator, or a file it reads, outside the project root. [The Eleventy + htmx guide](guides/eleventy-htmx.md#what-re-runs-measured) measures it edit by edit.) There is one generator per build: giving `--generate` twice on the command line is a usage error (exit 2), so put several tasks inside the one file and have it import and call the others. A `generate:` saved in `unify.yaml` plus one `--generate` is fine; the command line wins.
+It names a **file**, never a command. There is no shell, no argument list, and no way to say "and then run this other thing" — a path is something you wrote and can read. A relative path resolves against the source root and an absolute path is taken as written; the file can live anywhere — `_scripts/gen.mjs` inside `src/`, `../scripts/gen.mjs` beside it at the project root, or an absolute path — and is never published, because only the source tree and the generated directory are scanned. (`unify dev` and `watch` watch the project root as well as the source tree: its own files, and every directory directly under it that exists at startup, recursively — so saving `scripts/gen.mjs` rebuilds. Not watched: `node_modules/`, dot-directories such as `.git/`, the output directory, `unify.yaml`, and a generator, or a file it reads, outside the project root — unless you name it with [`--watch-path`](#watch-path-path-dev-and-watch-repeatable). [The Eleventy + htmx guide](guides/eleventy-htmx.md#what-re-runs-measured) measures it edit by edit.) There is one generator per build: giving `--generate` twice on the command line is a usage error (exit 2), so put several tasks inside the one file and have it import and call the others. A `generate:` saved in `unify.yaml` plus one `--generate` is fine; the command line wins.
 
 The whole interface is three positional arguments:
 
@@ -393,7 +394,7 @@ Build on a template without copying it into the project ([`conformance-spec.md`]
 
 The template's source tree (its `site/`, else `src/`, else the whole directory) sits beneath yours. Its layouts and includes resolve when you have none at that path, and its pages and assets publish when you have nothing at the same path or output path. **Your file always wins**: write `index.md` and the template's `index.html` is left out; write `assets/theme.css` and yours is the theme; write `_includes/nav.html` and every layout includes yours. To leave out a template page you don't want, use `--exclude` (`exclude:` listing `_*` and the page). Nothing else in the template is read: not its `unify.yaml` (your own settings decide everything), not its generator, and nothing it ships executes. `--dry-run` marks every row that comes from the template `(template)`, and a diagnostic in a template file names it where it is (`unify-docs-template@0.1.1/_layout.html`).
 
-The template is fetched before anything else runs. A source that cannot be reached exits `2` and writes nothing. A **pinned** source (an npm package at an exact version, a git commit, a built-in) is fetched once into `unify/templates/` in your cache directory (`$XDG_CACHE_HOME`, else `%LOCALAPPDATA%` on Windows, else `~/.cache`), and every later build reads it from there, offline. Anything else (a bare name, a tag, a branch) is fetched once per run. A directory is read where it is, every build. Pinning for a reproducible build: [`guides/template-versions.md`](guides/template-versions.md).
+The template is fetched before anything else runs. A source that cannot be reached exits `2` and writes nothing. A **pinned** source (an npm package at an exact version, a git commit, a built-in) is fetched once into `unify/templates/` in your cache directory (`$XDG_CACHE_HOME`, else `%LOCALAPPDATA%` on Windows, else `~/.cache`), and every later build reads it from there, offline. Anything else (a bare name, a tag, a branch) is fetched once per run. A directory is read where it is, every build; `dev` and `watch` rebuild when one outside the project changes only if you name it with [`--watch-path`](#watch-path-path-dev-and-watch-repeatable). Pinning for a reproducible build: [`guides/template-versions.md`](guides/template-versions.md).
 
 ```yaml
 # unify.yaml — a repository whose Markdown lives in docs/
@@ -405,6 +406,23 @@ base-url: https://owner.github.io/repo/
 ```
 
 `extends:` and `template:` are independent: `template:` is the record `unify update` fetches into a scaffolded project, and no build reads it; `extends:` is read by the build, and `update` never reads it.
+
+### `--watch-path <path>` (dev and watch, repeatable)
+
+Names a file or directory that a rebuild depends on and that nothing watches by itself ([`conformance-spec.md`](conformance-spec.md) §16): a sibling repository's `docs/` folder, a data file a generator reads, a template directory used with `--extends`. `unify dev` and `watch` already watch the source tree and the project root, so this is for inputs outside the project. An edit to a named file, or to any file under a named directory (one created there later included), is a change like any other: one debounced, coalesced full rebuild, which runs the generator again.
+
+A relative path is relative to the working directory on the command line and to the file's own directory in `unify.yaml`, where `watch-path:` takes a list or one value; the flag replaces the file's list, as `--exclude` does. Each path must exist when the command starts, or it exits `2` naming the path and the flag or file that named it, before anything is built. A named directory is watched recursively, except `.git/`, `node_modules/` and the other never-shipped names; a named file is watched through its parent directory, so an editor that saves by replacing the file, or a delete and recreate, still counts. A directory that is itself deleted and recreated is not watched again until you restart.
+
+A watch path only starts rebuilds. It is never scanned, included, composed or published because it is watched; the output directory cannot start a rebuild through it (name `.` and the project still builds once, not forever); and paths that overlap each other or the source tree still give one rebuild per change. Name inputs, not the system temporary directory, which is where a generator's scratch directory lives. `build` and `audit` ignore it. Nothing else is watched for you: a directory named with `--extends` outside the project is watched only if it is named here too.
+
+```yaml
+# unify.yaml — rebuild when the repository's docs or the template change
+generate: scripts/gen.mjs
+extends: ../../templates/docs
+watch-path:
+  - ../../docs
+  - ../../templates/docs
+```
 
 ### `--template <source>` (init and update)
 
@@ -463,7 +481,7 @@ Cycle and depth errors print the full chain (`_layout.html → _includes/nav.htm
 
 ## `unify.yaml`
 
-Optional: saved flags, nothing more. It lives beside `package.json` at the project root (the directory you run `unify` from), or in the source root; the source root's copy wins if both exist. A relative path in the file resolves against the file's own directory, so a project-root file says `source: site` and `generate: scripts/gen.mjs`, naming the directories beside it; a repository can keep its content in `site/`, `pages/` or whatever you like, with the config at the top. Keys are the long option names (`source`, `output`, `clean`, `exclude` — a list, `pretty-urls`, `base-url`, `canonical`, `feed-full`, `catalog`, `search-corpus`, `include-noindex`, `strict`, `audit`, `port`, `generate`, `source-inventory`, `extends` — the template the site builds on, and `template` — the one key that takes a block: the template's source as its value, or `source:` and `keep:` under it, the files `unify update` never overwrites); CLI flags win on conflict. No behavior exists that only the file can express; the file itself never ships. **Write only what differs from the defaults**: a file that spells out `output: dist` or `exclude: [_*]` builds exactly as no file would. `unify init` writes one with every key listed, described and commented out, so you uncomment what you need; `unify build ... --save-config` writes or updates it for you, taking a commented line's place when there is one.
+Optional: saved flags, nothing more. It lives beside `package.json` at the project root (the directory you run `unify` from), or in the source root; the source root's copy wins if both exist. A relative path in the file resolves against the file's own directory, so a project-root file says `source: site` and `generate: scripts/gen.mjs`, naming the directories beside it; a repository can keep its content in `site/`, `pages/` or whatever you like, with the config at the top. Keys are the long option names (`source`, `output`, `clean`, `exclude` — a list, `pretty-urls`, `base-url`, `canonical`, `feed-full`, `catalog`, `search-corpus`, `include-noindex`, `strict`, `audit`, `port`, `watch-path` — a list, read by `dev` and `watch` alone, `generate`, `source-inventory`, `extends` — the template the site builds on, and `template` — the one key that takes a block: the template's source as its value, or `source:` and `keep:` under it, the files `unify update` never overwrites); CLI flags win on conflict. No behavior exists that only the file can express; the file itself never ships. **Write only what differs from the defaults**: a file that spells out `output: dist` or `exclude: [_*]` builds exactly as no file would. `unify init` writes one with every key listed, described and commented out, so you uncomment what you need; `unify build ... --save-config` writes or updates it for you, taking a commented line's place when there is one.
 
 ```yaml
 # unify.yaml — the committed invocation

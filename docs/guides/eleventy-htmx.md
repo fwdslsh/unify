@@ -837,7 +837,9 @@ restarting `unify dev`: the saved flags are read once, at startup, and nothing t
 Those are the only "does not update" cases found, and both are never-shipped names whose
 churn the watcher deliberately ignores. A generator placed *outside the project root*
 (`--generate /elsewhere/x.mjs`) is the remaining case the spec names: unify runs it on
-every rebuild, but editing the script itself does not trigger one.
+every rebuild, but editing the script itself does not trigger one, unless you name where
+it lives: `--watch-path /elsewhere` (or `watch-path:` in `unify.yaml`) makes an edit there,
+to the script or to a file it reads, one more rebuild trigger.
 
 One smaller platform detail, the other way round from what you might expect: an
 `mtime`-only touch (`touch site/index.html`) *did* fire a rebuild in this measurement on

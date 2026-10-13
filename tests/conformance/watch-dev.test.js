@@ -21,8 +21,8 @@
  */
 import { afterEach, describe, expect, test } from "bun:test";
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { CLI, covers, mkTmp, writeTree } from "./support.mjs";
 
 /** The bound on any single wait. Reached only on a real failure, never on a pass. */
@@ -71,6 +71,26 @@ function start(args, cwd) {
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Start a long-running CLI command the way `unify watch > file 2>&1 &` does:
+ * stdout and stderr are ONE open regular file, a real descriptor and not a
+ * pipe, so the process can tell what it is writing to. `start` cannot do this,
+ * and reading the output off a pipe is exactly what hides the failure.
+ * @param {string[]} args
+ * @param {string} cwd
+ * @param {string} logRel - the log's path under `cwd`
+ */
+function startLogged(args, cwd, logRel) {
+  const log = join(cwd, logRel);
+  mkdirSync(dirname(log), { recursive: true });
+  const fd = openSync(log, "a");
+  const proc = spawn("bun", [CLI, ...args], { cwd, stdio: ["ignore", fd, fd] });
+  closeSync(fd); // the child holds its own copy
+  running.push({ proc });
+  const text = () => (existsSync(log) ? readFileSync(log, "utf8") : "");
+  return { proc, log, text, count: (word) => (text().match(new RegExp(`^${word}`, "gm")) ?? []).length };
+}
 
 /**
  * Poll `check` until it returns something truthy, and return that. A throw
@@ -199,6 +219,58 @@ async function settledSnapshot(dir, timeoutMs = SETTLE_TIMEOUT_MS) {
     await sleep(QUIET_MS);
     return null;
   }, `the output tree under ${dir} to stop changing`, timeoutMs);
+}
+
+/**
+ * A project whose generator reads inputs OUTSIDE it (#132): `proj/` is the
+ * project, `ext/` a sibling holding a data file and a directory (with a
+ * subdirectory, for the recursive case). The generator writes `data.html`
+ * from them and appends a line to `runs.log` — beside `proj/`, so it is
+ * nobody's input — every time it runs, which is what lets a test COUNT
+ * rebuilds: the page says what the generator last read, the log how often it
+ * ran. A missing file reads as MISSING, so a delete rebuilds instead of
+ * failing the generator.
+ * @param {Record<string, string>} [extra] - more files, relative to the temp root
+ */
+function externalFixture(extra = {}) {
+  const tmp = mkTmp();
+  const ext = join(tmp, "ext");
+  const runs = join(tmp, "runs.log");
+  const generator = `import { appendFileSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+const ext = ${JSON.stringify(ext)};
+const read = (p) => { try { return readFileSync(p, "utf8").trim(); } catch { return "MISSING"; } };
+const walk = (d) => readdirSync(d, { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : 1))
+  .flatMap((e) => (e.isDirectory() ? walk(join(d, e.name)).map((x) => e.name + "/" + x) : [e.name + "=" + read(join(d, e.name))]));
+appendFileSync(${JSON.stringify(runs)}, "run\\n");
+writeFileSync(join(process.argv[3], "data.html"), "<!doctype html>\\n<html><head><title>Data</title></head><body><p>data: " + read(join(ext, "data.txt")) + "</p><p>dir: " + walk(join(ext, "dir")).join(" ") + "</p></body></html>\\n");
+`;
+  writeTree(tmp, {
+    "ext/data.txt": "first\n",
+    "ext/dir/sub/deep.txt": "d1\n",
+    "proj/site/index.html": SITE["src/index.html"],
+    "proj/scripts/gen.mjs": generator,
+    ...extra,
+  });
+  const proj = join(tmp, "proj");
+  const page = join(proj, "dist/data.html");
+  const count = () => (existsSync(runs) ? readFileSync(runs, "utf8").split("\n").filter(Boolean).length : 0);
+  /**
+   * The generator's run count once it has held still for `quietMs` — "no
+   * rebuild is coming" is not an event, so this is the quiet period the
+   * negative assertions stand on, applied after every edit so the next one
+   * lands against a finished rebuild.
+   */
+  const settled = (quietMs = 400) => {
+    let last = -1;
+    let since = Date.now();
+    return waitUntil(() => {
+      const n = count();
+      if (n !== last) { last = n; since = Date.now(); return null; }
+      return Date.now() - since >= quietMs ? n : null;
+    }, "the generator to stop running");
+  };
+  return { tmp, proj, ext, page, count, settled };
 }
 
 const SITE = {
@@ -390,6 +462,141 @@ appendFileSync(${JSON.stringify(log)}, JSON.stringify(JSON.parse(readFileSync(co
     covers("WCH-09");
   }, 30_000);
 
+  // #136. The build's log is a file; written into a directory the watcher
+  // observes, every line it prints changed that file, and each change started
+  // a rebuild that printed another line — 1357 rebuilds in 8 seconds with no
+  // edit. The three places are the three kinds of watch the process holds: the
+  // project root (non-recursive), a top-level directory beside the source root
+  // (recursive), and the source root itself (recursive).
+  for (const [where, logRel] of [
+    ["the project root", "watch.log"],
+    ["a directory beside the source root", "logs/watch.log"],
+    ["the source root", "site/watch.log"],
+  ]) {
+    test(`WCH-10 — the file watch writes its own output to is not an input (log in ${where})`, async () => {
+      const tmp = mkTmp();
+      writeTree(tmp, {
+        "unify.yaml": "source: site\n",
+        "site/index.html": "<!doctype html>\n<html>\n<head><title>Home</title></head>\n<body>\n  <p>one</p>\n</body>\n</html>\n",
+      });
+      const w = startLogged(["watch"], tmp, logRel);
+      await waitUntil(() => w.count("rebuilt") >= 1, "the startup build to be logged");
+
+      // Unfixed, the log grows by tens of lines a second. The wait is a fixed
+      // quiet period because "no rebuild is coming" is not an event.
+      await sleep(1500);
+      expect(w.count("watching"), w.text()).toBe(1);
+      expect(w.count("rebuilt"), `the log must not start rebuilds:\n${w.text()}`).toBe(1);
+
+      // The watcher is not deaf: a real edit is one ordinary rebuild.
+      writeFileSync(join(tmp, "site/index.html"), readFileSync(join(tmp, "site/index.html"), "utf8").replace("one", "two"));
+      await waitForContent(join(tmp, "dist/index.html"), (t) => t.includes("two"), "the edit to reach dist/index.html");
+      await waitUntil(() => w.count("rebuilt") >= 2, "the edit's rebuild to be logged");
+      await sleep(500);
+      expect(w.count("rebuilt"), `one edit is one rebuild:\n${w.text()}`).toBe(2);
+
+      w.proc.kill("SIGTERM");
+      await waitForExit(w.proc);
+      covers("WCH-10");
+    }, 30_000);
+  }
+
+  // #132. A generator reading `../ext/...` is not rebuilt by an edit there,
+  // because nothing observes outside the project; the next source edit picks
+  // it up. `--watch-path` names such inputs, and each step below waits for its
+  // OWN effect in the page the generator wrote.
+  test("WCH-11 — a named external file or directory is a rebuild input: edits, new files, replace-by-rename, delete and recreate", async () => {
+    const f = externalFixture();
+    const w = start(["watch", "--generate", "../scripts/gen.mjs", "--watch-path", "../ext/data.txt", "--watch-path", "../ext/dir"], f.proj);
+    await w.ready;
+    await waitForContent(f.page, (t) => t.includes("data: first") && t.includes("sub/deep.txt=d1"), "the first build, with the generator's external inputs");
+    await f.settled();
+
+    const step = async (what, change, expected) => {
+      change();
+      await waitForContent(f.page, (t) => t.includes(expected), `${what} to rerun the generator (${expected})`);
+      await f.settled();
+    };
+    const data = join(f.ext, "data.txt");
+    await step("an edit to the named file", () => writeFileSync(data, "second\n"), "data: second");
+    await step("a file created in the named directory", () => writeFileSync(join(f.ext, "dir/new.txt"), "one\n"), "new.txt=one");
+    await step("an edit to that file", () => writeFileSync(join(f.ext, "dir/new.txt"), "two\n"), "new.txt=two");
+    await step("an edit in a subdirectory of the named directory", () => writeFileSync(join(f.ext, "dir/sub/deep.txt"), "d2\n"), "sub/deep.txt=d2");
+    // An editor's save: write a sibling, rename it over the file.
+    await step("the named file replaced by rename", () => { writeFileSync(join(f.ext, "data.next"), "third\n"); renameSync(join(f.ext, "data.next"), data); }, "data: third");
+    await step("the named file deleted", () => unlinkSync(data), "data: MISSING");
+    await step("the named file recreated", () => writeFileSync(data, "fourth\n"), "data: fourth");
+
+    // What was not named does not rebuild: a sibling of the named file, and the
+    // never-shipped names inside the named directory (§4.3).
+    const before = await f.settled();
+    writeFileSync(join(f.ext, "unlisted.txt"), "x\n");
+    mkdirSync(join(f.ext, "dir/node_modules"));
+    writeFileSync(join(f.ext, "dir/node_modules/pkg.txt"), "x\n");
+    await sleep(1200);
+    expect(f.count(), "an unlisted external file, or one under node_modules/, must not rebuild").toBe(before);
+    await step("an edit after those, so the watch is still alive", () => writeFileSync(data, "fifth\n"), "data: fifth");
+
+    // Watched is not published: only the site and the generator's page are in dist/.
+    expect(Object.keys(snapshot(join(f.proj, "dist"))).sort()).toEqual(["data.html", "index.html"]);
+
+    // Every watcher is closed on shutdown: unclosed ones would keep the process
+    // alive past SIGTERM until waitForExit's SIGKILL.
+    w.proc.kill("SIGTERM");
+    await waitForExit(w.proc);
+    expect([w.proc.exitCode, w.proc.signalCode]).toEqual([0, null]);
+    covers("WCH-11");
+  }, 60_000);
+
+  test("WCH-12 — a watch path holding the output directory does not loop, and overlapping paths are one rebuild per change", async () => {
+    const f = externalFixture();
+    // "." holds dist/ and the whole project; "site" is inside it and also the source root; both are named twice.
+    const w = start(["watch", "--generate", "../scripts/gen.mjs", "--watch-path", ".", "--watch-path", "site", "--watch-path", "site",
+      "--watch-path", "../ext/dir", "--watch-path", "../ext/dir"], f.proj);
+    await w.ready;
+    await waitForContent(f.page, (t) => t.includes("data: first"), "the first build");
+    // Unfixed, every rebuild writes dist/ under ".", which starts the next one.
+    const idle = await f.settled(1500);
+
+    writeFileSync(join(f.proj, "site/index.html"), SITE["src/index.html"].replace("one", "changed"));
+    await waitForContent(join(f.proj, "dist/index.html"), (t) => t.includes("changed"), "the site edit to publish");
+    expect(await f.settled(), "one edit under three overlapping watches is one rebuild").toBe(idle + 1);
+
+    writeFileSync(join(f.ext, "dir/a.txt"), "a\n");
+    await waitForContent(f.page, (t) => t.includes("a.txt=a"), "the external edit to rerun the generator");
+    expect(await f.settled(), "one edit to a path named twice is one rebuild").toBe(idle + 2);
+
+    w.proc.kill("SIGTERM");
+    await waitForExit(w.proc);
+    covers("WCH-12");
+  }, 60_000);
+
+  test("WCH-11 — a --watch-path in unify.yaml is read from the file's directory, and a flag replaces it", async () => {
+    // The file sits in the source root, so "relative to the file" and "relative
+    // to the working directory" name different places: ../../ext/data.txt from
+    // site/ is the sibling directory, and from proj/ it would be outside the
+    // temp root. The value is a single scalar, not a list.
+    const f = externalFixture();
+    writeFileSync(join(f.proj, "site/unify.yaml"), "generate: ../scripts/gen.mjs\nwatch-path: ../../ext/data.txt\n");
+    const w = start(["watch"], f.proj);
+    await w.ready;
+    await waitForContent(f.page, (t) => t.includes("data: first"), "the first build");
+    await f.settled();
+    writeFileSync(join(f.ext, "data.txt"), "second\n");
+    await waitForContent(f.page, (t) => t.includes("data: second"), "the file's watch-path to rerun the generator");
+    w.proc.kill("SIGTERM");
+    await waitForExit(w.proc);
+
+    // The flag replaces the file's list: a missing path in the file is not an error when the flag names others.
+    writeFileSync(join(f.proj, "site/unify.yaml"), "generate: ../scripts/gen.mjs\nwatch-path:\n  - ../../nowhere\n");
+    const replaced = start(["watch", "--watch-path", "../ext/dir"], f.proj);
+    await waitUntil(() => replaced.stdout.includes("rebuilt"), `a build with the flag replacing the file's missing path\n${replaced.stderr}`);
+    expect(replaced.proc.exitCode).toBeNull();
+    replaced.proc.kill("SIGTERM");
+    await waitForExit(replaced.proc);
+    covers("WCH-11");
+  }, 60_000);
+
   test("WCH-03 — an unchanged file is not rewritten across rebuilds", async () => {
     const tmp = mkTmp();
     writeTree(tmp, SITE);
@@ -512,6 +719,23 @@ describe("§16 dev server", () => {
     });
     expect(second).toBe(2);
     covers("WCH-05");
+  }, 30_000);
+
+  test("WCH-11 — under dev, an edit to a named external file reruns the generator and the served page follows", async () => {
+    const f = externalFixture();
+    const port = await freePort();
+    const d = start(["dev", "-p", String(port), "--generate", "../scripts/gen.mjs", "--watch-path", "../ext/data.txt"], f.proj);
+    await d.ready;
+    await waitForResponse(`http://localhost:${port}/data.html`, (r) => r.status === 200 && r.body.includes("data: first"), "dev to serve the generator's first page");
+    await f.settled();
+
+    writeFileSync(join(f.ext, "data.txt"), "second\n");
+    await waitForResponse(`http://localhost:${port}/data.html`, (r) => r.body.includes("data: second"), "dev to serve the page rebuilt from the edited external file");
+
+    d.proc.kill("SIGTERM");
+    await waitForExit(d.proc);
+    expect([d.proc.exitCode, d.proc.signalCode]).toEqual([0, null]);
+    covers("WCH-11");
   }, 30_000);
 
   test("WCH-06 — the reload script is served but never written to the output directory", async () => {

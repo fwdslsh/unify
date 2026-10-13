@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.16] - 2026-10-13
+
+Published to npm as `latest`; 0.11.16-alpha.1 on the `next` tag is folded into this entry.
+Two watch-mode changes, both opt-in or invisible: nothing a build or an audit does is different.
+
+### Added
+
+- **`--watch-path <path>`: files and directories outside the project that `dev` and `watch` rebuild on (#132).** A generator reading `../external/data.txt` was not rerun when that file changed, because nothing outside the source root and the project root is watched; the next source edit or a restart picked it up. `--watch-path` (repeatable; saved as `watch-path:` in `unify.yaml`, a list or one value) names a file or a directory: an edit to the file, or to anything under the directory, including files created there later, runs the usual debounced full rebuild and reruns the generator. A named file is watched through its parent directory, so an editor's replace-by-rename or a delete and recreate still counts. A watch path is a trigger only — never scanned, included or published — the output directory cannot start a rebuild through one, and overlapping paths still give one rebuild per change. A path is relative to the working directory on the command line and to the file in `unify.yaml`; one that does not exist exits `2` naming the path and what named it, before the first build. `build` and `audit` ignore it, and without it nothing changes; an `extends` directory outside the project is still not watched on its own. unify's own docs site names `../../docs` and `../../templates/docs` (conformance-spec §16).
+
+### Fixed
+
+- **`unify dev` and `unify watch` no longer rebuild forever when their output is redirected into the project (#136).** `unify watch > watch.log 2>&1 &` from the project root rebuilt endlessly — 1,357 times in eight seconds with no edit — because the project-root watch treats any file there as an input and each `rebuilt` line the log received started the next rebuild. The file a watch process writes as its own stdout or stderr is now never an input, wherever it sits under a watched directory; it is recognised by device and inode, so a renamed or rotated log still is. `unify dev | tee dev.log` cannot be recognised, because another process writes that file: keep such a log outside the project, or in a dot-directory (conformance-spec §16).
+
 ## [0.11.15] - 2026-10-13
 
 Published to npm as `latest`; 0.11.15-alpha.1 on the `next` tag is folded into this entry.
@@ -1076,7 +1089,8 @@ with generated compare-link notes only. Their diffs are on the
 [releases page](https://github.com/fwdslsh/unify/releases). Nothing here
 retroactively reconstructs detail those notes never carried.
 
-[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.11.15...HEAD
+[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.11.16...HEAD
+[0.11.16]: https://github.com/fwdslsh/unify/compare/v0.11.15...v0.11.16
 [0.11.15]: https://github.com/fwdslsh/unify/compare/v0.11.14...v0.11.15
 [0.11.14]: https://github.com/fwdslsh/unify/compare/v0.11.13...v0.11.14
 [0.11.13]: https://github.com/fwdslsh/unify/compare/v0.11.12...v0.11.13

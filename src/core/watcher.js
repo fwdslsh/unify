@@ -23,6 +23,11 @@
  *     to prevent: `-s . -o dist` nests the output directory inside the
  *     watched tree, and every rebuild writes into it — without excluding it,
  *     the watcher would react to the build's own writes and rebuild forever.
+ *     The same loop closes through the build's log: the file this process
+ *     writes as its stdout or stderr (`unify watch > watch.log 2>&1`) is
+ *     ignored wherever it sits under a watched root (`isOwnOutput`, #136).
+ *     The author may also name extra inputs (`watchPaths`, `--watch-path`):
+ *     each is one more watcher into the same debounce, and nothing else.
  *
  *   - The WCH-04 error-page helpers: `computeErrorPageTargets` maps a failed
  *     rebuild's problem diagnostics to the output page(s) they implicate,
@@ -31,9 +36,9 @@
  *     discipline as a real publish (WCH-03) by reusing publish.js's own
  *     `applyPublishPlan` rather than reimplementing it.
  */
-import { readdirSync, watch as fsWatch } from "node:fs";
+import { fstatSync, readdirSync, statSync, watch as fsWatch } from "node:fs";
 import { mkdir, readFile } from "node:fs/promises";
-import { extname, join, resolve, sep } from "node:path";
+import { basename, dirname, extname, join, resolve, sep } from "node:path";
 import * as collisions from "./collisions.js";
 import { Reporter } from "./diagnostics.js";
 import { contains, isNeverShipped, toRelative } from "./paths.js";
@@ -86,14 +91,50 @@ export function createCoalescer(task) {
 // ================================================== fs watching + debounce
 
 /**
+ * Is `abs` the file this process is writing as its own stdout or stderr?
+ * `unify watch > watch.log 2>&1 &` from the project root makes the build's log
+ * a file the project-root watch below treats as the site's, and every line the
+ * rebuild prints changes it: a rebuild per line, forever (#136). The log is
+ * recognised by device and inode, because a path is not an identity — the log
+ * can be renamed, rotated or reached through a link and still be what the
+ * descriptor writes — and only for a regular file with a non-zero inode: a
+ * terminal or pipe is no file that can change, and Windows may report 0. Both
+ * sides are read on every event, so a truncated or rotated log is still
+ * recognised; a path that no longer exists is not it. A file another process
+ * writes (`unify dev | tee dev.log`) is not this process's, and cannot be told.
+ * @param {string} abs
+ * @returns {boolean}
+ */
+function isOwnOutput(abs) {
+  const own = [];
+  for (const fd of [1, 2]) {
+    try {
+      const st = fstatSync(fd, { bigint: true });
+      if (st.isFile() && st.ino !== 0n) own.push(st);
+    } catch {
+      /* a closed descriptor writes nothing */
+    }
+  }
+  if (own.length === 0) return false;
+  try {
+    const { dev, ino } = statSync(abs, { bigint: true });
+    return own.some((st) => st.dev === dev && st.ino === ino);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * @param {string} root - directory to watch recursively
  * @param {object} opts
  * @param {string[]} [opts.ignoreDirs] - absolute paths; a change under any of these is dropped
  * @param {() => void} opts.onChange - called (debounced) for a change outside the ignore set
  * @param {number} [opts.debounceMs]
+ * @param {string|null} [opts.projectRoot] - the working directory, observed as §4.5 says
+ * @param {string[]} [opts.watchPaths] - explicit extra inputs (§16, `--watch-path`): files or directories that exist
  * @returns {{close(): void}}
  */
-export function watchSource(root, { ignoreDirs = [], onChange, debounceMs = 40, projectRoot = null }) {
+export function watchSource(root, { ignoreDirs = [], onChange, debounceMs = 40, projectRoot = null, watchPaths = [] }) {
   const absRoot = resolve(root);
   const absIgnores = ignoreDirs.map((d) => resolve(d));
   let timer = null;
@@ -114,7 +155,7 @@ export function watchSource(root, { ignoreDirs = [], onChange, debounceMs = 40, 
     const relPosix = filename.split(sep).join("/");
     if (isNeverShipped(relPosix)) return;
     const abs = join(absRoot, filename);
-    if (absIgnores.some((dir) => contains(dir, abs))) return;
+    if (absIgnores.some((dir) => contains(dir, abs)) || isOwnOutput(abs)) return;
     schedule();
   });
 
@@ -135,7 +176,7 @@ export function watchSource(root, { ignoreDirs = [], onChange, debounceMs = 40, 
       const name = String(filename).split(sep)[0];
       if (name.startsWith(".") || isNeverShipped(name)) return;
       const abs = join(project, name);
-      if (abs === absRoot || absIgnores.some((dir) => contains(dir, abs))) return;
+      if (abs === absRoot || absIgnores.some((dir) => contains(dir, abs)) || isOwnOutput(abs)) return;
       schedule();
     };
     try {
@@ -144,10 +185,41 @@ export function watchSource(root, { ignoreDirs = [], onChange, debounceMs = 40, 
         if (!entry.isDirectory() || entry.name.startsWith(".") || isNeverShipped(entry.name)) continue;
         const abs = join(project, entry.name);
         if (abs === absRoot || contains(abs, absRoot) || absIgnores.some((dir) => contains(dir, abs) || contains(abs, dir))) continue;
-        extra.push(fsWatch(abs, { recursive: true }, () => schedule()));
+        extra.push(fsWatch(abs, { recursive: true }, (_event, filename) => {
+          if (filename && isOwnOutput(join(abs, filename))) return;
+          schedule();
+        }));
       }
     } catch {
       // an unreadable project root is not the site's problem — the source tree is still watched
+    }
+  }
+
+  // §16 — `--watch-path`: the named paths and nothing else, whatever §4.5 does
+  // or does not already observe. A directory is watched recursively (files
+  // created in it later count), minus the never-shipped names; a file through
+  // its parent directory, filtered to its name, so an editor's
+  // replace-by-rename or a delete and recreate is still that file. The ignore
+  // set holds here too (a path may contain the output directory), and every
+  // watcher feeds the one debounce, so overlapping roots are still one rebuild.
+  for (const named of watchPaths) {
+    const path = resolve(named);
+    if (statSync(path).isDirectory()) {
+      extra.push(fsWatch(path, { recursive: true }, (_event, filename) => {
+        if (!filename) {
+          schedule();
+          return;
+        }
+        const abs = join(path, filename);
+        if (isNeverShipped(filename.split(sep).join("/")) || absIgnores.some((dir) => contains(dir, abs)) || isOwnOutput(abs)) return;
+        schedule();
+      }));
+    } else {
+      const name = basename(path);
+      extra.push(fsWatch(dirname(path), { recursive: false }, (_event, filename) => {
+        if ((filename && String(filename) !== name) || absIgnores.some((dir) => contains(dir, path)) || isOwnOutput(path)) return;
+        schedule();
+      }));
     }
   }
 
@@ -174,11 +246,13 @@ export function watchSource(root, { ignoreDirs = [], onChange, debounceMs = 40, 
  * @param {() => Promise<void>} args.rebuild
  * @param {AbortSignal} args.signal
  * @param {number} [args.debounceMs]
+ * @param {string|null} [args.projectRoot]
+ * @param {string[]} [args.watchPaths] - see `watchSource`
  * @returns {Promise<void>}
  */
-export function runWatchLoop({ sourceRoot, ignoreDirs = [], rebuild, signal, debounceMs = 40, projectRoot = null }) {
+export function runWatchLoop({ sourceRoot, ignoreDirs = [], rebuild, signal, debounceMs = 40, projectRoot = null, watchPaths = [] }) {
   const coalescer = createCoalescer(rebuild);
-  const fsWatcher = watchSource(sourceRoot, { ignoreDirs, debounceMs, projectRoot, onChange: () => coalescer.trigger() });
+  const fsWatcher = watchSource(sourceRoot, { ignoreDirs, debounceMs, projectRoot, watchPaths, onChange: () => coalescer.trigger() });
   coalescer.trigger(); // the initial build
 
   return new Promise((res) => {

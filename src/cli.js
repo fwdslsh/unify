@@ -17,7 +17,7 @@
  * 2 invalid usage or fatal environment fault.
  */
 
-import { existsSync, realpathSync, statSync } from "node:fs";
+import { accessSync, constants, existsSync, realpathSync, statSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import pkg from "../package.json" with { type: "json" };
@@ -63,6 +63,7 @@ Options:
       --format <kind>      \`audit\` report shape: human (default), json, or sarif
       --external           \`audit\` only: fetch every off-origin URL the site emits and report the ones that don't resolve
   -p, --port <n>           port for \`unify dev\` (default: 3000)
+      --watch-path <path>  \`dev\`/\`watch\`: a file or directory outside the project to rebuild on when it changes — watched only, never scanned or published (repeatable; relative to the working directory)
   -v, --version            print version
   -h, --help               print help
 `;
@@ -108,6 +109,21 @@ export async function run(argv) {
     throw new UsageError(`source directory not found: ${sourceRoot}`, [
       "pass --source <dir>, or run from a directory containing src/",
     ]);
+  }
+  // §16 — a path `dev` or `watch` is told to watch has to be there when it
+  // starts: checked here, before the first build, with the flag or the file that
+  // named it. `build` and `audit` never watch and read none of this.
+  if (command === "dev" || command === "watch") {
+    for (const { path, named } of settings.watchPaths) {
+      if (!existsSync(path)) {
+        throw new UsageError(`watch path not found: ${path} (named by ${named})`, ["create it, correct the path, or remove it from the watch paths"]);
+      }
+      try {
+        accessSync(path, constants.R_OK);
+      } catch {
+        throw new UsageError(`watch path is not readable: ${path} (named by ${named})`, ["grant read access to it, or remove it from the watch paths"]);
+      }
+    }
   }
   if (Number.isNaN(settings.port) || settings.port <= 0) {
     throw new UsageError(`--port must be a positive number, got: ${settings.port}`);
@@ -239,6 +255,10 @@ export async function run(argv) {
     if (entries.has("extends")) {
       const source = classifyTemplateSource(options.extends, Object.keys(TEMPLATES));
       if (source.kind === "dir") entries.set("extends", [`extends: ${rel(source.path)}`]);
+    }
+    // §16 — likewise `--watch-path`, given from the working directory.
+    if (entries.has("watch-path")) {
+      entries.set("watch-path", ["watch-path:", ...options["watch-path"].map((p) => `  - ${rel(resolve(p))}`)]);
     }
     if (options.source !== undefined && resolve(dir) !== resolve(sourceRoot)) {
       entries.set("source", [`source: ${rel(resolve(sourceRoot))}`]);
