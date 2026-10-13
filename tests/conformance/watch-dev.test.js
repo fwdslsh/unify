@@ -21,8 +21,8 @@
  */
 import { afterEach, describe, expect, test } from "bun:test";
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { CLI, covers, mkTmp, writeTree } from "./support.mjs";
 
 /** The bound on any single wait. Reached only on a real failure, never on a pass. */
@@ -71,6 +71,26 @@ function start(args, cwd) {
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Start a long-running CLI command the way `unify watch > file 2>&1 &` does:
+ * stdout and stderr are ONE open regular file, a real descriptor and not a
+ * pipe, so the process can tell what it is writing to. `start` cannot do this,
+ * and reading the output off a pipe is exactly what hides the failure.
+ * @param {string[]} args
+ * @param {string} cwd
+ * @param {string} logRel - the log's path under `cwd`
+ */
+function startLogged(args, cwd, logRel) {
+  const log = join(cwd, logRel);
+  mkdirSync(dirname(log), { recursive: true });
+  const fd = openSync(log, "a");
+  const proc = spawn("bun", [CLI, ...args], { cwd, stdio: ["ignore", fd, fd] });
+  closeSync(fd); // the child holds its own copy
+  running.push({ proc });
+  const text = () => (existsSync(log) ? readFileSync(log, "utf8") : "");
+  return { proc, log, text, count: (word) => (text().match(new RegExp(`^${word}`, "gm")) ?? []).length };
+}
 
 /**
  * Poll `check` until it returns something truthy, and return that. A throw
@@ -389,6 +409,45 @@ appendFileSync(${JSON.stringify(log)}, JSON.stringify(JSON.parse(readFileSync(co
     await waitForExit(w.proc);
     covers("WCH-09");
   }, 30_000);
+
+  // #136. The build's log is a file; written into a directory the watcher
+  // observes, every line it prints changed that file, and each change started
+  // a rebuild that printed another line — 1357 rebuilds in 8 seconds with no
+  // edit. The three places are the three kinds of watch the process holds: the
+  // project root (non-recursive), a top-level directory beside the source root
+  // (recursive), and the source root itself (recursive).
+  for (const [where, logRel] of [
+    ["the project root", "watch.log"],
+    ["a directory beside the source root", "logs/watch.log"],
+    ["the source root", "site/watch.log"],
+  ]) {
+    test(`WCH-10 — the file watch writes its own output to is not an input (log in ${where})`, async () => {
+      const tmp = mkTmp();
+      writeTree(tmp, {
+        "unify.yaml": "source: site\n",
+        "site/index.html": "<!doctype html>\n<html>\n<head><title>Home</title></head>\n<body>\n  <p>one</p>\n</body>\n</html>\n",
+      });
+      const w = startLogged(["watch"], tmp, logRel);
+      await waitUntil(() => w.count("rebuilt") >= 1, "the startup build to be logged");
+
+      // Unfixed, the log grows by tens of lines a second. The wait is a fixed
+      // quiet period because "no rebuild is coming" is not an event.
+      await sleep(1500);
+      expect(w.count("watching"), w.text()).toBe(1);
+      expect(w.count("rebuilt"), `the log must not start rebuilds:\n${w.text()}`).toBe(1);
+
+      // The watcher is not deaf: a real edit is one ordinary rebuild.
+      writeFileSync(join(tmp, "site/index.html"), readFileSync(join(tmp, "site/index.html"), "utf8").replace("one", "two"));
+      await waitForContent(join(tmp, "dist/index.html"), (t) => t.includes("two"), "the edit to reach dist/index.html");
+      await waitUntil(() => w.count("rebuilt") >= 2, "the edit's rebuild to be logged");
+      await sleep(500);
+      expect(w.count("rebuilt"), `one edit is one rebuild:\n${w.text()}`).toBe(2);
+
+      w.proc.kill("SIGTERM");
+      await waitForExit(w.proc);
+      covers("WCH-10");
+    }, 30_000);
+  }
 
   test("WCH-03 — an unchanged file is not rewritten across rebuilds", async () => {
     const tmp = mkTmp();

@@ -98,7 +98,7 @@ No flag turns it on, off, or moves it; `--port` is the only choice about the ser
 
 ### `unify watch`
 
-The same watch contract as `dev`, no server — for pairing with a server you already run. Saves are coalesced into one full rebuild (a save landing mid-rebuild queues exactly one follow-up); writes are atomic and minimal (unchanged files are not rewritten, deletions are precise), so external tools can consume the output directory safely.
+The same watch contract as `dev`, no server — for pairing with a server you already run. Saves are coalesced into one full rebuild (a save landing mid-rebuild queues exactly one follow-up); writes are atomic and minimal (unchanged files are not rewritten, deletions are precise), so external tools can consume the output directory safely. `dev` and `watch` can write their output to a file anywhere, the project root included (`unify watch > watch.log 2>&1 &`): the file the process itself writes as stdout or stderr is never a change. `unify dev | tee dev.log` is the exception, because another process writes that file, so keep such a log outside the project or in a dot-directory, which the watcher skips.
 
 ### `unify init [template]`
 
