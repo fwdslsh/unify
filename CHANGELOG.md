@@ -8,12 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.11.15-alpha.1] - 2026-10-12
+## [0.11.15] - 2026-10-13
 
-An alpha of 0.11.15, published to npm under the `next` tag (`npm install @fwdslsh/unify@next`)
-from the `release/0.11.15` branch; 0.11.15 follows once it has run on real sites. One change
-to read before upgrading: **`unify audit` and `build --audit` now exit `1` on a `broken`
-finding without `--strict`** (below).
+Published to npm as `latest`; 0.11.15-alpha.1 on the `next` tag is folded into this entry.
+One change to read before upgrading: **`unify audit` and `build --audit` now exit `1` on a
+`broken` finding without `--strict`** (below).
 
 ### Changed
 
@@ -21,8 +20,8 @@ finding without `--strict`** (below).
 
 ### Added
 
-- **`unify-docs-template` 0.5.0: ordered navigation, a section index and previous/next links from one list (#131).** `scripts/docs-nav.mjs`, beside `import-docs.mjs`, takes the pages `importDocs` returns and one ordered list of groups and writes the sidebar (`_includes/docnav.html`), an index of every document (`docs/index.md`) and a previous/next pair at the foot of every page, in reading order across the groups, as a plain `<nav aria-label="Previous and next pages">`. The links are root-relative links to the pages' sources, so `--pretty-urls`, `--base-url` and the reference check apply to them. A document no group lists follows in a trailing "More" group; a listed document the importer did not produce, or one listed twice, fails the build naming it, where the hand-written code it replaces dropped it silently. unify's own docs site uses it.
-- **Generator recipes: a content hash in an asset's URL, and an RSS feed (#129, #133).** Both were asked of the core, and both already work through `--generate`; `docs/guides/generator-recipes.md` shows how, every literal tested. The cache-busting generator hashes each asset into an include the layout pulls into every `<head>`, so the same bytes give the same `?v=` URL on every build; it versions the URLs the include writes and nothing reached from inside a file (`@import`, a module's imports). The feed generator writes `rss.xml` from the source inventory with its dates decided in code — a full timestamp becomes the same instant in RFC 822, a bare day gets no `<pubDate>`, never the clock. Named `feed.xml`, a generator's file replaces unify's Atom feed and silences A17, as one you wrote does.
+- **`unify-docs-template` 0.5.0: ordered navigation, a section index and previous/next links from one list (#131).** `scripts/docs-nav.mjs`, beside `import-docs.mjs`, takes the pages `importDocs` returns and one ordered list of groups and writes the sidebar (`_includes/docnav.html`), an index of every document (`docs/index.md`) and a previous/next pair at the foot of every page, in reading order across the groups, as a plain `<nav aria-label="Previous and next pages">`. The links are root-relative links to the pages' sources, so `--pretty-urls`, `--base-url` and the reference check apply to them. A document no group lists follows in a trailing "More" group; a listed document the importer did not produce, or one listed twice, fails the build naming it, where the hand-written code it replaces dropped it silently. A document that ends inside an unclosed code fence has the fence closed first, so its links render as links. unify's own docs site uses it.
+- **Generator recipes: a content hash in an asset's URL, and an RSS feed (#129, #133).** Both were asked of the core, and both already work through `--generate`; `docs/guides/generator-recipes.md` shows how, every literal tested. The cache-busting generator hashes each asset into an include the layout pulls into every `<head>`, so the same bytes give the same `?v=` URL on every build; it versions the URLs the include writes and nothing reached from inside a file (`@import`, a module's imports). The feed generator writes `rss.xml`, or an endpoint you already have such as `news/rss.xml`, from the source inventory with its dates decided in code — a full timestamp becomes the same instant in RFC 822, a bare day gets no `<pubDate>`, never the clock. Named `feed.xml`, a generator's file replaces unify's Atom feed and silences A17, as one you wrote does.
 - **Templates publish from release branches under npm's `next` tag.** A template whose version is not on npm yet now publishes from a `release/*` branch as `<version>-next.<run number>` under `next`, so `unify init unify-docs-template@next` reaches a pending template change before it merges; `latest` moves only from `main`, as before. Nothing moves `next` back after a release, so use it only while one is in progress. `docs/guides/template-versions.md` is the how-to: which sources pin a version (a built-in rides the unify you run; an exact npm version or a git commit is cached by `extends:`, a tag is not), moving a pin with `unify update <source>`, pinning `extends:` for reproducible builds, and trying unify or a template before it ships.
 
 ### Fixed
@@ -1077,8 +1076,8 @@ with generated compare-link notes only. Their diffs are on the
 [releases page](https://github.com/fwdslsh/unify/releases). Nothing here
 retroactively reconstructs detail those notes never carried.
 
-[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.11.15-alpha.1...HEAD
-[0.11.15-alpha.1]: https://github.com/fwdslsh/unify/compare/v0.11.14...v0.11.15-alpha.1
+[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.11.15...HEAD
+[0.11.15]: https://github.com/fwdslsh/unify/compare/v0.11.14...v0.11.15
 [0.11.14]: https://github.com/fwdslsh/unify/compare/v0.11.13...v0.11.14
 [0.11.13]: https://github.com/fwdslsh/unify/compare/v0.11.12...v0.11.13
 [0.11.12]: https://github.com/fwdslsh/unify/compare/v0.11.11...v0.11.12
