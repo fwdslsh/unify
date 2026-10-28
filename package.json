@@ -58,6 +58,7 @@
   },
   "files": [
     "src/",
+    "markdown.js",
     "README.md",
     "CHANGELOG.md"
   ]
