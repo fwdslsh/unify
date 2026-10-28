@@ -4,7 +4,7 @@ description: "The unify tutorial: install, scaffold a site, compose pages with i
 
 # Getting started with unify
 
-unify turns a folder of plain HTML (and Markdown) into a finished site with shared navs, headers, and footers — no templating language, no JavaScript framework, no configuration. If you can write HTML and CSS, you already know almost everything unify does.
+unify turns a folder of plain HTML (and Markdown) into a finished site with shared navs, headers, and footers — no templating language or JavaScript framework. Most sites need no configuration file: use conventions and CLI options, or save settings in `unify.yaml` when useful. If you can write HTML and CSS, you already know almost everything unify does.
 
 This guide takes you from nothing to a deploy-ready site. The complete rule set fits on one screen in [`authoring-rules.md`](authoring-rules.md).
 
