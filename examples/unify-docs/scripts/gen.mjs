@@ -18,7 +18,8 @@ import { docsNav } from "../../../templates/docs/scripts/docs-nav.mjs";
 import { importDocs } from "../../../templates/docs/scripts/import-docs.mjs";
 import { execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const [, , , overlay] = process.argv;
 const root = new URL("../../../", import.meta.url);
@@ -26,6 +27,8 @@ const version = readFileSync(new URL("docs/.runtime-version", root), "utf8").tri
 if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error("docs/.runtime-version must name an exact stable release");
 let revision = "local working tree";
 try {
+  const gitRoot = execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  if (gitRoot !== resolve(fileURLToPath(root))) throw new Error("source archive inside another repository");
   const sha = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
   const dirty = execFileSync("git", ["status", "--porcelain", "--", "docs", "examples/unify-docs", "templates/docs", "scripts/check-docs.mjs"], { cwd: root, encoding: "utf8" }).trim();
   revision = `<a href="https://github.com/fwdslsh/unify/tree/${sha}">${sha.slice(0, 7)}</a>${dirty ? " (working tree)" : ""}`;

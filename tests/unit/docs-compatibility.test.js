@@ -44,7 +44,12 @@ test("the docs preload alone selects the release CLI, without recording checkout
 });
 
 test("the docs site distinguishes runtime, revision, development specs and unreleased pages", async () => {
-  const tmp = mkTmp();
+  const enclosingRepo = mkTmp();
+  for (const args of [["init", "--quiet"], ["-c", "user.name=Docs test", "-c", "user.email=docs@example.invalid", "commit", "--quiet", "--allow-empty", "-m", "Unrelated parent"]]) {
+    const git = spawnSync("git", args, { cwd: enclosingRepo, encoding: "utf8", timeout: 30_000 });
+    if (git.status !== 0) throw new Error(git.stderr);
+  }
+  const tmp = join(enclosingRepo, "source-archive");
   for (const path of ["docs", "templates/docs", "examples/unify-docs"]) {
     cpSync(join(ROOT, path), join(tmp, path), { recursive: true, filter: (file) => !file.includes("/dist/") && !file.endsWith("/dist") });
   }
@@ -62,6 +67,9 @@ test("the docs site distinguishes runtime, revision, development specs and unrel
     const html = readFileSync(join(out, file), "utf8");
     expect(html).toContain(`Released guidance: Unify ${version}`);
     expect(html).toContain("Docs revision:");
+    // This copied source tree has no Git checkout of its own. The unrelated
+    // enclosing repo's real commit must not label these documents.
+    expect(html).toContain("Docs revision: local working tree");
   }
   expect(readFileSync(join(out, "docs/unreleased/probe/index.html"), "utf8"))
     .toContain(`<strong>Unreleased:</strong> This page describes development behavior, not released Unify ${version}.`);
