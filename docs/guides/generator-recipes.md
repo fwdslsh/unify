@@ -8,7 +8,7 @@ description: "Two generators you own: a content hash in an asset's URL for cache
 
 ## Cache-busting URLs
 
-A browser that cached `style.css` last week keeps using it after you change the file, because the address did not change. The cure is a version in the address, and the generator is the place to compute it: it runs on every build, it can read the files, and a fragment it writes reaches every page through the layout.
+None of this is needed to use unify: an ordinary `<link rel="stylesheet" href="/assets/style.css">` works, and the file ships byte-for-byte. Whether a browser fetches `style.css` again after you change it depends on the cache headers your host sends. Told to revalidate, it asks and gets the new file on the next load; told it may keep the file for a day, or a year, it uses last week's copy until then, because the address did not change. A version in the address makes long cache lifetimes safe, and the generator is the place to compute it: it runs on every build, it can read the files, and a fragment it writes reaches every page through the layout. One fragment in the layout is the whole recipe — no wrapper per page, no copied runtime, no bundler.
 
 `scripts/cache-bust.mjs`:
 
@@ -47,7 +47,7 @@ With an `assets/style.css` holding `body{color:#333}` and an `assets/app.js` hol
 
 ## An RSS feed
 
-unify's own `feed.xml` is Atom, and it leaves out a post whose `date` is a day alone (advisory A17) rather than invent a time of day: the built-in feed section of [the CLI reference](../cli-reference.md) and conformance spec §29 give the reasons. If you want RSS, or a feed at an endpoint that already exists, or day-dated posts in it, write the feed yourself. The generator reads every page's authored title, description and date from the source inventory (`context.inputs.sourcePages`, which is on whenever a generator is named; [the blog template's generator](../../templates/blog/scripts/gen.mjs) reads it the same way), and each decision unify declined to make is a line you can read.
+unify's own `feed.xml` is Atom, and it leaves out a post whose `date` is a day alone (advisory A17) rather than invent a time of day: the built-in feed section of [the CLI reference](../cli-reference.md) and conformance spec §29 give the reasons. If you want RSS, or a feed at an endpoint that already exists, or day-dated posts in it, write the feed yourself. That is compatibility code, and it is the right call when an address or a format other people already read must stay as it is; a site starting fresh needs no generator for its feed, and none for a [catalog or a search corpus](catalog-and-search.md) either: unify writes all three. The generator reads every page's authored title, description and date from the source inventory (`context.inputs.sourcePages`, which is on whenever a generator is named; [the blog template's generator](../../templates/blog/scripts/gen.mjs) reads it the same way), and each decision unify declined to make is a line you can read.
 
 `scripts/rss.mjs`:
 

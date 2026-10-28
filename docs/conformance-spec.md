@@ -695,7 +695,7 @@ No frontmatter `title` → the text content of the first `<h1>` in the converted
 
 ### 10.4 Heading ids
 
-Every converted heading (`h1`–`h6`) without an explicit `id` gets one derived from its text: lowercase; each run of whitespace becomes one hyphen; every remaining character that is not a letter, digit, or hyphen is dropped (Unicode letters and digits are kept); leading and trailing hyphens trimmed; a repeat within the page gets `-2`, `-3`, …. Fixtures: `Getting Started` → `getting-started`; `C++ & Rust!` → `c--rust` (the two space-hyphens survive; `+`, `&`, `!` drop — this matches GitHub's slugger); `Café menü` → `café-menü`; two `Setup` headings → `setup`, `setup-2`. HTML pages are never touched: unify does not rewrite headings the author wrote.
+Every converted heading (`h1`–`h6`) without an explicit `id` gets one derived from its text: lowercase; each run of whitespace becomes one hyphen; every remaining character that is not a letter, digit, or hyphen is dropped (Unicode letters and digits are kept); leading and trailing hyphens trimmed; a repeat within the page takes the next `-1`, `-2`, … that no earlier heading on the page already produced (GitHub's slugger, so an anchor written against a repository's view of the document reaches the same heading). Fixtures: `Getting Started` → `getting-started`; `C++ & Rust!` → `c--rust` (the two space-hyphens survive; `+`, `&`, `!` drop — this matches GitHub's slugger); `Café menü` → `café-menü`; two `Setup` headings → `setup`, `setup-1`. HTML pages are never touched: unify does not rewrite headings the author wrote.
 
 ### 10.5 Two hard errors
 
@@ -2639,7 +2639,7 @@ Each record has exactly these seven keys, in this order, and nothing else — no
 - **`.html`**: from the page file's own `<head>`, as written in the file: the `<title>` text and the `content` of `<meta name="description">` and `<meta name="date">`, character references decoded (§20.3), the first non-empty value winning (§20). **Includes are not resolved**, so a title an `<include>` supplies is not seen, and a page with no `<head>` element reads those elements wherever they stand, exactly as §20 does.
 - A frontmatter fault the build would report (invalid YAML, P17, §28.1's counter-prior keys, §10.5's frontmatter in an HTML page) is reported here the same located way and **stops the build before the generator runs**. No page is silently left out.
 
-**What it is not.** It is source facts, not the final manifest (§20) or the catalog (§30). A `title` here has no layout title suffix and no heading fallback, no generated page appears, nothing is rendered, a layout's own `<meta>` is not merged in, and a page's emitted URL is not computed. unify offers no query language, no field list, no sorting or grouping, and no second pass: a generator wanting the composed truth reads the catalog from a prior build (§30), as before.
+**What it is not.** It is source facts, not the final manifest (§20) or the catalog (§30). A `title` here has no layout title suffix and no heading fallback, no generated page appears, nothing is rendered, a layout's own `<meta>` is not merged in, and a page's emitted URL is not computed. unify offers no query language, no field list, no sorting or grouping, and no second pass: composed facts (a final title, rendered heading ids, a page's public URL) do not exist until after the generator has run, so the only catalog (§30) a generator can read is a prior build's, which describes that build rather than this one.
 
 ---
 

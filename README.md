@@ -161,7 +161,7 @@ And the guarantees that run the other way — what unify will never do:
 
 - **Ship JavaScript.** Your scripts pass through untouched; unify injects none of its own (dev's live reload never reaches `dist/`).
 - **Grow a templating language.** No variables, loops, conditionals, or props. Derived pages come from a script you own, run before the build — a feed is the one exception (`schema:` plus `--base-url`).
-- **Become a component framework.** Slots fill layouts; `<include>` splices files verbatim.
+- **Become a component framework.** Slots fill layouts; `<include>` splices a file verbatim, or fills a fragment's slots with markup you wrote — never props or values.
 - **Need configuration.** Conventions, not config files.
 - **Scope your CSS, or be a real web server.** `@scope`/`@layer` and a real server already answer those.
 

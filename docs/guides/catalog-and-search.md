@@ -82,6 +82,11 @@ same set of pages —
 `path` is the join key on purpose — the one field both files share verbatim, so a search
 hit's `path` looks up everything else about that page in the catalog.
 
+Both files describe the site after it is composed, so a script that runs *before* the build
+(a `--generate` generator) cannot read this build's copy; it reads the source inventory
+instead. [Source facts or final facts](../integrations.md#source-facts-or-final-facts) sets
+the five files that describe your pages side by side.
+
 ### Which pages are in the files, and private sites
 
 Both files list the same pages: the ones a crawler is allowed to index and that name themselves as canonical (no `noindex`, no canonical pointing elsewhere, never `404.html`). That is the same rule the sitemap uses, and for a public site it is what you want.

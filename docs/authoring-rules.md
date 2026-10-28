@@ -7,8 +7,8 @@ unify composes plain HTML at build time. No template language, variables, loops,
 ## Files
 - Source root is `site/` if it exists (else `src/`, else the current directory), or whatever `source:` in `unify.yaml` names. `.html`/`.md` are pages — except a name
   ending `.fragment.html`, a bare snippet shipped as written, for `<include>`, embeds, or `fetch`/`hx-get` — and every other file copies byte-for-byte to the same path. A leading `/` means the source root, in any path you write. Always
-  link the real filename — `/about.html`, never `/about/`; a directory link (`/guides/`) resolves only if you
-  wrote a `guides/index.html`. This stays true under `--pretty-urls`: you still write `/about.html`, and the build rewrites it to `/about/` in the output; `--base-url https://you.example/handbook/` — the site's whole address, never a bare path — prefixes them and makes `og:`/`canonical` absolute for share crawlers.
+  link the real filename — `/about.html`, not `/about/`. This stays true under `--pretty-urls`: you still write `/about.html`, and the build rewrites it to `/about/` in the output. A directory
+  link you write yourself (`/guides/`) builds only when the output has a `guides/index.html` — one you wrote, or one `--pretty-urls` made from `guides.html` — and is a broken link otherwise; `--base-url https://you.example/handbook/` — the site's whole address, never a bare path — prefixes every link and makes `og:`/`canonical` absolute for share crawlers.
 - **Everything in the source root ships.** Anything that is not part of the site — notes, drafts,
   scratch, scripts — goes under a leading underscore (`_draft.html`, `_notes/`, `_scripts/`): the
   build still reads it, the output never contains it. Files inside a `_` directory need no prefix.

@@ -41,8 +41,10 @@ published** and the previous `dist/` is untouched — never report success on a 
 - `tags:` and `categories:` are allowed and become ordinary `<meta>` tags, but they build
   nothing — there are no collections and no taxonomies, and unify reports nothing about them —
   they are inert by design, meaningful only to a consumer that chooses to interpret them.
-- Link the real file: `/about.html`, never `/about/`. A directory link resolves only if you wrote
-  `about/index.html`. A leading `/` means the source root, in any path you write.
+- Link the real file: `/about.html`, not `/about/` — with or without `--pretty-urls`, which
+  rewrites it to `/about/` for you. A directory link you write yourself builds only when the output
+  has an `about/index.html`: one you wrote, or one `--pretty-urls` made from `about.html`. A leading
+  `/` means the source root, in any path you write.
 - Derived files — a post index — come from a script you write, kept in `scripts/` beside the
   site and named in `unify.yaml` (`generate: scripts/gen.mjs`): unify runs it before every build,
   dev rebuild and audit, and it writes into the directory unify hands it, never into `site/`.

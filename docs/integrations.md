@@ -294,6 +294,127 @@ The `blog` template ships this worked: `unify init blog` writes a `scripts/gen.m
 by its `unify.yaml`, that reads `posts/*.md` and `_data/authors.json` and writes the index and the feed into
 the overlay on every build.
 
+### Source facts or final facts
+
+Five things describe your pages, and they answer different questions because they exist at
+different moments of the build:
+
+| What | When it exists | What it holds | Read it for |
+|---|---|---|---|
+| The source inventory, `source-pages.json` | before your generator runs, in every build that names one (unless `source-inventory: false`) | each source page's `source` and `href`, and the `title`, `description`, `date`, `<meta>` and `<link>` its author wrote | an index, an archive or a nav your generator writes in the same build |
+| `assets/unify/catalog.json` (`--catalog`) | after composition, published with the site | each public page's final address, its merged head (the title with the layout's suffix, every meta and link) and its headings with their ids | browse, filter and table-of-contents UI in the browser |
+| `assets/unify/search-corpus.json` (`--search-corpus`) | after composition, published with the site | each public page's `path` and visible text | client-side search, joined to the catalog on `path` |
+| `unify audit --format json` | a separate run that publishes nothing | each page's `source`, `outputPath` and final document (the catalog's record shape), plus the findings | a tool outside unify that needs source → output → address ([recipe 4](#4-interoperating-with-post-build-tools)) |
+| `/_unify/pages.json` | only while `unify dev` serves | each page's source, layout, includes and address | an editor; it is never a published file |
+
+The first is what you wrote; the other four are what the build made of it. This page,
+with the section layout from [Getting Started](getting-started.md#a-section-of-markdown-pages)
+around it:
+
+```markdown
+---
+description: The first note.
+tags: [setup, intro]
+---
+
+# First steps
+
+### Setup
+
+### Setup
+```
+
+is this record in the source inventory:
+
+```json
+{
+  "source": "notes/first.md",
+  "href": "/notes/first.html",
+  "title": null,
+  "description": "The first note.",
+  "date": null,
+  "meta": [
+    { "name": "description", "content": "The first note." },
+    { "name": "tags", "content": "setup" },
+    { "name": "tags", "content": "intro" }
+  ],
+  "links": []
+}
+```
+
+and, built with `--pretty-urls --base-url https://example.com/sub/ --catalog`, has these
+fields in `catalog.json`:
+
+```json
+{
+  "path": "/sub/notes/first/",
+  "url": "https://example.com/sub/notes/first/",
+  "head": { "title": "First steps — Notes — My Site" },
+  "body": {
+    "attributes": { "class": "notes" },
+    "headings": [
+      { "level": 1, "id": "first-steps", "text": "First steps" },
+      { "level": 3, "id": "setup", "text": "Setup" },
+      { "level": 3, "id": "setup-1", "text": "Setup" }
+    ]
+  }
+}
+```
+
+- **A title from the first heading is a final fact.** The page wrote no `title:`, so the
+  inventory says `null`; the heading becomes the title while the page is composed, and the
+  catalog has it. Fall back to the source path, as the reports index above does, or write a
+  `title:`.
+- **Repeated metadata is already parsed.** Every `tags` item is its own `meta` record, so
+  the generator filters `meta` (the series example above) and never parses YAML itself.
+- **`href` is a link for HTML you generate, not a public address.** It is `/` plus the
+  source path with `.md` turned into `.html`. Written into a generated HTML page, unify
+  rewrites it for `--pretty-urls` and `--base-url` like a link you typed. Written into JSON,
+  XML, or anything else that is not HTML, it ships exactly as written, so a generator
+  writing a feed or a data file computes the address itself ([the RSS recipe's
+  `address()`](guides/generator-recipes.md#an-rss-feed) does).
+- **The lists are not the same pages.** The inventory is every source page, a `noindex` one
+  included, and no generated page, since none exists yet. The catalog and the search corpus
+  are the published pages a crawler may index — no `noindex` page (unless
+  `--include-noindex`), no `404.html`, no page whose canonical names another — generated
+  pages included. The feed is narrower still: only pages declaring `Article` or
+  `BlogPosting`, with a date that carries a time of day.
+- **A table of contents comes from the composed page.** Heading ids exist only once a page
+  is composed, so this build's generator cannot read them. Read them in the browser — from
+  the page's own DOM, or from the catalog's `headings` — or, to ship the table in the HTML,
+  have your generator read the Markdown and apply the id rule itself (lowercase, hyphens for
+  spaces, punctuation dropped, `-1`, `-2` on a repeat; conformance spec §10.4).
+- **A previous build's catalog describes the previous build.** A generator reading
+  `dist/assets/unify/catalog.json` writes pages one edit behind, and finds nothing in a
+  fresh checkout. Build what needs the current pages from the inventory, or in the browser.
+
+### Navigation: the docs template's helper, or your own
+
+The docs template ships one navigation generator, `scripts/docs-nav.mjs` ([templates
+§4](templates.md#4-build-on-a-template-without-copying-it) shows the call). It takes the
+pages its importer returns (`source`, `path`, `title`, `description` each) and one ordered
+list of groups, and is called once, after `importDocs`, with the same output directory. It
+writes the sidebar `_includes/docnav.html`, an index of every document at `docs/index.md`,
+and, when there is more than one document, appends a `<nav class="pager">` of previous/next
+links to each imported page. A document
+no group lists joins a trailing "More" group; one listed twice, or listed but never
+imported, stops the build with an error naming it. Its markup is fixed, and the docs
+template's stylesheet styles it.
+
+Use it as it comes on a site built from the docs template. A site whose navigation must keep
+its own markup is better served by a few lines of its own generator over the source
+inventory, like the reports index above. Either way the division of work is the same:
+**HTML fragments own reusable structure, and the generator owns what is computed from the
+set of pages** — the order, the list, the groups. A card's markup is a fragment (a slotted
+include, when each use needs its own words); which cards appear, and in what order, is what
+the generator writes.
+
+One thing neither does for you: mark the current page's link. `<body class="home">` and a
+CSS rule style it ([Getting Started](getting-started.md#pages)), but a nav shared through
+an include is the same markup on every page, so nothing sets `aria-current`. Markup that
+differs per page is written per page — by you, or by the generator writing those pages.
+unify has no collections, repetition, or data binding, so this boundary stays where it is.
+
 ## 2. Image optimization
 
 unify copies every non-page file byte-for-byte, so a 4 MB photograph in your source tree
@@ -433,6 +554,30 @@ The one flag that touches the network is `unify audit --external`, which fetches
 off-origin URLs your site emits and reports the ones that do not resolve. It is opt-in for
 a reason: it makes the command's result depend on somebody else's uptime. Ordinary builds
 and ordinary audits never open a socket.
+
+**From a source file to its public address.** unify rewrites links in the HTML pages it
+composes, and nothing else. A JSON, XML or Markdown file a generator writes ships as
+written, and Markdown that another tool sends somewhere else — a script cross-posting an
+article, a newsletter — never passes through unify at all. A tool like that needs each
+page's address, and the audit report already maps every one:
+
+```bash
+unify audit --pretty-urls --base-url https://example.com/ --format json > audit.json
+```
+
+```js
+import { readFileSync } from "node:fs";
+
+const { pages } = JSON.parse(readFileSync("audit.json", "utf8"));
+const addressOf = new Map(pages.map((p) => [p.source, p.document.url]));
+console.log(addressOf.get("news/launch.md")); // https://example.com/news/launch/
+```
+
+Each page carries its `source` (relative to the source root), its `outputPath` (relative to
+the output directory) and its `document.url`, which is `null` without `--base-url`; then
+`document.path` is the root-relative address. That is each page's own address and no more:
+rewriting the links inside a document you export, keeping their queries and fragments, and
+choosing a canonical for a copy published elsewhere stay the exporter's job.
 
 ## 5. A prebuilt package's browser files
 

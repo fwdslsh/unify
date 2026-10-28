@@ -8,6 +8,19 @@ unify turns a folder of plain HTML (and Markdown) into a finished site with shar
 
 This guide takes you from nothing to a deploy-ready site. The complete rule set fits on one screen in [`authoring-rules.md`](authoring-rules.md).
 
+Coming back to do one thing? Each task below is one section of this guide:
+
+| To… | Read |
+|---|---|
+| add a page | [Pages](#pages), or [Markdown pages](#markdown-pages) |
+| add a folder of Markdown pages with its own chrome | [A section of Markdown pages](#a-section-of-markdown-pages) |
+| change the nav, the footer, or any part every page shares | the file in `site/_includes/` that the layout includes — [The layout](#the-layout) |
+| reuse one block with different words in each place | [A snippet that ships as written](#a-snippet-that-ships-as-written) |
+| link a page or an asset | [Links and assets](#links-and-assets) |
+| list pages on an index page | [Anything else derived from other files](#anything-else-derived-from-other-files) |
+| see a layout or an include on its own, or what the build made of a page | [Seeing what the build did](#seeing-what-the-build-did) |
+| check the site before publishing | [Checking and publishing](#checking-and-publishing) |
+
 ## Install
 
 Download the standalone binary for Linux or macOS from the releases page and put it on your `PATH` — no runtime, no package manager. (No Windows binary yet — Windows users, or developers who already use Bun, can `bun add -g @fwdslsh/unify` instead.)
@@ -107,7 +120,7 @@ Built result: the layout's `<main>` content is replaced by the page's, and the p
 Two details worth knowing:
 
 - Your page's own `<main>` wrapper is unwrapped during composition, so nothing ends up nested. Writing complete, semantic documents is exactly right.
-- A page's `<body class="home">` is merged onto the built page's `<body>` — which is how you do active-nav highlighting: `body.home .nav-home { font-weight: bold; }` in your stylesheet. No feature needed.
+- A page's `<body class="home">` is merged onto the built page's `<body>` — which is how you do active-nav highlighting: `body.home .nav-home { font-weight: bold; }` in your stylesheet. No feature needed. It is styling only: the shared nav's markup is the same on every page, so nothing marks the current link with `aria-current`.
 
 ## Overriding a region
 
@@ -128,6 +141,54 @@ Two details worth knowing:
 ```
 
 The built footer contains exactly the `<p>` you wrote — tag, attributes, and all. Pages that don't mention the footer keep the layout's default. Note what does *not* override anything: a plain `<header>` or `<footer>` element in your page is just content. Only `slot=` fills a region, and only on top-level elements (direct children of `<body>`).
+
+## What ends up in `<head>`
+
+The layout's `<head>` is the base. The page's `<title>` joins the layout's **where the layout's stands**; a page `<meta>` with the same `name` or `property` as one of the layout's **replaces it where it stands**; everything else the page's head holds is **appended** after the layout's last element. A stylesheet or script the layout already loads is not loaded twice. With this layout head:
+
+```html
+<head>
+  <meta charset="utf-8">
+  <title>— My Site</title>
+  <meta name="description" content="A site about things.">
+  <script src="/assets/analytics.js"></script>
+</head>
+```
+
+and this page head:
+
+```html
+<head>
+  <title>About</title>
+  <meta name="description" content="Who we are.">
+  <meta property="og:title" content="About us">
+  <link rel="stylesheet" href="/assets/about.css">
+  <script src="/assets/analytics.js"></script>
+</head>
+```
+
+the built page's head is:
+
+```html
+<head>
+  <meta charset="utf-8">
+  <title>About — My Site</title>
+  <meta name="description" content="Who we are.">
+  <script src="/assets/analytics.js"></script>
+  <meta property="og:title" content="About us">
+  <link rel="stylesheet" href="/assets/about.css">
+</head>
+```
+
+So the analytics script, which runs where it stands, sees the page's title and description: both took the places the layout gave them, above it. It does not see `og:title`, which the layout had no place for and so arrives after it — and if the layout had no `<title>`, the page's would arrive after it too. A script that reads the page's metadata either stands after the layout elements whose places the page fills, or carries `defer`, which runs it once the whole document has been read.
+
+Three things in a built head can come from unify rather than from you:
+
+- **`<link rel="canonical">`**, under `--base-url`, on an indexable page that has none (`--canonical none` turns it off). One you write always wins.
+- **JSON-LD**, on a page that declares `schema: WebPage`, `Article` or `BlogPosting` (`<meta name="schema" content="Article">` in HTML), built only from what the page already declares. A `<script type="application/ld+json">` you write wins and unify generates none — that is where any other type, or richer data, goes.
+- **Absolute URLs** in `og:`/`twitter:` values and the canonical, under `--base-url`. The values themselves stay yours: unify never copies the title or description into `og:title`, `og:description` or `twitter:*`.
+
+The details are in the CLI reference: [structured data](cli-reference.md#structured-data-schema), and `--canonical` just above it.
 
 ## Markdown pages
 
@@ -156,7 +217,57 @@ Two rules that save you from silent mistakes (unify makes both hard errors): HTM
 
 `site/404.html` carries `data-layout="none"` on its `<body>` — it ships as-is, with includes and URL rules still applied. Use the same attribute with a path to pick a different layout: `data-layout="/other.html"` (in Markdown: `layout: /other.html`). Layouts are always paths ending in `.html`, never bare names.
 
-Section layouts work by placement: put a `_layout.html` in `blog/` and every page under `blog/` uses it instead of the site layout. A section layout is a complete standalone page like any other layout — write the shared chrome into it too. Layouts do not chain: a layout that itself carries `data-layout` is a build error (unify tells you rather than silently ignoring it).
+## A section of Markdown pages
+
+A folder of articles needs no layout field in any of them. Put a `_layout.html` in the folder, and every page under it uses that layout instead of the site's:
+
+```
+site/
+├── _layout.html          # the site's chrome
+├── _includes/nav.html
+└── notes/
+    ├── _layout.html      # the notes section's chrome — a complete page, like any layout
+    ├── first.md
+    └── second.md
+```
+
+`site/notes/_layout.html`:
+
+```html
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>— Notes — My Site</title>
+  <link rel="stylesheet" href="/assets/style.css">
+</head>
+<body class="notes">
+  <include src="/_includes/nav.html"></include>
+  <main><article><slot></slot></article></main>
+</body>
+</html>
+```
+
+`site/notes/first.md`:
+
+```markdown
+---
+description: The first note.
+---
+
+# First steps
+
+The lead paragraph, written here like the heading above it.
+```
+
+Neither Markdown file names a layout: the nearest `_layout.html`, in their own folder, wraps both. `first.md` has no `title:`, so its `# First steps` supplies the title, and the page ships `<title>First steps — Notes — My Site</title>` with `<h1 id="first-steps">First steps</h1>` inside the layout's `<article>`.
+
+**Frontmatter describes the page; it never writes its content.** `title` sets the `<title>`, `class`, `lang` and `dir` set attributes on `<body>` and `<html>`, and every other key becomes a `<meta>`. Nothing in frontmatter appears as text on the page, and a layout cannot read it into its own markup, because there are no variables. The visible heading, the lead and a date line are text you write in the Markdown, as above. A page header computed from metadata — a date badge, a reading time, a table of contents built ahead of time — is something a script writes ([below](#anything-else-derived-from-other-files)), and most sites need none.
+
+- `layout: /path.html` in frontmatter is for the exception: one page under `notes/` that should use another layout. A whole folder needs only its `_layout.html`.
+- Layouts do not chain, so `notes/_layout.html` is a complete page that repeats the site's chrome. Keep that chrome in includes — `_includes/nav.html` above — and the repetition is one line per layout. A layout that itself carries `data-layout` is a build error rather than a silently ignored attribute.
+- A layout with no `<main>` and no slots is valid too: it contributes its `<head>` (a stylesheet, shared metas) and passes each page's body through as written.
+- The first-heading title is applied while the page is composed. A generator's source inventory reads what you wrote, before that, so it reports `title: null` for `first.md` — [which file answers which question](integrations.md#source-facts-or-final-facts).
 
 ## A snippet that ships as written
 
@@ -183,12 +294,62 @@ page of yours *and* be fetched by someone else:
 One file, one place to edit it, two consumers. (`examples/htmx-fragments` is this,
 worked end to end.)
 
+An include can also carry content, when its target is a fragment that declares slots. The
+content fills them exactly as a page fills a layout's: `slot="name"` on an element for a
+named slot, everything else to the bare one, and an unfilled slot shows its own content.
+
+```html
+<!-- site/_includes/callout.fragment.html -->
+<aside class="callout">
+  <h3><slot name="title">Note</slot></h3>
+  <slot></slot>
+</aside>
+```
+
+```html
+<include src="/_includes/callout.fragment.html">
+  <span slot="title">Opening hours</span>
+  <p>Saturday 10am–4pm</p>
+</include>
+```
+
+builds to
+
+```html
+<aside class="callout">
+  <h3><span>Opening hours</span></h3>
+  <p>Saturday 10am–4pm</p>
+</aside>
+```
+
+The callout's markup lives in one file and every use supplies its own words. The rules
+stay small. Only a `*.fragment.html` with a `<slot>` can take content, and any other
+non-empty include is a build error naming the fix; an empty include, like every one above,
+has no such requirement. What fills the slots is markup you wrote: no attributes are passed,
+there are no variables or expressions, and a fill reaches only the fragment it is written
+inside, never one that fragment includes in turn. The complete rule is
+[`conformance-spec.md`](conformance-spec.md) §32.
+
 ## Links and assets
 
 - Write paths that are correct for the file you're editing — relative or root-relative, both work. unify resolves URLs written in layouts and fragments against the file that wrote them, so composed pages are correct at every depth.
-- **Always link the real file**: `href="about.html"`, never a hand-written `/about/`. If you want pretty URLs, build with `--pretty-urls` — pages move to `about/index.html` and every internal link is rewritten for you.
+- **Link the real file**: `href="about.html"` — for a Markdown page, its `.md` name or the `.html` it becomes — rather than a hand-written `/about/`. That link is right in every build: `--pretty-urls` moves pages to `about/index.html` and rewrites it, and `--base-url` prefixes it.
 - Every non-page file in `site/` is copied through byte-for-byte to the same path. What you see in the folder is what ships — compress images before adding them.
+- **Reference stylesheets and scripts directly**: `<link rel="stylesheet" href="/assets/style.css">` is all unify needs, and the file ships as written. Whether a browser fetches it again after you change it is decided by the cache headers your host sends, not by unify; if you want a version in the address anyway, [the cache-busting recipe](guides/generator-recipes.md#cache-busting-urls) adds one with a small generator.
 - unify does not scope styles. If a fragment's CSS should not leak, use the platform: `@scope`, `@layer`, nesting, or a class prefix.
+
+What a link written in `site/index.html` becomes in the built page:
+
+| Source file | You write | Plain build | `--pretty-urls` | `--pretty-urls --base-url https://example.com/sub/` |
+|---|---|---|---|---|
+| `about.html` | `about.html` | `about.html` | `/about/` | `/sub/about/` |
+| `guide.md` | `guide.md` or `guide.html` | `guide.html` | `/guide/` | `/sub/guide/` |
+| `about.html` | `about.html?form=1#top` | `about.html?form=1#top` | `/about/?form=1#top` | `/sub/about/?form=1#top` |
+| `guides/index.html` | `/guides/` | `/guides/` | `/guides/` | `/sub/guides/` |
+| `guide.md` | `/guide/` | a broken link: the build fails | `/guide/` | `/sub/guide/` |
+| `404.html` | `/404.html` | `/404.html` | `/404.html` | `/sub/404.html` |
+
+The pages land at `dist/about.html` and `dist/guide.html` in a plain build, and at `dist/about/index.html` and `dist/guide/index.html` under `--pretty-urls` — except `404.html`, which never moves, because hosts look for it at exactly that path. A query and a fragment ride along unchanged. A directory link you write yourself, like the `/guide/` row, names an address rather than a file: it builds when the output has a `guide/index.html` — one you wrote, or one `--pretty-urls` made from `guide.md` — and stops any other build with an error naming the link. That is why the source filename is the advice: it is the one spelling that is right in both builds.
 
 ## Checking and publishing
 
@@ -207,11 +368,18 @@ unify audit                      # what the build would publish, evaluated; writ
 
 It reports the things a build has no business refusing over: a page with no description, two pages sharing a title, a heading and a `<title>` that disagree, a link to `#section` where nothing has that id, a page nothing links to. Each one prints what was seen and one thing to do about it. There is no score and nothing counts characters — a short title is not a problem, an absent one is. `unify audit` exits non-zero on a finding that is wrong whatever you meant (a link to an id nothing has, a duplicated id), and `unify audit --strict` on any finding, which is the CI gate; plain `unify build` never runs these checks at all, so none of them can hold up a release. A fresh scaffold reports nothing: `unify init && unify audit --strict` exits `0` for every starter template, so you can wire the gate up on day one and the first finding you see will be about a page you wrote.
 
-While `unify dev` is running you can read the same findings as a page, at **`http://localhost:3000/_unify/`** (an editor can read `/_unify/pages.json`, which maps every page to its source file, layout and address), and **`/_unify/preview/`** (the second address `unify dev` prints) lists every layout, include and page: open any layout or include on its own, rendered with the site's styles and its own default content, with a corner selector to compose it with a page of your choice — grouped by page, with each page's record beside them (title, description, language, canonical, headings, links in and out) and the build's own diagnostics underneath. It is the same information `unify audit` prints, arranged for looking at one page rather than scanning a list. Nothing about it is written to `dist/`.
-
 Two more `audit`-only flags, for wiring it into other tools: `--format json` (or `--format sarif`) prints the same findings as one machine-readable document instead of prose — the same `pages` records every other feature reads, plus a stable `fingerprint` per finding a CI system can use to suppress one it has already triaged. `--external` fetches every off-origin URL the site's output declares (a share image, a canonical to another site, a plain link) and reports the ones that don't answer — the only thing in unify that touches the network, and only when you ask for it; plain `build`/`audit` stay offline.
 
 Deploying under a subpath (GitHub Pages project sites)? Give `--base-url` the site's whole address: `unify build --pretty-urls --base-url https://you.github.io/repo-name/`. The path part prefixes every root-relative link; the domain absolutizes `og:` and canonical URLs, which is what Facebook, LinkedIn and Slack fetch when someone shares a page. A bare `/repo-name/` is rejected — it would prefix the links and leave the share metadata unfetchable.
+
+### Seeing what the build did
+
+Each of these answers a different question, and none of them writes anything to `dist/`:
+
+- **`unify build --dry-run`** — what would be written, copied and deleted, each page with the layout it composed from and the address it answers to. No server needed.
+- **`http://localhost:3000/_unify/`**, while `unify dev` runs — the findings `unify audit` prints, as a page, grouped by page, with each page's record beside them (title, description, language, canonical, headings, links in and out) and the build's own diagnostics underneath: the place to check that a page's metadata landed.
+- **`/_unify/preview/`** (the second address `unify dev` prints) — every layout, include and page. Open a layout or an include on its own, rendered with the site's styles and its own default content, with a corner selector to compose it with a page of your choice.
+- **`/_unify/pages.json`** — the same build as data, for an editor or a script: every page's source file, layout, includes and address.
 
 ## Feeds, a catalog, and a search corpus
 
@@ -242,7 +410,7 @@ A blog index, a gallery page — anything else computed from a set of files — 
 generate: scripts/gen.mjs
 ```
 
-The script lives in `scripts/` beside the site and writes real pages into a directory unify hands it for that one build (never into `site/`), where they get layouts, head merging, and reference checking like everything else (`unify init blog` ships a working example: `scripts/gen.mjs` at the project root, the line in `unify.yaml`, and the data file in the site). One habit matters the day the script reads a data file: **name the fields you emit — never spread the whole record**. The underscore keeps `_data/` itself out of `dist/`, but no build check can catch a private field once your script copies it into a page. unify itself has no collections, no data files, and no template language — that's the point.
+The script lives in `scripts/` beside the site and writes real pages into a directory unify hands it for that one build (never into `site/`), where they get layouts, head merging, and reference checking like everything else (`unify init blog` ships a working example: `scripts/gen.mjs` at the project root, the line in `unify.yaml`, and the data file in the site). The script does not have to read your pages itself: unify hands it the source inventory, every page's authored title, description, date and `<meta>` records, and [the integrations guide](integrations.md#an-index-of-your-pages-in-one-build) builds an index from it in one build. One habit matters the day the script reads a data file: **name the fields you emit — never spread the whole record**. The underscore keeps `_data/` itself out of `dist/`, but no build check can catch a private field once your script copies it into a page. unify itself has no collections, no data files, and no template language — that's the point.
 
 ## Where to go next
 
