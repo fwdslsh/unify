@@ -67,3 +67,5 @@
   cursor: pointer;
 }
 .card button.more:hover { color: var(--accent-bright); }
+
+.docs-version { max-width: calc(var(--site) + 2 * var(--gutter)); margin: 0 auto; padding: 0.5rem var(--gutter); font-size: 0.8125rem; }

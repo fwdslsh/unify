@@ -3,8 +3,8 @@
 The dogfooding example (issue #51). It renders the repository's real `docs/` directory as
 a documentation site, using nothing but the five authoring primitives.
 
-**Live at <https://unify.fwdslsh.dev/>**, deployed on every push to `main` that touches
-`docs/`, `src/`, or `examples/**` (`.github/workflows/deploy-docs.yml`). That address is a
+**Live at <https://unify.fwdslsh.dev/>**, deployed when its documentation, examples,
+template, or compatibility checks change on `main` (`.github/workflows/deploy-docs.yml`). That address is a
 custom domain, DNS-verified and configured as this repository's Pages domain in
 Settings > Pages.
 
@@ -13,7 +13,7 @@ than copies (`extends: ../../templates/docs` in `unify.yaml`): the layout, the s
 and the All-pages directory are the template's, read in place from this repository, and
 akm.fwdslsh.dev extends the same template from npm. What is this site's own is small:
 the four files that name it (`site/_includes/head.html`, `nav.html` and `footer.html`, and
-the sidebar the generator writes), its own pages (`index.html`, `examples/`, `templates/`),
+the sidebar the generator writes), the generated runtime/revision banner, its own pages (`index.html`, `examples/`, `templates/`),
 `assets/site.css` for those pages, and its share card. The only client JavaScript on the site is the few lines on `/examples/` that
 resolve the "View live" addresses — see the comment in `site/examples/index.html` for why
 they cannot be plain hrefs.
@@ -35,7 +35,7 @@ unify build --dry-run --strict   # exit 0
 unify audit --strict             # exit 0
 ```
 
-From the repository root (what the workflow does, with the CLI from the checkout), name
+Alternatively, from the repository root, name
 the source explicitly; `--generate` on the command line is relative to the source root, so
 it is `../scripts/gen.mjs` there, while `generate:` inside `unify.yaml` is relative to the
 file:
@@ -84,21 +84,21 @@ sidebar is generated rather than hand-authored and asserted.
 
 ## Deployment
 
-`.github/workflows/deploy-docs.yml` builds this example and publishes `dist/` to GitHub
-Pages on every push to `main` under `docs/`, `src/`, or `examples/**`, or on demand via
-`workflow_dispatch`. It runs the same two gates as above, `build --dry-run --strict` and
-then `audit --strict`, before the real `build --clean --strict` that is actually published;
-either gate failing stops the deploy, the same transactional guarantee `unify build` itself
-gives a local run.
+`.github/workflows/deploy-docs.yml` runs `bun scripts/check-docs.mjs --build` from
+the repository root. That command installs the exact published version in
+`docs/.runtime-version`, verifies the guide examples and strict build/audit gates,
+then renders this site and the five galleries with that same released CLI. CI
+runs the same command without `--build`. A failed check prevents publication.
 
-After that build, the workflow assembles five more example sites into
-`dist/examples/<name>/` — `seed-library`, `seed-library-alt`, `seed-library-ondemand`,
-`htmx-fragments`, and `catalog-search-blog` — each built with the CHECKOUT CLI as a wholly
-separate unify project, addressed at its own `--base-url` subpath, and each gated by its
-own `--dry-run --strict` before the real build. Those five directories, roughly 360 of the
-published tree's ~380 files, are what the `/examples/` gallery's "View live" links resolve
-to at runtime; this site's own build never emits them (see the comment at the bottom of
-`site/examples/index.html`, and Part 2 of `_notes/batches/b10-contract.md`, for why).
+Every page displays the released-guidance version and a separate Git docs revision.
+Pending instructions live under `docs/unreleased/` and carry an Unreleased warning.
+See [Documentation maintenance](../../docs/documentation.md) for corrections, new
+features and release promotion; the source remains the one `docs/` tree.
+
+The five galleries (`seed-library`, `seed-library-alt`, `seed-library-ondemand`,
+`htmx-fragments`, `catalog-search-blog`) are separate builds assembled below
+`dist/examples/<name>/` after the docs site's own clean build. Their live links
+resolve only after that assembly.
 
 **Two things the workflow could not do for itself, both now done**: GitHub Pages' source is
 set to **Settings > Pages > Build and deployment > Source > "GitHub Actions"**, and the
@@ -115,8 +115,8 @@ regardless, so a red `deploy` step next to a green `build` step means exactly th
 
 **The examples gallery under `unify dev`.** `site/examples/index.html`'s five "View live"
 links resolve against `location.href` no matter what, so `unify dev` on this site still
-builds and serves `/examples/` correctly. Only the deploy workflow's separate assembly
-steps (`.github/workflows/deploy-docs.yml`) ever produce the five `/examples/<name>/`
+builds and serves `/examples/` correctly. The compatibility command's `--build` assembly
+(also used by `.github/workflows/deploy-docs.yml`) produces the five `/examples/<name>/`
 trees those links point at, so following one locally 404s — the same dead end a visitor
 with JavaScript off sees from the page's `<noscript>` fallback, just reached by a
 different path.
