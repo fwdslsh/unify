@@ -137,8 +137,8 @@ Everything below is published at **[unify.fwdslsh.dev](https://unify.fwdslsh.dev
 
 **How the documentation was validated**
 
-- **[Ratification](docs/ratification.md)** — the evidence: agents authoring from the sixty lines in isolation, what each round found, and what it changed.
-- **[Ratification Protocol](docs/ratification-protocol.md)** — the procedure, for running another round.
+- **[Ratification](ratification/ratification.md)** — the evidence: agents authoring from the sixty lines in isolation, what each round found, and what it changed.
+- **[Ratification Protocol](ratification/ratification-protocol.md)** — the procedure, for running another round.
 - **[Migration Plan](docs/migration-plan.md)** — how the current tree came to be. History, not current work.
 
 ## For Agents

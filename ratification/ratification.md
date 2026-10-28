@@ -5,7 +5,7 @@ description: "The evidence behind the authoring rules: each ratification round, 
 # Ratification — what the agent-experiment rounds changed
 
 **Status**: v0.7.0, historical record and argument
-**Role**: This document is the narrative and the evidence behind `docs/ratification-protocol.md`. The protocol is the procedure — how to run a round, how to triage what it finds. This is the account of running it: what was measured, what broke, what the results changed in the documentation, the specification, the implementation, and the product itself. The round-by-round primary source is `_notes/ratification-rounds-7-25.md`, with round 1 and the pre-registrations beside it.
+**Role**: This document is the narrative and the evidence behind `ratification/ratification-protocol.md`. The protocol is the procedure — how to run a round, how to triage what it finds. This is the account of running it: what was measured, what broke, what the results changed in the documentation, the specification, the implementation, and the product itself. The round-by-round primary source is `_notes/ratification-rounds-7-25.md`, with round 1 and the pre-registrations beside it.
 **`_notes/`**: Paths under `_notes/` in this document name working files removed from the repository after commit `238050d`; `git show 238050d:_notes/<path>` reads any of them.
 
 ---
@@ -58,7 +58,7 @@ Every one of these was paid for.
 
 ## 4. Triage in practice
 
-Every finding is assigned to documentation, specification, implementation, or outlier, and the fix goes to the layer that is actually wrong. The full decision procedure is `docs/ratification-protocol.md`; these are four real assignments.
+Every finding is assigned to documentation, specification, implementation, or outlier, and the fix goes to the layer that is actually wrong. The full decision procedure is `ratification/ratification-protocol.md`; these are four real assignments.
 
 **Documentation — the named-slot fill (round 7).** The brief compelled exactly one named fill. Four of five Haiku failed: one wrote `<slot name="footer">` *in the page*, one nested a `<slot>` inside a page `<footer>`, one wrote `<slot slot="footer">` — both spellings at once — and one avoided the mechanism by inventing a third layout. Not contamination, not an outlier, and the spec was right: a `<slot>` in a page has always been inert. The cause was that the rule showed `<slot name="footer">fallback…</slot>` and never showed a fill, so the only concrete literal in the rule was the one that got copied into the wrong file. haiku-1's report quotes the sentence, restates the rule correctly, and then writes the wrong thing. The doc now shows the page-side literal (`<footer slot="footer">…</footer>`) and says outright that a `<slot>` tag in a page fills nothing. Round 9: 5 of 5 correct fills, zero stray `<slot>` tags.
 
@@ -230,7 +230,7 @@ untested, not as passing.
 
 ## 8. Running it again, and what is still untested
 
-`docs/ratification-protocol.md` is the procedure — setup, the harness traps, the triage order, the two amendment rules, and the results table for every round. `_notes/ratification-handoff-prompt.md` is the self-contained block to hand a fresh agent, including the five gates that must be green before any commit.
+`ratification/ratification-protocol.md` is the procedure — setup, the harness traps, the triage order, the two amendment rules, and the results table for every round. `_notes/ratification-handoff-prompt.md` is the self-contained block to hand a fresh agent, including the five gates that must be green before any commit.
 
 Known limits of the method, stated because a method with no acknowledged limitations has not been examined: it reaches only the authoring surface, roughly a fifth of the spec — splice rules, head-merge tables, collision matrices, URL rewriting and publish semantics are unreachable by an agent writing HTML. Samples are correlated, since models share training data. And the bar is a model, so "Haiku gets it right" is a moving target; a doc that passed a year ago is not thereby passing today.
 

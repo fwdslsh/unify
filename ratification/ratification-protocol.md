@@ -8,7 +8,7 @@ description: "How to validate the authoring rules empirically, by having agents 
 
 The method is small: give a model **nothing but those 60 lines and a plain-English brief**, in a sandbox it cannot escape, and see whether it authors a compliant site. Run several samples. Look for patterns. Change one thing. Run again.
 
-This document is the procedure. `docs/ratification.md` is its companion: what the rounds actually found, how each finding was triaged, and what changed in the documentation, the specification, the implementation, and the product as a result.
+This document is the procedure. `ratification/ratification.md` is its companion: what the rounds actually found, how each finding was triaged, and what changed in the documentation, the specification, the implementation, and the product as a result.
 
 Paths under `_notes/` in this document name working files removed from the repository after commit `238050d`; `git show 238050d:_notes/<path>` reads any of them.
 
@@ -72,7 +72,7 @@ Two more that cost hours rather than rounds:
 
 1. Regenerate the rules file from the current doc.
 2. Seed N sandboxes (5 Haiku + 1 control is a good default).
-3. Launch, wait, collect — then **archive the round immediately, before judging**: commit `judge-results.json`, every sample's `REPORT.md`, and a tarball of the sample source trees into `_notes/rounds/`. The machine these rounds run on resets without warning, `/tmp` does not survive it, and round 27's sandboxes — reports, transcripts, sites — were lost hours after judging; its evidence survived only as the one JSON file that had been committed and whatever the judge's write-up had quoted. Evidence that exists only on `/tmp` has not been collected.
+3. Launch, wait, collect — then **archive the round immediately, before judging**: copy every sample's `REPORT.md` and a tarball of the sample source trees into `ratification/rounds/<round>/`, where the judge (below) also writes `judge-results.json`. That directory is gitignored, so a round's archive lives in the checkout and never in the repository. The machine these rounds run on resets without warning, `/tmp` does not survive it, and round 27's sandboxes — reports, transcripts, sites — were lost hours after judging; its evidence survived only as the one JSON file that had been committed and whatever the judge's write-up had quoted. Evidence that exists only on `/tmp` has not been collected.
 4. **Run `unify build --dry-run --strict` over every sample yourself.** Exit code plus the
    diagnostic list is the verdict.
 5. Read the output anyway — a green exit says the site composes, not that the author reached
@@ -112,7 +112,7 @@ the environment as well as the doc, and the result stops being attributable.
 
 **Sweep the site output, not the sandbox.** `rules.md` quotes `{{ }}` as an example of what not to write, so a naive violation grep reports templating syntax in every clean sample. Exclude the harness files. (I lost a round's analysis to this and briefly believed four samples had failed.)
 
-**Judge with the standing instrument, not ad-hoc greps: `bun _notes/judge-round.mjs <round-dir>`** extracts each sample's own publish command whole (quoted arguments, backslash continuations), re-runs it in place with `--dry-run --strict`, greps for exact private values only, resolves client-side fetch targets against the deploy address, and records every candidate command so a wrong pick stays visible. Improvised judging is how every false verdict in this record happened — three in rounds 19–20 alone (a regex that truncated a quoted URL, a split line-continuation, a domain-level privacy grep), all from the experimenter and none from the samples.
+**Judge with the standing instrument, not ad-hoc greps: `bun ratification/scripts/judge-round.mjs <round-dir>`** extracts each sample's own publish command whole (quoted arguments, backslash continuations), re-runs it in place with `--dry-run --strict`, greps for exact private values only, resolves client-side fetch targets against the deploy address, and records every candidate command so a wrong pick stays visible, in `ratification/rounds/<round>/judge-results.json` (named after the round directory; the samples themselves are never written). Improvised judging is how every false verdict in this record happened — three in rounds 19–20 alone (a regex that truncated a quoted URL, a split line-continuation, a domain-level privacy grep), all from the experimenter and none from the samples.
 
 ## Triage: doc, spec, implementation, or outlier
 

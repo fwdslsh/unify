@@ -38,7 +38,7 @@ test("the authoring rules still fit the one screen they claim", () => {
   // The document's own first line calls itself "the complete rules", and
   // product-spec §6.1 makes that a constraint rather than a boast: "New
   // behavior must still be explainable in one sentence and keep the core
-  // authoring rules on one screen." docs/ratification-protocol.md measures
+  // authoring rules on one screen." ratification/ratification-protocol.md measures
   // the claim empirically at 60 lines; this pins the number so a feature that
   // needs a paragraph has to argue for it rather than append one.
   const rules = readFileSync(join(ROOT, "docs", "authoring-rules.md"), "utf8").replace(/\n+$/, "");

@@ -300,7 +300,7 @@ test("scaffold/blog: SCF-03 — two builds are byte-identical and the generator 
 
   // The seam, spelled exactly as docs/authoring-rules.md spells it — the
   // scaffold and the doc must agree, because a rule that shows exactly one
-  // literal will have that literal copied (docs/ratification.md §6).
+  // literal will have that literal copied (ratification/ratification.md §6).
   if (!scriptText.includes("generate: scripts/gen.mjs")) {
     throw new Error(`scripts/gen.mjs's opening comment must name the authoring rules' literal "generate: scripts/gen.mjs":\n${scriptText.split("\n").slice(0, 6).join("\n")}`);
   }
