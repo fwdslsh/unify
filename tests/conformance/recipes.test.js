@@ -27,13 +27,28 @@
  *
  * Real CLI spawns only (hygiene H3); no mocks (H1); no skips (H4).
  */
-import { test } from "bun:test";
-import { existsSync, readFileSync, readdirSync, symlinkSync } from "node:fs";
+import { expect, test } from "bun:test";
+import { existsSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { ROOT, mkTmp, runCli, writeTree } from "./support.mjs";
 
 const TEST_MS = 30_000;
 const DOC = readFileSync(join(ROOT, "docs", "integrations.md"), "utf8");
+
+/**
+ * The named `##` section of a document, up to the next `##` heading — the
+ * prose a claim sits in, and where `codeBlock()` looks for its literals.
+ *
+ * @param {string} heading - the section's `## ` heading text
+ * @param {string} [doc] - the document's text; integrations.md unless given
+ * @returns {string}
+ */
+function sectionText(heading, doc = DOC) {
+  const start = doc.indexOf(`\n## ${heading}\n`);
+  if (start < 0) throw new Error(`no section "## ${heading}"`);
+  const after = doc.indexOf("\n## ", start + 1);
+  return doc.slice(start, after < 0 ? doc.length : after);
+}
 
 /**
  * The nth fenced code block of the given language inside the named `##`
@@ -46,11 +61,7 @@ const DOC = readFileSync(join(ROOT, "docs", "integrations.md"), "utf8");
  * @returns {string}
  */
 function codeBlock(heading, lang, nth = 0) {
-  const start = DOC.indexOf(`\n## ${heading}\n`);
-  if (start < 0) throw new Error(`integrations.md has no section "## ${heading}"`);
-  const after = DOC.indexOf("\n## ", start + 1);
-  const section = DOC.slice(start, after < 0 ? DOC.length : after);
-  const blocks = [...section.matchAll(new RegExp("```" + lang + "\\n([\\s\\S]*?)```", "g"))].map((m) => m[1]);
+  const blocks = [...sectionText(heading).matchAll(new RegExp("```" + lang + "\\n([\\s\\S]*?)```", "g"))].map((m) => m[1]);
   if (!blocks[nth]) {
     throw new Error(`integrations.md "${heading}" has no ${lang} block #${nth} (found ${blocks.length})`);
   }
@@ -226,6 +237,58 @@ test("recipe 1 — a generator's failure is a build failure, and nothing publish
   if (!r.stderr.includes("the CMS was down")) throw new Error(`the generator's own message must reach the author:\n${r.stderr}`);
 }, TEST_MS);
 
+test("recipe 1 — source facts or final facts: the inventory record and the catalog fields the document prints, and who is in each", async () => {
+  const H = "1. The generator context: what `--generate` hands you";
+  const markdown = codeBlock(H, "markdown", 0);
+  const record = JSON.parse(codeBlock(H, "json", 1));
+  const fields = JSON.parse(codeBlock(H, "json", 2));
+  const flags = /built with `([^`]+)`/.exec(sectionText(H))?.[1];
+  if (!flags) throw new Error("the section no longer names the flags its catalog fields come from — update this test");
+  // "with the section layout from Getting Started around it" — that layout,
+  // read from that document, so the two cannot drift apart.
+  const gettingStarted = readFileSync(join(ROOT, "docs", "getting-started.md"), "utf8");
+  const layout = /```html\n([\s\S]*?)```/.exec(sectionText("A section of Markdown pages", gettingStarted))?.[1];
+  if (!layout) throw new Error("getting-started.md's section layout is gone — update this test");
+
+  const tmp = mkTmp();
+  writeTree(join(tmp, "site"), {
+    "index.html": page("Home", '<h1>Home</h1><a href="/notes/first.md">first</a> <a href="/notes/generated.md">generated</a>'),
+    "_includes/nav.html": '<nav><a href="/index.html">Home</a></nav>\n',
+    "assets/style.css": "body { margin: 0; }\n",
+    "notes/_layout.html": layout,
+    "notes/first.md": markdown,
+    "notes/hidden.md": "---\ntitle: Hidden\nrobots: noindex\n---\n# Hidden\n",
+  });
+  writeTree(join(tmp, "scripts"), {
+    // Test scaffolding: writes one generated page and hands the inventory back.
+    "gen.mjs": 'import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";\n' +
+      'import { join } from "node:path";\n' +
+      'const [, , , overlay, contextPath] = process.argv;\n' +
+      'copyFileSync(JSON.parse(readFileSync(contextPath, "utf8")).inputs.sourcePages, process.env.INVENTORY_OUT);\n' +
+      'mkdirSync(join(overlay, "notes"), { recursive: true });\n' +
+      'writeFileSync(join(overlay, "notes", "generated.md"), "---\\ntitle: Generated\\n---\\n# Generated\\n");\n',
+  });
+  const inventoryOut = join(tmp, "inventory.json");
+  const r = await runCli(["build", "-o", "dist", "--generate", "../scripts/gen.mjs", ...flags.split(" ")], tmp, { INVENTORY_OUT: inventoryOut });
+  expectExit(r, 0, `the source-facts page built with ${flags}`);
+
+  const inventory = JSON.parse(readFileSync(inventoryOut, "utf8")).pages;
+  expect(inventory.find((p) => p.source === "notes/first.md")).toEqual(record);
+  const catalog = JSON.parse(readFileSync(join(tmp, "dist", "assets", "unify", "catalog.json"), "utf8")).pages;
+  const entry = catalog.find((p) => p.path === fields.path);
+  if (!entry) throw new Error(`catalog.json has no page at ${fields.path}:\n${JSON.stringify(catalog.map((p) => p.path))}`);
+  // "has these fields": every field the document prints, as printed.
+  expect(entry).toMatchObject(fields);
+
+  // "The lists are not the same pages."
+  const sources = inventory.map((p) => p.source);
+  if (!sources.includes("notes/hidden.md")) throw new Error("the inventory includes a noindex page");
+  if (sources.includes("notes/generated.md")) throw new Error("the inventory has no generated page");
+  const paths = catalog.map((p) => p.path);
+  if (paths.includes("/sub/notes/hidden/")) throw new Error("the catalog leaves a noindex page out");
+  if (!paths.includes("/sub/notes/generated/")) throw new Error("the catalog includes generated pages");
+}, TEST_MS);
+
 // -------------------------------------------------------- recipe 2: images
 
 test("recipe 2 — _originals/ never publishes, derivatives do, and srcset is rewritten", async () => {
@@ -373,6 +436,35 @@ test("recipe 4 — findings carry a stable id and fingerprint, and --strict make
 
   const strict = await runCli(["audit", "-s", "src", "-o", "dist", "--base-url", "https://example.com/", "--strict"], tmp);
   if (strict.exit === 0) throw new Error("--strict must turn findings into a non-zero exit");
+}, TEST_MS);
+
+test("recipe 4 — the audit report maps a source file to its public address, as the snippet prints", async () => {
+  const H = "4. Interoperating with post-build tools";
+  const command = codeBlock(H, "bash", 2).trim();
+  const script = codeBlock(H, "js", 0);
+  const parts = /^unify (audit [^>]+) > (\S+)$/.exec(command);
+  if (!parts) throw new Error(`the documented command changed shape — update this test:\n${command}`);
+  const printed = /\/\/ (\S+)\s*$/.exec(script.trim())?.[1];
+  if (!printed) throw new Error(`the snippet no longer prints the address it expects:\n${script}`);
+
+  const tmp = mkTmp();
+  writeTree(join(tmp, "site"), {
+    "index.html": page("Home", '<h1>Home</h1><a href="/news/launch.md">launch</a>'),
+    "news/launch.md": "---\ntitle: Launch\ndescription: We launched.\nlang: en\n---\n# Launch\n",
+  });
+  const audit = await runCli(parts[1].trim().split(" "), tmp);
+  writeFileSync(join(tmp, parts[2]), audit.stdout);
+  writeTree(tmp, { "export.mjs": script });
+  const run = Bun.spawnSync({ cmd: [process.execPath, "export.mjs"], cwd: tmp, stdout: "pipe", stderr: "pipe" });
+  if (run.exitCode !== 0) throw new Error(`the snippet must run:\n${run.stderr.toString()}`);
+  if (run.stdout.toString().trim() !== printed) throw new Error(`expected ${printed}, the snippet printed ${run.stdout.toString()}`);
+
+  // "`document.url`, which is `null` without `--base-url`; then `document.path` is the root-relative address."
+  const plain = await runCli(["audit", "--pretty-urls", "--format", "json"], tmp);
+  const launch = JSON.parse(plain.stdout).pages.find((p) => p.source === "news/launch.md");
+  if (launch.document.url !== null || launch.document.path !== "/news/launch/" || launch.outputPath !== "news/launch/index.html") {
+    throw new Error(`without --base-url: ${JSON.stringify(launch)}`);
+  }
 }, TEST_MS);
 
 test("what stays outside unify — there is no --run, and the refusal says so", async () => {

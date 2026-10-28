@@ -8,6 +8,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Documentation only: nothing a build, an audit or a scaffold does is different.
+
+### Fixed
+
+- **The documents now say what a hand-written directory link does (#139).** The authoring rules and every
+  built-in template's README said `/guides/` resolves only if you wrote `guides/index.html`; it also resolves
+  when `--pretty-urls` makes that file from `guides.html` or `guides.md`, which the conformance spec already
+  said. Linking the source file stays the advice (`unify-default-template`, `-basic-`, `-blog-` and
+  `-portfolio-` 0.1.4, `unify-docs-template` 0.5.1).
+- **The product spec describes slotted includes as shipped (#139).** §3.1 still called a non-empty include
+  invalid, and §3.3, §5 and §6.4 called it an experiment; it shipped in 0.8.0 under conformance spec §32.
+- **A repeated heading's id is documented as `-1`, `-2`.** Product spec §3.5 and conformance spec §10.4 still
+  said `-2`, `-3`, the numbering before 0.11.10.
+
+### Added
+
+- **Getting Started covers the tasks a migration tripped on (#139):** a table of what each link spelling
+  becomes in a plain, `--pretty-urls` and subpath build; a folder of Markdown pages under its own
+  `_layout.html` with no layout field, and why frontmatter never becomes page content; a slotted
+  include, worked; how a layout's and a page's `<head>` merge, in order, and which head elements unify writes
+  for you; and where `--dry-run`, `/_unify/`, `/_unify/preview/` and `/_unify/pages.json` each help.
+- **The integrations guide sets the source inventory, the catalog, the search corpus, `audit --format json`
+  and `/_unify/pages.json` side by side (#139)**, with one page's inventory record and catalog entry, and adds
+  the docs template's navigation helper and the audit report's source-to-address map for exporters. The
+  cache-busting recipe no longer implies every unchanged URL stays stale. Every new literal is tested.
+
 ## [0.11.16] - 2026-10-13
 
 Published to npm as `latest`; 0.11.16-alpha.1 on the `next` tag is folded into this entry.
