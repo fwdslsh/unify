@@ -1,7 +1,7 @@
 # Authoring a unify site — the complete rules
 
-unify composes plain HTML at build time. No template language, variables, loops, or config: if you reach for
-`{{ }}`, `{% %}`, props, or a config key, you are solving it wrong. The vocabulary is standard HTML — `<main>`,
+unify composes plain HTML at build time, without a template language, variables, or loops (`{{ }}`, `{% %}`, props).
+Most sites need no configuration file: use conventions and CLI options, or save settings in `unify.yaml` when useful. The vocabulary is standard HTML — `<main>`,
 `<slot>`, `slot=` — plus `<include>` and `data-layout`. Derived files (a post index) come from a script you write, kept in `scripts/` beside the site and named in `unify.yaml` (`generate: scripts/gen.mjs`): unify runs it before every build and it writes into the directory unify hands it, never into `site/`. A feed at `/feed.xml` needs no script: declare `schema: Article` or `BlogPosting` (below) on any page and build with `--base-url`, and unify writes it — Atom, from your title/description/canonical/dates; a `date:` with no time is reported and left out rather than guessed at.
 
 ## Files

@@ -28,7 +28,7 @@
  * Real CLI spawns only (hygiene H3); no mocks (H1); no skips (H4).
  */
 import { expect, test } from "bun:test";
-import { existsSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, renameSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { ROOT, mkTmp, runCli, writeTree } from "./support.mjs";
 
@@ -156,6 +156,25 @@ test("recipe 1 — the source-inventory generator builds clean in ONE strict aud
       throw new Error(`[${v.args.join(" ")}] order or titles wrong:\n${out}`);
     }
     if (out.includes("Draft")) throw new Error(`an underscore page leaked into the index:\n${out}`);
+
+    // Maintenance of the same literal recipe: the author changes source files,
+    // never a second list. Each edit must appear after ONE build.
+    writeTree(join(tmp, "site"), { "reports/q3.md": report(3, "Q3", "2026-10-02T09:00:00Z") });
+    expectExit(await runCli(["build", "-o", "dist", ...flags, ...v.args], tmp), 0, "index after adding an article");
+    const added = readFileSync(join(tmp, "dist", indexPath), "utf8");
+    const thirdLink = v.link.replace("q2", "q3");
+    if (!added.includes(thirdLink) || added.indexOf("Q3") >= added.indexOf("Q2")) {
+      throw new Error(`the added article must lead the index with its rewritten URL:\n${added}`);
+    }
+    renameSync(join(tmp, "site/reports/q3.md"), join(tmp, "site/reports/autumn.md"));
+    expectExit(await runCli(["build", "-o", "dist", ...flags, ...v.args], tmp), 0, "index after renaming an article");
+    const renamed = readFileSync(join(tmp, "dist", indexPath), "utf8");
+    if (!renamed.includes(thirdLink.replace("q3", "autumn")) || renamed.includes(thirdLink)) {
+      throw new Error(`the index must follow the source rename without a stale entry:\n${renamed}`);
+    }
+    if ((renamed.match(/>Q3<\/a>/g) ?? []).length !== 1) throw new Error(`the renamed article must appear exactly once:\n${renamed}`);
+    const oldOutput = v.args.includes("--pretty-urls") ? "reports/q3/index.html" : "reports/q3.html";
+    if (existsSync(join(tmp, "dist", oldOutput))) throw new Error(`the renamed article left a stale output: ${oldOutput}`);
   }
 
   // `generate:` and `source-inventory: true` saved in unify.yaml: the command
@@ -266,7 +285,8 @@ test("recipe 1 — source facts or final facts: the inventory record and the cat
       'const [, , , overlay, contextPath] = process.argv;\n' +
       'copyFileSync(JSON.parse(readFileSync(contextPath, "utf8")).inputs.sourcePages, process.env.INVENTORY_OUT);\n' +
       'mkdirSync(join(overlay, "notes"), { recursive: true });\n' +
-      'writeFileSync(join(overlay, "notes", "generated.md"), "---\\ntitle: Generated\\n---\\n# Generated\\n");\n',
+      'writeFileSync(join(overlay, "notes", "generated.md"), "---\\ntitle: Generated\\n---\\n# Generated\\n\\n[First](/notes/first.md#first-steps)\\n");\n' +
+      'writeFileSync(join(overlay, "links.json"), JSON.stringify({ href: "/notes/first.md#first-steps" }));\n',
   });
   const inventoryOut = join(tmp, "inventory.json");
   const r = await runCli(["build", "-o", "dist", "--generate", "../scripts/gen.mjs", ...flags.split(" ")], tmp, { INVENTORY_OUT: inventoryOut });
@@ -287,6 +307,16 @@ test("recipe 1 — source facts or final facts: the inventory record and the cat
   const paths = catalog.map((p) => p.path);
   if (paths.includes("/sub/notes/hidden/")) throw new Error("the catalog leaves a noindex page out");
   if (!paths.includes("/sub/notes/generated/")) throw new Error("the catalog includes generated pages");
+
+  // Recipe 4's boundary: generated Markdown is a page and composes normally;
+  // a raw export's links are the exporter's responsibility.
+  const generated = readFileSync(join(tmp, "dist/notes/generated/index.html"), "utf8");
+  if (!generated.includes('<a href="/sub/notes/first/#first-steps">First</a>')) {
+    throw new Error(`the generated Markdown's link must be rewritten:\n${generated}`);
+  }
+  if (!generated.includes("<title>Generated — Notes — My Site</title>")) throw new Error("generated Markdown must use the shared layout");
+  if (existsSync(join(tmp, "dist/notes/generated.md"))) throw new Error("a generated Markdown page must not ship raw");
+  expect(readFileSync(join(tmp, "dist/links.json"), "utf8")).toBe(JSON.stringify({ href: "/notes/first.md#first-steps" }));
 }, TEST_MS);
 
 // -------------------------------------------------------- recipe 2: images
