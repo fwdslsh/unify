@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Documentation only: nothing a build, an audit or a scaffold does is different.
+Build, audit and scaffold behavior is unchanged. The JavaScript helper below is new and unreleased.
 
 ### Fixed
 
@@ -24,6 +24,11 @@ Documentation only: nothing a build, an audit or a scaffold does is different.
 
 ### Added
 
+- **Read Markdown headings without copying the renderer's slug rules.** The unreleased
+  `analyzeMarkdown(source)` helper from `@fwdslsh/unify/markdown.js` returns headings
+  before includes/layouts compose, using the CLI's conversion and document reader.
+  The [TOC recipe](docs/unreleased/markdown-analysis.md) demonstrates the npm API;
+  it is not available in 0.11.16 and does not change rendered output.
 - **Getting Started covers the tasks a migration tripped on (#139):** a table of what each link spelling
   becomes in a plain, `--pretty-urls` and subpath build; a folder of Markdown pages under its own
   `_layout.html` with no layout field, and why frontmatter never becomes page content; a slotted

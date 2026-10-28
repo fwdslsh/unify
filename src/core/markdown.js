@@ -74,6 +74,7 @@ import { readFile } from "node:fs/promises";
 import MarkdownIt from "markdown-it";
 import { loadAll as yamlLoadAll, FAILSAFE_SCHEMA } from "js-yaml";
 import { nameOf, resolutionRoots } from "./paths.js";
+import { extractDocument } from "./document.js";
 
 // --------------------------------------------------------------- engine
 
@@ -657,6 +658,32 @@ function metaElement(key, value) {
 }
 
 // ----------------------------------------------------------------- exports
+
+/**
+ * Read the headings of one Markdown page before includes/layout composition.
+ * Public API: @fwdslsh/unify/markdown.js. The same converter assigns IDs for
+ * both this helper and the CLI; the same document reader reads raw HTML
+ * headings and decoded text for both this helper and the final-page catalog.
+ * No filesystem access, include expansion, URL rewriting or build validation.
+ *
+ * @param {string} source - complete Markdown page, optionally with frontmatter
+ * @returns {{headings: {level: number, id: string|null, text: string}[]}}
+ * @throws {TypeError} when source is not a string
+ * @throws {SyntaxError} for a Markdown/frontmatter problem conversion reports
+ */
+export function analyzeMarkdown(source) {
+  if (typeof source !== "string") throw new TypeError("analyzeMarkdown source must be a string");
+  const problems = [];
+  const ctx = { file: "markdown.md", reporter: { problem: (problem) => problems.push(problem) } };
+  const { body, bodyStartLine } = readFrontmatter(source, ctx);
+  const { html } = convertBody(body, bodyStartLine, ctx);
+  if (problems.length) {
+    throw new SyntaxError(problems.map(({ line, message }) =>
+      `${line === undefined ? "Markdown" : `Markdown line ${line}`}: ${message}`
+    ).join("\n"));
+  }
+  return { headings: extractDocument(html).document.body.headings };
+}
 
 /**
  * §10.2 — one Markdown page's frontmatter, read and validated: split, parsed,

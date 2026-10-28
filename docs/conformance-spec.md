@@ -736,7 +736,7 @@ More.
     <main>
       <h1 id="about">About</h1>
 <p>Text here.</p>
-<h1 id="about-2">About</h1>
+<h1 id="about-1">About</h1>
 <p>More.</p>
     </main>
   </body>
@@ -789,6 +789,28 @@ No layout wanted.
 ```
 
 (Title from the first `<h1>`; `layout: none` is consumed, never a meta; the reserved keys landed on the shell's own root elements exactly where §10.2 sends them.)
+
+---
+
+### 10.8 JavaScript heading analysis (unreleased)
+
+The npm package's `@fwdslsh/unify/markdown.js` exports `analyzeMarkdown(source)`.
+It accepts one string containing a Markdown **page**, including optional
+frontmatter, and synchronously returns `{ headings }`. Conversion is the same
+§10 conversion the CLI uses; the headings are then the §20 document reader's
+`body.headings` from that converted HTML, before any includes, layouts, slots or
+URL rewriting. Each record is `{ level, id, text }`, in source order and scoped
+by §20.7 (first `<main>`, else `<body>`, else the converted fragment). Thus raw
+HTML headings participate without being assigned IDs, while Markdown headings
+get §10.4's IDs; this helper never implements a second slug algorithm.
+
+The call performs no I/O, and each call has independent conversion state and
+result objects. A non-string input throws `TypeError`. A problem reported by
+§10's page conversion/frontmatter validation throws `SyntaxError` with the
+converter's message and source line where known. Other build validation remains
+the build's responsibility. The helper does not promise the final page's outline:
+composition may add, move or replace headings. The runnable consumer and the
+supported boundary are in [the unreleased guide](unreleased/markdown-analysis.md).
 
 ---
 
