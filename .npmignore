@@ -6,7 +6,6 @@ docker/
 .claude/
 CLAUDE.md
 CONTRIBUTING.md
-_notes/
 
 *.test.js
 *.spec.js

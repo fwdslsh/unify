@@ -98,7 +98,7 @@ separate unify project, addressed at its own `--base-url` subpath, and each gate
 own `--dry-run --strict` before the real build. Those five directories, roughly 360 of the
 published tree's ~380 files, are what the `/examples/` gallery's "View live" links resolve
 to at runtime; this site's own build never emits them (see the comment at the bottom of
-`site/examples/index.html`, and Part 2 of `_notes/batches/b10-contract.md`, for why).
+`site/examples/index.html`, and Part 2 of `_notes/batches/b10-contract.md` as of commit `238050d`, for why).
 
 **Two things the workflow could not do for itself, both now done**: GitHub Pages' source is
 set to **Settings > Pages > Build and deployment > Source > "GitHub Actions"**, and the

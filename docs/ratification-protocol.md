@@ -10,6 +10,8 @@ The method is small: give a model **nothing but those 60 lines and a plain-Engli
 
 This document is the procedure. `docs/ratification.md` is its companion: what the rounds actually found, how each finding was triaged, and what changed in the documentation, the specification, the implementation, and the product as a result.
 
+Paths under `_notes/` in this document name working files removed from the repository after commit `238050d`; `git show 238050d:_notes/<path>` reads any of them.
+
 ## Why this works when review does not
 
 Reviewing your own documentation fails in a specific way: you read it the way you meant it. Every ambiguity resolves silently in your head, so the sentence that will mislead a reader looks fine to you forever.
