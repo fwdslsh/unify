@@ -188,7 +188,7 @@ Three things in a built head can come from unify rather than from you:
 - **JSON-LD**, on a page that declares `schema: WebPage`, `Article` or `BlogPosting` (`<meta name="schema" content="Article">` in HTML), built only from what the page already declares. A `<script type="application/ld+json">` you write wins and unify generates none — that is where any other type, or richer data, goes.
 - **Absolute URLs** in `og:`/`twitter:` values and the canonical, under `--base-url`. The values themselves stay yours: unify never copies the title or description into `og:title`, `og:description` or `twitter:*`.
 
-The details are in the CLI reference: [structured data](cli-reference.md#structured-data-schema), and `--canonical` just above it.
+The details are in the CLI reference: [structured data](cli-reference.md#structured-data-schema), and `--canonical` just above it. The [social metadata recipe](guides/social-metadata.md) shows shared defaults, page overrides, and optional reuse of an HTML page's title and description.
 
 ## Markdown pages
 
