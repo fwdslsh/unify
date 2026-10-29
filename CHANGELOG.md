@@ -8,7 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Documentation only: nothing a build, an audit or a scaffold does is different.
+### Added
+
+- **Open Graph defaults from the final document.** Builds fill `og:title` from the composed title (including its layout suffix), `og:description` from the final description, and `og:url` from the resolved canonical. Page-authored Open Graph tags, including empty values, repeated tags, Markdown frontmatter and page-head includes, win. Derived values replace generic layout defaults; absent source values leave those defaults alone. Twitter tags remain authored. This is unreleased behavior and is not available in 0.11.16.
 
 ### Fixed
 

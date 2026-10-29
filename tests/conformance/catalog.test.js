@@ -273,6 +273,7 @@ Body text nobody should see in the catalog.
     { name: "series", content: "architecture-notes" },
     { property: "og:title", content: "Unify and HTMX" },
     { property: "og:image", content: "/card.png" },
+    { property: "og:description", content: "A practical static-site architecture." },
   ];
   if (JSON.stringify(meta) !== JSON.stringify(expected)) {
     throw new Error(`§30.2: repeated tags, a custom key, and og: entries must all survive in declaration order with every attribute.\n  expected: ${JSON.stringify(expected)}\n  actual:   ${JSON.stringify(meta)}`);

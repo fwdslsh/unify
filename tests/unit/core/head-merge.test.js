@@ -15,6 +15,7 @@ import { mergeHead } from "../../../src/core/head-merge.js";
 import { inlineIncludes } from "../../../src/core/includes.js";
 import { spansToDiagnosticLocator } from "../../../src/core/urls.js";
 import { compareHtml } from "../../../tests/conformance/compare.mjs";
+import { completeOpenGraph, declaredOpenGraph } from "../../../src/core/open-graph.js";
 import { Reporter } from "../../../src/core/diagnostics.js";
 
 const ROOT = join(import.meta.dir, "..", "..", "..");
@@ -46,7 +47,8 @@ describe("FIX-11 — the whole head-merge table at once", () => {
     const actualHead = run(layoutText, "_layout.html", pageText, "deep/page.html", reporter);
     const expectedHead = headOf(expectedText);
     const expectedHeadText = expectedText.slice(expectedHead.start, expectedHead.end);
-    const diffs = compareHtml(expectedHeadText, actualHead, "head");
+    // The shared expected head is final build output, after §22.6 completion.
+    const diffs = compareHtml(expectedHeadText, completeOpenGraph(actualHead, declaredOpenGraph(pageText)).text, "head");
     expect(diffs).toEqual([]);
     expect(reporter.diagnostics).toEqual([]); // identical charset, no advisory
   });

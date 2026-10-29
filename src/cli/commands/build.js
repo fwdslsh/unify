@@ -66,6 +66,7 @@ import * as feed from "../../core/feed.js";
 import * as catalog from "../../core/catalog.js";
 import * as searchCorpus from "../../core/search-corpus.js";
 import { completeCanonical } from "../../core/canonical.js";
+import { completeOpenGraph, declaredOpenGraph } from "../../core/open-graph.js";
 import { checkSchemaDeclarations, generateStructuredData } from "../../core/structured-data.js";
 import * as robots from "../../core/robots.js";
 import * as generate from "../../core/generate.js";
@@ -263,7 +264,7 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
       // the include's own already-reported problem.
       const hadNewProblem = reporter.problemsReported > problemsBefore;
       if (composed !== null && !hadNewProblem) {
-        composedPages.push({ relPath: page.relPath, html: composed.text, spans: composed.spans, layoutFile: composed.layoutFile, generated: page.generated === true, template: page.template === true });
+        composedPages.push({ relPath: page.relPath, html: composed.text, spans: composed.spans, layoutFile: composed.layoutFile, pageOpenGraph: composed.pageOpenGraph, generated: page.generated === true, template: page.template === true });
       }
     } catch (err) {
       // Best-effort composition (PIP-02): one page's failure must not stop
@@ -402,6 +403,7 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
       template: p.template === true,
       layout: p.layoutFile ?? null,
       includes,
+      pageOpenGraph: p.pageOpenGraph,
     });
   }
 
@@ -419,9 +421,9 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
   // literally true rather than being patched around. The extra pass runs only
   // under --canonical auto.
   /**
-   * Output path -> the byte insertions §22 and §26 made, so §14.1's locator can
+   * Output path -> the edits §22 and §26 made (insertions or OG replacements), so §14.1's locator can
    * undo them — in **reverse application order**, most recent first. Each `at`
-   * is a position in the text that insertion was applied to, so the locator
+   * is a position in the text that edit was applied to, so the locator
    * has to peel them off newest-first to keep asking each `at` about an offset
    * measured in its own text (see `makeReferenceLocator`).
    */
@@ -438,12 +440,12 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
    */
   const preInsertionByOutputPath = new Map();
   /**
-   * Record one feature's insertions into a page — newest first, since each
+   * Record one feature's edits into a page — newest first, since each
    * `at` is measured in the text ITS feature was applied to — and remember the
    * page's pre-insertion text the first time anything writes into it. Called
    * BEFORE `page.html` is replaced, which is what makes that text the right one.
    *
-   * Each insertion carries the page's OWN source path: §1's provenance is "the
+   * Each edit carries the page's OWN source path: §1's provenance is "the
    * source file whose text contained an element's start tag" and a generated
    * element has none, so a reference §12 finds inside these bytes is located at
    * the page the block was generated for (§26.7) rather than at whichever file
@@ -472,6 +474,17 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
       tempFiles.set(page.outputPath, completed.text);
       completedCount++;
     }
+  }
+
+  // ---- §22.6 — Open Graph defaults, after the final canonical is known. ----
+  // Page declarations were collected after includes, before layout merge.
+  // They stay private build state; the public manifest still reads only bytes.
+  for (const page of manifestPages) {
+    const completed = completeOpenGraph(page.html, page.pageOpenGraph);
+    if (completed.text === page.html) continue;
+    noteInsertions(page, completed.insertions);
+    page.html = completed.text;
+    tempFiles.set(page.outputPath, completed.text);
   }
 
   // ---- §26 — structured data: P23, then bounded generation. ----------------
@@ -1072,7 +1085,7 @@ function makeSourceLineResolver(roots) {
  *
  * So `urls.rewriteUrls` now reports the shifts it imposed — the general fix
  * this comment previously named and declined — and they are unwound below
- * alongside §22/§26's insertions.
+ * alongside §22/§26's insertions and replacements.
  *
  * Once the right span is found, its position in that file's OWN raw text
  * gives a real line number through `resolveLine` — the same resolver
@@ -1089,6 +1102,9 @@ function makeSourceLineResolver(roots) {
  * @param {Map<string,string>} htmlFiles
  * @param {Map<string,string>} cssFiles
  * @param {(file: string, fileOffset: number) => number|undefined} resolveLine
+ * @param {Map<string, {at:number,length:number,replacedLength?:number,file?:string}[]>} insertionsByOutputPath
+ * @param {Map<string,string>} preInsertionByOutputPath
+ * @param {Map<string, {at:number,len:number,delta:number}[][]>} urlShiftsByOutputPath
  * @returns {import('../../core/references.js').Locate}
  */
 function makeReferenceLocator(
@@ -1098,59 +1114,29 @@ function makeReferenceLocator(
 ) {
   return (outputFile, offset) => {
     const spans = pageSpansByOutputPath.get(outputFile);
-    // §22's completion INSERTS bytes after the spans were computed, which is
-    // the one thing the invariant below never allowed for: §11's rewrites only
-    // ever replace attribute values in place, so a final-text offset indexed
-    // the span table exactly. An insertion breaks that, and it broke it
-    // silently — a broken link inside an include was attributed to a different
-    // file at a line holding unrelated content, which is worse than no location
-    // at all. Subtracting the insertions that precede the offset maps a
-    // final-text position back to the pre-insertion text the spans describe.
-    // The list is in REVERSE APPLICATION ORDER (see `insertionsByOutputPath`),
-    // and that is what makes this loop total rather than merely lucky. Each
-    // insertion's `at` is a position in the text IT was applied to, so §26's
-    // block sits at an offset in the text §22 had already lengthened. Undoing
-    // the most recent first means `offset - shift` is always expressed in the
-    // space the next `at` was measured in; undoing them in application order
-    // compares a §26-space position against a §22-space offset, which happens
-    // to come out right only because a JSON-LD block is longer than a canonical
-    // link. One insertion cannot show the difference, which is why the order
-    // had to be decided the moment a second feature wrote into the same head.
+    // Completion edits happen after composition and URL rewriting. Undo them
+    // newest first: each `at` is measured in the text its feature received.
+    // Within OG completion, edits apply right-to-left, so records are stored
+    // left-to-right. Account for net length: replacement can grow or shrink,
+    // and removing a duplicate is a replacement with zero emitted bytes.
     //
-    // An offset that lands INSIDE an insertion has no preimage at all, and the
-    // three cases have to be separated rather than lumped together: §26's
-    // generated block carries references §12 checks (`url`, `image` — §26.7),
-    // so a page whose `og:image` names nothing produces a P13 inside bytes no
-    // source file contains. Subtracting the whole insertion for such an offset
-    // walks BACKWARDS past the insertion point by however much of the block
-    // preceded the reference, which on a page with a long description crossed
-    // into another file entirely: one missing image reported at `_layout.html`
-    // line 2, `<html lang="en">`, holding nothing of the kind. §1's provenance
-    // is "the source file whose text contained the element's start tag" and a
-    // generated element has none, so the position is mapped to the insertion
-    // POINT — a real position in the pre-insertion text — and §14.1's rule
-    // decides the rest: a line is omitted rather than guessed.
-    //
-    // The FILE is decided the same way and had to be, because mapping to the
-    // insertion point answers the line question and then silently answers the
-    // file question wrong: the insertion point is wherever `</head>` came from,
-    // which for a Markdown page under a layout is the LAYOUT, and for a layout
-    // that includes its head chrome is that FRAGMENT — files that contain no
-    // such reference and that the author can grep to no effect. §26.7 fixes
-    // the answer instead: a reference inside a generated block is located at
-    // the page the block was generated for, which every insertion carries.
+    // Bytes INSIDE a generated tag/block have no authored preimage. Map them
+    // to the edit point while unwinding earlier edits, but attribute any
+    // reference there to the page the feature generated it FOR, without a
+    // guessed line (§14.1, §22.6, §26.7). The closing head may belong to a layout
+    // or include; neither wrote the generated reference.
     const insertions = insertionsByOutputPath.get(outputFile) ?? [];
     let shift = 0;
-    /** The page an insertion was generated FOR, when the offset lands inside one. */
+    /** The page generated bytes belong to, when the offset lands inside an edit. */
     let generatedFile = null;
     for (const ins of insertions) {
       const local = offset - shift;
-      if (local >= ins.at + ins.length) shift += ins.length;
+      if (local >= ins.at + ins.length) shift += ins.length - (ins.replacedLength ?? 0);
       else if (local >= ins.at) { shift += local - ins.at; generatedFile = ins.file ?? outputFile; }
     }
     const generated = generatedFile !== null;
-    // Insertions undone; now §11's own length changes. The order is forced:
-    // §22/§26 insert into the text §11 already rewrote, so an offset has to
+    // Completion edits undone; now §11's own length changes. The order is forced:
+    // §22/§26 edit the text §11 already rewrote, so an offset has to
     // come back through the insertions before it means anything to the
     // rewrite shifts. Undoing them the other way round compares a
     // post-insertion position against a pre-insertion `at`.
@@ -1236,7 +1222,7 @@ function trackIncludedFiles(spans, entryFile, consumedAsIncludeOrLayout) {
  * when the page has a problem of its own (already reported) — best-effort
  * composition continues with the next page regardless (the caller's loop,
  * not this function).
- * @returns {Promise<{text: string, spans: {start:number,end:number,file:string,fileOffset:number}[], layoutFile: string|null}|null>}
+ * @returns {Promise<{text: string, spans: {start:number,end:number,file:string,fileOffset:number}[], layoutFile: string|null, pageOpenGraph: Set<string>}|null>}
  */
 async function buildPage(page, { sourceRoot, roots, reporter, layoutCache, convertMarkdown, consumedAsIncludeOrLayout, resolveLine }) {
   const pageFile = page.relPath;
@@ -1268,7 +1254,7 @@ async function buildPage(page, { sourceRoot, roots, reporter, layoutCache, conve
 
     if (resolution.none) {
       const { text: pageText, spans: pageSpans } = compose.assembleMarkdownDocument(assembled, { standalone: true, pageFile });
-      return { ...compose.compose({ pageText, pageFile, pageSpans, layoutText: null, resolveLine, reporter }), layoutFile: null };
+      return { ...compose.compose({ pageText, pageFile, pageSpans, layoutText: null, resolveLine, reporter }), layoutFile: null, pageOpenGraph: declaredOpenGraph(pageText) };
     }
 
     const loaded = await loadLayout(resolution.path, { sourceRoot, roots, reporter, convertMarkdown, layoutCache, consumedAsIncludeOrLayout, resolveLine });
@@ -1280,6 +1266,7 @@ async function buildPage(page, { sourceRoot, roots, reporter, layoutCache, conve
         resolveLine, reporter,
       }),
       layoutFile: loaded.file,
+      pageOpenGraph: declaredOpenGraph(pageText),
     };
   }
 
@@ -1299,7 +1286,7 @@ async function buildPage(page, { sourceRoot, roots, reporter, layoutCache, conve
   if (resolution.problem) return null;
 
   if (resolution.none) {
-    return { ...compose.compose({ pageText: inlined.text, pageFile, pageSpans: inlined.spans, layoutText: null, resolveLine, reporter }), layoutFile: null };
+    return { ...compose.compose({ pageText: inlined.text, pageFile, pageSpans: inlined.spans, layoutText: null, resolveLine, reporter }), layoutFile: null, pageOpenGraph: declaredOpenGraph(inlined.text) };
   }
 
   const loaded = await loadLayout(resolution.path, { sourceRoot, roots, reporter, convertMarkdown, layoutCache, consumedAsIncludeOrLayout, resolveLine });
@@ -1310,6 +1297,7 @@ async function buildPage(page, { sourceRoot, roots, reporter, layoutCache, conve
       layoutText: loaded.text, layoutFile: loaded.file, layoutSpans: loaded.spans, resolveLine, reporter,
     }),
     layoutFile: loaded.file,
+    pageOpenGraph: declaredOpenGraph(inlined.text),
   };
 }
 

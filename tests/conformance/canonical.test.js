@@ -110,7 +110,7 @@ test("CAN-01: unify.yaml canonical: auto is the identical setting", async () => 
 
 test("CAN-02: the element lands at </head>'s own indentation, everything else byte-identical", async () => {
   const tmp = mkTmp();
-  writeTree(join(tmp, "src"), { "about.html": page("About"), "index.html": page("Home") });
+  writeTree(join(tmp, "src"), { "about.html": page("About", '    <meta property="og:title" content="About">\n    <meta property="og:url" content="https://example.com/about.html">\n'), "index.html": page("Home") });
   // The baseline is completion switched off (auto is the default under --base-url).
   const before = await runCli(["build", "-s", "src", "-o", "plain", "--base-url", BASE, "--canonical", "none"], tmp);
   expectExit(before, 0, "baseline build");
