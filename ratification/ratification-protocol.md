@@ -24,7 +24,7 @@ The empirical record from this project: three adversarial reviews and a ten-agen
 
 ## The bar
 
-The rules and the spec are **ratified** when the weakest model in the loop — Haiku — consistently (4 of 5 or better) produces a spec-compliant multipage site from the rules alone.
+The rules and the spec are **ratified** when the weakest model in the loop — Haiku in every round recorded here; by default now the free OpenCode models — consistently (4 of 5 or better) produces a spec-compliant multipage site from the rules alone.
 
 Run a stronger model alongside as a control. The comparison is the signal: **when the strong model succeeds where the weak one fails, the gap is a documentation defect that reasoning can paper over, not a capability floor.** In round 1, Sonnet got the title rule right and 3 of 4 Haikus got it wrong — and both Sonnets reported having *inferred* it rather than read it. That combination is diagnostic. The rule was described accurately and instructed nobody.
 
@@ -34,7 +34,7 @@ Run a stronger model alongside as a control. The comparison is the signal: **whe
 below, and has the traps after them built in. [`README.md`](README.md) has the commands.
 This section says what it does and why.
 
-**Isolation must be structural, not instructed.** In-session subagents inherit project context — the repo's `CLAUDE.md` loads no matter what the prompt says. Each sample is its own `claude -p` process, working in its own directory, with the prompt on stdin — and with none of the user settings, hooks, MCP servers or session variables of the machine running the round.
+**Isolation must be structural, not instructed.** In-session subagents inherit project context — the repo's `CLAUDE.md` loads no matter what the prompt says. Each sample is its own `opencode run` process, working in its own directory, with the prompt on stdin — and with nothing of the machine running the round but its model providers and credentials: no instructions, agents, plugins, MCP servers, skills or session history.
 
 Verify it rather than trusting it — and verify the right thing. Asking the agent whether
 it has project context is necessary and **not sufficient**: `cwd` is not isolation,
@@ -46,7 +46,8 @@ readable, and their samples would have answered NO too.
 So every sample runs in a private mount namespace (`ratification/scripts/isolate.sh`): its
 own directory is its `/tmp/sandbox`, a fresh empty `/tmp` replaces the real one — masking
 every other copy at once, since enumerating leak paths by hand was wrong twice — and the
-repository, the package caches and every other session's transcripts are masked. The check
+repository, the package caches, and the agent's own configuration, history and skill
+directories are masked. The check
 is then empirical: before launching, the runner searches the whole filesystem *from a
 sample's view* for the tool's documentation, and stops the round if it finds any. Asking a
 sample whether it has project context remains a useful spot check, never the proof.
@@ -58,8 +59,8 @@ of the unify under test, that unify compiled to `./unify`, and the brief's seed 
 
 Two traps that each cost a full round, both handled by the runner:
 
-- **`--allowedTools` is variadic** and will swallow a positional prompt as another tool name. Pass the prompt on stdin. (Symptom: every agent exits 1 with "Input must be provided.")
-- **Restrict tools.** In print mode a permission prompt has nobody to answer it, and the run hangs to its timeout. The runner names the brief's tools (`--tools`, file access plus `Bash` by default) and denies anything else without asking (`--permission-prompts none`).
+- **Pass the prompt on stdin.** Claude Code's `--allowedTools` was variadic and swallowed a positional prompt as another tool name, so every agent exited 1 with "Input must be provided." The runner pipes the prompt to `opencode run`.
+- **Answer every permission in advance.** A non-interactive run has nobody to answer a permission prompt, and the run hangs to its timeout. The runner's OpenCode configuration allows the file and shell tools and refuses everything else: the web tools, questions, and directories outside the sample.
 
 Two more that cost hours rather than rounds:
 
@@ -68,9 +69,10 @@ Two more that cost hours rather than rounds:
 
 ## Running a round
 
-1. `bun run ratify --brief <name> --samples 5` seeds five Haiku samples, launches them and
-   waits. Run the control as a second round (`--model sonnet`); 5 Haiku plus 1 control is
-   a good default.
+1. `bun run ratify --brief <name> --samples 5` seeds five samples of every free OpenCode
+   model, launches them and waits; `--model <provider/model>` measures one model instead.
+   Run the control as a second round with a stronger model and `--samples 1`; 5 samples
+   plus 1 control is a good default.
 2. The runner then judges every sample with the standing instrument (below): **the sample's
    own publish command, re-run with `--dry-run --strict`**, where exit code plus the
    diagnostic list is the verdict. It rebuilds each site in a copy, runs the brief's checks
@@ -86,7 +88,7 @@ Two more that cost hours rather than rounds:
 4. Read the output anyway — a green check says the site composes, not that the author
    reached for the mechanism the brief was built to compel.
 5. Read every agent's self-report (`SUMMARY.md` quotes the start of each) and, for anything
-   surprising, its transcript.
+   surprising, its transcript: the event stream in `<brief>/.harness/<sample>/events.jsonl`.
 6. Triage each finding (next section).
 7. Amend at most a handful of things. Re-run.
 

@@ -8,13 +8,13 @@
  * not here. `brief.json` may mark a check `"scored": false` to report it without
  * counting it toward the sample's pass.
  *
- * ctx: { out, site, command, judge, baseUrl, transcripts, exec(command) }
+ * ctx: { out, site, command, judge, baseUrl, events, exec(command) }
  *   out          absolute path of the fresh build's output directory
  *   site         absolute path of the copy the build ran in
  *   command      the sample's publish command, as its REPORT.md states it
  *   judge        the sample's record from judge-round.mjs
  *   baseUrl      the address the brief says the site is served from
- *   transcripts  the directory holding the agent's session transcripts
+ *   events       the agent's OpenCode event stream (`opencode run --format json`)
  *   exec(cmd)    run a shell command in the copy, isolated → { exit, stdout, stderr }
  */
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
@@ -146,18 +146,16 @@ export const CHECKS = {
     return { pass: r.exit === 0, detail: `exit ${r.exit}: ${last}` };
   },
 
-  /** The agent ran a shell command matching `pattern` at least once (read from its transcript). */
+  /** The agent ran a shell command matching `pattern` at least once (read from its event stream). */
   ranCommand(ctx, { pattern }) {
     const re = new RegExp(pattern);
-    const runs = new Set(); // by tool-use id: a transcript can repeat a message
-    for (const rel of walk(ctx.transcripts).filter((r) => r.endsWith(".jsonl"))) {
-      for (const line of readFileSync(join(ctx.transcripts, rel), "utf8").split("\n")) {
-        if (!line.includes('"tool_use"')) continue;
-        try {
-          const content = JSON.parse(line).message?.content;
-          for (const c of Array.isArray(content) ? content : []) if (c.type === "tool_use" && c.name === "Bash" && re.test(c.input?.command ?? "")) runs.add(c.id);
-        } catch { /* a partial line */ }
-      }
+    const runs = new Set(); // by call id: a call can be reported more than once
+    for (const line of (existsSync(ctx.events) ? readFileSync(ctx.events, "utf8") : "").split("\n")) {
+      if (!line.includes('"tool_use"')) continue;
+      try {
+        const { part } = JSON.parse(line);
+        if (part?.tool === "bash" && re.test(part.state?.input?.command ?? "")) runs.add(part.callID ?? part.id);
+      } catch { /* a partial line */ }
     }
     return { pass: runs.size > 0, detail: `${runs.size} run${runs.size === 1 ? "" : "s"} matching /${pattern}/` };
   },

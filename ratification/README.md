@@ -21,8 +21,13 @@ bun run ratify --list
 bun run ratify --brief publishing
 ```
 
-That builds unify from your working tree, runs one Haiku sample on the `publishing` brief,
-and prints the summary when it finishes. Leave out `--brief` to run every brief.
+That builds unify from your working tree, runs one sample of every free OpenCode Zen model
+on the `publishing` brief, and prints the summary when it finishes. Leave out `--brief` to
+run every brief; name a model to run only that one:
+
+```bash
+bun run ratify --brief publishing --model opencode/big-pickle
+```
 
 ### Requirements
 
@@ -31,12 +36,16 @@ and prints the summary when it finishes. Leave out `--brief` to run every brief.
   kernel.apparmor_restrict_unprivileged_userns=0`). Elsewhere, run it in a Linux container
   or VM.
 - **Bun** 1.2 or later, and **git**.
-- The **`claude` CLI**, signed in: if `claude -p "hello"` answers, rounds will run. A login,
-  `ANTHROPIC_API_KEY`, Bedrock and Vertex all work; nothing else from your environment
-  reaches a sample.
+- **[OpenCode](https://opencode.ai)**: `npm install -g opencode-ai`. The free models need
+  no account, only access to `opencode.ai`. Any other model OpenCode can use works too —
+  whatever you have signed in to with `opencode auth login` or configured as a provider:
+  `opencode models` lists them, and `--model` takes any name it prints. Your providers and
+  credentials are all that reaches a sample from your OpenCode setup; your environment
+  variables reach it too, since OpenCode reads provider keys from them.
 - The repository cloned **outside `/tmp`**, which a sample's view replaces.
 
-Every sample calls the model, so a round costs money: `SUMMARY.md` totals it.
+The free models cost nothing. Any other model is billed by its provider, and `SUMMARY.md`
+totals the cost OpenCode reports.
 
 ## Running a round
 
@@ -44,14 +53,14 @@ Every sample calls the model, so a round costs money: `SUMMARY.md` totals it.
 |---|---|---|
 | `--unify <ref>` | the working tree | the unify to evaluate: a tag (`v0.11.16`), branch or commit |
 | `--brief <name>` | every brief | repeatable; `--list` names them |
-| `--model <id>` | `haiku` | repeatable; any name `claude --model` takes |
+| `--model <id>` | `free` | repeatable; `provider/model` as `opencode models` prints it; `free` is every free OpenCode Zen model |
 | `--samples <n>` | `1` | samples per brief and model |
 | `--stagger <secs>` | `20` | between launches |
 | `--timeout <secs>` | the brief's, else `1800` | per sample |
 | `--mask <path>` | | one more path to hide from samples (repeatable) |
 | `--name <id>` | time and ref | the round's directory name |
 | `--rejudge <dir>` | | score a finished round again, with the checks as they are now |
-| `--agent <command>` | | run a shell command instead of `claude`, to test the harness: it gets the prompt on stdin and runs isolated, so it cannot read this repository |
+| `--agent <command>` | | run a shell command instead of OpenCode, to test the harness: it gets the prompt on stdin and runs isolated, so it cannot read this repository |
 
 The tuning loop is short: edit `docs/authoring-rules.md` or `src/`, run the briefs that
 failed, read `SUMMARY.md`, repeat. Uncommitted edits count, and the summary names them by a
@@ -78,11 +87,11 @@ Everything is under `ratification/rounds/<round>/`, which git ignores:
 
 ```
 SUMMARY.md, results.json     the score, every check per sample, the agents' own notes
-round.json                   what ran: unify commit and version, rules and prompt hashes, agent
+round.json                   what ran: unify commit and version, rules and prompt hashes, OpenCode version, models
 rules.md, bin/unify          exactly what every sample was given
 <brief>/PROMPT.md            the prompt every sample of that brief received
 <brief>/<sample>/            the agent's directory, exactly as it left it, REPORT.md included
-<brief>/.harness/<sample>/   the agent's result (agent.json), stderr, exit and session transcripts
+<brief>/.harness/<sample>/   OpenCode's event stream (events.jsonl), stderr, exit, and its session data
 <brief>/.build/<sample>/     the fresh build every check reads
 <brief>/judge-results.json   the judge's full record: chosen command, diagnostics, markers
 ```
@@ -93,7 +102,7 @@ A round exists only in this checkout. Copy the directory somewhere durable to ke
 
 A sample passes when every scored check passes. Every brief starts with three:
 
-- **agent-finished** — the agent exited 0 within its time and wrote `REPORT.md`.
+- **agent-finished** — the agent exited 0 within its time, reported no error, and wrote `REPORT.md`.
 - **publish-command** — `REPORT.md` states a `unify build` command in a fenced block.
 - **strict-build** — that command, re-run where the agent ran it with `--dry-run --strict`,
   exits 0: no problem and no advisory.
@@ -111,7 +120,7 @@ command:
 | `postArticles` | at least `min` dated pages, each with Article or BlogPosting JSON-LD |
 | `postShareCards` | at least `min` dated pages, each with an `og:image` under the address (and its size, with `dimensions`) |
 | `auditStrict` | `unify audit --strict`, with the command's own options, exits 0 |
-| `ranCommand` | the agent ran a shell command matching `pattern` (from its transcript) |
+| `ranCommand` | the agent ran a shell command matching `pattern` (from its event stream) |
 | `noSlots` | no `<slot>` reached a published page |
 | `bareFragment` | a `*.fragment.html` is published, without `<html>`, `<head>` or `<body>` |
 | `cssUrls` | every root-relative `url()` in published CSS is under the address |
@@ -132,9 +141,14 @@ agent's answer to "what did `rules.md` not answer?", which the summary quotes.
 
 [`scripts/isolate.sh`](scripts/isolate.sh) gives each sample its own mount namespace: its
 directory appears as `/tmp/sandbox`, `/tmp` is a fresh empty filesystem, and the
-repository, the bun and npm caches, unify's template cache and every other Claude session's
-transcripts are hidden. The sample's `claude` runs with no user settings, hooks or MCP
-servers, and only the environment variables it needs to sign in. Before any sample starts,
+repository, the bun and npm caches, unify's template cache, your OpenCode configuration and
+history, and the `~/.claude` and `~/.agents` directories OpenCode would load skills from are
+hidden. The sample's OpenCode gets your providers and credentials and nothing else of yours —
+no instructions, agents, commands, plugins, MCP servers or skills — and keeps its session in
+the sample's harness directory, not yours. Its permissions are answered in advance, so
+nothing waits for a person: file and shell tools are allowed; subagents, skills, the web
+tools, questions and directories outside the sample are refused. A provider that only a
+plugin adds is therefore not available. Before any sample starts,
 the runner searches the whole filesystem from a sample's view for unify's documentation and
 stops if it finds any; hide what it names with `--mask <dir>` or remove it.
 
@@ -145,8 +159,9 @@ rules. They are compiled into the binary, and a sample has already extracted one
 
 Not covered:
 
-- **The network.** A sample can reach the model API, so it could also fetch unify's
-  documentation from the web. Read the transcript of any result that looks too good.
+- **The network.** OpenCode's web tools are refused, but a sample's shell can reach the
+  web, so it could fetch unify's documentation with `curl`. Read the event stream of any
+  result that looks too good.
 - **Writes outside the sample.** Hiding a path is not protecting the rest of the disk: a
   sample has a shell and your permissions everywhere it can still see, and one has already
   written a scratch script into the home directory. Run rounds in a container or VM, or as
@@ -162,7 +177,7 @@ A brief is a directory under `briefs/`:
 ```
 briefs/<name>/
   BRIEF.md       the task, in plain English: what the site must do, never which mechanism
-  brief.json     title, origin, baseUrl, checks; optionally tools, timeoutSecs, judge
+  brief.json     title, origin, baseUrl, checks; optionally timeoutSecs, judge
   seed/          optional: files copied into every sample's directory
 ```
 

@@ -48,7 +48,7 @@
  *   timeoutMs        per-build timeout                       (default 240000)
  *   primitives       {label: literal-or-/regex/} swept over the source tree
  *   sweepExclude     top-level names skipped by the sweep ("X*" = prefix match)
- *   isolate          {script, repo, transcripts}: run each build through isolate.sh
+ *   isolate          {script, repo, state}: run each build through isolate.sh
  */
 
 import { spawnSync } from "node:child_process";
@@ -304,7 +304,7 @@ function runBuild(sampleDir, command, timeoutMs, isolate) {
   // With `isolate` configured (run-round.mjs does), the build runs where the agent ran:
   // in the sample, seen as /tmp/sandbox, with the repository and the host /tmp masked.
   const [cmd, args] = isolate
-    ? [isolate.script, [sampleDir, isolate.repo, isolate.transcripts, "bash", "-c", executed]]
+    ? [isolate.script, [sampleDir, isolate.repo, isolate.state, "bash", "-c", executed]]
     : ["bash", ["-c", executed]];
   const res = spawnSync(cmd, args, {
     cwd: sampleDir,

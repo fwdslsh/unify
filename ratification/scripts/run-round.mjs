@@ -9,7 +9,8 @@
  *   --unify <ref>      the unify to evaluate: a tag (v0.11.16), branch or commit; default
  *                      the working tree as it stands, uncommitted edits included
  *   --brief <name>     a brief under ratification/briefs/ (repeatable; default: all of them)
- *   --model <id>       the model every sample runs (repeatable; default: haiku)
+ *   --model <id>       an OpenCode model, provider/model as `opencode models` lists it
+ *                      (repeatable); `free` means every free OpenCode Zen model, the default
  *   --samples <n>      samples per brief and model (default 1; the protocol's bar needs 5)
  *   --stagger <secs>   seconds between launches (default 20)
  *   --timeout <secs>   per-sample time limit (default: the brief's, else 1800)
@@ -17,14 +18,14 @@
  *   --name <id>        the round's directory name (default: time and unify ref)
  *   --rejudge <dir>    score a finished round again, with the checks as they are now
  *   --list             list the briefs
- *   --agent <command>  run this shell command as the agent instead of `claude`, prompt on
+ *   --agent <command>  run this shell command as the agent instead of OpenCode, prompt on
  *                      stdin: for testing the harness itself
  *
  * Everything a round writes is under ratification/rounds/<id>/ (gitignored):
  *   SUMMARY.md, results.json   the score, per sample and check, and the agents' own notes
  *   round.json                 what ran: unify commit and version, rules and prompt hashes
  *   <brief>/<sample>/          the agent's working directory, exactly as it left it
- *   <brief>/.harness/<sample>/ the agent's result, stderr and session transcripts
+ *   <brief>/.harness/<sample>/ the agent's event stream, stderr and OpenCode session data
  *   <brief>/.build/<sample>/   the fresh build every check reads
  *
  * Exit: 0 when every sample passed every scored check, 1 when one did not, 2 when the
@@ -47,7 +48,6 @@ const BRIEFS = join(RAT, "briefs");
 const ROUNDS = join(RAT, "rounds");
 const ISOLATE = join(HERE, "isolate.sh");
 const JUDGE = join(HERE, "judge-round.mjs");
-const TOOLS = ["Read", "Write", "Edit", "Glob", "Grep", "Bash"];
 const BUILD_TIMEOUT_MS = 240_000;
 
 const say = (s = "") => process.stdout.write(`${s}\n`);
@@ -116,13 +116,74 @@ function prepareUnify(ref, roundDir) {
 
 // -------------------------------------------------------------- isolation
 
-/** The variables a sample's `claude` needs to sign in and reach the network, and nothing else. */
-const KEEP_ENV = /^(PATH|HOME|USER|LOGNAME|SHELL|LANG|LANGUAGE|LC_\w+|TERM|TZ|ANTHROPIC_\w+|CLAUDE_CODE_OAUTH_TOKEN|CLAUDE_CONFIG_DIR|CLAUDE_CODE_USE_(BEDROCK|VERTEX|FOUNDRY)|AWS_\w+|GOOGLE_\w+|CLOUD_ML_REGION|VERTEX_REGION_\w+|HTTPS?_PROXY|NO_PROXY|https?_proxy|no_proxy|NODE_EXTRA_CA_CERTS|SSL_CERT_(FILE|DIR))$/;
+/**
+ * What OpenCode can use, as `opencode models --verbose` prints it: `provider/model` on a
+ * line of its own, then that model's JSON.
+ */
+function opencodeModels(provider) {
+  const text = run("opencode", ["models", ...(provider ? [provider] : []), "--verbose"], { cwd: ROUNDS }).stdout;
+  return [...text.matchAll(/^(\S+\/\S+)\n(\{[\s\S]*?\n\})$/gm)].map((m) => ({ ...JSON.parse(m[2]), id: m[1] }));
+}
 
-function sampleEnv(masks) {
-  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => KEEP_ENV.test(k)));
-  if (masks.length) env.RATIFY_MASK = masks.map((m) => resolve(m)).join(":");
-  return env;
+/** `free` becomes every free OpenCode Zen model that can call tools; any other name must be one OpenCode lists. */
+function resolveModels(requested) {
+  const models = [];
+  for (const name of requested) {
+    if (name === "free") {
+      const free = opencodeModels("opencode")
+        .filter((m) => m.cost?.input === 0 && m.cost?.output === 0 && m.capabilities?.toolcall && m.status !== "deprecated")
+        .map((m) => m.id);
+      if (!free.length) stop("OpenCode lists no free models: `opencode models opencode` shows what it offers");
+      models.push(...free);
+    } else {
+      models.push(name);
+    }
+  }
+  const known = new Set(opencodeModels().map((m) => m.id));
+  const unknown = models.filter((m) => !known.has(m));
+  if (unknown.length) stop(`OpenCode does not list ${unknown.join(", ")}: \`opencode models\` shows the models it can use`);
+  return [...new Set(models)];
+}
+
+/**
+ * The OpenCode a sample runs: the user's providers and credentials, and nothing else of
+ * theirs — no instructions, agents, commands, plugins, MCP servers or skills (isolate.sh
+ * hides the files; these variables cover the rest). Every permission is answered in
+ * advance, so nothing waits for a person: file and shell tools work inside the sample's
+ * directory; subagents (whose commands would not reach the sample's event stream), skills,
+ * the web tools, questions and other directories are refused.
+ */
+function sampleEnv(model, masks) {
+  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(OPENCODE_|CLAUDE)/.test(k)));
+  const user = JSON.parse(run("opencode", ["debug", "config"], { cwd: ROUNDS, env: { ...env, OPENCODE_DISABLE_PROJECT_CONFIG: "1" } }).stdout);
+  const config = {
+    $schema: "https://opencode.ai/config.json",
+    ...Object.fromEntries(["provider", "enabled_providers", "disabled_providers"].filter((k) => k in user).map((k) => [k, user[k]])),
+    model,
+    small_model: model,
+    permission: {
+      read: "allow", edit: "allow", glob: "allow", grep: "allow", list: "allow", bash: "allow", todowrite: "allow", lsp: "allow",
+      task: "deny", skill: "deny", webfetch: "deny", websearch: "deny", question: "deny", doom_loop: "deny", external_directory: "deny",
+    },
+    autoupdate: false,
+    share: "disabled",
+    snapshot: false,
+    formatter: false,
+    lsp: false,
+  };
+  const auth = join(process.env.XDG_DATA_HOME ?? join(process.env.HOME, ".local", "share"), "opencode", "auth.json");
+  return {
+    ...env,
+    OPENCODE_CONFIG_CONTENT: JSON.stringify(config),
+    ...(existsSync(auth) ? { OPENCODE_AUTH_CONTENT: readFileSync(auth, "utf8") } : {}),
+    OPENCODE_DISABLE_PROJECT_CONFIG: "1",
+    OPENCODE_DISABLE_CLAUDE_CODE: "1",
+    OPENCODE_DISABLE_EXTERNAL_SKILLS: "1",
+    OPENCODE_DISABLE_AUTOUPDATE: "1",
+    OPENCODE_DISABLE_LSP_DOWNLOAD: "1",
+    OPENCODE_PURE: "1",
+    ...(masks.length ? { RATIFY_MASK: masks.map((m) => resolve(m)).join(":") } : {}),
+  };
 }
 
 const LEAK_NAMES = ["conformance-spec.md", "product-spec.md", "authoring-rules.md", "ratification-protocol.md", "judge-round.mjs"];
@@ -133,7 +194,7 @@ function probe(roundDir, env) {
   mkdirSync(join(dir, "sandbox"), { recursive: true });
   const names = LEAK_NAMES.map((n) => `-name ${n}`).join(" -o ");
   const find = `find / \\( -path /proc -o -path /sys -o -path /dev -o -path /run \\) -prune -o \\( ${names} -o -path '*@fwdslsh*' -o -path '*unify-*-template*' \\) -print 2>/dev/null | head -40`;
-  const r = run(ISOLATE, [join(dir, "sandbox"), REPO, join(dir, "transcripts"), "bash", "-c", find], { env, check: false, timeout: 600_000 });
+  const r = run(ISOLATE, [join(dir, "sandbox"), REPO, join(dir, "state"), "bash", "-c", find], { env, check: false, timeout: 600_000 });
   if (r.exit !== 0) {
     stop(`isolation failed (isolate.sh exited ${r.exit}): ${r.stderr.trim()}\n` +
       "Samples run in a mount namespace: run as root, or allow unprivileged user namespaces " +
@@ -143,16 +204,16 @@ function probe(roundDir, env) {
 }
 
 /** Run a shell command in a site copy, seen as /tmp/sandbox exactly as the agent saw its own directory. */
-function isolated(site, transcripts, command) {
-  return run(ISOLATE, [site, REPO, transcripts, "bash", "-c", command], { check: false, timeout: BUILD_TIMEOUT_MS });
+function isolated(site, state, command) {
+  return run(ISOLATE, [site, REPO, state, "bash", "-c", command], { check: false, timeout: BUILD_TIMEOUT_MS });
 }
 
 // ------------------------------------------------------------------ launch
 
-function launch(job, env) {
+function launch(job) {
   return new Promise((done) => {
     mkdirSync(job.harness, { recursive: true });
-    const fds = [openSync(job.prompt, "r"), openSync(join(job.harness, "agent.json"), "w"), openSync(join(job.harness, "agent-stderr.txt"), "w")];
+    const fds = [openSync(job.prompt, "r"), openSync(join(job.harness, "events.jsonl"), "w"), openSync(join(job.harness, "agent-stderr.txt"), "w")];
     const started = Date.now();
     const finish = (exit, signal, error) => {
       fds.forEach((fd) => closeSync(fd));
@@ -160,28 +221,26 @@ function launch(job, env) {
       writeFileSync(join(job.harness, "exit.json"), `${JSON.stringify(record, null, 2)}\n`);
       done(record);
     };
-    const child = spawn(ISOLATE, [job.sample, REPO, join(job.harness, "transcripts"), ...job.command], { env, stdio: fds });
+    const child = spawn(ISOLATE, [job.sample, REPO, join(job.harness, "opencode"), ...job.command], { env: job.env, stdio: fds });
     child.on("error", (e) => finish(null, null, e.message));
     child.on("close", (code, signal) => finish(code, signal, null));
   });
 }
 
-function agentCommand(opts, model, brief, claude) {
+function agentCommand(opts, model, brief) {
   const secs = String(Number(opts.timeout ?? brief.timeoutSecs ?? 1800));
-  const tools = brief.tools ?? TOOLS;
   if (opts.agent) return ["timeout", "-k", "30", secs, "bash", "-c", opts.agent];
-  return ["timeout", "-k", "30", secs, claude, "-p", "--model", model, "--output-format", "json",
-    "--tools", tools.join(","), "--permission-mode", "acceptEdits", "--permission-prompts", "none",
-    "--setting-sources", "project", "--strict-mcp-config", "--allowedTools", ...tools];
+  return ["timeout", "-k", "30", secs, "opencode", "run", "--pure", "--format", "json", "--model", model];
 }
 
 async function newRound(opts) {
   if (process.platform !== "linux") stop("rounds run on Linux: samples are isolated with mount namespaces. Use a Linux machine, VM or container.");
-  for (const tool of ["unshare", "git", "bun", "timeout", "find", "tar", ...(opts.agent ? [] : ["claude"])]) {
-    if (!has(tool)) stop(tool === "claude" ? "the claude CLI is not installed: npm install -g @anthropic-ai/claude-code, then sign in" : `${tool} is not installed`);
+  for (const tool of ["unshare", "git", "bun", "timeout", "find", "tar", "opencode"]) {
+    if (!has(tool)) stop(tool === "opencode" ? "OpenCode is not installed: npm install -g opencode-ai (https://opencode.ai)" : `${tool} is not installed`);
   }
+  mkdirSync(ROUNDS, { recursive: true });
   const briefs = (opts.brief.length ? opts.brief : briefNames()).map(loadBrief);
-  const models = opts.model.length ? opts.model : ["haiku"];
+  const models = resolveModels(opts.model.length ? opts.model : ["free"]);
   const per = Number(opts.samples ?? 1);
   if (!Number.isInteger(per) || per < 1) stop("--samples must be a whole number of at least 1");
   const ref = opts.unify ?? "worktree";
@@ -206,14 +265,14 @@ async function prepareAndRun(opts, { id, dir, ref, briefs, models, per }) {
   writeFileSync(join(dir, "rules.md"), rules);
   const contract = readFileSync(join(BRIEFS, "PROMPT.md"), "utf8");
 
-  const env = sampleEnv(opts.mask);
+  const envs = Object.fromEntries(models.map((m) => [m, sampleEnv(m, opts.mask)]));
+  say(`  models: ${models.join(", ")}`);
   say("  checking that a sample cannot read unify's own documentation…");
-  const leaks = probe(dir, env);
+  const leaks = probe(dir, envs[models[0]]);
   if (leaks.length) {
     stop(`a sample could read unify's own documentation:\n  ${leaks.join("\n  ")}\nRemove those files, or hide their directory with --mask <dir>.`);
   }
 
-  const claude = opts.agent ? null : run("bash", ["-c", "command -v claude"]).stdout.trim();
   const jobs = [];
   const manifestBriefs = briefs.map((brief) => {
     const bdir = join(dir, brief.name);
@@ -231,7 +290,7 @@ async function prepareAndRun(opts, { id, dir, ref, briefs, models, per }) {
         writeFileSync(join(sample, "rules.md"), rules);
         linkOrCopy(join(dir, "bin", "unify"), join(sample, "unify"));
         samples.push({ name, model });
-        jobs.push({ label: `${brief.name}/${name}`, sample, prompt, harness: join(bdir, ".harness", name), command: agentCommand(opts, model, brief, claude) });
+        jobs.push({ label: `${brief.name}/${name}`, sample, prompt, harness: join(bdir, ".harness", name), env: envs[model], command: agentCommand(opts, model, brief) });
       }
     }
     return { name: brief.name, title: brief.title, origin: brief.origin, sha256: sha(brief.text), samples };
@@ -243,7 +302,7 @@ async function prepareAndRun(opts, { id, dir, ref, briefs, models, per }) {
     unify: { ref, commit: unify.commit, dirty: unify.dirty, version: unify.version },
     rules: { sha256: sha(unify.rules) },
     prompt: { sha256: sha(contract) },
-    agent: opts.agent ? `custom: ${opts.agent}` : run(claude, ["--version"], { env }).stdout.trim(),
+    agent: opts.agent ? `custom: ${opts.agent}` : `opencode ${run("opencode", ["--version"]).stdout.trim()}`,
     models,
     samplesPerModel: per,
     isolation: { mode: process.getuid?.() === 0 ? "mount namespace" : "user and mount namespace", probe: "clean", masks: opts.mask },
@@ -256,7 +315,7 @@ async function prepareAndRun(opts, { id, dir, ref, briefs, models, per }) {
   await Promise.all(jobs.map(async (job, i) => {
     await sleep(i * stagger);
     say(`  started  ${job.label}`);
-    const r = await launch(job, env);
+    const r = await launch(job);
     say(`  finished ${job.label}: exit ${r.exit}${r.timedOut ? " (timed out)" : ""} after ${duration(r.durationMs)}`);
   }));
   round.finished = new Date().toISOString();
@@ -270,7 +329,7 @@ async function prepareAndRun(opts, { id, dir, ref, briefs, models, per }) {
 function judgeBrief(bdir, brief) {
   const config = join(bdir, "judge.json");
   const out = join(bdir, "judge-results.json");
-  writeFileSync(config, `${JSON.stringify({ ...brief.judge, isolate: { script: ISOLATE, repo: REPO, transcripts: join(bdir, ".harness", ".judge") } }, null, 2)}\n`);
+  writeFileSync(config, `${JSON.stringify({ ...brief.judge, isolate: { script: ISOLATE, repo: REPO, state: join(bdir, ".harness", ".judge") } }, null, 2)}\n`);
   rmSync(out, { force: true });
   run(process.execPath, [JUDGE, bdir, "--config", config, "--out", out], { check: false });
   return readJson(out)?.samples ?? [];
@@ -285,11 +344,25 @@ function rulesGaps(sample) {
   return lines.slice(at, end === -1 ? at + 12 : Math.min(end, at + 12)).join("\n").trim();
 }
 
+/** What OpenCode's `--format json` event stream says about a run: its steps, cost and first error. */
+function agentEvents(file) {
+  const events = (existsSync(file) ? readFileSync(file, "utf8") : "").split("\n").flatMap((l) => {
+    try { return [JSON.parse(l)]; } catch { return []; }
+  });
+  const steps = events.filter((e) => e.type === "step_finish");
+  const error = events.find((e) => e.type === "error")?.error;
+  return {
+    turns: events.length ? steps.length : null,
+    costUsd: steps.length ? steps.reduce((a, e) => a + (e.part?.cost ?? 0), 0) : null,
+    error: error ? (error.data?.message ?? error.name ?? "error") : null,
+  };
+}
+
 function scoreSample(dir, bdir, brief, { name, model }, judge) {
   const sample = join(bdir, name);
   const harness = join(bdir, ".harness", name);
   const exit = readJson(join(harness, "exit.json")) ?? {};
-  const agent = readJson(join(harness, "agent.json")) ?? {};
+  const agent = agentEvents(join(harness, "events.jsonl"));
   const reported = existsSync(join(sample, "REPORT.md"));
   const command = judge?.chosenCommand ?? null;
 
@@ -308,7 +381,7 @@ function scoreSample(dir, bdir, brief, { name, model }, judge) {
   }
 
   const ctx = {
-    out, site, command, judge, baseUrl: brief.baseUrl, transcripts: join(harness, "transcripts"),
+    out, site, command, judge, baseUrl: brief.baseUrl, events: join(harness, "events.jsonl"),
     exec: (c) => isolated(site, join(bdir, ".harness", ".build"), c),
   };
   const strict = !judge
@@ -319,8 +392,8 @@ function scoreSample(dir, bdir, brief, { name, model }, judge) {
   const checks = [
     {
       id: "agent-finished", scored: true,
-      pass: exit.exit === 0 && agent.is_error !== true && reported,
-      detail: `exit ${exit.exit}${exit.timedOut ? " (timed out)" : ""}${agent.is_error ? ", agent ended in error" : ""}, ${reported ? "wrote REPORT.md" : "no REPORT.md"}`,
+      pass: exit.exit === 0 && !agent.error && reported,
+      detail: `exit ${exit.exit}${exit.timedOut ? " (timed out)" : ""}${agent.error ? `, agent error: ${agent.error}` : ""}, ${reported ? "wrote REPORT.md" : "no REPORT.md"}`,
     },
     { id: "publish-command", scored: true, pass: Boolean(command), detail: command ?? judge?.chosenReason ?? "no REPORT.md" },
     { id: "strict-build", scored: true, ...strict },
@@ -338,7 +411,7 @@ function scoreSample(dir, bdir, brief, { name, model }, judge) {
     name, model,
     pass: checks.filter((c) => c.scored).every((c) => c.pass),
     checks,
-    agent: { exit: exit.exit ?? null, timedOut: Boolean(exit.timedOut), durationMs: exit.durationMs ?? null, turns: agent.num_turns ?? null, costUsd: agent.total_cost_usd ?? null },
+    agent: { exit: exit.exit ?? null, timedOut: Boolean(exit.timedOut), durationMs: exit.durationMs ?? null, turns: agent.turns, costUsd: agent.costUsd },
     freshBuild: build && { command, exit: build.exit },
     rulesGaps: rulesGaps(sample),
   };
@@ -412,7 +485,7 @@ function renderSummary(round, results) {
     }
   }
   md.push("", "---", "", "`✓` passed, `✗` failed, `(i)` reported but not scored. Each sample's directory is " +
-    "`<brief>/<sample>/`, its agent result and transcripts are in `<brief>/.harness/<sample>/`, and the build the checks read is " +
+    "`<brief>/<sample>/`, its OpenCode event stream and session data are in `<brief>/.harness/<sample>/`, and the build the checks read is " +
     "`<brief>/.build/<sample>/`. Triage every failure with ratification/ratification-protocol.md before changing anything.", "");
   return md.join("\n");
 }
