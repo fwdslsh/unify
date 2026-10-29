@@ -34,7 +34,7 @@ The composition vocabulary is deliberately standard. `<main>`, `<slot>`, and the
 1. **Explainable in one sentence** to someone who knows only HTML and CSS. If a rule needs a diagram, it's out.
 2. **Every source file is real HTML a browser can parse as written.** Layouts and pages are complete documents (a layout's slot fallbacks are its own preview — they render natively in any browser, no script); fragments are well-formed snippets; no template holes, no unbalanced markup. A source file opens and edits anywhere — but *composed* preview is the built site: `unify dev` (§4) serves `dist/` and reloads on save. Direct preview of an uncomposed source tree is a possible convenience, not a product dependency or a current priority (§6.6).
 3. **Polyfill-able**: the **HTML** composition model must be implementable by a small (~200-line) browser script that produces the same DOM at design time as the CLI produces at build time. This is a complexity test, not a promise that the browser polyfill will ship. Any HTML rule too intricate to survive that test is too intricate to ship. Markdown, audits, generators, and discovery artifacts are outside that budget because none changes how HTML pages compose.
-4. **Zero configuration.** Conventions, not config files.
+4. **Configuration is unnecessary in most scenarios.** Use conventions and CLI options; save settings in `unify.yaml` when useful.
 
 ---
 
