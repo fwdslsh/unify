@@ -40,6 +40,7 @@ import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { CHECKS } from "./checks.mjs";
+import { isolationEnvironment } from "./isolation.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const RAT = resolve(HERE, "..");
@@ -173,7 +174,7 @@ function sampleEnv(model, masks) {
   };
   const auth = join(process.env.XDG_DATA_HOME ?? join(process.env.HOME, ".local", "share"), "opencode", "auth.json");
   return {
-    ...env,
+    ...isolationEnvironment(masks, env),
     OPENCODE_CONFIG_CONTENT: JSON.stringify(config),
     ...(existsSync(auth) ? { OPENCODE_AUTH_CONTENT: readFileSync(auth, "utf8") } : {}),
     OPENCODE_DISABLE_PROJECT_CONFIG: "1",
@@ -182,7 +183,6 @@ function sampleEnv(model, masks) {
     OPENCODE_DISABLE_AUTOUPDATE: "1",
     OPENCODE_DISABLE_LSP_DOWNLOAD: "1",
     OPENCODE_PURE: "1",
-    ...(masks.length ? { RATIFY_MASK: masks.map((m) => resolve(m)).join(":") } : {}),
   };
 }
 
@@ -204,8 +204,8 @@ function probe(roundDir, env) {
 }
 
 /** Run a shell command in a site copy, seen as /tmp/sandbox exactly as the agent saw its own directory. */
-function isolated(site, state, command) {
-  return run(ISOLATE, [site, REPO, state, "bash", "-c", command], { check: false, timeout: BUILD_TIMEOUT_MS });
+function isolated(site, state, command, masks) {
+  return run(ISOLATE, [site, REPO, state, "bash", "-c", command], { env: isolationEnvironment(masks), check: false, timeout: BUILD_TIMEOUT_MS });
 }
 
 // ------------------------------------------------------------------ launch
@@ -234,6 +234,7 @@ function agentCommand(opts, model, brief) {
 }
 
 async function newRound(opts) {
+  opts.mask = [...new Set([...(process.env.RATIFY_MASK ?? "").split(":").filter(Boolean), ...opts.mask].map((p) => resolve(p)))];
   if (process.platform !== "linux") stop("rounds run on Linux: samples are isolated with mount namespaces. Use a Linux machine, VM or container.");
   for (const tool of ["unshare", "git", "bun", "timeout", "find", "tar", "opencode"]) {
     if (!has(tool)) stop(tool === "opencode" ? "OpenCode is not installed: npm install -g opencode-ai (https://opencode.ai)" : `${tool} is not installed`);
@@ -326,10 +327,10 @@ async function prepareAndRun(opts, { id, dir, ref, briefs, models, per }) {
 // ----------------------------------------------------------------- scoring
 
 /** The judge's record for every sample of one brief, from builds run where the agent ran. */
-function judgeBrief(bdir, brief) {
+function judgeBrief(bdir, brief, masks) {
   const config = join(bdir, "judge.json");
   const out = join(bdir, "judge-results.json");
-  writeFileSync(config, `${JSON.stringify({ ...brief.judge, isolate: { script: ISOLATE, repo: REPO, state: join(bdir, ".harness", ".judge") } }, null, 2)}\n`);
+  writeFileSync(config, `${JSON.stringify({ ...brief.judge, isolate: { script: ISOLATE, repo: REPO, state: join(bdir, ".harness", ".judge"), masks } }, null, 2)}\n`);
   rmSync(out, { force: true });
   run(process.execPath, [JUDGE, bdir, "--config", config, "--out", out], { check: false });
   return readJson(out)?.samples ?? [];
@@ -367,7 +368,7 @@ function agentEvents(harness) {
   };
 }
 
-function scoreSample(dir, bdir, brief, { name, model }, judge) {
+function scoreSample(dir, bdir, brief, { name, model }, judge, masks) {
   const sample = join(bdir, name);
   const harness = join(bdir, ".harness", name);
   const exit = readJson(join(harness, "exit.json")) ?? {};
@@ -380,18 +381,18 @@ function scoreSample(dir, bdir, brief, { name, model }, judge) {
   rmSync(site, { recursive: true, force: true });
   let out = null;
   let build = null;
-  if (command) {
+  if (command && !judge.run.refused && judge.outputDir != null) {
     cpSync(sample, site, { recursive: true, verbatimSymlinks: true, filter: (src) => src !== join(sample, "unify") });
     linkOrCopy(join(dir, "bin", "unify"), join(site, "unify"));
-    const o = judge.outputDir ?? "dist";
+    const o = judge.outputDir;
     out = /^\/tmp\/sandbox(\/|$)/.test(o) ? join(site, o.slice("/tmp/sandbox".length)) : isAbsolute(o) ? o : join(site, o);
     if (out.startsWith(site + "/")) rmSync(out, { recursive: true, force: true });
-    build = isolated(site, join(bdir, ".harness", ".build"), command.replace(/^unify\b/, "./unify"));
+    build = isolated(site, join(bdir, ".harness", ".build"), command.replace(/^unify\b/, "./unify"), masks);
   }
 
   const ctx = {
-    out, site, command, judge, baseUrl: brief.baseUrl, events: join(harness, "events.jsonl"),
-    exec: (c) => isolated(site, join(bdir, ".harness", ".build"), c),
+    out, site, command: judge?.buildCommand ?? command, judge, baseUrl: brief.baseUrl, events: join(harness, "events.jsonl"),
+    exec: (c) => isolated(site, join(bdir, ".harness", ".build"), c, masks),
   };
   const strict = !judge
     ? { pass: false, detail: "not judged: no REPORT.md" }
@@ -407,6 +408,8 @@ function scoreSample(dir, bdir, brief, { name, model }, judge) {
     },
     { id: "publish-command", scored: true, pass: Boolean(command), detail: command ?? judge?.chosenReason ?? "no REPORT.md" },
     { id: "strict-build", scored: true, ...strict },
+    { id: "fresh-build", scored: true, pass: build?.exit === 0,
+      detail: build ? `exit ${build.exit}${build.exit !== 0 ? `: ${(build.stderr + "\n" + build.stdout).trim().split("\n").slice(-4).join(" / ")}` : ""}` : "publish command could not be rebuilt" },
     ...(brief.checks ?? []).map(({ id, check, scored = true, ...params }) => {
       const fn = CHECKS[check];
       if (!fn) return { id: id ?? check, scored, pass: false, detail: `unknown check "${check}"` };
@@ -429,16 +432,17 @@ function scoreSample(dir, bdir, brief, { name, model }, judge) {
 
 function score(dir) {
   const round = readJson(join(dir, "round.json")) ?? stop(`${dir} has no round.json`);
+  const masks = round.isolation?.masks ?? [];
   say(`scoring ${round.id}…`);
   const results = { round: round.id, scoredAt: new Date().toISOString(), briefs: [] };
   for (const b of round.briefs) {
     const brief = loadBrief(b.name);
     const bdir = join(dir, b.name);
-    const judged = judgeBrief(bdir, brief);
+    const judged = judgeBrief(bdir, brief, masks);
     results.briefs.push({
       name: b.name, title: brief.title, origin: brief.origin,
       briefChanged: sha(brief.text) !== b.sha256,
-      samples: b.samples.map((s) => scoreSample(dir, bdir, brief, s, judged.find((j) => j.sample === s.name))),
+      samples: b.samples.map((s) => scoreSample(dir, bdir, brief, s, judged.find((j) => j.sample === s.name), masks)),
     });
   }
   const summary = renderSummary(round, results);

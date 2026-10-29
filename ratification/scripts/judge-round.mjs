@@ -9,11 +9,12 @@
  * <round-dir> contains sample subdirectories (haiku-1, sonnet-1, …), each with
  * REPORT.md, the authored site, usually dist/, and the round's own `unify`
  * binary. Samples are treated as read-only evidence: nothing is ever written
- * into a sample directory, and every build runs with `--dry-run` appended
+ * into a sample directory, and direct builds run with `--dry-run` appended
  * ("no writes at all, anywhere" — build.js's own contract). The one file this
  * tool writes is `judge-results.json`, in `ratification/rounds/<round>/` — the
  * round directory's own name under this repository's gitignored `rounds/` — or
- * wherever `--out` names (run-round.mjs passes it).
+ * wherever `--out` names (run-round.mjs passes it). Npm publish wrappers prepare
+ * a scratch copy under .judge/ before the resolved build is checked strictly.
  *
  * Why this exists: every false verdict in twenty rounds came from improvised
  * judging, never from the samples. The three most recent, each encoded here as
@@ -48,13 +49,14 @@
  *   timeoutMs        per-build timeout                       (default 240000)
  *   primitives       {label: literal-or-/regex/} swept over the source tree
  *   sweepExclude     top-level names skipped by the sweep ("X*" = prefix match)
- *   isolate          {script, repo, state}: run each build through isolate.sh
+ *   isolate          {script, repo, state, masks}: run each build through isolate.sh
  */
 
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { isolationEnvironment } from "./isolation.mjs";
 
 const VERSION = "1.0.0";
 
@@ -210,7 +212,7 @@ const isUnifyToken = (t) => t === "unify" || t === "./unify" || t.endsWith("/uni
  * ` && bar` / redirect suffix cut at top-level operators only. All candidates
  * are returned; the caller records them all so a wrong pick stays visible.
  */
-function extractCandidates(reportText) {
+function extractCandidates(reportText, scripts = {}) {
   const { blocks, lines } = fencedBlocks(reportText);
   const candidates = [];
   for (const block of blocks) {
@@ -225,6 +227,18 @@ function extractCandidates(reportText) {
     }
     for (const logical of logicalLines(block.lines)) {
       const { tokens, balanced } = scanShellLine(logical.text);
+      // Resolve a deliberately small, explicit npm-script grammar. Execute the
+      // original wrapper in a COPY; use its resolved Unify invocation for strict
+      // diagnostics and option discovery. Never append Unify flags to npm.
+      if (/^\s*npm\s+(?:run|run-script)\b/.test(logical.text)) {
+        const command = logical.text.trim();
+        const resolution = resolveNpmBuild(command, scripts);
+        candidates.push({ line: logical.line, raw: command, command,
+          complete: balanced && !logical.dangling, inPublishSection,
+          substitution: scanShellLine(command).substitution, wrapper: true,
+          ...resolution });
+        continue;
+      }
       for (let i = 0; i < tokens.length - 1; i++) {
         if (tokens[i].op || !isUnifyToken(tokens[i].text)) continue;
         if (tokens[i + 1].op || tokens[i + 1].text !== "build") continue;
@@ -253,12 +267,60 @@ function extractCandidates(reportText) {
   return candidates;
 }
 
+function resolveNpmBuild(command, scripts) {
+  const builds = [];
+  const visiting = new Set();
+  const visit = (cmd) => {
+    const scan = scanShellLine(cmd);
+    if (!scan.balanced || scan.substitution || /[\r\n]/.test(cmd) || scan.tokens.some((t) => t.op && t.text !== "&&")) {
+      throw new Error("npm script needs static commands joined by &&");
+    }
+    let start = 0;
+    const steps = [];
+    for (const token of scan.tokens.filter((t) => t.op)) {
+      steps.push(cmd.slice(start, token.start).trim());
+      start = token.end;
+    }
+    steps.push(cmd.slice(start).trim());
+    for (const step of steps) {
+      const words = scanShellLine(step).tokens.map((t) => t.text);
+      if (!words.length) throw new Error("empty npm script command");
+      if (words[0] === "npm") {
+        if (!/^(run|run-script)$/.test(words[1]) || words.length !== 3 || !/^[\w:.-]+$/.test(words[2])) {
+          throw new Error("supported wrapper is npm run <script> without extra arguments");
+        }
+        const name = words[2];
+        if (visiting.has(name) || visiting.size >= 16) throw new Error(`cyclic npm script: ${name}`);
+        if (typeof scripts[name] !== "string") throw new Error(`missing npm script: ${name}`);
+        visiting.add(name);
+        for (const key of [`pre${name}`, name, `post${name}`]) if (typeof scripts[key] === "string") visit(scripts[key]);
+        visiting.delete(name);
+      } else if (isUnifyToken(words[0]) && words[1] === "build") {
+        builds.push(step);
+      } else if (words[0] === "cd" || !/^[\w./:-]+$/.test(words[0])) {
+        throw new Error("npm script changes directory or uses unsupported shell syntax");
+      }
+    }
+  };
+  try {
+    visit(command);
+    if (builds.length !== 1) throw new Error(`npm script resolves to ${builds.length} Unify builds; expected one`);
+    return { buildCommand: builds[0] };
+  } catch (e) {
+    return { resolutionError: e.message };
+  }
+}
+
 /** Prefer the publish-command section, then completeness, then length. */
 function chooseCandidate(candidates) {
-  if (candidates.length === 0) return { chosen: null, reason: "no fenced `unify build` command found" };
+  if (candidates.length === 0) return { chosen: null, reason: "no fenced `unify build` or resolvable npm run command found" };
+  // A verification command cannot publish. Reports often put a longer strict
+  // dry run immediately after the publish command, within the section heuristic.
+  const publish = candidates.filter((c) => !c.resolutionError && !scanShellLine(c.buildCommand ?? c.command).tokens.some((t) => /^(?:--dry-run|"--dry-run"|'--dry-run')$/.test(t.text)));
+  if (publish.length === 0) return { chosen: null, reason: candidates.find((c) => c.resolutionError)?.resolutionError ?? "only dry-run commands found; no publish command" };
   let best = null;
   let bestScore = -1;
-  for (const c of candidates) {
+  for (const c of publish) {
     const score = (c.complete ? 2000 : 0) + (c.inPublishSection ? 1000 : 0) + c.command.length;
     if (score > bestScore) {
       best = c;
@@ -268,7 +330,7 @@ function chooseCandidate(candidates) {
   const why = [];
   if (best.inPublishSection) why.push("in the publish-command section");
   why.push(best.complete ? "complete" : "INCOMPLETE (unbalanced quoting)");
-  if (candidates.length > 1) why.push(`longest of ${candidates.length} candidates`);
+  if (publish.length > 1) why.push(`longest of ${publish.length} publish candidates`);
   return { chosen: best, reason: why.join(", ") };
 }
 
@@ -296,11 +358,11 @@ function optionValue(command, names) {
  * with --dry-run --strict appended (deduplicated). Output is captured in
  * memory — never redirected into the sample.
  */
-function runBuild(sampleDir, command, timeoutMs, isolate) {
+function runBuild(sampleDir, command, timeoutMs, isolate, strict = true) {
   let executed = command;
   if (/^unify\s/.test(executed) && existsSync(join(sampleDir, "unify"))) executed = `./${executed}`;
-  if (!/(^|\s)--dry-run(\s|$)/.test(executed)) executed += " --dry-run";
-  if (!/(^|\s)--strict(\s|$)/.test(executed)) executed += " --strict";
+  if (strict && !/(^|\s)--dry-run(\s|$)/.test(executed)) executed += " --dry-run";
+  if (strict && !/(^|\s)--strict(\s|$)/.test(executed)) executed += " --strict";
   // With `isolate` configured (run-round.mjs does), the build runs where the agent ran:
   // in the sample, seen as /tmp/sandbox, with the repository and the host /tmp masked.
   const [cmd, args] = isolate
@@ -308,6 +370,7 @@ function runBuild(sampleDir, command, timeoutMs, isolate) {
     : ["bash", ["-c", executed]];
   const res = spawnSync(cmd, args, {
     cwd: sampleDir,
+    ...(isolate ? { env: isolationEnvironment(isolate.masks) } : {}),
     encoding: "utf8",
     timeout: timeoutMs,
     maxBuffer: 64 * 1024 * 1024,
@@ -597,27 +660,43 @@ function sweepPrimitives(sampleDir, sourceRoot, outputDir, config) {
 // ------------------------------------------------------------------- output
 
 function judgeSample(roundDir, name, config) {
-  const sampleDir = join(roundDir, name);
+  let sampleDir = join(roundDir, name);
   const reportPath = join(sampleDir, "REPORT.md");
   const result = { sample: name };
 
   const reportText = readFileSync(reportPath, "utf8");
-  const candidates = extractCandidates(reportText);
+  let scripts = {};
+  try { scripts = JSON.parse(readFileSync(join(sampleDir, "package.json"), "utf8")).scripts ?? {}; } catch { /* no usable package manifest */ }
+  const candidates = extractCandidates(reportText, scripts);
   const { chosen, reason } = chooseCandidate(candidates);
   result.candidates = candidates.map((c) => ({
     line: c.line,
     command: c.command,
     complete: c.complete,
     inPublishSection: c.inPublishSection,
+    ...(c.wrapper ? { buildCommand: c.buildCommand ?? null, resolutionError: c.resolutionError ?? null } : {}),
     chosen: c === chosen,
   }));
   result.chosenCommand = chosen ? chosen.command : null;
+  result.buildCommand = chosen ? (chosen.buildCommand ?? chosen.command) : null;
   result.chosenReason = reason;
 
-  if (chosen && chosen.substitution) {
-    result.run = { executed: null, exit: null, refused: "command contains $/\\` shell substitution — refusing to execute" };
+  if (chosen?.wrapper && chosen.complete && !chosen.substitution) {
+    const copy = join(roundDir, ".judge", name);
+    rmSync(copy, { recursive: true, force: true });
+    cpSync(sampleDir, copy, { recursive: true, verbatimSymlinks: true });
+    sampleDir = copy;
+    const preparation = runBuild(sampleDir, chosen.command, config.timeoutMs, config.isolate, false);
+    result.preparation = { command: chosen.command, exit: preparation.exit, error: preparation.error,
+      diagnostics: (preparation.stderr + "\n" + preparation.stdout).trim().split("\n").slice(-config.diagnosticLines) };
+  }
+  if (chosen && (!chosen.complete || chosen.substitution)) {
+    result.run = { executed: null, exit: null, refused: !chosen.complete ? "command has incomplete quoting or continuation" : "command contains $/\\` shell substitution — refusing to execute" };
+  } else if (result.preparation && result.preparation.exit !== 0) {
+    result.run = { executed: chosen.command, exit: result.preparation.exit, refused: "npm publish script failed before strict verification",
+      diagnostics: result.preparation.diagnostics };
   } else if (chosen) {
-    const run = runBuild(sampleDir, chosen.command, config.timeoutMs, config.isolate);
+    const run = runBuild(sampleDir, result.buildCommand, config.timeoutMs, config.isolate);
     const parsed = parseDiagnostics(run.stderr, run.stdout, config.diagnosticLines);
     result.run = {
       executed: run.executed,
@@ -635,13 +714,19 @@ function judgeSample(roundDir, name, config) {
     result.run = { executed: null, exit: null, refused: reason };
   }
 
-  const command = chosen ? chosen.command : "";
-  const outputDir = optionValue(command, ["--output", "-o"]) ?? "dist";
+  const command = result.buildCommand ?? "";
+  // Ask the evaluated binary, not this checkout's config parser: the round may
+  // target another release. Its dry-run summary includes saved settings and CLI
+  // overrides, including quoted output paths. No summary means no inferred dist/.
+  const summary = result.run.wouldPublish ?? "";
+  const outputDir = summary.match(/^would publish \d+ files? to (.*)\/$/)?.[1]
+    ?? summary.match(/^would publish nothing — \d+ problems?; (.*)\/ would be left untouched$/)?.[1]
+    ?? optionValue(command, ["--output", "-o"]);
   const sourceRoot = optionValue(command, ["--source", "-s"]) ?? (existsSync(join(sampleDir, "src")) ? "src" : ".");
   const baseUrl = config.baseUrl ?? optionValue(command, ["--base-url"]);
   // An agent sees its own directory as /tmp/sandbox (isolate.sh), and may write that path.
-  const inSandbox = /^\/tmp\/sandbox(\/|$)/.test(outputDir);
-  const outAbs = inSandbox ? join(sampleDir, outputDir.slice("/tmp/sandbox".length)) : isAbsolute(outputDir) ? outputDir : join(sampleDir, outputDir);
+  const inSandbox = /^\/tmp\/sandbox(\/|$)/.test(outputDir ?? "");
+  const outAbs = outputDir == null ? null : inSandbox ? join(sampleDir, outputDir.slice("/tmp/sandbox".length)) : isAbsolute(outputDir) ? outputDir : join(sampleDir, outputDir);
 
   result.outputDir = outputDir;
   result.markers = { pattern: config.marker, ...countMarkers(outAbs, config.marker) };
@@ -758,6 +843,11 @@ function selfTest() {
     "```\n./unify build --pretty-urls --base-url https://x.example/a/ --clean --exclude drafts\n```\n\n**Exact publish command:**\n```\n./unify build --pretty-urls --base-url https://x.example/a/\n```\n",
   );
   check("publish-section candidate wins", chooseCandidate(two).chosen?.command, "./unify build --pretty-urls --base-url https://x.example/a/");
+
+  const verification = extractCandidates("```sh\n./unify build '--dry-run' --strict\n```\n");
+  check("verification alone is not a publish command", chooseCandidate(verification).chosen, null);
+  const namedOutput = extractCandidates('```sh\n./unify build --output "notes --dry-run"\n```\n');
+  check("dry-run text inside an output name is not a flag", chooseCandidate(namedOutput).chosen?.command, './unify build --output "notes --dry-run"');
 
   // 7. Option-value parsing, quoted and =-joined.
   check("optionValue -o", optionValue("./unify build -o out --strict", ["--output", "-o"]), "out");

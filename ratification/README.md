@@ -93,6 +93,7 @@ rules.md, bin/unify          exactly what every sample was given
 <brief>/<sample>/            the agent's directory, exactly as it left it, REPORT.md included
 <brief>/.harness/<sample>/   OpenCode's event stream (events.jsonl), stderr, exit, and its session data
 <brief>/.build/<sample>/     the fresh build every check reads
+<brief>/.judge/<sample>/     scratch copy for npm-script preparation before strict judging
 <brief>/judge-results.json   the judge's full record: chosen command, diagnostics, markers
 ```
 
@@ -100,12 +101,24 @@ A round exists only in this checkout. Copy the directory somewhere durable to ke
 
 ## How a sample is scored
 
-A sample passes when every scored check passes. Every brief starts with three:
+A sample passes when every scored check passes. Every brief starts with four:
 
 - **agent-finished** — the agent exited 0 within its time, reported no error, and wrote `REPORT.md`.
-- **publish-command** — `REPORT.md` states a `unify build` command in a fenced block.
-- **strict-build** — that command, re-run where the agent ran it with `--dry-run --strict`,
-  exits 0: no problem and no advisory.
+- **publish-command** — `REPORT.md` states a `unify build` command or a resolvable
+  `npm run <script>` in a fenced block. Verification commands containing `--dry-run`
+  are not publish candidates, including when hidden behind an npm script.
+- **strict-build** — the resolved Unify command with `--dry-run --strict` exits 0:
+  no problem and no advisory. An npm wrapper first runs in a scratch copy, including
+  nested scripts and pre/post hooks; failed preparation fails this check.
+- **fresh-build** — the publish command exits 0 in a separate copy with its previous
+  output removed. The named checks below read that fresh output.
+
+Npm resolution supports static commands joined by `&&`, with exactly one Unify build,
+and nested `npm run <script>` calls without extra arguments. Cycles, directory changes,
+shell substitutions, and ambiguous/multiple builds are reported as unsupported.
+The original wrapper runs unchanged, so preprocessing is retained; strict and audit
+flags are applied only to the resolved Unify invocation. Original sample files are
+preserved, and saved isolation masks apply to both copies.
 
 Each brief's `brief.json` adds its own checks from
 [`scripts/checks.mjs`](scripts/checks.mjs), most of them read from a fresh build of that
@@ -113,19 +126,34 @@ command:
 
 | Check | Passes when |
 |---|---|
-| `addresses` | every internal link is under the brief's address and names no `.html` file |
+| `addresses` | checked internal links are under the brief's address, name no `.html` file (404 and fragments excepted), and resolve to published files |
 | `absent` | none of the listed paths is published, and no published text contains a listed string |
 | `minPages` | at least `min` pages are published |
-| `feed` | `feed.xml` has at least `minEntries` entries, each timestamped |
+| `feed` | `feed.xml` is well-formed Atom with at least `minEntries` entries, each with a full timestamp, a title and an alternate link |
 | `postArticles` | at least `min` dated pages, each with Article or BlogPosting JSON-LD |
 | `postShareCards` | at least `min` dated pages, each with an `og:image` under the address (and its size, with `dimensions`) |
 | `auditStrict` | `unify audit --strict`, with the command's own options, exits 0 |
 | `ranCommand` | the agent ran a shell command matching `pattern` (from its event stream) |
 | `noSlots` | no `<slot>` reached a published page |
-| `bareFragment` | a `*.fragment.html` is published, without `<html>`, `<head>` or `<body>` |
+| `bareFragment` | bare HTML is published, including extensionless endpoints, without a document wrapper; empty list fragments may coexist with a nonempty panel |
 | `cssUrls` | every root-relative `url()` in published CSS is under the address |
 | `clientFetches` | every fetch target the judge found in the pages resolves |
 | `privacy` | no private value from the seed file is published |
+
+`addresses` also checks links inside fetched bare fragments against the **including
+page's URL**, honoring its first `<base href>`. Inline scripts and local `<script src>`
+files are inspected without executing them. Static analysis recognizes literal paths,
+templates, concatenation, unambiguous aliases, simple path-returning functions and
+`hx-get`. A script must both read response text and insert HTML before its fetches are
+considered possible fragment insertion contexts. Each matched context and broken link
+is recorded in `results.json`.
+
+This is not browser execution or full JavaScript data-flow analysis. Dynamic patterns
+match emitted files; they cannot prove which runtime values a user will request.
+Unresolved fetch expressions, unavailable scripts, and unmatched patterns appear in
+the check's `coverage` notes. Imported modules, links synthesized from JSON, and arbitrary
+DOM/JavaScript logic still need manual review. Unknown contexts are never replaced with
+the fragment's own URL or an invented page URL.
 
 A check marked `"scored": false` is reported, never counted. The round's score is the share
 of samples that passed. The summary also says whether the protocol's bar was met — at least
@@ -168,7 +196,16 @@ Not covered:
   a user with nothing to lose.
 
 The judge and the fresh builds run each sample's own command, generator scripts included,
-inside the same isolation.
+inside the same isolation. Extra masks are saved as absolute paths in `round.json` and
+reapplied during judging, rebuilding, checks and `--rejudge`. The output directory comes
+from the evaluated binary's dry-run report, so settings saved in `unify.yaml` and CLI
+overrides are both respected.
+
+Harness regressions run with `bun test tests/unit/ratification.test.js`. On a Linux host
+that supports the mount namespaces used for rounds, also run
+`bun ratification/scripts/test-isolation.mjs`: an external sentinel proves that saved
+masks reach the judge, fresh builds and audit checks when rejudging, even when the
+caller's `RATIFY_MASK` differs. The fixture and compiled binary are removed afterward.
 
 ## Adding a brief
 

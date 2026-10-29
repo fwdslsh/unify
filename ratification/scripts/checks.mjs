@@ -19,6 +19,8 @@
  */
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { checkAtomFeed } from "./atom.mjs";
+import { checkAddresses, checkBareFragments } from "./site-links.mjs";
 
 const TEXT = /\.(html|css|js|mjs|json|xml|txt|md|svg|webmanifest)$/i;
 
@@ -54,24 +56,9 @@ const list = (items, n = 4) => items.slice(0, n).join("; ") + (items.length > n 
 const missing = (out) => (existsSync(out) ? null : { pass: false, detail: "no build output" });
 
 export const CHECKS = {
-  /** Every internal link is under the brief's address and names no `.html` file (404.html and fragments aside). */
+  /** Page and fetched-fragment links resolve from their document to published targets. */
   addresses(ctx) {
-    if (missing(ctx.out)) return missing(ctx.out);
-    const base = new URL(ctx.baseUrl);
-    const bad = [];
-    let seen = 0;
-    for (const p of pages(ctx.out)) {
-      const pageUrl = new URL(p.rel, base);
-      for (const { href } of tags(p.text, "a")) {
-        if (!href || /^(#|mailto:|tel:|javascript:|data:)/i.test(href)) continue;
-        const url = new URL(href, pageUrl);
-        if (/^([a-z][a-z0-9+.-]*:|\/\/)/i.test(href) && url.origin !== base.origin) continue;
-        seen++;
-        if (!url.pathname.startsWith(base.pathname)) bad.push(`${p.rel}: ${href} (outside ${base.pathname})`);
-        else if (url.pathname.endsWith(".html") && !/(\/404|\.fragment)\.html$/.test(url.pathname)) bad.push(`${p.rel}: ${href} (.html)`);
-      }
-    }
-    return bad.length ? { pass: false, detail: `${bad.length} of ${seen} links: ${list(bad)}` } : { pass: true, detail: `${seen} links, all extensionless under ${base.pathname}` };
+    return checkAddresses(ctx.out, ctx.baseUrl);
   },
 
   /** Nothing named in `paths` is published, and no published text contains a string in `text`. */
@@ -95,16 +82,12 @@ export const CHECKS = {
     return { pass: n >= min, detail: `${n} pages (needs ${min})` };
   },
 
-  /** `feed.xml` has at least `minEntries` entries, every `<updated>` carrying a time of day. */
+  /** A well-formed Atom feed with a timestamp, title and alternate link per entry. */
   feed(ctx, { minEntries = 1 }) {
     if (missing(ctx.out)) return missing(ctx.out);
     const path = join(ctx.out, "feed.xml");
     if (!existsSync(path)) return { pass: false, detail: "no feed.xml" };
-    const feed = readFileSync(path, "utf8");
-    const entries = (feed.match(/<entry\b/g) ?? []).length;
-    const updated = [...feed.matchAll(/<updated>([^<]*)<\/updated>/g)].map((m) => m[1]);
-    const untimed = updated.filter((u) => !/T\d\d:\d\d/.test(u)).length;
-    return { pass: entries >= minEntries && untimed === 0, detail: `${entries} entries (needs ${minEntries}), ${untimed} without a time` };
+    return checkAtomFeed(readFileSync(path, "utf8"), { minEntries, baseUrl: ctx.baseUrl });
   },
 
   /** At least `min` dated pages, each with JSON-LD of type Article or BlogPosting. */
@@ -168,12 +151,9 @@ export const CHECKS = {
     return bad.length ? { pass: false, detail: `<slot> in ${list(bad)}` } : { pass: true, detail: "none" };
   },
 
-  /** At least one published `*.fragment.html`, none carrying `<html>`, `<head>` or `<body>`. */
+  /** At least one published bare HTML fragment, including extensionless endpoints. */
   bareFragment(ctx) {
-    if (missing(ctx.out)) return missing(ctx.out);
-    const frags = walk(ctx.out).filter((r) => r.endsWith(".fragment.html"));
-    const bad = frags.filter((r) => /<(html|head|body)[\s>]/i.test(readFileSync(join(ctx.out, r), "utf8")));
-    return { pass: frags.length > 0 && bad.length === 0, detail: frags.length ? `${frags.length} fragment(s)${bad.length ? `; wrapped: ${list(bad)}` : ""}` : "no .fragment.html published" };
+    return checkBareFragments(ctx.out);
   },
 
   /** Every root-relative `url()` in published CSS — files, `<style>` and `style=` — is under the address. */
