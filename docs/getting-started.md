@@ -119,7 +119,7 @@ Built result: the layout's `<main>` content is replaced by the page's, and the p
 
 Two details worth knowing:
 
-- Your page's own `<main>` wrapper is unwrapped during composition, so nothing ends up nested. Writing complete, semantic documents is exactly right.
+- Your first default-content `<main>` wrapper is unwrapped during composition, including inside a styling wrapper. This avoids adding another main around an ordinary page main; it does not repair already-nested mains.
 - A page's `<body class="home">` is merged onto the built page's `<body>` — which is how you do active-nav highlighting: `body.home .nav-home { font-weight: bold; }` in your stylesheet. No feature needed. It is styling only: the shared nav's markup is the same on every page, so nothing marks the current link with `aria-current`.
 
 ## Overriding a region
@@ -140,7 +140,9 @@ Two details worth knowing:
 </html>
 ```
 
-The built footer contains exactly the `<p>` you wrote — tag, attributes, and all. Pages that don't mention the footer keep the layout's default. Note what does *not* override anything: a plain `<header>` or `<footer>` element in your page is just content. Only `slot=` fills a region, and only on top-level elements (direct children of `<body>`).
+A named fill also preserves any main in its subtree. For example, `<main slot="content" id="guide">…</main>` fills `<slot name="content"></slot>` as a complete main, with only `slot="content"` removed. Its nested slot attributes are left alone. An unmatched name on a direct-body main reports the same advisory as any other unmatched fill; its contents follow the default route.
+
+The built footer contains exactly the `<p>` you wrote — tag, attributes, and all. Pages that don't mention the footer keep the layout's default. Note what does *not* override anything: a plain `<header>` or `<footer>` element in your page is just content. Only `slot=` fills a region, on direct children of `<body>` or of the selected default-content main; arbitrary nested `slot` attributes stay untouched.
 
 ## What ends up in `<head>`
 
@@ -167,7 +169,7 @@ and this page head:
 </head>
 ```
 
-the built page's head is (the added `og:description` default is unreleased; 0.11.16 leaves it out):
+the built page's head is:
 
 ```html
 <head>
@@ -187,7 +189,7 @@ These things in a built head can come from unify rather than from you:
 
 - **`<link rel="canonical">`**, under `--base-url`, on an indexable page that has none (`--canonical none` turns it off). One you write always wins.
 - **JSON-LD**, on a page that declares `schema: WebPage`, `Article` or `BlogPosting` (`<meta name="schema" content="Article">` in HTML), built only from what the page already declares. A `<script type="application/ld+json">` you write wins and unify generates none — that is where any other type, or richer data, goes.
-- **Open Graph defaults**: `og:title` from the final title, `og:description` from the final description, and `og:url` from the resolved canonical. Page-authored OG tags win, including empty values and page-head includes. Derived values replace layout fallbacks; absent values leave those fallbacks unchanged. No Twitter tags are generated. This OG completion is **unreleased; 0.11.16 requires authored tags**.
+- **Open Graph defaults**: `og:title` from the final title, `og:description` from the final description, and `og:url` from the resolved canonical. Page-authored OG tags win, including empty values and page-head includes. Derived values replace layout fallbacks; absent values leave those fallbacks unchanged. No Twitter tags are generated.
 - **Absolute URLs** in URL-valued `og:`/`twitter:` metadata and the canonical, under `--base-url`.
 
 The details are in the CLI reference: [structured data](cli-reference.md#structured-data-schema), and `--canonical` just above it. The [social metadata recipe](guides/social-metadata.md) shows shared defaults and page overrides for HTML and Markdown.
@@ -297,8 +299,10 @@ One file, one place to edit it, two consumers. (`examples/htmx-fragments` is thi
 worked end to end.)
 
 An include can also carry content, when its target is a fragment that declares slots. The
-content fills them exactly as a page fills a layout's: `slot="name"` on an element for a
-named slot, everything else to the bare one, and an unfilled slot shows its own content.
+content uses the same slot replacement and fallback: `slot="name"` on a direct child
+element for a named slot, everything else to the bare one, and an unfilled slot shows its
+own content. Unlike page/layout composition, a main stays intact and its children are
+not promoted to fills; there is no implicit main sink.
 
 ```html
 <!-- site/_includes/callout.fragment.html -->

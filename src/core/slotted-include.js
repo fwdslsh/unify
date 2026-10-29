@@ -23,7 +23,8 @@
  * an include may carry content when its target is a fragment with slots, and
  * that content fills them the way a page fills a layout's.
  *
- * TWO SUBTRACTIONS from §7, and both follow from what a fragment is (§4.4):
+ * Unlike page/layout composition, mains stay intact and only direct children
+ * can be fills; there is no implicit main sink. A fragment (§4.4) also has
  * no head merge and no root attributes. A fragment is a bare snippet; it
  * contributes no `<title>`, no `<meta>`, no `<link>`, and it has neither
  * `<html>` nor `<body>` for §9 to range over. One of those elements inside a

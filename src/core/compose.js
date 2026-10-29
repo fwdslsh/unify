@@ -526,11 +526,27 @@ function composeSinkedBody({ preparedC, cBody, preparedL, sinks, pageFile, layou
   const preparedCText = preparedC.text;
   const preparedLText = preparedL.text;
 
-  // §7.2 — unwrap C's first <main>, at any depth, exactly once (R4).
+  // Named fills own their complete subtree, including any <main>. Choose the
+  // first default-content main only after reserving eligible body-level fills.
+  const namedFills = elementChildren(cBody).filter((el) => sinks.namedSlots.has(attrValueOrEmpty(el, SLOT_ATTR)));
+  const main = findAll(cBody, (n) => isElement(n, "main"))
+    .find((n) => !namedFills.some((fill) => n.start >= fill.start && n.end <= fill.end));
+
+  // A direct-body main is a fill candidate too. Report an unmatched name
+  // before unwrapping removes its tag; deeper slot attributes remain inert.
+  const mainSlot = main?.parent === cBody ? attrValueOrEmpty(main, SLOT_ATTR) : "";
+  if (mainSlot) {
+    const at = spansToDiagnosticLocator(preparedC.spans, pageFile, resolveLine);
+    reporter.advisory({
+      ...at(main.start),
+      message: `no slot named "${mainSlot}" in ${layoutFile}; its content stayed in the page content`,
+    });
+  }
+
+  // §7.2 — unwrap the selected default-content main once, at any depth.
   let bodyText = preparedCText;
   let bodySpans = preparedC.spans;
   let body = cBody;
-  const main = findFirst(cBody, (n) => isElement(n, "main"));
   // Where this <main>'s own element children will land once its open tag is
   // gone — every one shifts left by exactly that tag's length. Captured here,
   // before the splice, because after it the nodes are new objects. See the

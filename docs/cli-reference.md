@@ -178,7 +178,7 @@ Pages that are `noindex`, that are `404.html`, or whose own canonical points els
 
 Nothing else about the page changes: the element lands immediately before `</head>` at that tag's indentation, and every other byte is what it was.
 
-## Open Graph defaults (unreleased; not in 0.11.16)
+## Open Graph defaults
 
 No flag is needed. `og:title`, `og:description` and `og:url` use the final composed title, description and resolved canonical. Page-head OG tags, including page-head includes and Markdown frontmatter, override those defaults; empty values still count. Derived values replace layout OG fallbacks, and missing values leave those fallbacks unchanged. `--canonical none` disables canonical creation but still allows an authored canonical to supply `og:url`. Twitter metadata stays authored. See the [social metadata guide](guides/social-metadata.md).
 
