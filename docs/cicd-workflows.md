@@ -4,21 +4,12 @@ description: "What each of unify's GitHub Actions workflows runs, and what a gre
 
 # CI/CD workflows
 
-What actually runs, and what each job is allowed to mean. The main workflows are
+What actually runs, and what each job is allowed to mean. Three workflow files exist:
 `.github/workflows/test.yml` (every push and PR), `.github/workflows/release.yml`
 (releases and prereleases), and `.github/workflows/deploy-docs.yml` (publishes the live
-`unify-docs` site — see below). `publish-templates.yml` publishes template packages separately.
+`unify-docs` site — see below).
 
-## `test.yml`
-
-### `docs-release` — documentation compatibility
-
-Runs `bun scripts/check-docs.mjs`: installs the exact published version in
-`docs/.runtime-version`, verifies its self-reported version, runs the stable guides'
-existing literal tests against that installed CLI, then checks the docs site and its
-five live galleries. Failure is blocking; it never substitutes the checkout CLI.
-The normal full suite still tests the checkout. See [Documentation maintenance](documentation.md)
-for the one release pin, Unreleased convention and promotion steps.
+## `test.yml` — seven jobs
 
 ### `release-signal` — runtime coverage against the phase baseline
 
@@ -133,17 +124,16 @@ Two ways in, and two jobs, all defined in this repo:
 
 ## `deploy-docs.yml`
 
-Publishes `examples/unify-docs` to GitHub Pages at `unify.fwdslsh.dev` when docs,
-examples, the docs template or compatibility checks change on `main`, or on demand.
-It runs `bun scripts/check-docs.mjs --build`: the same released-runtime compatibility
-check as CI, followed by the docs and five gallery builds using that exact installed
-release. Only a successful artifact reaches Pages. The banner separates the declared
-released-guidance version from the Git docs revision, so corrections can publish
-without a runtime release; unreleased pages are visibly marked.
-
-The content source remains `docs/`. See [Documentation maintenance](documentation.md)
-for contributor steps and `examples/unify-docs/README.md` for the site's assembly and
-one-time Pages/domain settings.
+Publishes `examples/unify-docs` to GitHub Pages at `unify.fwdslsh.dev` on every push to
+`main` touching `docs/`, `src/`, or `examples/**`, or on demand. Its `build` job runs the
+same two gates as `test.yml`'s `unify-docs` step (`build --dry-run --strict`, then
+`audit --strict`) before the real `build --clean --strict` that publishes the site — then,
+in a separate step per example, assembles five more sites (`seed-library`,
+`seed-library-alt`, `seed-library-ondemand`, `htmx-fragments`, `catalog-search-blog`) into
+`dist/examples/<name>/` with the checkout CLI, each addressed at its own `--base-url`
+subpath and gated by its own `--dry-run --strict`. Those five directories are what the
+docs site's `/examples/` gallery links to at runtime; see `examples/unify-docs/README.md`'s
+Deployment section and this workflow's own comments for the full seam.
 
 Required secrets: `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`, both checked with a named error rather than failing obscurely mid-push. npm needs none.
 

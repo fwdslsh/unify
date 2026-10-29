@@ -4,8 +4,6 @@ description: "The implementer-grade reference: unify's exact behavior rule by ru
 
 # unify — Conformance Specification
 
-> **Development reference:** This specification describes the checkout’s contract. New behavior is marked **Unreleased** until published. For released runtime guidance and its version, see [Documentation maintenance](documentation.md).
-
 **Status**: normative
 **Role**: The implementer-grade reference. `docs/product-spec.md` defines the product; this document defines the exact behavior, rule by rule. Every worked example in this document is a test fixture: an implementation conforms when it reproduces each example's output exactly — exact in element structure, tag names, attributes and their order, and text content — with only whitespace between block-level elements waived (§3; the comparator contract is `docs/testing-strategy.md` §2), and each diagnostic at the stated severity. Where this document and the product spec appear to differ, that is a defect in the document set to be fixed — neither may be silently reinterpreted.
 

@@ -8,18 +8,6 @@ on:
   workflow_dispatch:
 
 jobs:
-  docs-release:
-    name: Documentation on released Unify
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - run: bun install --frozen-lockfile
-      - run: bun scripts/check-docs.mjs
-
   # The runtime signal (docs/migration-plan.md §1). Two assertions, both
   # blocking, because a job that cannot fail is not a signal.
   #
@@ -164,8 +152,9 @@ jobs:
       # exercises. Mirror deploy-docs.yml's exact assembly commands here
       # (minus the real build — --dry-run --strict is the gate) so a
       # --base-url-sensitive regression fails on the PR, not on the deploy.
-      # Keep these checkout-runtime flags in sync with scripts/check-docs.mjs,
-      # which also proves the same galleries on the declared released runtime.
+      # Keep this in sync with the "Assemble example —" steps in
+      # .github/workflows/deploy-docs.yml; the base URL differs (this repo's
+      # own domain is a stand-in) but every flag after it must match.
       - name: Dependency-free examples at deploy subpath (matches deploy-docs.yml)
         env:
           SITE_BASE_URL: https://unify.fwdslsh.dev/

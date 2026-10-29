@@ -11,7 +11,7 @@ bun install
 bun test
 ```
 
-**Bun >= 1.2.0 develops; Bun and Node >= 22.12.0 both run the CLI.** There is no Deno build or lint/format step. `bun run build:linux`, `build:macos`, and `build:windows` compile the standalone binary. The documentation compatibility command is described below.
+**Bun >= 1.2.0 develops; Bun and Node >= 22.12.0 both run the CLI.** There is no Deno build, no lint or format step, and no docs generator. The only other scripts are `bun run build:linux`, `build:macos`, and `build:windows`, which compile the standalone binary.
 
 The split is worth understanding before you change anything under `src/`:
 
@@ -42,12 +42,6 @@ Two rules follow from that set:
 - **`docs/authoring-rules.md` is the complete authoring surface, capped at sixty lines** (release gate G10). The README links it rather than duplicating it; edit the file, and keep any README summary of it consistent.
 
 ## How tests are organized
-
-Documentation corrections can ship independently of runtime releases. Follow
-[`docs/documentation.md`](docs/documentation.md): keep released guidance compatible
-with `docs/.runtime-version`, put pending instructions under `docs/unreleased/`, and
-run `bun scripts/check-docs.mjs` before publishing. The command tests the actual npm
-release; ordinary `bun test` still tests this checkout.
 
 Read [`docs/testing-strategy.md`](docs/testing-strategy.md) §1 before writing a test. It is the root-cause analysis of why the previous suite reached 93% coverage on a product whose `init` command exited 1 and whose builds silently deleted page content. Every rule below is a countermeasure to a specific mechanism named there.
 

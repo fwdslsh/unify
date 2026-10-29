@@ -1,13 +1,11 @@
 ---
-description: "The current product contract: what unify is, who it serves, the composition model, the CLI and the boundaries future work must keep."
+description: "The shipped product contract: what unify is, who it serves, the composition model, the CLI and the boundaries future work must keep."
 ---
 
 # unify — Product Specification
 
-> **Development reference:** This specification describes the checkout’s contract. New behavior is marked **Unreleased** until published. For released runtime guidance and its version, see [Documentation maintenance](documentation.md).
-
-**Status**: Current contract — released behavior unless explicitly marked **Unreleased**; §6 includes the production-and-discovery layer’s design record
-**Role**: This document records the current product contract — the composition core, plus the production-and-discovery layer built on it — with §6 retained as that layer's design record: what unify is, who it serves, what exists now, and which boundaries future work must preserve. The rule-by-rule mechanism for this contract — every merge rule with worked input→output examples, the algorithms, the error taxonomy — lives in `docs/conformance-spec.md`, the normative implementation reference. The two documents are written to agree about behavior and release status; a divergence between them is a defect to be fixed, never a license to reinterpret either. `docs/authoring-rules.md` is the complete core composition surface in under sixty lines.
+**Status**: Shipped contract — the composition core plus the production-and-discovery layer; §6 is that layer's design record
+**Role**: This document records the shipped product contract — the composition core, plus the production-and-discovery layer built on it — with §6 retained as that layer's design record: what unify is, who it serves, what exists now, and which boundaries future work must preserve. The rule-by-rule mechanism for shipped behavior — every merge rule with worked input→output examples, the algorithms, the error taxonomy — lives in `docs/conformance-spec.md`, the normative implementation reference. The two documents are written to agree about shipped behavior; a divergence between them is a defect to be fixed, never a license to reinterpret either. `docs/authoring-rules.md` is the complete core composition surface in under sixty lines.
 
 ---
 

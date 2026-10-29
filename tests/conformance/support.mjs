@@ -19,9 +19,7 @@ import { registerTmp } from "../tmp-reaper.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const ROOT = join(HERE, "..", "..");
-// Only scripts/check-docs.mjs opts into the published CLI, through an explicit
-// test preload. An inherited environment variable cannot redirect bun test.
-export const CLI = globalThis.__unifyDocsCli ?? join(ROOT, "src", "cli.js");
+export const CLI = join(ROOT, "src", "cli.js");
 const LEDGER = join(ROOT, ".conformance-ledger.jsonl");
 
 const CLI_TIMEOUT_MS = 30_000; // a hang is a failure, never a wait (same discipline as harness.test.js)
@@ -37,9 +35,6 @@ const CLI_TIMEOUT_MS = 30_000; // a hang is a failure, never a wait (same discip
  * @param {...string} ruleIds
  */
 export const covers = (...ruleIds) => {
-  // Released-runtime documentation checks are not evidence about this
-  // checkout's implementation. Never mix them into its conformance ledger.
-  if (globalThis.__unifyDocsCli) return;
   const frame = (new Error().stack ?? "").split("\n")[2] ?? "";
   const testId = frame.replace(/^\s*at\s+/, "").replaceAll(`${ROOT}/`, "").trim() || "unknown-test";
   const lines = ruleIds.map((rule) => JSON.stringify({ rule, test: testId, status: "pass" }));

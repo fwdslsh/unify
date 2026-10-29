@@ -30,7 +30,7 @@
 import { expect, test } from "bun:test";
 import { existsSync, readFileSync, readdirSync, renameSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { CLI, ROOT, mkTmp, runCli, writeTree } from "./support.mjs";
+import { ROOT, mkTmp, runCli, writeTree } from "./support.mjs";
 
 const TEST_MS = 30_000;
 const DOC = readFileSync(join(ROOT, "docs", "integrations.md"), "utf8");
@@ -563,7 +563,7 @@ test("recipe 5 — the generator vendors the package's browser bundle, under bun
   // The claim the earlier draft got wrong. node must agree with bun, byte for byte.
   const nodeTmp = recipeTree();
   const r = Bun.spawnSync({
-    cmd: [nodeBin(), CLI, "build", "-s", "src", "-o", "dist", "--generate", "_scripts/vendor.mjs"],
+    cmd: [nodeBin(), join(ROOT, "src", "cli.js"), "build", "-s", "src", "-o", "dist", "--generate", "_scripts/vendor.mjs"],
     cwd: nodeTmp,
     stdout: "pipe",
     stderr: "pipe",
