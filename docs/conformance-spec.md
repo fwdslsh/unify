@@ -51,13 +51,13 @@ unify composes by editing spans of source text — it never reformats, re-indent
 - **S2 — Include splice.** The include element (start tag through matching end tag, or the void tag, or the SSI comment) is replaced by the included file's processed contents.
 - **S3 — Slot fill.** The slot element is replaced by the fill elements, in page order. The consumed `slot` attribute is removed from each fill; nothing else about a fill's markup changes.
 - **S4 — Slot fallback.** An unfilled slot's start and end tags are removed; its children remain, as written.
-- **S5 — Children replacement** (a `<main>` receiving default content, or a sink-less layout `<body>`, §7.4–7.5). The element's children are replaced by the default content; the element itself — tag and attributes — stays.
-- **S6 — Unwrap.** The page's first `<main>`'s start and end tags are removed; its children stay in place.
+- **S5 — Children replacement** (a `<main>` receiving default content, or a sink-less layout `<body>`, §7.4–7.5). The element's children are replaced by the default content; its tag stays, with attributes merged separately under S11.
+- **S6 — Unwrap.** The page's first default-content `<main>`'s start and end tags are removed; its children stay in place. Successfully addressed named fills and their subtrees are excluded (§7.2).
 - **S7 — Removal.** A removed element (head dedup, replaced layout elements) is removed entirely; a removed attribute (`data-layout`, a consumed `slot`) is removed cleanly from its tag. Removal changes nothing else.
 - **S8 — Head replacement in place.** A layout head element replaced under §8 has the page's element(s) take its position, in page order; the layout's other same-key elements are removed per S7.
 - **S9 — Head append.** Appended head elements land at the end of the layout's head content, in page-source order.
 - **S10 — Title join.** The layout `<title>`'s text becomes `pageText + " " + layoutText`, both trimmed of leading/trailing whitespace. The layout's title element (tag and attributes) is kept. Title text is text content and is compared exactly.
-- **S11 — Root attributes.** The layout's `<html>`/`<body>` tags are edited in place: the `class` value becomes the layout's tokens in order followed by page tokens not already present, space-separated; an overridden attribute keeps its position with the page's value; a new attribute is appended to the tag, in page-source order.
+- **S11 — Attributes.** The layout's `<html>`/`<body>` tags, and the receiving `<main>` paired under §9, are edited in place: the `class` value becomes the layout's tokens in order followed by page tokens not already present, space-separated; an overridden attribute keeps its position with the page's value; a new attribute is appended to the tag, in page-source order.
 - **S12 — Default content.** Default content (§7.2) keeps its nodes — elements, text, comments — in source order, interior text preserved as written; whitespace-only text nodes at its boundaries are not significant.
 
 The output document's shell — doctype, `<html>`, `<head>`, `<body>` tags — is the layout's. The page's doctype and shell tags are not emitted (their attributes participate via S11). A page with no layout is emitted from its own text; for a layout-less Markdown page that text is its converted body inside the synthesized shell of §10.7.
@@ -313,9 +313,11 @@ src/_layout.html:8: problem: <slot name="inner"> is nested inside the fallback o
 
 ### 7.2 Preparing C's content
 
-If L has at least one sink: C's body content is **unwrapped once** — the first `<main>` in C's body in document order, **at any depth, not only top level**, is replaced by its children (S6): a `<main>` inside a wrapper `<div>` unwraps and the wrapper stays. Exactly once — a `<main>` inside the first one is the author's own markup and survives. No other element is unwrapped. (Top-level-only unwrap would ship `<main>`-inside-`<main>` for the common wrapper pattern; unwrapping the first one anywhere is what keeps composed output valid.)
+**Unreleased (not 0.11.16):** reserve C's direct body children whose non-empty `slot` names a slot in L. Each such named fill and its whole subtree are preserved, including any `<main>`; only the fill's own `slot` attribute is consumed (§7.3). Do not interpret nested `slot` attributes inside that fill. In 0.11.16 the first main was unwrapped even inside a named fill.
 
-**Fills** are then collected: every direct element child of C's body, **and every direct element child of the `<main>` that was just unwrapped, wherever it sat**, carrying a `slot` attribute with a non-empty value. (`slot=""` counts as absent.) The unwrap and the collection are one step, not two: a fill inside a `<main>` inside a wrapper `<div>` counts, because the `<main>` is the page's content region and the wrapper is styling. A `slot` attribute anywhere else — deeper than that, or inside a `<template>` — is the author's own markup and is never touched or reported: the parent of a fill is always `<body>` or that `<main>`, and neither can be a component the author is assigning light DOM to. Fill elements are removed from the default-content sequence wherever they sat; a wrapper they leave behind stays, possibly empty.
+If L has at least one sink: the first `<main>` outside those reserved subtrees in C's body, in document order and **at any depth**, is **unwrapped once** (S6). A main inside a wrapper `<div>` unwraps and the wrapper stays. A main inside that selected main survives; no other element is unwrapped. This avoids adding another main around an ordinary page main, but does not repair already-nested mains. A bare slot outside any layout main still unwraps the selected page main; wrapper preservation is not part of this rule.
+
+**Fills** are then collected: every direct element child of C's body, **and every direct element child of the default-content `<main>` that was just unwrapped, wherever it sat**, carrying a `slot` attribute with a non-empty value. (`slot=""` counts as absent.) The unwrap and the collection are one step, not two: a fill inside a `<main>` inside a wrapper `<div>` counts, because the `<main>` is the page's content region and the wrapper is styling. A `slot` attribute anywhere else — deeper than that, or inside a `<template>` — is the author's own markup and is never touched or reported: the parent of a fill is always `<body>` or that `<main>`, and neither can be a component the author is assigning light DOM to. Fill elements are removed from the default-content sequence wherever they sat; a wrapper they leave behind stays, possibly empty.
 
 **Default content** is everything else in C's body — elements, text, comments — in source order (S12).
 
@@ -328,7 +330,7 @@ Each unfilled named slot is replaced by its own children (S4). Fallback content 
 ### 7.4 Routing default content
 
 - L has a default slot → the default content replaces it (S3, S12). If the default content is empty, the default slot renders its fallback (S4).
-- No default slot, L has `<main>` → the default content replaces `<main>`'s children (S5). If the default content is empty, `<main>` keeps its children (the layout's default persists). The sink `<main>` is L's first in document order, at any depth — the same search §7.2 uses for the page's own `<main>`.
+- No default slot, L has `<main>` → the default content replaces `<main>`'s children (S5). If the default content is empty, `<main>` keeps its children (the layout's default persists). The sink `<main>` is L's first in document order, at any depth.
 - No default slot, and a named `<slot>` sits inside that `<main>` → **problem** (**P19**). The two rules would target overlapping spans: this bullet replaces `<main>`'s children wholesale, while §7.3 fills or falls back that slot. Resolving it either way loses something silently — swallow the slot and a page's fill vanishes against the content-loss law; honor it and the sink is no longer wholesale — so the layout is ambiguous and says so:
 
 ```
@@ -649,9 +651,13 @@ Row by row: identical charset silent; title joined; description replaced in plac
 
 ---
 
-## 9. Root attributes
+## 9. Root and main attributes
 
-On `<html>` and `<body>` only (S11): the page's class tokens are appended to the layout's (duplicates not repeated); any other attribute the page sets wins (edited in place if the layout had it, inserted before `>` otherwise). `data-layout` and consumed `slot` attributes are removed before this merge. A page cannot remove a layout attribute — there is no mechanism, by design. Attributes merge nowhere else.
+On `<html>` and `<body>` (S11): the page's class tokens are appended to the layout's (duplicates not repeated); any other attribute the page sets wins (edited in place if the layout had it, inserted before `>` otherwise). `data-layout` and consumed `slot` attributes are removed before this merge. A page cannot remove a layout attribute — there is no mechanism, by design. Copied attribute values retain their authored quoting and source provenance.
+
+**Unreleased (not 0.11.16):** the same rule applies to the unwrapped default-content page main and the layout main receiving **non-empty** default content. Without a bare slot, the destination is the implicit first main sink. With a bare slot, it is that slot's nearest main ancestor, if any; an unrelated main receives nothing. Layout children outside a bare slot stay in place. Named fills never participate. If default content is empty, the layout's fallback and attributes remain unchanged; without a page main there are no main attributes to merge. No other elements merge.
+
+This changes output for pages whose main attributes were previously discarded: IDs, classes, accessibility attributes and styling hooks now reach the receiving main. A body-level bare slot still discards the page-main wrapper and has no main to receive its attributes.
 
 Fixture: layout `<body class="site">` + page `<body class="home" data-theme="dark">` → `<body class="site home" data-theme="dark">`.
 
@@ -2430,7 +2436,7 @@ The include's children are merged into the parsed fragment exactly as a page's b
 Two things a layout does are **not** done here, and both follow from what a fragment is:
 
 - **No head merge.** A `.fragment.html` is a bare snippet (§4.4); it contributes no `<title>`, no `<meta>`, no `<link>`.
-- **No root attributes.** §9 ranges over `<html>` and `<body>`, and a fragment has neither.
+- **No attribute merging.** A fragment has no `<html>` or `<body>`. The main pairing in §9 belongs only to page/layout composition; slotted includes preserve authored main elements and never pair their attributes.
 
 A `<head>`, `<html>`, or `<body>` element inside a fragment reached by a non-empty include is **P27**, located at that element — the same shape as §10.5's "a literal `<head>` in a Markdown body", and for the same reason: it would land in the body and do nothing.
 

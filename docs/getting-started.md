@@ -119,8 +119,21 @@ Built result: the layout's `<main>` content is replaced by the page's, and the p
 
 Two details worth knowing:
 
-- Your page's own `<main>` wrapper is unwrapped during composition, so nothing ends up nested. Writing complete, semantic documents is exactly right.
+- Your first default-content `<main>` wrapper is unwrapped during composition, including inside a styling wrapper. This avoids adding another main around an ordinary page main; it does not repair already-nested mains.
 - A page's `<body class="home">` is merged onto the built page's `<body>` — which is how you do active-nav highlighting: `body.home .nav-home { font-weight: bold; }` in your stylesheet. No feature needed. It is styling only: the shared nav's markup is the same on every page, so nothing marks the current link with `aria-current`.
+
+**Unreleased (not 0.11.16): main attributes follow the content.** When non-empty default content enters a layout main, its classes and the page main's classes combine; other page attributes win. For example:
+
+```html
+<!-- Layout body -->
+<body><main id="layout-content" class="shell" tabindex="-1"></main></body>
+<!-- Page body -->
+<body><main id="guide" class="article" aria-label="Guide"><h1>Guide</h1></main></body>
+<!-- Built body -->
+<body><main id="guide" class="shell article" tabindex="-1" aria-label="Guide"><h1>Guide</h1></main></body>
+```
+
+This also works with `<main><slot></slot></main>`; markup outside the slot stays. An unrelated main or fallback-only main keeps its own attributes. Named fills do not merge. Version 0.11.16 discards page-main attributes, so this can change existing IDs, selectors and accessibility hooks when upgrading. A bare slot outside a main still unwraps the page main, and unaddressed page siblings still enter the default destination.
 
 ## Overriding a region
 
@@ -140,7 +153,9 @@ Two details worth knowing:
 </html>
 ```
 
-The built footer contains exactly the `<p>` you wrote — tag, attributes, and all. Pages that don't mention the footer keep the layout's default. Note what does *not* override anything: a plain `<header>` or `<footer>` element in your page is just content. Only `slot=` fills a region, and only on top-level elements (direct children of `<body>`).
+**Unreleased (not 0.11.16):** a named fill also preserves any main in its subtree. For example, `<main slot="content" id="guide">…</main>` fills `<slot name="content"></slot>` as a complete main, with only `slot="content"` removed. Its nested slot attributes are left alone.
+
+The built footer contains exactly the `<p>` you wrote — tag, attributes, and all. Pages that don't mention the footer keep the layout's default. Note what does *not* override anything: a plain `<header>` or `<footer>` element in your page is just content. Only `slot=` fills a region, on direct children of `<body>` or of the selected default-content main; arbitrary nested `slot` attributes stay untouched.
 
 ## What ends up in `<head>`
 

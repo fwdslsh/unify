@@ -26,7 +26,7 @@
  * TWO SUBTRACTIONS from §7, and both follow from what a fragment is (§4.4):
  * no head merge and no root attributes. A fragment is a bare snippet; it
  * contributes no `<title>`, no `<meta>`, no `<link>`, and it has neither
- * `<html>` nor `<body>` for §9 to range over. One of those elements inside a
+ * `<html>` nor `<body>`. §9's main pairing is page/layout-only. One of those elements inside a
  * fragment reached this way is **P27** — §10.5's shape one file type over,
  * and for the same reason: it would land in the body and do nothing.
  *

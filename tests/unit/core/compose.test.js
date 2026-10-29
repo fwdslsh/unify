@@ -631,3 +631,30 @@ describe("P21: the merge requires a <body> on both sides (§7/MRG-20)", () => {
     expect(out.text).toContain("<ul><li>x</li></ul>");
   });
 });
+
+describe("main attribute provenance", () => {
+  test("appended and overridden values retain the included file's exact byte offsets and quoting", () => {
+    const fragment = `<main\n  id="guide"\n  style='--label: "Hi"; background: url(missing.svg)'><p>Guide</p></main>`;
+    const prefix = '<html><head></head><body>';
+    const suffix = '</body></html>';
+    const pageText = prefix + fragment + suffix;
+    const pageSpans = [
+      { start: 0, end: prefix.length, file: "page.html", fileOffset: 0 },
+      { start: prefix.length, end: prefix.length + fragment.length, file: "parts/main.html", fileOffset: 0 },
+      { start: prefix.length + fragment.length, end: pageText.length, file: "page.html", fileOffset: prefix.length },
+    ];
+    for (const style of ['', ' style="color: red"']) {
+      const reporter = silentReporter();
+      const result = compose({
+        pageText, pageSpans, pageFile: "page.html", reporter,
+        layoutText: `<html><head></head><body><main${style}></main></body></html>`, layoutFile: "_layout.html",
+      });
+      expect(reporter.diagnostics).toEqual([]);
+      expect(result.text).toContain(`style='--label: "Hi"; background: url(missing.svg)'`);
+      const offset = result.text.indexOf("missing.svg");
+      const span = result.spans.find((s) => s.start <= offset && offset < s.end);
+      expect(span.file).toBe("parts/main.html");
+      expect(span.fileOffset + offset - span.start).toBe(fragment.indexOf("missing.svg"));
+    }
+  });
+});
