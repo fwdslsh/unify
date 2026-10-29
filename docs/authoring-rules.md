@@ -40,7 +40,7 @@ an error — on a layout too, because layouts don't chain (a section layout is a
   `<meta charset>` the layout's wins. **Write the separator into the layout's title** —
   `<title>— My Site</title>`, no leading space — and a page writes only its own name
   (`<title>About</title>`); the join adds the space, giving `About — My Site`. Your `<meta>` replaces the layout's same-`name`/`property`, your `canonical`/`icon`
-  links replace the layout's, everything else appends after — page CSS wins.
+  links replace the layout's, everything else appends after — page CSS wins. **Unreleased (not 0.11.16):** `og:title`/`og:description`/`og:url` default to final title/description/canonical; page-head declarations win over derived values, which win over layout fallbacks. No missing value or Twitter tag is invented.
 - **Root attributes.** On `<html>`/`<body>` only, your classes are added and any other attribute you
   set wins; attributes merge nowhere else. Active nav is `<body class="home">` plus CSS
   (`body.home .nav-home {…}`), not a feature.

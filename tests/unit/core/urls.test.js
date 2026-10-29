@@ -8,7 +8,7 @@
  *  - Fixture-driven cases drive the REAL pipeline — `includes.js`'s
  *    `inlineIncludes` and `compose.js`'s `compose`, both of which now return
  *    real `{text, spans}` provenance (see either module's own doc comment) —
- *    then apply urls.js on top, using `spansToLocator` to build
+ *    then apply urls.js and final OG completion on top, using `spansToLocator` to build
  *    `provenanceOf` straight from the real spans, and diff the result
  *    against the checked-in kitchen-sink / landmine expected trees using
  *    compare.mjs's `compareHtml` (H5 discipline: one comparator, never
@@ -31,6 +31,7 @@ import {
 import { inlineIncludes } from "../../../src/core/includes.js";
 import { assembleMarkdownDocument, compose } from "../../../src/core/compose.js";
 import { convert } from "../../../src/core/markdown.js";
+import { completeOpenGraph, declaredOpenGraph } from "../../../src/core/open-graph.js";
 import { Reporter } from "../../../src/core/diagnostics.js";
 import { compareHtml } from "../../../tests/conformance/compare.mjs";
 
@@ -90,7 +91,7 @@ async function composeWithProvenance({ caseDir, pageRel, layoutRel, isMarkdown =
     pageText, pageFile: pageRel, pageSpans, layoutText, layoutFile: layoutRel, layoutSpans, reporter,
   });
 
-  return { composed, provenanceOf: spansToLocator(spans, pageRel), reporter };
+  return { composed, provenanceOf: spansToLocator(spans, pageRel), pageOpenGraph: declaredOpenGraph(pageText), reporter };
 }
 
 // ============================================================ isSkippedUrl
@@ -273,7 +274,7 @@ describe("rewriteSrcsetValue", () => {
 describe("rewriteProvenanceUrls — fixture: stranded-underscore-asset (the spec's own §11.1 worked example)", () => {
   test("nav.html's relative logo resolves against ITS OWN directory, not the layout's or page's", async () => {
     const dir = join(LANDMINES, "stranded-underscore-asset");
-    const { composed, provenanceOf } = await composeWithProvenance({
+    const { composed, provenanceOf, pageOpenGraph } = await composeWithProvenance({
       caseDir: dir, pageRel: "index.html", layoutRel: "_layout.html",
     });
     expect(composed).toContain('<img src="logo.png" alt="logo">'); // pre-rewrite sanity: still relative in composed text
@@ -287,12 +288,12 @@ describe("rewriteProvenanceUrls — fixture: stranded-underscore-asset (the spec
 describe("rewriteProvenanceUrls — fixture: srcset-poster-rewrite", () => {
   test("byte-exact against the checked-in expected tree", async () => {
     const dir = join(LANDMINES, "srcset-poster-rewrite");
-    const { composed, provenanceOf } = await composeWithProvenance({
+    const { composed, provenanceOf, pageOpenGraph } = await composeWithProvenance({
       caseDir: dir, pageRel: "gallery/index.html", layoutRel: "gallery/_layout.html",
     });
     const out = rewriteProvenanceUrls(composed, { provenanceOf, pageFile: "gallery/index.html", pageMoved: false });
     const expected = readFileSync(join(dir, "expected", "gallery", "index.html"), "utf8");
-    expect(compareHtml(expected, out, "gallery/index.html")).toEqual([]);
+    expect(compareHtml(expected, completeOpenGraph(out, pageOpenGraph).text, "gallery/index.html")).toEqual([]);
   });
 });
 
@@ -383,23 +384,23 @@ describe("full §11.1+§11.2+§11.3 chain — fixture: kitchen-sink (pretty-base
   const base = parseBaseUrl("https://meridian.coffee/coffee/");
 
   test("index.html", async () => {
-    const { composed, provenanceOf } = await composeWithProvenance({ caseDir: KITCHEN_SINK, pageRel: "index.html", layoutRel: "_layout.html" });
+    const { composed, provenanceOf, pageOpenGraph } = await composeWithProvenance({ caseDir: KITCHEN_SINK, pageRel: "index.html", layoutRel: "_layout.html" });
     const out = rewriteUrls(composed, {
       provenanceOf, pageFile: "index.html", pageOutputPath: "index.html",
       prettyUrls: true, emittedHtmlPaths, base,
     });
     const expected = readFileSync(join(KITCHEN_SINK, "expected-pretty-base", "index.html"), "utf8");
-    expect(compareHtml(expected, out, "index.html")).toEqual([]);
+    expect(compareHtml(expected, completeOpenGraph(out, pageOpenGraph).text, "index.html")).toEqual([]);
   });
 
   test("menu/index.html (layout-provenance relative img; page-self relative link to a moved page)", async () => {
-    const { composed, provenanceOf } = await composeWithProvenance({ caseDir: KITCHEN_SINK, pageRel: "menu/index.html", layoutRel: "menu/_layout.html" });
+    const { composed, provenanceOf, pageOpenGraph } = await composeWithProvenance({ caseDir: KITCHEN_SINK, pageRel: "menu/index.html", layoutRel: "menu/_layout.html" });
     const out = rewriteUrls(composed, {
       provenanceOf, pageFile: "menu/index.html", pageOutputPath: "menu/index.html",
       prettyUrls: true, emittedHtmlPaths, base,
     });
     const expected = readFileSync(join(KITCHEN_SINK, "expected-pretty-base", "menu", "index.html"), "utf8");
-    expect(compareHtml(expected, out, "menu/index.html")).toEqual([]);
+    expect(compareHtml(expected, completeOpenGraph(out, pageOpenGraph).text, "menu/index.html")).toEqual([]);
   });
 });
 
@@ -466,12 +467,12 @@ describe("applyBaseUrl (§11.3)", () => {
 describe("applyBaseUrl — fixture: base-url-subpath (B3's pinned trap)", () => {
   test("full base with a non-root path: og/twitter/canonical get origin+path, everything else gets path only", async () => {
     const dir = join(LANDMINES, "base-url-subpath");
-    const { composed, provenanceOf } = await composeWithProvenance({ caseDir: dir, pageRel: "index.html", layoutRel: "_layout.html" });
+    const { composed, provenanceOf, pageOpenGraph } = await composeWithProvenance({ caseDir: dir, pageRel: "index.html", layoutRel: "_layout.html" });
     const base = parseBaseUrl("https://example.com/repo/");
     const rewritten = rewriteProvenanceUrls(composed, { provenanceOf, pageFile: "index.html", pageMoved: false });
     const out = applyBaseUrl(rewritten, base);
     const expected = readFileSync(join(dir, "expected", "index.html"), "utf8");
-    expect(compareHtml(expected, out, "index.html")).toEqual([]);
+    expect(compareHtml(expected, completeOpenGraph(out, pageOpenGraph).text, "index.html")).toEqual([]);
   });
 });
 
@@ -479,14 +480,14 @@ describe("applyBaseUrl — fixture: base-url-subpath (B3's pinned trap)", () => 
 
 describe("full chain — fixture: kitchen-sink (origin profile, no pretty-urls)", () => {
   test("index.html: root-relative canonical gains the full origin, regular hrefs do not", async () => {
-    const { composed, provenanceOf } = await composeWithProvenance({ caseDir: KITCHEN_SINK, pageRel: "index.html", layoutRel: "_layout.html" });
+    const { composed, provenanceOf, pageOpenGraph } = await composeWithProvenance({ caseDir: KITCHEN_SINK, pageRel: "index.html", layoutRel: "_layout.html" });
     const base = parseBaseUrl("https://meridian.coffee/");
     const out = rewriteUrls(composed, {
       provenanceOf, pageFile: "index.html", pageOutputPath: "index.html",
       prettyUrls: false, base,
     });
     const expected = readFileSync(join(KITCHEN_SINK, "expected-origin", "index.html"), "utf8");
-    expect(compareHtml(expected, out, "index.html")).toEqual([]);
+    expect(compareHtml(expected, completeOpenGraph(out, pageOpenGraph).text, "index.html")).toEqual([]);
   });
 });
 
@@ -498,14 +499,14 @@ describe("full chain — fixture: kitchen-sink (default profile: §11.1 only, no
     ["contact.html", "_layout.html", "contact.html"],
     ["menu/index.html", "menu/_layout.html", "menu/index.html"],
   ])("%s", async (pageRel, layoutRel, expectedRel) => {
-    const { composed, provenanceOf } = await composeWithProvenance({ caseDir: KITCHEN_SINK, pageRel, layoutRel });
+    const { composed, provenanceOf, pageOpenGraph } = await composeWithProvenance({ caseDir: KITCHEN_SINK, pageRel, layoutRel });
     const out = rewriteProvenanceUrls(composed, { provenanceOf, pageFile: pageRel, pageMoved: false });
     const expected = readFileSync(join(KITCHEN_SINK, "expected", expectedRel), "utf8");
-    expect(compareHtml(expected, out, expectedRel)).toEqual([]);
+    expect(compareHtml(expected, completeOpenGraph(out, pageOpenGraph).text, expectedRel)).toEqual([]);
   });
 
   test("about.md (Markdown page): page-self relative links/images stay exactly as written, unmoved", async () => {
-    const { composed, provenanceOf } = await composeWithProvenance({
+    const { composed, provenanceOf, pageOpenGraph } = await composeWithProvenance({
       caseDir: KITCHEN_SINK, pageRel: "about.md", layoutRel: "_layout.html", isMarkdown: true,
     });
     const out = rewriteProvenanceUrls(composed, { provenanceOf, pageFile: "about.md", pageMoved: false });

@@ -34,7 +34,7 @@ For `build`, `--dry-run`, and every watch rebuild, in this order:
 4. **Resolve layouts** (§6) and compose each page with its layout (§7–§9).
 5. **Rewrite URLs** by provenance (§11.1), then apply `--pretty-urls` (§11.2), then `--base-url` (§11.3).
 6. **Compute output paths**; detect collisions (§13).
-7. **Write** pages and copy assets into a temporary tree.
+7. **Write** pages and copy assets into a temporary tree. Complete canonical and Open Graph metadata (§22), then structured data (§26), before deriving the final manifest (§20) used by checks and generated artifacts.
 8. **Reference check** the temporary tree (§12).
 9. **Report** all diagnostics (§14), ordered by path then line.
 10. **Publish** transactionally (§15): zero problems → the output directory is updated; otherwise it is untouched.
@@ -281,6 +281,9 @@ src/_layout.html:14: problem: class "unify-footer" is retired area vocabulary
 ---
 
 ## 7. Composition: the merge
+
+The worked `dist/` outputs in this section illustrate composition, before the final metadata completion in §22 and §26.
+
 
 For each page: C is the page document (after includes and Markdown conversion), L its selected layout (§6.1).
 
@@ -597,7 +600,7 @@ Start from the layout's `<head>`; apply, in this order:
 |---|---|---|---|
 | 1 | `<meta charset>` | — | Dropped in favor of the layout's, which stays first. If the layout declares none, the page's is kept and moved to the head's first position. Identical values: silent. Different values: advisory A08. |
 | 2 | `<title>` | — | Joined per S10: page text + `" "` + layout text, in the layout title's position. Page title with empty/whitespace-only text = absent. Layout with no `<title>`: the page's title appends (row 7) with its own text. |
-| 3 | `<meta name="…">`, `<meta property="…">` | the `name`/`property` value, ASCII case-insensitive | Replaces in place (S8): all layout elements with the key are removed, the page's take the first one's position in page order. Multiple page elements with one key are all kept (`og:image` is legitimately plural) — dedup only crosses the layout/page boundary, never within one source. `http-equiv` metas are not keyed; they append (row 7). |
+| 3 | `<meta name="…">`, `<meta property="…">` | the `name`/`property` value, ASCII case-insensitive (the three OG keys in §22.6 also decode entities, trim whitespace and take precedence over `name`) | Replaces in place (S8): all layout elements with the key are removed, the page's take the first one's position in page order. Multiple page elements with one key are all kept (`og:image` is legitimately plural) — dedup only crosses the layout/page boundary, never within one source. `http-equiv` metas are not keyed; they append (row 7). |
 | 4 | `<link rel="canonical">` | `canonical` ∈ rel tokens | Replaces in place (S8). **One canonical, never two** — this closes the doubled-canonical defect. |
 | 5 | `<link rel="icon">` (rel token list contains `icon`, ASCII case-insensitive — covers `shortcut icon`) | `icon` | Replaces in place (S8): all the layout's icon links are removed; the page's icon set takes the first one's position. `apple-touch-icon` is a different token and is not keyed. |
 | 6 | `<link rel="stylesheet">`, `<script src>` | the URL, **compared after §11.1 resolution** | If the resolved URL equals a layout head reference's resolved URL, the page copy is dropped (S7) — the layout's position stands. A page `assets/style.css` and layout `/assets/style.css` are one reference. Inline `<script>`/`<style>` with byte-identical content: the page copy is dropped. |
@@ -1479,7 +1482,7 @@ The second projection of §20, and the first that writes into a page rather than
 
 ### 22.1 Activation
 
-**On by default whenever the site has an address**: with `--base-url` set, completion runs as if `--canonical auto` had been given; `--canonical none` (or `canonical: none` in `unify.yaml`) switches it off, and `--canonical auto` is the same setting as the default, kept so a build can say so. `auto` and `none` are the only accepted values; anything else is a usage error naming both, so a future mode cannot be silently misspelled into today's behaviour. `--canonical auto` without `--base-url` is a usage error (a canonical must be absolute, and there is no address to build one from); without `--base-url` and without the option nothing in this section runs, no page changes, and nothing is reported — the golden path.
+**On by default whenever the site has an address**: with `--base-url` set, completion runs as if `--canonical auto` had been given; `--canonical none` (or `canonical: none` in `unify.yaml`) switches it off, and `--canonical auto` is the same setting as the default, kept so a build can say so. `auto` and `none` are the only accepted values; anything else is a usage error naming both, so a future mode cannot be silently misspelled into today's behaviour. `--canonical auto` without `--base-url` is a usage error (a canonical must be absolute, and there is no address to build one from); without `--base-url` and without the option canonical completion does not run; Open Graph defaults (§22.6) are independent.
 
 **`--canonical auto` requires `--base-url`**, and the combination is checked as a usage error (exit 2) rather than degrading. A canonical must be an absolute URL: that is why §11.3 absolutizes authored ones, and why a path-only base URL is itself a usage error. Without a public address §20.5 makes `document.url` null, so there is nothing truthful to write — and writing a root-relative canonical, or writing nothing while the flag says otherwise, are both worse than saying so.
 
@@ -1516,6 +1519,16 @@ A page is completed when §21.2's sitemap membership holds — `isPublicDestinat
 A canonical — authored or completed — that names a location this site does not emit is already **P13**. §12 checks `link href` for every `rel`, so no new rule is needed and none is added; the case is pinned two-sided.
 
 Multiple canonicals, a canonical on a `noindex` page, and disagreement between a canonical and the sitemap are content-quality judgements. Product-spec §6.3.4 assigns them to `unify audit`, and §6.1 states that ordinary `build` does not reject subjective findings. `metadataConflicts` (§20.4) already computes the multiple-canonical case on demand, which is what the evaluation command will read. Adding any of them here would put a judgement in the publish path that the product contract puts outside it.
+
+---
+
+### 22.6 Open Graph defaults (unreleased; not in 0.11.16)
+
+Every composed HTML or Markdown page with a closed `<head>` receives defaults for three Open Graph properties: `og:title` from `titleOf`, `og:description` from `descriptionOf`, and `og:url` from `canonicalOf` (§20.4). Values are read after layout/include composition, URL rewriting and canonical completion, before structured data and the final manifest. The title includes the layout suffix. A missing or empty source value produces no default; a canonical is never invented here. `--canonical none` prevents automatic canonical creation, not reuse of an authored canonical. Without `--base-url`, title/description still complete and an authored canonical is reused in its final rewritten form.
+
+For each property, precedence is **page declaration > derived final value > inherited layout fallback**. A page declaration is a `<meta property="…">` in the page's own head after its includes expand (Markdown frontmatter counts); property values are entity-decoded, trimmed and matched case-insensitively. These three property keys also take precedence over a `name` attribute on the same element for head-merge identity. Presence wins even with empty or absent `content`; repeated page declarations are preserved by §8. Layout declarations, including those from layout-head includes, are fallbacks: if a final value is available, replace the first inherited tag in place and remove other inherited tags for that property; otherwise preserve them all. Body and `<template>` metadata are not page-head declarations.
+
+Missing tags append immediately before `</head>` in title, description, URL order, reusing the whitespace before that closing tag. Synthesized tags use `property` then `content`, double quotes, and HTML-escape `&`, `"`, `<` and `>` in the value. No head is synthesized, no other OG property or Twitter tag is generated, and other authored bytes are unchanged. Diagnostics after insertion or replacement retain original source locations; generated tags belong to the page without a guessed line. Audit, catalog, search and feeds observe these final bytes; the pre-generator source inventory stays source-only.
 
 ---
 
@@ -1904,7 +1917,7 @@ Four of these choices are not arbitrary and are argued rather than asserted:
 
 ### 26.7 Ordering, and what checks the result
 
-Generation runs **after §22's canonical completion and before §20's final manifest**, for the reason §22 runs where it does: the manifest reads emitted bytes (§20.2), so anything that writes into a page must have written before the reading that every consumer shares. A build with both features derives the manifest three times — once to decide completion, once to decide generation against the completed text, once as the manifest — and §20.2's "deriving it changes nothing" is exactly what makes that safe rather than a smell.
+Generation runs **after §22's canonical and Open Graph completion and before §20's final manifest**, for the reason §22 runs where it does: the manifest reads emitted bytes (§20.2), so anything that writes into a page must have written before the reading that every consumer shares. A build with both features derives the manifest three times — once to decide completion, once to decide generation against the completed text, once as the manifest — and §20.2's "deriving it changes nothing" is exactly what makes that safe rather than a smell.
 
 §12 then checks the generated block like any other, and here it **can only fail where the page's own value already failed**: `url` is the canonical §12 already checks as a `link href`, and `image` is the `og:image` value §12 already checks as a URL-valued meta, so the block carries no reference the page did not already carry. It runs anyway, for §21.6's reason — it is the executable form of the claim that a generated block and the published tree agree, so a change that lets them drift fails in the suite rather than at a crawler.
 

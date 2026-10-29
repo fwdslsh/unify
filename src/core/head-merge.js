@@ -35,6 +35,7 @@
  * source (every unit test).
  */
 import { decodePathSegments } from "./urls.js";
+import { decodeEntities } from "./entities.js";
 import {
   contentSpan, elementChildren, getAttr, hasAttr, innerText, isElement,
   lineOf, rawSpan, tokens,
@@ -86,8 +87,13 @@ function resolveForCompare(url, provenanceFile) {
  */
 function dedupKey(el, text, provenanceFile) {
   if (isElement(el, "meta")) {
+    const property = getAttr(el, "property") ?? "";
+    const decoded = decodeEntities(property).trim().toLowerCase();
+    // §22.6 identifies these overrides by property, even beside a name.
+    // Recognizing an override must also remove its layout fallback.
+    if (["og:title", "og:description", "og:url"].includes(decoded)) return `property:${decoded}`;
     if (hasAttr(el, "name")) return `name:${(getAttr(el, "name") ?? "").toLowerCase()}`;
-    if (hasAttr(el, "property")) return `property:${(getAttr(el, "property") ?? "").toLowerCase()}`;
+    if (hasAttr(el, "property")) return `property:${property.toLowerCase()}`;
     return null; // http-equiv, or a bare/other meta — never keyed
   }
   if (isElement(el, "link")) {

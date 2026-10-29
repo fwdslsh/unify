@@ -13,7 +13,7 @@
  * Real CLI spawns only (hygiene H3); no mocks (H1); no skips (H4); HTML is
  * compared through the one comparator (H5).
  */
-import { test } from "bun:test";
+import { expect, test } from "bun:test";
 import { existsSync, readFileSync, renameSync } from "node:fs";
 import { join } from "node:path";
 import { compareHtml, diffSnapshots, snapshotTree } from "./compare.mjs";
@@ -305,7 +305,7 @@ test("a snippet that ships as written — the slotted include builds to the mark
   const tmp = mkTmp();
   writeTree(join(tmp, "site"), { [fragment.path]: fragment.text, "index.html": page("Home", usage) });
   expectExit(await runCli(["build", "-o", "dist"], tmp), 0, "the slotted include");
-  expectSameHtml(page("Home", shown), readFileSync(join(tmp, "dist", "index.html"), "utf8"), "slotted include");
+  expectSameHtml(page("Home", shown).replace("</head>", '<meta property="og:title" content="Home"></head>'), readFileSync(join(tmp, "dist", "index.html"), "utf8"), "slotted include");
 }, TEST_MS);
 
 test("slotted includes in Markdown — authored markup fills slots; same-named frontmatter does not", async () => {
@@ -376,11 +376,13 @@ test("what ends up in <head> — with no layout <title>, the page's arrives afte
   if (script < 0 || title < 0 || title < script) throw new Error(`the page's title must follow the layout's script:\n${head}`);
 }, TEST_MS);
 
-test("what ends up in <head> — under --base-url unify adds a canonical and never writes og:title, og:description or twitter:*", async () => {
+test("what ends up in <head> — canonical and Open Graph defaults agree, and Twitter stays authored", async () => {
   const tmp = headProject(codeBlock(HEAD, "html", 0).trim());
   expectExit(await runCli(["build", "-o", "dist", "--base-url", "https://example.com/"], tmp), 0, "the head example under --base-url");
   const head = headOf(readFileSync(join(tmp, "dist", "about.html"), "utf8"));
   if (!head.includes('<link rel="canonical" href="https://example.com/about.html">')) throw new Error(`expected a completed canonical:\n${head}`);
-  if (head.includes('property="og:description"') || head.includes('name="twitter:')) throw new Error(`unify must not write social metadata:\n${head}`);
+  expect(head).toContain('<meta property="og:description" content="Who we are.">');
+  expect(head).toContain('<meta property="og:url" content="https://example.com/about.html">');
+  if (head.includes('name="twitter:')) throw new Error(`unify must not write Twitter metadata:\n${head}`);
   if ((head.match(/property="og:title"/g) ?? []).length !== 1) throw new Error(`the page's own og:title, and only it:\n${head}`);
 }, TEST_MS);

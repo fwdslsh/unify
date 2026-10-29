@@ -13,7 +13,7 @@ description: "The shipped product contract: what unify is, who it serves, the co
 
 Web pages have needed shared headers, footers, and navigation since the beginning — and HTML still has no way to express that. Every existing answer forces a trade the author didn't ask for: a JavaScript framework, a templating language, a config-heavy build system, or copy-paste.
 
-unify is a static site generator for **front-end designers and hobbyists** — people fluent in HTML and CSS who have no interest in JavaScript frameworks, templating languages, or build tooling. It lets them define a header, footer, nav, or page layout once, in plain HTML files, and have those rendered into every page of the site. The pitch in one line: **HTML-native composition — no expression language, no client runtime**. Composed HTML remains the author's markup plus visible, deterministic composition and any standard metadata the author explicitly asks unify to derive; unify adds no executable JavaScript of its own. Because the source and output use platform formats, a unify site stays reviewable by the person who owns it — read the source, read the built page and generated discovery files, and see exactly what happened, no matter who or what wrote the files. unify replaces copy-paste chrome, hand-edited HTML, and Apache SSI — it does not compete with Hugo, Eleventy, or Astro (§5).
+unify is a static site generator for **front-end designers and hobbyists** — people fluent in HTML and CSS who have no interest in JavaScript frameworks, templating languages, or build tooling. It lets them define a header, footer, nav, or page layout once, in plain HTML files, and have those rendered into every page of the site. The pitch in one line: **HTML-native composition — no expression language, no client runtime**. Composed HTML remains the author's markup plus visible, deterministic composition and standard metadata derived from authored declarations under documented defaults or options; unify adds no executable JavaScript of its own. Because the source and output use platform formats, a unify site stays reviewable by the person who owns it — read the source, read the built page and generated discovery files, and see exactly what happened, no matter who or what wrote the files. unify replaces copy-paste chrome, hand-edited HTML, and Apache SSI — it does not compete with Hugo, Eleventy, or Astro (§5).
 
 The core composition surface is five things, learnable in five minutes:
 
@@ -259,6 +259,10 @@ Write paths that are correct for the file you're editing — relative (`hero.jpg
 **Always link the real file.** Write `href="about.html"`, never a hand-written pretty URL like `/about/` — the real file previews correctly, works without any flags, and `--pretty-urls` (§4) rewrites every internal link to the pretty form at build time. A hand-written pretty URL is a link to a file that does not exist in the source tree, and the reference check — which validates the *emitted* tree — reports it as exactly that, unless `--pretty-urls` happened to move a page to that address. That exception is the argument rather than a loophole: the link the flag writes for you is correct in both modes, and the one you hand-write is correct in one.
 
 ---
+
+### Open Graph defaults (unreleased; not in 0.11.16)
+
+After composition and canonical resolution, `og:title`, `og:description` and `og:url` default to the final document title, description and canonical. Explicit page-head tags (including includes and Markdown frontmatter) win, even when empty. Derived values replace generic layout fallbacks; absent source values retain those fallbacks. No description, canonical, other OG property or Twitter tag is invented. The same final HTML feeds audit and discovery; source inventory remains authored source facts. See conformance §22.6.
 
 ## 4. CLI (the complete surface)
 
