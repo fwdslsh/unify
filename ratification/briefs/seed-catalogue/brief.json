@@ -1,0 +1,36 @@
+{
+  "title": "A 225-variety catalogue generated from a JSON export, fetched one family at a time",
+  "origin": "round 20; the judge's default marker and privacy fields are this brief's",
+  "baseUrl": "https://fernhollow.pages.dev/library/",
+  "timeoutSecs": 2700,
+  "checks": [
+    {
+      "check": "addresses"
+    },
+    {
+      "id": "drafts-and-export-unpublished",
+      "check": "absent",
+      "paths": [
+        "drafts/",
+        "varieties.json"
+      ],
+      "text": [
+        "DRAFT — not for publication"
+      ]
+    },
+    {
+      "id": "private-data",
+      "check": "privacy"
+    },
+    {
+      "id": "variety-pages",
+      "check": "minPages",
+      "min": 225
+    },
+    {
+      "id": "fetch-targets",
+      "check": "clientFetches",
+      "scored": false
+    }
+  ]
+}

@@ -6,6 +6,7 @@ description: "How the v0.6 test tree and codebase were migrated to the suite the
 
 **Status**: v0.7.0, normative for the migration
 **Role**: The path from the current 240-file `tests/` tree and the v0.6 codebase to the suite defined in `docs/testing-strategy.md`. Structured so that at no point can the pipeline report green while the golden path is broken — the inversion v0.6 lived in. Companion documents: `docs/testing-strategy.md` (the destination), `CLAUDE.md` (implementation map), `_notes/unbiased-design-synthesis.md` §7 (migration reality).
+**`_notes/`**: Paths under `_notes/` in this document name working files removed from the repository after commit `238050d`; `git show 238050d:_notes/<path>` reads any of them.
 
 ---
 

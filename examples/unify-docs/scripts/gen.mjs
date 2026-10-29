@@ -49,8 +49,6 @@ const GROUPS = [
   { label: "Project", docs: [
     ["testing-strategy.md", "Testing strategy"],
     ["cicd-workflows.md", "CI/CD workflows"],
-    ["ratification.md", "Ratification"],
-    ["ratification-protocol.md", "Ratification protocol"],
     ["migration-plan.md", "Migration plan"],
   ] },
 ];

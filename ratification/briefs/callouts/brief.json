@@ -1,0 +1,24 @@
+{
+  "title": "One equipment callout in ten places with different words, its border changed in one file",
+  "origin": "round 26, the slotted-include ship condition (conformance spec §32.7)",
+  "baseUrl": "https://harrowgate.pages.dev/observatory/",
+  "checks": [
+    {
+      "check": "addresses"
+    },
+    {
+      "id": "drafts-unpublished",
+      "check": "absent",
+      "paths": [
+        "drafts/"
+      ],
+      "text": [
+        "DRAFT — not for publication"
+      ]
+    },
+    {
+      "id": "no-slot-shipped",
+      "check": "noSlots"
+    }
+  ]
+}

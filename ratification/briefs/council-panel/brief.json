@@ -1,0 +1,29 @@
+{
+  "title": "A bare opening-hours panel another site fetches, kept in one place, and month lists fetched on demand",
+  "origin": "round 23, the first exposure of *.fragment.html",
+  "baseUrl": "https://holtfen.pages.dev/mill/",
+  "checks": [
+    {
+      "check": "addresses"
+    },
+    {
+      "id": "drafts-unpublished",
+      "check": "absent",
+      "paths": [
+        "drafts/"
+      ],
+      "text": [
+        "DRAFT — not for publication"
+      ]
+    },
+    {
+      "id": "bare-fragment",
+      "check": "bareFragment"
+    },
+    {
+      "id": "fetch-targets",
+      "check": "clientFetches",
+      "scored": false
+    }
+  ]
+}

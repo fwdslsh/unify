@@ -1,0 +1,14 @@
+{
+  "title": "Photo banners on every section under a subpath, with extensionless addresses",
+  "origin": "round 22: does anyone ship a root-relative url() that 404s under the subpath",
+  "baseUrl": "https://alderfen.pages.dev/arboretum/",
+  "checks": [
+    {
+      "check": "addresses"
+    },
+    {
+      "id": "css-urls",
+      "check": "cssUrls"
+    }
+  ]
+}
