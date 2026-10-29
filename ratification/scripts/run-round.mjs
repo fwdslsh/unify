@@ -344,17 +344,26 @@ function rulesGaps(sample) {
   return lines.slice(at, end === -1 ? at + 12 : Math.min(end, at + 12)).join("\n").trim();
 }
 
-/** What OpenCode's `--format json` event stream says about a run: its steps, cost and first error. */
-function agentEvents(file) {
+/**
+ * What a run's OpenCode said about it: steps, cost and first error from the event stream.
+ * A model error OpenCode keeps retrying — a provider's usage limit — never reaches the
+ * stream, and the run idles to its timeout; the session log is where it says why.
+ */
+function agentEvents(harness) {
+  const file = join(harness, "events.jsonl");
   const events = (existsSync(file) ? readFileSync(file, "utf8") : "").split("\n").flatMap((l) => {
     try { return [JSON.parse(l)]; } catch { return []; }
   });
   const steps = events.filter((e) => e.type === "step_finish");
   const error = events.find((e) => e.type === "error")?.error;
+  const logs = join(harness, "opencode", "log");
+  const logged = (existsSync(logs) ? readdirSync(logs).sort() : [])
+    .flatMap((f) => [...readFileSync(join(logs, f), "utf8").matchAll(/level=ERROR .*?error\.error="([^"]*)"/g)].map((m) => m[1]));
   return {
     turns: events.length ? steps.length : null,
     costUsd: steps.length ? steps.reduce((a, e) => a + (e.part?.cost ?? 0), 0) : null,
     error: error ? (error.data?.message ?? error.name ?? "error") : null,
+    logged: logged.at(-1) ?? null,
   };
 }
 
@@ -362,7 +371,7 @@ function scoreSample(dir, bdir, brief, { name, model }, judge) {
   const sample = join(bdir, name);
   const harness = join(bdir, ".harness", name);
   const exit = readJson(join(harness, "exit.json")) ?? {};
-  const agent = agentEvents(join(harness, "events.jsonl"));
+  const agent = agentEvents(harness);
   const reported = existsSync(join(sample, "REPORT.md"));
   const command = judge?.chosenCommand ?? null;
 
@@ -393,7 +402,8 @@ function scoreSample(dir, bdir, brief, { name, model }, judge) {
     {
       id: "agent-finished", scored: true,
       pass: exit.exit === 0 && !agent.error && reported,
-      detail: `exit ${exit.exit}${exit.timedOut ? " (timed out)" : ""}${agent.error ? `, agent error: ${agent.error}` : ""}, ${reported ? "wrote REPORT.md" : "no REPORT.md"}`,
+      detail: `${exit.exit == null ? `killed (${exit.signal ?? exit.error ?? "no exit code"})` : `exit ${exit.exit}`}${exit.timedOut ? " (timed out)" : ""}` +
+        `${agent.error ? `, agent error: ${agent.error}` : agent.logged && !reported ? `, OpenCode logged: ${agent.logged}` : ""}, ${reported ? "wrote REPORT.md" : "no REPORT.md"}`,
     },
     { id: "publish-command", scored: true, pass: Boolean(command), detail: command ?? judge?.chosenReason ?? "no REPORT.md" },
     { id: "strict-build", scored: true, ...strict },

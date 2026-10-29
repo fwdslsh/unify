@@ -97,6 +97,7 @@ export const CHECKS = {
 
   /** `feed.xml` has at least `minEntries` entries, every `<updated>` carrying a time of day. */
   feed(ctx, { minEntries = 1 }) {
+    if (missing(ctx.out)) return missing(ctx.out);
     const path = join(ctx.out, "feed.xml");
     if (!existsSync(path)) return { pass: false, detail: "no feed.xml" };
     const feed = readFileSync(path, "utf8");
