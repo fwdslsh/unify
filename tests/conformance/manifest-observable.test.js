@@ -535,7 +535,10 @@ Some body text.
   // synthesized <meta charset> from the comparison, since that element's
   // presence is a §10.2 implementation detail (standalone-document
   // synthesis) rather than a fact either page's author declared.
-  const withoutCharset = (meta) => meta.filter((m) => m.charset === undefined);
+  // The two source paths imply different completed canonical/OG URLs.
+  eq(fromMd.document.head.meta.find((m) => m.property === "og:url").content, "https://example.com/from-md.html", "Markdown OG URL follows its own canonical");
+  eq(fromHtml.document.head.meta.find((m) => m.property === "og:url").content, "https://example.com/from-html.html", "HTML OG URL follows its own canonical");
+  const withoutCharset = (meta) => meta.filter((m) => m.charset === undefined && m.property !== "og:url");
   eq(withoutCharset(fromMd.document.head.meta), [
     { name: "description", content: "Who we are." },
     { name: "tags", content: "alpha" },
@@ -544,6 +547,8 @@ Some body text.
     // under --base-url (which `records()` always supplies), same as every
     // other page this file audits.
     { property: "og:image", content: "https://example.com/card.png" },
+    { property: "og:title", content: "About Us" },
+    { property: "og:description", content: "Who we are." },
   ], "MD-09/MD-12/MD-10: description, repeated tags, and the flattened og: block, in frontmatter order");
   eq(withoutCharset(fromMd.document.head.meta), withoutCharset(fromHtml.document.head.meta),
     "MD-09/MD-12/MD-10: the Markdown page's synthesized metas match the HTML author's hand-written ones exactly");

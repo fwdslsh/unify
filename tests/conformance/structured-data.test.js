@@ -284,6 +284,7 @@ test("SD-10 — the block lands immediately before </head>, at that tag's indent
     <head>
         <meta charset="utf-8">
         <title>Deep Field</title>
+        <meta property="og:title" content="Deep Field">
         <meta name="schema" content="WebPage">
     </head>
     <body>
@@ -348,7 +349,7 @@ test("SD-10 — the two-space serialization survives a </head> with no whitespac
   const authored = mkTmp();
   const abut = `<!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><title>Abut</title><meta name="schema" content="WebPage"></head>
+<head><meta charset="utf-8"><title>Abut</title><meta property="og:title" content="Abut"><meta name="schema" content="WebPage"></head>
 <body>
 <h1>Abut</h1>
 </body>

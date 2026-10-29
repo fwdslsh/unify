@@ -167,7 +167,7 @@ and this page head:
 </head>
 ```
 
-the built page's head is:
+the built page's head is (the added `og:description` default is unreleased; 0.11.16 leaves it out):
 
 ```html
 <head>
@@ -177,18 +177,20 @@ the built page's head is:
   <script src="/assets/analytics.js"></script>
   <meta property="og:title" content="About us">
   <link rel="stylesheet" href="/assets/about.css">
+  <meta property="og:description" content="Who we are.">
 </head>
 ```
 
 So the analytics script, which runs where it stands, sees the page's title and description: both took the places the layout gave them, above it. It does not see `og:title`, which the layout had no place for and so arrives after it — and if the layout had no `<title>`, the page's would arrive after it too. A script that reads the page's metadata either stands after the layout elements whose places the page fills, or carries `defer`, which runs it once the whole document has been read.
 
-Three things in a built head can come from unify rather than from you:
+These things in a built head can come from unify rather than from you:
 
 - **`<link rel="canonical">`**, under `--base-url`, on an indexable page that has none (`--canonical none` turns it off). One you write always wins.
 - **JSON-LD**, on a page that declares `schema: WebPage`, `Article` or `BlogPosting` (`<meta name="schema" content="Article">` in HTML), built only from what the page already declares. A `<script type="application/ld+json">` you write wins and unify generates none — that is where any other type, or richer data, goes.
-- **Absolute URLs** in `og:`/`twitter:` values and the canonical, under `--base-url`. The values themselves stay yours: unify never copies the title or description into `og:title`, `og:description` or `twitter:*`.
+- **Open Graph defaults**: `og:title` from the final title, `og:description` from the final description, and `og:url` from the resolved canonical. Page-authored OG tags win, including empty values and page-head includes. Derived values replace layout fallbacks; absent values leave those fallbacks unchanged. No Twitter tags are generated. This OG completion is **unreleased; 0.11.16 requires authored tags**.
+- **Absolute URLs** in URL-valued `og:`/`twitter:` metadata and the canonical, under `--base-url`.
 
-The details are in the CLI reference: [structured data](cli-reference.md#structured-data-schema), and `--canonical` just above it.
+The details are in the CLI reference: [structured data](cli-reference.md#structured-data-schema), and `--canonical` just above it. The [social metadata recipe](guides/social-metadata.md) shows shared defaults and page overrides for HTML and Markdown.
 
 ## Markdown pages
 
