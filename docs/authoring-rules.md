@@ -19,7 +19,7 @@ Most sites need no configuration file: use conventions and CLI options, or save 
 ## Include — reuse a fragment
 `<include src="/_includes/nav.html"></include>`, always with the closing tag; `/…` resolves from the source
 root, anything else relative to the including file. Works in any file — layouts, pages, `<head>`, fragments,
-and `.md` — but never inside `<pre>`/`<code>`: there both spellings are left as written (a code sample is content). Empty, it splices the file in verbatim. **Content between the tags fills slots** — allowed only when the target is a `*.fragment.html` declaring `<slot>`, and filled exactly as a page fills a layout's (`slot="name"` on a top-level element, everything else to the bare slot, an unfilled slot showing its own fallback). Fills reach that fragment's slots and no deeper. No props, no attributes passed, no expressions: an include is still not a component.
+and `.md` — but never inside `<pre>`/`<code>`: there both spellings are left as written (a code sample is content). Empty, it splices the file in verbatim. **Content between the tags fills slots** — allowed only when the target is a `*.fragment.html` declaring `<slot>`, with `slot="name"` on direct child elements, everything else to the bare slot, and an unfilled slot showing its fallback; main elements stay intact and their children are not fills. Fills reach that fragment's slots and no deeper. No props, no attributes passed, no expressions: an include is still not a component.
 
 ## Layout — chrome around a page
 Every page is wrapped by the nearest `_layout.html` — its own folder, then each parent; the page says
@@ -32,15 +32,15 @@ an error — on a layout too, because layouts don't chain (a section layout is a
 - **Named slots.** The layout writes `<slot name="footer">fallback…</slot>`; the page fills it with `slot=`
   on a real element — `<footer slot="footer">…</footer>`, never a `<slot>` tag, which in a page fills nothing
   — and that element replaces the slot, tag and all, keeping its own markup; only the `slot=` attribute is dropped. Omit the fill and the
-  fallback ships; `slot=` counts on direct children of `<body>` — or of your `<main>`, unwrapped first — and silently does nothing deeper. `grep -o '<slot[^>]*>' site/_layout.html` lists a layout's slots.
+  fallback ships; `slot=` counts on direct body children or direct children of your default-content main. A named `<main slot="content">` fill and its subtree stay intact; nested fills there are inert.
 - **Everything else** replaces the layout's bare `<slot></slot>` if it has one — `<main><slot></slot></main>`
-  is the usual shape — otherwise the children of its `<main>`. A `<main>` you wrote is dropped and its children used, so write complete semantic
+  is the usual shape — otherwise the children of its `<main>`. The first default-content page main unwraps, even for a bare slot outside a layout main; write complete semantic
   documents. A bare `<header>`/`<footer>` does **not** replace the layout's — only `slot=` fills, and it fills the *contents*: where the layout wraps its slot in its own `<footer>`, write `<p slot="footer">`, or you ship a footer inside a footer.
 - **Head.** A page has its own complete `<head>`; the layout's is the base, and where both declare
   `<meta charset>` the layout's wins. **Write the separator into the layout's title** —
   `<title>— My Site</title>`, no leading space — and a page writes only its own name
   (`<title>About</title>`); the join adds the space, giving `About — My Site`. Your `<meta>` replaces the layout's same-`name`/`property`, your `canonical`/`icon`
-  links replace the layout's, everything else appends after — page CSS wins. **Unreleased (not 0.11.16):** `og:title`/`og:description`/`og:url` default to final title/description/canonical; page-head declarations win over derived values, which win over layout fallbacks. No missing value or Twitter tag is invented.
+  links replace the layout's, everything else appends after — page CSS wins. `og:title`/`og:description`/`og:url` default to final title/description/canonical; page-head declarations win over derived values, which win over layout fallbacks. No missing value or Twitter tag is invented.
 - **Root attributes.** On `<html>`/`<body>` only, your classes are added and any other attribute you
   set wins; attributes merge nowhere else. Active nav is `<body class="home">` plus CSS
   (`body.home .nav-home {…}`), not a feature.

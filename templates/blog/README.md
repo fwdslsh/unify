@@ -78,15 +78,17 @@ published** and the previous `dist/` is untouched — never report success on a 
   error, because a section layout is a complete standalone page.
 - `<include src="/_includes/nav.html"></include>` splices a file in verbatim, always with the
   closing tag. Empty, it splices the file in verbatim; content between the tags fills the slots of
-  a `*.fragment.html` that declares them, exactly as a page fills a layout's. An include is still
-  not a component: it takes no props and merges no attributes.
+  a `*.fragment.html` that declares them: direct child elements fill named slots, the rest fills
+  the bare slot, and unfilled slots show their fallback. Main elements stay intact; their children
+  are not fills. An include is still not a component: it takes no props and merges no attributes.
 - The layout's bare `<slot></slot>` — usually inside its `<main>` — receives everything the page
-  did not address elsewhere. A `<main>` you wrote is unwrapped and its children used, so write
+  did not address elsewhere. Your first default-content main is unwrapped and its children used, so write
   complete semantic documents.
 - A named slot `<slot name="footer">fallback</slot>` is filled by `slot="footer"` on a real
   element of the page, which replaces the slot tag and all. A `<slot>` tag written in a *page*
   fills nothing. Fills count on direct children of `<body>` (or of your `<main>`, unwrapped
-  first). Omit the fill and the fallback ships.
+  first). Omit the fill and the fallback ships. A successfully
+  addressed named fill and its subtree keep any main intact; nested fills inside it are inert.
 - Heads merge: the layout's is the base, your `<title>` is joined in front of the layout's
   (the separator lives in the layout — `<title>— My Site</title>`, and a page writes just
   `<title>About</title>`), your `<meta>` replaces the layout's with the same `name`/`property`,

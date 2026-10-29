@@ -4,8 +4,6 @@ description: "Open Graph defaults from page metadata, with shared site settings 
 
 # Social metadata from your page
 
-**Unreleased behavior:** this guide describes native Open Graph completion in the development version. Unify 0.11.16 does not generate these defaults; on that release, author the tags explicitly as shown under overrides below.
-
 Write a title and description once. Unify uses the final composed title for `og:title`, the final description for `og:description`, and the resolved canonical for `og:url`. No generator, extra configuration or browser script is needed. A page's explicit OG tags win; otherwise these derived values replace generic layout defaults. Missing source values leave layout fallbacks unchanged.
 
 ## Shared layout
