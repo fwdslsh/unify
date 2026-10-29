@@ -122,7 +122,7 @@ Two details worth knowing:
 - Your first default-content `<main>` wrapper is unwrapped during composition, including inside a styling wrapper. This avoids adding another main around an ordinary page main; it does not repair already-nested mains.
 - A page's `<body class="home">` is merged onto the built page's `<body>` — which is how you do active-nav highlighting: `body.home .nav-home { font-weight: bold; }` in your stylesheet. No feature needed. It is styling only: the shared nav's markup is the same on every page, so nothing marks the current link with `aria-current`.
 
-**Unreleased (not 0.11.16): main attributes follow the content.** When non-empty default content enters a layout main, its classes and the page main's classes combine; other page attributes win. For example:
+**Main attributes follow the content.** When non-empty default content enters a layout main, its classes and the page main's classes combine; other page attributes win. For example:
 
 ```html
 <!-- Layout body -->
@@ -133,7 +133,7 @@ Two details worth knowing:
 <body><main id="guide" class="shell article" tabindex="-1" aria-label="Guide"><h1>Guide</h1></main></body>
 ```
 
-This also works with `<main><slot></slot></main>`; markup outside the slot stays. An unrelated main or fallback-only main keeps its own attributes. Named fills do not merge. Version 0.11.16 discards page-main attributes, so this can change existing IDs, selectors and accessibility hooks when upgrading. A bare slot outside a main still unwraps the page main, and unaddressed page siblings still enter the default destination.
+This also works with `<main><slot></slot></main>`; markup outside the slot stays. An unrelated main or fallback-only main keeps its own attributes. Named fills do not merge. A bare slot outside a main still unwraps the page main, and unaddressed page siblings still enter the default destination.
 
 ## Overriding a region
 
@@ -153,7 +153,7 @@ This also works with `<main><slot></slot></main>`; markup outside the slot stays
 </html>
 ```
 
-**Unreleased (not 0.11.16):** a named fill also preserves any main in its subtree. For example, `<main slot="content" id="guide">…</main>` fills `<slot name="content"></slot>` as a complete main, with only `slot="content"` removed. Its nested slot attributes are left alone.
+A named fill also preserves any main in its subtree. For example, `<main slot="content" id="guide">…</main>` fills `<slot name="content"></slot>` as a complete main, with only `slot="content"` removed. Its nested slot attributes are left alone.
 
 The built footer contains exactly the `<p>` you wrote — tag, attributes, and all. Pages that don't mention the footer keep the layout's default. Note what does *not* override anything: a plain `<header>` or `<footer>` element in your page is just content. Only `slot=` fills a region, on direct children of `<body>` or of the selected default-content main; arbitrary nested `slot` attributes stay untouched.
 
@@ -182,7 +182,7 @@ and this page head:
 </head>
 ```
 
-the built page's head is (the added `og:description` default is unreleased; 0.11.16 leaves it out):
+the built page's head is:
 
 ```html
 <head>
@@ -202,7 +202,7 @@ These things in a built head can come from unify rather than from you:
 
 - **`<link rel="canonical">`**, under `--base-url`, on an indexable page that has none (`--canonical none` turns it off). One you write always wins.
 - **JSON-LD**, on a page that declares `schema: WebPage`, `Article` or `BlogPosting` (`<meta name="schema" content="Article">` in HTML), built only from what the page already declares. A `<script type="application/ld+json">` you write wins and unify generates none — that is where any other type, or richer data, goes.
-- **Open Graph defaults**: `og:title` from the final title, `og:description` from the final description, and `og:url` from the resolved canonical. Page-authored OG tags win, including empty values and page-head includes. Derived values replace layout fallbacks; absent values leave those fallbacks unchanged. No Twitter tags are generated. This OG completion is **unreleased; 0.11.16 requires authored tags**.
+- **Open Graph defaults**: `og:title` from the final title, `og:description` from the final description, and `og:url` from the resolved canonical. Page-authored OG tags win, including empty values and page-head includes. Derived values replace layout fallbacks; absent values leave those fallbacks unchanged. No Twitter tags are generated.
 - **Absolute URLs** in URL-valued `og:`/`twitter:` metadata and the canonical, under `--base-url`.
 
 The details are in the CLI reference: [structured data](cli-reference.md#structured-data-schema), and `--canonical` just above it. The [social metadata recipe](guides/social-metadata.md) shows shared defaults and page overrides for HTML and Markdown.

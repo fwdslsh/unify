@@ -32,7 +32,7 @@ an error — on a layout too, because layouts don't chain (a section layout is a
 - **Named slots.** The layout writes `<slot name="footer">fallback…</slot>`; the page fills it with `slot=`
   on a real element — `<footer slot="footer">…</footer>`, never a `<slot>` tag, which in a page fills nothing
   — and that element replaces the slot, tag and all, keeping its own markup; only the `slot=` attribute is dropped. Omit the fill and the
-  fallback ships; `slot=` counts on direct body children or direct children of your default-content main. **Unreleased (not 0.11.16):** a named `<main slot="content">` fill and its subtree stay intact; nested fills there are inert.
+  fallback ships; `slot=` counts on direct body children or direct children of your default-content main. A named `<main slot="content">` fill and its subtree stay intact; nested fills there are inert.
 - **Everything else** replaces the layout's bare `<slot></slot>` if it has one — `<main><slot></slot></main>`
   is the usual shape — otherwise the children of its `<main>`. The first default-content page main unwraps, even for a bare slot outside a layout main; write complete semantic
   documents. A bare `<header>`/`<footer>` does **not** replace the layout's — only `slot=` fills, and it fills the *contents*: where the layout wraps its slot in its own `<footer>`, write `<p slot="footer">`, or you ship a footer inside a footer.
@@ -40,9 +40,9 @@ an error — on a layout too, because layouts don't chain (a section layout is a
   `<meta charset>` the layout's wins. **Write the separator into the layout's title** —
   `<title>— My Site</title>`, no leading space — and a page writes only its own name
   (`<title>About</title>`); the join adds the space, giving `About — My Site`. Your `<meta>` replaces the layout's same-`name`/`property`, your `canonical`/`icon`
-  links replace the layout's, everything else appends after — page CSS wins. **Unreleased (not 0.11.16):** `og:title`/`og:description`/`og:url` default to final title/description/canonical; page-head declarations win over derived values, which win over layout fallbacks. No missing value or Twitter tag is invented.
+  links replace the layout's, everything else appends after — page CSS wins. `og:title`/`og:description`/`og:url` default to final title/description/canonical; page-head declarations win over derived values, which win over layout fallbacks. No missing value or Twitter tag is invented.
 - **Attributes.** On `<html>`/`<body>`, your classes are added and any other attribute you set wins.
-  **Unreleased (not 0.11.16):** the same merge preserves your default main's attributes on the layout main receiving non-empty default content (the implicit sink or bare slot's main ancestor). Named fills, unrelated mains and fallback-only content do not merge.
+  The same merge preserves your default main's attributes on the layout main receiving non-empty default content (the implicit sink or bare slot's main ancestor). Named fills, unrelated mains and fallback-only content do not merge.
   Active nav is `<body class="home">` plus CSS (`body.home .nav-home {…}`), not a feature.
 
 ## Markdown

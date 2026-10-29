@@ -198,8 +198,6 @@ That is the whole core authoring model. Production options and audits may improv
 
 ### 3.3 The merge — four rules
 
-**Unreleased (not 0.11.16):** named-fill main preservation and paired-main attribute merging below are runtime changes. Version 0.11.16 unwraps the first page main even inside a named fill and merges attributes only on html/body.
-
 **Rule 1 — Slots.** A layout's `<body>` may contain `<slot>` elements. A page element carrying `slot="name"` fills `<slot name="name">`: **the slot element is replaced by the filling element(s)** — the page's markup ships exactly as written, no attribute merging, no discarding (the consumed `slot` attribute itself is removed). Multiple fills with the same name land in page order. A successfully addressed named fill keeps its whole subtree, including a `<main>`; nested `slot` attributes in that subtree are not interpreted. A slot nothing fills is replaced by its own children (its fallback — which is also what a browser shows when the layout is opened directly). `slot=` is honored on the page's own top level — the children of `<body>`, and the children of the `<main>` you wrote, wherever you put it. That scope is what keeps unify's hands off `slot=` inside an author's own web-component markup: the parent of a fill is always `<body>` or your `<main>`, never a component. Slots inside `<template>` elements are never touched (that is an author's declarative shadow DOM, not unify's). Slots are recognized only in layouts and only in `<body>`; a `<slot>` anywhere else is an advisory and is replaced by its own children. Slotted includes (§3.1) make a `*.fragment.html` one deliberately bounded second host, without changing page-to-layout scope. A second bare `<slot>` in a layout, or a repeated slot name, is an advisory and the first wins.
 
 The layout author controls the replacement boundary by where they put the slot, with no additional rule:
@@ -262,7 +260,7 @@ Write paths that are correct for the file you're editing — relative (`hero.jpg
 
 ---
 
-### Open Graph defaults (unreleased; not in 0.11.16)
+### Open Graph defaults
 
 After composition and canonical resolution, `og:title`, `og:description` and `og:url` default to the final document title, description and canonical. Explicit page-head tags (including includes and Markdown frontmatter) win, even when empty. Derived values replace generic layout fallbacks; absent source values retain those fallbacks. No description, canonical, other OG property or Twitter tag is invented. The same final HTML feeds audit and discovery; source inventory remains authored source facts. See conformance §22.6.
 

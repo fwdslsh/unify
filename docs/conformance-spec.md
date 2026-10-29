@@ -313,7 +313,7 @@ src/_layout.html:8: problem: <slot name="inner"> is nested inside the fallback o
 
 ### 7.2 Preparing C's content
 
-**Unreleased (not 0.11.16):** reserve C's direct body children whose non-empty `slot` names a slot in L. Each such named fill and its whole subtree are preserved, including any `<main>`; only the fill's own `slot` attribute is consumed (§7.3). Do not interpret nested `slot` attributes inside that fill. In 0.11.16 the first main was unwrapped even inside a named fill.
+Reserve C's direct body children whose non-empty `slot` names a slot in L. Each such named fill and its whole subtree are preserved, including any `<main>`; only the fill's own `slot` attribute is consumed (§7.3). Do not interpret nested `slot` attributes inside that fill.
 
 If L has at least one sink: the first `<main>` outside those reserved subtrees in C's body, in document order and **at any depth**, is **unwrapped once** (S6). A main inside a wrapper `<div>` unwraps and the wrapper stays. A main inside that selected main survives; no other element is unwrapped. This avoids adding another main around an ordinary page main, but does not repair already-nested mains. A bare slot outside any layout main still unwraps the selected page main; wrapper preservation is not part of this rule.
 
@@ -655,7 +655,7 @@ Row by row: identical charset silent; title joined; description replaced in plac
 
 On `<html>` and `<body>` (S11): the page's class tokens are appended to the layout's (duplicates not repeated); any other attribute the page sets wins (edited in place if the layout had it, inserted before `>` otherwise). `data-layout` and consumed `slot` attributes are removed before this merge. A page cannot remove a layout attribute — there is no mechanism, by design. Copied attribute values retain their authored quoting and source provenance.
 
-**Unreleased (not 0.11.16):** the same rule applies to the unwrapped default-content page main and the layout main receiving **non-empty** default content. Without a bare slot, the destination is the implicit first main sink. With a bare slot, it is that slot's nearest main ancestor, if any; an unrelated main receives nothing. Layout children outside a bare slot stay in place. Named fills never participate. If default content is empty, the layout's fallback and attributes remain unchanged; without a page main there are no main attributes to merge. No other elements merge.
+The same rule applies to the unwrapped default-content page main and the layout main receiving **non-empty** default content. Without a bare slot, the destination is the implicit first main sink. With a bare slot, it is that slot's nearest main ancestor, if any; an unrelated main receives nothing. Layout children outside a bare slot stay in place. Named fills never participate. If default content is empty, the layout's fallback and attributes remain unchanged; without a page main there are no main attributes to merge. No other elements merge.
 
 This changes output for pages whose main attributes were previously discarded: IDs, classes, accessibility attributes and styling hooks now reach the receiving main. A body-level bare slot still discards the page-main wrapper and has no main to receive its attributes.
 
@@ -1528,7 +1528,7 @@ Multiple canonicals, a canonical on a `noindex` page, and disagreement between a
 
 ---
 
-### 22.6 Open Graph defaults (unreleased; not in 0.11.16)
+### 22.6 Open Graph defaults
 
 Every composed HTML or Markdown page with a closed `<head>` receives defaults for three Open Graph properties: `og:title` from `titleOf`, `og:description` from `descriptionOf`, and `og:url` from `canonicalOf` (§20.4). Values are read after layout/include composition, URL rewriting and canonical completion, before structured data and the final manifest. The title includes the layout suffix. A missing or empty source value produces no default; a canonical is never invented here. `--canonical none` prevents automatic canonical creation, not reuse of an authored canonical. Without `--base-url`, title/description still complete and an authored canonical is reused in its final rewritten form.
 

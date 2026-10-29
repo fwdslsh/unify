@@ -10,12 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Open Graph defaults from the final document.** Builds fill `og:title` from the composed title (including its layout suffix), `og:description` from the final description, and `og:url` from the resolved canonical. Page-authored Open Graph tags, including empty values, repeated tags, Markdown frontmatter and page-head includes, win. Derived values replace generic layout defaults; absent source values leave those defaults alone. Twitter tags remain authored. This is unreleased behavior and is not available in 0.11.16.
+- **Open Graph defaults from the final document.** Builds fill `og:title` from the composed title (including its layout suffix), `og:description` from the final description, and `og:url` from the resolved canonical. Page-authored Open Graph tags, including empty values, repeated tags, Markdown frontmatter and page-head includes, win. Derived values replace generic layout defaults; absent source values leave those defaults alone. Twitter tags remain authored.
 
 ### Fixed
 
 - **Named slot fills preserve main elements (#146).** A named `<main slot="content">` or a named element containing a main now fills the requested region intact. Its subtree is not unwrapped or recursively filled. Previously the first main could lose its routing attribute or wrapper.
-- **Main attributes follow default content (#147).** The page main's classes combine with the actual receiving layout main's; other page attributes win. This works for an implicit main sink and a bare slot inside a main. Named fills, unrelated mains and fallback-only content keep their existing behavior. This is unreleased, not available in 0.11.16, and can change IDs, styling and accessibility hooks that previously disappeared. Body-level bare slots still unwrap page mains. Copied attributes retain authored quoting and reference provenance, including values from includes.
+- **Main attributes follow default content (#147).** The page main's classes combine with the actual receiving layout main's; other page attributes win. This works for an implicit main sink and a bare slot inside a main. Named fills, unrelated mains and fallback-only content keep their existing behavior. This can change IDs, styling and accessibility hooks that previously disappeared. Body-level bare slots still unwrap page mains. Copied attributes retain authored quoting and reference provenance, including values from includes.
 
 - **The documents now say what a hand-written directory link does (#139).** The authoring rules and every
   built-in template's README said `/guides/` resolves only if you wrote `guides/index.html`; it also resolves
