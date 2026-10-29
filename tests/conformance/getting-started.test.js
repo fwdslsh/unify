@@ -14,9 +14,9 @@
  * compared through the one comparator (H5).
  */
 import { test } from "bun:test";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, renameSync } from "node:fs";
 import { join } from "node:path";
-import { compareHtml } from "./compare.mjs";
+import { compareHtml, diffSnapshots, snapshotTree } from "./compare.mjs";
 import { ROOT, mkTmp, runCli, writeTree } from "./support.mjs";
 
 const TEST_MS = 30_000;
@@ -198,6 +198,98 @@ test("a section of Markdown pages — the folder's layout wraps both pages, and 
   if (!record || record.title !== null) throw new Error(`the inventory must report title: null for first.md: ${JSON.stringify(record)}`);
 }, TEST_MS);
 
+test("maintaining the tutorial site — add, rename, edit shared nav, diagnose and repair links without losing content", async () => {
+  const tmp = mkTmp();
+  const site = join(tmp, "site");
+  const dist = join(tmp, "dist");
+  const flags = ["--pretty-urls", "--base-url", "https://example.com/handbook/"];
+  let nav = '<nav><a href="/index.html">Home</a> <a href="/notes/first.md">Notes</a></nav>\n';
+  let second = '---\ndescription: The second note.\n---\n# Second steps\n\nKeep this second-note sentence.\n\n[First steps](/notes/first.md#first-steps)\n';
+  writeTree(site, {
+    "_layout.html": codeBlock("The layout", "html"),
+    "_includes/nav.html": nav,
+    "assets/style.css": "body { margin: 0; }\n",
+    "index.html": page("Home", "<h1>Home</h1><p>Keep this home sentence.</p>"),
+    "notes/_layout.html": codeBlock(SECTION, "html"),
+    "notes/first.md": codeBlock(SECTION, "markdown"),
+  });
+  expectExit(await runCli(["build", "--strict", ...flags], tmp), 0, "the conventions-only seed");
+  if (existsSync(join(tmp, "unify.yaml"))) throw new Error("the seed needed no configuration file");
+
+  // Add a flat Markdown source; the section layout and pretty address follow
+  // without a layout field, a nested index.md, or generated page wrappers.
+  writeTree(site, { "notes/second.md": second });
+  nav = nav.replace("</nav>", ' <a href="/notes/second.md">Latest note</a></nav>');
+  writeTree(site, { "_includes/nav.html": nav });
+  expectExit(await runCli(["build", "--strict", ...flags], tmp), 0, "add an article and edit one shared nav");
+  const assertContent = (firstPath) => {
+    const markers = {
+      "index.html": "Keep this home sentence.",
+      [firstPath]: "The lead paragraph, written here like the heading above it.",
+      "notes/second/index.html": "Keep this second-note sentence.",
+    };
+    for (const [path, marker] of Object.entries(markers)) {
+      const html = readFileSync(join(dist, path), "utf8");
+      if (!html.includes(marker)) throw new Error(`${path} lost its content: ${marker}`);
+      if (!html.includes('<a href="/handbook/notes/second/">Latest note</a>')) {
+        throw new Error(`${path} did not receive the shared navigation edit:\n${html}`);
+      }
+    }
+  };
+  assertContent("notes/first/index.html");
+  const added = readFileSync(join(dist, "notes/second/index.html"), "utf8");
+  if (!added.includes("<title>Second steps — Notes — My Site</title>") || !added.includes('<body class="notes">')) {
+    throw new Error(`the added article must use the section's title and chrome:\n${added}`);
+  }
+  expectSameHtml(
+    '<main><article><h1 id="second-steps">Second steps</h1><p>Keep this second-note sentence.</p><p><a href="/handbook/notes/first/#first-steps">First steps</a></p></article></main>',
+    /<main>[\s\S]*?<\/main>/.exec(added)?.[0] ?? "",
+    "the added article's section wrapper and visible content",
+  );
+  const previous = snapshotTree(dist);
+
+  renameSync(join(site, "notes/first.md"), join(site, "notes/welcome.md"));
+  const broken = await runCli(["build", "--strict", ...flags], tmp);
+  expectExit(broken, 1, "renaming a source does not repair authored references");
+  if (!broken.stderr.includes("site/_includes/nav.html:1: problem:") || !broken.stderr.includes("/notes/first.md does not resolve")) {
+    throw new Error(`the missing-file diagnostic must locate the stale reference:\n${broken.stderr}`);
+  }
+  const changes = diffSnapshots(previous, snapshotTree(dist));
+  if (changes.length) throw new Error(`the failed rename published changes:\n${changes.join("\n")}`);
+  nav = nav.replace("first.md", "welcome.md");
+  second = second.replace("first.md", "welcome.md");
+  writeTree(site, { "_includes/nav.html": nav, "notes/second.md": second });
+  expectExit(await runCli(["build", "--strict", ...flags], tmp), 0, "repair the source references");
+  assertContent("notes/welcome/index.html");
+  if (existsSync(join(dist, "notes/first/index.html"))) throw new Error("the old route must leave the output after the rename");
+
+  // A missing heading is a different check: the page exists, so build succeeds;
+  // audit diagnoses the fragment. Keep the link and article when repairing it.
+  writeTree(site, { "notes/second.md": second.replace("#first-steps)", "#missing-heading)") });
+  expectExit(await runCli(["build", "--strict", ...flags], tmp), 0, "an existing page with a missing anchor builds");
+  const audit = await runCli(["audit", ...flags], tmp);
+  expectExit(audit, 1, "audit detects the missing anchor");
+  if (!audit.stdout.includes("[fragment-missing]") || !audit.stdout.includes("missing-heading")) {
+    throw new Error(`audit must name the missing anchor:\n${audit.stdout}`);
+  }
+  writeTree(site, { "notes/second.md": second });
+  expectExit(await runCli(["audit", ...flags], tmp), 0, "the repaired link has no broken findings");
+  expectExit(await runCli(["build", "--strict", ...flags], tmp), 0, "publish the repair");
+  assertContent("notes/welcome/index.html");
+  const repaired = readFileSync(join(dist, "notes/second/index.html"), "utf8");
+  if (!repaired.includes('href="/handbook/notes/welcome/#first-steps"')) throw new Error("repair removed or changed the intended link");
+
+  // Saving the working CLI options is a convenience, not another authoring
+  // model. Compare every emitted byte, not merely the command's exit status.
+  const cliOutput = snapshotTree(dist);
+  expectExit(await runCli(["build", ...flags, "--save-config"], tmp), 0, "save the working settings");
+  if (!existsSync(join(tmp, "unify.yaml"))) throw new Error("--save-config must persist the settings");
+  expectExit(await runCli(["build", "--strict"], tmp), 0, "build with saved settings");
+  const configChanges = diffSnapshots(cliOutput, snapshotTree(dist));
+  if (configChanges.length) throw new Error(`saved settings changed the output:\n${configChanges.join("\n")}`);
+  if (existsSync(join(dist, "unify.yaml"))) throw new Error("configuration must not publish");
+}, TEST_MS);
+
 // ------------------------------------------------------------ slotted include
 
 const SNIPPET = "A snippet that ships as written";
@@ -214,6 +306,24 @@ test("a snippet that ships as written — the slotted include builds to the mark
   writeTree(join(tmp, "site"), { [fragment.path]: fragment.text, "index.html": page("Home", usage) });
   expectExit(await runCli(["build", "-o", "dist"], tmp), 0, "the slotted include");
   expectSameHtml(page("Home", shown), readFileSync(join(tmp, "dist", "index.html"), "utf8"), "slotted include");
+}, TEST_MS);
+
+test("slotted includes in Markdown — authored markup fills slots; same-named frontmatter does not", async () => {
+  const fragment = namedFile(codeBlock(SNIPPET, "html", 2));
+  const usage = codeBlock(SNIPPET, "html", 3).trim();
+  const shown = codeBlock(SNIPPET, "html", 4).trim();
+  const tmp = mkTmp();
+  writeTree(join(tmp, "site"), {
+    [fragment.path]: fragment.text,
+    "index.md": `---\ntitle: Metadata title\ndescription: Metadata description\n---\n\n${usage}\n\n<include src="/${fragment.path}"><p>Keep the default title.</p></include>\n`,
+  });
+  expectExit(await runCli(["build", "--strict"], tmp), 0, "Markdown with the guide's slotted include");
+  const html = readFileSync(join(tmp, "dist/index.html"), "utf8");
+  if (!html.includes("<title>Metadata title</title>") || !html.includes('<meta name="description" content="Metadata description">')) {
+    throw new Error(`frontmatter must still supply the document head:\n${html}`);
+  }
+  const body = /<body>([\s\S]*)<\/body>/.exec(html)?.[1];
+  expectSameHtml(`${shown}\n<aside class="callout"><h3>Note</h3><p>Keep the default title.</p></aside>`, body ?? "", "explicit fill and untouched fallback");
 }, TEST_MS);
 
 test("a snippet that ships as written — content in an include of a file that is not a fragment is a build error naming the fix", async () => {

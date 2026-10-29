@@ -556,9 +556,9 @@ a reason: it makes the command's result depend on somebody else's uptime. Ordina
 and ordinary audits never open a socket.
 
 **From a source file to its public address.** unify rewrites links in the HTML pages it
-composes, and nothing else. A JSON, XML or Markdown file a generator writes ships as
-written, and Markdown that another tool sends somewhere else — a script cross-posting an
-article, a newsletter — never passes through unify at all. A tool like that needs each
+composes, including pages rendered from a generator's Markdown. Generated JSON, XML and
+other non-page assets ship as written. Markdown that another tool sends somewhere else —
+a script cross-posting an article, a newsletter — never passes through unify at all. A tool like that needs each
 page's address, and the audit report already maps every one:
 
 ```bash

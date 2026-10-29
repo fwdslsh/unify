@@ -234,6 +234,58 @@ Never say "use a named slot." Say the footer shows one thing everywhere and some
 
 **Keep a brief stable across rounds when measuring a fix.** Changing the task and the doc simultaneously makes the result uninterpretable. Introduce new briefs deliberately, as new experiments.
 
+### Maintenance tasks, after the first build
+
+Use [`ratification/briefs/BRIEF-maintenance.md`](briefs/BRIEF-maintenance.md) for a **guided
+maintenance** experiment: can a new maintainer add an article, rename it, change shared
+navigation, build an index, and repair broken links? This extends the task set; it does
+not replace the rules-only experiment or inherit its ratification result. Seed the
+current `authoring-rules.md`, `getting-started.md` and `integrations.md` as the fixed
+documentation corpus, plus the CLI. Record their commit/hash and the CLI version/hash
+separately; a documentation correction need not change runtime behavior.
+
+Before launching, prepare one reference-clean seed from Getting Started's layout,
+section layout and Markdown example: a home page, `notes/first.md`, `notes/second.md`,
+`_includes/nav.html`, and `assets/style.css`. Give both notes an explicit title and a
+different full timestamp in `date:`, and link all three pages. Add one unique marker
+sentence to each page's content. Use `https://example.com/handbook/` and pretty URLs,
+with the options recorded as the seed's CLI command; no configuration file is needed.
+Archive this exact seed and the expected markers before the round. Verify the seed's
+strict build and audit have no broken findings before copying it into clean sandboxes.
+
+Deliver the brief's tasks one at a time. Archive the source, output, report and transcript
+after each task, before the next instruction. For the repair task, plant a missing-file
+reference and a missing heading anchor in a copy of the last successful source; record
+the exact edits privately. Keep the target pages and their content intact. This measures
+repair from diagnostics, not an ability to guess a missing page's content.
+
+Judge with the standing instrument and an explicit outcome sheet:
+
+| Task | Required evidence beyond exit 0 |
+|---|---|
+| Add an article | The new Markdown source renders with section chrome, visible content and the requested address; every old content marker remains. |
+| Rename it | The renamed source has the new address, authored links reach it, and the old file/route is gone. No automatic redirect is required or assumed. |
+| Change shared navigation | One shared edit reaches the home page and both old and new notes; verify the files as well as the output. |
+| Build an index | Every published note appears once, newest first, with working links; an excluded draft stays absent. Add and rename a note in a disposable copy and rebuild once per change to prove membership is not a hand-maintained list. |
+| Repair links | The missing-file reference is diagnosed by build (P13); the missing anchor by audit (`fragment-missing`). Both links reach their intended targets afterward, and all content markers survive. |
+| Reuse article markup | Shared wrapper changes propagate, each use retains its own visible text, and document metadata stays correct. Explicit HTML fills or a generator are valid; frontmatter is not an implicit body binding. |
+
+`judge-round.mjs` supplies the publish-command/strict-build check and marker counts. It
+does **not** decide these task outcomes, prove marker identity from a total, or establish
+that archived `dist/` matches the source. Review the archived files and transcript, and
+rebuild in a disposable copy before inspecting output. Record pass/fail per criterion,
+the evidence paths and the same doc/spec/implementation/outlier triage used above. Do
+not call a green build or an author's self-report a passed maintenance task.
+
+The executable counterparts already run in `tests/conformance/getting-started.test.js`
+(add/rename/nav/repair, content preservation, CLI versus saved options, explicit slot
+fills) and `recipes.test.js` (index maintenance and composed Markdown versus raw exports).
+They establish that the documented mechanisms work, **not** that a fresh author can
+discover them. This maintenance brief has not yet been run in isolation; the revised
+configuration wording and generated-Markdown clarification remain unratified corrections.
+Pre-register a round's models, criteria and threshold before running it, and retain the
+fitted-versus-tested distinction when changing its brief or documentation afterward.
+
 ## Recording
 
 Keep a results table with, per round: sample count and models, the specific property under test, violations found, and — most valuable — **which findings were doc, spec, implementation, or outlier**. That last column is what lets you see whether the doc is converging or you are chasing noise.
