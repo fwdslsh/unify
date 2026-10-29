@@ -122,19 +122,6 @@ Two details worth knowing:
 - Your first default-content `<main>` wrapper is unwrapped during composition, including inside a styling wrapper. This avoids adding another main around an ordinary page main; it does not repair already-nested mains.
 - A page's `<body class="home">` is merged onto the built page's `<body>` — which is how you do active-nav highlighting: `body.home .nav-home { font-weight: bold; }` in your stylesheet. No feature needed. It is styling only: the shared nav's markup is the same on every page, so nothing marks the current link with `aria-current`.
 
-**Main attributes follow the content.** When non-empty default content enters a layout main, its classes and the page main's classes combine; other page attributes win. For example:
-
-```html
-<!-- Layout body -->
-<body><main id="layout-content" class="shell" tabindex="-1"></main></body>
-<!-- Page body -->
-<body><main id="guide" class="article" aria-label="Guide"><h1>Guide</h1></main></body>
-<!-- Built body -->
-<body><main id="guide" class="shell article" tabindex="-1" aria-label="Guide"><h1>Guide</h1></main></body>
-```
-
-This also works with `<main><slot></slot></main>`; markup outside the slot stays. An unrelated main or fallback-only main keeps its own attributes. Named fills do not merge. A bare slot outside a main still unwraps the page main, and unaddressed page siblings still enter the default destination.
-
 ## Overriding a region
 
 `site/index.html` replaces the footer by using the slot's name — one standard HTML attribute on a top-level element:
@@ -153,7 +140,7 @@ This also works with `<main><slot></slot></main>`; markup outside the slot stays
 </html>
 ```
 
-A named fill also preserves any main in its subtree. For example, `<main slot="content" id="guide">…</main>` fills `<slot name="content"></slot>` as a complete main, with only `slot="content"` removed. Its nested slot attributes are left alone.
+A named fill also preserves any main in its subtree. For example, `<main slot="content" id="guide">…</main>` fills `<slot name="content"></slot>` as a complete main, with only `slot="content"` removed. Its nested slot attributes are left alone. An unmatched name on a direct-body main reports the same advisory as any other unmatched fill; its contents follow the default route.
 
 The built footer contains exactly the `<p>` you wrote — tag, attributes, and all. Pages that don't mention the footer keep the layout's default. Note what does *not* override anything: a plain `<header>` or `<footer>` element in your page is just content. Only `slot=` fills a region, on direct children of `<body>` or of the selected default-content main; arbitrary nested `slot` attributes stay untouched.
 
@@ -312,8 +299,10 @@ One file, one place to edit it, two consumers. (`examples/htmx-fragments` is thi
 worked end to end.)
 
 An include can also carry content, when its target is a fragment that declares slots. The
-content fills them exactly as a page fills a layout's: `slot="name"` on an element for a
-named slot, everything else to the bare one, and an unfilled slot shows its own content.
+content uses the same slot replacement and fallback: `slot="name"` on a direct child
+element for a named slot, everything else to the bare one, and an unfilled slot shows its
+own content. Unlike page/layout composition, a main stays intact and its children are
+not promoted to fills; there is no implicit main sink.
 
 ```html
 <!-- site/_includes/callout.fragment.html -->

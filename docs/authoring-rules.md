@@ -19,7 +19,7 @@ Most sites need no configuration file: use conventions and CLI options, or save 
 ## Include — reuse a fragment
 `<include src="/_includes/nav.html"></include>`, always with the closing tag; `/…` resolves from the source
 root, anything else relative to the including file. Works in any file — layouts, pages, `<head>`, fragments,
-and `.md` — but never inside `<pre>`/`<code>`: there both spellings are left as written (a code sample is content). Empty, it splices the file in verbatim. **Content between the tags fills slots** — allowed only when the target is a `*.fragment.html` declaring `<slot>`, and filled exactly as a page fills a layout's (`slot="name"` on a top-level element, everything else to the bare slot, an unfilled slot showing its own fallback). Fills reach that fragment's slots and no deeper. No props, no attributes passed, no expressions: an include is still not a component.
+and `.md` — but never inside `<pre>`/`<code>`: there both spellings are left as written (a code sample is content). Empty, it splices the file in verbatim. **Content between the tags fills slots** — allowed only when the target is a `*.fragment.html` declaring `<slot>`, with `slot="name"` on direct child elements, everything else to the bare slot, and an unfilled slot showing its fallback; main elements stay intact and their children are not fills. Fills reach that fragment's slots and no deeper. No props, no attributes passed, no expressions: an include is still not a component.
 
 ## Layout — chrome around a page
 Every page is wrapped by the nearest `_layout.html` — its own folder, then each parent; the page says
@@ -41,9 +41,9 @@ an error — on a layout too, because layouts don't chain (a section layout is a
   `<title>— My Site</title>`, no leading space — and a page writes only its own name
   (`<title>About</title>`); the join adds the space, giving `About — My Site`. Your `<meta>` replaces the layout's same-`name`/`property`, your `canonical`/`icon`
   links replace the layout's, everything else appends after — page CSS wins. `og:title`/`og:description`/`og:url` default to final title/description/canonical; page-head declarations win over derived values, which win over layout fallbacks. No missing value or Twitter tag is invented.
-- **Attributes.** On `<html>`/`<body>`, your classes are added and any other attribute you set wins.
-  The same merge preserves your default main's attributes on the layout main receiving non-empty default content (the implicit sink or bare slot's main ancestor). Named fills, unrelated mains and fallback-only content do not merge.
-  Active nav is `<body class="home">` plus CSS (`body.home .nav-home {…}`), not a feature.
+- **Root attributes.** On `<html>`/`<body>` only, your classes are added and any other attribute you
+  set wins; attributes merge nowhere else. Active nav is `<body class="home">` plus CSS
+  (`body.home .nav-home {…}`), not a feature.
 
 ## Markdown
 Frontmatter is YAML: quote any value containing a colon — `title: "Finish: the last quarter"`. `title`,

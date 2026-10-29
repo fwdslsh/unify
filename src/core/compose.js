@@ -91,7 +91,7 @@ import { spansToDiagnosticLocator, verbatimLineResolver, wholeTextSpan } from ".
 
 const DATA_LAYOUT = "data-layout";
 const SLOT_ATTR = "slot";
-/** Composition attributes never participate in §9's attribute merge (ATT-03). */
+/** Never merged onto the composed <html>/<body> tag — consumed before §9's merge (ATT-03). */
 const ROOT_ATTR_SKIP = new Set([DATA_LAYOUT, SLOT_ATTR]);
 /** head-merge.js's own, sole join/insert separator for every multi-piece row (verified against its source). */
 const HEAD_JOIN = "\n    ";
@@ -509,8 +509,8 @@ function composeWithLayout({ pageText, pageFile, pageSpans, layoutText, layoutFi
   }));
 
   // §9/S11 root attributes, and defensive data-layout/slot stripping on the layout's own tags.
-  edits.push(...mergeAttributes(lHtml, cHtml, preparedC));
-  edits.push(...mergeAttributes(lBody, cBody, preparedC));
+  edits.push(...mergeRootAttrs(lHtml, cHtml));
+  edits.push(...mergeRootAttrs(lBody, cBody));
 
   const composed = spliceTrackingSpans(preparedL.text, preparedL.spans, edits, pageFile);
   return stripPolyfillScripts(composed.text, composed.spans, pageFile);
@@ -532,8 +532,18 @@ function composeSinkedBody({ preparedC, cBody, preparedL, sinks, pageFile, layou
   const main = findAll(cBody, (n) => isElement(n, "main"))
     .find((n) => !namedFills.some((fill) => n.start >= fill.start && n.end <= fill.end));
 
-  // §7.2 — unwrap that main at any depth, exactly once. A bare slot outside
-  // a layout main still unwraps, but has no element to receive its attributes.
+  // A direct-body main is a fill candidate too. Report an unmatched name
+  // before unwrapping removes its tag; deeper slot attributes remain inert.
+  const mainSlot = main?.parent === cBody ? attrValueOrEmpty(main, SLOT_ATTR) : "";
+  if (mainSlot) {
+    const at = spansToDiagnosticLocator(preparedC.spans, pageFile, resolveLine);
+    reporter.advisory({
+      ...at(main.start),
+      message: `no slot named "${mainSlot}" in ${layoutFile}; its content stayed in the page content`,
+    });
+  }
+
+  // §7.2 — unwrap the selected default-content main once, at any depth.
   let bodyText = preparedCText;
   let bodySpans = preparedC.spans;
   let body = cBody;
@@ -610,9 +620,6 @@ function composeSinkedBody({ preparedC, cBody, preparedL, sinks, pageFile, layou
   const defaultContentText = defaultSlice.text;
   const defaultContentSpans = defaultSlice.spans;
   const defaultEmpty = isBlank(defaultContentText);
-  if (!defaultEmpty && main && sinks.receivingMain) {
-    edits.push(...mergeAttributes(sinks.receivingMain, main, preparedC));
-  }
 
   // §7.4 — route default content.
   let swallowedByMain = null;
@@ -702,7 +709,7 @@ function composeSinkedBody({ preparedC, cBody, preparedL, sinks, pageFile, layou
  * `layoutFile` is still named in the A13 messages themselves, because "which
  * layout is this page composing against" is the fact the author needs there
  * and stays true even when the duplicate arrived from a fragment.
- * @returns {{defaultSlot: object|null, namedSlots: Map<string,object>, firstMain: object|null, receivingMain: object|null,
+ * @returns {{defaultSlot: object|null, namedSlots: Map<string,object>, firstMain: object|null,
  *   duplicates: {node:object, kind:'slot'|'main'}[], namedSlotsInMain: object[], none: boolean}}
  */
 function detectSinks(lBody, excluded, at, layoutFile, reporter) {
@@ -735,10 +742,6 @@ function detectSinks(lBody, excluded, at, layoutFile, reporter) {
 
   const allMains = findAll(lBody, (n) => isElement(n, "main"));
   const firstMain = allMains[0] ?? null;
-  // A bare slot can belong to a different main than the implicit first sink.
-  // Only its nearest main ancestor receives default-content attributes.
-  let receivingMain = defaultSlot ? defaultSlot.parent : firstMain;
-  while (receivingMain && !isElement(receivingMain, "main")) receivingMain = receivingMain.parent;
   for (let i = 1; i < allMains.length; i++) {
     reporter.advisory({
       ...at(allMains[i].start),
@@ -760,7 +763,7 @@ function detectSinks(lBody, excluded, at, layoutFile, reporter) {
   }
 
   return {
-    defaultSlot, namedSlots, firstMain, receivingMain, duplicates, namedSlotsInMain,
+    defaultSlot, namedSlots, firstMain, duplicates, namedSlotsInMain,
     none: !defaultSlot && namedSlots.size === 0 && !firstMain,
   };
 }
@@ -889,18 +892,20 @@ function headEditReplacementSpans(replacement, candidates) {
   return spans;
 }
 
-// ------------------------------------------------------- §9/S11 attributes
+// ------------------------------------------------------- §9/S11 root attrs
 
 /**
- * Merges page attributes onto the layout's `<html>`, `<body>`, or receiving `<main>`,
+ * Merges page attributes onto the layout's `<html>` or `<body>` start tag,
  * in place, per §9/S11: `class` is layout tokens then new page tokens
  * (deduplicated); any other page attribute overrides the layout's value at
  * its existing position, or is appended (page-source order) when the layout
- * doesn't have it; `data-layout`/consumed `slot` never participate. Attribute
- * values keep their authored quoting and provenance: a style URL or other
- * checked reference may have come from an included fragment.
+ * doesn't have it; `data-layout`/consumed `slot` never participate. Never
+ * URL-bearing (§11 has no rule for `<html>`/`<body>` attributes), so these
+ * edits carry no `replacementSpans` — the enclosing splice attributes them
+ * to `pageFile` by fallback, which is harmless and, for `class`/page-set
+ * attributes, also simply correct.
  */
-function mergeAttributes(layoutEl, pageEl, page) {
+function mergeRootAttrs(layoutEl, pageEl) {
   const edits = [];
   if (!layoutEl) return edits;
   // Defensive: a layout should never itself carry these (a layout declaring
@@ -920,31 +925,25 @@ function mergeAttributes(layoutEl, pageEl, page) {
       const layoutClass = getAttrNode(layoutEl, "class");
       const merged = [...tokens(layoutClass ? layoutClass.value : "")];
       for (const t of tokens(pa.value)) if (!merged.includes(t)) merged.push(t);
-      const value = merged.join(" ").replaceAll('"', "&quot;");
+      const value = merged.join(" ");
       if (layoutClass) {
         edits.push({ start: layoutClass.nameStart, end: layoutClass.end, replacement: `class="${value}"` });
       } else {
-        appendParts.push({ text: `class="${value}"`, spans: [] });
+        appendParts.push(`class="${value}"`);
       }
       continue;
     }
 
     const layoutAttr = getAttrNode(layoutEl, pa.name);
-    const name = layoutAttr?.name ?? pa.name;
-    const suffixStart = pa.nameStart + pa.name.length;
-    const part = {
-      text: name + page.text.slice(suffixStart, pa.end),
-      spans: shiftSpans(sliceSpans(page.spans, suffixStart, pa.end), name.length),
-    };
     if (layoutAttr) {
-      edits.push({ start: layoutAttr.nameStart, end: layoutAttr.end, replacement: part.text, replacementSpans: part.spans });
+      const rendered = pa.value === null ? layoutAttr.name : `${layoutAttr.name}="${pa.value}"`;
+      edits.push({ start: layoutAttr.nameStart, end: layoutAttr.end, replacement: rendered });
     } else {
-      appendParts.push(part);
+      appendParts.push(pa.value === null ? pa.name : `${pa.name}="${pa.value}"`);
     }
   }
   if (appendParts.length > 0) {
-    const joined = joinWithGlue(appendParts, " ");
-    edits.push({ start: layoutEl.attrsEnd, end: layoutEl.attrsEnd, replacement: ` ${joined.replacement}`, replacementSpans: shiftSpans(joined.replacementSpans, 1) });
+    edits.push({ start: layoutEl.attrsEnd, end: layoutEl.attrsEnd, replacement: ` ${appendParts.join(" ")}` });
   }
   return edits;
 }

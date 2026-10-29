@@ -6,28 +6,11 @@ upgrading across them.
 The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.11.17] - 2026-10-29
 
 ### Added
 
 - **Open Graph defaults from the final document.** Builds fill `og:title` from the composed title (including its layout suffix), `og:description` from the final description, and `og:url` from the resolved canonical. Page-authored Open Graph tags, including empty values, repeated tags, Markdown frontmatter and page-head includes, win. Derived values replace generic layout defaults; absent source values leave those defaults alone. Twitter tags remain authored.
-
-### Fixed
-
-- **Named slot fills preserve main elements (#146).** A named `<main slot="content">` or a named element containing a main now fills the requested region intact. Its subtree is not unwrapped or recursively filled. Previously the first main could lose its routing attribute or wrapper.
-- **Main attributes follow default content (#147).** The page main's classes combine with the actual receiving layout main's; other page attributes win. This works for an implicit main sink and a bare slot inside a main. Named fills, unrelated mains and fallback-only content keep their existing behavior. This can change IDs, styling and accessibility hooks that previously disappeared. Body-level bare slots still unwrap page mains. Copied attributes retain authored quoting and reference provenance, including values from includes.
-
-- **The documents now say what a hand-written directory link does (#139).** The authoring rules and every
-  built-in template's README said `/guides/` resolves only if you wrote `guides/index.html`; it also resolves
-  when `--pretty-urls` makes that file from `guides.html` or `guides.md`, which the conformance spec already
-  said. Linking the source file stays the advice (`unify-default-template`, `-basic-`, `-blog-` and
-  `-portfolio-` 0.1.4, `unify-docs-template` 0.5.1).
-- **The product spec describes slotted includes as shipped (#139).** §3.1 still called a non-empty include
-  invalid, and §3.3, §5 and §6.4 called it an experiment; it shipped in 0.8.0 under conformance spec §32.
-- **A repeated heading's id is documented as `-1`, `-2`.** Product spec §3.5 and conformance spec §10.4 still
-  said `-2`, `-3`, the numbering before 0.11.10.
-
-### Added
 
 - **Getting Started covers the tasks a migration tripped on (#139):** a table of what each link spelling
   becomes in a plain, `--pretty-urls` and subpath build; a folder of Markdown pages under its own
@@ -38,6 +21,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `/_unify/pages.json` side by side (#139)**, with one page's inventory record and catalog entry, and adds
   the docs template's navigation helper and the audit report's source-to-address map for exporters. The
   cache-busting recipe no longer implies every unchanged URL stays stale. Every new literal is tested.
+
+### Fixed
+
+- **Named slot fills preserve main elements (#146).** A named `<main slot="content">` or a named element containing a main now fills the requested region intact. Its subtree is not unwrapped or recursively filled. Previously the first main could lose its routing attribute or wrapper.
+- **Unmatched slot names on a main report an advisory.** A direct-body `<main slot="conent">` previously lost its misspelled name before the unmatched-fill check. It now reports the same advisory as other unmatched fills, with the original source location. Its content still follows the default route; `--strict` exits 1, following the existing advisory policy.
+- **Slotted include guidance distinguishes slot filling from page/layout preparation.** Only direct include children can fill named slots. Main elements remain ordinary markup; their wrappers stay and their children are not promoted to fills.
+
+- **The documents now say what a hand-written directory link does (#139).** The authoring rules and every
+  built-in template's README said `/guides/` resolves only if you wrote `guides/index.html`; it also resolves
+  when `--pretty-urls` makes that file from `guides.html` or `guides.md`, which the conformance spec already
+  said. Linking the source file stays the advice (`unify-default-template`, `-basic-`, `-blog-` and
+  `-portfolio-` 0.1.4, `unify-docs-template` 0.5.1).
+- **The product spec describes slotted includes as shipped (#139).** §3.1 still called a non-empty include
+  invalid, and §3.3, §5 and §6.4 called it an experiment; it shipped in 0.8.0 under conformance spec §32.
+- **A repeated heading's id is documented as `-1`, `-2`.** Product spec §3.5 and conformance spec §10.4 still
+  said `-2`, `-3`, the numbering before 0.11.10.
 
 ## [0.11.16] - 2026-10-13
 

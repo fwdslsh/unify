@@ -5,13 +5,13 @@ S01	§3	rule	fixture	Preservation: all bytes outside an edited span are preserve
 S02	§3	rule	fixture	Include splice: the include element or SSI comment is replaced by the included file's processed contents
 S03	§3	rule	fixture	Slot fill: the slot element is replaced by the fill elements in page order; the consumed slot attribute is removed; nothing else about a fill's markup changes
 S04	§3	rule	fixture	Slot fallback: slot start/end tags removed, inner bytes kept as written
-S05	§3	rule	fixture	Children replacement: the element's children are replaced by default content; its tag stays and attributes merge separately under S11
+S05	§3	rule	fixture	Children replacement: the element's children are replaced by the default content; the element itself, tag and attributes, stays
 S06	§3	rule	fixture	Unwrap: page's first default-content main outside successfully addressed named fills loses its tags; inner bytes stay in place
 S07	§3	rule	fixture	Removal: removed elements are removed entirely; removed attributes (data-layout, consumed slot) are removed cleanly; removal changes nothing else
 S08	§3	rule	fixture	Head replacement in place: the page's element(s) take the layout element's position in page order; other same-key layout elements removed per S07
 S09	§3	rule	fixture	Head append: appended head elements land at the end of the layout's head content, in page-source order
 S10	§3	rule	fixture	Title join: layout title inner text becomes pageText + " " + layoutText, both trimmed; layout's title tag kept
-S11	§3	rule	fixture	Root and paired-main attributes: class = layout tokens then page tokens not already present; overridden attr edited in place; new attr inserted before closing > in page order
+S11	§3	rule	fixture	Root attributes: class = layout tokens then page tokens not already present; overridden attr edited in place; new attr inserted before closing > in page order
 S12	§3	rule	fixture	Default content: nodes kept in source order with interior text preserved as written; boundary whitespace-only text nodes are not significant
 SHL-01	§3	rule	fixture	Output shell (doctype, html, head, body tags) is the layout's; page's doctype/shell not emitted; page with no layout emitted from its own text (layout-less .md: converted body inside the §10.7 shell)
 EXC-01	§4.1	rule	fixture	--exclude repeatable; unify.yaml key exclude is a list; default is the single glob _*; user globs replace the default
@@ -61,7 +61,7 @@ MRG-06	§7.2	rule	fixture	With a layout sink, the first page main outside succes
 MRG-07	§7.2	rule	fixture	Fills are the direct element children of the page body and of the selected default-content main wherever it sat, carrying a non-empty slot attribute; slot="" counts as absent; slot anywhere else is never touched or reported
 MRG-08	§7.2	rule	fixture	Default content is everything else in the page body - elements, text, comments - in source order (S12)
 MRG-09	§7.3	rule	fixture	For each name with fills, <slot name> is replaced by the fills in page order (S03)
-MRG-10	§7.3	rule	fixture	A fill naming a slot the layout lacks: advisory A02, slot attribute consumed, element stays in place in the default-content sequence
+MRG-10	§7.3	rule	fixture	A fill naming a slot the layout lacks: advisory A02, slot attribute consumed, element stays in the default-content sequence; diagnose a direct-body main before unwrapping it
 MRG-11	§7.3	rule	fixture	Each unfilled named slot is replaced by its own children (S04); fallback content is plain markup (a nested slot is P16/MRG-19); slots inside <template> ship as written
 MRG-12	§7.4	rule	fixture	Default slot present → default content replaces it; empty default content → the default slot renders its fallback
 MRG-13	§7.4	rule	fixture	No default slot, layout has <main> → default content replaces <main>'s children (S05); empty default content → <main> keeps its children
@@ -80,10 +80,9 @@ HED-04	§8 row 4	rule	fixture	link rel=canonical replaces in place; one canonica
 HED-05	§8 row 5	rule	fixture	link with icon in its rel token list (covers shortcut icon, ASCII case-insensitive): all layout icon links removed, page set takes the first one's position; apple-touch-icon not keyed
 HED-06	§8 row 6	rule	fixture	Stylesheet/script-src dedup by URL compared after §11.1 resolution — page copy dropped, layout position stands; inline script/style with byte-identical content: page copy dropped
 HED-07	§8 row 7	rule	fixture	Everything else appends after the layout's head content in page-source order (S09); page CSS loads last
-ATT-01	§9	rule	fixture	On html/body and the paired receiving main: page class tokens appended to the layout's without repeats
+ATT-01	§9	rule	fixture	On html/body only: page class tokens appended to the layout's without repeats
 ATT-02	§9	rule	fixture	Any other attribute the page sets wins: edited in place if the layout had it, inserted before > otherwise
-ATT-03	§9	rule	fixture	data-layout and consumed slot never merge; a page cannot remove a layout attribute; only html/body and the paired main merge; copied values keep authored quoting and provenance
-ATT-04	§9	rule	targeted	Main attributes merge only onto the implicit main or actual bare-slot main ancestor receiving non-empty default content; named fills, unrelated mains and fallback-only content never merge
+ATT-03	§9	rule	fixture	data-layout and consumed slot attributes are removed before the root-attribute merge; a page cannot remove a layout attribute; attributes merge nowhere else
 MD-01	§10.1	rule	fixture	markdown-it's default feature set — CommonMark plus GFM pipe tables and strikethrough — beyond §10.4 heading ids; output filename swaps .md for .html
 MD-02	§10.1	rule	fixture	Include timing in Markdown: conversion first — include tags/SSI comments pass through the converter as raw HTML and resolve on the converted output; fragment contents are spliced verbatim, never converted; a .md include target converts exactly once
 MD-03	§10.1	rule	fixture	Layout rules apply exactly as for an HTML page whose body is the converted output and whose head is synthesized from frontmatter
@@ -134,7 +133,7 @@ COL-04	§13	rule	structural	Pages and assets cannot collide by construction; col
 COL-05	§13	rule	targeted	Two outputs that one host folding sees as one name, where the folding is not case alone, are advisory A16; the key is NFC and THEN case-folded because the common normalizing host folds both at once, so the group CONTAINS A11's whenever a name appears in both a second case and a second form. The guarantee is that each advisory says only what is true of what it names — A11 names ONLY pairs differing by case (its group is one case fold, its representatives one per NFC form, so any two it names differ in NFC) and A16 makes no per-pair claim at all, asserting only the folding that merges its whole group, because a group can hold a pure-ASCII case pair (Kilo.html/kilo.html beside U+212A Kilo.html) about which no form claim is true. Not a partition: a group that is A11's entirely — every member the same after case folding AND every member a distinct NFC form — is skipped, both halves load-bearing (case-fold alone hands the KELVIN pair to A11, form alone makes the macOS pair silent in both), and every surviving group is quoted in full, one escaped spelling per member, so a name colliding in both ways is named by both. The table is closed because §20.5's address function is injective over output paths (encodeURIComponent escapes % so decoding inverts it, and about/index.html is the only path yielding /about/), leaving only the host's own name foldings
 DIA-01	§14.1	rule	fixture	Two severities only: problem and advisory; never "warning", "error:", or rule codes
 DIA-02	§14.1	rule	fixture	Exit 0: published (with --dry-run: would have)
-DIA-03	§14.1	rule	fixture	Exit 1: problems found (or advisories under --strict); nothing published; previous output untouched
+DIA-03	§14.1	rule	fixture	Exit 1: problems leave previous output untouched; advisories under --strict change the exit code but do not withhold publication
 DIA-04	§14.1	rule	targeted	Exit 2: invalid usage or fatal environment error (unknown flag, missing source dir, --clean containment refusal, port in use)
 DIA-05	§14.1	rule	fixture	Diagnostics to stderr; build summary and --dry-run list to stdout; both ordered by path then line; two runs print the same bytes
 DIA-06	§14.1	rule	fixture	Every diagnostic line begins FILE:LINE: SEVERITY: (line omitted when unknown); prefix and severity token are stable contract, message prose is not

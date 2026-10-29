@@ -164,8 +164,9 @@ generator's directory is refused whether or not it publishes).
   error, because a section layout is a complete standalone page.
 - `<include src="/_includes/nav.html"></include>` splices a file in verbatim, always with the
   closing tag. Empty, it splices the file in verbatim; content between the tags fills the slots of
-  a `*.fragment.html` that declares them, exactly as a page fills a layout's. An include is still
-  not a component: it takes no props and merges no attributes.
+  a `*.fragment.html` that declares them: direct child elements fill named slots, the rest fills
+  the bare slot, and unfilled slots show their fallback. Main elements stay intact; their children
+  are not fills. An include is still not a component: it takes no props and merges no attributes.
 - The layout's bare `<slot></slot>` — usually inside its `<main>` — receives everything the page
   did not address elsewhere. Your first default-content main is unwrapped and its children used, so write
   complete semantic documents.
@@ -178,9 +179,7 @@ generator's directory is refused whether or not it publishes).
   (the separator lives in the layout — `<title>— My Site</title>`, and a page writes just
   `<title>About</title>`), your `<meta>` replaces the layout's with the same `name`/`property`,
   and everything else appends. On `<html>`/`<body>` your classes are added and any other attribute
-  you set wins. The same merge applies to your main and the layout
-  main receiving non-empty default content (the implicit main or bare slot's main ancestor).
-  Named fills and fallback-only content do not merge.
+  you set wins; attributes merge nowhere else.
 
 ## Metadata, without inventing anything
 
