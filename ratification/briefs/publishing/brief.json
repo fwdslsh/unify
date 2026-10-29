@@ -1,0 +1,25 @@
+{
+  "title": "Publishing surface: schema:, og: share cards, dated posts, a feed, a subpath",
+  "origin": "round 27, re-run unchanged in round 29; checks follow round 27's pre-registered V1-V5",
+  "baseUrl": "https://bellwick.example/workshop/",
+  "checks": [
+    {
+      "check": "addresses"
+    },
+    {
+      "id": "feed",
+      "check": "feed",
+      "minEntries": 4
+    },
+    {
+      "id": "article-data",
+      "check": "postArticles",
+      "min": 4
+    },
+    {
+      "id": "share-cards",
+      "check": "postShareCards",
+      "min": 4
+    }
+  ]
+}

@@ -3,7 +3,7 @@
  * judge-round.mjs — the standing instrument for judging a ratification round.
  * Version 1.0.0. Runs under bun or node (>=18). Zero dependencies.
  *
- *   bun ratification/scripts/judge-round.mjs <round-dir> [--config judge.json]
+ *   bun ratification/scripts/judge-round.mjs <round-dir> [--config judge.json] [--out results.json]
  *   bun ratification/scripts/judge-round.mjs --self-test
  *
  * <round-dir> contains sample subdirectories (haiku-1, sonnet-1, …), each with
@@ -12,7 +12,8 @@
  * into a sample directory, and every build runs with `--dry-run` appended
  * ("no writes at all, anywhere" — build.js's own contract). The one file this
  * tool writes is `judge-results.json`, in `ratification/rounds/<round>/` — the
- * round directory's own name under this repository's gitignored `rounds/`.
+ * round directory's own name under this repository's gitignored `rounds/` — or
+ * wherever `--out` names (run-round.mjs passes it).
  *
  * Why this exists: every false verdict in twenty rounds came from improvised
  * judging, never from the samples. The three most recent, each encoded here as
@@ -47,11 +48,12 @@
  *   timeoutMs        per-build timeout                       (default 240000)
  *   primitives       {label: literal-or-/regex/} swept over the source tree
  *   sweepExclude     top-level names skipped by the sweep ("X*" = prefix match)
+ *   isolate          {script, repo, transcripts}: run each build through isolate.sh
  */
 
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { basename, isAbsolute, join, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const VERSION = "1.0.0";
@@ -294,12 +296,17 @@ function optionValue(command, names) {
  * with --dry-run --strict appended (deduplicated). Output is captured in
  * memory — never redirected into the sample.
  */
-function runBuild(sampleDir, command, timeoutMs) {
+function runBuild(sampleDir, command, timeoutMs, isolate) {
   let executed = command;
   if (/^unify\s/.test(executed) && existsSync(join(sampleDir, "unify"))) executed = `./${executed}`;
   if (!/(^|\s)--dry-run(\s|$)/.test(executed)) executed += " --dry-run";
   if (!/(^|\s)--strict(\s|$)/.test(executed)) executed += " --strict";
-  const res = spawnSync("bash", ["-c", executed], {
+  // With `isolate` configured (run-round.mjs does), the build runs where the agent ran:
+  // in the sample, seen as /tmp/sandbox, with the repository and the host /tmp masked.
+  const [cmd, args] = isolate
+    ? [isolate.script, [sampleDir, isolate.repo, isolate.transcripts, "bash", "-c", executed]]
+    : ["bash", ["-c", executed]];
+  const res = spawnSync(cmd, args, {
     cwd: sampleDir,
     encoding: "utf8",
     timeout: timeoutMs,
@@ -610,7 +617,7 @@ function judgeSample(roundDir, name, config) {
   if (chosen && chosen.substitution) {
     result.run = { executed: null, exit: null, refused: "command contains $/\\` shell substitution — refusing to execute" };
   } else if (chosen) {
-    const run = runBuild(sampleDir, chosen.command, config.timeoutMs);
+    const run = runBuild(sampleDir, chosen.command, config.timeoutMs, config.isolate);
     const parsed = parseDiagnostics(run.stderr, run.stdout, config.diagnosticLines);
     result.run = {
       executed: run.executed,
@@ -632,7 +639,9 @@ function judgeSample(roundDir, name, config) {
   const outputDir = optionValue(command, ["--output", "-o"]) ?? "dist";
   const sourceRoot = optionValue(command, ["--source", "-s"]) ?? (existsSync(join(sampleDir, "src")) ? "src" : ".");
   const baseUrl = config.baseUrl ?? optionValue(command, ["--base-url"]);
-  const outAbs = isAbsolute(outputDir) ? outputDir : join(sampleDir, outputDir);
+  // An agent sees its own directory as /tmp/sandbox (isolate.sh), and may write that path.
+  const inSandbox = /^\/tmp\/sandbox(\/|$)/.test(outputDir);
+  const outAbs = inSandbox ? join(sampleDir, outputDir.slice("/tmp/sandbox".length)) : isAbsolute(outputDir) ? outputDir : join(sampleDir, outputDir);
 
   result.outputDir = outputDir;
   result.markers = { pattern: config.marker, ...countMarkers(outAbs, config.marker) };
@@ -765,7 +774,7 @@ function main(argv) {
   if (argv[0] === "--self-test") return selfTest();
   const roundArg = argv.find((a) => !a.startsWith("--"));
   if (!roundArg) {
-    process.stderr.write("usage: judge-round.mjs <round-dir> [--config judge.json] | --self-test\n");
+    process.stderr.write("usage: judge-round.mjs <round-dir> [--config judge.json] [--out results.json] | --self-test\n");
     return 2;
   }
   const roundDir = resolve(roundArg);
@@ -822,9 +831,9 @@ function main(argv) {
     },
     samples: results,
   };
-  const outDir = join(ROUNDS_DIR, basename(roundDir));
-  mkdirSync(outDir, { recursive: true });
-  const jsonPath = join(outDir, "judge-results.json");
+  const oi = argv.indexOf("--out");
+  const jsonPath = oi !== -1 && argv[oi + 1] ? resolve(argv[oi + 1]) : join(ROUNDS_DIR, basename(roundDir), "judge-results.json");
+  mkdirSync(dirname(jsonPath), { recursive: true });
   writeFileSync(jsonPath, `${JSON.stringify(json, null, 2)}\n`);
   process.stdout.write(`\nresults written: ${jsonPath}\n`);
 

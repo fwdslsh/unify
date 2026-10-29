@@ -1,0 +1,31 @@
+{
+  "title": "Hand over only when every check the tool offers reports nothing",
+  "origin": "round 28; checks follow its pre-registered V1-V4, plus the brief's extensionless addresses",
+  "baseUrl": "https://fernway.example/library/",
+  "checks": [
+    {
+      "check": "addresses"
+    },
+    {
+      "id": "audit-strict",
+      "check": "auditStrict"
+    },
+    {
+      "id": "article-data",
+      "check": "postArticles",
+      "min": 3
+    },
+    {
+      "id": "share-cards",
+      "check": "postShareCards",
+      "min": 3,
+      "dimensions": true
+    },
+    {
+      "id": "ran-audit",
+      "check": "ranCommand",
+      "pattern": "unify audit",
+      "scored": false
+    }
+  ]
+}

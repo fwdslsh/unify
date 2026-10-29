@@ -30,13 +30,11 @@ Run a stronger model alongside as a control. The comparison is the signal: **whe
 
 ## Setup
 
-**Isolation must be structural, not instructed.** In-session subagents inherit project context — the repo's `CLAUDE.md` loads no matter what the prompt says. Run each agent as its own process with cwd inside a sandbox:
+`bun run ratify` (`ratification/scripts/run-round.mjs`) is the setup: it does every step
+below, and has the traps after them built in. [`README.md`](README.md) has the commands.
+This section says what it does and why.
 
-```bash
-cd /tmp/ratify/<round>/<agent>
-printf '%s' "$PROMPT" | claude -p --model haiku \
-  --permission-mode acceptEdits --allowedTools Read Write Edit Glob Grep
-```
+**Isolation must be structural, not instructed.** In-session subagents inherit project context — the repo's `CLAUDE.md` loads no matter what the prompt says. Each sample is its own `claude -p` process, working in its own directory, with the prompt on stdin — and with none of the user settings, hooks, MCP servers or session variables of the machine running the round.
 
 Verify it rather than trusting it — and verify the right thing. Asking the agent whether
 it has project context is necessary and **not sufficient**: `cwd` is not isolation,
@@ -45,41 +43,52 @@ that question and, in the same file, listed three copies of `conformance-spec.md
 harness copies it had just found on disk. Rounds 16–18 ran with the full specification
 readable, and their samples would have answered NO too.
 
-Run each sample in a private mount namespace instead (`/tmp/ratify/harness/isolate.sh`):
-bind the sample directory to `/sandbox`, bind a fresh writable `/tmp` over the real one —
-masking every other copy at once, since enumerating leak paths by hand was wrong twice —
-and mask the repo and the session transcripts. The check is then empirical: the sample
-answers NO **and** a whole-filesystem search for the tool's documentation returns nothing.
-Do both once per protocol change.
+So every sample runs in a private mount namespace (`ratification/scripts/isolate.sh`): its
+own directory is its `/tmp/sandbox`, a fresh empty `/tmp` replaces the real one — masking
+every other copy at once, since enumerating leak paths by hand was wrong twice — and the
+repository, the package caches and every other session's transcripts are masked. The check
+is then empirical: before launching, the runner searches the whole filesystem *from a
+sample's view* for the tool's documentation, and stops the round if it finds any. Asking a
+sample whether it has project context remains a useful spot check, never the proof.
 
-Copy the task, the rules, and the report format **into** each sandbox so no path outside cwd is ever referenced. Regenerate the rules file from the doc each round, so every sample is provably given byte-identical input:
+Every sample is given byte-identical input, copied **into** its directory so no path outside
+it is ever referenced: the brief, `rules.md` regenerated from the `docs/authoring-rules.md`
+of the unify under test, that unify compiled to `./unify`, and the brief's seed files.
+`round.json` records the unify commit and the rules and prompt hashes.
 
-```bash
-{ echo '```markdown'; cat docs/authoring-rules.md; echo '```'; } > <sandbox>/rules.md
-```
-
-Two traps that each cost a full round:
+Two traps that each cost a full round, both handled by the runner:
 
 - **`--allowedTools` is variadic** and will swallow a positional prompt as another tool name. Pass the prompt on stdin. (Symptom: every agent exits 1 with "Input must be provided.")
-- **Restrict tools to file access.** In print mode a permission prompt has nobody to answer it, and the run hangs to its timeout.
+- **Restrict tools.** In print mode a permission prompt has nobody to answer it, and the run hangs to its timeout. The runner names the brief's tools (`--tools`, file access plus `Bash` by default) and denies anything else without asking (`--permission-prompts none`).
 
 Two more that cost hours rather than rounds:
 
-- **Empty the sandbox before re-seeding it.** A retried sample that starts on top of the dead run's half-built site is not a sample, and nothing downstream will tell you.
-- **Stagger the launches.** Thirteen simultaneous cold starts produced a burst of transient proxy TLS failures that killed half a round; twenty seconds apart, none. Check every sample's exit code before analysing anything — a sample that never started looks exactly like a sample that did nothing.
+- **Empty the sandbox before re-seeding it.** A retried sample that starts on top of the dead run's half-built site is not a sample, and nothing downstream will tell you. Every round gets a new directory.
+- **Stagger the launches.** Thirteen simultaneous cold starts produced a burst of transient proxy TLS failures that killed half a round; twenty seconds apart, none. Check every sample's exit code before analysing anything — a sample that never started looks exactly like a sample that did nothing. The runner records every exit code and scores it.
 
 ## Running a round
 
-1. Regenerate the rules file from the current doc.
-2. Seed N sandboxes (5 Haiku + 1 control is a good default).
-3. Launch, wait, collect — then **archive the round immediately, before judging**: copy every sample's `REPORT.md` and a tarball of the sample source trees into `ratification/rounds/<round>/`, where the judge (below) also writes `judge-results.json`. That directory is gitignored, so a round's archive lives in the checkout and never in the repository. The machine these rounds run on resets without warning, `/tmp` does not survive it, and round 27's sandboxes — reports, transcripts, sites — were lost hours after judging; its evidence survived only as the one JSON file that had been committed and whatever the judge's write-up had quoted. Evidence that exists only on `/tmp` has not been collected.
-4. **Run `unify build --dry-run --strict` over every sample yourself.** Exit code plus the
-   diagnostic list is the verdict.
-5. Read the output anyway — a green exit says the site composes, not that the author reached
-   for the mechanism the brief was built to compel.
-6. Read every agent's self-report.
-7. Triage each finding (next section).
-8. Amend at most a handful of things. Re-run.
+1. `bun run ratify --brief <name> --samples 5` seeds five Haiku samples, launches them and
+   waits. Run the control as a second round (`--model sonnet`); 5 Haiku plus 1 control is
+   a good default.
+2. The runner then judges every sample with the standing instrument (below): **the sample's
+   own publish command, re-run with `--dry-run --strict`**, where exit code plus the
+   diagnostic list is the verdict. It rebuilds each site in a copy, runs the brief's checks
+   on the result, and writes `SUMMARY.md`. Read it.
+3. The round is archived as it runs: the samples work inside `ratification/rounds/<round>/`
+   and everything stays there. That directory is gitignored, so a round's archive lives in
+   the checkout and never in the repository; copy it somewhere durable if the machine can
+   reset. The machine these rounds run on resets without warning, `/tmp` does not survive
+   it, and round 27's sandboxes — reports, transcripts, sites — were lost hours after
+   judging; its evidence survived only as the one JSON file that had been committed and
+   whatever the judge's write-up had quoted. Evidence that exists only on `/tmp` has not
+   been collected.
+4. Read the output anyway — a green check says the site composes, not that the author
+   reached for the mechanism the brief was built to compel.
+5. Read every agent's self-report (`SUMMARY.md` quotes the start of each) and, for anything
+   surprising, its transcript.
+6. Triage each finding (next section).
+7. Amend at most a handful of things. Re-run.
 
 **The build is the instrument, and it is much sharper than reading.** Rounds 1–6 were judged
 by hand and recorded two 6/6 sweeps. The first brief judged by the real build came back
@@ -87,9 +96,12 @@ by hand and recorded two 6/6 sweeps. The first brief judged by the real build ca
 Read every pre-round-7 result as *no violation a human reviewer noticed*, and re-run any
 older brief you intend to rely on.
 
-Two cautions the upgrade brings. Put the CLI **inside** the sandbox (a compiled binary
-carries no docs with it) so isolation still holds — verify with the project-context
-question, as always. And keep briefs honest about what the build will check: a reference to
+Two cautions the upgrade brings. Put the CLI **inside** the sandbox, compiled, so isolation
+still holds. The binary carries none of `docs/`, but it is not documentation-free: it holds
+`--help`, every diagnostic, and the built-in templates `unify init` writes, whose READMEs
+restate the rules, and a sample in the first harness round read the blog template's
+generator out of it with `strings`. Treat that as the tool teaching, which is what a sample
+given the build is measuring; it is not contamination. And keep briefs honest about what the build will check: a reference to
 an image the agent had no way to create fails the build without telling you anything about
 the doc. Seed those assets, or ask for placeholders in the brief.
 
@@ -112,7 +124,7 @@ the environment as well as the doc, and the result stops being attributable.
 
 **Sweep the site output, not the sandbox.** `rules.md` quotes `{{ }}` as an example of what not to write, so a naive violation grep reports templating syntax in every clean sample. Exclude the harness files. (I lost a round's analysis to this and briefly believed four samples had failed.)
 
-**Judge with the standing instrument, not ad-hoc greps: `bun ratification/scripts/judge-round.mjs <round-dir>`** extracts each sample's own publish command whole (quoted arguments, backslash continuations), re-runs it in place with `--dry-run --strict`, greps for exact private values only, resolves client-side fetch targets against the deploy address, and records every candidate command so a wrong pick stays visible, in `ratification/rounds/<round>/judge-results.json` (named after the round directory; the samples themselves are never written). Improvised judging is how every false verdict in this record happened — three in rounds 19–20 alone (a regex that truncated a quoted URL, a split line-continuation, a domain-level privacy grep), all from the experimenter and none from the samples.
+**Judge with the standing instrument, not ad-hoc greps.** The runner calls `ratification/scripts/judge-round.mjs`, which extracts each sample's own publish command whole (quoted arguments, backslash continuations), re-runs it in place with `--dry-run --strict` inside the sample's own isolation, greps for exact private values only, resolves client-side fetch targets against the deploy address, and records every candidate command so a wrong pick stays visible, in `<brief>/judge-results.json`; the samples themselves are never written. A question the checks do not answer yet becomes a check in `ratification/scripts/checks.mjs`, re-run over a finished round with `--rejudge`, not a grep. Improvised judging is how every false verdict in this record happened — three in rounds 19–20 alone (a regex that truncated a quoted URL, a split line-continuation, a domain-level privacy grep), all from the experimenter and none from the samples.
 
 ## Triage: doc, spec, implementation, or outlier
 

@@ -1,0 +1,21 @@
+{
+  "title": "A Svelte component compiled to a browser asset by one repeatable command",
+  "origin": "round 24 (round 25 re-ran it with docs/integrations.md seeded); needs the npm registry",
+  "baseUrl": "https://thistleknap.pages.dev/forge/",
+  "timeoutSecs": 2700,
+  "checks": [
+    {
+      "check": "addresses"
+    },
+    {
+      "id": "drafts-unpublished",
+      "check": "absent",
+      "paths": [
+        "drafts/"
+      ],
+      "text": [
+        "DRAFT — not for publication"
+      ]
+    }
+  ]
+}
