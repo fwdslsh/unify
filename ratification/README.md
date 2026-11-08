@@ -105,7 +105,8 @@ A sample passes when every scored check passes. Every brief starts with four:
 
 - **agent-finished** — the agent exited 0 within its time, reported no error, and wrote `REPORT.md`.
 - **publish-command** — `REPORT.md` states a `unify build` command or a resolvable
-  `npm run <script>` in a fenced block. Verification commands containing `--dry-run`
+  `npm run <script>` in a fenced or indented code block (outside blockquotes).
+  Verification commands containing `--dry-run`
   are not publish candidates, including when hidden behind an npm script.
 - **strict-build** — the resolved Unify command with `--dry-run --strict` exits 0:
   no problem and no advisory. An npm wrapper first runs in a scratch copy, including

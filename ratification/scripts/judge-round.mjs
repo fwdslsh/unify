@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * judge-round.mjs — the standing instrument for judging a ratification round.
- * Version 1.0.0. Runs under bun or node (>=18). Zero dependencies.
+ * Version 1.1.0. Runs under bun or node (>=18), using the project's markdown-it.
  *
  *   bun ratification/scripts/judge-round.mjs <round-dir> [--config judge.json] [--out results.json]
  *   bun ratification/scripts/judge-round.mjs --self-test
@@ -23,7 +23,7 @@
  *  1. A `grep -oE '\.\/unify build[^`"|]*'` truncated a command at its own
  *     quoted --base-url value and judged the sample with the amputated half
  *     (exit 2, "needs a value"). → Commands are extracted with a quote-aware
- *     scanner from fenced code blocks, whole, and every candidate is recorded
+ *     scanner from Markdown code blocks, whole, and every candidate is recorded
  *     so a wrong pick is visible in the output.
  *  2. A backslash line-continuation split another sample's command in two and
  *     produced a spurious exit 2. → Continuations are joined before scanning.
@@ -56,9 +56,11 @@ import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import MarkdownIt from "markdown-it";
 import { isolationEnvironment } from "./isolation.mjs";
 
-const VERSION = "1.0.0";
+const VERSION = "1.1.0";
+const reportMarkdown = new MarkdownIt("commonmark");
 
 /** Where results land: `ratification/rounds/`, beside this script's directory, gitignored. */
 const ROUNDS_DIR = fileURLToPath(new URL("../rounds/", import.meta.url));
@@ -78,27 +80,27 @@ const DEFAULTS = {
 // ---------------------------------------------------------------- extraction
 
 /**
- * Fenced code blocks (``` or ~~~) with their content lines and 1-based line
- * numbers. Inline code in prose is deliberately not scanned: reports quote the
+ * Fenced and indented code blocks, with 1-based source line numbers.
+ * Markdown parsing distinguishes indentation from paragraph/list continuation.
+ * Blockquoted examples and inline code are deliberately not scanned: reports quote the
  * rules doc's `node gen.mjs && unify build` in running text, and those quotes
  * are not the sample's command.
  */
-function fencedBlocks(text) {
-  const lines = text.split("\n");
-  const blocks = [];
-  let open = null;
-  for (let i = 0; i < lines.length; i++) {
-    const m = lines[i].match(/^\s*(```+|~~~+)/);
-    if (m && !open) {
-      open = { fence: m[1][0], openLine: i + 1, lines: [] };
-    } else if (m && open && m[1][0] === open.fence) {
-      blocks.push(open);
-      open = null;
-    } else if (open) {
-      open.lines.push({ text: lines[i], line: i + 1 });
-    }
-  }
-  if (open) blocks.push(open); // unterminated fence: judge what is there
+function codeBlocks(text) {
+  const lines = text.replace(/\r\n?/g, "\n").split("\n");
+  let quoteDepth = 0;
+  const blocks = reportMarkdown.parse(text, {})
+    .filter((token) => {
+      if (token.type === "blockquote_open") quoteDepth++;
+      if (token.type === "blockquote_close") quoteDepth--;
+      return quoteDepth === 0 && (token.type === "fence" || token.type === "code_block");
+    })
+    .map((token) => {
+      const openLine = token.map[0] + 1;
+      const firstContentLine = openLine + (token.type === "fence" ? 1 : 0);
+      return { openLine, lines: token.content.replace(/\n$/, "").split("\n")
+        .map((text, i) => ({ text, line: firstContentLine + i })) };
+    });
   return { blocks, lines };
 }
 
@@ -207,17 +209,17 @@ function scanShellLine(line) {
 const isUnifyToken = (t) => t === "unify" || t === "./unify" || t.endsWith("/unify");
 
 /**
- * Every `unify build` invocation in REPORT.md's fenced blocks, whole:
+ * Every `unify build` invocation in REPORT.md's code blocks, whole:
  * continuations joined, quoted arguments intact, any `foo && ` prefix and any
  * ` && bar` / redirect suffix cut at top-level operators only. All candidates
  * are returned; the caller records them all so a wrong pick stays visible.
  */
 function extractCandidates(reportText, scripts = {}) {
-  const { blocks, lines } = fencedBlocks(reportText);
+  const { blocks, lines } = codeBlocks(reportText);
   const candidates = [];
   for (const block of blocks) {
     // "Exact publish command" section detection: any line in the 12 lines
-    // above the opening fence naming the publish command.
+    // above the start of the block naming the publish command.
     let inPublishSection = false;
     for (let i = block.openLine - 2; i >= Math.max(0, block.openLine - 13); i--) {
       if (/(publish|exact)[^\n]{0,40}command/i.test(lines[i] ?? "")) {
@@ -313,7 +315,7 @@ function resolveNpmBuild(command, scripts) {
 
 /** Prefer the publish-command section, then completeness, then length. */
 function chooseCandidate(candidates) {
-  if (candidates.length === 0) return { chosen: null, reason: "no fenced `unify build` or resolvable npm run command found" };
+  if (candidates.length === 0) return { chosen: null, reason: "no `unify build` or resolvable npm run command found in a code block" };
   // A verification command cannot publish. Reports often put a longer strict
   // dry run immediately after the publish command, within the section heuristic.
   const publish = candidates.filter((c) => !c.resolutionError && !scanShellLine(c.buildCommand ?? c.command).tokens.some((t) => /^(?:--dry-run|"--dry-run"|'--dry-run')$/.test(t.text)));

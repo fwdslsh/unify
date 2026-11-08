@@ -80,6 +80,40 @@ test("ratification chooses the publish command over a nearby longer verification
   expect(judged.run.exit).toBe(0);
 });
 
+for (const [name, report, command, refused, commandLine = 3] of [
+  ["four spaces", '## Publish command\n\n    ./unify build --output "public site"\n', './unify build --output "public site"'],
+  ["list code block", '- Publish command\n\n      ./unify build --output "public site"\n', './unify build --output "public site"'],
+  ["list fenced block", '- Publish command\n\n  ```sh\n  ./unify build --output "public site"\n  ```\n', './unify build --output "public site"', null, 4],
+  ["tab and continuation", '## Publish command\n\n\t./unify build \\\n\t    --output "public site"\n', './unify build      --output "public site"'],
+  ["indented substitution", '## Publish command\n\n    ./unify build --output "$(touch sentinel)"\n', './unify build --output "$(touch sentinel)"', "shell substitution"],
+  ["paragraph continuation", 'The docs show this example:\n    ./unify build\n', null],
+  ["quoted example", '> Example from the rules:\n>\n>     ./unify build\n', null],
+  ["quoted fenced example", '> ```sh\n> ./unify build\n> ```\n', null],
+  ["list paragraph", '- Example from the rules:\n\n    ./unify build\n', null],
+]) {
+  test(`ratification report code blocks: ${name}`, () => {
+    const round = join(root, `code-block-${name}`);
+    const sample = join(round, "sample");
+    mkdirSync(join(sample, "site"), { recursive: true });
+    linkSync(binary, join(sample, "unify"));
+    writeFileSync(join(sample, "site/index.html"), html);
+    writeFileSync(join(sample, "REPORT.md"), report);
+    const out = join(round, "judge.json");
+    Bun.spawnSync({ cmd: ["bun", "ratification/scripts/judge-round.mjs", round, "--out", out], cwd: REPO, stdout: "pipe", stderr: "pipe" });
+    const judged = JSON.parse(readFileSync(out, "utf8")).samples[0];
+    expect(judged.chosenCommand).toBe(command);
+    if (refused) expect(judged.run.refused).toContain(refused);
+    else if (command) {
+      expect(judged.run.exit).toBe(0);
+      expect(judged.outputDir).toBe("public site");
+      expect(judged.candidates[0].line).toBe(commandLine);
+      expect(judged.candidates[0].inPublishSection).toBe(true);
+    } else expect(judged.run.executed).toBeNull();
+    expect(existsSync(join(sample, "sentinel"))).toBe(false);
+    expect(readFileSync(join(sample, "REPORT.md"), "utf8")).toBe(report);
+  });
+}
+
 const entry = (updated = "2026-01-02T09:30:00Z") => `<entry><title>News &amp; events</title><link href="https://example.test/news/"/><updated>${updated}</updated></entry>`;
 const feed = (body) => `<feed xmlns="http://www.w3.org/2005/Atom">${body}</feed>`;
 let serial = 0;
