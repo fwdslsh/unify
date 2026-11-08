@@ -119,6 +119,12 @@ const HEAD_JOIN = "\n    ";
  * @returns {boolean} whether a problem was reported
  */
 export function reportRetiredFill(el, { declared, at, host, reporter }) {
+  // §6.3's code-sample exemption includes the pre/code element itself.
+  // Keep it here so page composition and slotted includes agree.
+  for (let node = el; node; node = node.parent) {
+    if (isElement(node, "pre") || isElement(node, "code")) return false;
+  }
+  if (attrValueOrEmpty(el, SLOT_ATTR).trim() !== "") return false;
   const name = attrValueOrEmpty(el, DATA_SLOT).trim();
   if (name === "" || !declared.has(name)) return false;
   reporter.problem({
@@ -574,9 +580,9 @@ function composeSinkedBody({ preparedC, cBody, preparedL, sinks, pageFile, layou
       ...at(main.start),
       message: `no slot named "${mainSlot}" in ${layoutFile}; its content stayed in the page content`,
     });
-  } else if (main?.parent === cBody) {
+  } else if (main) {
     // §7.3/P08 — the retired fill spelling on the main §7.2 is about to
-    // unwrap, which would take the attribute with it. Same timing as A02's.
+    // unwrap at any depth, which would take the attribute with it.
     reportRetiredFill(main, {
       declared: sinks.namedSlots, at: spansToDiagnosticLocator(preparedC.spans, pageFile, resolveLine), host: layoutFile, reporter,
     });

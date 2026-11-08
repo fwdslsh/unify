@@ -125,7 +125,9 @@ test("LAY-15 — data-slot naming a slot the layout declares, in fill position, 
   const cases = {
     "a direct body child": '<main><h1>Home</h1></main><aside data-slot="sidebar">meant as a fill</aside>',
     "the default-content main itself": '<main data-slot="sidebar"><h1>Home</h1></main>',
+    "the default-content main inside a wrapper": '<div><main data-slot="sidebar"><h1>Home</h1></main></div>',
     "a child of the unwrapped main": '<main><aside data-slot="sidebar">meant as a fill</aside></main>',
+    "a child of the nested unwrapped main": '<div><main><aside data-slot="sidebar">meant as a fill</aside></main></div>',
   };
   for (const [name, body] of Object.entries(cases)) {
     const r = await build({ "_layout.html": layoutWithSidebar, "index.html": page("Home", body) });
@@ -138,6 +140,26 @@ test("LAY-15 — data-slot naming a slot the layout declares, in fill position, 
   const deep = await build({ "_layout.html": layoutWithSidebar, "index.html": page("Home", '<main><div><p data-slot="sidebar">deep</p></div></main>') });
   if (deep.exit !== 0) throw new Error(`a nested data-slot is not in fill position:\n${deep.stderr}`);
   covers("LAY-15", "P08");
+}, TEST_MS);
+
+test("LAY-16 — matching data-slot stays inert on code samples in page and include fill positions", async () => {
+  for (const tag of ["pre", "code"]) {
+    const sample = `<${tag} data-slot="sidebar">sample</${tag}>`;
+    for (const body of [
+      `<main>${sample}</main>`,
+      `<main><h1>Home</h1></main>${sample}`,
+      `<main><include src="/_includes/card.fragment.html">${sample}</include></main>`,
+    ]) {
+      const r = await build({
+        "_layout.html": layoutWithSidebar,
+        "_includes/card.fragment.html": '<section><slot name="sidebar">fallback</slot><slot></slot></section>',
+        "index.html": page("Home", body),
+      });
+      if (r.exit !== 0) throw new Error(`code sample must stay inert:\n${r.stderr}`);
+      if (!r.read("index.html").includes(sample)) throw new Error(`sample must ship unchanged: ${sample}`);
+    }
+  }
+  covers("LAY-15", "LAY-16", "P08");
 }, TEST_MS);
 
 test("LAY-15 — in a slotted include, data-slot naming a declared slot is P08; one naming none is content for the bare slot", async () => {
