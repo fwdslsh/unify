@@ -6,6 +6,40 @@ upgrading across them.
 The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.18] - 2026-11-08
+
+### Changed
+
+- **A plain `data-slot` or `data-layout` that addresses nothing is the author's (#154).** P08 read
+  `data-slot` on every element of every source file and failed the build, and P07 did the same for
+  `data-layout` on any element below the root. Both are ordinary `data-*` names that third-party markup
+  uses for its own purposes — shadcn/ui puts a `data-slot` on every primitive — and a port that carried
+  such markup could not build until the attributes were renamed. unify consumes `data-layout` on
+  `<html>`/`<body>` alone and never consumed `data-slot`, so nothing was ever lost; the two checks now
+  reach only as far as the intent is unambiguous. `data-slot="X"` is still P08 where it would have been
+  a fill — on an element in fill position whose layout, or whose fragment in a slotted include, declares
+  `<slot name="X">` — and names `slot="X"` as the fix. `data-layout` off the root is still P07 when its
+  value is a layout reference, a path ending `.html` or `none`. `data-unify` and `unify-*`, the
+  unify-branded tokens, are swept everywhere as before. A `<title data-slot="title">` in a layout, the
+  0.8.3 case, is no longer reported: a page's title merges regardless (conformance spec §6.3, §7.3, §32.3).
+
+### Fixed
+
+- **P15 points at the include recipe (#155).** The fix line for a layout that declares `data-layout`
+  said only to make it a complete standalone layout or delete it, which read as "copy the shell"; it
+  now also says to keep shared chrome in `_includes/`, so a section layout repeats one `<include>` per
+  region. The product spec's "accepted cost is repeating shared chrome" is corrected to match Getting
+  Started, and the first external request for chaining is logged beside the deferral (product spec
+  §3.2, §6.6).
+
+### Added
+
+- **A porting guide (#156).** `docs/guides/porting-an-existing-site.md` maps each live address to the
+  source path that keeps it, in a plain build and under `--pretty-urls`; states the rule for a site that
+  mixes `/x/` and `/x.html` addresses (no flag, every route in its path); and gives a ten-line check
+  that compares `unify audit --format json` against the list of addresses a port must keep. Every
+  literal is tested.
+
 ## [0.11.17] - 2026-10-29
 
 ### Added

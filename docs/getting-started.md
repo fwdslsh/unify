@@ -343,6 +343,7 @@ inside, never one that fragment includes in turn. The complete rule is
 - Every non-page file in `site/` is copied through byte-for-byte to the same path. What you see in the folder is what ships — compress images before adding them.
 - **Reference stylesheets and scripts directly**: `<link rel="stylesheet" href="/assets/style.css">` is all unify needs, and the file ships as written. Whether a browser fetches it again after you change it is decided by the cache headers your host sends, not by unify; if you want a version in the address anyway, [the cache-busting recipe](guides/generator-recipes.md#cache-busting-urls) adds one with a small generator.
 - unify does not scope styles. If a fragment's CSS should not leak, use the platform: `@scope`, `@layer`, nesting, or a class prefix.
+- **Porting a site whose addresses already exist?** [Porting an existing site](guides/porting-an-existing-site.md) maps each live URL to the source path that keeps it, with and without `--pretty-urls`, and checks the whole list against a build.
 
 What a link written in `site/index.html` becomes in the built page:
 
