@@ -16,6 +16,24 @@ The [protocol](ratification-protocol.md) defines the rules. The
 
 ## Quick start
 
+From a Linux checkout outside `/tmp`, with Bun installed:
+
+```sh
+bun run ratify:setup
+```
+
+Setup installs repository dependencies and offers to install OpenCode 1.18.25 if it
+is missing. It keeps an existing OpenCode installation, prompts you to configure a
+provider using OpenCode's own login flow (or keep your existing setup), lists models,
+and runs preflight for the model you select. It prints the run commands without
+starting an evaluation or creating a provider configuration file. Missing system
+tools or unsupported isolation are reported; setup does not change OS security settings.
+If Bun's global executable directory is outside your shell's PATH, setup uses it for
+its checks and prints the `export PATH=...` command to run afterward.
+Use an interactive terminal; `bun run ratify:setup --help` shows its requirements.
+
+For an already-configured environment, the manual commands remain:
+
 ```sh
 bun install --frozen-lockfile
 opencode models
