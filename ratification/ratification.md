@@ -4,7 +4,7 @@ description: "The evidence behind the authoring rules: each ratification round, 
 
 # Ratification — what the agent-experiment rounds changed
 
-**Status**: v0.7.0, historical record and argument
+**Status**: historical record through v0.7.0, with later rounds and PR #157 validation on v0.11.18
 **Role**: This document is the narrative and the evidence behind `ratification/ratification-protocol.md`. The protocol is the procedure — how to run a round, how to triage what it finds. This is the account of running it: what was measured, what broke, what the results changed in the documentation, the specification, the implementation, and the product itself. The round-by-round primary source is `_notes/ratification-rounds-7-25.md`, with round 1 and the pre-registrations beside it.
 **`_notes/`**: Paths under `_notes/` in this document name working files removed from the repository after commit `238050d`; `git show 238050d:_notes/<path>` reads any of them.
 
@@ -239,3 +239,114 @@ Open work, in the order the record recommends:
 1. **The human half.** Eighteen rounds, all models. A person who knows HTML but not this tool fails differently — they stop and re-read where a model guesses and moves on.
 2. **A Markdown source map.** A body-derived diagnostic on a `.md` page currently omits its line number, because the text the engine holds at that point is converted HTML and any line it computed would be a guess (DIA-13). Omitting is correct and it is not the same as being located; mapping converted offsets back to `.md` source lines would let those diagnostics carry a real `FILE:LINE`.
 3. **The mis-nested fill.** A `slot=` under a plain wrapper `<div>` still does nothing, still ships unify's own attribute into output that is supposed to contain no tool vocabulary, and says nothing. Three catalogue slots are free, but the evidence does not yet say whether authors write that markup at all. The experiment that would settle it is a brief compelling a fill from inside a styled wrapper — not a guess.
+
+## 9. PR #157: parser repair and Qwen full-suite validation
+
+On 2026-11-08 (the full run crossed into November 9 UTC), PR #157 was evaluated at
+`83bc115168cb411488f0dbc0d156d8196ad7fa1b`, Unify 0.11.18, with judge 1.1.0 and OpenCode
+1.18.25. The model was **`krang/opencode-zen/qwen3.8-flash`**, through Bifrost. The configured
+client limits were 1,000,000 context tokens and 16,384 output tokens. The rules and prompt
+were unchanged across the initial attempt and recovery rounds; their hashes and every
+selected sample are in the [aggregate results](evidence/pr157/pr157-qwen-full-results.json).
+
+**The full suite did not meet the registered bar:** 31 of 35 samples passed all scored
+checks, but seed-catalogue scored 3/5, below the required 4/5 per brief.
+
+| Brief | Passed | Bar met |
+|---|---:|---|
+| audit-handover | 5/5 | yes |
+| callouts | 5/5 | yes |
+| council-panel | 5/5 | yes |
+| photo-banners | 5/5 | yes |
+| publishing | 4/5 | yes |
+| seed-catalogue | 3/5 | no |
+| svelte-estimator | 4/5 | yes |
+
+The initial 35-sample attempt exhausted the Zen account balance: 14 samples completed and
+passed, while 21 returned explicit HTTP 402 “Insufficient account funds” errors. After the
+account was funded, only those 21 were replaced in fresh sandboxes. The
+[recovery mapping](evidence/pr157/pr157-qwen-full-recovery.json) was fixed before launching
+replacements. Every original normal completion was retained, and genuine replacement
+failures were retained. The initial attempt's raw 14/35 score remains in its archive as an
+infrastructure-interrupted result, not a model-quality conclusion.
+
+A second infrastructure issue interrupted the supervising process with exit 143. Twelve
+replacement exit records were already written; nine were missing. All nine model processes
+subsequently completed. Their unique launch order/times, kernel zombie wait status 0, and
+final OpenCode `stop` events established normal completion without another model call.
+`exit-recovery.json` in the recovery archive preserves the raw kernel records and mapping;
+reconstructed `exit.json` records are explicitly marked, with durations left null. The
+supervisor's exact termination cause was not established. The final group was then scored
+with the unchanged judge over the unchanged authored sites.
+
+### Failure triage
+
+- **Seed catalogue, samples 3 and 5:** both strict dry-runs reproduce 225 `page-orphan`
+  incomplete findings. The variety links live in family fragments fetched by the browse
+  page; fragment interiors deliberately do not participate in the static document graph
+  (§4.4 and §20.9 of the conformance spec). Both reports' publish commands include
+  `--audit`; adding the judge's `--strict` gates on those findings. Normal publishing and
+  all remaining scored checks pass. This exposes a mismatch between dynamic reachability
+  and strict audit, rather than 225 demonstrated broken links. Resolve the audit/spec
+  treatment of this supported pattern before rerunning; no criterion was relaxed here.
+  The judge's diagnostic summary also misses `incomplete` findings printed on stdout and
+  misleadingly shows zero problems/advisories. Full reproduction logs are archived.
+- **Publishing, sample 2:** the agent repeatedly called the nonexistent `todos` tool and
+  triggered the configured `doom_loop` denial. Its report and site checks pass, but its
+  exit is 1, so the agent-finished check fails. This is not a billing interruption and was
+  not replaced.
+- **Svelte estimator, sample 4:** the report's primary `./unify build` passes a separate
+  strict dry-run. Its claimed equivalent adds `--generate scripts/gen.mjs`, which resolves
+  relative to the source root and looks for the nonexistent `site/scripts/gen.mjs`.
+  The configured generator instead resolves from the config file's directory. The judge
+  selects the longest candidate and therefore rejects the incorrect alternative. Keep
+  this as a report/command-selection ambiguity; neither silently substitute the successful
+  command nor call the primary site's build broken. Both reproduction outcomes are recorded.
+
+Manual source review also confirmed reusable slotted fragments in the callout samples,
+family-by-family fetch scripts in the catalogue samples, and retained `.svelte` components
+compiled through Svelte/esbuild in all five estimator samples. These inspections supplement
+the registered checks; they are not a claim of independent browser interaction testing.
+Repeated reports asked for the generator argv/context contract and the distinction between
+config-relative and CLI source-relative generator paths. Those are follow-up documentation
+findings, not amendments applied during the experiment.
+
+### Earlier PR trials and durable evidence
+
+| Model / operation | Scope | Result |
+|---|---|---:|
+| Local Qwen3.6-35B-A3B (`krang/local/fast`, 16K client context) | audit-handover | 0/5; all ended without `REPORT.md` |
+| Zen Qwen3.8 Flash, old judge | audit-handover | 4/5; valid indented command rejected |
+| Same five Qwen sites, parser 1.1.0 | unchanged samples rejudged | 5/5 |
+| Zen GPT-5 Nano | audit-handover | 0/5; commands parsed, authoring checks failed |
+| Zen Claude Haiku 5.5 | audit-handover | 5/5 |
+
+The earlier engine was `98dfd174e09b6c5e22ada673298c98fe074ff484`; the parser fix and later
+trials use `83bc115`. Rejudging the original five Qwen sites is not five new samples.
+Haiku's passing brief is not a full-suite control: no stronger model was run across all
+seven briefs in this Qwen-only request, so this does not establish the protocol's comparative
+weak/strong-model diagnosis.
+
+The [evidence index](evidence/pr157/index.json) records archive SHA-256 hashes, model IDs,
+commits, and scope. Archives retain authored sites, reports, event streams, scores, and
+build evidence; credential-bearing OpenCode state/cache directories, installed dependencies,
+and redundant compiled binaries are excluded. Three files contained the injected provider
+key captured by model environment probes; the exact credential bytes have been redacted,
+with affected paths listed in the index. Rebuild the recorded engine with locked
+dependencies. The [recovery archive](evidence/pr157/pr157-zen-qwen38-flash-recovery-evidence.tar.gz)
+includes the exit recovery proof and diagnostic reproductions. All failing results remain
+visible. OpenCode's custom provider pricing was unset: its `$0.00` summaries are **not** an
+actual cost measurement.
+
+The initial invocation was:
+
+```sh
+bun ratification/scripts/run-round.mjs --model krang/opencode-zen/qwen3.8-flash --samples 5 --name pr157-zen-qwen38-flash-full
+```
+
+Recovery used the same command with the recorded `retry-*` names and `--brief` selections:
+one audit sample, three council samples, two photo samples, and five each for publishing,
+seed catalogue, and Svelte estimator. The original 20-second launch spacing and brief
+30/45-minute time limits were retained. Runs used a disposable container with namespace
+isolation; the initial 12 GiB / 4 CPU allocation was raised to 32 GiB / 8 CPU before memory
+pressure, with no container OOM event observed.

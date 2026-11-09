@@ -1,0 +1,2622 @@
+{
+  "pr": "https://github.com/fwdslsh/unify/pull/157",
+  "model": "krang/opencode-zen/qwen3.8-flash",
+  "engineAndJudgeCommit": "83bc115168cb411488f0dbc0d156d8196ad7fa1b",
+  "judgeVersion": "1.1.0",
+  "unifyVersion": "0.11.18",
+  "rulesSha256": "fb07d931bd36ead293dc4ea3d24dc723fa0f4ea0ff810e8df2453525896da590",
+  "promptSha256": "4561314687508deab81ae93169f4707df250121addade51d25992eab548c28a8",
+  "bar": "At least 4/5 all-scored-check passes in each of seven briefs",
+  "status": "failed",
+  "passed": 31,
+  "total": 35,
+  "barMet": false,
+  "billingInterruptedSamplesExcluded": 21,
+  "retainedOriginalSamples": 14,
+  "cleanReplacementSamples": 21,
+  "kernelRecoveredExitRecords": 9,
+  "recoveryManifest": "pr157-qwen-full-recovery.json",
+  "strongerModelControl": "Not run across all seven briefs; prior Haiku 5.5 trial covers audit-handover only.",
+  "costNote": "OpenCode custom provider pricing was unset; $0.00 in harness summaries is not an actual bill.",
+  "triage": [
+    {
+      "brief": "publishing",
+      "sample": 2,
+      "classification": "agent tool-loop failure",
+      "detail": "Repeated unavailable todos calls triggered doom_loop denial. Kept as failure despite report and site checks passing."
+    },
+    {
+      "brief": "seed-catalogue",
+      "samples": [
+        3,
+        5
+      ],
+      "classification": "strict audit / dynamic-fragment reachability mismatch",
+      "detail": "Each reproduces 225 page-orphan incomplete findings for variety pages reached through fetched family fragments. Static manifest excludes fragment interiors by design (spec sections 4.4, 20.9, 24.3). Actual publishing commands without strict succeed; judge appends strict to commands already carrying --audit. Keep failures under unchanged registered checks. Decide how audit should describe dynamic reachability before amending engine/spec or scoring. The judge summary misses stdout incomplete findings and misleadingly displays zero problems/advisories."
+    },
+    {
+      "brief": "svelte-estimator",
+      "sample": 4,
+      "classification": "incorrect claimed equivalent command and selection ambiguity",
+      "detail": "REPORT primary ./unify build passes a separate strict dry-run. Its claimed equivalent adds --generate scripts/gen.mjs, which resolves under site/ and fails. The judge chooses the longest candidate. Config generation path and CLI generation path have different bases; the report itself describes that distinction later. Keep scored failure; no post-hoc command override."
+    }
+  ],
+  "briefs": [
+    {
+      "name": "audit-handover",
+      "passed": 5,
+      "total": 5,
+      "barMet": true,
+      "samples": [
+        {
+          "originalSample": "krang-opencode-zen-qwen3-8-flash-1",
+          "sourceRound": "pr157-zen-qwen38-flash-full",
+          "sourceSample": "krang-opencode-zen-qwen3-8-flash-1",
+          "exitRecoveredFromKernel": false,
+          "name": "krang-opencode-zen-qwen3-8-flash-1",
+          "model": "krang/opencode-zen/qwen3.8-flash",
+          "pass": true,
+          "checks": [
+            {
+              "id": "agent-finished",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0, wrote REPORT.md"
+            },
+            {
+              "id": "publish-command",
+              "scored": true,
+              "pass": true,
+              "detail": "./unify build --clean --audit --strict"
+            },
+            {
+              "id": "strict-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0: 0 problems, 0 advisories"
+            },
+            {
+              "id": "fresh-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0"
+            },
+            {
+              "id": "addresses",
+              "scored": true,
+              "pass": true,
+              "detail": "30 internal links (0 in fetched fragments), all extensionless under /library/ with published targets",
+              "contexts": [],
+              "coverage": [],
+              "failures": []
+            },
+            {
+              "id": "audit-strict",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0: gen.mjs: wrote notes.html from 3 note(s) / audit: nothing to report"
+            },
+            {
+              "id": "article-data",
+              "scored": true,
+              "pass": true,
+              "detail": "3 dated pages (needs 3)"
+            },
+            {
+              "id": "share-cards",
+              "scored": true,
+              "pass": true,
+              "detail": "3 dated pages (needs 3)"
+            },
+            {
+              "id": "ran-audit",
+              "scored": false,
+              "pass": true,
+              "detail": "9 runs matching /unify audit/"
+            }
+          ],
+          "agent": {
+            "exit": 0,
+            "timedOut": false,
+            "durationMs": 611433,
+            "turns": 49,
+            "costUsd": 0
+          },
+          "freshBuild": {
+            "command": "./unify build --clean --audit --strict",
+            "exit": 0
+          },
+          "rulesGaps": "**What `rules.md` did not answer \u2014 the sentence I wanted.** It never documents\n`unify audit` at all: no sentence like \"the checks beyond the build are `unify audit`, whose\nnon-blocking findings \u2014 advisories and `incomplete` \u2014 only fail the exit code under\n`--strict`, and whose `--external` check fetches off-origin URLs.\" The brief demands\nevery check including the non-blocking ones, and rules.md's only mention of checks is the\none line about `build --dry-run --strict`. I found audit from `./unify --help`, and the\nconvention (`build --audit --strict` before publishing) from the `unify init` scaffold's\nown README.md and DEPLOY.md. Second gap: how a `generate:` script is run. The sentence I\nwanted was \"unify hands it argv[2] the source root, argv[3] an overlay directory whose\nfiles join the build as ordinary pages, and argv[4] generator-context.json, which names\nsource-pages.json.\" rules.md says only \"it writes into the directory unify hands it\" \u2014\nwhat that directory is, and the whole shape of source-pages.json, are absent; I took them"
+        },
+        {
+          "originalSample": "krang-opencode-zen-qwen3-8-flash-2",
+          "sourceRound": "pr157-zen-qwen38-flash-retry-audit",
+          "sourceSample": "krang-opencode-zen-qwen3-8-flash-1",
+          "exitRecoveredFromKernel": false,
+          "name": "krang-opencode-zen-qwen3-8-flash-1",
+          "model": "krang/opencode-zen/qwen3.8-flash",
+          "pass": true,
+          "checks": [
+            {
+              "id": "agent-finished",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0, wrote REPORT.md"
+            },
+            {
+              "id": "publish-command",
+              "scored": true,
+              "pass": true,
+              "detail": "./unify build"
+            },
+            {
+              "id": "strict-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0: 0 problems, 0 advisories"
+            },
+            {
+              "id": "fresh-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0"
+            },
+            {
+              "id": "addresses",
+              "scored": true,
+              "pass": true,
+              "detail": "29 internal links (0 in fetched fragments), all extensionless under /library/ with published targets",
+              "contexts": [],
+              "coverage": [],
+              "failures": []
+            },
+            {
+              "id": "audit-strict",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0: audit: nothing to report"
+            },
+            {
+              "id": "article-data",
+              "scored": true,
+              "pass": true,
+              "detail": "3 dated pages (needs 3)"
+            },
+            {
+              "id": "share-cards",
+              "scored": true,
+              "pass": true,
+              "detail": "3 dated pages (needs 3)"
+            },
+            {
+              "id": "ran-audit",
+              "scored": false,
+              "pass": true,
+              "detail": "7 runs matching /unify audit/"
+            }
+          ],
+          "agent": {
+            "exit": 0,
+            "timedOut": false,
+            "durationMs": 381502,
+            "turns": 46,
+            "costUsd": 0
+          },
+          "freshBuild": {
+            "command": "./unify build",
+            "exit": 0
+          },
+          "rulesGaps": "## What `rules.md` did not answer\n\nThe generate-script calling contract. The sentence I wanted \u2014 and could not find \u2014 is\n\"unify runs the script with the generated directory as argv[3] and the path of a\ngenerator-context file as argv[4]\". The docs only say the script \"writes into the directory\nunify hands it\"; *how* it is handed that directory, and where `source-pages.json` lives, are\nnowhere stated. I discovered the argv order and the context JSON (which contains\n`inputs.sourcePages`) by running a probe script that dumped `process.argv`, `process.cwd()`,\nand the context file. Related gaps: nothing says `unify audit` refuses a saved `clean:`\nconfig key (it errored `exit=2` until I removed it), and nothing warns that\n`build --dry-run --strict` passes while `audit --strict` fails \u2014 dry-run did not report the\nimage-dimension incompletes, so relying on it alone would have shipped a rejected site."
+        },
+        {
+          "originalSample": "krang-opencode-zen-qwen3-8-flash-3",
+          "sourceRound": "pr157-zen-qwen38-flash-full",
+          "sourceSample": "krang-opencode-zen-qwen3-8-flash-3",
+          "exitRecoveredFromKernel": false,
+          "name": "krang-opencode-zen-qwen3-8-flash-3",
+          "model": "krang/opencode-zen/qwen3.8-flash",
+          "pass": true,
+          "checks": [
+            {
+              "id": "agent-finished",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0, wrote REPORT.md"
+            },
+            {
+              "id": "publish-command",
+              "scored": true,
+              "pass": true,
+              "detail": "./unify build --base-url https://fernway.example/library/ --pretty-urls --audit"
+            },
+            {
+              "id": "strict-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0: 0 problems, 0 advisories"
+            },
+            {
+              "id": "fresh-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0"
+            },
+            {
+              "id": "addresses",
+              "scored": true,
+              "pass": true,
+              "detail": "29 internal links (0 in fetched fragments), all extensionless under /library/ with published targets",
+              "contexts": [],
+              "coverage": [],
+              "failures": []
+            },
+            {
+              "id": "audit-strict",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0: audit: nothing to report"
+            },
+            {
+              "id": "article-data",
+              "scored": true,
+              "pass": true,
+              "detail": "3 dated pages (needs 3)"
+            },
+            {
+              "id": "share-cards",
+              "scored": true,
+              "pass": true,
+              "detail": "3 dated pages (needs 3)"
+            },
+            {
+              "id": "ran-audit",
+              "scored": false,
+              "pass": true,
+              "detail": "9 runs matching /unify audit/"
+            }
+          ],
+          "agent": {
+            "exit": 0,
+            "timedOut": false,
+            "durationMs": 394959,
+            "turns": 55,
+            "costUsd": 0
+          },
+          "freshBuild": {
+            "command": "./unify build --base-url https://fernway.example/library/ --pretty-urls --audit",
+            "exit": 0
+          },
+          "rulesGaps": "**What `rules.md` did not answer \u2014 the sentence I wanted and could not find.**\nNothing in the file tells you how a generator is actually invoked. The sentence I kept\nlooking for was some form of *\"unify runs it as `node gen.mjs <sourceRoot> <generatedRoot> <context.json>`\"*:\n\"it writes into the directory unify hands it\" never names the handoff \u2014 the generated\nroot arrives as `argv[3]` and the pointer to `source-pages.json` sits in a context JSON\n(`argv[4]` \u2192 `inputs.sourcePages`). I instrumented a probe script and read the printed\nargv to find this. Two more missing sentences: whether `generate:` in `unify.yaml`\nresolves relative to the yaml (it does) or the source root like the `--generate` flag\n(it doesn't \u2014 that looked for `site/scripts/` and failed); and whether the inventory's\n\"authored title\" includes a Markdown page's heading-derived title \u2014 it doesn't\n(`title: null`), so the posts keep both a `title:` key *and* an `<h1>` heading, which\nthe prose neither requires nor forbids."
+        },
+        {
+          "originalSample": "krang-opencode-zen-qwen3-8-flash-4",
+          "sourceRound": "pr157-zen-qwen38-flash-full",
+          "sourceSample": "krang-opencode-zen-qwen3-8-flash-4",
+          "exitRecoveredFromKernel": false,
+          "name": "krang-opencode-zen-qwen3-8-flash-4",
+          "model": "krang/opencode-zen/qwen3.8-flash",
+          "pass": true,
+          "checks": [
+            {
+              "id": "agent-finished",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0, wrote REPORT.md"
+            },
+            {
+              "id": "publish-command",
+              "scored": true,
+              "pass": true,
+              "detail": "./unify build --base-url https://fernway.example/library/ --pretty-urls --generate _scripts/gen.mjs"
+            },
+            {
+              "id": "strict-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0: 0 problems, 0 advisories"
+            },
+            {
+              "id": "fresh-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0"
+            },
+            {
+              "id": "addresses",
+              "scored": true,
+              "pass": true,
+              "detail": "29 internal links (0 in fetched fragments), all extensionless under /library/ with published targets",
+              "contexts": [],
+              "coverage": [],
+              "failures": []
+            },
+            {
+              "id": "audit-strict",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0: audit: nothing to report"
+            },
+            {
+              "id": "article-data",
+              "scored": true,
+              "pass": true,
+              "detail": "3 dated pages (needs 3)"
+            },
+            {
+              "id": "share-cards",
+              "scored": true,
+              "pass": true,
+              "detail": "3 dated pages (needs 3)"
+            },
+            {
+              "id": "ran-audit",
+              "scored": false,
+              "pass": true,
+              "detail": "7 runs matching /unify audit/"
+            }
+          ],
+          "agent": {
+            "exit": 0,
+            "timedOut": false,
+            "durationMs": 383002,
+            "turns": 42,
+            "costUsd": 0
+          },
+          "freshBuild": {
+            "command": "./unify build --base-url https://fernway.example/library/ --pretty-urls --generate _scripts/gen.mjs",
+            "exit": 0
+          },
+          "rulesGaps": "**What `rules.md` did not answer \u2014 the sentence I wanted and could not find.**\nThere is no sentence describing the generator script's calling contract. `rules.md` says only that the script \"writes into the directory unify hands it\" \u2014 it never says *how* it is handed that directory. I had to write a probe script and print `process.argv` to discover it is invoked as `node gen.mjs <sourceRoot> <generatedOverlayDir> <contextJsonPath>`, and find `ctx.inputs.sourcePages` inside that JSON to read the page inventory. Related gaps:\n- Nothing lists what the checks look for. \"Every check the tool offers\" was clear (`audit`, `--strict`, `--external`, `build --dry-run --strict`, from `./unify --help`), but rules.md never mentions `h1-missing`, `image-missing-dimensions`, or the `incomplete`/`broken` categories at all \u2014 I learned them only by running `audit --strict` and being told.\n- Nothing says whether files written into the generated overlay are still wrapped by the site's `_layout.html` (they are \u2014 confirmed in output), and whether a generated `.md` may use frontmatter (it may).\n- Nothing states which options `--save-config` treats as saveable; I inferred baseUrl/pretty-urls/generate from the one-line it echoed.\n\n**What I had to re-read, and why it did not land the first time.**\nThe Files section bullet \u2014 one unbroken paragraph mixing source-root resolution, `.fragment.html`, byte-for-byte copying, link spelling under `--pretty-urls` (\"write `/about.html`, the build rewrites to `/about/`\"), directory links, and `--base-url`. It didn't land because the key rule (always author the `.html` filename, even under pretty-urls) is the *middle* sentence of a seven-sentence paragraph; I had to re-read to be sure the post links in the generated index use `/notes/xxx.html` while the served URLs are pretty. Same for the schema/Markdown paragraph: the rule \"a `date` unify cannot read as `2026-01-02` or `2026-01-02T09:30:00Z` is left out and reported\" sits at its end \u2014 I first wrote quoted dates without checking the exact accepted formats, and the earlier feed sentence (\"a `date:` with no time is \u2026 reported and left out\") only made sense on a second pass. The Head bullet's override order (page `<meta>` replaces layout's same-name; `og:` defaults to final title/description/canonical) also took a second read to see that I only needed `og:image*` per post and no hand-written `og:title`.\n\n**What I guessed or inferred rather than read.**\n- The generator's argv/context contract \u2014 inferred by probing (see above); rules.md documents none of it.\n- That the generator's output md should declare `layout: /_layout.html` rather than rely on nearest-layout discovery across the overlay \u2014 a guess; the dry-run shows it resolved."
+        },
+        {
+          "originalSample": "krang-opencode-zen-qwen3-8-flash-5",
+          "sourceRound": "pr157-zen-qwen38-flash-full",
+          "sourceSample": "krang-opencode-zen-qwen3-8-flash-5",
+          "exitRecoveredFromKernel": false,
+          "name": "krang-opencode-zen-qwen3-8-flash-5",
+          "model": "krang/opencode-zen/qwen3.8-flash",
+          "pass": true,
+          "checks": [
+            {
+              "id": "agent-finished",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0, wrote REPORT.md"
+            },
+            {
+              "id": "publish-command",
+              "scored": true,
+              "pass": true,
+              "detail": "./unify build --clean"
+            },
+            {
+              "id": "strict-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0: 0 problems, 0 advisories"
+            },
+            {
+              "id": "fresh-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0"
+            },
+            {
+              "id": "addresses",
+              "scored": true,
+              "pass": true,
+              "detail": "30 internal links (0 in fetched fragments), all extensionless under /library/ with published targets",
+              "contexts": [],
+              "coverage": [],
+              "failures": []
+            },
+            {
+              "id": "audit-strict",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0: audit: nothing to report"
+            },
+            {
+              "id": "article-data",
+              "scored": true,
+              "pass": true,
+              "detail": "3 dated pages (needs 3)"
+            },
+            {
+              "id": "share-cards",
+              "scored": true,
+              "pass": true,
+              "detail": "3 dated pages (needs 3)"
+            },
+            {
+              "id": "ran-audit",
+              "scored": false,
+              "pass": true,
+              "detail": "7 runs matching /unify audit/"
+            }
+          ],
+          "agent": {
+            "exit": 0,
+            "timedOut": false,
+            "durationMs": 321611,
+            "turns": 45,
+            "costUsd": 0
+          },
+          "freshBuild": {
+            "command": "./unify build --clean",
+            "exit": 0
+          },
+          "rulesGaps": "## What `rules.md` did not answer\n\n**The sentence I wanted most and could not find:** something like *\"unify runs the\ngenerate script with three arguments \u2014 the source root, the generated overlay\ndirectory it may write into, and a JSON context file naming `inputs.sourcePages`\"* .\n`rules.md` only says the script \"writes into the directory unify hands it\" without\never saying **how the directory is handed over** (argv? env? cwd?), nor that the\nhand-written script receives the pages' titles/dates via the source inventory. I\nfound the contract by making `scripts/gen.mjs` print `process.argv`, `process.cwd()`\nand a directory listing during a dry-run build. Even the inventory itself\n(`--source-inventory`, \"on by default with `--generate`\") exists only in `--help`,\nnot in `rules.md` at all."
+        }
+      ]
+    },
+    {
+      "name": "callouts",
+      "passed": 5,
+      "total": 5,
+      "barMet": true,
+      "samples": [
+        {
+          "originalSample": "krang-opencode-zen-qwen3-8-flash-1",
+          "sourceRound": "pr157-zen-qwen38-flash-full",
+          "sourceSample": "krang-opencode-zen-qwen3-8-flash-1",
+          "exitRecoveredFromKernel": false,
+          "name": "krang-opencode-zen-qwen3-8-flash-1",
+          "model": "krang/opencode-zen/qwen3.8-flash",
+          "pass": true,
+          "checks": [
+            {
+              "id": "agent-finished",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0, wrote REPORT.md"
+            },
+            {
+              "id": "publish-command",
+              "scored": true,
+              "pass": true,
+              "detail": "./unify build --clean --pretty-urls --base-url https://harrowgate.pages.dev/observatory/"
+            },
+            {
+              "id": "strict-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0: 0 problems, 0 advisories"
+            },
+            {
+              "id": "fresh-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0"
+            },
+            {
+              "id": "addresses",
+              "scored": true,
+              "pass": true,
+              "detail": "41 internal links (0 in fetched fragments), all extensionless under /observatory/ with published targets",
+              "contexts": [],
+              "coverage": [],
+              "failures": []
+            },
+            {
+              "id": "drafts-unpublished",
+              "scored": true,
+              "pass": true,
+              "detail": "none published"
+            },
+            {
+              "id": "no-slot-shipped",
+              "scored": true,
+              "pass": true,
+              "detail": "none"
+            }
+          ],
+          "agent": {
+            "exit": 0,
+            "timedOut": false,
+            "durationMs": 402561,
+            "turns": 53,
+            "costUsd": 0
+          },
+          "freshBuild": {
+            "command": "./unify build --clean --pretty-urls --base-url https://harrowgate.pages.dev/observatory/",
+            "exit": 0
+          },
+          "rulesGaps": "## 1. What `rules.md` did not answer\n\nThe sentence I wanted and could not find: *what the `generate` script is passed.*\nLine 6 says the script \"writes into the directory unify hands it\" and nothing names\nthe hand. I had to run the script printing `process.argv` to learn it is handed\n`(sourceRoot, generatedOverlay, contextJsonPath)`, and find the context JSON's\n`inputs.sourcePages` path (the inventory file) there \u2014 `--help` names the inventory\nbut not these. Related: nothing states that **generated overlay files get the same\nlayout merging, link rewriting and `--pretty-urls` treatment as source pages**; I\nobserved `\u2190 generated + _layout.html` in the dry-run listing and trusted it after\nthat."
+        },
+        {
+          "originalSample": "krang-opencode-zen-qwen3-8-flash-2",
+          "sourceRound": "pr157-zen-qwen38-flash-full",
+          "sourceSample": "krang-opencode-zen-qwen3-8-flash-2",
+          "exitRecoveredFromKernel": false,
+          "name": "krang-opencode-zen-qwen3-8-flash-2",
+          "model": "krang/opencode-zen/qwen3.8-flash",
+          "pass": true,
+          "checks": [
+            {
+              "id": "agent-finished",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0, wrote REPORT.md"
+            },
+            {
+              "id": "publish-command",
+              "scored": true,
+              "pass": true,
+              "detail": "./unify build --clean --base-url https://harrowgate.pages.dev/observatory/ --pretty-urls"
+            },
+            {
+              "id": "strict-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0: 0 problems, 0 advisories"
+            },
+            {
+              "id": "fresh-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0"
+            },
+            {
+              "id": "addresses",
+              "scored": true,
+              "pass": true,
+              "detail": "58 internal links (0 in fetched fragments), all extensionless under /observatory/ with published targets",
+              "contexts": [],
+              "coverage": [],
+              "failures": []
+            },
+            {
+              "id": "drafts-unpublished",
+              "scored": true,
+              "pass": true,
+              "detail": "none published"
+            },
+            {
+              "id": "no-slot-shipped",
+              "scored": true,
+              "pass": true,
+              "detail": "none"
+            }
+          ],
+          "agent": {
+            "exit": 0,
+            "timedOut": false,
+            "durationMs": 536736,
+            "turns": 94,
+            "costUsd": 0
+          },
+          "freshBuild": {
+            "command": "./unify build --clean --base-url https://harrowgate.pages.dev/observatory/ --pretty-urls",
+            "exit": 0
+          },
+          "rulesGaps": "**1. What rules.md did not answer.** The sentence I wanted and could not find: what\narguments and what environment a generator script is actually run with. rules.md says\n\"unify runs it before every build and it writes into the directory unify hands it\" \u2014 it\nnever says how that directory is handed to the script (argv? env var?). I had to\nprint `process.argv` and `generator-context.json` from a throwaway script to learn the\ncontract: `argv[2..4] = sourceRoot, overlay, contextPath`, plus `--source-inventory`'s\nJSON path. rules.md also never says generated overlay files are treated as source pages\n(i.e. that a `<include>` or `data-layout` inside them is processed); I inferred it from a\nprobe and confirmed it by grepping the built output. And it never says the source-pages\ninventory reports `title: null` for a Markdown page whose title comes from its first `#`\nheading \u2014 the \"no `title:` \u2192 first `# Heading`\" rule applies to the rendered page, not to\nthe inventory I feed `gen.mjs`, which I discovered only when the built log index listed"
+        },
+        {
+          "originalSample": "krang-opencode-zen-qwen3-8-flash-3",
+          "sourceRound": "pr157-zen-qwen38-flash-full",
+          "sourceSample": "krang-opencode-zen-qwen3-8-flash-3",
+          "exitRecoveredFromKernel": false,
+          "name": "krang-opencode-zen-qwen3-8-flash-3",
+          "model": "krang/opencode-zen/qwen3.8-flash",
+          "pass": true,
+          "checks": [
+            {
+              "id": "agent-finished",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0, wrote REPORT.md"
+            },
+            {
+              "id": "publish-command",
+              "scored": true,
+              "pass": true,
+              "detail": "./unify build --base-url https://harrowgate.pages.dev/observatory/ --pretty-urls --clean --audit"
+            },
+            {
+              "id": "strict-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0: 0 problems, 0 advisories"
+            },
+            {
+              "id": "fresh-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0"
+            },
+            {
+              "id": "addresses",
+              "scored": true,
+              "pass": true,
+              "detail": "47 internal links (0 in fetched fragments), all extensionless under /observatory/ with published targets",
+              "contexts": [],
+              "coverage": [],
+              "failures": []
+            },
+            {
+              "id": "drafts-unpublished",
+              "scored": true,
+              "pass": true,
+              "detail": "none published"
+            },
+            {
+              "id": "no-slot-shipped",
+              "scored": true,
+              "pass": true,
+              "detail": "none"
+            }
+          ],
+          "agent": {
+            "exit": 0,
+            "timedOut": false,
+            "durationMs": 523202,
+            "turns": 41,
+            "costUsd": 0
+          },
+          "freshBuild": {
+            "command": "./unify build --base-url https://harrowgate.pages.dev/observatory/ --pretty-urls --clean --audit",
+            "exit": 0
+          },
+          "rulesGaps": "## 1. What `rules.md` did not answer\n\nThe interface of the `generate` script. \"unify runs it before every build and it writes into the\ndirectory unify hands it\" \u2014 the sentence I wanted and could not find is: *\"your script is invoked\nwith the source root, the generated-overlay directory, and a JSON context file as argv 2\u20134\"* (and\nwhat is inside that context). The CLI help adds that the script gets `source-pages.json`, but\nneither says the overlay is a first-class source. I probed with a throwaway site and found argv =\n`[unify, script, sourceRoot, overlay, generator-context.json]`, the context carrying `baseUrl`,\n`prettyUrls`, `outputRoot`, `inputs.sourcePages` \u2014 and, crucially, that files written into the\noverlay behave like real pages (they get the nearest `_layout.html`, title joining, and the\n`--base-url`/`--pretty-urls` link rewrites)."
+        },
+        {
+          "originalSample": "krang-opencode-zen-qwen3-8-flash-4",
+          "sourceRound": "pr157-zen-qwen38-flash-full",
+          "sourceSample": "krang-opencode-zen-qwen3-8-flash-4",
+          "exitRecoveredFromKernel": false,
+          "name": "krang-opencode-zen-qwen3-8-flash-4",
+          "model": "krang/opencode-zen/qwen3.8-flash",
+          "pass": true,
+          "checks": [
+            {
+              "id": "agent-finished",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0, wrote REPORT.md"
+            },
+            {
+              "id": "publish-command",
+              "scored": true,
+              "pass": true,
+              "detail": "./unify build"
+            },
+            {
+              "id": "strict-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0: 0 problems, 0 advisories"
+            },
+            {
+              "id": "fresh-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0"
+            },
+            {
+              "id": "addresses",
+              "scored": true,
+              "pass": true,
+              "detail": "55 internal links (0 in fetched fragments), all extensionless under /observatory/ with published targets",
+              "contexts": [],
+              "coverage": [],
+              "failures": []
+            },
+            {
+              "id": "drafts-unpublished",
+              "scored": true,
+              "pass": true,
+              "detail": "none published"
+            },
+            {
+              "id": "no-slot-shipped",
+              "scored": true,
+              "pass": true,
+              "detail": "none"
+            }
+          ],
+          "agent": {
+            "exit": 0,
+            "timedOut": false,
+            "durationMs": 535696,
+            "turns": 49,
+            "costUsd": 0
+          },
+          "freshBuild": {
+            "command": "./unify build",
+            "exit": 0
+          },
+          "rulesGaps": "## What `rules.md` did not answer \u2014 the sentence I wanted and could not find\n\nThe generator contract. The one relevant sentence is \"unify runs it before every build and it\nwrites into the directory unify hands it, never into `site/`\" \u2014 but nowhere does it say *how*\nthe directory is handed. I wanted: \"your script is called as\n`gen.mjs <sourceRoot> <generatedRoot> <context.json>`\" \u2014 that is what the probe of argv\nshowed, plus the context naming `inputs.sourcePages`. Also never stated: the shape of\n`source-pages.json` (I dumped one and read it), whether a page written into the generated\noverlay is wrapped by the site's `_layout.html` like an authored page (it is), and whether\n`--generate` (help: \"a relative path is from the source root\") and the yaml key `generate:`\nresolve from the same base \u2014 they do not: the yaml path resolves from the working directory,\nwhich is the only reading that makes \"kept in `scripts/` beside the site\" true. Nothing says"
+        },
+        {
+          "originalSample": "krang-opencode-zen-qwen3-8-flash-5",
+          "sourceRound": "pr157-zen-qwen38-flash-full",
+          "sourceSample": "krang-opencode-zen-qwen3-8-flash-5",
+          "exitRecoveredFromKernel": false,
+          "name": "krang-opencode-zen-qwen3-8-flash-5",
+          "model": "krang/opencode-zen/qwen3.8-flash",
+          "pass": true,
+          "checks": [
+            {
+              "id": "agent-finished",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0, wrote REPORT.md"
+            },
+            {
+              "id": "publish-command",
+              "scored": true,
+              "pass": true,
+              "detail": "./unify build --base-url https://harrowgate.pages.dev/observatory/ --pretty-urls"
+            },
+            {
+              "id": "strict-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0: 0 problems, 0 advisories"
+            },
+            {
+              "id": "fresh-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0"
+            },
+            {
+              "id": "addresses",
+              "scored": true,
+              "pass": true,
+              "detail": "53 internal links (0 in fetched fragments), all extensionless under /observatory/ with published targets",
+              "contexts": [],
+              "coverage": [],
+              "failures": []
+            },
+            {
+              "id": "drafts-unpublished",
+              "scored": true,
+              "pass": true,
+              "detail": "none published"
+            },
+            {
+              "id": "no-slot-shipped",
+              "scored": true,
+              "pass": true,
+              "detail": "none"
+            }
+          ],
+          "agent": {
+            "exit": 0,
+            "timedOut": false,
+            "durationMs": 357113,
+            "turns": 38,
+            "costUsd": 0
+          },
+          "freshBuild": {
+            "command": "./unify build --base-url https://harrowgate.pages.dev/observatory/ --pretty-urls",
+            "exit": 0
+          },
+          "rulesGaps": "## 1. What `rules.md` did not answer\n\nThe generate-script contract. The sentence I wanted and could not find: **\"unify invokes\nyour script with `argv = [node, script, sourceRoot, generatedRoot, contextJsonPath]`\"**\n(or anything like it). rules.md says only that the script \"writes into the directory unify\nhands it\" \u2014 it never says *how* the directory is handed: argv, an env var, the cwd? I had\nto write a probe script that dumped `process.argv` and a `generator-context.json` to learn\nthe three positional arguments and the `inputs.sourcePages` inventory path. Nothing in the\ndocs says the generated files are then treated as source pages, nor that they get wrapped\nby the site's `_layout.html` \u2014 I inferred both from the build report (`log/index.html\n\u2190 generated + _layout.html`)."
+        }
+      ]
+    },
+    {
+      "name": "council-panel",
+      "passed": 5,
+      "total": 5,
+      "barMet": true,
+      "samples": [
+        {
+          "originalSample": "krang-opencode-zen-qwen3-8-flash-1",
+          "sourceRound": "pr157-zen-qwen38-flash-full",
+          "sourceSample": "krang-opencode-zen-qwen3-8-flash-1",
+          "exitRecoveredFromKernel": false,
+          "name": "krang-opencode-zen-qwen3-8-flash-1",
+          "model": "krang/opencode-zen/qwen3.8-flash",
+          "pass": true,
+          "checks": [
+            {
+              "id": "agent-finished",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0, wrote REPORT.md"
+            },
+            {
+              "id": "publish-command",
+              "scored": true,
+              "pass": true,
+              "detail": "./unify build --base-url https://holtfen.pages.dev/mill/ --pretty-urls --clean --audit"
+            },
+            {
+              "id": "strict-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0: 0 problems, 0 advisories"
+            },
+            {
+              "id": "fresh-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0"
+            },
+            {
+              "id": "addresses",
+              "scored": true,
+              "pass": true,
+              "detail": "42 internal links (0 in fetched fragments), all extensionless under /mill/ with published targets; 1 static-analysis coverage note(s)",
+              "contexts": [],
+              "coverage": [
+                "index.html via months.js: fetch(url)"
+              ],
+              "failures": []
+            },
+            {
+              "id": "drafts-unpublished",
+              "scored": true,
+              "pass": true,
+              "detail": "none published"
+            },
+            {
+              "id": "bare-fragment",
+              "scored": true,
+              "pass": true,
+              "detail": "3 fragment(s)"
+            },
+            {
+              "id": "fetch-targets",
+              "scored": false,
+              "pass": false,
+              "detail": "0 of 0 resolved, 1 built at runtime"
+            }
+          ],
+          "agent": {
+            "exit": 0,
+            "timedOut": false,
+            "durationMs": 472174,
+            "turns": 52,
+            "costUsd": 0
+          },
+          "freshBuild": {
+            "command": "./unify build --base-url https://holtfen.pages.dev/mill/ --pretty-urls --clean --audit",
+            "exit": 0
+          },
+          "rulesGaps": "## 3. What `rules.md` did not answer\n\n- **How the generator is invoked.** The docs say it \"writes into the directory unify hands it\"\n  \u2014 that is all. The sentence I wanted, and could not find, is the calling convention: *what\n  arguments, and where does it write so unify picks the files up*. I discovered by experiment\n  that the script gets `argv[2]=source root, argv[3]=generated overlay, argv[4]=context JSON`,\n  that the context names `site.baseUrl`, `site.prettyUrls`, and `inputs.sourcePages` (the page\n  inventory), and that HTML written into the overlay is composed like a real page (layout,\n  rewriting, canonical all applied) while a `.fragment.html` written there ships raw. None of\n  that is written down anywhere.\n- **Whether `--pretty-urls` touches fragments.** The docs define pretty-urls as\n  `about.html \u2192 about/index.html` and define fragments as shipped \"as written\"; the interaction"
+        },
+        {
+          "originalSample": "krang-opencode-zen-qwen3-8-flash-2",
+          "sourceRound": "pr157-zen-qwen38-flash-full",
+          "sourceSample": "krang-opencode-zen-qwen3-8-flash-2",
+          "exitRecoveredFromKernel": false,
+          "name": "krang-opencode-zen-qwen3-8-flash-2",
+          "model": "krang/opencode-zen/qwen3.8-flash",
+          "pass": true,
+          "checks": [
+            {
+              "id": "agent-finished",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0, wrote REPORT.md"
+            },
+            {
+              "id": "publish-command",
+              "scored": true,
+              "pass": true,
+              "detail": "./unify build --base-url https://holtfen.pages.dev/mill/ --pretty-urls --clean --audit --strict"
+            },
+            {
+              "id": "strict-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0: 0 problems, 0 advisories"
+            },
+            {
+              "id": "fresh-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0"
+            },
+            {
+              "id": "addresses",
+              "scored": true,
+              "pass": true,
+              "detail": "45 internal links (0 in fetched fragments), all extensionless under /mill/ with published targets; 1 static-analysis coverage note(s)",
+              "contexts": [],
+              "coverage": [
+                "index.html via index.html: fetch(sources[month])"
+              ],
+              "failures": []
+            },
+            {
+              "id": "drafts-unpublished",
+              "scored": true,
+              "pass": true,
+              "detail": "none published"
+            },
+            {
+              "id": "bare-fragment",
+              "scored": true,
+              "pass": true,
+              "detail": "3 fragment(s)"
+            },
+            {
+              "id": "fetch-targets",
+              "scored": false,
+              "pass": false,
+              "detail": "0 of 0 resolved, 1 built at runtime"
+            }
+          ],
+          "agent": {
+            "exit": 0,
+            "timedOut": false,
+            "durationMs": 431400,
+            "turns": 36,
+            "costUsd": 0
+          },
+          "freshBuild": {
+            "command": "./unify build --base-url https://holtfen.pages.dev/mill/ --pretty-urls --clean --audit --strict",
+            "exit": 0
+          },
+          "rulesGaps": "## What `rules.md` did not answer\n\n**Whether a generator's output is composed like a page or shipped verbatim.** The sentence I\nwanted and could not find, on line 6 \u2014 \"it writes into the directory unify hands it\" \u2014 stops\nexactly there. Nothing distinguishes the two `milling/index.html` outcomes (a composed\ndocument with chrome) from the fragments (verbatim copies). The dry-run report label\n`\u2190 generated + _layout.html` is the only place the behavior appears, and I found it by\ngetting it wrong: my first generator hand-spliced the header and footer into the index, and\nthe build wrapped them in the layout chrome too \u2014 two mastheads, one list, a doubled title.\n`unify audit` had even told me my probe page was \"composed with no layout\"; I read that as\n\"generated files never get a layout\", when it really meant \"my probe had no `_layout.html`\nto find\". Once I knew the rule, the generated index became a plain page-shaped document"
+        },
+        {
+          "originalSample": "krang-opencode-zen-qwen3-8-flash-3",
+          "sourceRound": "pr157-zen-qwen38-flash-retry-council",
+          "sourceSample": "krang-opencode-zen-qwen3-8-flash-1",
+          "exitRecoveredFromKernel": false,
+          "name": "krang-opencode-zen-qwen3-8-flash-1",
+          "model": "krang/opencode-zen/qwen3.8-flash",
+          "pass": true,
+          "checks": [
+            {
+              "id": "agent-finished",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0, wrote REPORT.md"
+            },
+            {
+              "id": "publish-command",
+              "scored": true,
+              "pass": true,
+              "detail": "./unify build --pretty-urls --base-url https://holtfen.pages.dev/mill/"
+            },
+            {
+              "id": "strict-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0: 0 problems, 0 advisories"
+            },
+            {
+              "id": "fresh-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0"
+            },
+            {
+              "id": "addresses",
+              "scored": true,
+              "pass": true,
+              "detail": "43 internal links (0 in fetched fragments), all extensionless under /mill/ with published targets; 7 static-analysis coverage note(s)",
+              "contexts": [],
+              "coverage": [
+                "index.html via home.js: fetch(url)",
+                "milling-days/2026-10-17-brake-wheel/index.html via home.js: fetch(url)",
+                "milling-days/2026-11-14-sails-by-hand/index.html via home.js: fetch(url)",
+                "milling-days/2026-11-28-winter-grain/index.html via home.js: fetch(url)",
+                "milling-days/2026-12-12-st-lucia/index.html via home.js: fetch(url)",
+                "milling-days/index.html via home.js: fetch(url)",
+                "visit/index.html via home.js: fetch(url)"
+              ],
+              "failures": []
+            },
+            {
+              "id": "drafts-unpublished",
+              "scored": true,
+              "pass": true,
+              "detail": "none published"
+            },
+            {
+              "id": "bare-fragment",
+              "scored": true,
+              "pass": true,
+              "detail": "3 fragment(s)"
+            },
+            {
+              "id": "fetch-targets",
+              "scored": false,
+              "pass": false,
+              "detail": "0 of 0 resolved, 1 built at runtime"
+            }
+          ],
+          "agent": {
+            "exit": 0,
+            "timedOut": false,
+            "durationMs": 386520,
+            "turns": 35,
+            "costUsd": 0
+          },
+          "freshBuild": {
+            "command": "./unify build --pretty-urls --base-url https://holtfen.pages.dev/mill/",
+            "exit": 0
+          },
+          "rulesGaps": "## 3. What `rules.md` did not answer\n\nThe **URL a `.fragment.html` ends up at under `--pretty-urls`**. The doc says\nfragments are \"shipped as written\" and separately that pretty-urls rewrites\n`about.html` \u2192 `about/` \u2014 it never says whether the pretty treatment is *exempt*\nfor fragments, and the \"no `.html` addresses\" rule then becomes a judgement call.\nThe sentence I wanted and could not find, in words close to: *\"fragments are not\npretty-ised; their served address keeps the `.fragment.html` suffix.\"* I learned\nit only by building: the report line is `copy dist/hours.fragment.html\n(/mill/hours.fragment.html) \u2190 generated`. I read the brief's \"addresses visitors\nsee\" as scoping the no-`.html` rule to human navigation, which leaves the two\nmachine addresses (the council's fetch, the JS month lists) legally `.html`."
+        },
+        {
+          "originalSample": "krang-opencode-zen-qwen3-8-flash-4",
+          "sourceRound": "pr157-zen-qwen38-flash-retry-council",
+          "sourceSample": "krang-opencode-zen-qwen3-8-flash-2",
+          "exitRecoveredFromKernel": false,
+          "name": "krang-opencode-zen-qwen3-8-flash-2",
+          "model": "krang/opencode-zen/qwen3.8-flash",
+          "pass": true,
+          "checks": [
+            {
+              "id": "agent-finished",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0, wrote REPORT.md"
+            },
+            {
+              "id": "publish-command",
+              "scored": true,
+              "pass": true,
+              "detail": "./unify build --base-url https://holtfen.pages.dev/mill/ --pretty-urls --clean --audit --strict"
+            },
+            {
+              "id": "strict-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0: 0 problems, 0 advisories"
+            },
+            {
+              "id": "fresh-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0"
+            },
+            {
+              "id": "addresses",
+              "scored": true,
+              "pass": true,
+              "detail": "57 internal links (0 in fetched fragments), all extensionless under /mill/ with published targets; 1 static-analysis coverage note(s)",
+              "contexts": [],
+              "coverage": [
+                "index.html via index.html: fetch(url)"
+              ],
+              "failures": []
+            },
+            {
+              "id": "drafts-unpublished",
+              "scored": true,
+              "pass": true,
+              "detail": "none published"
+            },
+            {
+              "id": "bare-fragment",
+              "scored": true,
+              "pass": true,
+              "detail": "3 fragment(s)"
+            },
+            {
+              "id": "fetch-targets",
+              "scored": false,
+              "pass": false,
+              "detail": "0 of 0 resolved, 1 built at runtime"
+            }
+          ],
+          "agent": {
+            "exit": 0,
+            "timedOut": false,
+            "durationMs": 648252,
+            "turns": 50,
+            "costUsd": 0
+          },
+          "freshBuild": {
+            "command": "./unify build --base-url https://holtfen.pages.dev/mill/ --pretty-urls --clean --audit --strict",
+            "exit": 0
+          },
+          "rulesGaps": "## What `rules.md` did not answer\n\n- **The generate script's whole interface.** The docs say only \"it writes into the directory unify\n  hands it\". They never say how the script learns which directory that is or where the inventory is.\n  The sentence I wanted, and could not find: *\"the script is invoked as\n  `\u2026 gen.mjs <sourceRoot> <generatedDir> <generator-context.json>` and the context names\n  `inputs.sourcePages`.\"* I probed with a throwaway script that printed `process.argv` and the\n  context file.\n- **Whether the generated overlay is composed or merely copied.** \"Writes into the directory unify\n  hands it\" is silent on what happens to those files next. They are composed as sources \u2014 layout,\n  base-url rewriting, pretty-urls \u2014 which is what makes a script-generated *index page* sane. I\n  found this by experiment, and it changed my design (the index is a plain page with authored links,"
+        },
+        {
+          "originalSample": "krang-opencode-zen-qwen3-8-flash-5",
+          "sourceRound": "pr157-zen-qwen38-flash-retry-council",
+          "sourceSample": "krang-opencode-zen-qwen3-8-flash-3",
+          "exitRecoveredFromKernel": false,
+          "name": "krang-opencode-zen-qwen3-8-flash-3",
+          "model": "krang/opencode-zen/qwen3.8-flash",
+          "pass": true,
+          "checks": [
+            {
+              "id": "agent-finished",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0, wrote REPORT.md"
+            },
+            {
+              "id": "publish-command",
+              "scored": true,
+              "pass": true,
+              "detail": "./unify build --clean --strict --pretty-urls --base-url https://holtfen.pages.dev/mill/"
+            },
+            {
+              "id": "strict-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0: 0 problems, 0 advisories"
+            },
+            {
+              "id": "fresh-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0"
+            },
+            {
+              "id": "addresses",
+              "scored": true,
+              "pass": true,
+              "detail": "43 internal links (0 in fetched fragments), all extensionless under /mill/ with published targets; 1 static-analysis coverage note(s)",
+              "contexts": [],
+              "coverage": [
+                "index.html via index.html: fetch(url)"
+              ],
+              "failures": []
+            },
+            {
+              "id": "drafts-unpublished",
+              "scored": true,
+              "pass": true,
+              "detail": "none published"
+            },
+            {
+              "id": "bare-fragment",
+              "scored": true,
+              "pass": true,
+              "detail": "3 fragment(s)"
+            },
+            {
+              "id": "fetch-targets",
+              "scored": false,
+              "pass": false,
+              "detail": "0 of 0 resolved, 1 built at runtime"
+            }
+          ],
+          "agent": {
+            "exit": 0,
+            "timedOut": false,
+            "durationMs": 519894,
+            "turns": 51,
+            "costUsd": 0
+          },
+          "freshBuild": {
+            "command": "./unify build --clean --strict --pretty-urls --base-url https://holtfen.pages.dev/mill/",
+            "exit": 0
+          },
+          "rulesGaps": "## What rules.md did not answer\n\n- **The generator's calling contract.** The sentence I wanted \u2014 and there is none \u2014 is one that\n  says *how* `generate:` runs the script. I only learned by probing: unify runs it as\n  `node scripts/gen.mjs <sourceRoot> <generatedOverlayDir> <generator-context.json>` with cwd\n  = source root, hands paths absolutely, runs it before every build (including `--dry-run` and\n  `audit`), and files written into the overlay participate in the build *as if they were sources*\n  (layout applied, links rewritten). Rules says only \"it writes into the directory unify hands\n  it\" \u2014 which directory that is, and what a file written there becomes, you must discover.\n- **Whether `--pretty-urls` touches fragment paths.** \"Every file \u2026 copies byte-for-byte to the\n  same path\" plus the fragment definition implies `/mill/hours.fragment.html` stays exactly that,\n  but I wanted the explicit \"a `.fragment.html` name keeps its `.html` suffix under"
+        }
+      ]
+    },
+    {
+      "name": "photo-banners",
+      "passed": 5,
+      "total": 5,
+      "barMet": true,
+      "samples": [
+        {
+          "originalSample": "krang-opencode-zen-qwen3-8-flash-1",
+          "sourceRound": "pr157-zen-qwen38-flash-retry-photos",
+          "sourceSample": "krang-opencode-zen-qwen3-8-flash-1",
+          "exitRecoveredFromKernel": false,
+          "name": "krang-opencode-zen-qwen3-8-flash-1",
+          "model": "krang/opencode-zen/qwen3.8-flash",
+          "pass": true,
+          "checks": [
+            {
+              "id": "agent-finished",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0, wrote REPORT.md"
+            },
+            {
+              "id": "publish-command",
+              "scored": true,
+              "pass": true,
+              "detail": "./unify build --clean --pretty-urls --base-url https://alderfen.pages.dev/arboretum/"
+            },
+            {
+              "id": "strict-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0: 0 problems, 0 advisories"
+            },
+            {
+              "id": "fresh-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0"
+            },
+            {
+              "id": "addresses",
+              "scored": true,
+              "pass": true,
+              "detail": "41 internal links (0 in fetched fragments), all extensionless under /arboretum/ with published targets",
+              "contexts": [],
+              "coverage": [],
+              "failures": []
+            },
+            {
+              "id": "css-urls",
+              "scored": true,
+              "pass": true,
+              "detail": "every root-relative url() is under /arboretum/"
+            }
+          ],
+          "agent": {
+            "exit": 0,
+            "timedOut": false,
+            "durationMs": 314993,
+            "turns": 21,
+            "costUsd": 0
+          },
+          "freshBuild": {
+            "command": "./unify build --clean --pretty-urls --base-url https://alderfen.pages.dev/arboretum/",
+            "exit": 0
+          },
+          "rulesGaps": "## What `rules.md` did not answer\n\nThe sentence I wanted and could not find: **how to link to a page whose source is\nMarkdown.** The rule says \"Always link the real filename \u2014 `/about.html`, not\n`/about/`\", but my guides are `oaks.md`, whose \"real filename\" is neither of the two\nspellings a link needs. Is it `/collections/oaks.md`? `/collections/oaks.html`? Nothing\nsays. I wrote `/collections/oaks.html`, and `--dry-run --strict` reported no broken\nlink and rewrote it to `/arboretum/collections/oaks/` \u2014 so it holds, but by experiment,\nnot by reading.\n\nClosely related and also unanswered: the docs never spell out **what the\n`--base-url` prefix looks like in the emitted HTML** \u2014 root-relative `/arboretum/...`"
+        },
+        {
+          "originalSample": "krang-opencode-zen-qwen3-8-flash-2",
+          "sourceRound": "pr157-zen-qwen38-flash-full",
+          "sourceSample": "krang-opencode-zen-qwen3-8-flash-2",
+          "exitRecoveredFromKernel": false,
+          "name": "krang-opencode-zen-qwen3-8-flash-2",
+          "model": "krang/opencode-zen/qwen3.8-flash",
+          "pass": true,
+          "checks": [
+            {
+              "id": "agent-finished",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0, wrote REPORT.md"
+            },
+            {
+              "id": "publish-command",
+              "scored": true,
+              "pass": true,
+              "detail": "./unify build --clean        --base-url https://alderfen.pages.dev/arboretum/ --pretty-urls"
+            },
+            {
+              "id": "strict-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0: 0 problems, 0 advisories"
+            },
+            {
+              "id": "fresh-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0"
+            },
+            {
+              "id": "addresses",
+              "scored": true,
+              "pass": true,
+              "detail": "52 internal links (0 in fetched fragments), all extensionless under /arboretum/ with published targets",
+              "contexts": [],
+              "coverage": [],
+              "failures": []
+            },
+            {
+              "id": "css-urls",
+              "scored": true,
+              "pass": true,
+              "detail": "every root-relative url() is under /arboretum/"
+            }
+          ],
+          "agent": {
+            "exit": 0,
+            "timedOut": false,
+            "durationMs": 331606,
+            "turns": 37,
+            "costUsd": 0
+          },
+          "freshBuild": {
+            "command": "./unify build --clean        --base-url https://alderfen.pages.dev/arboretum/ --pretty-urls",
+            "exit": 0
+          },
+          "rulesGaps": "### What `rules.md` did not answer \u2014 the sentence I wanted and could not find\n\nThe rules explain `--base-url` and `--pretty-urls` **separately**, each in its own bullet, and\nnever show them **together**. There is no sentence anywhere stating that a link I wrote as\n`/visit.html`, under both flags, becomes `https://alderfen.pages.dev/arboretum/visit/` \u2014 base\nprefix *and* pretty rewrite composed. I wanted one worked example proving the two flags stack\ncleanly rather than fight (e.g. base-prefix a `.html` that pretty-urls has already removed).\nI had to trust the composition and then verify by reading the literal `href=` values in the\nbuilt `dist/` files.\n\nA second sentence I looked for and did not find: whether Markdown `title:` frontmatter takes\npart in the separator-join rule (that rule is written entirely for HTML `<title>`:"
+        },
+        {
+          "originalSample": "krang-opencode-zen-qwen3-8-flash-3",
+          "sourceRound": "pr157-zen-qwen38-flash-full",
+          "sourceSample": "krang-opencode-zen-qwen3-8-flash-3",
+          "exitRecoveredFromKernel": false,
+          "name": "krang-opencode-zen-qwen3-8-flash-3",
+          "model": "krang/opencode-zen/qwen3.8-flash",
+          "pass": true,
+          "checks": [
+            {
+              "id": "agent-finished",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0, wrote REPORT.md"
+            },
+            {
+              "id": "publish-command",
+              "scored": true,
+              "pass": true,
+              "detail": "./unify build --base-url https://alderfen.pages.dev/arboretum/ --pretty-urls --clean"
+            },
+            {
+              "id": "strict-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0: 0 problems, 0 advisories"
+            },
+            {
+              "id": "fresh-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0"
+            },
+            {
+              "id": "addresses",
+              "scored": true,
+              "pass": true,
+              "detail": "42 internal links (0 in fetched fragments), all extensionless under /arboretum/ with published targets",
+              "contexts": [],
+              "coverage": [],
+              "failures": []
+            },
+            {
+              "id": "css-urls",
+              "scored": true,
+              "pass": true,
+              "detail": "every root-relative url() is under /arboretum/"
+            }
+          ],
+          "agent": {
+            "exit": 0,
+            "timedOut": false,
+            "durationMs": 295617,
+            "turns": 32,
+            "costUsd": 0
+          },
+          "freshBuild": {
+            "command": "./unify build --base-url https://alderfen.pages.dev/arboretum/ --pretty-urls --clean",
+            "exit": 0
+          },
+          "rulesGaps": "## What `rules.md` did not answer\n\nThe sentence I looked for and could not find: **what counts as the \"real filename\" when\nlinking to a Markdown page.** The rules say \"Always link the real filename \u2014 `/about.html`,\nnot `/about/`\", but every example is an `.html` source, and the real filename of the oaks\nguide is `oaks.md`. I wrote `/collections/guides/oaks.html` and got silence from a strict\naudit and the right `/arboretum/collections/guides/oaks/` in the output \u2014 proof after the\nfact, not an answer.\n\nOther things the documentation left open:\n\n- Whether `--pretty-urls` turns the home page into `index/index.html`. The spec sentence"
+        },
+        {
+          "originalSample": "krang-opencode-zen-qwen3-8-flash-4",
+          "sourceRound": "pr157-zen-qwen38-flash-full",
+          "sourceSample": "krang-opencode-zen-qwen3-8-flash-4",
+          "exitRecoveredFromKernel": false,
+          "name": "krang-opencode-zen-qwen3-8-flash-4",
+          "model": "krang/opencode-zen/qwen3.8-flash",
+          "pass": true,
+          "checks": [
+            {
+              "id": "agent-finished",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0, wrote REPORT.md"
+            },
+            {
+              "id": "publish-command",
+              "scored": true,
+              "pass": true,
+              "detail": "./unify build --base-url https://alderfen.pages.dev/arboretum/ --pretty-urls --clean --audit"
+            },
+            {
+              "id": "strict-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0: 0 problems, 0 advisories"
+            },
+            {
+              "id": "fresh-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0"
+            },
+            {
+              "id": "addresses",
+              "scored": true,
+              "pass": true,
+              "detail": "41 internal links (0 in fetched fragments), all extensionless under /arboretum/ with published targets",
+              "contexts": [],
+              "coverage": [],
+              "failures": []
+            },
+            {
+              "id": "css-urls",
+              "scored": true,
+              "pass": true,
+              "detail": "every root-relative url() is under /arboretum/"
+            }
+          ],
+          "agent": {
+            "exit": 0,
+            "timedOut": false,
+            "durationMs": 293968,
+            "turns": 32,
+            "costUsd": 0
+          },
+          "freshBuild": {
+            "command": "./unify build --base-url https://alderfen.pages.dev/arboretum/ --pretty-urls --clean --audit",
+            "exit": 0
+          },
+          "rulesGaps": "## What `rules.md` did not answer\n\n- **Links to Markdown pages.** The docs say to link the real filename (`/about.html`, not\n  `/about/`) and that this \"stays true under `--pretty-urls`\" \u2014 but only ever for `.html`. Nowhere\n  is it stated that you write `oaks.md` and the build rewrites it to `/collections/guides/oaks/`.\n  The sentence I wanted and could not find: \"a link to a `.md` page names its `.md` file.\" I wrote\n  `/collections/guides/oaks.md` on the collections page as the obvious extrapolation; the clean\n  strict audit and my link-walk confirmed it.\n- **Front matter `title` and the body `<h1>`.** Nothing says whether `title: \"The Oaks\"` also\n  renders a heading. I guessed it would and omitted an `# heading`; `audit` reported\n  `h1-missing`, telling me unify deliberately emits no `<h1>` for a titled page \u2014 the inverse of\n  what \"No `title:` \u2192 first `# Heading`\" almost implies. Added `# The Oaks` etc."
+        },
+        {
+          "originalSample": "krang-opencode-zen-qwen3-8-flash-5",
+          "sourceRound": "pr157-zen-qwen38-flash-retry-photos",
+          "sourceSample": "krang-opencode-zen-qwen3-8-flash-2",
+          "exitRecoveredFromKernel": false,
+          "name": "krang-opencode-zen-qwen3-8-flash-2",
+          "model": "krang/opencode-zen/qwen3.8-flash",
+          "pass": true,
+          "checks": [
+            {
+              "id": "agent-finished",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0, wrote REPORT.md"
+            },
+            {
+              "id": "publish-command",
+              "scored": true,
+              "pass": true,
+              "detail": "./unify build --base-url https://alderfen.pages.dev/arboretum/ --pretty-urls --clean"
+            },
+            {
+              "id": "strict-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0: 0 problems, 0 advisories"
+            },
+            {
+              "id": "fresh-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0"
+            },
+            {
+              "id": "addresses",
+              "scored": true,
+              "pass": true,
+              "detail": "29 internal links (0 in fetched fragments), all extensionless under /arboretum/ with published targets",
+              "contexts": [],
+              "coverage": [],
+              "failures": []
+            },
+            {
+              "id": "css-urls",
+              "scored": true,
+              "pass": true,
+              "detail": "every root-relative url() is under /arboretum/"
+            }
+          ],
+          "agent": {
+            "exit": 0,
+            "timedOut": false,
+            "durationMs": 223433,
+            "turns": 17,
+            "costUsd": 0
+          },
+          "freshBuild": {
+            "command": "./unify build --base-url https://alderfen.pages.dev/arboretum/ --pretty-urls --clean",
+            "exit": 0
+          },
+          "rulesGaps": "## What `rules.md` did not answer\n\n- **Nothing about `index.html` under `--pretty-urls`.** The rule shown is\n  `about.html \u2192 about/index.html`; would the root page fold to a directory too? I found\n  out from the dry-run report (`write dist/index.html (/arboretum/)`), not from the docs.\n- **Nothing about `--pretty-urls` + `--base-url` interaction on the links I wrote.** I\n  wrote `/index.html` in the nav; the output shows it became `/arboretum/`. That the home\n  link folds all the way to the base URL is plausible, but nowhere stated.\n- **The sitemap.** I only knew `--base-url` \"generates sitemap.xml\" from `./unify --help`;\n  `rules.md` never mentions it. Likewise it doesn't say (in prose) that the *default*\n  `--canonical auto` gives every page that authors none its absolute URL \u2014 the Markdown\n  section only warns that a layout must never set canonical."
+        }
+      ]
+    },
+    {
+      "name": "publishing",
+      "passed": 4,
+      "total": 5,
+      "barMet": true,
+      "samples": [
+        {
+          "originalSample": "krang-opencode-zen-qwen3-8-flash-1",
+          "sourceRound": "pr157-zen-qwen38-flash-retry-remaining",
+          "sourceSample": "krang-opencode-zen-qwen3-8-flash-1",
+          "exitRecoveredFromKernel": false,
+          "name": "krang-opencode-zen-qwen3-8-flash-1",
+          "model": "krang/opencode-zen/qwen3.8-flash",
+          "pass": true,
+          "checks": [
+            {
+              "id": "agent-finished",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0, wrote REPORT.md"
+            },
+            {
+              "id": "publish-command",
+              "scored": true,
+              "pass": true,
+              "detail": "./unify build --base-url https://bellwick.example/workshop/ --pretty-urls --audit"
+            },
+            {
+              "id": "strict-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0: 0 problems, 0 advisories"
+            },
+            {
+              "id": "fresh-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0"
+            },
+            {
+              "id": "addresses",
+              "scored": true,
+              "pass": true,
+              "detail": "49 internal links (0 in fetched fragments), all extensionless under /workshop/ with published targets",
+              "contexts": [],
+              "coverage": [],
+              "failures": []
+            },
+            {
+              "id": "feed",
+              "scored": true,
+              "pass": true,
+              "detail": "4 entries (needs 4), each with a timestamp, title and link"
+            },
+            {
+              "id": "article-data",
+              "scored": true,
+              "pass": true,
+              "detail": "4 dated pages (needs 4)"
+            },
+            {
+              "id": "share-cards",
+              "scored": true,
+              "pass": true,
+              "detail": "4 dated pages (needs 4)"
+            }
+          ],
+          "agent": {
+            "exit": 0,
+            "timedOut": false,
+            "durationMs": 390031,
+            "turns": 47,
+            "costUsd": 0
+          },
+          "freshBuild": {
+            "command": "./unify build --base-url https://bellwick.example/workshop/ --pretty-urls --audit",
+            "exit": 0
+          },
+          "rulesGaps": "## 1. What `rules.md` did not answer\n\nThe sentence I wanted and could not find: **\"unify runs the generate script as\n`node <script> <sourceRoot> <overlayDir> <contextFile>`, the context file names\n`source-pages.json`, and files written into the overlay are composed like source pages.\"**\nrules.md says the script \"writes into the directory unify hands it\" and never says *how* it\nis handed, in which argument, that a context JSON exists at all, what `source-pages.json`\ncontains, or whether a generated file gets the layout applied. I discovered all of that by\nrunning throwaway probes that printed `process.argv`, the context file, and the inventory.\nTwo smaller gaps: `--source-inventory`/`source-pages.json` and `sitemap.xml` exist only in\n`./unify --help`, not in the rules; and nothing says a Markdown post must write its own\n`# heading` \u2014 a page's `title:` does **not** emit an `<h1>` (the audit's `h1-missing`"
+        },
+        {
+          "originalSample": "krang-opencode-zen-qwen3-8-flash-2",
+          "sourceRound": "pr157-zen-qwen38-flash-retry-remaining",
+          "sourceSample": "krang-opencode-zen-qwen3-8-flash-2",
+          "exitRecoveredFromKernel": false,
+          "name": "krang-opencode-zen-qwen3-8-flash-2",
+          "model": "krang/opencode-zen/qwen3.8-flash",
+          "pass": false,
+          "checks": [
+            {
+              "id": "agent-finished",
+              "scored": true,
+              "pass": false,
+              "detail": "exit 1, agent error: The user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules [{\"permission\":\"*\",\"action\":\"allow\",\"pattern\":\"*\"},{\"permission\":\"doom_loop\",\"action\":\"ask\",\"pattern\":\"*\"},{\"permission\":\"doom_loop\",\"action\":\"deny\",\"pattern\":\"*\"}], wrote REPORT.md"
+            },
+            {
+              "id": "publish-command",
+              "scored": true,
+              "pass": true,
+              "detail": "./unify build --base-url https://bellwick.example/workshop/ --pretty-urls"
+            },
+            {
+              "id": "strict-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0: 0 problems, 0 advisories"
+            },
+            {
+              "id": "fresh-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0"
+            },
+            {
+              "id": "addresses",
+              "scored": true,
+              "pass": true,
+              "detail": "50 internal links (0 in fetched fragments), all extensionless under /workshop/ with published targets",
+              "contexts": [],
+              "coverage": [],
+              "failures": []
+            },
+            {
+              "id": "feed",
+              "scored": true,
+              "pass": true,
+              "detail": "4 entries (needs 4), each with a timestamp, title and link"
+            },
+            {
+              "id": "article-data",
+              "scored": true,
+              "pass": true,
+              "detail": "4 dated pages (needs 4)"
+            },
+            {
+              "id": "share-cards",
+              "scored": true,
+              "pass": true,
+              "detail": "4 dated pages (needs 4)"
+            }
+          ],
+          "agent": {
+            "exit": 1,
+            "timedOut": false,
+            "durationMs": 452877,
+            "turns": 42,
+            "costUsd": 0
+          },
+          "freshBuild": {
+            "command": "./unify build --base-url https://bellwick.example/workshop/ --pretty-urls",
+            "exit": 0
+          },
+          "rulesGaps": "**1. What rules.md did not answer \u2014 the sentence I wanted and could not find.**\nrules.md says the generator script \"writes into the directory unify hands it\" but never\nsays *how* the directory is handed over, nor how the script learns what the posts are.\nThe sentence I wanted \u2014 \"the script is invoked as\n`process.argv = [source root, generated directory, context JSON path]`\" \u2014 does not\nexist. I found it by writing a throwaway probe that dumped `process.argv` and reading\nthe `generator-context.json` it names. The context file's `inputs.sourcePages` pointer\nto `source-pages.json` (the per-page title/date/meta inventory I built the index from)\nis not mentioned in rules.md at all \u2014 only `--help` says it is \"on by default with\n--generate\". rules.md also never states whether files the generator writes get the\nlayout wrapped around them; I had to believe the dry-run report line\n`dist/news/index.html \u2190 generated + _layout.html`."
+        },
+        {
+          "originalSample": "krang-opencode-zen-qwen3-8-flash-3",
+          "sourceRound": "pr157-zen-qwen38-flash-retry-remaining",
+          "sourceSample": "krang-opencode-zen-qwen3-8-flash-3",
+          "exitRecoveredFromKernel": false,
+          "name": "krang-opencode-zen-qwen3-8-flash-3",
+          "model": "krang/opencode-zen/qwen3.8-flash",
+          "pass": true,
+          "checks": [
+            {
+              "id": "agent-finished",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0, wrote REPORT.md"
+            },
+            {
+              "id": "publish-command",
+              "scored": true,
+              "pass": true,
+              "detail": "./unify build --base-url https://bellwick.example/workshop/ --pretty-urls --clean --audit"
+            },
+            {
+              "id": "strict-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0: 0 problems, 0 advisories"
+            },
+            {
+              "id": "fresh-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0"
+            },
+            {
+              "id": "addresses",
+              "scored": true,
+              "pass": true,
+              "detail": "62 internal links (0 in fetched fragments), all extensionless under /workshop/ with published targets",
+              "contexts": [],
+              "coverage": [],
+              "failures": []
+            },
+            {
+              "id": "feed",
+              "scored": true,
+              "pass": true,
+              "detail": "4 entries (needs 4), each with a timestamp, title and link"
+            },
+            {
+              "id": "article-data",
+              "scored": true,
+              "pass": true,
+              "detail": "4 dated pages (needs 4)"
+            },
+            {
+              "id": "share-cards",
+              "scored": true,
+              "pass": true,
+              "detail": "4 dated pages (needs 4)"
+            }
+          ],
+          "agent": {
+            "exit": 0,
+            "timedOut": false,
+            "durationMs": 366867,
+            "turns": 41,
+            "costUsd": 0
+          },
+          "freshBuild": {
+            "command": "./unify build --base-url https://bellwick.example/workshop/ --pretty-urls --clean --audit",
+            "exit": 0
+          },
+          "rulesGaps": "## 1. What `rules.md` did not answer\n\nThe sentence I wanted and could not find was, in effect: **\"unify runs the\ngenerator with the source directory, the generated directory and a context JSON\nfile as its arguments.\"** Line 6 says only that the script \"writes into the\ndirectory unify hands it\" \u2014 it never says *how* it is handed. `rules.md` also\nnever documents `source-pages.json`'s shape (the CLI help calls it \"authored\ntitle\" but no schema), and never says whether files written into that directory\nare treated as pages (layout-applied, links rewritten). I discovered\n`argv = [script, srcDir, overlayDir, context.json]` and\n`generator-context.json`'s `paths.generatedRoot` / `inputs.sourcePages` by\nrunning a probe script. Related gap: the inventory's `title` is null for a post"
+        },
+        {
+          "originalSample": "krang-opencode-zen-qwen3-8-flash-4",
+          "sourceRound": "pr157-zen-qwen38-flash-retry-remaining",
+          "sourceSample": "krang-opencode-zen-qwen3-8-flash-4",
+          "exitRecoveredFromKernel": false,
+          "name": "krang-opencode-zen-qwen3-8-flash-4",
+          "model": "krang/opencode-zen/qwen3.8-flash",
+          "pass": true,
+          "checks": [
+            {
+              "id": "agent-finished",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0, wrote REPORT.md"
+            },
+            {
+              "id": "publish-command",
+              "scored": true,
+              "pass": true,
+              "detail": "./unify build --base-url https://bellwick.example/workshop/ --pretty-urls"
+            },
+            {
+              "id": "strict-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0: 0 problems, 0 advisories"
+            },
+            {
+              "id": "fresh-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0"
+            },
+            {
+              "id": "addresses",
+              "scored": true,
+              "pass": true,
+              "detail": "51 internal links (0 in fetched fragments), all extensionless under /workshop/ with published targets",
+              "contexts": [],
+              "coverage": [],
+              "failures": []
+            },
+            {
+              "id": "feed",
+              "scored": true,
+              "pass": true,
+              "detail": "4 entries (needs 4), each with a timestamp, title and link"
+            },
+            {
+              "id": "article-data",
+              "scored": true,
+              "pass": true,
+              "detail": "4 dated pages (needs 4)"
+            },
+            {
+              "id": "share-cards",
+              "scored": true,
+              "pass": true,
+              "detail": "4 dated pages (needs 4)"
+            }
+          ],
+          "agent": {
+            "exit": 0,
+            "timedOut": false,
+            "durationMs": 334551,
+            "turns": 34,
+            "costUsd": 0
+          },
+          "freshBuild": {
+            "command": "./unify build --base-url https://bellwick.example/workshop/ --pretty-urls",
+            "exit": 0
+          },
+          "rulesGaps": "### 1. What `rules.md` did not answer\n\nThe sentence I wanted and could not find: **how the generator script is invoked \u2014 what\narguments, what working directory, and how it is handed \"the directory unify hands it\" \u2014\nand where `source-pages.json` lives.** Line 6 says a derived index comes from \"a script\nyou write\u2026 and it writes into the directory unify hands it\", full stop. I only learned the\nanswer by writing a probe generator that dumped `process.argv`/`process.cwd`: it is called\nwith (source root, overlay dir, context JSON), the context JSON points at\n`source-pages.json`, and files written into the overlay ship as if authored (the layout\nwraps them). `source-pages.json` itself appears nowhere in `rules.md` \u2014 only in\n`--help`. Other gaps: `rules.md` never mentions `sitemap.xml` (the help does), never says\n`--canonical` defaults to `auto` under `--base-url` (I needed that for canonical/og:url),"
+        },
+        {
+          "originalSample": "krang-opencode-zen-qwen3-8-flash-5",
+          "sourceRound": "pr157-zen-qwen38-flash-retry-remaining",
+          "sourceSample": "krang-opencode-zen-qwen3-8-flash-5",
+          "exitRecoveredFromKernel": false,
+          "name": "krang-opencode-zen-qwen3-8-flash-5",
+          "model": "krang/opencode-zen/qwen3.8-flash",
+          "pass": true,
+          "checks": [
+            {
+              "id": "agent-finished",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0, wrote REPORT.md"
+            },
+            {
+              "id": "publish-command",
+              "scored": true,
+              "pass": true,
+              "detail": "./unify build --base-url https://bellwick.example/workshop/ --pretty-urls"
+            },
+            {
+              "id": "strict-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0: 0 problems, 0 advisories"
+            },
+            {
+              "id": "fresh-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0"
+            },
+            {
+              "id": "addresses",
+              "scored": true,
+              "pass": true,
+              "detail": "45 internal links (0 in fetched fragments), all extensionless under /workshop/ with published targets",
+              "contexts": [],
+              "coverage": [],
+              "failures": []
+            },
+            {
+              "id": "feed",
+              "scored": true,
+              "pass": true,
+              "detail": "4 entries (needs 4), each with a timestamp, title and link"
+            },
+            {
+              "id": "article-data",
+              "scored": true,
+              "pass": true,
+              "detail": "4 dated pages (needs 4)"
+            },
+            {
+              "id": "share-cards",
+              "scored": true,
+              "pass": true,
+              "detail": "4 dated pages (needs 4)"
+            }
+          ],
+          "agent": {
+            "exit": 0,
+            "timedOut": false,
+            "durationMs": 331714,
+            "turns": 31,
+            "costUsd": 0
+          },
+          "freshBuild": {
+            "command": "./unify build --base-url https://bellwick.example/workshop/ --pretty-urls",
+            "exit": 0
+          },
+          "rulesGaps": "## 1. What `rules.md` did not answer\n\nThe sentence I wanted and could not find: **how the generator is \"handed\" its directory, and\nwhether files the script writes are treated as source pages.** The rules say \"it writes into\nthe directory unify hands it, never into `site/`\" \u2014 but never say it is handed as `argv[3]`\n(next to `argv[2]` = source root and `argv[4]` = `generator-context.json`), never mention\nthat a `generator-context.json` or `source-pages.json` exists at all (that is `--help` and\n`--source-inventory` territory), and never state whether an `index.html` written into the\noverlay gets layout wrapping and link rewriting or ships verbatim. A probe script that dumped\n`process.argv` plus a line in the dry-run report (`\u2190 generated + _layout.html`) settled both.\nRelated gaps: the rules' example `generate: scripts/gen.mjs` reads as project-root-relative\nwhile the CLI says `--generate` paths are \"from the source root\" \u2014 in practice the YAML"
+        }
+      ]
+    },
+    {
+      "name": "seed-catalogue",
+      "passed": 3,
+      "total": 5,
+      "barMet": false,
+      "samples": [
+        {
+          "originalSample": "krang-opencode-zen-qwen3-8-flash-1",
+          "sourceRound": "pr157-zen-qwen38-flash-retry-remaining",
+          "sourceSample": "krang-opencode-zen-qwen3-8-flash-1",
+          "exitRecoveredFromKernel": false,
+          "name": "krang-opencode-zen-qwen3-8-flash-1",
+          "model": "krang/opencode-zen/qwen3.8-flash",
+          "pass": true,
+          "checks": [
+            {
+              "id": "agent-finished",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0, wrote REPORT.md"
+            },
+            {
+              "id": "publish-command",
+              "scored": true,
+              "pass": true,
+              "detail": "./unify build --clean"
+            },
+            {
+              "id": "strict-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0: 0 problems, 0 advisories"
+            },
+            {
+              "id": "fresh-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0"
+            },
+            {
+              "id": "addresses",
+              "scored": true,
+              "pass": true,
+              "detail": "1684 internal links (0 in fetched fragments), all extensionless under /library/ with published targets; 1 static-analysis coverage note(s)",
+              "contexts": [],
+              "coverage": [
+                "catalogue/index.html via assets/browse.js: fetch(url, { headers: { accept: 'text/html' } })"
+              ],
+              "failures": []
+            },
+            {
+              "id": "drafts-and-export-unpublished",
+              "scored": true,
+              "pass": true,
+              "detail": "none published"
+            },
+            {
+              "id": "private-data",
+              "scored": true,
+              "pass": true,
+              "detail": "0 of 6 private values published"
+            },
+            {
+              "id": "variety-pages",
+              "scored": true,
+              "pass": true,
+              "detail": "244 pages (needs 225)"
+            },
+            {
+              "id": "fetch-targets",
+              "scored": false,
+              "pass": false,
+              "detail": "0 of 0 resolved, 0 built at runtime (no base URL (none in config, none in the command) \u2014 skipped)"
+            }
+          ],
+          "agent": {
+            "exit": 0,
+            "timedOut": false,
+            "durationMs": 483065,
+            "turns": 40,
+            "costUsd": 0
+          },
+          "freshBuild": {
+            "command": "./unify build --clean",
+            "exit": 0
+          },
+          "rulesGaps": "## What `rules.md` did not answer\n\n- **Whether a `.fragment.html` file's links get rewritten.** The file rules say a\n  fragment is \"shipped as written\"; the finishing section says the build \"rewrites\n  only HTML's own URL attributes (`href`, `src`)\" \u2014 and also that \"`fetch()`/`hx-get`\n  address[es] ship as written\". The sentence I wanted and could not find is the\n  tie-breaker: *do `--base-url`/`--pretty-urls` rewrite `<a href>` inside a fragment,\n  or does \"as written\" win?* I tested it: as written wins \u2014 a fragment in `dist/`\n  still carried `/variety/nine-star-pea-1.html`, no prefix, no pretty form. That\n  decided the architecture: the family lists ship as real generated pages\n  (rewritten by the build like everything else), and `browse.js` fetches the page\n  and injects its `<main>` \u2014 so only that family's varieties arrive, at URLs that"
+        },
+        {
+          "originalSample": "krang-opencode-zen-qwen3-8-flash-2",
+          "sourceRound": "pr157-zen-qwen38-flash-retry-remaining",
+          "sourceSample": "krang-opencode-zen-qwen3-8-flash-2",
+          "exitRecoveredFromKernel": true,
+          "name": "krang-opencode-zen-qwen3-8-flash-2",
+          "model": "krang/opencode-zen/qwen3.8-flash",
+          "pass": true,
+          "checks": [
+            {
+              "id": "agent-finished",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0, wrote REPORT.md"
+            },
+            {
+              "id": "publish-command",
+              "scored": true,
+              "pass": true,
+              "detail": "./unify build --clean --base-url https://fernhollow.pages.dev/library/ --pretty-urls"
+            },
+            {
+              "id": "strict-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0: 0 problems, 0 advisories"
+            },
+            {
+              "id": "fresh-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0"
+            },
+            {
+              "id": "addresses",
+              "scored": true,
+              "pass": true,
+              "detail": "2078 internal links (0 in fetched fragments), all extensionless under /library/ with published targets; 1 static-analysis coverage note(s)",
+              "contexts": [],
+              "coverage": [
+                "catalogue/index.html via js/browse.js: fetch(link.getAttribute(\"href\"))"
+              ],
+              "failures": []
+            },
+            {
+              "id": "drafts-and-export-unpublished",
+              "scored": true,
+              "pass": true,
+              "detail": "none published"
+            },
+            {
+              "id": "private-data",
+              "scored": true,
+              "pass": true,
+              "detail": "0 of 6 private values published"
+            },
+            {
+              "id": "variety-pages",
+              "scored": true,
+              "pass": true,
+              "detail": "232 pages (needs 225)"
+            },
+            {
+              "id": "fetch-targets",
+              "scored": false,
+              "pass": false,
+              "detail": "0 of 0 resolved, 1 built at runtime"
+            }
+          ],
+          "agent": {
+            "exit": 0,
+            "timedOut": false,
+            "durationMs": null,
+            "turns": 59,
+            "costUsd": 0
+          },
+          "freshBuild": {
+            "command": "./unify build --clean --base-url https://fernhollow.pages.dev/library/ --pretty-urls",
+            "exit": 0
+          },
+          "rulesGaps": "## What `rules.md` did not answer\n\n- **How the generator is invoked.** The rules say the script \"writes into the\n  directory unify hands it\" but never say what it is handed. The sentence I\n  wanted: *what argv does a `--generate` script receive?* I discovered by\n  printing: `[unify, script, sourceRoot, generatedRoot, generator-context.json]`\n  \u2014 after a first attempt wrote straight into `site/` because I guessed argv[2].\n- **Whether \"shipped as written\" for fragments also exempts them from\n  rewriting and from link resolution.** Line 57 says unify \"rewrites only\n  HTML's own URL attributes\" and line 10 says fragments ship \"as written\" \u2014 but\n  nowhere states that the `href`s *inside a fragment* keep the exact bytes the\n  generator wrote and are not rewritten by `--base-url`. I learned it by"
+        },
+        {
+          "originalSample": "krang-opencode-zen-qwen3-8-flash-3",
+          "sourceRound": "pr157-zen-qwen38-flash-retry-remaining",
+          "sourceSample": "krang-opencode-zen-qwen3-8-flash-3",
+          "exitRecoveredFromKernel": true,
+          "name": "krang-opencode-zen-qwen3-8-flash-3",
+          "model": "krang/opencode-zen/qwen3.8-flash",
+          "pass": false,
+          "checks": [
+            {
+              "id": "agent-finished",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0, wrote REPORT.md"
+            },
+            {
+              "id": "publish-command",
+              "scored": true,
+              "pass": true,
+              "detail": "./unify build --clean --pretty-urls --base-url https://fernhollow.pages.dev/library/ --audit"
+            },
+            {
+              "id": "strict-build",
+              "scored": true,
+              "pass": false,
+              "detail": "exit 1: 0 problems, 0 advisories"
+            },
+            {
+              "id": "fresh-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0"
+            },
+            {
+              "id": "addresses",
+              "scored": true,
+              "pass": true,
+              "detail": "1405 internal links (0 in fetched fragments), all extensionless under /library/ with published targets; 1 static-analysis coverage note(s)",
+              "contexts": [],
+              "coverage": [
+                "browse/index.html via assets/browse.js: fetch(link.href)"
+              ],
+              "failures": []
+            },
+            {
+              "id": "drafts-and-export-unpublished",
+              "scored": true,
+              "pass": true,
+              "detail": "none published"
+            },
+            {
+              "id": "private-data",
+              "scored": true,
+              "pass": true,
+              "detail": "0 of 6 private values published"
+            },
+            {
+              "id": "variety-pages",
+              "scored": true,
+              "pass": true,
+              "detail": "232 pages (needs 225)"
+            },
+            {
+              "id": "fetch-targets",
+              "scored": false,
+              "pass": false,
+              "detail": "0 of 0 resolved, 1 built at runtime"
+            }
+          ],
+          "agent": {
+            "exit": 0,
+            "timedOut": false,
+            "durationMs": null,
+            "turns": 41,
+            "costUsd": 0
+          },
+          "freshBuild": {
+            "command": "./unify build --clean --pretty-urls --base-url https://fernhollow.pages.dev/library/ --audit",
+            "exit": 0
+          },
+          "rulesGaps": "## What `rules.md` did not answer\n\n**The sentence I wanted and could not find: how the `--generate` script is invoked.** The\ndocs say \"unify runs it before every build and it writes into the directory unify hands\nit\" \u2014 but never *how the directory is handed over*: no documented argv order, working\ndirectory, or context file. I found it by running a probe script that dumped\n`process.argv`: it is `node <script> <sourceRoot> <generatedRoot> <context.json>`, cwd =\nthe source root, and the fourth argument is a JSON file containing `paths`, `site`\n(including `baseUrl` and `prettyUrls`) and the source-pages inventory. Nothing in the\ndocumentation mentions that context file except the `--source-inventory` flag line.\n\nRelated unanswered questions I resolved only by building a probe site:"
+        },
+        {
+          "originalSample": "krang-opencode-zen-qwen3-8-flash-4",
+          "sourceRound": "pr157-zen-qwen38-flash-retry-remaining",
+          "sourceSample": "krang-opencode-zen-qwen3-8-flash-4",
+          "exitRecoveredFromKernel": true,
+          "name": "krang-opencode-zen-qwen3-8-flash-4",
+          "model": "krang/opencode-zen/qwen3.8-flash",
+          "pass": true,
+          "checks": [
+            {
+              "id": "agent-finished",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0, wrote REPORT.md"
+            },
+            {
+              "id": "publish-command",
+              "scored": true,
+              "pass": true,
+              "detail": "./unify build --clean --base-url https://fernhollow.pages.dev/library/ --pretty-urls"
+            },
+            {
+              "id": "strict-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0: 0 problems, 0 advisories"
+            },
+            {
+              "id": "fresh-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0"
+            },
+            {
+              "id": "addresses",
+              "scored": true,
+              "pass": true,
+              "detail": "2387 internal links (0 in fetched fragments), all extensionless under /library/ with published targets; 1 static-analysis coverage note(s)",
+              "contexts": [],
+              "coverage": [
+                "browse/index.html via assets/browse.js: fetch(url)"
+              ],
+              "failures": []
+            },
+            {
+              "id": "drafts-and-export-unpublished",
+              "scored": true,
+              "pass": true,
+              "detail": "none published"
+            },
+            {
+              "id": "private-data",
+              "scored": true,
+              "pass": true,
+              "detail": "0 of 6 private values published"
+            },
+            {
+              "id": "variety-pages",
+              "scored": true,
+              "pass": true,
+              "detail": "244 pages (needs 225)"
+            },
+            {
+              "id": "fetch-targets",
+              "scored": false,
+              "pass": false,
+              "detail": "0 of 0 resolved, 1 built at runtime"
+            }
+          ],
+          "agent": {
+            "exit": 0,
+            "timedOut": false,
+            "durationMs": null,
+            "turns": 46,
+            "costUsd": 0
+          },
+          "freshBuild": {
+            "command": "./unify build --clean --base-url https://fernhollow.pages.dev/library/ --pretty-urls",
+            "exit": 0
+          },
+          "rulesGaps": "## What `rules.md` did not answer\n\nThe sentence I wanted and could not find: **what happens to files the generate script writes\ninto the directory it is handed.** The docs say a script exists, runs before every build, and\n\"writes into the directory unify hands it\" \u2014 but never say that those files are composed like\nnormal source pages. I had to test it: overlay pages pick up the root `_layout.html` (two\nlevels deep), get `--pretty-urls` and `--base-url` rewriting, canonicals and sitemap entries.\nRelated gaps: *which* argument is that directory (I guessed argv[2] \u2014 the source root \u2014 and\nthe script wrote into `site/`, the one place the docs forbid; the contract turns out to be\n`[unify, script, sourceRoot, generatedRoot, generatorContext.json]`); and the\ngenerator-context.json inventory, which the docs only hint at via `--source-inventory`\n(\"on by default with `--generate`\") without saying where that file is \u2014 argv[4], with"
+        },
+        {
+          "originalSample": "krang-opencode-zen-qwen3-8-flash-5",
+          "sourceRound": "pr157-zen-qwen38-flash-retry-remaining",
+          "sourceSample": "krang-opencode-zen-qwen3-8-flash-5",
+          "exitRecoveredFromKernel": true,
+          "name": "krang-opencode-zen-qwen3-8-flash-5",
+          "model": "krang/opencode-zen/qwen3.8-flash",
+          "pass": false,
+          "checks": [
+            {
+              "id": "agent-finished",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0, wrote REPORT.md"
+            },
+            {
+              "id": "publish-command",
+              "scored": true,
+              "pass": true,
+              "detail": "./unify build --base-url https://fernhollow.pages.dev/library/ --pretty-urls --clean --audit"
+            },
+            {
+              "id": "strict-build",
+              "scored": true,
+              "pass": false,
+              "detail": "exit 1: 0 problems, 0 advisories \u2014 gen: 225 variety pages, 12 family fragments, browse page (base \"/library/\", pretty true)"
+            },
+            {
+              "id": "fresh-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0"
+            },
+            {
+              "id": "addresses",
+              "scored": true,
+              "pass": true,
+              "detail": "2080 internal links (0 in fetched fragments), all extensionless under /library/ with published targets; 1 static-analysis coverage note(s)",
+              "contexts": [],
+              "coverage": [
+                "browse/index.html via js/browse.js: fetch(link.href)"
+              ],
+              "failures": []
+            },
+            {
+              "id": "drafts-and-export-unpublished",
+              "scored": true,
+              "pass": true,
+              "detail": "none published"
+            },
+            {
+              "id": "private-data",
+              "scored": true,
+              "pass": true,
+              "detail": "0 of 6 private values published"
+            },
+            {
+              "id": "variety-pages",
+              "scored": true,
+              "pass": true,
+              "detail": "232 pages (needs 225)"
+            },
+            {
+              "id": "fetch-targets",
+              "scored": false,
+              "pass": false,
+              "detail": "0 of 0 resolved, 1 built at runtime"
+            }
+          ],
+          "agent": {
+            "exit": 0,
+            "timedOut": false,
+            "durationMs": null,
+            "turns": 44,
+            "costUsd": 0
+          },
+          "freshBuild": {
+            "command": "./unify build --base-url https://fernhollow.pages.dev/library/ --pretty-urls --clean --audit",
+            "exit": 0
+          },
+          "rulesGaps": "## What `rules.md` did not answer\n\nThe sentence I wanted and could not find, in order of how much it cost me:\n\n- **How the `generate:` script is actually invoked.** `rules.md` says it \"writes into the\n  directory unify hands it\" \u2014 but never says *what it is handed*: the working directory,\n  the argument order (source root, generated root, context path), or that\n  `generator-context.json` contains `baseUrl`/`prettyUrls`/`sourcePages`. I learned all of\n  that by running a probe script that printed `process.argv` and dumped the context file.\n  A sentence like \"unify runs `node <script> <source-root> <generated-root> <context.json>`\n  from the source root\" would have saved the whole first experiment.\n- **Whether the contents of the generated directory get the same treatment as source files.**"
+        }
+      ]
+    },
+    {
+      "name": "svelte-estimator",
+      "passed": 4,
+      "total": 5,
+      "barMet": true,
+      "samples": [
+        {
+          "originalSample": "krang-opencode-zen-qwen3-8-flash-1",
+          "sourceRound": "pr157-zen-qwen38-flash-retry-remaining",
+          "sourceSample": "krang-opencode-zen-qwen3-8-flash-1",
+          "exitRecoveredFromKernel": true,
+          "name": "krang-opencode-zen-qwen3-8-flash-1",
+          "model": "krang/opencode-zen/qwen3.8-flash",
+          "pass": true,
+          "checks": [
+            {
+              "id": "agent-finished",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0, wrote REPORT.md"
+            },
+            {
+              "id": "publish-command",
+              "scored": true,
+              "pass": true,
+              "detail": "./unify build --clean --base-url https://thistleknap.pages.dev/forge/ --pretty-urls --strict"
+            },
+            {
+              "id": "strict-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0: 0 problems, 0 advisories"
+            },
+            {
+              "id": "fresh-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0"
+            },
+            {
+              "id": "addresses",
+              "scored": true,
+              "pass": true,
+              "detail": "56 internal links (0 in fetched fragments), all extensionless under /forge/ with published targets",
+              "contexts": [],
+              "coverage": [],
+              "failures": []
+            },
+            {
+              "id": "drafts-unpublished",
+              "scored": true,
+              "pass": true,
+              "detail": "none published"
+            }
+          ],
+          "agent": {
+            "exit": 0,
+            "timedOut": false,
+            "durationMs": null,
+            "turns": 50,
+            "costUsd": 0
+          },
+          "freshBuild": {
+            "command": "./unify build --clean --base-url https://thistleknap.pages.dev/forge/ --pretty-urls --strict",
+            "exit": 0
+          },
+          "rulesGaps": "## What `rules.md` did not answer\n\nThe generator-script contract. rules.md says the script \"writes into the directory unify hands\nit\" \u2014 the sentence I wanted and could not find is **how it is handed over**. Nothing in\nrules.md; the CLI help doesn't say either. I found it only by making a script dump\n`process.argv`: `[unify, script, sourceRoot, generatedRoot, generator-context.json]`, and the\ncontext JSON reveals `paths`, `site` options and `inputs.sourcePages`. The second clue was\nunify's error message, which prints `BUN_BE_BUN=1 unify scripts/gen.mjs` \u2014 so generators run\nunder Bun, which is nowhere stated; that's why `gen.mjs` stays runtime-agnostic and spawns\n`node` explicitly for the esbuild/svelte step.\n\nAlso unanswered:"
+        },
+        {
+          "originalSample": "krang-opencode-zen-qwen3-8-flash-2",
+          "sourceRound": "pr157-zen-qwen38-flash-retry-remaining",
+          "sourceSample": "krang-opencode-zen-qwen3-8-flash-2",
+          "exitRecoveredFromKernel": true,
+          "name": "krang-opencode-zen-qwen3-8-flash-2",
+          "model": "krang/opencode-zen/qwen3.8-flash",
+          "pass": true,
+          "checks": [
+            {
+              "id": "agent-finished",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0, wrote REPORT.md"
+            },
+            {
+              "id": "publish-command",
+              "scored": true,
+              "pass": true,
+              "detail": "./unify build --clean"
+            },
+            {
+              "id": "strict-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0: 0 problems, 0 advisories"
+            },
+            {
+              "id": "fresh-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0"
+            },
+            {
+              "id": "addresses",
+              "scored": true,
+              "pass": true,
+              "detail": "42 internal links (0 in fetched fragments), all extensionless under /forge/ with published targets",
+              "contexts": [],
+              "coverage": [],
+              "failures": []
+            },
+            {
+              "id": "drafts-unpublished",
+              "scored": true,
+              "pass": true,
+              "detail": "none published"
+            }
+          ],
+          "agent": {
+            "exit": 0,
+            "timedOut": false,
+            "durationMs": null,
+            "turns": 74,
+            "costUsd": 0
+          },
+          "freshBuild": {
+            "command": "./unify build --clean",
+            "exit": 0
+          },
+          "rulesGaps": "## What `rules.md` did not answer\n\n**The generator's invocation contract.** The docs say \"unify runs it before every build and it\nwrites into the directory unify hands it\" \u2014 but never *how the hand is given*. There is no\ndocumented argv order, no documented context file, and no documented cwd. I had to write a\nprobe generator that printed `process.argv` and the file unify passes it\n(`<generator-context.json>`, which names `generatedRoot`, the source inventory path, and the\neffective `baseUrl`/`prettyUrls`) to learn: `unify <script.mjs> <sourceRoot> <generatedOverlay>\n<context.json>`, cwd = source root, run by unify's own runtime (so the generator itself must\nstay plain Node \u2014 I shell out to `node` for the Svelte/esbuild step rather than import them\nunder whatever runtime unify uses)."
+        },
+        {
+          "originalSample": "krang-opencode-zen-qwen3-8-flash-3",
+          "sourceRound": "pr157-zen-qwen38-flash-retry-remaining",
+          "sourceSample": "krang-opencode-zen-qwen3-8-flash-3",
+          "exitRecoveredFromKernel": true,
+          "name": "krang-opencode-zen-qwen3-8-flash-3",
+          "model": "krang/opencode-zen/qwen3.8-flash",
+          "pass": true,
+          "checks": [
+            {
+              "id": "agent-finished",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0, wrote REPORT.md"
+            },
+            {
+              "id": "publish-command",
+              "scored": true,
+              "pass": true,
+              "detail": "./unify build"
+            },
+            {
+              "id": "strict-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0: 0 problems, 0 advisories"
+            },
+            {
+              "id": "fresh-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0"
+            },
+            {
+              "id": "addresses",
+              "scored": true,
+              "pass": true,
+              "detail": "44 internal links (0 in fetched fragments), all extensionless under /forge/ with published targets",
+              "contexts": [],
+              "coverage": [],
+              "failures": []
+            },
+            {
+              "id": "drafts-unpublished",
+              "scored": true,
+              "pass": true,
+              "detail": "none published"
+            }
+          ],
+          "agent": {
+            "exit": 0,
+            "timedOut": false,
+            "durationMs": null,
+            "turns": 50,
+            "costUsd": 0
+          },
+          "freshBuild": {
+            "command": "./unify build",
+            "exit": 0
+          },
+          "rulesGaps": "## 4. What `rules.md` did not answer\n\n- **What happens to the directory the generator writes into.** The one sentence I wanted and\n  could not find: *\"the generated directory is composed as if it were source files under the\n  source root.\"* Rules only say the script \"writes into the directory unify hands it, never\n  into `site/`\" \u2014 not that those files get wrapped by the site's `_layout.html`, rewritten\n  under `--pretty-urls`, prefixed by `--base-url`, or that assets placed there are copied\n  like source assets. All of that was true, and all of it I had to discover with probe\n  builds.\n- **How the generator is handed anything.** Nothing in `rules.md` says the script receives\n  the generated directory and a `generator-context.json` (with `inputs.sourcePages` pointing\n  at the inventory) as `process.argv[3]`/`argv[4]`. `--help` hints \"give that file"
+        },
+        {
+          "originalSample": "krang-opencode-zen-qwen3-8-flash-4",
+          "sourceRound": "pr157-zen-qwen38-flash-retry-remaining",
+          "sourceSample": "krang-opencode-zen-qwen3-8-flash-4",
+          "exitRecoveredFromKernel": true,
+          "name": "krang-opencode-zen-qwen3-8-flash-4",
+          "model": "krang/opencode-zen/qwen3.8-flash",
+          "pass": false,
+          "checks": [
+            {
+              "id": "agent-finished",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0, wrote REPORT.md"
+            },
+            {
+              "id": "publish-command",
+              "scored": true,
+              "pass": true,
+              "detail": "./unify build --pretty-urls --base-url https://thistleknap.pages.dev/forge/ --generate scripts/gen.mjs"
+            },
+            {
+              "id": "strict-build",
+              "scored": true,
+              "pass": false,
+              "detail": "exit 1: 1 problems, 0 advisories \u2014 site/scripts/gen.mjs: problem: --generate scripts/gen.mjs failed (exit 1): error: Module not found \"/tmp/sandbox/site/scripts/gen.mjs\""
+            },
+            {
+              "id": "fresh-build",
+              "scored": true,
+              "pass": false,
+              "detail": "publish command could not be rebuilt"
+            },
+            {
+              "id": "addresses",
+              "scored": true,
+              "pass": false,
+              "detail": "no build output"
+            },
+            {
+              "id": "drafts-unpublished",
+              "scored": true,
+              "pass": false,
+              "detail": "no build output"
+            }
+          ],
+          "agent": {
+            "exit": 0,
+            "timedOut": false,
+            "durationMs": null,
+            "turns": 53,
+            "costUsd": 0
+          },
+          "freshBuild": null,
+          "rulesGaps": "## What `rules.md` did not answer\n\nThe sentences I looked for and could not find:"
+        },
+        {
+          "originalSample": "krang-opencode-zen-qwen3-8-flash-5",
+          "sourceRound": "pr157-zen-qwen38-flash-retry-remaining",
+          "sourceSample": "krang-opencode-zen-qwen3-8-flash-5",
+          "exitRecoveredFromKernel": true,
+          "name": "krang-opencode-zen-qwen3-8-flash-5",
+          "model": "krang/opencode-zen/qwen3.8-flash",
+          "pass": true,
+          "checks": [
+            {
+              "id": "agent-finished",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0, wrote REPORT.md"
+            },
+            {
+              "id": "publish-command",
+              "scored": true,
+              "pass": true,
+              "detail": "./unify build"
+            },
+            {
+              "id": "strict-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0: 0 problems, 0 advisories"
+            },
+            {
+              "id": "fresh-build",
+              "scored": true,
+              "pass": true,
+              "detail": "exit 0"
+            },
+            {
+              "id": "addresses",
+              "scored": true,
+              "pass": true,
+              "detail": "49 internal links (0 in fetched fragments), all extensionless under /forge/ with published targets",
+              "contexts": [],
+              "coverage": [],
+              "failures": []
+            },
+            {
+              "id": "drafts-unpublished",
+              "scored": true,
+              "pass": true,
+              "detail": "none published"
+            }
+          ],
+          "agent": {
+            "exit": 0,
+            "timedOut": false,
+            "durationMs": null,
+            "turns": 53,
+            "costUsd": 0
+          },
+          "freshBuild": {
+            "command": "./unify build",
+            "exit": 0
+          },
+          "rulesGaps": "## What `rules.md` did not answer\n\n- It never says **how the generate script receives the \"directory unify hands it\"** \u2014\n  not as argv, not as env, just \"it writes into the directory\". I discovered by running\n  one: `argv[2]` = source root, `argv[3]` = a generated *overlay* directory, `argv[4]` =\n  a context JSON whose `inputs.sourcePages` points at the inventory. The sentence I\n  wanted and could not find: *\"The generate script is called with the source root, the\n  generated overlay directory and a context file as its arguments.\"*\n- It does not say that **files written into the overlay get the full treatment** \u2014 layout,\n  `--base-url` prefixing, `--pretty-urls` \u2014 though everything works that way. I inferred\n  it from \"Derived files (a post index)\", then tested it before relying on it.\n- The **shape of `source-pages.json`** is undocumented (keys `source/href/title/date/\u2026`),"
+        }
+      ]
+    }
+  ]
+}
