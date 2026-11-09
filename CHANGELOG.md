@@ -25,6 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Strict audit recognizes navigation supplied by fetched fragments.** Pages linked from a shipped
+  `.fragment.html` referenced by a composed page no longer receive false `page-orphan` findings.
+  Fragment URLs resolve against their consuming page, including pretty URLs under a deployment
+  subpath; unrelated orphans and broken findings still block strict publishing.
+
 - **P15 points at the include recipe (#155).** The fix line for a layout that declares `data-layout`
   said only to make it a complete standalone layout or delete it, which read as "copy the shell"; it
   now also says to keep shared chrome in `_includes/`, so a section layout repeats one `<include>` per

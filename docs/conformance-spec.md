@@ -1313,9 +1313,10 @@ Collapsing covers **ASCII** whitespace only. A decoded `&nbsp;` is U+00A0, a cha
 | `linksOut` | string[] | §20.9 — deduplicated, sorted output paths of internal pages this page links to |
 | `linksIn` | string[] | §20.9 — the exact reverse relation, deduplicated and sorted |
 | `fragmentLinks` | `{target, id}[]` | §20.9 |
+| `linksInFromFragments` | `string[]` | §20.9 — possible consumers supplying links through shipped fragments |
 | `refresh` | `{raw, seconds, url, target}`\|null | §20.11 |
 
-`extractDocument` itself returns the *per-document* half of this table — `visibleText`, `ids`, `titleTexts`, `langTexts`, `jsonLd`, `strayMetadata`, plus an unresolved `rawHrefs` (every `<a href>` value, document order) and an unresolved `refresh` reading. `linksOut`, `linksIn`, and `fragmentLinks` do not exist yet at that point — they are relations over the *whole manifest*, resolvable only once every document does — so `manifest.js`'s own second pass consumes `rawHrefs` into them and resolves `refresh.target`, exactly as `_hrefs`/`_refresh` were consumed and deleted in the 0.8 model. `rawHrefs` never survives onto the final envelope.
+`extractDocument` itself returns the *per-document* half of this table — `visibleText`, `ids`, `titleTexts`, `langTexts`, `jsonLd`, `strayMetadata`, plus an unresolved `rawHrefs` (every `<a href>` value, document order) and an unresolved `refresh` reading. `linksOut`, `linksIn`, `linksInFromFragments`, and `fragmentLinks` do not exist yet at that point — they are relations over the *whole manifest*, resolvable only once every document does — so `manifest.js`'s own second pass consumes `rawHrefs` into them and resolves `refresh.target`, exactly as `_hrefs`/`_refresh` were consumed and deleted in the 0.8 model. `rawHrefs` never survives onto the final envelope.
 
 ### 20.4 The `BuildDocument` envelope and the selector layer
 
@@ -1381,6 +1382,8 @@ A crawler-specific meta (`<meta name="googlebot">`) is **not** read: unify does 
 ### 20.9 The internal link graph
 
 `analysis.linksOut` holds the output paths of the pages this page links to. A link participates when it is an `<a href>` in the emitted document whose value, after `--base-url` stripping (§12's own rule, reused), resolves to an output path that has a document. Fragment-only, external, `mailto:`, `tel:`, and `data:` URLs never participate, and a link to a non-page asset never participates; the query and fragment of a participating URL are discarded before matching. A page linking to itself records itself. Values are deduplicated and sorted.
+
+`analysis.linksInFromFragments` records potential incoming navigation separately from the static graph. For each composed page, follow its emitted `<a href>` references to shipped `.fragment.html` files, and their anchor references to further shipped fragments, with a visited set per consumer. Resolve links inside each fragment against the **consuming page's output address**, not the fragment's own file path, using the same base stripping, entity/percent decoding, and directory-index resolution as the static graph. Record that consumer's output path on each existing destination page, excluding self-links; deduplicate and sort. Ignore inert markup, external URLs, and unreferenced or unpublished fragments. This is evidence that a page may receive navigation after fragment insertion, not proof that JavaScript executed. It does not add static graph edges or fragment-ID checks, rewrite fragment bytes, or validate their internal references. Arbitrary JavaScript-generated URLs remain outside the analysis.
 
 `analysis.fragmentLinks` records the same links again, keeping the fragment §12 discards: `{target, id}` per internal link that carries one. §12 deliberately does not validate fragments (REF-06) because a missing one is a reader's judgement rather than a build gate — but it is a *checkable* judgement, so the model carries the pairs and the evaluation command decides. `analysis.ids` is the other half: every `id` in the emitted document, in document order and with repeats kept, so that both "this fragment names nothing" and "this page declares one id twice" are answerable without re-parsing.
 
@@ -1617,7 +1620,7 @@ Every finding but the last is a predicate over the §20 model — the snapshot, 
 | `h1-missing` | incomplete | the page's `document.body.headings` (§20.3's heading scope) contains no level-1 entry |
 | `h1-multiple` | incomplete | `document.body.headings` contains more than one level-1 entry |
 | `lang-missing` | incomplete | `langOf(doc)` is null |
-| `page-orphan` | incomplete | `analysis.linksIn` is empty and the output path is neither `index.html` nor `404.html` |
+| `page-orphan` | incomplete | neither `analysis.linksIn` nor `analysis.linksInFromFragments` contains another page, and the output path is neither `index.html` nor `404.html` |
 | `id-duplicate` | broken | an id appears more than once in `analysis.ids`; one finding per repeated id, in sorted order |
 | `fragment-missing` | broken | an `analysis.fragmentLinks` entry names a page in this manifest whose `analysis.ids` does not contain the id |
 | `jsonld-invalid` | broken | an `analysis.jsonLd` entry has a non-null `error` |
