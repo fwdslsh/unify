@@ -554,7 +554,13 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
   // fixture corpus rather than to the pages a discovery feature happens to
   // touch. An extractor that threw on some real emitted document would fail
   // the suite here, not at the first site that enabled a sitemap.
-  const manifest = buildManifest({ pages: manifestPages, base: baseConfig });
+  const shippedFragments = new Map(assetFiles
+    .filter((asset) => asset.relPath.endsWith(".fragment.html"))
+    .map((asset) => {
+      const path = outputPathOf.get(asset.relPath);
+      return [path, tempFiles.get(path).toString("utf8")];
+    }));
+  const manifest = buildManifest({ pages: manifestPages, base: baseConfig, fragments: shippedFragments });
 
   // ---- §21 — sitemap generation, the manifest's first projection. ----------
   // §21.5 must know which paths the site already emits from its own source

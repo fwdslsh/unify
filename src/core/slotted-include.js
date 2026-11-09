@@ -50,6 +50,7 @@ import { findAll, getAttr, getAttrNode, isElement, parse } from "./html.js";
 import {
   checkNestedSlots,
   joinWithGlue,
+  reportRetiredFill,
   sliceSpans,
   spansWithAttrRemoved,
   spliceTrackingSpans,
@@ -152,6 +153,11 @@ export function mergeSlottedInclude({
   for (const node of cRoot.children ?? []) {
     const name = node.type === "element" ? (getAttr(node, "slot") ?? "").trim() : "";
     if (name === "") {
+      // §32.3/P08 — the retired fill spelling naming a slot this fragment
+      // declares. One fault, one message: collapse, as every error path here does.
+      if (node.type === "element" && reportRetiredFill(node, { declared: named, at: () => at, host: fragmentFile, reporter })) {
+        return collapsedToFallbacks(fragmentText, fragmentSpans, fragmentFile);
+      }
       unaddressed.push(node);
       continue;
     }

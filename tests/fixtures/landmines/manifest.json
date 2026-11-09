@@ -1879,16 +1879,17 @@
       "published": false,
       "diagnostics": [
         {
-          "file": "src/_layout.html",
-          "line": 3,
+          "file": "src/index.html",
+          "line": 6,
           "severity": "problem",
           "containsAll": [
-            "data-slot"
+            "data-slot=\"sidebar\"",
+            "slot name=\"sidebar\""
           ]
         }
       ],
       "diagnosticsExhaustive": true,
-      "note": "data-slot was inert rather than diagnosed: a page carrying it composed at exit 0 with the fill silently dropped. Found by migrating fwdslsh.dev, where <title data-slot=\"title\"> in the shared layout left every page emitting the layout's default title."
+      "note": "data-slot is the retired fill spelling, diagnosed only where it would have been a fill (#154): the page's direct body child names a slot the layout declares, so P08 fires at the element and names slot=. Until 2026-11 the fixture was a layout carrying <title data-slot=\"title\"> and the sweep read data-slot on every element of every file; that failed a port over third-party markup (shadcn/ui puts data-slot on every primitive), and a data-slot naming no declared slot now ships as written (retired-vocabulary.test.js)."
     }
   }
 }

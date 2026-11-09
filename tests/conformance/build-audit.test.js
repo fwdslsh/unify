@@ -191,3 +191,45 @@ test("AUD-17: default build is unchanged — findings neither print nor block", 
   if (!existsSync(join(tmp, "dist", "index.html"))) throw new Error("published");
   covers("AUD-17");
 }, TEST_MS);
+
+test("AUD-17: generated fetched fragments survive strict audit at a pretty subpath deploy", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": page("Home", '<a href="/browse.html">Browse</a>'),
+    "browse.html": page("Browse", '<a href="/deep/panels/family.fragment.html">Family</a><script>document.querySelector("a").onclick = async e => { e.preventDefault(); document.body.insertAdjacentHTML("beforeend", await (await fetch(e.target.href)).text()); };</script>'),
+    "varieties/bean.html": page("Bean", '<a href="/">Home</a>'),
+    "_gen.mjs": `import { writeFileSync, mkdirSync } from 'node:fs';
+import { join } from 'node:path';
+const out = process.argv[3]; mkdirSync(join(out, 'deep/panels'), { recursive: true });
+writeFileSync(join(out, 'deep/panels/family.fragment.html'), '<a href="../varieties/bean/">Bean</a>');`,
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--generate", "_gen.mjs", "--base-url", "https://example.com/library/", "--pretty-urls", "--audit", "--strict"], tmp);
+  expectExit(r, 0, "a page linked through a generated fetched fragment");
+  if (!existsSync(join(tmp, "dist/varieties/bean/index.html"))) throw new Error("strict audit must publish the linked variety");
+  if (readFileSync(join(tmp, "dist/deep/panels/family.fragment.html"), "utf8") !== '<a href="../varieties/bean/">Bean</a>') throw new Error("fragment bytes changed");
+  covers("AUD-17");
+}, TEST_MS);
+
+test("AUD-17: fragment evidence never hides unrelated or broken pages", async () => {
+  const tmp = mkTmp();
+  writeTree(join(tmp, "src"), {
+    "index.html": page("Home", '<a href="/browse.html">Browse</a>'),
+    "browse.html": page("Browse", '<a href="/deep/panels/family.fragment.html">Family</a>'),
+    "deep/panels/family.fragment.html": '<a href="../varieties/bean/">Bean</a><a href="/library/deep/panels/loop.fragment.html">More</a><template><a href="/library/inert/">Inert</a></template><a href="https://elsewhere.example/library/external/">External</a>',
+    "deep/panels/loop.fragment.html": '<a href="/library/deep/panels/family.fragment.html">Back</a>',
+    "unused.fragment.html": '<a href="/library/unlinked/">Unlinked</a>',
+    "varieties/bean.html": page("Bean", '<p id="dup">a</p><p id="dup">b</p>'),
+    "deep/varieties/bean.html": page("Wrong base"),
+    "unlinked.html": page("Unlinked"), "inert.html": page("Inert"), "external.html": page("External"),
+  });
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--base-url", "https://example.com/library/", "--pretty-urls", "--audit", "--strict"], tmp);
+  expectExit(r, 1, "real defects still block strict publishing");
+  const orphans = r.stdout.split("\n").filter(l => l.includes("[page-orphan]"));
+  for (const file of ["deep/varieties/bean.html", "unlinked.html", "inert.html", "external.html"]) {
+    if (!orphans.some(l => l.startsWith(file + ":"))) throw new Error(`missing real orphan ${file}\n${r.stdout}`);
+  }
+  if (orphans.some(l => l.startsWith("varieties/bean.html:"))) throw new Error(`wrong consumer-relative resolution\n${r.stdout}`);
+  if (!r.stdout.includes("[id-duplicate]")) throw new Error("lost broken finding");
+  if (existsSync(join(tmp, "dist"))) throw new Error("failed audit published");
+  covers("AUD-17");
+}, TEST_MS);

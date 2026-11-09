@@ -1,6 +1,6 @@
 {
   "name": "@fwdslsh/unify",
-  "version": "0.11.17",
+  "version": "0.11.18",
   "description": "A static site generator for HTML-native composition: includes, layouts, and slots in plain HTML \u2014 no expression language, no client runtime",
   "type": "module",
   "main": "src/cli.js",
@@ -20,7 +20,8 @@
     "build:linux": "bun build --compile --target=bun-linux-x64 ./src/cli.js --outfile unify-linux",
     "build:macos": "bun build --compile --target=bun-darwin-arm64 ./src/cli.js --outfile unify-macos",
     "build:windows": "bun build --compile --target=bun-windows-x64 ./src/cli.js --outfile unify-windows.exe",
-    "ratify": "bun ratification/scripts/run-round.mjs"
+    "ratify": "bun ratification/scripts/run-round.mjs",
+    "ratify:setup": "bun ratification/scripts/setup.mjs"
   },
   "keywords": [
     "static-site-generator",

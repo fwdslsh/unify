@@ -64,7 +64,6 @@ const LAYOUT_FILENAME = "_layout.html";
 
 const DATA_LAYOUT = "data-layout";
 const DATA_UNIFY = "data-unify";
-const DATA_SLOT = "data-slot";
 const UNIFY_CLASS_PREFIX = "unify-";
 
 // ------------------------------------------------------------- §6.1 selection
@@ -189,7 +188,10 @@ export function checkLayoutDocument({ root, text, spans, resolveLine, file, repo
     // stays the useful fact even when a fragment contributed the markup).
     ...at(attr.start),
     message: "this layout declares data-layout — layout chaining is not supported",
-    fixes: [`make ${file} a complete standalone layout, or delete it so pages use a parent ${LAYOUT_FILENAME}`],
+    fixes: [
+      `make ${file} a complete standalone layout, or delete it so pages use a parent ${LAYOUT_FILENAME}`,
+      "keep shared chrome in _includes/ so a section layout repeats one <include> per region, not the chrome",
+    ],
   });
   return { broken: true };
 }
@@ -197,12 +199,21 @@ export function checkLayoutDocument({ root, text, spans, resolveLine, file, repo
 // --------------------------------------------------------------- §6.3 / P08
 
 /**
- * §6.3 second bullet / P08: any `data-unify` attribute, any `data-slot`
- * attribute, and any class token beginning `unify-`, anywhere in ANY source file — excluded files included;
+ * §6.3 second bullet / P08: any `data-unify` attribute and any class token
+ * beginning `unify-`, anywhere in ANY source file — excluded files included;
  * only the never-shipped list (§4.3) escapes scanning. Call once per
  * discovered `.html`/`.md` file, independent of whether the build ever loads
  * it as a page, layout, or include (the caller owns that full-tree sweep;
  * §4/§4.1 classification is not this module's scope).
+ *
+ * `data-slot` LEFT this sweep (issue #154). The two tokens that remain are
+ * unify-branded and cannot collide with anything; `data-slot` is a plain
+ * `data-*` name that third-party markup uses for its own purposes — shadcn/ui
+ * puts one on every primitive — and a whole-tree ban on it failed builds
+ * that had never addressed a byte to unify. It is still diagnosed, but only
+ * where it would have been a fill: compose.js's `reportRetiredFill` reads it
+ * on an element in fill position whose layout (or, for a slotted include,
+ * whose fragment) declares a slot of that name (§7.3, §32.3).
  *
  * @param {object} args
  * @param {string} args.text
@@ -343,14 +354,6 @@ export function checkRetiredVocabulary({ text, file, reporter }) {
         fixes: ['write data-layout="/path.html" (or data-layout="none") on <html> or <body>'],
       });
     }
-    if (hasAttr(el, DATA_SLOT)) {
-      reporter.problem({
-        file,
-        line: lineOf(text, el.start),
-        message: "data-slot is a retired spelling",
-        fixes: ['write slot="name" on the page element and <slot name="name">…</slot> in the layout'],
-      });
-    }
     const classAttr = getAttrNode(el, "class");
     if (classAttr) {
       for (const token of tokens(classAttr.value)) {
@@ -382,9 +385,23 @@ function documentLocator({ file, text, spans, resolveLine }) {
 }
 
 /**
+ * §6.3/P07 reads `data-layout` off the root only when its value is a LAYOUT
+ * REFERENCE — a path ending `.html`, or `none`, the two shapes §6.1 accepts
+ * on the root. Any other value (`data-layout="grid"` on a `<div>`) is an
+ * ordinary data attribute that means nothing to unify and ships as written;
+ * unify consumes the attribute on `<html>`/`<body>` alone, and reserving a
+ * plain `data-*` name any further than its value is unmistakably unify's
+ * failed builds over third-party markup (issue #154).
+ */
+function isLayoutReference(value) {
+  const v = (value ?? "").trim();
+  return v === "none" || v.endsWith(".html");
+}
+
+/**
  * Every `data-layout`-carrying element in a parsed document, split into the
  * root ones §6.1 selection reads (`<html>`, `<body>`) and misplaced ones
- * (§6.3/P07 — any other element).
+ * (§6.3/P07 — any other element whose value is a layout reference).
  */
 function findDataLayoutAttrs(root) {
   const elements = findAll(root, (n) => n.type === "element" && hasAttr(n, DATA_LAYOUT));
@@ -394,7 +411,10 @@ function findDataLayoutAttrs(root) {
   return {
     onHtml: htmlEl ? getAttrNode(htmlEl, DATA_LAYOUT) : null,
     onBody: bodyEl ? getAttrNode(bodyEl, DATA_LAYOUT) : null,
-    misplaced: elements.filter((n) => !rootSet.has(n)).map((el) => ({ el, attr: getAttrNode(el, DATA_LAYOUT) })),
+    misplaced: elements
+      .filter((n) => !rootSet.has(n))
+      .map((el) => ({ el, attr: getAttrNode(el, DATA_LAYOUT) }))
+      .filter(({ attr }) => isLayoutReference(attr.value)),
   };
 }
 
