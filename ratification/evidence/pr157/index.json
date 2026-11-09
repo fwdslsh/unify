@@ -87,6 +87,18 @@
       "total": 35,
       "barMet": true,
       "notes": "No new model calls. 2,294 original sample files verified byte-identical. Only seed-catalogue changes, from 3/5 to 5/5. Original tool-loop and incorrect alternative command failures retained."
+    },
+    {
+      "model": "krang/local/fast",
+      "scope": "One fresh audit-handover sample; not a five-sample ratification",
+      "engineCommit": "b61dcfe5ee7853272bb012029687dc58fbc784c9",
+      "archive": "pr157-fast100k-evidence.tar.gz",
+      "archiveSha256": "a3af55d083c4d67e0aea3ce74d5379c5d5767c159064a0060ce38d5abae33299",
+      "passed": 1,
+      "total": 1,
+      "contextTokens": 102400,
+      "outputTokens": 4096,
+      "notes": "Finished in 337589 ms, 101 turns; all eight scored checks passed. Peak reported context 49043 tokens. Actual provider key isolated in separate relay; only a non-secret placeholder exposed to the sample."
     }
   ],
   "costNote": "Custom provider pricing was not configured in OpenCode. Reported $0.00 does not mean free inference.",

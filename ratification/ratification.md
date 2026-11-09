@@ -382,3 +382,25 @@ reported 1,754 passes and one WCH-11 timeout waiting for replacement-by-rename t
 generator. The same timeout reproduced on the original `83bc115` engine in the same pinned
 container, so it predates this fix. Suite hygiene, module reachability, and runtime traceability
 (zero baseline gaps) passed. Validation logs are included in the rescore archive.
+
+### Local 35B with the enlarged context: one fresh audit sample
+
+A fresh `audit-handover` sample on `krang/local/fast` (Qwen3.6-35B-A3B UD-Q2_K_XL)
+**passed all eight scored checks**, including strict build, strict audit, published addresses,
+article data, share cards, and normal completion with `REPORT.md`. It finished in
+**5m38s (337,589 ms), 101 turns**, using a peak reported context of **49,043 tokens**.
+This is **1/1**, not a five-sample ratification or a test of the full 100K capacity.
+
+The live server advertised a 102,400-token shared pool, two parallel slots, and Q4 K/V cache.
+The isolated OpenCode 1.18.25 client used a 102,400-token context limit with the earlier
+4,096-token output cap. The engine was `b61dcfe`, judge 1.1.0, with unchanged brief/rules.
+Only one model sample ran. A Git ownership preflight failure occurred before the sample
+started and was resolved inside the disposable container.
+
+The earlier 16K trial ended 0/5 without reports. This success demonstrates that the enlarged
+configuration can complete this brief, but changes in KV precision, engine revision, and
+concurrency prevent attributing the improvement solely to context size. The
+[complete evidence](evidence/pr157/pr157-fast100k-evidence.tar.gz) includes live server settings,
+request statuses, reported context usage, source, report, builds, and scores. The actual
+Bifrost key stayed in a separate relay outside the agent sandbox; the model received only
+a non-secret placeholder. Both disposable containers were removed after recording evidence.
