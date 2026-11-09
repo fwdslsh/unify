@@ -2472,7 +2472,7 @@ For a Markdown page, §10.1's ordering is unchanged: conversion first, then incl
 
 No props. No attributes passed to a fragment. No expressions, loops, conditionals, or implicit data. No attribute merging on the include element or anywhere else. No style scoping. A fragment cannot read the page that included it, and a page cannot read the fragment. The complete authoring rule is: **an include may carry content when its target is a fragment with slots, and that content fills them the way a page fills a layout's.**
 
-Product-spec §6.4.1 makes shipping conditional on that rule still fitting comfortably on the authoring-rules page. The mechanical half of the condition is enforced rather than asserted: `docs/authoring-rules.md` stays within its line budget and `tests/unit/docs-sync.test.js` fails if it does not. The empirical half is **not currently evidenced**: retained ratification results have been removed. A new authorized run under `ratification/ratification-protocol.md` is required before claiming empirical ratification. `ratification/ratification.md` records that status.
+Product-spec §6.4.1 makes shipping conditional on that rule still fitting comfortably on the authoring-rules page. The mechanical half of the condition is enforced rather than asserted: `docs/authoring-rules.md` stays within its line budget and `tests/unit/docs-sync.test.js` fails if it does not. The empirical half is **not currently evidenced**: retained ratification results have been removed. A new authorized run under `ratification/ratification-protocol.md` is required before claiming empirical ratification. The [ratification status](../ratification/README.md#status) records that status.
 
 ---
 

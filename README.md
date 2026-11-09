@@ -138,8 +138,8 @@ Everything below is published at **[unify.fwdslsh.dev](https://unify.fwdslsh.dev
 
 **How the documentation was validated**
 
-- **[Ratification](ratification/ratification.md)** — current status and the standard execution policy; historical results have been removed.
-- **[Ratification Protocol](ratification/ratification-protocol.md)** — the procedure, for running another round.
+- **[Ratification](ratification/README.md)** — setup, running the tool, outputs and current status.
+- **[Ratification Protocol](ratification/ratification-protocol.md)** — execution policy, scoring, isolation and evidence rules.
 - **[Migration Plan](docs/migration-plan.md)** — how the current tree came to be. History, not current work.
 
 ## For Agents
