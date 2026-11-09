@@ -404,3 +404,66 @@ concurrency prevent attributing the improvement solely to context size. The
 request statuses, reported context usage, source, report, builds, and scores. The actual
 Bifrost key stayed in a separate relay outside the agent sandbox; the model received only
 a non-secret placeholder. Both disposable containers were removed after recording evidence.
+
+### Local 35B with 100K context: full seven-brief run
+
+The fresh 35-sample run on `krang/local/fast` **passed 14/35 (40%); the ratification
+bar was not met**. Only photo-banners and publishing reached at least 4/5. Normal
+process exits and report presence in interim progress updates were execution status,
+not scored passes; the final checks found failures in many of those reports/sites.
+
+| Brief | Passed |
+|---|---|
+| audit-handover | 2/5 |
+| callouts | 0/5 |
+| council-panel | 3/5 |
+| photo-banners | 4/5 |
+| publishing | 5/5 |
+| seed-catalogue | 0/5 |
+| svelte-estimator | 0/5 |
+
+Authorship ran from **2026-11-09 04:42:58.974 to 10:23:57.702 UTC**, approximately
+**5h41m (20,458.728 seconds)**, on engine `1ced77bc3a24`, judge 1.1.0 and OpenCode
+1.18.25. The client retained context 102,400/output 4,096; Rocksteady advertised
+102,400 shared context, two slots, Q4 K/V, and reasoning disabled. Samples ran
+serially using a container-only launch-loop change preserved as `serial-harness.patch`;
+engine, prompts, rules, checks and timeouts were unchanged. No stronger-model control
+or replacement samples were run.
+
+Failures included extension-bearing or off-subpath links, an incorrect generator
+path, build output accidentally included as input, leftover slots, and date-only
+post timestamps producing strict-build advisories. Strict mode correctly counts
+advisories as failures. Catalogue checks found missing variety pages and test-fixture
+private values in emitted output; one sample left no `varieties.json` for the privacy
+check to inspect, so it failed closed rather than establishing a privacy pass. Those
+fixture values are separate from provider credentials. Catalogue sample 4 reached
+its normal 45-minute timeout after 549 turns without a report.
+
+**Infrastructure and context failures are retained separately:** Svelte sample 1
+exited normally without `REPORT.md`. The experiment relay then crashed on an
+unhandled streaming timeout, causing API connection failures in Svelte samples 2–4.
+The relay was repaired with a handled stream pipeline and restarted with the same
+route and credential; its original log and the exact repair diff are retained.
+Svelte sample 5 resumed receiving responses but ultimately submitted **103,466 tokens
+against the server's 102,400-token limit**, exited with an API error, and left no
+report. No failed sample was rerun or replaced. Thus the Svelte 0/5 combines model/run
+failures with three infrastructure interruptions, and must not be interpreted as
+five independent capability failures. Other briefs already miss the bar independently
+of that outage.
+
+Peak successful-step reported context was **98,208 tokens**, measured as input plus
+cache reads/writes; the rejected request demonstrates that this metric does not bound
+the next submitted request. The enlarged context helped execution but did not make
+this model/configuration reliable across the full suite. A future run should retain
+the relay repair and investigate client compaction/headroom before making further
+capacity claims; this run does not change lab configuration.
+
+The [summary](evidence/pr157/pr157-fast100k-full-summary.json) and
+[complete evidence](evidence/pr157/pr157-fast100k-full-evidence.tar.gz) preserve all
+35 outcomes, original reports/sites/event streams, judge/build output, configuration,
+per-sample context observations, and incident provenance. All **6,589 original regular
+evidence files** were verified byte-identical after export. The final archive excludes
+OpenCode state, dependencies, Git metadata and redundant binaries, and passed an exact
+scan for the real provider credential, which remained isolated in the separate relay.
+This records the failed local-model experiment without replacing the earlier passing
+33/35 cloud-Qwen rescore.

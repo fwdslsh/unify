@@ -1,0 +1,69 @@
+{
+  "round": "pr157-fast100k-full",
+  "model": "krang/local/fast",
+  "physicalModel": "Qwen3.6-35B-A3B-UD-Q2_K_XL",
+  "engineCommit": "1ced77bc3a24a55d4d15241f248881bfb5a9d416",
+  "judgeVersion": "1.1.0",
+  "openCodeVersion": "1.18.25",
+  "startedAt": "2026-11-09T04:42:58.974Z",
+  "finishedAt": "2026-11-09T10:23:57.702Z",
+  "scoredAt": "2026-11-09T10:23:57.727Z",
+  "agentPhaseDurationSeconds": 20458.728,
+  "passed": 14,
+  "total": 35,
+  "barMet": false,
+  "briefs": [
+    {
+      "brief": "audit-handover",
+      "passed": 2,
+      "total": 5
+    },
+    {
+      "brief": "callouts",
+      "passed": 0,
+      "total": 5
+    },
+    {
+      "brief": "council-panel",
+      "passed": 3,
+      "total": 5
+    },
+    {
+      "brief": "photo-banners",
+      "passed": 4,
+      "total": 5
+    },
+    {
+      "brief": "publishing",
+      "passed": 5,
+      "total": 5
+    },
+    {
+      "brief": "seed-catalogue",
+      "passed": 0,
+      "total": 5
+    },
+    {
+      "brief": "svelte-estimator",
+      "passed": 0,
+      "total": 5
+    }
+  ],
+  "clientContextTokens": 102400,
+  "clientOutputTokens": 4096,
+  "concurrency": 1,
+  "maxReportedContextTokens": 98208,
+  "contextMetric": "Maximum input + cache.read + cache.write reported by step_finish events; not the size of every submitted request.",
+  "contextOverflow": {
+    "sample": "svelte-estimator/krang-local-fast-5",
+    "requestTokens": 103466,
+    "serverLimitTokens": 102400
+  },
+  "relayInterruptedSamples": [
+    "svelte-estimator/krang-local-fast-2",
+    "svelte-estimator/krang-local-fast-3",
+    "svelte-estimator/krang-local-fast-4"
+  ],
+  "sampleReplacements": 0,
+  "notes": "Original 35 outcomes retained, including three infrastructure failures. Earlier progress reports described execution status, not scored passes. No stronger-model control was run. Strict build treats advisories as failures; fixture-private-data findings are not provider credential exposure."
+}

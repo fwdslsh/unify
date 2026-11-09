@@ -99,6 +99,23 @@
       "contextTokens": 102400,
       "outputTokens": 4096,
       "notes": "Finished in 337589 ms, 101 turns; all eight scored checks passed. Peak reported context 49043 tokens. Actual provider key isolated in separate relay; only a non-secret placeholder exposed to the sample."
+    },
+    {
+      "model": "krang/local/fast",
+      "scope": "Full seven-brief local 35B run, five fresh samples per brief",
+      "engineCommit": "1ced77bc3a24a55d4d15241f248881bfb5a9d416",
+      "archive": "pr157-fast100k-full-evidence.tar.gz",
+      "archiveSha256": "18d633524c73dec01fbe1af1a452b61103c363d20966ffbe5aa06203f382a0cb",
+      "passed": 14,
+      "total": 35,
+      "barMet": false,
+      "contextTokens": 102400,
+      "outputTokens": 4096,
+      "concurrency": 1,
+      "agentPhaseDurationSeconds": 20458.728,
+      "maxReportedContextTokens": 98208,
+      "infrastructureInterrupted": 3,
+      "notes": "Original outcomes retained without replacements. Relay crashed during Svelte samples 2-4; repaired for sample 5, which exceeded server context (103466 > 102400). Separate timeout and missing-report failures retained. See summary and archive for all quality failures."
     }
   ],
   "costNote": "Custom provider pricing was not configured in OpenCode. Reported $0.00 does not mean free inference.",
@@ -142,10 +159,10 @@
     "note": "The model captured its injected provider credential during environment probes. Exact credential bytes are redacted in the archives; prompts, authored code, reports, checks and result values are otherwise preserved."
   },
   "latestResult": {
-    "path": "pr157-qwen-fragment-audit-rescore-summary.json",
-    "sha256": "8cb197dc9a47f6ce37ca0b5245e2432996fdafc1cd9df51919131445a4a69903",
-    "passed": 33,
+    "path": "pr157-fast100k-full-summary.json",
+    "sha256": "803593d6b884f57e402d7dac5506a638daf5f35138800a17dad6f5f07eb484aa",
+    "passed": 14,
     "total": 35,
-    "barMet": true
+    "barMet": false
   }
 }
