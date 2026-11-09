@@ -1,0 +1,77 @@
+{
+  "status": "passed-per-brief-bar",
+  "engineCommit": "f5bf8e9b6ab2eab624bf21959df0fddf8df13389",
+  "authorshipCommit": "83bc115168cb411488f0dbc0d156d8196ad7fa1b",
+  "judgeVersion": "1.1.0",
+  "model": "krang/opencode-zen/qwen3.8-flash",
+  "method": "Rescore the same selected 35 samples. No model calls. All pre-existing sample files byte-identical after judging; per-file hashes in source-provenance.json.",
+  "rulesSha256": "fb07d931bd36ead293dc4ea3d24dc723fa0f4ea0ff810e8df2453525896da590",
+  "promptSha256": "4561314687508deab81ae93169f4707df250121addade51d25992eab548c28a8",
+  "passed": 33,
+  "total": 35,
+  "barMet": true,
+  "briefs": [
+    {
+      "name": "audit-handover",
+      "passed": 5,
+      "total": 5,
+      "failures": []
+    },
+    {
+      "name": "callouts",
+      "passed": 5,
+      "total": 5,
+      "failures": []
+    },
+    {
+      "name": "council-panel",
+      "passed": 5,
+      "total": 5,
+      "failures": []
+    },
+    {
+      "name": "photo-banners",
+      "passed": 5,
+      "total": 5,
+      "failures": []
+    },
+    {
+      "name": "publishing",
+      "passed": 4,
+      "total": 5,
+      "failures": [
+        {
+          "sample": "krang-opencode-zen-qwen3-8-flash-2",
+          "failedChecks": [
+            "agent-finished"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "seed-catalogue",
+      "passed": 5,
+      "total": 5,
+      "failures": []
+    },
+    {
+      "name": "svelte-estimator",
+      "passed": 4,
+      "total": 5,
+      "failures": [
+        {
+          "sample": "krang-opencode-zen-qwen3-8-flash-4",
+          "failedChecks": [
+            "strict-build",
+            "fresh-build",
+            "addresses",
+            "drafts-unpublished"
+          ]
+        }
+      ]
+    }
+  ],
+  "previousResult": "pr157-qwen-full-results.json",
+  "sourceProvenanceSha256": "b747abf225928b493e69283ebfcf1f632c98265d32ee8eed3d0af55eae0fea76",
+  "limitations": "No full-suite stronger-model control; dynamic analysis covers anchors referencing shipped fragments, not arbitrary JavaScript."
+}

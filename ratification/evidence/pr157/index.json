@@ -75,6 +75,18 @@
       "passed": 17,
       "total": 21,
       "notes": "All quality/tool failures retained. Nine normal exits reconstructed from recorded kernel wait statuses after supervising process terminated; exact proof retained in archive."
+    },
+    {
+      "model": "krang/opencode-zen/qwen3.8-flash",
+      "scope": "Same selected 35 samples rescored after fragment-navigation audit fix",
+      "engineCommit": "f5bf8e9b6ab2eab624bf21959df0fddf8df13389",
+      "authorshipCommit": "83bc115168cb411488f0dbc0d156d8196ad7fa1b",
+      "archive": "pr157-qwen-fragment-audit-rescore-evidence.tar.gz",
+      "archiveSha256": "cf9c54b9ec9d78b21044378391464aafb89e44950858ab50a013f5db16cc152a",
+      "passed": 33,
+      "total": 35,
+      "barMet": true,
+      "notes": "No new model calls. 2,294 original sample files verified byte-identical. Only seed-catalogue changes, from 3/5 to 5/5. Original tool-loop and incorrect alternative command failures retained."
     }
   ],
   "costNote": "Custom provider pricing was not configured in OpenCode. Reported $0.00 does not mean free inference.",
@@ -116,5 +128,12 @@
       }
     ],
     "note": "The model captured its injected provider credential during environment probes. Exact credential bytes are redacted in the archives; prompts, authored code, reports, checks and result values are otherwise preserved."
+  },
+  "latestResult": {
+    "path": "pr157-qwen-fragment-audit-rescore-summary.json",
+    "sha256": "8cb197dc9a47f6ce37ca0b5245e2432996fdafc1cd9df51919131445a4a69903",
+    "passed": 33,
+    "total": 35,
+    "barMet": true
   }
 }

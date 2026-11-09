@@ -350,3 +350,35 @@ seed catalogue, and Svelte estimator. The original 20-second launch spacing and 
 30/45-minute time limits were retained. Runs used a disposable container with namespace
 isolation; the initial 12 GiB / 4 CPU allocation was raised to 32 GiB / 8 CPU before memory
 pressure, with no container OOM event observed.
+
+### PR #157 rescore after the fragment-navigation audit fix
+
+The same 35 samples were rescored with engine commit
+`f5bf8e9` and the unchanged 1.1.0 judge. **33/35 passed; every brief now meets the 4/5 bar.**
+Seed-catalogue improved from 3/5 to **5/5**. The four originally perfect briefs remain 5/5;
+publishing and Svelte estimator remain 4/5, with the same tool-loop and incorrect-alternative-
+command failures retained. This is a rescore of existing authorship, not a new model trial or
+a stronger-model control.
+
+The fix records potential incoming navigation through shipped `.fragment.html` files
+referenced by emitted page anchors. Fragment links resolve against the consuming page,
+including pretty URLs and a deploy subpath. This evidence is separate from the static page
+link graph and affects only orphan detection; it neither executes arbitrary JavaScript nor
+adds validation of fragment-internal URLs. Unreferenced fragments do not excuse orphans,
+and broken findings still fail strict audit. The spec and CLI regression cases now cover
+that distinction, generated fragments, cycles, inert markup, off-origin links, and incorrect
+fragment-relative resolution.
+
+The [rescore summary](evidence/pr157/pr157-qwen-fragment-audit-rescore-summary.json) records
+counts and provenance. The [rescore archive](evidence/pr157/pr157-qwen-fragment-audit-rescore-evidence.tar.gz)
+contains all 35 selected sample copies, their original completion records, new scores/builds,
+and `source-provenance.json`: every original file was verified byte-identical after rescoring.
+Only the compiled engine binary was substituted and omitted installed dependencies were
+restored from each sample's lockfile. No provider credentials or new model calls were used.
+The original failed run and billing/exit recovery evidence remain unchanged alongside it.
+
+Validation: 100 focused audit/manifest/mutation-inventory tests passed; the final full suite
+reported 1,754 passes and one WCH-11 timeout waiting for replacement-by-rename to rerun a
+generator. The same timeout reproduced on the original `83bc115` engine in the same pinned
+container, so it predates this fix. Suite hygiene, module reachability, and runtime traceability
+(zero baseline gaps) passed. Validation logs are included in the rescore archive.
