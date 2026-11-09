@@ -8,23 +8,26 @@ The CLI's help, diagnostics and built-in templates remain part of the authoring 
 ## Standard execution only
 
 Use `bun run ratify` from a clean checkout of the committed code under test. Use the
-installed OpenCode CLI and its existing provider authentication. Select an existing model from `opencode models`, as documented in [README.md](README.md).
-When using an existing Bifrost connection, do not add another gateway in front of it.
+installed OpenCode CLI and its normal provider configuration and authentication. Select
+any configured model from `opencode models`, as documented in [README.md](README.md).
+Existing endpoints, environment variables, network proxies and authentication plugins
+are supported. The harness must not implement provider-specific setup or transport.
 
 The following are forbidden during a run:
 
-- Custom proxies, credential relays, forwarding servers or alternative endpoints.
+- Creating experiment-specific proxies, credential relays or forwarding servers.
 - Custom agent commands, patched SDKs, model adapters or launcher wrappers.
 - Temporary edits to the runner, judge, engine, briefs, prompts or scoring thresholds,
   including edits made only inside a container.
 - Per-run model/context/output overrides, custom timeout or concurrency tuning,
-  custom masks, or configuration injected through environment overrides.
+  or custom isolation masks. Ordinary OpenCode configuration and environment variables
+  remain supported; the harness must not rewrite them to rescue a run.
 - Replacing failed samples, combining favorable subsets, or presenting process exits
   and report presence as scored passes.
 
 Select only the requested installed model, brief scope, sample count and round name.
 The runner uses committed HEAD, serial execution and the brief's committed timeout.
-It rejects uncommitted inputs, prohibited command options and injected routing overrides. There
+It rejects uncommitted inputs and prohibited command options. There
 is no bypass option. Containers and VMs may provide isolation, not customization.
 
 Run `--check` before inference; it checks local prerequisites, not upstream billing or health.

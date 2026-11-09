@@ -38,7 +38,7 @@ import { privateSeedValues } from "./seed-values.mjs";
 import { CHECKS } from "./checks.mjs";
 import { isolationEnvironment } from "./isolation.mjs";
 import { executionFailure, runSerial, scoreVerdict } from "./run-state.mjs";
-import { POLICY, assertStandardEnvironment, assertCommittedInputs, standardProviderConfig } from "./run-policy.mjs";
+import { POLICY, assertCommittedInputs, standardProviderConfig, sampleEnvironment } from "./run-policy.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const RAT = resolve(HERE, "..");
@@ -112,7 +112,7 @@ function prepareUnify(ref, roundDir) {
  * line of its own, then that model's JSON.
  */
 function opencodeModels(provider) {
-  const text = run("opencode", ["models", ...(provider ? [provider] : []), "--verbose"], { cwd: ROUNDS }).stdout;
+  const text = run("opencode", ["models", ...(provider ? [provider] : []), "--verbose"], { cwd: REPO }).stdout;
   return [...text.matchAll(/^(\S+\/\S+)\n(\{[\s\S]*?\n\})$/gm)].map((m) => ({ ...JSON.parse(m[2]), id: m[1] }));
 }
 
@@ -138,21 +138,21 @@ function resolveModels(requested) {
 
 /**
  * The OpenCode a sample runs: the user's providers and credentials, and nothing else of
- * theirs — no instructions, agents, commands, plugins, MCP servers or skills (isolate.sh
+ * theirs — no instructions, agents, commands, MCP servers or skills (isolate.sh
  * hides the files; these variables cover the rest). Every permission is answered in
  * advance, so nothing waits for a person: file and shell tools work inside the sample's
  * directory; subagents (whose commands would not reach the sample's event stream), skills,
  * the web tools, questions and other directories are refused.
  */
 function sampleEnv(model, masks) {
-  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(OPENCODE_|CLAUDE)/.test(k)));
-  const resolved = run("opencode", ["debug", "config"], { check: false, cwd: ROUNDS, env: { ...env, OPENCODE_DISABLE_PROJECT_CONFIG: "1" } });
-  if (resolved.exit !== 0) stop("could not read installed OpenCode configuration; do not create an override or relay");
+  const resolved = run("opencode", ["debug", "config"], { check: false, cwd: REPO });
+  if (resolved.exit !== 0) stop("could not read OpenCode configuration; check `opencode debug config` in this checkout");
+  const env = sampleEnvironment(process.env);
   let user;
   try { user = JSON.parse(resolved.stdout); } catch { stop("invalid installed OpenCode configuration"); }
   const config = {
     $schema: "https://opencode.ai/config.json",
-    ...standardProviderConfig(model, user),
+    ...standardProviderConfig(user),
     model,
     small_model: model,
     permission: {
@@ -169,13 +169,12 @@ function sampleEnv(model, masks) {
   return {
     ...isolationEnvironment(masks, env),
     OPENCODE_CONFIG_CONTENT: JSON.stringify(config),
-    ...(existsSync(auth) ? { OPENCODE_AUTH_CONTENT: readFileSync(auth, "utf8") } : {}),
+    ...(!env.OPENCODE_AUTH_CONTENT && existsSync(auth) ? { OPENCODE_AUTH_CONTENT: readFileSync(auth, "utf8") } : {}),
     OPENCODE_DISABLE_PROJECT_CONFIG: "1",
     OPENCODE_DISABLE_CLAUDE_CODE: "1",
     OPENCODE_DISABLE_EXTERNAL_SKILLS: "1",
     OPENCODE_DISABLE_AUTOUPDATE: "1",
     OPENCODE_DISABLE_LSP_DOWNLOAD: "1",
-    OPENCODE_PURE: "1",
   };
 }
 
@@ -225,11 +224,10 @@ function launch(job) {
 
 function agentCommand(model, brief) {
   const secs = String(Number(brief.timeoutSecs ?? 1800));
-  return ["timeout", "-k", "30", secs, "opencode", "run", "--pure", "--format", "json", "--model", model];
+  return ["timeout", "-k", "30", secs, "opencode", "run", "--format", "json", "--model", model];
 }
 
 async function newRound(opts) {
-  assertStandardEnvironment(process.env);
   if (!opts.model.length) stop("--model is required; select an installed model without changing its configuration");
   assertCommittedInputs(REPO);
   opts.mask = [];
@@ -274,6 +272,13 @@ async function prepareAndRun(opts, { id, dir, ref, briefs, models, per }) {
   const leaks = probe(dir, envs[models[0]]);
   if (leaks.length) {
     stop(`a sample could read unify's own documentation:\n  ${leaks.join("\n  ")}\nUse a clean isolated environment; do not patch the runner or add custom masks.`);
+  }
+  for (const model of models) {
+    const available = run(ISOLATE, [join(dir, ".probe", "sandbox"), REPO, join(dir, ".probe", "state"), "opencode", "models"],
+      { env: envs[model], check: false, timeout: 120_000 });
+    if (available.exit !== 0 || !available.stdout.split(/\r?\n/).includes(model)) {
+      stop(`OpenCode cannot load ${model} inside sample isolation. Check provider/plugin and credential-file availability in this environment. No samples were launched.`);
+    }
   }
 
   if (opts.check) { say("Preflight passed. No model inference was run."); return 0; }

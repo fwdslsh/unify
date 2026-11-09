@@ -2,7 +2,7 @@ import { afterAll, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { assertCommittedInputs, assertStandardEnvironment, standardProviderConfig } from "../../ratification/scripts/run-policy.mjs";
+import { assertCommittedInputs, standardProviderConfig, sampleEnvironment } from "../../ratification/scripts/run-policy.mjs";
 import { executionFailure, runSerial, scoreVerdict } from "../../ratification/scripts/run-state.mjs";
 import { privateSeedValues } from "../../ratification/scripts/seed-values.mjs";
 import { CHECKS } from "../../ratification/scripts/checks.mjs";
@@ -13,17 +13,21 @@ afterAll(() => rmSync(root, { recursive: true, force: true }));
 test("installed providers work without endpoint, adapter or model-limit rewrites", () => {
   const provider = { npm: "@ai-sdk/openai-compatible", options: { baseURL: "https://existing.example/v1", apiKey: "fixture" },
     models: { fast: { limit: { context: 102400, output: 4096 } } } };
-  const result = standardProviderConfig("existing/fast", { provider: { existing: provider, unrelated: { options: { apiKey: "other" } } } });
-  expect(result).toEqual({ provider: { existing: provider }, enabled_providers: ["existing"] });
-  expect(standardProviderConfig("opencode/model", {})).toEqual({ enabled_providers: ["opencode"] });
+  const setup = { provider: { existing: provider }, plugin: ["provider-auth-plugin"],
+    enabled_providers: ["existing", "anthropic"], disabled_providers: ["disabled"], enterprise: { url: "https://enterprise.example" } };
+  const result = standardProviderConfig({ ...setup, instructions: ["private.md"], agent: { private: {} }, mcp: { private: {} } });
+  expect(result).toEqual(setup);
+  expect(standardProviderConfig({})).toEqual({});
 });
 
-test("run-specific provider/proxy overrides fail without printing their values", () => {
-  for (const key of ["HTTP_PROXY", "https_proxy", "ALL_PROXY", "OPENCODE_CONFIG", "OPENCODE_CONFIG_CONTENT", "OPENCODE_CONFIG_DIR", "OPENAI_BASE_URL", "NODE_OPTIONS", "RATIFY_MASK"]) {
-    expect(() => assertStandardEnvironment({ [key]: "private-fixture-value" })).toThrow(key);
-    try { assertStandardEnvironment({ [key]: "private-fixture-value" }); } catch (e) { expect(e.message).not.toContain("private-fixture-value"); }
-  }
-  expect(() => assertStandardEnvironment({ OPENAI_API_KEY: "fixture", PATH: "/bin" })).not.toThrow();
+test("ordinary provider environments are inherited without name-based bans or rewrites", () => {
+  const env = { LAB_AI_BASE_URL: "https://lab.example", OPENAI_BASE_URL: "https://openai.example",
+    HTTPS_PROXY: "http://corporate.example", AWS_PROFILE: "test", GOOGLE_APPLICATION_CREDENTIALS: "/credentials.json",
+    OPENCODE_API_KEY: "fixture", OPENCODE_AUTH_CONTENT: '{"test":{"type":"api","key":"fixture"}}',
+    NODE_EXTRA_CA_CERTS: "/corporate-ca.pem", PATH: "/bin" };
+  expect(sampleEnvironment({ ...env, OPENCODE_CONFIG: "/existing.json", OPENCODE_CONFIG_DIR: "/existing",
+    OPENCODE_CONFIG_CONTENT: '{"instructions":["private.md"]}' })).toEqual(env);
+  expect(sampleEnvironment(env)).toEqual(env);
 });
 
 test("committed input check catches container-only edits and extra harness files", () => {

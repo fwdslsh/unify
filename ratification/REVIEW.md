@@ -8,7 +8,7 @@ review, not a model evaluation. Historical results have been removed.
 | Finding | Resolution |
 |---|---|
 | Runs required improvised launch patches, proxies and monitor scripts. | One checked-in `bun run ratify` entry point; serial execution, `--check` and `--status` are built in. No custom agent, endpoint, timeout, stagger or mask options. |
-| The previous attempted cleanup hard-coded provider names and a private lab URL. | Removed. Select an installed OpenCode model; its existing provider configuration is reused without endpoint/SDK/limit changes. |
+| Cleanup restricted normal provider configuration and rejected unrelated environment variables. | Removed the environment blacklist and provider selection rewrite. OpenCode resolves global, project and environment configuration; provider definitions, authentication plugins, operator allow/deny lists and credential/network environment variables are retained. |
 | Per-run edits were accepted without review. | New inference runs reject dirty engine, harness, briefs, rules and dependency manifests. No bypass flag. |
 | Provider failure could consume the remaining sample queue. | Stop launching after an infrastructure error, checkpoint the interrupted run, score only attempted samples, and return exit 2. No automatic retries/replacements. |
 | A zero process exit was easy to confuse with a passing sample. | Status reports completed/planned execution separately from the scored verdict. The exit code and summary use the same per-brief bar. |
@@ -22,7 +22,7 @@ review, not a model evaluation. Historical results have been removed.
 
 ## Validation
 
-Focused tests cover installed-provider reuse, rejected overrides, clean-input checks,
+Focused tests cover configured-provider reuse, inherited credential/network environments, clean-input checks,
 serial execution, interruption, timeout/context classification, the per-brief verdict,
 fresh-output privacy checks, quoted audit arguments and evidence preservation. Existing
 report-parser, HTML/link/fragment, Atom, npm-wrapper and documentation tests remain in place.
@@ -38,9 +38,12 @@ access after the restricted run timed out. No model evaluation was launched.
 
 - `--check` performs no inference. It verifies local configuration and isolation, not
   upstream billing/authentication or whether a model can finish a brief.
-- Installed provider configuration is operator-owned. No portable runner can infer
-  whether an arbitrary configured URL secretly fronts another proxy. The procedure
-  prohibits introducing an experiment-specific proxy; it does not claim network enforcement.
+- Provider configuration is operator-owned and resolved by OpenCode. Ordinary network
+  proxies and custom provider endpoints are supported. The procedure prohibits creating
+  experiment-specific infrastructure; it does not police the operator's network.
+- Authentication plugins are retained, so operators must ensure installed plugins do
+  not inject project knowledge. Files used by providers/plugins must be available in
+  the execution environment. The namespace runner requires Linux (native, VM or container).
 - Namespace masking protects experiment context, not the host from a hostile shell.
   Run in an ordinary disposable environment without host secrets or a Docker socket.
   Authentication available to OpenCode can be observed by the sample. Export review

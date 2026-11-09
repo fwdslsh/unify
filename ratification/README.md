@@ -1,13 +1,15 @@
 # Ratification rounds
 
 Run the checked-in harness unchanged through the installed OpenCode CLI. Select an
-existing model from `opencode models`. The runner reuses its provider configuration
-verbatim, including an existing Bifrost connection; it does not create a transport.
+existing model from `opencode models`. OpenCode resolves its normal configuration and
+authentication, including environment variables, custom endpoints and authentication
+plugins. The runner does not create or manage a provider connection.
 
-**No custom proxies, relays, adapters, launch wrappers, provider endpoints, or per-run
-patches.** Do not rewrite model/context settings, add a credential-forwarding service,
-or replace OpenCode with another agent. If the standard connection fails, report the
-blocker. Fixes belong in a reviewed, tested repository change before another run.
+**Reuse the runner unchanged.** Do not create run-specific proxies, relays, adapters,
+launch wrappers or patches. Existing OpenCode provider settings, network proxies and
+credentials are supported; they are operator configuration, not harness customization.
+If the configured connection fails, report the blocker. Fixes belong in a reviewed,
+tested repository change before another run.
 
 The [protocol](ratification-protocol.md) defines the rules. The
 [result status](ratification.md) contains no retained historical results.
@@ -16,15 +18,15 @@ The [protocol](ratification-protocol.md) defines the rules. The
 
 ```sh
 bun install --frozen-lockfile
+opencode models
 bun run ratify --list
-bun run ratify --check --model krang/local/fast
-bun run ratify --model krang/local/fast --samples 5 --name full-ratification
+bun run ratify --check --model "provider/model"
+bun run ratify --model "provider/model" --samples 5 --name full-ratification
 ```
 
 That runs all seven briefs, five samples each, **serially**, using committed HEAD and
-the existing installed model definition. Select an installed Zen model with
-`--model opencode/<model-id>` instead when requested. Discover IDs with `opencode models`;
-do not invent a provider to make an unavailable model work.
+the existing model definition. Replace `provider/model` with any ID listed by
+`opencode models` in this checkout. For one sample from each brief, use `--samples 1`.
 
 ## Requirements
 
@@ -36,12 +38,12 @@ do not invent a provider to make an unavailable model work.
 - Use an ordinary isolated container or VM if needed. Do not mount host secrets or
   the Docker socket, patch the harness in the container, or replace the transport.
 
-Run-specific configuration/routing environment overrides are rejected before launch.
-There are no endpoint, adapter, proxy or custom-agent CLI options. The selected installed
-provider is forwarded unchanged; the harness does not hard-code a provider/domain list.
-Do not edit the installed configuration to introduce an experiment-specific relay.
-Code and guidance cannot identify whether an arbitrary pre-existing URL secretly fronts
-a proxy; operators must use their established provider configuration.
+Provider selection, configuration precedence, authentication and networking belong to
+OpenCode. Global, project and `OPENCODE_CONFIG*` settings are resolved normally before
+sample isolation; provider definitions and plugins are retained. Environment variables
+are not rejected based on their names. The runner has no provider/domain allowlist and
+no endpoint, adapter, proxy or custom-agent options. Do not add an experiment-specific
+relay or change model settings to rescue a run.
 
 `--check` validates the model ID, configuration, clean inputs, binary build and namespace
 isolation **without inference**. It cannot establish upstream authentication, billing or
@@ -171,12 +173,14 @@ agent's answer to "what did `rules.md` not answer?", which the summary quotes.
 directory appears as `/tmp/sandbox`, `/tmp` is a fresh empty filesystem, and the
 repository, the bun and npm caches, unify's template cache, your OpenCode configuration and
 history, and the `~/.claude` and `~/.agents` directories OpenCode would load skills from are
-hidden. The sample's OpenCode gets its selected provider and existing authentication and nothing else of yours —
-no instructions, agents, commands, plugins, MCP servers or skills — and keeps its session in
+hidden. The sample's OpenCode gets the resolved providers, authentication plugins and existing credentials;
+configured instructions, agents, commands, MCP servers and skills are not forwarded. It keeps its session in
 the sample's harness directory, not yours. Its permissions are answered in advance, so
 nothing waits for a person: file and shell tools are allowed; subagents, skills, the web
-tools, questions and directories outside the sample are refused. A provider that only a
-plugin adds is therefore not available. Before any sample starts,
+tools, questions and directories outside the sample are refused. Installed plugins are
+retained because providers may need them for authentication; plugins must not inject
+project knowledge into an evaluation. Provider credential files and local plugin files
+must be accessible inside the execution environment. Before any sample starts,
 the runner searches the whole filesystem from a sample's view for unify's documentation and
 stops if it finds any. Use a clean isolated environment; do not patch the runner or add masks.
 
