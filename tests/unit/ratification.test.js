@@ -306,3 +306,31 @@ test("npm wrapper resolution rejects cycles, missing scripts, multiple builds an
     expect(judged.run.refused).toContain(reason);
   }
 });
+
+test("direct strict judging runs generators in a copy and preserves original evidence", () => {
+  const round = join(root, "direct-generator-copy"), sample = join(round, "sample");
+  mkdirSync(join(sample, "site"), { recursive: true });
+  linkSync(binary, join(sample, "unify"));
+  writeFileSync(join(sample, "site/index.html"), html);
+  writeFileSync(join(sample, "site/_generate.mjs"), 'import { writeFileSync } from "node:fs"; writeFileSync("../generated-marker.txt", "changed");');
+  writeFileSync(join(sample, "REPORT.md"), '## Publish command\n```sh\n./unify build --generate _generate.mjs\n```\n');
+  const out = join(round, "judged.json");
+  run(["bun", "ratification/scripts/judge-round.mjs", round, "--out", out]);
+  const judged = JSON.parse(readFileSync(out, "utf8")).samples[0];
+  expect(judged.run.exit, JSON.stringify(judged.run)).toBe(0);
+  expect(existsSync(join(sample, "generated-marker.txt"))).toBe(false);
+  expect(existsSync(join(round, ".judge/sample/generated-marker.txt"))).toBe(true);
+});
+
+test("runner's canonical binary replaces an agent-modified executable only in the judge copy", () => {
+  const round = join(root, "canonical-binary"), sample = join(round, "sample");
+  mkdirSync(join(sample, "site"), { recursive: true });
+  writeFileSync(join(sample, "unify"), "agent-modified binary");
+  writeFileSync(join(sample, "site/index.html"), html);
+  writeFileSync(join(sample, "REPORT.md"), '## Publish command\n```sh\n./unify build\n```\n');
+  const config = join(round, "config.json"), out = join(round, "judged.json");
+  writeFileSync(config, JSON.stringify({ binary }));
+  run(["bun", "ratification/scripts/judge-round.mjs", round, "--config", config, "--out", out]);
+  expect(JSON.parse(readFileSync(out, "utf8")).samples[0].run.exit).toBe(0);
+  expect(readFileSync(join(sample, "unify"), "utf8")).toBe("agent-modified binary");
+});

@@ -1,85 +1,84 @@
 # Ratification rounds
 
-Can an agent, given only `docs/authoring-rules.md` and the `unify` binary, build the site a
-brief asks for? A round answers that for one unify (your working tree, a release, or any
-commit) and one model: each sample agent works alone, in a directory that cannot see the
-rest of this repository, and its site is then rebuilt and checked. You get a score, a
-summary, and everything each agent wrote and ran.
+Run the checked-in harness unchanged through the installed OpenCode CLI. Select an
+existing model from `opencode models`. The runner reuses its provider configuration
+verbatim, including an existing Bifrost connection; it does not create a transport.
 
-[`ratification-protocol.md`](ratification-protocol.md) is the method — why rounds are run
-this way and how to triage what they find — and [`ratification.md`](ratification.md) is the
-record of past rounds. This page is how to run one.
+**No custom proxies, relays, adapters, launch wrappers, provider endpoints, or per-run
+patches.** Do not rewrite model/context settings, add a credential-forwarding service,
+or replace OpenCode with another agent. If the standard connection fails, report the
+blocker. Fixes belong in a reviewed, tested repository change before another run.
+
+The [protocol](ratification-protocol.md) defines the rules. The
+[result status](ratification.md) contains no retained historical results.
 
 ## Quick start
 
-```bash
-bun install
+```sh
+bun install --frozen-lockfile
 bun run ratify --list
+bun run ratify --check --model krang/local/fast
+bun run ratify --model krang/local/fast --samples 5 --name full-ratification
 ```
 
-```bash
-bun run ratify --brief publishing
+That runs all seven briefs, five samples each, **serially**, using committed HEAD and
+the existing installed model definition. Select an installed Zen model with
+`--model opencode/<model-id>` instead when requested. Discover IDs with `opencode models`;
+do not invent a provider to make an unavailable model work.
+
+## Requirements
+
+- Linux with working mount namespaces (`unshare`), Git, Bun and the standard OpenCode CLI.
+- A clean checkout outside `/tmp`, with committed engine, harness, briefs and rules.
+- Existing provider authentication/configuration. Keep credentials out of Git and
+  exported results. Samples can inspect their process environment; direct provider
+  authentication is not a secret vault. Do not solve this by adding a custom proxy.
+- Use an ordinary isolated container or VM if needed. Do not mount host secrets or
+  the Docker socket, patch the harness in the container, or replace the transport.
+
+Run-specific configuration/routing environment overrides are rejected before launch.
+There are no endpoint, adapter, proxy or custom-agent CLI options. The selected installed
+provider is forwarded unchanged; the harness does not hard-code a provider/domain list.
+Do not edit the installed configuration to introduce an experiment-specific relay.
+Code and guidance cannot identify whether an arbitrary pre-existing URL secretly fronts
+a proxy; operators must use their established provider configuration.
+
+`--check` validates the model ID, configuration, clean inputs, binary build and namespace
+isolation **without inference**. It cannot establish upstream authentication, billing or
+model health. Check a run at any time without custom monitor scripts:
+
+```sh
+bun run ratify --status ratification/rounds/full-ratification
 ```
 
-That builds unify from your working tree, runs one sample of every free OpenCode Zen model
-on the `publishing` brief, and prints the summary when it finishes. Leave out `--brief` to
-run every brief; name a model to run only that one:
+Normal completion is separate from scored passes. Connection/authentication errors stop
+launching further samples and produce an **incomplete** round with pending samples
+excluded from pass/fail counts. Timeouts and context-limit errors remain recorded sample
+failures. There are no automatic replacement samples. Resolve a blocker before explicitly
+requesting a separate run; never patch a running experiment.
 
-```bash
-bun run ratify --brief publishing --model opencode/big-pickle
-```
+Exit codes: **0** means the per-brief bar is met, **1** means it is not, and **2** means
+blocked/incomplete. With fewer than five samples, exit 0 means all diagnostic samples
+passed, not that full ratification was established. `results.json` includes an explicit
+`verdict` with completeness, planned/completed counts and `barMet`.
 
-### Requirements
+## Supported options
 
-- **Linux**, with `unshare` (util-linux). Run as root, or as a user allowed to create
-  user namespaces (on Ubuntu 23.10 and later: `sudo sysctl
-  kernel.apparmor_restrict_unprivileged_userns=0`). Elsewhere, run it in a Linux container
-  or VM.
-- **Bun** 1.2 or later, and **git**.
-- **[OpenCode](https://opencode.ai)**: `npm install -g opencode-ai`. The free models need
-  no account, only access to `opencode.ai`. Any other model OpenCode can use works too —
-  whatever you have signed in to with `opencode auth login` or configured as a provider:
-  `opencode models` lists them, and `--model` takes any name it prints. Your providers and
-  credentials are all that reaches a sample from your OpenCode setup; your environment
-  variables reach it too, since OpenCode reads provider keys from them.
-- The repository cloned **outside `/tmp`**, which a sample's view replaces.
-
-The free models cost nothing. Any other model is billed by its provider, and `SUMMARY.md`
-totals the cost OpenCode reports.
-
-## Running a round
-
-| Option | Default | |
+| Option | Default | Purpose |
 |---|---|---|
-| `--unify <ref>` | the working tree | the unify to evaluate: a tag (`v0.11.16`), branch or commit |
-| `--brief <name>` | every brief | repeatable; `--list` names them |
-| `--model <id>` | `free` | repeatable; `provider/model` as `opencode models` prints it; `free` is every free OpenCode Zen model |
-| `--samples <n>` | `1` | samples per brief and model |
-| `--stagger <secs>` | `20` | between launches |
-| `--timeout <secs>` | the brief's, else `1800` | per sample |
-| `--mask <path>` | | one more path to hide from samples (repeatable) |
-| `--name <id>` | time and ref | the round's directory name |
-| `--rejudge <dir>` | | score a finished round again, with the checks as they are now |
-| `--agent <command>` | | run a shell command instead of OpenCode, to test the harness: it gets the prompt on stdin and runs isolated, so it cannot read this repository |
+| `--model <id>` | required | installed model; repeatable; `free` selects free Zen models |
+| `--brief <name>` | all seven | select a committed brief; repeatable |
+| `--samples <n>` | 5 | samples per brief/model; fewer than five is diagnostic only |
+| `--name <id>` | timestamp and HEAD | simple directory name |
+| `--list` | | list the committed briefs without inference |
+| `--check` | | preflight without model inference |
+| `--status <dir>` | | read progress without launching or judging anything |
+| `--rejudge <dir>` | | offline scoring with the current judge; never new model calls |
 
-The tuning loop is short: edit `docs/authoring-rules.md` or `src/`, run the briefs that
-failed, read `SUMMARY.md`, repeat. Uncommitted edits count, and the summary names them by a
-hash so two loops can be told apart. A result you mean to act on needs the protocol's bar,
-4 of 5 samples, so finish with `--samples 5`:
-
-```bash
-bun run ratify --brief callouts --samples 5
-```
-
-To see whether a release holds, name it: `bun run ratify --unify v0.11.16 --samples 5`. A
-fresh clone may need `git fetch --tags` first.
-
-A check that got something wrong is fixed in `scripts/checks.mjs` or the brief's
-`brief.json` and re-applied to the round you already have, at no model cost:
-
-```bash
-bun run ratify --rejudge ratification/rounds/<round>
-```
+`--agent`, `--unify`, `--stagger`, `--timeout` and `--mask` are not supported. There is
+no override flag for the policy. Timeouts come from the committed brief (otherwise
+30 minutes). Execution is always serial. Commit legitimate harness/engine fixes
+before running; never use a temporary patch or a custom replacement command.
 
 ## What a round leaves behind
 
@@ -93,11 +92,11 @@ rules.md, bin/unify          exactly what every sample was given
 <brief>/<sample>/            the agent's directory, exactly as it left it, REPORT.md included
 <brief>/.harness/<sample>/   OpenCode's event stream (events.jsonl), stderr, exit, and its session data
 <brief>/.build/<sample>/     the fresh build every check reads
-<brief>/.judge/<sample>/     scratch copy for npm-script preparation before strict judging
+<brief>/.judge/<sample>/     scratch copy for every strict judgement and npm-script preparation
 <brief>/judge-results.json   the judge's full record: chosen command, diagnostics, markers
 ```
 
-A round exists only in this checkout. Copy the directory somewhere durable to keep it.
+A round exists only in this checkout. Publish results only when explicitly requested, after inspecting and redacting credentials from every exported file. Never publish raw OpenCode state or authentication files. Do not add an authentication proxy to avoid this export check.
 
 ## How a sample is scored
 
@@ -118,8 +117,8 @@ Npm resolution supports static commands joined by `&&`, with exactly one Unify b
 and nested `npm run <script>` calls without extra arguments. Cycles, directory changes,
 shell substitutions, and ambiguous/multiple builds are reported as unsupported.
 The original wrapper runs unchanged, so preprocessing is retained; strict and audit
-flags are applied only to the resolved Unify invocation. Original sample files are
-preserved, and saved isolation masks apply to both copies.
+flags are applied only to the resolved Unify invocation. All judge commands, including direct builds and generators, run in copies. Original sample files
+are preserved, and saved isolation masks apply to both copies.
 
 Each brief's `brief.json` adds its own checks from
 [`scripts/checks.mjs`](scripts/checks.mjs), most of them read from a fresh build of that
@@ -139,7 +138,7 @@ command:
 | `bareFragment` | bare HTML is published, including extensionless endpoints, without a document wrapper; empty list fragments may coexist with a nonempty panel |
 | `cssUrls` | every root-relative `url()` in published CSS is under the address |
 | `clientFetches` | every fetch target the judge found in the pages resolves |
-| `privacy` | no private value from the seed file is published |
+| `privacy` | no private value from the committed seed is present in the fresh output |
 
 `addresses` also checks links inside fetched bare fragments against the **including
 page's URL**, honoring its first `<base href>`. Inline scripts and local `<script src>`
@@ -172,14 +171,14 @@ agent's answer to "what did `rules.md` not answer?", which the summary quotes.
 directory appears as `/tmp/sandbox`, `/tmp` is a fresh empty filesystem, and the
 repository, the bun and npm caches, unify's template cache, your OpenCode configuration and
 history, and the `~/.claude` and `~/.agents` directories OpenCode would load skills from are
-hidden. The sample's OpenCode gets your providers and credentials and nothing else of yours —
+hidden. The sample's OpenCode gets its selected provider and existing authentication and nothing else of yours —
 no instructions, agents, commands, plugins, MCP servers or skills — and keeps its session in
 the sample's harness directory, not yours. Its permissions are answered in advance, so
 nothing waits for a person: file and shell tools are allowed; subagents, skills, the web
 tools, questions and directories outside the sample are refused. A provider that only a
 plugin adds is therefore not available. Before any sample starts,
 the runner searches the whole filesystem from a sample's view for unify's documentation and
-stops if it finds any; hide what it names with `--mask <dir>` or remove it.
+stops if it finds any. Use a clean isolated environment; do not patch the runner or add masks.
 
 What a sample *can* learn from, besides `rules.md`, is the tool itself: `./unify --help`,
 its diagnostics, and the built-in templates `unify init` writes, whose READMEs restate the
@@ -197,12 +196,12 @@ Not covered:
   a user with nothing to lose.
 
 The judge and the fresh builds run each sample's own command, generator scripts included,
-inside the same isolation. Extra masks are saved as absolute paths in `round.json` and
-reapplied during judging, rebuilding, checks and `--rejudge`. The output directory comes
+inside the same isolation. Legacy rounds' saved masks are reapplied during offline
+judging, rebuilding and checks; new runs accept no custom masks. The output directory comes
 from the evaluated binary's dry-run report, so settings saved in `unify.yaml` and CLI
 overrides are both respected.
 
-Harness regressions run with `bun test tests/unit/ratification.test.js`. On a Linux host
+Harness regressions run with `bun test tests/unit/ratification.test.js tests/unit/ratification-runner.test.js`. On a Linux host
 that supports the mount namespaces used for rounds, also run
 `bun ratification/scripts/test-isolation.mjs`: an external sentinel proves that saved
 masks reach the judge, fresh builds and audit checks when rejudging, even when the

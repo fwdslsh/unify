@@ -6,20 +6,15 @@
  *
  *   bun run ratify [-- options]
  *
- *   --unify <ref>      the unify to evaluate: a tag (v0.11.16), branch or commit; default
- *                      the working tree as it stands, uncommitted edits included
  *   --brief <name>     a brief under ratification/briefs/ (repeatable; default: all of them)
  *   --model <id>       an OpenCode model, provider/model as `opencode models` lists it
- *                      (repeatable); `free` means every free OpenCode Zen model, the default
- *   --samples <n>      samples per brief and model (default 1; the protocol's bar needs 5)
- *   --stagger <secs>   seconds between launches (default 20)
- *   --timeout <secs>   per-sample time limit (default: the brief's, else 1800)
- *   --mask <path>      one more path to hide from the samples (repeatable)
+ *                      (required, repeatable); `free` selects free OpenCode Zen models
+ *   --samples <n>      samples per brief and model (default 5)
  *   --name <id>        the round's directory name (default: time and unify ref)
  *   --rejudge <dir>    score a finished round again, with the checks as they are now
+ *   --check            check prerequisites/configuration/isolation without model inference
+ *   --status <dir>     show progress without running or judging anything
  *   --list             list the briefs
- *   --agent <command>  run this shell command as the agent instead of OpenCode, prompt on
- *                      stdin: for testing the harness itself
  *
  * Everything a round writes is under ratification/rounds/<id>/ (gitignored):
  *   SUMMARY.md, results.json   the score, per sample and check, and the agents' own notes
@@ -28,19 +23,22 @@
  *   <brief>/.harness/<sample>/ the agent's event stream, stderr and OpenCode session data
  *   <brief>/.build/<sample>/   the fresh build every check reads
  *
- * Exit: 0 when every sample passed every scored check, 1 when one did not, 2 when the
- * round could not run.
+ * Exit: 0 when the 4/5-per-brief bar is met, 1 when it is not, 2 when incomplete or blocked.
+ * Diagnostic rounds with fewer than five samples require every sample to pass for exit 0.
  */
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
-  chmodSync, closeSync, copyFileSync, cpSync, existsSync, linkSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync, writeFileSync,
+  chmodSync, closeSync, copyFileSync, cpSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync, writeFileSync, renameSync,
 } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import { privateSeedValues } from "./seed-values.mjs";
 import { CHECKS } from "./checks.mjs";
 import { isolationEnvironment } from "./isolation.mjs";
+import { executionFailure, runSerial, scoreVerdict } from "./run-state.mjs";
+import { POLICY, assertStandardEnvironment, assertCommittedInputs, standardProviderConfig } from "./run-policy.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const RAT = resolve(HERE, "..");
@@ -55,7 +53,6 @@ const say = (s = "") => process.stdout.write(`${s}\n`);
 const sha = (text) => createHash("sha256").update(text).digest("hex");
 const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 const readJson = (p) => { try { return JSON.parse(readFileSync(p, "utf8")); } catch { return null; } };
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const duration = (ms) => (ms == null ? "—" : ms < 60_000 ? `${Math.round(ms / 1000)}s` : `${Math.floor(ms / 60_000)}m${String(Math.round((ms % 60_000) / 1000)).padStart(2, "0")}s`);
 
 class Stop extends Error {}
@@ -64,15 +61,16 @@ const stop = (msg) => { throw new Stop(msg); };
 /** Run a command to completion; with `check`, a non-zero exit stops the round. */
 function run(cmd, args, { check = true, ...opts } = {}) {
   const r = spawnSync(cmd, args, { encoding: "utf8", maxBuffer: 256 * 1024 * 1024, ...opts });
-  if (r.error) stop(`${cmd}: ${r.error.message}`);
+  if (r.error && check) stop(`${cmd}: ${r.error.message}`);
   if (check && r.status !== 0) stop(`${cmd} ${args.join(" ")} exited ${r.status}\n${r.stderr || r.stdout || ""}`);
-  return { exit: r.status, stdout: r.stdout ?? "", stderr: r.stderr ?? "" };
+  return { exit: r.status, error: r.error?.message ?? null, stdout: r.stdout ?? "", stderr: r.stderr ?? "" };
 }
 const git = (...args) => run("git", args, { cwd: REPO }).stdout.trim();
 const has = (tool) => run("bash", ["-c", `command -v ${tool}`], { check: false }).exit === 0;
 
-function linkOrCopy(from, to) {
-  try { linkSync(from, to); } catch { copyFileSync(from, to); chmodSync(to, 0o755); }
+function copyBinary(from, to) {
+  copyFileSync(from, to);
+  chmodSync(to, 0o755); // Never share a writable inode between independent samples.
 }
 
 // ------------------------------------------------------------------ briefs
@@ -80,9 +78,16 @@ function linkOrCopy(from, to) {
 const briefNames = () => readdirSync(BRIEFS).filter((n) => existsSync(join(BRIEFS, n, "brief.json"))).sort();
 
 function loadBrief(name) {
+  if (!briefNames().includes(name)) stop(`unknown brief: ${name}`);
   const dir = join(BRIEFS, name);
   if (!existsSync(join(dir, "brief.json"))) stop(`no brief "${name}"; the briefs are: ${briefNames().join(", ")}`);
-  return { name, dir, ...readJson(join(dir, "brief.json")), text: readFileSync(join(dir, "BRIEF.md"), "utf8") };
+  const brief = { name, dir, ...readJson(join(dir, "brief.json")), text: readFileSync(join(dir, "BRIEF.md"), "utf8") };
+  if (brief.checks?.some(c => c.check === "privacy")) {
+    const seed = readJson(join(dir, "seed", brief.judge?.seedFile ?? "varieties.json"));
+    brief.privateValues = brief.judge?.privateValues ?? privateSeedValues(seed, brief.judge?.privateFields);
+    if (!brief.privateValues.length) stop(`brief ${name} has no committed privacy expectations`);
+  }
+  return brief;
 }
 
 // -------------------------------------------------------- the unify under test
@@ -91,27 +96,12 @@ function loadBrief(name) {
 function prepareUnify(ref, roundDir) {
   const bin = join(roundDir, "bin", "unify");
   mkdirSync(dirname(bin), { recursive: true });
-  let root, commit, dirty = null;
-  if (ref === "worktree") {
-    root = REPO;
-    commit = git("rev-parse", "HEAD");
-    const paths = ["src", "package.json", "docs/authoring-rules.md"];
-    const changes = run("git", ["diff", "HEAD", "--", ...paths], { cwd: REPO }).stdout + git("ls-files", "--others", "--exclude-standard", "--", ...paths);
-    if (changes) dirty = sha(changes).slice(0, 12);
-    if (!existsSync(join(REPO, "node_modules"))) run("bun", ["install", "--frozen-lockfile"], { cwd: REPO });
-  } else {
-    const r = run("git", ["rev-parse", "--verify", "--quiet", `${ref}^{commit}`], { cwd: REPO, check: false });
-    if (r.exit !== 0) stop(`--unify ${ref}: no such tag, branch or commit in this clone (a fresh clone may need \`git fetch --tags\`)`);
-    commit = r.stdout.trim();
-    root = join(roundDir, ".unify-src");
-    mkdirSync(root, { recursive: true });
-    const lock = ["bun.lock", "bun.lockb"].filter((f) => run("git", ["cat-file", "-e", `${commit}:${f}`], { cwd: REPO, check: false }).exit === 0);
-    run("bash", ["-c", `git archive "$1" src package.json docs/authoring-rules.md ${lock.join(" ")} | tar -x -C "$2"`, "_", commit, root], { cwd: REPO });
-    run("bun", ["install", "--production", ...(lock.length ? ["--frozen-lockfile"] : [])], { cwd: root });
-  }
+  const root = REPO;
+  const commit = git("rev-parse", "HEAD");
+  const dirty = null;
+  if (!existsSync(join(REPO, "node_modules"))) run("bun", ["install", "--frozen-lockfile"], { cwd: REPO });
   run("bun", ["build", "--compile", join(root, "src", "cli.js"), "--outfile", bin], { cwd: root });
   const rules = readFileSync(join(root, "docs", "authoring-rules.md"), "utf8");
-  if (root !== REPO) rmSync(root, { recursive: true, force: true });
   return { ref, commit, dirty, version: run(bin, ["--version"]).stdout.trim(), rules };
 }
 
@@ -156,10 +146,13 @@ function resolveModels(requested) {
  */
 function sampleEnv(model, masks) {
   const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(OPENCODE_|CLAUDE)/.test(k)));
-  const user = JSON.parse(run("opencode", ["debug", "config"], { cwd: ROUNDS, env: { ...env, OPENCODE_DISABLE_PROJECT_CONFIG: "1" } }).stdout);
+  const resolved = run("opencode", ["debug", "config"], { check: false, cwd: ROUNDS, env: { ...env, OPENCODE_DISABLE_PROJECT_CONFIG: "1" } });
+  if (resolved.exit !== 0) stop("could not read installed OpenCode configuration; do not create an override or relay");
+  let user;
+  try { user = JSON.parse(resolved.stdout); } catch { stop("invalid installed OpenCode configuration"); }
   const config = {
     $schema: "https://opencode.ai/config.json",
-    ...Object.fromEntries(["provider", "enabled_providers", "disabled_providers"].filter((k) => k in user).map((k) => [k, user[k]])),
+    ...standardProviderConfig(model, user),
     model,
     small_model: model,
     permission: {
@@ -215,7 +208,10 @@ function launch(job) {
     mkdirSync(job.harness, { recursive: true });
     const fds = [openSync(job.prompt, "r"), openSync(join(job.harness, "events.jsonl"), "w"), openSync(join(job.harness, "agent-stderr.txt"), "w")];
     const started = Date.now();
+    let settled = false;
     const finish = (exit, signal, error) => {
+      if (settled) return;
+      settled = true;
       fds.forEach((fd) => closeSync(fd));
       const record = { exit, signal, error, timedOut: exit === 124, durationMs: Date.now() - started };
       writeFileSync(join(job.harness, "exit.json"), `${JSON.stringify(record, null, 2)}\n`);
@@ -227,30 +223,36 @@ function launch(job) {
   });
 }
 
-function agentCommand(opts, model, brief) {
-  const secs = String(Number(opts.timeout ?? brief.timeoutSecs ?? 1800));
-  if (opts.agent) return ["timeout", "-k", "30", secs, "bash", "-c", opts.agent];
+function agentCommand(model, brief) {
+  const secs = String(Number(brief.timeoutSecs ?? 1800));
   return ["timeout", "-k", "30", secs, "opencode", "run", "--pure", "--format", "json", "--model", model];
 }
 
 async function newRound(opts) {
-  opts.mask = [...new Set([...(process.env.RATIFY_MASK ?? "").split(":").filter(Boolean), ...opts.mask].map((p) => resolve(p)))];
+  assertStandardEnvironment(process.env);
+  if (!opts.model.length) stop("--model is required; select an installed model without changing its configuration");
+  assertCommittedInputs(REPO);
+  opts.mask = [];
   if (process.platform !== "linux") stop("rounds run on Linux: samples are isolated with mount namespaces. Use a Linux machine, VM or container.");
   for (const tool of ["unshare", "git", "bun", "timeout", "find", "tar", "opencode"]) {
     if (!has(tool)) stop(tool === "opencode" ? "OpenCode is not installed: npm install -g opencode-ai (https://opencode.ai)" : `${tool} is not installed`);
   }
   mkdirSync(ROUNDS, { recursive: true });
-  const briefs = (opts.brief.length ? opts.brief : briefNames()).map(loadBrief);
-  const models = resolveModels(opts.model.length ? opts.model : ["free"]);
-  const per = Number(opts.samples ?? 1);
+  const briefs = [...new Set(opts.brief.length ? opts.brief : briefNames())].map(loadBrief);
+  const models = resolveModels(opts.model);
+  if (new Set(models.map(slug)).size !== models.length) stop("selected model IDs collide as directory names");
+  const per = Number(opts.samples ?? 5);
   if (!Number.isInteger(per) || per < 1) stop("--samples must be a whole number of at least 1");
-  const ref = opts.unify ?? "worktree";
-  const id = opts.name ?? `${new Date().toISOString().slice(0, 16).replace(/[-:]/g, "").replace("T", "-")}-${slug(ref)}`;
+  const ref = "HEAD";
+  const id = opts.name ?? `${new Date().toISOString().replace(/[:.]/g, "-")}-${slug(ref)}`;
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(id)) stop("--name must be a simple directory name");
   const dir = join(ROUNDS, id);
   if (existsSync(dir)) stop(`${relative(REPO, dir)} already exists; pass another --name`);
   mkdirSync(dir, { recursive: true });
   try {
-    return await prepareAndRun(opts, { id, dir, ref, briefs, models, per });
+    const result = await prepareAndRun(opts, { id, dir, ref, briefs, models, per });
+    if (opts.check) rmSync(dir, { recursive: true, force: true });
+    return result;
   } catch (e) {
     if (!existsSync(join(dir, "round.json"))) rmSync(dir, { recursive: true, force: true }); // nothing ran: leave nothing
     throw e;
@@ -259,7 +261,7 @@ async function newRound(opts) {
 
 async function prepareAndRun(opts, { id, dir, ref, briefs, models, per }) {
   say(`round ${id}`);
-  say(`  building unify from ${ref === "worktree" ? "the working tree" : ref}…`);
+  say(`  building unify from ${ref}…`);
   const unify = prepareUnify(ref, dir);
   say(`  unify ${unify.version} at ${unify.commit.slice(0, 12)}${unify.dirty ? ` + uncommitted changes (${unify.dirty})` : ""}`);
   const rules = `\`\`\`markdown\n${unify.rules}\`\`\`\n`;
@@ -271,8 +273,10 @@ async function prepareAndRun(opts, { id, dir, ref, briefs, models, per }) {
   say("  checking that a sample cannot read unify's own documentation…");
   const leaks = probe(dir, envs[models[0]]);
   if (leaks.length) {
-    stop(`a sample could read unify's own documentation:\n  ${leaks.join("\n  ")}\nRemove those files, or hide their directory with --mask <dir>.`);
+    stop(`a sample could read unify's own documentation:\n  ${leaks.join("\n  ")}\nUse a clean isolated environment; do not patch the runner or add custom masks.`);
   }
+
+  if (opts.check) { say("Preflight passed. No model inference was run."); return 0; }
 
   const jobs = [];
   const manifestBriefs = briefs.map((brief) => {
@@ -289,9 +293,9 @@ async function prepareAndRun(opts, { id, dir, ref, briefs, models, per }) {
         if (existsSync(join(brief.dir, "seed"))) cpSync(join(brief.dir, "seed"), sample, { recursive: true });
         writeFileSync(join(sample, "BRIEF.md"), brief.text);
         writeFileSync(join(sample, "rules.md"), rules);
-        linkOrCopy(join(dir, "bin", "unify"), join(sample, "unify"));
+        copyBinary(join(dir, "bin", "unify"), join(sample, "unify"));
         samples.push({ name, model });
-        jobs.push({ label: `${brief.name}/${name}`, sample, prompt, harness: join(bdir, ".harness", name), env: envs[model], command: agentCommand(opts, model, brief) });
+        jobs.push({ label: `${brief.name}/${name}`, sample, prompt, harness: join(bdir, ".harness", name), env: envs[model], command: agentCommand(model, brief) });
       }
     }
     return { name: brief.name, title: brief.title, origin: brief.origin, sha256: sha(brief.text), samples };
@@ -303,23 +307,35 @@ async function prepareAndRun(opts, { id, dir, ref, briefs, models, per }) {
     unify: { ref, commit: unify.commit, dirty: unify.dirty, version: unify.version },
     rules: { sha256: sha(unify.rules) },
     prompt: { sha256: sha(contract) },
-    agent: opts.agent ? `custom: ${opts.agent}` : `opencode ${run("opencode", ["--version"]).stdout.trim()}`,
+    agent: `opencode ${run("opencode", ["--version"]).stdout.trim()}`,
+    executionPolicy: POLICY,
+    concurrency: 1,
     models,
     samplesPerModel: per,
+    status: "prepared",
     isolation: { mode: process.getuid?.() === 0 ? "mount namespace" : "user and mount namespace", probe: "clean", masks: opts.mask },
     briefs: manifestBriefs,
   };
   writeFileSync(join(dir, "round.json"), `${JSON.stringify(round, null, 2)}\n`);
 
-  const stagger = Number(opts.stagger ?? 20) * 1000;
-  say(`  launching ${jobs.length} sample${jobs.length === 1 ? "" : "s"}${jobs.length > 1 ? `, ${stagger / 1000}s apart` : ""}…`);
-  await Promise.all(jobs.map(async (job, i) => {
-    await sleep(i * stagger);
-    say(`  started  ${job.label}`);
-    const r = await launch(job);
-    say(`  finished ${job.label}: exit ${r.exit}${r.timedOut ? " (timed out)" : ""} after ${duration(r.durationMs)}`);
-  }));
-  round.finished = new Date().toISOString();
+  say(`  launching ${jobs.length} samples serially…`);
+  const complete = await runSerial(jobs, {
+    launch: async (job) => {
+      say(`  started  ${job.label}`);
+      const r = await launch(job);
+      say(`  finished ${job.label}: exit ${r.exit}${r.timedOut ? " (timed out)" : ""} after ${duration(r.durationMs)}`);
+      return r;
+    },
+    inspect: (job) => agentEvents(job.harness),
+    checkpoint: (state) => {
+      Object.assign(round, state, { updated: new Date().toISOString() });
+      const path = join(dir, "round.json");
+      writeFileSync(path + ".tmp", `${JSON.stringify(round, null, 2)}\n`);
+      renameSync(path + ".tmp", path);
+    },
+  });
+  if (complete) round.finished = new Date().toISOString();
+  else say("Provider/agent infrastructure failed. Remaining samples were not launched; this round is incomplete.");
   writeFileSync(join(dir, "round.json"), `${JSON.stringify(round, null, 2)}\n`);
   return score(dir);
 }
@@ -330,7 +346,7 @@ async function prepareAndRun(opts, { id, dir, ref, briefs, models, per }) {
 function judgeBrief(bdir, brief, masks) {
   const config = join(bdir, "judge.json");
   const out = join(bdir, "judge-results.json");
-  writeFileSync(config, `${JSON.stringify({ ...brief.judge, isolate: { script: ISOLATE, repo: REPO, state: join(bdir, ".harness", ".judge"), masks } }, null, 2)}\n`);
+  writeFileSync(config, `${JSON.stringify({ ...brief.judge, binary: join(dirname(bdir), "bin", "unify"), ...(brief.privateValues ? { privateValues: brief.privateValues } : {}), isolate: { script: ISOLATE, repo: REPO, state: join(bdir, ".harness", ".judge"), masks } }, null, 2)}\n`);
   rmSync(out, { force: true });
   run(process.execPath, [JUDGE, bdir, "--config", config, "--out", out], { check: false });
   return readJson(out)?.samples ?? [];
@@ -364,6 +380,7 @@ function agentEvents(harness) {
     turns: events.length ? steps.length : null,
     costUsd: steps.length ? steps.reduce((a, e) => a + (e.part?.cost ?? 0), 0) : null,
     error: error ? (error.data?.message ?? error.name ?? "error") : null,
+    errorName: error?.name ?? null,
     logged: logged.at(-1) ?? null,
   };
 }
@@ -383,15 +400,21 @@ function scoreSample(dir, bdir, brief, { name, model }, judge, masks) {
   let build = null;
   if (command && !judge.run.refused && judge.outputDir != null) {
     cpSync(sample, site, { recursive: true, verbatimSymlinks: true, filter: (src) => src !== join(sample, "unify") });
-    linkOrCopy(join(dir, "bin", "unify"), join(site, "unify"));
+    copyBinary(join(dir, "bin", "unify"), join(site, "unify"));
     const o = judge.outputDir;
     out = /^\/tmp\/sandbox(\/|$)/.test(o) ? join(site, o.slice("/tmp/sandbox".length)) : isAbsolute(o) ? o : join(site, o);
-    if (out.startsWith(site + "/")) rmSync(out, { recursive: true, force: true });
-    build = isolated(site, join(bdir, ".harness", ".build"), command.replace(/^unify\b/, "./unify"), masks);
+    out = resolve(out);
+    if (!out.startsWith(site + "/")) {
+      out = null;
+      build = { exit: null, stderr: "output must be inside the sample directory", stdout: "" };
+    } else {
+      rmSync(out, { recursive: true, force: true });
+      build = isolated(site, join(bdir, ".harness", ".build"), command.replace(/^unify\b/, "./unify"), masks);
+    }
   }
 
   const ctx = {
-    out, site, command: judge?.buildCommand ?? command, judge, baseUrl: brief.baseUrl, events: join(harness, "events.jsonl"),
+    out, site, privateValues: brief.privateValues, command: judge?.buildCommand ?? command, judge, baseUrl: brief.baseUrl, events: join(harness, "events.jsonl"),
     exec: (c) => isolated(site, join(bdir, ".harness", ".build"), c, masks),
   };
   const strict = !judge
@@ -424,7 +447,7 @@ function scoreSample(dir, bdir, brief, { name, model }, judge, masks) {
     name, model,
     pass: checks.filter((c) => c.scored).every((c) => c.pass),
     checks,
-    agent: { exit: exit.exit ?? null, timedOut: Boolean(exit.timedOut), durationMs: exit.durationMs ?? null, turns: agent.turns, costUsd: agent.costUsd },
+    agent: { exit: exit.exit ?? null, timedOut: Boolean(exit.timedOut), durationMs: exit.durationMs ?? null, turns: agent.turns, costUsd: agent.costUsd, failure: executionFailure(exit, agent) },
     freshBuild: build && { command, exit: build.exit },
     rulesGaps: rulesGaps(sample),
   };
@@ -432,6 +455,8 @@ function scoreSample(dir, bdir, brief, { name, model }, judge, masks) {
 
 function score(dir) {
   const round = readJson(join(dir, "round.json")) ?? stop(`${dir} has no round.json`);
+  const pending = round.briefs.flatMap(b => b.samples.filter(s => !existsSync(join(dir, b.name, ".harness", s.name, "exit.json"))));
+  if (round.status === "running" && pending.length) stop("round is still running; use --status instead of --rejudge");
   const masks = round.isolation?.masks ?? [];
   say(`scoring ${round.id}…`);
   const results = { round: round.id, scoredAt: new Date().toISOString(), briefs: [] };
@@ -442,16 +467,17 @@ function score(dir) {
     results.briefs.push({
       name: b.name, title: brief.title, origin: brief.origin,
       briefChanged: sha(brief.text) !== b.sha256,
-      samples: b.samples.map((s) => scoreSample(dir, bdir, brief, s, judged.find((j) => j.sample === s.name), masks)),
+      samples: b.samples.filter(s => existsSync(join(bdir, ".harness", s.name, "exit.json"))).map((s) => scoreSample(dir, bdir, brief, s, judged.find((j) => j.sample === s.name), masks)),
     });
   }
+  results.verdict = scoreVerdict(results.briefs, round.models, round.briefs.reduce((n, b) => n + b.samples.length, 0));
   const summary = renderSummary(round, results);
   writeFileSync(join(dir, "results.json"), `${JSON.stringify(results, null, 2)}\n`);
   writeFileSync(join(dir, "SUMMARY.md"), summary);
   say();
   say(summary);
   say(`written: ${relative(process.cwd(), join(dir, "SUMMARY.md"))} and results.json`);
-  return results.briefs.every((b) => b.samples.every((s) => s.pass)) ? 0 : 1;
+  return results.verdict.exitCode;
 }
 
 // ----------------------------------------------------------------- summary
@@ -463,15 +489,16 @@ function renderSummary(round, results) {
   const cell = (c) => (c.pass ? "✓" : "✗") + (c.scored ? "" : " (i)");
   const md = [];
   const groups = results.briefs.flatMap((b) => round.models.map((m) => ({ brief: b.name, model: m, samples: b.samples.filter((s) => s.model === m) })));
-  const bar = groups.every((g) => g.samples.length >= 5)
-    ? (groups.every((g) => g.samples.filter((s) => s.pass).length / g.samples.length >= 0.8) ? "**met**" : "**not met**")
-    : "not measured: the bar needs at least 5 samples per brief and model, so this score is indicative";
+  const bar = !results.verdict.complete ? "**incomplete: unattempted samples are not failures or passes**"
+    : results.verdict.barMet === null ? "not measured: at least 5 samples per brief and model are required"
+    : results.verdict.barMet ? "**met**" : "**not met**";
 
   md.push(`# Ratification round ${round.id}`, "");
   md.push(`- **unify** ${round.unify.version} at \`${round.unify.commit.slice(0, 12)}\`${round.unify.ref === "worktree" ? " (working tree)" : ` (${round.unify.ref})`}${round.unify.dirty ? `, plus uncommitted changes \`${round.unify.dirty}\`` : ""}`);
   md.push(`- **rules** \`${round.rules.sha256.slice(0, 12)}\` · **prompt** \`${round.prompt.sha256.slice(0, 12)}\` · **agent** ${round.agent} · **models** ${round.models.join(", ")} · **isolation** ${round.isolation.mode}, probe ${round.isolation.probe}`);
   md.push(`- ${round.created}${round.finished ? ` to ${round.finished}` : ""}; scored ${results.scoredAt}${cost ? `; agent cost $${cost.toFixed(2)}` : ""}`, "");
   md.push("## Score", "");
+  md.push(`Completed ${results.verdict.completed}/${results.verdict.expected} planned samples.`, "");
   md.push(`**${passed} of ${all.length} samples completed their brief: every scored check passed (${all.length ? Math.round((100 * passed) / all.length) : 0}%).**`, "");
   md.push(`The protocol's bar, at least 4 of 5 samples of a model on each brief: ${bar}.`, "");
   md.push("| Brief | Model | Passed | Checks that failed |", "|---|---|---|---|");
@@ -509,10 +536,10 @@ function renderSummary(round, results) {
 async function main() {
   const { values: opts } = parseArgs({
     options: {
-      unify: { type: "string" }, brief: { type: "string", multiple: true, default: [] },
+      brief: { type: "string", multiple: true, default: [] },
       model: { type: "string", multiple: true, default: [] }, samples: { type: "string" },
-      stagger: { type: "string" }, timeout: { type: "string" }, mask: { type: "string", multiple: true, default: [] },
-      name: { type: "string" }, rejudge: { type: "string" }, list: { type: "boolean" }, agent: { type: "string" },
+      name: { type: "string" }, rejudge: { type: "string" }, list: { type: "boolean" },
+      check: { type: "boolean" }, status: { type: "string" },
       help: { type: "boolean", short: "h" },
     },
   });
@@ -520,6 +547,7 @@ async function main() {
     say(readFileSync(fileURLToPath(import.meta.url), "utf8").split("*/")[0].replace(/^#!.*\n\/\*\*\n?/, "").replace(/^ \* ?/gm, ""));
     return 0;
   }
+  if ([opts.check, opts.status, opts.rejudge, opts.list].filter(Boolean).length > 1) stop("choose only one of --check, --status, --rejudge or --list");
   if (opts.list) {
     for (const n of briefNames()) {
       const b = loadBrief(n);
@@ -527,11 +555,20 @@ async function main() {
     }
     return 0;
   }
+  if (opts.status) {
+    const dir = resolve(opts.status);
+    const round = readJson(join(dir, "round.json")) ?? stop("no round.json in the requested directory");
+    const total = round.briefs.reduce((n, b) => n + b.samples.length, 0);
+    const completed = round.briefs.reduce((n, b) => n + b.samples.filter(s => existsSync(join(dir, b.name, ".harness", s.name, "exit.json"))).length, 0);
+    say(JSON.stringify({ round: round.id, status: round.status ?? "unknown", completed, total,
+      active: round.active ?? null, verdict: readJson(join(dir, "results.json"))?.verdict ?? null }, null, 2));
+    return 0;
+  }
   if (opts.rejudge) return score(resolve(opts.rejudge));
   return newRound(opts);
 }
 
 main().then((code) => { process.exitCode = code; }, (e) => {
-  process.stderr.write(`ratify: ${e instanceof Stop ? e.message : e.stack}\n`);
+  process.stderr.write(`ratify: ${e.message}\n`);
   process.exitCode = 2;
 });

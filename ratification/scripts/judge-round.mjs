@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * judge-round.mjs — the standing instrument for judging a ratification round.
- * Version 1.1.0. Runs under bun or node (>=18), using the project's markdown-it.
+ * Version 1.2.0. Runs under bun or node (>=18), using the project's markdown-it.
  *
  *   bun ratification/scripts/judge-round.mjs <round-dir> [--config judge.json] [--out results.json]
  *   bun ratification/scripts/judge-round.mjs --self-test
@@ -9,16 +9,12 @@
  * <round-dir> contains sample subdirectories (haiku-1, sonnet-1, …), each with
  * REPORT.md, the authored site, usually dist/, and the round's own `unify`
  * binary. Samples are treated as read-only evidence: nothing is ever written
- * into a sample directory, and direct builds run with `--dry-run` appended
- * ("no writes at all, anywhere" — build.js's own contract). The one file this
- * tool writes is `judge-results.json`, in `ratification/rounds/<round>/` — the
- * round directory's own name under this repository's gitignored `rounds/` — or
- * wherever `--out` names (run-round.mjs passes it). Npm publish wrappers prepare
- * a scratch copy under .judge/ before the resolved build is checked strictly.
+ * into a sample directory. Every build runs in a scratch copy under .judge/;
+ * generators may write there even during a dry run. Npm publish wrappers prepare
+ * that copy before the resolved build is checked strictly. Results go to
+ * judge-results.json or wherever --out names (run-round.mjs passes it).
  *
- * Why this exists: every false verdict in twenty rounds came from improvised
- * judging, never from the samples. The three most recent, each encoded here as
- * behaviour plus a self-test:
+ * Parser and scoring pitfalls encoded as behaviour and regression tests:
  *
  *  1. A `grep -oE '\.\/unify build[^`"|]*'` truncated a command at its own
  *     quoted --base-url value and judged the sample with the amputated half
@@ -28,14 +24,13 @@
  *  2. A backslash line-continuation split another sample's command in two and
  *     produced a spurious exit 2. → Continuations are joined before scanning.
  *  3. A domain-level grep for leaked private data matched a *public* address
- *     the samples had invented (5/6 "leak" that was 0/6 for the real values).
+ *     the samples had invented.
  *     → The privacy check greps for the exact private strings only — from
  *     config, or derived from the seed file's named fields — never a domain,
  *     never a pattern.
  *
- * Two older traps are also structural here: the build is judged IN PLACE with
- * the sample's own command (never re-run with -o elsewhere, which manufactured
- * false failures twice), and the primitive sweep reads the site SOURCE tree,
+ * The build uses the sample's own command and relative paths in a scratch copy
+ * (never re-run with -o elsewhere), and the primitive sweep reads the site SOURCE tree,
  * not the sandbox (rules.md quotes `{{ }}` as a counter-example, so sweeping
  * the whole sandbox false-positives on every clean sample).
  *
@@ -50,16 +45,17 @@
  *   primitives       {label: literal-or-/regex/} swept over the source tree
  *   sweepExclude     top-level names skipped by the sweep ("X*" = prefix match)
  *   isolate          {script, repo, state, masks}: run each build through isolate.sh
+ *   binary           canonical evaluated binary to copy over the sample's executable
  */
 
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import MarkdownIt from "markdown-it";
 import { isolationEnvironment } from "./isolation.mjs";
 
-const VERSION = "1.1.0";
+const VERSION = "1.2.0";
 const reportMarkdown = new MarkdownIt("commonmark");
 
 /** Where results land: `ratification/rounds/`, beside this script's directory, gitignored. */
@@ -131,7 +127,7 @@ function logicalLines(blockLines) {
  * — quotes, glob patterns and all. Control operators (&& || ; | & and
  * redirects) become their own tokens and terminate a command's extent.
  */
-function scanShellLine(line) {
+export function scanShellLine(line) {
   const tokens = [];
   let cur = null;
   let state = "n"; // n = normal, s = single-quoted, d = double-quoted
@@ -356,7 +352,7 @@ function optionValue(command, names) {
 // ------------------------------------------------------------------ running
 
 /**
- * Judge in place: the sample's own command, in the sample's own directory,
+ * Judge the sample's own command in its scratch directory,
  * with --dry-run --strict appended (deduplicated). Output is captured in
  * memory — never redirected into the sample.
  */
@@ -366,7 +362,7 @@ function runBuild(sampleDir, command, timeoutMs, isolate, strict = true) {
   if (strict && !/(^|\s)--dry-run(\s|$)/.test(executed)) executed += " --dry-run";
   if (strict && !/(^|\s)--strict(\s|$)/.test(executed)) executed += " --strict";
   // With `isolate` configured (run-round.mjs does), the build runs where the agent ran:
-  // in the sample, seen as /tmp/sandbox, with the repository and the host /tmp masked.
+  // in the scratch copy, seen as /tmp/sandbox, with the repository and host /tmp masked.
   const [cmd, args] = isolate
     ? [isolate.script, [sampleDir, isolate.repo, isolate.state, "bash", "-c", executed]]
     : ["bash", ["-c", executed]];
@@ -416,15 +412,8 @@ function walkFiles(dir, out = [], rel = "") {
   for (const e of entries) {
     const abs = join(dir, e.name);
     const r = rel ? `${rel}/${e.name}` : e.name;
-    let isDir = e.isDirectory();
-    if (e.isSymbolicLink()) {
-      try {
-        isDir = statSync(abs).isDirectory();
-      } catch {
-        continue;
-      }
-    }
-    if (isDir) walkFiles(abs, out, r);
+    if (e.isSymbolicLink()) continue;
+    if (e.isDirectory()) walkFiles(abs, out, r);
     else out.push(r);
   }
   return out;
@@ -683,14 +672,20 @@ function judgeSample(roundDir, name, config) {
   result.buildCommand = chosen ? (chosen.buildCommand ?? chosen.command) : null;
   result.chosenReason = reason;
 
-  if (chosen?.wrapper && chosen.complete && !chosen.substitution) {
+  if (chosen && chosen.complete && !chosen.substitution) {
     const copy = join(roundDir, ".judge", name);
     rmSync(copy, { recursive: true, force: true });
     cpSync(sampleDir, copy, { recursive: true, verbatimSymlinks: true });
+    if (config.binary) {
+      rmSync(join(copy, "unify"), { force: true });
+      copyFileSync(config.binary, join(copy, "unify"));
+    }
     sampleDir = copy;
-    const preparation = runBuild(sampleDir, chosen.command, config.timeoutMs, config.isolate, false);
-    result.preparation = { command: chosen.command, exit: preparation.exit, error: preparation.error,
-      diagnostics: (preparation.stderr + "\n" + preparation.stdout).trim().split("\n").slice(-config.diagnosticLines) };
+    if (chosen.wrapper) {
+      const preparation = runBuild(sampleDir, chosen.command, config.timeoutMs, config.isolate, false);
+      result.preparation = { command: chosen.command, exit: preparation.exit, error: preparation.error,
+        diagnostics: (preparation.stderr + "\n" + preparation.stdout).trim().split("\n").slice(-config.diagnosticLines) };
+    }
   }
   if (chosen && (!chosen.complete || chosen.substitution)) {
     result.run = { executed: null, exit: null, refused: !chosen.complete ? "command has incomplete quoting or continuation" : "command contains $/\\` shell substitution — refusing to execute" };
@@ -728,7 +723,8 @@ function judgeSample(roundDir, name, config) {
   const baseUrl = config.baseUrl ?? optionValue(command, ["--base-url"]);
   // An agent sees its own directory as /tmp/sandbox (isolate.sh), and may write that path.
   const inSandbox = /^\/tmp\/sandbox(\/|$)/.test(outputDir ?? "");
-  const outAbs = outputDir == null ? null : inSandbox ? join(sampleDir, outputDir.slice("/tmp/sandbox".length)) : isAbsolute(outputDir) ? outputDir : join(sampleDir, outputDir);
+  const candidate = outputDir == null ? null : inSandbox ? join(sampleDir, outputDir.slice("/tmp/sandbox".length)) : isAbsolute(outputDir) ? outputDir : join(sampleDir, outputDir);
+  const outAbs = candidate && resolve(candidate).startsWith(sampleDir + "/") ? resolve(candidate) : null;
 
   result.outputDir = outputDir;
   result.markers = { pattern: config.marker, ...countMarkers(outAbs, config.marker) };
@@ -746,7 +742,7 @@ function pad(s, w) {
 function printHuman(roundDir, results, config) {
   const p = (s) => process.stdout.write(`${s}\n`);
   p(`judge-round v${VERSION} — ${roundDir}`);
-  p(`marker: /${config.marker}/   privacy: exact values only   builds: in place, --dry-run --strict appended`);
+  p(`marker: /${config.marker}/   privacy: exact values only   builds: in scratch copies, --dry-run --strict appended`);
   p("");
   const header = ["sample", "exit", "prob", "adv", "markers", "privacy", "urls", "command (as chosen)"];
   const rows = results.map((r) => {
@@ -937,4 +933,4 @@ function main(argv) {
   return 0;
 }
 
-process.exitCode = main(process.argv.slice(2));
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) process.exitCode = main(process.argv.slice(2));
