@@ -2,8 +2,9 @@
 
 Run the checked-in harness unchanged through the installed OpenCode CLI. Select an
 existing model from `opencode models`. OpenCode resolves its normal configuration and
-authentication, including environment variables, custom endpoints and authentication
-plugins. The runner does not create or manage a provider connection.
+authentication, including environment variables, custom endpoints and OpenCode's
+built-in authentication. Evaluations use OpenCode's `--pure` mode: external plugins
+cannot inject instructions or change tools. The runner does not manage a provider connection.
 
 **Reuse the runner unchanged.** Do not create run-specific proxies, relays, adapters,
 launch wrappers or patches. Existing OpenCode provider settings, network proxies and
@@ -58,10 +59,24 @@ the existing model definition. Replace `provider/model` with any ID listed by
 
 Provider selection, configuration precedence, authentication and networking belong to
 OpenCode. Global, project and `OPENCODE_CONFIG*` settings are resolved normally before
-sample isolation; provider definitions and plugins are retained. Environment variables
+sample isolation; provider definitions are retained, external plugins are not. Environment variables
 are not rejected based on their names. The runner has no provider/domain allowlist and
 no endpoint, adapter, proxy or custom-agent options. Do not add an experiment-specific
 relay or change model settings to rescue a run.
+
+Preflight prints the **effective context and output limits inside isolation**, and each
+round records them in `round.json`. A server's larger context does not automatically
+update OpenCode's client definition. Configure that definition before starting. When a
+specific context is required, assert it without overriding configuration:
+
+```sh
+bun run ratify --check --model "provider/model" --expect-context 102400
+bun run ratify --model "provider/model" --expect-context 102400 --samples 1
+```
+
+A mismatch stops before inference. There is no minimum context imposed on other models.
+Providers requiring an external authentication plugin need a native OpenCode connection
+for this evaluation; do not work around that with a proxy or plugin adapter.
 
 `--check` validates the model ID, configuration, clean inputs, binary build and namespace
 isolation **without inference**. It cannot establish upstream authentication, billing or
@@ -90,6 +105,7 @@ passed, not that full ratification was established. `results.json` includes an e
 | `--brief <name>` | all seven | select a committed brief; repeatable |
 | `--samples <n>` | 5 | samples per brief/model; fewer than five is diagnostic only |
 | `--name <id>` | timestamp and HEAD | simple directory name |
+| `--expect-context <n>` | | require this exact configured context; never changes it |
 | `--list` | | list the committed briefs without inference |
 | `--check` | | preflight without model inference |
 | `--status <dir>` | | read progress without launching or judging anything |
@@ -106,10 +122,10 @@ Everything is under `ratification/rounds/<round>/`, which git ignores:
 
 ```
 SUMMARY.md, results.json     the score, every check per sample, the agents' own notes
-round.json                   what ran: unify commit and version, rules and prompt hashes, OpenCode version, models
+round.json                   commit, prompt/rules hashes, OpenCode version, models, effective context/output limits, plugin policy
 rules.md, bin/unify          exactly what every sample was given
 <brief>/PROMPT.md            the prompt every sample of that brief received
-<brief>/<sample>/            the agent's directory, exactly as it left it, REPORT.md included
+<brief>/<sample>/            agent's directory, including persistent AGENTS.md and REPORT.md if authored
 <brief>/.harness/<sample>/   OpenCode's event stream (events.jsonl), stderr, exit, and its session data
 <brief>/.build/<sample>/     the fresh build every check reads
 <brief>/.judge/<sample>/     scratch copy for every strict judgement and npm-script preparation
@@ -191,16 +207,21 @@ agent's answer to "what did `rules.md` not answer?", which the summary quotes.
 directory appears as `/tmp/sandbox`, `/tmp` is a fresh empty filesystem, and the
 repository, the bun and npm caches, unify's template cache, your OpenCode configuration and
 history, and the `~/.claude` and `~/.agents` directories OpenCode would load skills from are
-hidden. The sample's OpenCode gets the resolved providers, authentication plugins and existing credentials;
+hidden. The sample's OpenCode gets the resolved providers and existing credentials;
 configured instructions, agents, commands, MCP servers and skills are not forwarded. It keeps its session in
 the sample's harness directory, not yours. Its permissions are answered in advance, so
 nothing waits for a person: file and shell tools are allowed; subagents, skills, the web
-tools, questions and directories outside the sample are refused. Installed plugins are
-retained because providers may need them for authentication; plugins must not inject
-project knowledge into an evaluation. Provider credential files and local plugin files
+tools, questions and directories outside the sample are refused. External plugins are
+disabled by OpenCode's `--pure` mode; built-in authentication remains available. Provider credential files
 must be accessible inside the execution environment. Before any sample starts,
 the runner searches the whole filesystem from a sample's view for unify's documentation and
 stops if it finds any. Use a clean isolated environment; do not patch the runner or add masks.
+
+Each sample receives `AGENTS.md`, byte-for-byte identical to its original `PROMPT.md`
+(shared contract plus brief). OpenCode loads that absolute path as persistent system
+instructions on every agent turn, including after context compaction. The report requirement
+does not depend on a model-generated summary remembering it. Missing reports still fail;
+the runner never writes reports on the agent's behalf or resumes a failed sample with hints.
 
 What a sample *can* learn from, besides `rules.md`, is the tool itself: `./unify --help`,
 its diagnostics, and the built-in templates `unify init` writes, whose READMEs restate the
@@ -228,6 +249,11 @@ that supports the mount namespaces used for rounds, also run
 `bun ratification/scripts/test-isolation.mjs`: an external sentinel proves that saved
 masks reach the judge, fresh builds and audit checks when rejudging, even when the
 caller's `RATIFY_MASK` differs. The fixture and compiled binary are removed afterward.
+
+With OpenCode installed in that environment, run `bun ratification/scripts/test-opencode.mjs`.
+This integration test uses a local HTTP fixture (no real inference or credentials) to force
+compaction and verify that the original contract survives and external plugins cannot load.
+It produces no ratification results and is never part of a model run's transport.
 
 ## Adding a brief
 

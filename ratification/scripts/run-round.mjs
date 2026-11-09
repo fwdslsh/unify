@@ -9,6 +9,7 @@
  *   --brief <name>     a brief under ratification/briefs/ (repeatable; default: all of them)
  *   --model <id>       an OpenCode model, provider/model as `opencode models` lists it
  *                      (required, repeatable); `free` selects free OpenCode Zen models
+ *   --expect-context <n>  refuse a different configured context; never overrides it
  *   --samples <n>      samples per brief and model (default 5)
  *   --name <id>        the round's directory name (default: time and unify ref)
  *   --rejudge <dir>    score a finished round again, with the checks as they are now
@@ -38,7 +39,7 @@ import { privateSeedValues } from "./seed-values.mjs";
 import { CHECKS } from "./checks.mjs";
 import { isolationEnvironment } from "./isolation.mjs";
 import { executionFailure, runSerial, scoreVerdict } from "./run-state.mjs";
-import { POLICY, assertCommittedInputs, standardProviderConfig, sampleEnvironment } from "./run-policy.mjs";
+import { POLICY, assertCommittedInputs, sampleConfig, sampleEnvironment, parseModels, modelSettings } from "./run-policy.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const RAT = resolve(HERE, "..");
@@ -112,8 +113,8 @@ function prepareUnify(ref, roundDir) {
  * line of its own, then that model's JSON.
  */
 function opencodeModels(provider) {
-  const text = run("opencode", ["models", ...(provider ? [provider] : []), "--verbose"], { cwd: REPO }).stdout;
-  return [...text.matchAll(/^(\S+\/\S+)\n(\{[\s\S]*?\n\})$/gm)].map((m) => ({ ...JSON.parse(m[2]), id: m[1] }));
+  const text = run("opencode", ["models", ...(provider ? [provider] : []), "--verbose", "--pure"], { cwd: REPO }).stdout;
+  return parseModels(text);
 }
 
 /** `free` becomes every free OpenCode Zen model that can call tools; any other name must be one OpenCode lists. */
@@ -145,26 +146,12 @@ function resolveModels(requested) {
  * the web tools, questions and other directories are refused.
  */
 function sampleEnv(model, masks) {
-  const resolved = run("opencode", ["debug", "config"], { check: false, cwd: REPO });
+  const resolved = run("opencode", ["debug", "config", "--pure"], { check: false, cwd: REPO });
   if (resolved.exit !== 0) stop("could not read OpenCode configuration; check `opencode debug config` in this checkout");
   const env = sampleEnvironment(process.env);
   let user;
   try { user = JSON.parse(resolved.stdout); } catch { stop("invalid installed OpenCode configuration"); }
-  const config = {
-    $schema: "https://opencode.ai/config.json",
-    ...standardProviderConfig(user),
-    model,
-    small_model: model,
-    permission: {
-      read: "allow", edit: "allow", glob: "allow", grep: "allow", list: "allow", bash: "allow", todowrite: "allow", lsp: "allow",
-      task: "deny", skill: "deny", webfetch: "deny", websearch: "deny", question: "deny", doom_loop: "deny", external_directory: "deny",
-    },
-    autoupdate: false,
-    share: "disabled",
-    snapshot: false,
-    formatter: false,
-    lsp: false,
-  };
+  const config = sampleConfig(user, model);
   const auth = join(process.env.XDG_DATA_HOME ?? join(process.env.HOME, ".local", "share"), "opencode", "auth.json");
   return {
     ...isolationEnvironment(masks, env),
@@ -224,13 +211,18 @@ function launch(job) {
 
 function agentCommand(model, brief) {
   const secs = String(Number(brief.timeoutSecs ?? 1800));
-  return ["timeout", "-k", "30", secs, "opencode", "run", "--format", "json", "--model", model];
+  return ["timeout", "-k", "30", secs, "opencode", "run", "--pure", "--format", "json", "--model", model];
 }
 
 async function newRound(opts) {
   if (!opts.model.length) stop("--model is required; select an installed model without changing its configuration");
   assertCommittedInputs(REPO);
   opts.mask = [];
+  if (opts["expect-context"] !== undefined) {
+    const value = Number(opts["expect-context"]);
+    if (!Number.isSafeInteger(value) || value <= 0) stop("--expect-context must be a positive whole number");
+    opts.expectedContext = value;
+  }
   if (process.platform !== "linux") stop("rounds run on Linux: samples are isolated with mount namespaces. Use a Linux machine, VM or container.");
   for (const tool of ["unshare", "git", "bun", "timeout", "find", "tar", "opencode"]) {
     if (!has(tool)) stop(tool === "opencode" ? "OpenCode is not installed: npm install -g opencode-ai (https://opencode.ai)" : `${tool} is not installed`);
@@ -238,6 +230,9 @@ async function newRound(opts) {
   mkdirSync(ROUNDS, { recursive: true });
   const briefs = [...new Set(opts.brief.length ? opts.brief : briefNames())].map(loadBrief);
   const models = resolveModels(opts.model);
+  // Refuse mismatches before compiling or preparing any sample.
+  const configured = opencodeModels();
+  for (const model of models) modelSettings(configured, model, opts.expectedContext);
   if (new Set(models.map(slug)).size !== models.length) stop("selected model IDs collide as directory names");
   const per = Number(opts.samples ?? 5);
   if (!Number.isInteger(per) || per < 1) stop("--samples must be a whole number of at least 1");
@@ -273,12 +268,16 @@ async function prepareAndRun(opts, { id, dir, ref, briefs, models, per }) {
   if (leaks.length) {
     stop(`a sample could read unify's own documentation:\n  ${leaks.join("\n  ")}\nUse a clean isolated environment; do not patch the runner or add custom masks.`);
   }
+  const effectiveModels = {};
   for (const model of models) {
-    const available = run(ISOLATE, [join(dir, ".probe", "sandbox"), REPO, join(dir, ".probe", "state"), "opencode", "models"],
+    const available = run(ISOLATE, [join(dir, ".probe", "sandbox"), REPO, join(dir, ".probe", "state"), "opencode", "models", "--verbose", "--pure"],
       { env: envs[model], check: false, timeout: 120_000 });
-    if (available.exit !== 0 || !available.stdout.split(/\r?\n/).includes(model)) {
-      stop(`OpenCode cannot load ${model} inside sample isolation. Check provider/plugin and credential-file availability in this environment. No samples were launched.`);
+    if (available.exit !== 0) {
+      stop(`OpenCode cannot load ${model} inside sample isolation without external plugins. Check provider and credential-file availability. No samples were launched.`);
     }
+    effectiveModels[model] = modelSettings(parseModels(available.stdout), model, opts.expectedContext);
+    const limits = effectiveModels[model];
+    say(`  ${model}: context ${limits.context}, output ${limits.output}${limits.input !== undefined ? `, input ${limits.input}` : ""}; external plugins disabled`);
   }
 
   if (opts.check) { say("Preflight passed. No model inference was run."); return 0; }
@@ -288,7 +287,8 @@ async function prepareAndRun(opts, { id, dir, ref, briefs, models, per }) {
     const bdir = join(dir, brief.name);
     const prompt = join(bdir, "PROMPT.md");
     mkdirSync(bdir, { recursive: true });
-    writeFileSync(prompt, `${contract}\n---\n\n${brief.text}`);
+    const instructions = `${contract}\n---\n\n${brief.text}`;
+    writeFileSync(prompt, instructions);
     const samples = [];
     for (const model of models) {
       for (let n = 1; n <= per; n++) {
@@ -297,6 +297,8 @@ async function prepareAndRun(opts, { id, dir, ref, briefs, models, per }) {
         mkdirSync(sample);
         if (existsSync(join(brief.dir, "seed"))) cpSync(join(brief.dir, "seed"), sample, { recursive: true });
         writeFileSync(join(sample, "BRIEF.md"), brief.text);
+        // The same original instructions stay in the system context after compaction.
+        writeFileSync(join(sample, "AGENTS.md"), instructions);
         writeFileSync(join(sample, "rules.md"), rules);
         copyBinary(join(dir, "bin", "unify"), join(sample, "unify"));
         samples.push({ name, model });
@@ -316,6 +318,10 @@ async function prepareAndRun(opts, { id, dir, ref, briefs, models, per }) {
     executionPolicy: POLICY,
     concurrency: 1,
     models,
+    modelSettings: effectiveModels,
+    externalPlugins: false,
+    persistentInstructions: "AGENTS.md (identical to PROMPT.md)",
+    ...(opts.expectedContext !== undefined ? { expectedContext: opts.expectedContext } : {}),
     samplesPerModel: per,
     status: "prepared",
     isolation: { mode: process.getuid?.() === 0 ? "mount namespace" : "user and mount namespace", probe: "clean", masks: opts.mask },
@@ -501,6 +507,9 @@ function renderSummary(round, results) {
   md.push(`# Ratification round ${round.id}`, "");
   md.push(`- **unify** ${round.unify.version} at \`${round.unify.commit.slice(0, 12)}\`${round.unify.ref === "worktree" ? " (working tree)" : ` (${round.unify.ref})`}${round.unify.dirty ? `, plus uncommitted changes \`${round.unify.dirty}\`` : ""}`);
   md.push(`- **rules** \`${round.rules.sha256.slice(0, 12)}\` · **prompt** \`${round.prompt.sha256.slice(0, 12)}\` · **agent** ${round.agent} · **models** ${round.models.join(", ")} · **isolation** ${round.isolation.mode}, probe ${round.isolation.probe}`);
+  for (const [model, limits] of Object.entries(round.modelSettings ?? {})) {
+    md.push(`- **${model} limits**: context ${limits.context}, output ${limits.output}${limits.input !== undefined ? `, input ${limits.input}` : ""}; external plugins ${round.externalPlugins ? "enabled" : "disabled"}`);
+  }
   md.push(`- ${round.created}${round.finished ? ` to ${round.finished}` : ""}; scored ${results.scoredAt}${cost ? `; agent cost $${cost.toFixed(2)}` : ""}`, "");
   md.push("## Score", "");
   md.push(`Completed ${results.verdict.completed}/${results.verdict.expected} planned samples.`, "");
@@ -544,7 +553,7 @@ async function main() {
       brief: { type: "string", multiple: true, default: [] },
       model: { type: "string", multiple: true, default: [] }, samples: { type: "string" },
       name: { type: "string" }, rejudge: { type: "string" }, list: { type: "boolean" },
-      check: { type: "boolean" }, status: { type: "string" },
+      check: { type: "boolean" }, status: { type: "string" }, "expect-context": { type: "string" },
       help: { type: "boolean", short: "h" },
     },
   });
@@ -566,6 +575,7 @@ async function main() {
     const total = round.briefs.reduce((n, b) => n + b.samples.length, 0);
     const completed = round.briefs.reduce((n, b) => n + b.samples.filter(s => existsSync(join(dir, b.name, ".harness", s.name, "exit.json"))).length, 0);
     say(JSON.stringify({ round: round.id, status: round.status ?? "unknown", completed, total,
+      modelSettings: round.modelSettings,
       active: round.active ?? null, verdict: readJson(join(dir, "results.json"))?.verdict ?? null }, null, 2));
     return 0;
   }

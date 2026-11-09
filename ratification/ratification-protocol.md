@@ -10,8 +10,10 @@ The CLI's help, diagnostics and built-in templates remain part of the authoring 
 Use `bun run ratify` from a clean checkout of the committed code under test. Use the
 installed OpenCode CLI and its normal provider configuration and authentication. Select
 any configured model from `opencode models`, as documented in [README.md](README.md).
-Existing endpoints, environment variables, network proxies and authentication plugins
-are supported. The harness must not implement provider-specific setup or transport.
+Existing endpoints, environment variables, network proxies and built-in authentication
+are supported. Use OpenCode's `--pure` mode to exclude external plugins. A provider
+requiring an external authentication plugin needs a native OpenCode connection first;
+the harness must not implement provider-specific setup or transport.
 
 The following are forbidden during a run:
 
@@ -26,6 +28,7 @@ The following are forbidden during a run:
   and report presence as scored passes.
 
 Select only the requested installed model, brief scope, sample count and round name.
+`--expect-context` may assert a required configured context; it never changes the model.
 The runner uses committed HEAD, serial execution and the brief's committed timeout.
 It rejects uncommitted inputs and prohibited command options. There
 is no bypass option. Containers and VMs may provide isolation, not customization.
@@ -46,10 +49,15 @@ Every scored check must pass for a sample to pass. The model meets the bar only 
 at least four of five samples pass **each** brief. A process exit of zero or a report
 file is not a pass. Strict builds must have zero problems and zero advisories.
 
-Record the commit, CLI version, model, standard execution policy, prompt/rules hashes,
+Record the commit, CLI version, model, effective context/output limits, plugin policy, prompt/rules hashes,
 all sample outcomes and infrastructure failures. Do not claim that an interrupted run
 is a clean capability measurement. A stronger-model comparison is a separate experiment
 and must be requested explicitly. All earlier result records have been removed.
+
+Keep the original contract and brief in each sample's persistent `AGENTS.md`, identical
+to `PROMPT.md`, and load it through OpenCode's absolute `instructions` path. Context
+compaction must not remove those requirements. Do not add follow-up hints, synthesize a
+report, or change scoring when an agent stops without completing its deliverables.
 
 ## Triage and changes
 

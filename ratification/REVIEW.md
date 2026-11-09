@@ -8,7 +8,10 @@ review, not a model evaluation. Historical results have been removed.
 | Finding | Resolution |
 |---|---|
 | Runs required improvised launch patches, proxies and monitor scripts. | One checked-in `bun run ratify` entry point; serial execution, `--check` and `--status` are built in. No custom agent, endpoint, timeout, stagger or mask options. |
-| Cleanup restricted normal provider configuration and rejected unrelated environment variables. | Removed the environment blacklist and provider selection rewrite. OpenCode resolves global, project and environment configuration; provider definitions, authentication plugins, operator allow/deny lists and credential/network environment variables are retained. |
+| Cleanup restricted normal provider configuration and rejected unrelated environment variables. | OpenCode resolves global, project and environment configuration; provider definitions, built-in authentication, operator allow/deny lists and credential/network environment variables are retained. |
+| Forwarding all plugins allowed unrelated instructions into samples. | Use native `--pure` mode for discovery, preflight and execution; do not forward external plugins. |
+| A server context increase was mistaken for a client context increase. | Print and record limits resolved inside isolation. Optional `--expect-context` rejects mismatches before inference without overriding model settings. |
+| Compaction summaries lost the report requirement. | Load the unchanged original contract and brief from a persistent absolute instructions file on every turn. Missing reports still fail, with no corrective retries or synthetic reports. |
 | Per-run edits were accepted without review. | New inference runs reject dirty engine, harness, briefs, rules and dependency manifests. No bypass flag. |
 | Provider failure could consume the remaining sample queue. | Stop launching after an infrastructure error, checkpoint the interrupted run, score only attempted samples, and return exit 2. No automatic retries/replacements. |
 | A zero process exit was easy to confuse with a passing sample. | Status reports completed/planned execution separately from the scored verdict. The exit code and summary use the same per-brief bar. |
@@ -29,10 +32,14 @@ report-parser, HTML/link/fragment, Atom, npm-wrapper and documentation tests rem
 The namespace regression runs real generators, npm preparation, strict judging, fresh
 builds and audits in isolation, without a model or provider credentials.
 
-Verified: 59 focused runner, judge/parser and documentation tests pass; the namespace
-regression passes; suite hygiene passes. The scaffold suite's 56 other tests passed
-in the broader run, and its network-dependent SCF-13 test passed separately with network
-access after the restricted run timed out. No model evaluation was launched.
+The installed-OpenCode regression forces compaction with a local HTTP test fixture whose
+summary omits the report. It verifies that the next agent request still carries the
+original contract and brief verbatim, and that `--pure` prevents an external plugin
+from executing. The fixture is a test only, never a transport for real evaluations.
+
+Verified for the execution-policy fix: 69 focused runner, judge/parser, setup and
+documentation tests pass. The installed OpenCode 1.18.25 compaction/plugin regression
+passes. These tests do not make real model requests or establish a ratification result.
 
 ## Boundaries that remain explicit
 
@@ -41,9 +48,9 @@ access after the restricted run timed out. No model evaluation was launched.
 - Provider configuration is operator-owned and resolved by OpenCode. Ordinary network
   proxies and custom provider endpoints are supported. The procedure prohibits creating
   experiment-specific infrastructure; it does not police the operator's network.
-- Authentication plugins are retained, so operators must ensure installed plugins do
-  not inject project knowledge. Files used by providers/plugins must be available in
-  the execution environment. The namespace runner requires Linux (native, VM or container).
+- External plugins are disabled; built-in authentication is retained. Providers requiring
+  an external auth plugin need a native OpenCode connection before evaluation. Credential
+  files must be available in the execution environment. The namespace runner requires Linux.
 - Namespace masking protects experiment context, not the host from a hostile shell.
   Run in an ordinary disposable environment without host secrets or a Docker socket.
   Authentication available to OpenCode can be observed by the sample. Export review

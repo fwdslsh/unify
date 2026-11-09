@@ -2,7 +2,7 @@ import { afterAll, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { assertCommittedInputs, standardProviderConfig, sampleEnvironment } from "../../ratification/scripts/run-policy.mjs";
+import { assertCommittedInputs, standardProviderConfig, sampleEnvironment, sampleConfig, parseModels, modelSettings } from "../../ratification/scripts/run-policy.mjs";
 import { executionFailure, runSerial, scoreVerdict } from "../../ratification/scripts/run-state.mjs";
 import { privateSeedValues } from "../../ratification/scripts/seed-values.mjs";
 import { CHECKS } from "../../ratification/scripts/checks.mjs";
@@ -16,8 +16,30 @@ test("installed providers work without endpoint, adapter or model-limit rewrites
   const setup = { provider: { existing: provider }, plugin: ["provider-auth-plugin"],
     enabled_providers: ["existing", "anthropic"], disabled_providers: ["disabled"], enterprise: { url: "https://enterprise.example" } };
   const result = standardProviderConfig({ ...setup, instructions: ["private.md"], agent: { private: {} }, mcp: { private: {} } });
-  expect(result).toEqual(setup);
+  const { plugin, ...connection } = setup;
+  expect(result).toEqual(connection);
   expect(standardProviderConfig({})).toEqual({});
+});
+
+test("sample instructions persist independently of conversation summaries and user plugins", () => {
+  const config = sampleConfig({ plugin: ["akm-opencode"], instructions: ["private.md"], agent: { build: { prompt: "private" } } }, "test/model");
+  expect(config.instructions).toEqual(["/tmp/sandbox/AGENTS.md"]);
+  expect(config.plugin).toBeUndefined();
+  expect(config.agent).toBeUndefined();
+  expect(config.model).toBe("test/model");
+});
+
+test("preflight records isolated model limits and rejects a stale context without rewriting it", () => {
+  const text = 'test/model\n{\n  "limit": {"context":32768,"output":8192},\n  "options":{"apiKey":"DO-NOT-RECORD"}\n}\n';
+  const models = parseModels(text);
+  expect(modelSettings(models, "test/model")).toEqual({ context: 32768, output: 8192 });
+  expect(() => modelSettings(models, "test/model", 102400)).toThrow("context 32768; expected 102400");
+  expect(models[0].limit.context).toBe(32768);
+  models[0].limit.context = 102400;
+  expect(modelSettings(models, "test/model", 102400)).toEqual({ context: 102400, output: 8192 });
+  expect(() => modelSettings(models, "missing/model")).toThrow("cannot load");
+  expect(() => modelSettings([{ id: "test/model" }], "test/model")).toThrow("positive context and output");
+  expect(parseModels(text.replaceAll("\n", "\r\n"))).toEqual(parseModels(text));
 });
 
 test("ordinary provider environments are inherited without name-based bans or rewrites", () => {
