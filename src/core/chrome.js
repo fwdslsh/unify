@@ -33,15 +33,21 @@ const ID = "unify-chrome";
  * @param {string[]} args.layouts - layout rels a fragment may be shown in
  * @param {{page: string|null, layout: string|null}} args.selection - the current `?page=` / `?layout=`
  * @param {string[]} args.problems - formatted diagnostics for this file
+ * @param {string[]} [args.unavailableSources] - dependencies without an available preview source
  * @param {string} args.previewPath - "/_unify/preview/"
  * @param {string} args.auditPath - "/_unify/"
  * @returns {string} HTML for insertion immediately before `</body>`
  */
-export function renderChrome({ kind, rel, record = null, reaching = [], layouts = [], selection = {}, problems = [], previewPath = "/_unify/preview/", auditPath = "/_unify/" }) {
+export function renderChrome({ kind, rel, record = null, reaching = [], layouts = [], selection = {}, problems = [], unavailableSources = [], previewPath = "/_unify/preview/", auditPath = "/_unify/" }) {
   const sel = { page: selection?.page ?? null, layout: selection?.layout ?? null };
   const href = (path) => previewPath + String(path ?? "").split("/").map(encodeURIComponent).join("/");
   const label = kind === "fragment" ? "include" : kind;
   const n = problems.length;
+  const unavailable = new Set(unavailableSources);
+  const dependency = (path) => unavailable.has(path)
+    ? `<span class="uc-muted">${esc(path)} (source preview unavailable)</span>`
+    : `<a class="uc-link" href="${esc(href(path))}">${esc(path)}</a>`;
+  const sourceOption = (path, selected) => opt(path, unavailable.has(path) ? `${path} (source preview unavailable)` : path, selected, unavailable.has(path));
 
   const head = [
     `<span class="uc-mark" aria-hidden="true">/</span>`,
@@ -57,24 +63,24 @@ export function renderChrome({ kind, rel, record = null, reaching = [], layouts 
   if (kind === "page") {
     const includes = record?.includes ?? [];
     const layout = record?.layout
-      ? `layout: <a class="uc-link" href="${esc(href(record.layout))}">${esc(record.layout)}</a>`
+      ? `layout: ${dependency(record.layout)}`
       : `<span class="uc-muted">no layout</span>`;
     const inc = includes.length
       ? `<button type="button" class="uc-btn uc-text" aria-expanded="false" aria-controls="${ID}-includes">includes: ${includes.length}</button>`
       : `<span class="uc-muted">no includes</span>`;
     const list = includes.length
-      ? `<ul class="uc-list" id="${ID}-includes" hidden>${includes.map((i) => `<li><a class="uc-link" href="${esc(href(i))}">${esc(i)}</a></li>`).join("")}</ul>`
+      ? `<ul class="uc-list" id="${ID}-includes" hidden>${includes.map((i) => `<li>${dependency(i)}</li>`).join("")}</ul>`
       : "";
     body = `<div class="uc-row uc-meta">${layout}<span class="uc-dot" aria-hidden="true">·</span>${inc}</div>${list}`;
   } else {
     const empty = kind === "layout" ? "No page — the layout's own defaults" : "No page — the include's own defaults";
     const extra = sel.page && !reaching.some((p) => p.source === sel.page) ? [{ source: sel.page }] : [];
     const pageOpts = [opt("", reaching.length ? empty : `${empty} (no built page uses this ${label})`, !sel.page)]
-      .concat(reaching.concat(extra).map((p) => opt(p.source, p.source, p.source === sel.page))).join("");
+      .concat(reaching.concat(extra).map((p) => sourceOption(p.source, p.source === sel.page))).join("");
     let fields = `<label class="uc-field"><span>page</span><select name="page" class="uc-select">${pageOpts}</select></label>`;
     if (kind === "fragment") {
       const all = sel.layout && !layouts.includes(sel.layout) ? layouts.concat(sel.layout) : layouts;
-      const layoutOpts = [opt("", "Default layout", !sel.layout)].concat(all.map((l) => opt(l, l, l === sel.layout))).join("");
+      const layoutOpts = [opt("", "Default layout", !sel.layout)].concat(all.map((l) => sourceOption(l, l === sel.layout))).join("");
       fields += `<label class="uc-field"><span>layout</span><select name="layout" class="uc-select">${layoutOpts}</select></label>`;
     }
     body = `<form class="uc-row uc-form" method="get">${fields}<noscript><button class="uc-btn">apply</button></noscript></form>`;
@@ -90,8 +96,8 @@ export function renderChrome({ kind, rel, record = null, reaching = [], layouts 
     `<script>${SCRIPT}</script></div>`;
 }
 
-function opt(value, text, selected) {
-  return `<option value="${esc(value)}"${selected ? " selected" : ""}>${esc(text)}</option>`;
+function opt(value, text, selected, disabled = false) {
+  return `<option value="${esc(value)}"${selected ? " selected" : ""}${disabled ? " disabled" : ""}>${esc(text)}</option>`;
 }
 
 function esc(value) {

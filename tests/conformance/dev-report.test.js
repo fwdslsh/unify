@@ -945,6 +945,95 @@ describe("§27 the local audit view", () => {
     for (const rel of readdirSync(join(tmp, "dist"))) expect(rel).not.toContain("preview");
     covers("DEV-07");
   }, 60_000);
+  test("generated dependencies stay visible without dead preview links across rebuilds", async () => {
+    const tmp = mkTmp();
+    writeTree(tmp, {
+      "src/index.md": "---\ntitle: Example\n---\n# Example\n\nExample body.\n",
+      "src/_includes/authored.fragment.html": "<aside>Authored include</aside>",
+      "src/authored/_layout.html": '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Authored</title></head><body><slot></slot></body></html>',
+      "src/authored/index.md": "# Authored page",
+      "src/mode.txt": "first",
+      "generate.mjs": `
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join, dirname } from "node:path";
+const [source, overlay] = process.argv.slice(2);
+const mode = readFileSync(join(source, "mode.txt"), "utf8");
+writeFileSync(join(dirname(source), ".overlay-path.txt"), overlay);
+mkdirSync(join(overlay, "_includes"), { recursive: true });
+writeFileSync(join(overlay, "_includes", mode + ".fragment.html"), "<nav>Generated " + mode + "</nav>");
+writeFileSync(join(overlay, "_layout.html"), '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Example</title></head><body><include src="/_includes/' + mode + '.fragment.html"></include><include src="/_includes/authored.fragment.html"></include><main><slot></slot></main></body></html>');
+writeFileSync(join(overlay, "generated.md"), "# Generated page");
+if (mode === "failed") writeFileSync(join(overlay, "broken.html"), '<include src="/_includes/missing.html"></include>');
+`,
+    });
+    const port = await freePort();
+    const d = start(["dev", "-p", String(port), "--generate", join(tmp, "generate.mjs")], tmp);
+    await d.ready;
+    const text = async (path) => (await fetch(`http://localhost:${port}${path}`)).text();
+    const map = async () => JSON.parse(await text("/_unify/pages.json"));
+    await waitForStatus(`http://localhost:${port}/index.html`, 200);
+
+    const check = async (mode) => {
+      const page = await text("/");
+      for (const path of ["_layout.html", `_includes/${mode}.fragment.html`]) {
+        expect(page).toContain(`${path} (source preview unavailable)`);
+        expect(page).not.toContain(`href="/_unify/preview/${path}"`);
+        const res = await fetch(`http://localhost:${port}/_unify/preview/${path}`);
+        expect(res.status).toBe(404);
+        await res.text();
+      }
+      expect(page).toContain('href="/_unify/preview/_includes/authored.fragment.html"');
+      const authored = await fetch(`http://localhost:${port}/_unify/preview/_includes/authored.fragment.html`);
+      expect(authored.status).toBe(200);
+      const preview = await authored.text();
+      expect(preview).toContain('<option value="_layout.html" disabled>_layout.html (source preview unavailable)</option>');
+      expect(preview).toContain('<option value="authored/_layout.html">authored/_layout.html</option>');
+      expect(await text("/authored/")).toContain('href="/_unify/preview/authored/_layout.html"');
+      const layout = await fetch(`http://localhost:${port}/_unify/preview/authored/_layout.html`);
+      expect(layout.status).toBe(200);
+      await layout.text();
+      const index = await text("/_unify/preview/");
+      expect(index).toContain(`<span>_includes/${mode}.fragment.html</span> <small>source preview unavailable</small>`);
+      expect(index).not.toContain('href="/_unify/preview/_layout.html"');
+      expect(index).toContain('href="/generated.html"');
+      expect(await text("/generated.html")).toContain("Generated page");
+      expect(existsSync(readFileSync(join(tmp, ".overlay-path.txt"), "utf8"))).toBe(false);
+    };
+    const waitForMode = async (mode) => {
+      const deadline = Date.now() + 20_000;
+      while (!(await map()).pages.some((p) => p.includes.includes(`_includes/${mode}.fragment.html`))) {
+        if (Date.now() >= deadline) throw new Error(`No published map for ${mode}`);
+        await sleep(100);
+      }
+    };
+    await waitForMode("first");
+    await check("first");
+    writeFileSync(join(tmp, "src/mode.txt"), "second");
+    await waitForMode("second");
+    await check("second");
+    const goodMap = await map();
+
+    writeFileSync(join(tmp, "src/mode.txt"), "failed");
+    await reportUntil(port, (t) => t.includes("_includes/missing.html"));
+    expect(await map()).toEqual(goodMap);
+    const failedPage = await text("/");
+    expect(failedPage).toContain("_includes/second.fragment.html (source preview unavailable)");
+    expect(failedPage).not.toContain("_includes/failed.fragment.html");
+    expect(existsSync(readFileSync(join(tmp, ".overlay-path.txt"), "utf8"))).toBe(false);
+
+    writeFileSync(join(tmp, "src/mode.txt"), "recovered");
+    await waitForMode("recovered");
+    await check("recovered");
+    d.proc.kill("SIGTERM");
+    await sleep(200);
+    const before = await settledSnapshot(join(tmp, "dist"));
+    const built = await runCli(["build", "--generate", join(tmp, "generate.mjs")], tmp);
+    expect(built.exit).toBe(0);
+    expect(await settledSnapshot(join(tmp, "dist"))).toEqual(before);
+    expect(readFileSync(join(tmp, "dist/index.html"), "utf8")).not.toContain("unify-chrome");
+    expect(existsSync(readFileSync(join(tmp, ".overlay-path.txt"), "utf8"))).toBe(false);
+  }, 60_000);
+
   test("DEV-08 — the chrome rides on every served page the page map knows and on every preview, from the page map, and chrome=off omits it", async () => {
     const tmp = mkTmp();
     writeTree(tmp, {

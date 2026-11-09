@@ -40,7 +40,7 @@ import { renderInterrupted, renderReport } from "../../core/dev-report.js";
 import { resolve } from "node:path";
 import { renderPageMap } from "../../core/page-map.js";
 import { resolutionRoots } from "../../core/paths.js";
-import { AUDIT_PATH, PREVIEW_PATH, renderPreview } from "../../core/preview.js";
+import { AUDIT_PATH, PREVIEW_PATH, hasPreviewSource, renderPreview } from "../../core/preview.js";
 import { renderChrome } from "../../core/chrome.js";
 import { watch } from "./watch.js";
 
@@ -80,6 +80,8 @@ export async function dev(context, opts = {}) {
         kind: "page",
         rel: record.source.path,
         record: { path: record.document.path, layout: record.source.layout, includes: record.source.includes },
+        unavailableSources: [record.source.layout, ...(record.source.includes ?? [])]
+          .filter((path) => path && !hasPreviewSource(roots, path)),
         reaching: [], layouts: [], selection: { page: null, layout: null }, problems: [],
         previewPath: PREVIEW_PATH, auditPath: AUDIT_PATH,
       });
@@ -112,11 +114,12 @@ export async function dev(context, opts = {}) {
         onEvaluation(evaluation) {
           reports++;
           devServer.setReport(renderReport(evaluation));
-          // §27.6 — the page map follows every COMPLETED build; a rebuild that
-          // produced none leaves the previous map, which still describes the
-          // site in the output directory (§15 left it in place).
-          devServer.setPages(renderPageMap({ sourceRoot: absSourceRoot, documents: evaluation.documents, built: true }));
-          lastDocuments = evaluation.documents;
+          // The report describes every attempt; dependencies and served paths
+          // describe only the last published build, including after failures.
+          if (evaluation.published) {
+            devServer.setPages(renderPageMap({ sourceRoot: absSourceRoot, documents: evaluation.documents, built: true }));
+            lastDocuments = evaluation.documents;
+          }
         },
       },
     }, {

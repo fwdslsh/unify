@@ -112,6 +112,11 @@ function scanLayouts(roots) {
   return scanSourceFiles(roots).filter((rel) => posix.basename(rel) === LAYOUT_FILENAME);
 }
 
+/** The same available-source boundary used by the preview request handler. */
+export function hasPreviewSource(roots, rel) {
+  return /\.(html|md)$/i.test(rel) && Boolean(locateExisting(roots, rel));
+}
+
 /**
  * §27.7 — the index at `/_unify/preview/`: every layout, include and page the
  * namespace holds, each a link to its preview (a built page to its own
@@ -122,12 +127,19 @@ function renderIndex({ roots, pages, outputDir }) {
   const knownLayouts = new Set(pages.map((p) => p.layout).filter(Boolean));
   const groups = { layout: [], fragment: [], page: [] };
   for (const rel of scanSourceFiles(roots, outputDir)) groups[kindOf(rel, knownLayouts)].push(rel);
+  for (const p of pages) {
+    if (p.layout && !groups.layout.includes(p.layout)) groups.layout.push(p.layout);
+    for (const rel of p.includes ?? []) if (!groups.fragment.includes(rel)) groups.fragment.push(rel);
+  }
   for (const p of pages) if (p.generated && !groups.page.includes(p.source)) groups.page.push(p.source);
   const built = new Map(pages.map((p) => [p.source, p]));
   const previewHref = (rel) => `${PREVIEW_PATH}${rel.split("/").map(encodeURIComponent).join("/")}`;
+  const dependency = (rel) => hasPreviewSource(roots, rel)
+    ? `<a href="${esc(previewHref(rel))}">${esc(rel)}</a>`
+    : `<span>${esc(rel)}</span> <small>source preview unavailable</small>`;
   const list = (items, link) => (items.length ? `<ul>\n${items.map(link).join("\n")}\n</ul>` : "<p>none</p>");
-  const layouts = list(groups.layout, (rel) => `<li><a href="${esc(previewHref(rel))}">${esc(rel)}</a> <small>${pages.filter((p) => p.layout === rel).length} page(s)</small></li>`);
-  const fragments = list(groups.fragment, (rel) => `<li><a href="${esc(previewHref(rel))}">${esc(rel)}</a> <small>${pages.filter((p) => (p.includes || []).includes(rel)).length} page(s)</small></li>`);
+  const layouts = list(groups.layout, (rel) => `<li>${dependency(rel)} <small>${pages.filter((p) => p.layout === rel).length} page(s)</small></li>`);
+  const fragments = list(groups.fragment, (rel) => `<li>${dependency(rel)} <small>${pages.filter((p) => (p.includes || []).includes(rel)).length} page(s)</small></li>`);
   const pageList = list(groups.page.sort(), (rel) => {
     const record = built.get(rel);
     return record
@@ -184,7 +196,7 @@ export async function renderPreview({ sourceRoot, roots, relPath, page = null, l
   if (rel === "" || rel === ".") return { status: 200, html: renderIndex({ roots, pages, outputDir }) };
   const abs = locateExisting(roots, rel);
   const ext = extname(rel).toLowerCase();
-  if (!abs || (ext !== ".html" && ext !== ".md")) {
+  if (!hasPreviewSource(roots, rel)) {
     return { status: 404, html: message("Not a source file", `<code>${esc(rel)}</code> is not an <code>.html</code> or <code>.md</code> file under the source root.`) };
   }
   const knownLayouts = new Set(pages.map((p) => p.layout).filter(Boolean));
@@ -207,6 +219,7 @@ export async function renderPreview({ sourceRoot, roots, relPath, page = null, l
     reaching: pages.filter((p) => !p.generated && uses(p)).map((p) => ({ source: p.source, path: p.path })),
     layouts: kind === "fragment" ? [...new Set([...scanLayouts(roots), ...knownLayouts])].sort() : [],
     selection: { page, layout },
+    unavailableSources: [...knownLayouts, ...pages.map((p) => p.source)].filter((path) => !hasPreviewSource(roots, path)),
     problems: reporter.sorted().map((d) => Reporter.format(d)),
     previewPath: PREVIEW_PATH, auditPath: AUDIT_PATH,
   }) : "");

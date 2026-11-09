@@ -117,7 +117,7 @@ test("recipe 1 — the source-inventory generator builds clean in ONE strict aud
   const command = codeBlock(H, "sh", 0).trim();
   // The command literal, run as written: `unify` is the CLI under test, and
   // the layout flags the test needs are added after it.
-  if (command !== "unify build --generate ../scripts/reports.mjs --source-inventory --audit --strict") {
+  if (command !== "unify build --generate ../scripts/reports.mjs --audit --strict") {
     throw new Error(`the documented command changed — update the test to run what the document says:\n${command}`);
   }
   const flags = command.replace(/^unify build /, "").split(" ");
@@ -177,12 +177,12 @@ test("recipe 1 — the source-inventory generator builds clean in ONE strict aud
     if (existsSync(join(tmp, "dist", oldOutput))) throw new Error(`the renamed article left a stale output: ${oldOutput}`);
   }
 
-  // `generate:` and `source-inventory: true` saved in unify.yaml: the command
+  // `generate:` alone saved in unify.yaml enables inventory: the command
   // the document ends on is then just `unify build --audit --strict`.
   const saved = mkTmp();
   writeTree(join(saved, "site"), tree);
   writeTree(join(saved, "scripts"), { "reports.mjs": generator });
-  writeTree(saved, { "unify.yaml": "generate: scripts/reports.mjs\nsource-inventory: true\n" });
+  writeTree(saved, { "unify.yaml": "generate: scripts/reports.mjs\n" });
   expectExit(await runCli(["build", "-o", "dist", "--audit", "--strict"], saved), 0, "the saved-config command");
   if (!existsSync(join(saved, "dist", "reports", "index.html"))) throw new Error("saved config did not generate the index");
 }, TEST_MS);
