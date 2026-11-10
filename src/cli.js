@@ -85,18 +85,61 @@ function version() {
 }
 
 /**
- * @param {string[]} argv
- * @returns {Promise<number>}
+ * One problem or advisory, as data: what the command prints on stderr.
+ * @typedef {object} Diagnostic
+ * @property {"problem"|"advisory"} severity
+ * @property {string} file - relative to the working directory
+ * @property {number} [line] - 1-based; absent when unknown
+ * @property {string} message - prose, not contract
+ * @property {string} [context] - the offending source text
+ * @property {string[]} [fixes] - one edit per entry
+ *
+ * What a run produced, as data. The same four keys for every command.
+ * @typedef {object} Result
+ * @property {number} status - the exit code: 0, or 1 when a problem (or, under `--strict`, an advisory or finding) was found
+ * @property {Diagnostic[]} diagnostics - ordered by path, then line, as printed
+ * @property {Map<string, Uint8Array>} files - output path -> bytes: the site the pipeline built, written or not. Empty when a problem (or the `--audit` gate) kept it from being published, and for commands that build no site
+ * @property {object|null} report - the document `unify audit --format json` prints, when the run was audited (`audit`, or `build --audit`); otherwise `null`
  */
-export async function run(argv, io = process) {
+
+/**
+ * The command line, as a function: `run(["build", "--base-url", "https://example.com/"])`
+ * is `unify build --base-url https://example.com/`, in this process. The same
+ * arguments, the same `unify.yaml`, the same files written and the same lines
+ * printed; what it adds is the return value.
+ *
+ * This is the package's public API, and it is EXPERIMENTAL: it may change or be
+ * removed in any release before v1. See docs/api.md.
+ *
+ * @param {string[]} argv - the arguments after `unify`
+ * @returns {Promise<Result>} rejects with a `UsageError` (`.message`, `.fixes`)
+ *   for what the command line exits 2 for, and with the original error for
+ *   anything unexpected
+ */
+export async function run(argv) {
+  const result = { status: 0, diagnostics: [], files: new Map(), report: null };
+  result.status = await execute(argv, result);
+  for (const [path, content] of result.files) {
+    if (typeof content === "string") result.files.set(path, Buffer.from(content));
+  }
+  return result;
+}
+
+/**
+ * The command itself: parse, check, dispatch.
+ * @param {string[]} argv
+ * @param {Result} result - filled in by the commands that build a site
+ * @returns {Promise<number>} the exit code
+ */
+async function execute(argv, result) {
   const { command, template, options } = parseArgs(argv);
 
   if (options.help) {
-    io.stdout.write(HELP);
+    process.stdout.write(HELP);
     return 0;
   }
   if (options.version) {
-    io.stdout.write(`${version()}\n`);
+    process.stdout.write(`${version()}\n`);
     return 0;
   }
 
@@ -276,13 +319,13 @@ export async function run(argv, io = process) {
     }
   }
 
-  const reporter = new Reporter({ strict: settings.strict, stdout: io.stdout, stderr: io.stderr });
+  const reporter = new Reporter({ strict: settings.strict });
   // §33.2 — the actual subcommand, carried alongside `settings` rather than
   // folded into it: it is not a saved-flag concept (unify.yaml has nothing
   // named `command`), only the generator context's `command` field reads it,
   // and every command handler below (build/audit/dev/watch) already receives
   // and forwards this whole context object.
-  const context = { sourceRoot, output, settings, reporter, template, sourceDefaulted, command, io };
+  const context = { sourceRoot, output, settings, reporter, template, sourceDefaulted, command, result };
 
   switch (command) {
     case "build": {
@@ -294,10 +337,10 @@ export async function run(argv, io = process) {
         const { path } = configPath(sourceRoot);
         relocateSavedPaths(saving, path);
         if (saving.size === 0) {
-          io.stdout.write("--save-config: no saveable options were given, so unify.yaml was not written\n");
+          process.stdout.write("--save-config: no saveable options were given, so unify.yaml was not written\n");
         } else {
           writeConfig(path, saving);
-          io.stdout.write(`saved ${[...saving.keys()].join(", ")} to ${path}\n`);
+          process.stdout.write(`saved ${[...saving.keys()].join(", ")} to ${path}\n`);
         }
       }
       return code;
@@ -353,31 +396,16 @@ function isProgram() {
   }
 }
 
-/**
- * `run`, plus what the program does with a failure: a usage error prints its
- * message and `fix:` lines and is exit 2; anything else prints `unify: <message>`
- * (and the stack under `DEBUG=1`) and is exit 1. Never exits, never touches the
- * process: the streams are `io`'s, the code is the return value. The program
- * below is `main` with the real process; the experimental API (src/index.js)
- * is `main` with captured streams.
- * @param {string[]} argv
- * @param {{stdout: {write(s: string): unknown}, stderr: {write(s: string): unknown}}} [io]
- * @returns {Promise<number>}
- */
-export async function main(argv, io = process) {
-  try {
-    return await run(argv, io);
-  } catch (error) {
-    const usage = error instanceof UsageError;
-    io.stderr.write(`${usage ? "" : "unify: "}${error.message}\n`);
-    for (const fix of usage ? error.fixes : []) io.stderr.write(`  fix: ${fix}\n`);
-    if (process.env.DEBUG === "1" && error.stack) io.stderr.write(`${error.stack}\n`);
-    return usage ? 2 : 1;
-  }
-}
-
 /* c8 ignore start — process wiring, exercised by the conformance harness */
 if (isProgram()) {
-  process.exitCode = await main(process.argv.slice(2));
+  try {
+    process.exitCode = (await run(process.argv.slice(2))).status;
+  } catch (error) {
+    const usage = error instanceof UsageError;
+    process.stderr.write(`${usage ? "" : "unify: "}${error.message}\n`);
+    for (const fix of usage ? error.fixes : []) process.stderr.write(`  fix: ${fix}\n`);
+    if (process.env.DEBUG === "1" && error.stack) process.stderr.write(`${error.stack}\n`);
+    process.exitCode = usage ? 2 : 1;
+  }
 }
 /* c8 ignore stop */

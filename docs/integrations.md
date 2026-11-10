@@ -679,8 +679,8 @@ Plainly, so you can plan around it rather than discover it:
   or fingerprint. Your toolchain does that and unify ships the result.
 - **Arbitrary pipelines.** There is no plugin API, no hook system, no task graph, and no
   `--run "<shell command>"`. `--generate` names one file you wrote; everything else is a
-  command you type, in the order you typed it. unify's experimental public API
-  ([api.md](api.md)) drives a whole build or audit from another program; it does not hook into one.
+  command you type, in the order you typed it. unify's experimental public API ([api.md](api.md))
+  drives a whole build or audit from another program; it does not hook into one.
 
 Each of these is a decision rather than a gap. The seam is the filesystem, in both
 directions, and it stays narrow enough to hold in your head.

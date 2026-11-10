@@ -127,6 +127,14 @@ export async function audit(context) {
   }
 
   // ---- the report ---------------------------------------------------------
+  // The document, built once: `--format json`/`sarif` print it below, and
+  // `run()` returns it (`result.report`) whatever was printed.
+  const report = buildReport({
+    documents, findings, base,
+    problemCount: buildReporter.problemCount,
+    advisoryCount: buildReporter.advisoryCount,
+  });
+  if (context.result) context.result.report = report;
   if (format === "human") {
     // Replay everything build.js printed before its own (now-superseded)
     // findings report — the sourceDefaulted notice, when there is one — so
@@ -143,11 +151,6 @@ export async function audit(context) {
     // lines around it.
     context.reporter.summary(formatFindings(findings, buildReporter.problemCount));
   } else {
-    const report = buildReport({
-      documents, findings, base,
-      problemCount: buildReporter.problemCount,
-      advisoryCount: buildReporter.advisoryCount,
-    });
     // Machine-readable output must BE the document, start to finish: no prose
     // line before it (nothing from `captured` is replayed here) or after.
     context.reporter.summary(

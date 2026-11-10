@@ -119,8 +119,8 @@ Everything below is published at **[unify.fwdslsh.dev](https://unify.fwdslsh.dev
 - **[Getting Started](docs/getting-started.md)** — the tutorial.
 - **[Authoring Rules](docs/authoring-rules.md)** — the complete authoring surface, in under sixty lines.
 - **[CLI Reference](docs/cli-reference.md)** — every command, option, and exit code.
+- **[JavaScript API](docs/api.md)** — *experimental, may be removed before v1.* `run(argv)`: the command line as a function, returning the status, the diagnostics, the built files and the audit report as data.
 - **[Templates](docs/templates.md)** — scaffold from a built-in, a directory, a git repository or an npm package; keep the site current with `unify update`, which lists what it would overwrite and asks; publish a template of your own.
-- **[JavaScript API](docs/api.md)** — *experimental, may be removed before v1.* `build()` and `audit()` are the command line called as a function: the same flags, returning the exit code and what the command would have printed.
 - **[Integrations](docs/integrations.md)** — the compile-to-asset pattern: Svelte, TypeScript, or anything with a compiler, without adopting a framework.
 - **[Eleventy + htmx](docs/guides/eleventy-htmx.md)** — the advanced stack: another generator produces data-driven pages, unify composes them, htmx enhances them. Optional layers, and when not to reach for them.
 - **[Catalog and Search](docs/guides/catalog-and-search.md)** — a blog list, facets, and a search box built client-side from the two files `--catalog`/`--search-corpus` write.
