@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Development links and assets work under `--base-url` subpaths.** The dev server serves the deployment mount as well as its existing root addresses, and the toolbar recognizes explicit `index.html` addresses and other aliases of the same page. The preview index also lists pages inherited from templates.
 - **Toolbar choices survive navigation.** Turning the toolbar off persists across pages, previews and redirects; page and layout selectors preserve unrelated query parameters, repeated values and URL fragments. Site pseudo-element styles no longer leak into toolbar controls.
 - **Generator and post-processing guidance matches the existing behavior (#152).** The integration guide correctly describes the source inventory as enabled by default for configured generators. It also explains where Unify's transaction ends, what source-based audit checks, and which watch, validation and artifact-update responsibilities belong to external tools.
+- **Scaffold and example guidance reflects current behavior.** Starter READMEs describe the new include preview controls, the blog template identifies the built-in Atom feed correctly, and the CLI reference and examples correct stale generator and resolved-finding descriptions.
 
 ## [0.11.18] - 2026-11-08
 

@@ -2005,11 +2005,11 @@ A request that arrives before any build has completed is answered — with the r
 
 The document is `{ "schemaVersion": 1, "built": <boolean>, "sourceRoot": <absolute path>, "pages": [ … ] }`, two-space-indented with a trailing newline, and each record carries exactly: `source` (the page's path relative to the source root, or relative to the generator's overlay when `generated` is true), `generated`, `layout` (relative to the source root, or `null` for a page that composed with none, §20.3), `includes` (every other file that authored a byte of the page — fragments included by the page, by its layout, and transitively — relative to the source root and sorted, §20.4), `outputPath` (under the output directory), `path` (the path the server and the site answer: `/about/` under `--pretty-urls`), and `url` (absolute under `--base-url`, else `null`). Only pages have records: a mirror-copied asset, the sitemap, the feed and the catalog are not in it. `schemaVersion` moves only when a field's meaning changes in a way an existing reader would misread; a new field is not a bump.
 
-It follows publication: a build that publishes swaps in a whole new map, and a request before any build has published is answered at once with `"built": false` and no pages. A rebuild that fails leaves the previous map in place, because §15 left the previous output directory in place and the map describes the site the server is serving. It is never written to the output directory (§27.1), it is one of the two paths beneath `/_unify/` that answer (§27.2; every other stays a 404), and only `unify dev` serves it.
+It follows publication: a build that publishes swaps in a whole new map, and a request before any build has published is answered at once with `"built": false` and no pages. A rebuild that fails leaves the previous map in place, because §15 left the previous output directory in place and the map describes the site the server is serving. It is never written to the output directory (§27.1), it is one of the reserved paths beneath `/_unify/` that answer (§27.2, alongside the preview routes), and only `unify dev` serves it.
 
 ### 27.7 The source preview (`/_unify/preview/<source path>`)
 
-A page has an address once it is built. A layout and an include never do — neither ships (§4.2, §4.4) — yet both are where a design is made, and both carry their own default content: a layout's slot fallbacks and a fragment's slot fallbacks are what a browser shows of them when nothing fills them. `unify dev` therefore answers `/_unify/preview/<path>`, where `<path>` is a source path relative to the source root (the §33.3 namespace, so a layout beside `package.json` previews too), with a rendering **composed on request from the source tree**, by the build's own inliner (§5), composer (§7) and URL rewriting (§11), for the selected file and its requested context. It is a view of the source as the build would read it, not of the output directory, and it is the one thing the development server serves that `dist/` does not hold. Nothing here is a second composition model: previews reuse the build's inliner, composer and provenance rewriting.
+A page has an address once it is built. A layout and an include never do — neither ships (§4.2, §4.4) — yet both are where a design is made, and both carry their own default content: a layout's slot fallbacks and a fragment's slot fallbacks are what a browser shows of them when nothing fills them. `unify dev` therefore answers `/_unify/preview/<path>`, where `<path>` is a source path relative to the source root (the §33.3 namespace, so a layout beside `package.json` previews too), with a rendering **composed on request from the source tree**, by the build's own inliner (§5), composer (§7) and URL rewriting (§11), for the selected file and its requested context. It is a view of the source as the build would read it, not of the output directory, and, like the audit view and page map, it is served only by the development server and is not held in `dist/`. Nothing here is a second composition model: previews reuse the build's inliner, composer and provenance rewriting.
 
 Three kinds of file, told apart by the rules that already exist (a file named `_layout.html`, or one the last build composed with as a layout, is a **layout**; a `.fragment.html` or any path with a `_`-prefixed segment is an **include**; everything else that is `.html` or `.md` is a **page**):
 
@@ -2550,7 +2550,7 @@ The subprocess is therefore part of the contract and not an implementation detai
     "searchCorpus": null
   },
   "inputs": {
-    "sourcePages": null
+    "sourcePages": "/tmp/unify-generated-abc123/source-pages.json"
   }
 }
 ```
@@ -2568,7 +2568,7 @@ The subprocess is therefore part of the contract and not an implementation detai
 | `site.canonical` | `"auto"` \| null | `--canonical auto`'s value, or `null` |
 | `outputs.catalog` | string \| null | `assets/unify/catalog.json`, output-root-relative, when `--catalog` is set; `null` otherwise |
 | `outputs.searchCorpus` | string \| null | `assets/unify/search-corpus.json`, output-root-relative, when `--search-corpus` is set; `null` otherwise |
-| `inputs.sourcePages` | string \| null | the absolute path of `source-pages.json` (§33.7) when `--source-inventory` is set; `null` otherwise. Added in 0.9.3 as a new optional field, so `schemaVersion` stays `1` |
+| `inputs.sourcePages` | string \| null | the absolute path of `source-pages.json` (§33.7), enabled by default when a generator is named; `null` when `source-inventory: false` disables it. Added in 0.9.3 as a new optional field, so `schemaVersion` stays `1` |
 
 **Versioning.** The context carries its own `schemaVersion`, independent of `unifyVersion`, starting at `1`, and the rule is the same one §30.7 states for `catalog.json`/`search-corpus.json`: within version 1, only additive optional fields may be added; a change to an existing field's meaning or shape — including widening `command`'s closed set with a new value, or changing `site.baseUrl` from a string to an object — requires `schemaVersion` to increment. A generator reading `schemaVersion 1` today keeps reading a valid `schemaVersion 1` document as this contract grows only by new fields, the same guarantee `argv[2]`/`argv[3]` already make for a generator that predates `argv[4]` entirely.
 
