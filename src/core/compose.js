@@ -532,9 +532,22 @@ function composeSinkedBody({ preparedC, cBody, preparedL, sinks, pageFile, layou
   const main = findAll(cBody, (n) => isElement(n, "main"))
     .find((n) => !namedFills.some((fill) => n.start >= fill.start && n.end <= fill.end));
 
+  // R — the layout main that receives the default content (§7.2): the nearest
+  // <main> around the default slot, else (no default slot) the first <main>
+  // sink. A default slot outside every layout main, in a layout with no <main>
+  // sink at all, has no layout main to land in: the page's main is kept whole.
+  let receiver = null;
+  if (sinks.defaultSlot) {
+    for (let n = sinks.defaultSlot.parent; n && !receiver; n = n.parent) if (isElement(n, "main")) receiver = n;
+  } else {
+    receiver = sinks.firstMain;
+  }
+  const keepMain = Boolean(main) && sinks.defaultSlot !== null && sinks.firstMain === null;
+
   // A direct-body main is a fill candidate too. Report an unmatched name
   // before unwrapping removes its tag; deeper slot attributes remain inert.
-  const mainSlot = main?.parent === cBody ? attrValueOrEmpty(main, SLOT_ATTR) : "";
+  // A kept main stays in the fill scope below, which reports and consumes it.
+  const mainSlot = !keepMain && main?.parent === cBody ? attrValueOrEmpty(main, SLOT_ATTR) : "";
   if (mainSlot) {
     const at = spansToDiagnosticLocator(preparedC.spans, pageFile, resolveLine);
     reporter.advisory({
@@ -553,10 +566,10 @@ function composeSinkedBody({ preparedC, cBody, preparedL, sinks, pageFile, layou
   // fill-scope note below for why they count.
   const unwrappedKidStarts = new Set();
   if (main) {
-    const delta = main.openTagEnd - main.start;
+    const delta = keepMain ? 0 : main.openTagEnd - main.start;
     for (const k of elementChildren(main)) unwrappedKidStarts.add(k.start - delta);
   }
-  if (main) {
+  if (main && !keepMain) {
     const unwrapEdits = [{ start: main.start, end: main.openTagEnd, replacement: "" }];
     if (main.endTagStart != null) unwrapEdits.push({ start: main.endTagStart, end: main.endTagEnd, replacement: "" });
     const unwrapped = spliceTrackingSpans(preparedCText, preparedC.spans, unwrapEdits, pageFile);
@@ -588,6 +601,9 @@ function composeSinkedBody({ preparedC, cBody, preparedL, sinks, pageFile, layou
   const fillScope = extraKids.length
     ? [...topKids, ...extraKids].sort((a, b) => a.start - b.start)
     : topKids;
+  // §9 — the unwrapped main's attributes merge onto the layout main that
+  // receives its content, whether or not that content turns out to be empty.
+  if (main && !keepMain && receiver) edits.push(...mergeRootAttrs(receiver, main, { stripLayout: false }));
   const fillsByName = new Map(); // name -> {text,spans}[] (already slot-attr-stripped, in page order)
   const localEdits = []; // within body's own content span
   for (const el of fillScope) {
@@ -905,14 +921,18 @@ function headEditReplacementSpans(replacement, candidates) {
  * to `pageFile` by fallback, which is harmless and, for `class`/page-set
  * attributes, also simply correct.
  */
-function mergeRootAttrs(layoutEl, pageEl) {
+function mergeRootAttrs(layoutEl, pageEl, { stripLayout = true } = {}) {
   const edits = [];
   if (!layoutEl) return edits;
   // Defensive: a layout should never itself carry these (a layout declaring
   // data-layout is P15, someone else's check), but LAY-12 is unconditional.
-  for (const name of ROOT_ATTR_SKIP) {
-    const e = removeAttrEdit(layoutEl, name);
-    if (e) edits.push(e);
+  // Only on <html>/<body>: a layout <main> that receives no page attributes
+  // is not rewritten at all (§9).
+  if (stripLayout) {
+    for (const name of ROOT_ATTR_SKIP) {
+      const e = removeAttrEdit(layoutEl, name);
+      if (e) edits.push(e);
+    }
   }
   if (!pageEl) return edits;
 
@@ -925,27 +945,38 @@ function mergeRootAttrs(layoutEl, pageEl) {
       const layoutClass = getAttrNode(layoutEl, "class");
       const merged = [...tokens(layoutClass ? layoutClass.value : "")];
       for (const t of tokens(pa.value)) if (!merged.includes(t)) merged.push(t);
-      const value = merged.join(" ");
+      const rendered = `class=${quoteAttrValue(merged.join(" "))}`;
       if (layoutClass) {
-        edits.push({ start: layoutClass.nameStart, end: layoutClass.end, replacement: `class="${value}"` });
+        edits.push({ start: layoutClass.nameStart, end: layoutClass.end, replacement: rendered });
       } else {
-        appendParts.push(`class="${value}"`);
+        appendParts.push(rendered);
       }
       continue;
     }
 
     const layoutAttr = getAttrNode(layoutEl, pa.name);
+    const render = (name) => pa.value === null ? name : `${name}=${quoteAttrValue(pa.value)}`;
     if (layoutAttr) {
-      const rendered = pa.value === null ? layoutAttr.name : `${layoutAttr.name}="${pa.value}"`;
-      edits.push({ start: layoutAttr.nameStart, end: layoutAttr.end, replacement: rendered });
+      edits.push({ start: layoutAttr.nameStart, end: layoutAttr.end, replacement: render(layoutAttr.name) });
     } else {
-      appendParts.push(pa.value === null ? pa.name : `${pa.name}="${pa.value}"`);
+      appendParts.push(render(pa.name));
     }
   }
   if (appendParts.length > 0) {
     edits.push({ start: layoutEl.attrsEnd, end: layoutEl.attrsEnd, replacement: ` ${appendParts.join(" ")}` });
   }
   return edits;
+}
+
+/**
+ * Quotes a raw attribute value (source text, entities untouched) so the
+ * attribute stays well-formed and says what it did: `"` unless the value holds
+ * one, then `'`, and only a value holding both has its `"` written `&quot;`.
+ */
+function quoteAttrValue(value) {
+  if (!value.includes('"')) return `"${value}"`;
+  if (!value.includes("'")) return `'${value}'`;
+  return `"${value.replaceAll('"', "&quot;")}"`;
 }
 
 // -------------------------------------------------------------- §6.4 LAY-13
