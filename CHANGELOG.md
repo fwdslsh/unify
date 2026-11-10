@@ -6,7 +6,12 @@ upgrading across them.
 The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.12.0] - 2026-11-10
+
+Two changes to read before upgrading, both under Changed: a page's `<main>` now composes with
+the layout's `<main>`, which changes built output, and `run`, the package's export, takes an
+options object. Also new: a generator can read each page's published address, and `run(options)`
+is documented as an experimental JavaScript API.
 
 ### Changed
 
@@ -1140,7 +1145,9 @@ with generated compare-link notes only. Their diffs are on the
 [releases page](https://github.com/fwdslsh/unify/releases). Nothing here
 retroactively reconstructs detail those notes never carried.
 
-[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.11.16...HEAD
+[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/fwdslsh/unify/compare/v0.11.17...v0.12.0
+[0.11.17]: https://github.com/fwdslsh/unify/compare/v0.11.16...v0.11.17
 [0.11.16]: https://github.com/fwdslsh/unify/compare/v0.11.15...v0.11.16
 [0.11.15]: https://github.com/fwdslsh/unify/compare/v0.11.14...v0.11.15
 [0.11.14]: https://github.com/fwdslsh/unify/compare/v0.11.13...v0.11.14
