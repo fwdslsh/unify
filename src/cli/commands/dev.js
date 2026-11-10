@@ -40,8 +40,9 @@ import { renderInterrupted, renderReport } from "../../core/dev-report.js";
 import { resolve } from "node:path";
 import { renderPageMap } from "../../core/page-map.js";
 import { resolutionRoots } from "../../core/paths.js";
-import { AUDIT_PATH, PREVIEW_PATH, renderPreview } from "../../core/preview.js";
+import { AUDIT_PATH, PREVIEW_PATH, hasPreviewSource, renderPreview } from "../../core/preview.js";
 import { renderChrome } from "../../core/chrome.js";
+import { parseBaseUrl } from "../../core/urls.js";
 import { watch } from "./watch.js";
 
 /**
@@ -59,6 +60,7 @@ export async function dev(context, opts = {}) {
   const devServer = await createDevServer({
     outputDir: output,
     port: settings.port,
+    basePath: settings.baseUrl ? parseBaseUrl(settings.baseUrl).pathPrefix : "/",
     pages: renderPageMap({ sourceRoot: absSourceRoot, documents: [], built: false }),
     preview: (relPath, params) => renderPreview({
       sourceRoot: absSourceRoot,
@@ -66,6 +68,8 @@ export async function dev(context, opts = {}) {
       relPath,
       page: params.get("page") || null,
       layout: params.get("layout") || null,
+      view: params.get("view"),
+      placement: params.get("placement"),
       chrome: params.get("chrome") !== "off" && params.get("chrome") !== "false",
       pages: lastDocuments.map((d) => ({ source: d.source.path, generated: d.source.generated, layout: d.source.layout, includes: d.source.includes, path: d.document.path, outputPath: d.outputPath })),
       prettyUrls: Boolean(settings.prettyUrls),
@@ -73,13 +77,17 @@ export async function dev(context, opts = {}) {
     }),
     // §27.8 — on a served page the chrome names the source file and links the
     // layout and includes it reaches, from the page map (no second reading).
-    chrome: (servedPath) => {
-      const record = lastDocuments.find((d) => d.document.path === servedPath || d.document.path === `${servedPath}/`);
+    chrome: (_servedPath, outputPath) => {
+      // The resolved output file is the identity across directory, explicit
+      // index, percent-encoded and --base-url-prefixed spellings of a page.
+      const record = lastDocuments.find((d) => d.outputPath === outputPath);
       if (!record) return "";
       return renderChrome({
         kind: "page",
         rel: record.source.path,
         record: { path: record.document.path, layout: record.source.layout, includes: record.source.includes },
+        unavailableSources: [record.source.layout, ...(record.source.includes ?? [])]
+          .filter((path) => path && !hasPreviewSource(roots, path)),
         reaching: [], layouts: [], selection: { page: null, layout: null }, problems: [],
         previewPath: PREVIEW_PATH, auditPath: AUDIT_PATH,
       });
@@ -112,11 +120,12 @@ export async function dev(context, opts = {}) {
         onEvaluation(evaluation) {
           reports++;
           devServer.setReport(renderReport(evaluation));
-          // §27.6 — the page map follows every COMPLETED build; a rebuild that
-          // produced none leaves the previous map, which still describes the
-          // site in the output directory (§15 left it in place).
-          devServer.setPages(renderPageMap({ sourceRoot: absSourceRoot, documents: evaluation.documents, built: true }));
-          lastDocuments = evaluation.documents;
+          // The report describes every attempt; dependencies and served paths
+          // describe only the last published build, including after failures.
+          if (evaluation.published) {
+            devServer.setPages(renderPageMap({ sourceRoot: absSourceRoot, documents: evaluation.documents, built: true }));
+            lastDocuments = evaluation.documents;
+          }
         },
       },
     }, {

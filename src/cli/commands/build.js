@@ -132,7 +132,7 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
       // is pure and deterministic, so a second call here and `runBuild`'s own
       // below produce the identical `{origin, pathPrefix}` for the same flag.
       const baseConfig = settings.baseUrl ? urls.parseBaseUrl(settings.baseUrl) : null;
-      // §33.7 — the opt-in source inventory: the build's own scan of the SOURCE
+      // §33.7 — the source inventory (on by default with a generator): the build's own scan of the SOURCE
       // tree (no overlay, the generator hasn't run), read for authored metadata.
       // A frontmatter problem it reports stops the build here, before the
       // generator, the same located way and with the same exit as P29 below.

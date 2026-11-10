@@ -4,8 +4,8 @@
  *
  * SOURCE FACTS, NOTHING ELSE. The generator runs before the scan (§33.5), so
  * there is no manifest, no composed page and no layout to ask. What exists is
- * the author's own files, and this reads exactly three things out of each:
- * the `title`, `description` and `date` the AUTHOR wrote. It is not the
+ * the author's own files, and this reads the `title`, `description`, `date`,
+ * `meta` and `links` the AUTHOR wrote. It is not the
  * catalog (§30), has no layout title suffix, lists no generated page, and
  * renders no Markdown.
  *

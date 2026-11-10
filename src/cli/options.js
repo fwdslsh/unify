@@ -52,8 +52,8 @@ const OPTIONS = {
   // absolute; anywhere on disk), never a command. Saved in unify.yaml like any
   // other long option.
   generate: { kind: "value", about: "a JavaScript file unify runs before every build, relative to this file", default: "none", save: "generate: scripts/gen.mjs" },
-  // §33.7 — opt in to `source-pages.json` for the generator. A boolean, saveable;
-  // naming it with no generator is a usage error (cli.js), like --include-noindex.
+  // §33.7 — source-pages.json is on by default with a generator and can be
+  // disabled in config; without a generator the setting is inert.
   "source-inventory": { kind: "flag", about: "hand that file source-pages.json: every source page's title, description, date, metas and links", default: "true whenever generate is set", save: "source-inventory: false" },
   // §19.10 — the template this project came from, as typed to `init`, which
   // records it (the one line it writes live); `update` fetches it again. The

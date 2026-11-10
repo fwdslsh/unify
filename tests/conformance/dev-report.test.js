@@ -879,13 +879,19 @@ describe("§27 the local audit view", () => {
     expect(card.text).not.toContain("<footer>");
     expect(card.text).toContain('name="layout"'); // an include's chrome offers a layout too
 
-    // The same include filled the way a chosen page fills it (§32).
+    // Choosing a page defaults to its complete composition, including fills (§32).
     const filled = await get("_includes/card.fragment.html?page=about.html");
     expect(filled.status).toBe(200);
     expect(filled.text).toContain("Opening hours");
     expect(filled.text).toContain("Nine to five.");
     expect(filled.text).not.toContain("Untitled card");
-    expect(filled.text).not.toContain("<nav>");
+    expect(filled.text).toContain("<nav>");
+    expect(filled.text).toContain("About page footer.");
+    expect(filled.text).toContain('data-view="context"');
+    const isolated = await get("_includes/card.fragment.html?page=about.html&view=isolated");
+    expect(isolated.text).toContain("Opening hours");
+    expect(isolated.text).not.toContain("<nav>");
+    expect(isolated.text).toContain('data-view="isolated"');
 
     // An include with no slots previews too, assets resolved from its own file.
     const nav = await get("_includes/nav.html");
@@ -945,6 +951,228 @@ describe("§27 the local audit view", () => {
     for (const rel of readdirSync(join(tmp, "dist"))) expect(rel).not.toContain("preview");
     covers("DEV-07");
   }, 60_000);
+  test("DEV-07/DEV-08 — include context composes full pages, nested and repeated uses, and explicit layout staging", async () => {
+    const tmp = mkTmp();
+    const card = '<article class="card"><h2><slot name="title">Default card</slot></h2><img src="../assets/logo.svg" alt=""></article>';
+    writeTree(tmp, {
+      "src/_layout.html": '<html lang="en"><head><title> — Context</title><link rel="stylesheet" href="assets/site.css"></head><body class="site"><header>Site header</header><main class="grid"><slot>Layout default</slot></main><aside><include src="/_includes/notice.fragment.html"><span slot="title">Layout notice</span></include></aside><footer><slot name="footer">Site footer</slot></footer></body></html>',
+      "src/alternate/_layout.html": '<html lang="en"><head><title> — Alternate</title></head><body class="alternate"><header>Alternate header</header><main><slot>Alternate default</slot></main><footer>Alternate footer</footer></body></html>',
+      "src/main-only/_layout.html": '<html lang="en"><head><title>Main only</title></head><body><header>Main header</header><main>Replace this default</main><footer>Main footer</footer></body></html>',
+      "src/no-sink/_layout.html": '<html lang="en"><head><title>No sink</title></head><body><header>No insertion point</header></body></html>',
+      "src/_includes/card.fragment.html": card,
+      "src/_includes/notice.fragment.html": '<p class="notice"><slot name="title">Default notice</slot></p>',
+      "src/_includes/wrapper.fragment.html": '<section class="nested"><include src="/_includes/card.fragment.html"><span slot="title">Nested card</span></include></section>',
+      "src/_includes/words.md": "**Markdown fragment**",
+      "src/assets/site.css": ".grid > .card{color:green}",
+      "src/assets/logo.svg": '<svg xmlns="http://www.w3.org/2000/svg"/>',
+      "src/direct.html": '<html><head><title>Direct</title><meta name="description" content="A direct page"><style>.card{background:yellow}</style></head><body class="page-theme"><h1>Page heading</h1><include src="/_includes/card.fragment.html"><span slot="title">First card</span></include><include src="/_includes/card.fragment.html"><span slot="title">Second card</span></include><p slot="footer">Page footer</p></body></html>',
+      "src/nested.html": page("Nested", "Nested content", '<include src="/_includes/wrapper.fragment.html"></include>'),
+      "src/notes.md": '---\ntitle: Notes\ndescription: Markdown page context\n---\n# Markdown heading\n\n<include src="/_includes/wrapper.fragment.html"></include>\n',
+      "src/plain.html": '<html lang="en" data-layout="none"><head><title>Plain</title><meta name="description" content="Standalone page"></head><body class="plain"><h1>Plain heading</h1><include src="/_includes/card.fragment.html"><span slot="title">Plain card</span></include></body></html>',
+    });
+    const port = await freePort();
+    const d = start(["dev", "-p", String(port), "--pretty-urls", "--base-url", "https://example.test/docs/"], tmp);
+    await d.ready;
+    await waitForStatus(`http://localhost:${port}/docs/direct/`, 200);
+    const before = readFileSync(join(tmp, "dist/direct/index.html"), "utf8");
+    const get = async (path) => {
+      const res = await fetch(`http://localhost:${port}/_unify/preview/${path}`);
+      expect(res.status).toBe(200);
+      return await res.text();
+    };
+    const target = "_includes/card.fragment.html";
+    const context = await get(`${target}?page=direct.html`);
+    for (const text of ["Page heading", "Site header", "Page footer", "First card", "Second card", '<main class="grid">', '<body class="site page-theme">', ".card{background:yellow}", 'href="/assets/site.css"', 'src="/assets/logo.svg"']) expect(context).toContain(text);
+    expect(context.match(/ data-unify-preview-target=""/g)).toHaveLength(2);
+    expect(context).toContain('data-kind="fragment"');
+    expect(context).toContain('data-view="context"');
+    expect(context).toContain("Locate include");
+    expect(context).not.toContain('src="/docs/assets/logo.svg"'); // source previews stay at the dev origin root
+    const isolated = await get(`${target}?page=direct.html&view=isolated`);
+    expect(isolated).toContain("First card");
+    for (const text of ["Second card", "Page heading", "Site header", "Page footer"]) expect(isolated).not.toContain(text);
+    for (const source of ["nested.html", "notes.md"]) {
+      const nested = await get(`${target}?page=${source}`);
+      expect(nested).toContain("Nested card");
+      expect(nested).toContain('<section class="nested">');
+      expect(nested).toContain("Site header");
+      expect(nested).not.toContain("Default card");
+    }
+    const notice = await get("_includes/notice.fragment.html?page=direct.html");
+    expect(notice).toContain("Layout notice");
+    expect(notice).toContain("Page heading");
+    expect(notice).not.toContain("Default notice");
+    const overridden = await get(`${target}?page=direct.html&layout=alternate/_layout.html`);
+    expect(overridden).toContain("Alternate header");
+    expect(overridden).toContain("Second card");
+    expect(overridden).toContain('<body class="alternate page-theme">');
+    expect(overridden).not.toContain("Site header");
+    const removed = await get("_includes/notice.fragment.html?page=direct.html&layout=alternate/_layout.html");
+    expect(removed).not.toContain('class="notice"');
+    expect(removed).toContain("No element from this include can be located");
+    expect(removed).not.toContain("Place in main content"); // do not invent placement on a selected page
+    const plain = await get(`${target}?page=plain.html`);
+    expect(plain).toContain("Plain heading");
+    expect(plain).toContain("Plain card");
+    expect(plain).toContain('<body class="plain">');
+    expect(plain).not.toContain("Site header");
+    const natural = await get("_includes/notice.fragment.html?layout=_layout.html");
+    expect(natural).toContain("Layout notice");
+    expect(natural).toContain("Site header");
+    expect(natural).toContain("Layout default");
+    expect(natural).not.toContain("Place in main content");
+    const unstaged = await get(`${target}?layout=alternate/_layout.html`);
+    expect(unstaged).toContain("Alternate default");
+    expect(unstaged).toContain("Place in main content");
+    expect(unstaged).not.toContain('class="card"');
+    for (const layout of ["alternate/_layout.html", "main-only/_layout.html"]) {
+      const staged = await get(`${target}?layout=${layout}&view=context&placement=main`);
+      expect(staged).toContain("Staged in main content");
+      expect(staged).toContain("Default card");
+      expect(staged).toContain('src="/assets/logo.svg"');
+      expect(staged).not.toContain("Replace this default");
+      expect(staged).not.toContain('class="uc-warn"');
+      expect(staged.match(/ data-unify-preview-target=""/g)).toHaveLength(1);
+    }
+    const noSink = await get(`${target}?layout=no-sink/_layout.html&placement=main`);
+    expect(noSink).toContain("no main content slot");
+    expect(noSink).not.toContain("Place in main content");
+    expect(noSink).not.toContain('class="card"');
+    const md = await get("_includes/words.md?layout=alternate/_layout.html&placement=main");
+    expect(md).toContain("Markdown fragment</strong>");
+    expect(md).toContain("Alternate header");
+    const quiet = await get(`${target}?page=direct.html&chrome=off`);
+    expect(quiet).toContain("Second card");
+    expect(quiet).not.toContain('id="unify-chrome"');
+    expect(quiet).not.toContain("data-unify-preview-target");
+    const unknown = await get(`${target}?page=direct.html&view=unknown`);
+    expect(unknown).toContain('data-view="context"');
+    expect(readFileSync(join(tmp, "dist/direct/index.html"), "utf8")).toBe(before);
+    expect(before).not.toContain("data-unify-preview-target");
+    expect(before).not.toContain("unify-chrome");
+    covers("DEV-07", "DEV-08");
+  }, 60_000);
+
+  test("DEV-07/DEV-08 — missing context and non-element include content stay explicit without invented wrappers", async () => {
+    const tmp = mkTmp();
+    writeTree(tmp, {
+      "src/_includes/words.html": "Text without an element",
+      "src/_includes/head.html": '<meta name="author" content="Example author">',
+      "src/index.html": '<html lang="en"><head><title>Plain</title><meta name="description" content="Text-only example"><include src="/_includes/head.html"></include></head><body><h1>Page around text</h1><p><include src="/_includes/words.html"></include></p></body></html>',
+    });
+    const port = await freePort();
+    const d = start(["dev", "-p", String(port)], tmp);
+    await d.ready;
+    await waitForStatus(`http://localhost:${port}/`, 200);
+    const preview = async (path) => await (await fetch(`http://localhost:${port}/_unify/preview/${path}`)).text();
+    const noContext = await preview("_includes/words.html?view=context");
+    expect(noContext).toContain("Choose a page or layout");
+    expect(noContext).toContain("Text without an element");
+    for (const include of ["words.html", "head.html"]) {
+      const context = await preview(`_includes/${include}?page=index.html`);
+      expect(context).toContain("Page around text");
+      expect(context).toContain("<p>Text without an element</p>");
+      expect(context).toContain("No element from this include can be located");
+      expect(context).toContain('class="uc-btn uc-locate" disabled');
+      expect(context).not.toContain(' data-unify-preview-target=""');
+    }
+    covers("DEV-07", "DEV-08");
+  }, 60_000);
+
+  test("generated dependencies stay visible without dead preview links across rebuilds", async () => {
+    const tmp = mkTmp();
+    writeTree(tmp, {
+      "src/index.md": "---\ntitle: Example\n---\n# Example\n\nExample body.\n",
+      "src/_includes/authored.fragment.html": "<aside>Authored include</aside>",
+      "src/authored/_layout.html": '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Authored</title></head><body><slot></slot></body></html>',
+      "src/authored/index.md": "# Authored page",
+      "src/mode.txt": "first",
+      "generate.mjs": `
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join, dirname } from "node:path";
+const [source, overlay] = process.argv.slice(2);
+const mode = readFileSync(join(source, "mode.txt"), "utf8");
+writeFileSync(join(dirname(source), ".overlay-path.txt"), overlay);
+mkdirSync(join(overlay, "_includes"), { recursive: true });
+writeFileSync(join(overlay, "_includes", mode + ".fragment.html"), "<nav>Generated " + mode + "</nav>");
+writeFileSync(join(overlay, "_layout.html"), '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Example</title></head><body><include src="/_includes/' + mode + '.fragment.html"></include><include src="/_includes/authored.fragment.html"></include><main><slot></slot></main></body></html>');
+writeFileSync(join(overlay, "generated.md"), "# Generated page");
+if (mode === "failed") writeFileSync(join(overlay, "broken.html"), '<include src="/_includes/missing.html"></include>');
+`,
+    });
+    const port = await freePort();
+    const d = start(["dev", "-p", String(port), "--generate", join(tmp, "generate.mjs")], tmp);
+    await d.ready;
+    const text = async (path) => (await fetch(`http://localhost:${port}${path}`)).text();
+    const map = async () => JSON.parse(await text("/_unify/pages.json"));
+    await waitForStatus(`http://localhost:${port}/index.html`, 200);
+
+    const check = async (mode) => {
+      const page = await text("/");
+      for (const path of ["_layout.html", `_includes/${mode}.fragment.html`]) {
+        expect(page).toContain(`${path} (source preview unavailable)`);
+        expect(page).not.toContain(`href="/_unify/preview/${path}"`);
+        const res = await fetch(`http://localhost:${port}/_unify/preview/${path}`);
+        expect(res.status).toBe(404);
+        await res.text();
+      }
+      expect(page).toContain('href="/_unify/preview/_includes/authored.fragment.html"');
+      const authored = await fetch(`http://localhost:${port}/_unify/preview/_includes/authored.fragment.html`);
+      expect(authored.status).toBe(200);
+      const preview = await authored.text();
+      expect(preview).toContain('<option value="_layout.html" disabled>_layout.html (source preview unavailable)</option>');
+      expect(preview).toContain('<option value="authored/_layout.html">authored/_layout.html</option>');
+      const unavailableContext = await text("/_unify/preview/_includes/authored.fragment.html?page=index.md");
+      expect(unavailableContext).toContain("Context unavailable");
+      expect(unavailableContext).toContain("open the built page");
+      expect(unavailableContext).not.toContain("No such page");
+
+      expect(await text("/authored/")).toContain('href="/_unify/preview/authored/_layout.html"');
+      const layout = await fetch(`http://localhost:${port}/_unify/preview/authored/_layout.html`);
+      expect(layout.status).toBe(200);
+      await layout.text();
+      const index = await text("/_unify/preview/");
+      expect(index).toContain(`<span>_includes/${mode}.fragment.html</span> <small>source preview unavailable</small>`);
+      expect(index).not.toContain('href="/_unify/preview/_layout.html"');
+      expect(index).toContain('href="/generated.html"');
+      expect(await text("/generated.html")).toContain("Generated page");
+      expect(existsSync(readFileSync(join(tmp, ".overlay-path.txt"), "utf8"))).toBe(false);
+    };
+    const waitForMode = async (mode) => {
+      const deadline = Date.now() + 20_000;
+      while (!(await map()).pages.some((p) => p.includes.includes(`_includes/${mode}.fragment.html`))) {
+        if (Date.now() >= deadline) throw new Error(`No published map for ${mode}`);
+        await sleep(100);
+      }
+    };
+    await waitForMode("first");
+    await check("first");
+    writeFileSync(join(tmp, "src/mode.txt"), "second");
+    await waitForMode("second");
+    await check("second");
+    const goodMap = await map();
+
+    writeFileSync(join(tmp, "src/mode.txt"), "failed");
+    await reportUntil(port, (t) => t.includes("_includes/missing.html"));
+    expect(await map()).toEqual(goodMap);
+    const failedPage = await text("/");
+    expect(failedPage).toContain("_includes/second.fragment.html (source preview unavailable)");
+    expect(failedPage).not.toContain("_includes/failed.fragment.html");
+    expect(existsSync(readFileSync(join(tmp, ".overlay-path.txt"), "utf8"))).toBe(false);
+
+    writeFileSync(join(tmp, "src/mode.txt"), "recovered");
+    await waitForMode("recovered");
+    await check("recovered");
+    d.proc.kill("SIGTERM");
+    await sleep(200);
+    const before = await settledSnapshot(join(tmp, "dist"));
+    const built = await runCli(["build", "--generate", join(tmp, "generate.mjs")], tmp);
+    expect(built.exit).toBe(0);
+    expect(await settledSnapshot(join(tmp, "dist"))).toEqual(before);
+    expect(readFileSync(join(tmp, "dist/index.html"), "utf8")).not.toContain("unify-chrome");
+    expect(existsSync(readFileSync(join(tmp, ".overlay-path.txt"), "utf8"))).toBe(false);
+  }, 60_000);
+
   test("DEV-08 — the chrome rides on every served page the page map knows and on every preview, from the page map, and chrome=off omits it", async () => {
     const tmp = mkTmp();
     writeTree(tmp, {
@@ -973,6 +1201,9 @@ describe("§27 the local audit view", () => {
     expect(about).toContain('href="/_unify/preview/"');
     expect(about).toContain('href="/_unify/"');
     expect((await text("/about")).includes('id="unify-chrome"')).toBe(true); // the slashless spelling too
+    for (const alias of ["/index.html", "/about/index.html", "/%61bout/"]) {
+      expect(await text(alias)).toContain('id="unify-chrome"');
+    }
     // A page with no layout and no includes says so rather than linking nowhere.
     const plain = await text("/plain/");
     expect(plain).toContain('id="unify-chrome"');
@@ -981,7 +1212,8 @@ describe("§27 the local audit view", () => {
     // §27.1 holds: dist/ carries none of it, and neither does the reload script.
     expect(readFileSync(join(tmp, "dist", "about", "index.html"), "utf8")).not.toContain("unify-chrome");
 
-    // Off for the request that says so; what the browser stores is its own business.
+    // Off requests omit the overlay; the reload script still stores the
+    // preference (the browser regression exercises navigation afterward).
     expect(await text("/about/?chrome=off")).not.toContain('id="unify-chrome"');
     expect(await text("/about/?chrome=false")).not.toContain('id="unify-chrome"');
     expect(await text("/about/?chrome=partials")).toContain('id="unify-chrome"');
@@ -996,6 +1228,59 @@ describe("§27 the local audit view", () => {
     expect(served).toBe(readFileSync(join(tmp, "dist", "about", "index.html"), "utf8"));
     d.proc.kill("SIGTERM");
     await sleep(200);
+    covers("DEV-08");
+  }, 60_000);
+  test("DEV-08 — base-url paths, output-root aliases, inherited pages, preview redirects and assets remain usable in dev", async () => {
+    const tmp = mkTmp();
+    writeTree(tmp, {
+      "src/_layout.html": '<html><head><title> — Site</title><link rel="stylesheet" href="/style.css"></head><body><slot>Default</slot></body></html>',
+      "src/index.html": page("Home", "The landing page here", '<a href="/about.html">About</a>'),
+      "src/about.html": page("About", "About this site here", "<p>About.</p>"),
+      "src/style.css": "body{color:navy}",
+      "theme/template.html": page("Template", "A page inherited from a template", '<include src="/_includes/template.fragment.html"></include>'),
+      "theme/_includes/template.fragment.html": "<p>Template fragment.</p>",
+    });
+    const port = await freePort();
+    const d = start(["dev", "-p", String(port), "--pretty-urls", "--base-url", "https://example.test/docs/", "--extends", "./theme"], tmp);
+    await d.ready;
+    const base = `http://localhost:${port}`;
+    await waitForStatus(base + "/", 200);
+    for (const path of ["/", "/index.html", "/docs", "/docs/", "/docs/index.html", "/about/", "/about/index.html", "/docs/about/", "/docs/about/index.html", "/%64ocs/", "/%64ocs/about/"]) {
+      const res = await fetch(base + path);
+      expect(res.status).toBe(200);
+      expect(await res.text()).toContain('id="unify-chrome"');
+    }
+    for (const path of ["/style.css", "/docs/style.css"]) {
+      const res = await fetch(base + path);
+      expect(res.status).toBe(200);
+      expect(await res.text()).toBe("body{color:navy}");
+    }
+    for (const path of ["/docs/missing.html", "/docstyle.css", "/_unify/unknown", "/docs/_unify/unknown", "/docs/_unify/", "/docs/__unify_reload__"]) {
+      expect((await fetch(base + path)).status).toBe(404);
+    }
+    const map = await (await fetch(base + "/_unify/pages.json")).json();
+    expect(map.pages.map((p) => p.path).sort()).toEqual(["/docs/", "/docs/about/", "/docs/template/"]);
+    const index = await (await fetch(base + "/_unify/preview/")).text();
+    expect(index).toContain('<a href="/docs/template/">template.html</a>');
+    expect(index).toContain('_includes/template.fragment.html</span> <small>source preview unavailable</small>');
+    expect((await fetch(base + "/docs/template/")).status).toBe(200);
+    const preview = await (await fetch(base + "/_unify/preview/_layout.html")).text();
+    expect(preview).toContain('href="/style.css"');
+    expect(preview).toContain('id="unify-chrome"');
+    for (const [path, destination] of [
+      ["/_unify/preview/about.html", "/docs/about/"],
+      ["/_unify/preview", "/_unify/preview/"],
+      ["/_unify", "/_unify/"],
+    ]) {
+      const query = "?chrome=off&collapsed=true&tag=a&tag=b";
+      const res = await fetch(base + path + query, { redirect: "manual" });
+      expect(res.status).toBe(302);
+      expect(res.headers.get("location")).toBe(destination + query);
+    }
+    const reload = await fetch(base + "/__unify_reload__");
+    expect(reload.headers.get("content-type")).toContain("text/event-stream");
+    await reload.body.cancel();
+    d.proc.kill("SIGTERM");
     covers("DEV-08");
   }, 60_000);
 });

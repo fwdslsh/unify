@@ -120,7 +120,7 @@ and rewrites it per page, and the head merge keeps one stylesheet link.
 | Layout | one `site/_layout.html` wraps every page, generated ones included |
 | Named slot | the footer, with fallback content no page overrides |
 | Underscore | `_includes/` is read by the build and never ships; `scripts/` and `unify.yaml` sit outside `site/` |
-| Markdown + frontmatter | five posts; `tags`/`series`/`description`/`date`/`schema` all become `<meta>` tags, with no schema unify registers anywhere |
+| Markdown + frontmatter | five posts; `tags`/`series`/`description`/`date` become metadata; `schema: BlogPosting` declares posts for the built-in feed |
 
 Plus the production layer: `--pretty-urls`, `--base-url`, `--catalog`, `--search-corpus`,
 `schema: BlogPosting`, and the `feed.xml`/`sitemap.xml` that combination activates for

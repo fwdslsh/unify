@@ -149,7 +149,7 @@ an empty directory that exists only for this build, and `contextPath` the absolu
 `generator-context.json` — a versioned, read-only snapshot unify wrote for this one build:
 `schemaVersion`, `unifyVersion`, the running `command`, the same three paths, the effective
 site settings (`baseUrl`, `prettyUrls`, `canonical`), where `--catalog`/`--search-corpus`
-will land, and (`inputs.sourcePages`) the source page list `--source-inventory` writes, or `null`. The working directory is the source root. There is nothing to import. All three
+will land, and (`inputs.sourcePages`) the source page list enabled by default for a generator, or `null` when `source-inventory: false` disables it. The working directory is the source root. There is nothing to import. All three
 arguments are always supplied — a generator that reads only the first two keeps working
 exactly as it did before `contextPath` existed.
 

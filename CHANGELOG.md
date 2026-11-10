@@ -6,6 +6,20 @@ upgrading across them.
 The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.19] - 2026-11-09
+
+### Changed
+
+- **Include previews can show the complete page or layout.** Choosing a page or layout now defaults to **In context**, preserving surrounding markup, page styles and classes, and nested or repeated include content. **Isolated** keeps the existing focused preview. **Locate include** cycles through visible include elements without adding layout wrappers. Layout-only previews offer explicit, labeled placement in main content when the include is not already rendered there. Preview choices survive reloads and never change source files or published output.
+
+### Fixed
+
+- **Unavailable source previews no longer offer dead links (#153).** Generated or otherwise unavailable layouts and includes remain visible as labeled dependencies, while authored sources retain working previews. Failed rebuilds preserve the dependency map of the last published pages. An include preview whose selected page has an unavailable layout explains the limitation and links to the built page.
+- **Development links and assets work under `--base-url` subpaths.** The dev server serves the deployment mount as well as its existing root addresses, and the toolbar recognizes explicit `index.html` addresses and other aliases of the same page. The preview index also lists pages inherited from templates.
+- **Toolbar choices survive navigation.** Turning the toolbar off persists across pages, previews and redirects; page and layout selectors preserve unrelated query parameters, repeated values and URL fragments. Site pseudo-element styles no longer leak into toolbar controls.
+- **Generator and post-processing guidance matches the existing behavior (#152).** The integration guide correctly describes the source inventory as enabled by default for configured generators. It also explains where Unify's transaction ends, what source-based audit checks, and which watch, validation and artifact-update responsibilities belong to external tools.
+- **Scaffold and example guidance reflects current behavior.** Starter READMEs describe the new include preview controls, the blog template identifies the built-in Atom feed correctly, and the CLI reference and examples correct stale generator and resolved-finding descriptions.
+
 ## [0.11.18] - 2026-11-08
 
 ### Changed
@@ -1158,7 +1172,10 @@ with generated compare-link notes only. Their diffs are on the
 [releases page](https://github.com/fwdslsh/unify/releases). Nothing here
 retroactively reconstructs detail those notes never carried.
 
-[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.11.16...HEAD
+[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.11.19...HEAD
+[0.11.19]: https://github.com/fwdslsh/unify/compare/v0.11.18...v0.11.19
+[0.11.18]: https://github.com/fwdslsh/unify/compare/v0.11.17...v0.11.18
+[0.11.17]: https://github.com/fwdslsh/unify/compare/v0.11.16...v0.11.17
 [0.11.16]: https://github.com/fwdslsh/unify/compare/v0.11.15...v0.11.16
 [0.11.15]: https://github.com/fwdslsh/unify/compare/v0.11.14...v0.11.15
 [0.11.14]: https://github.com/fwdslsh/unify/compare/v0.11.13...v0.11.14
