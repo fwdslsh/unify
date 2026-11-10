@@ -43,6 +43,7 @@ const GROUPS = [
   ] },
   { label: "Reference", docs: [
     ["cli-reference.md", "CLI reference"],
+    ["api.md", "JavaScript API"],
     ["product-spec.md", "Product spec"],
     ["conformance-spec.md", "Conformance spec"],
   ] },

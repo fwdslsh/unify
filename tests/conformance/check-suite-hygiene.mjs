@@ -15,6 +15,8 @@
  *  H3  No internal imports in behavior tests. Importing from src/** couples
  *      tests to internals and lets them pass while the CLI is broken; behavior
  *      tests spawn the CLI. (The harness itself holds the single cli.js path.)
+ *      The one carve-out is the public entry point, src/index.js (or the
+ *      package by name): a behavior test may import what an embedder may.
  *  H4  No test opts itself out of running. `skip`, `skipIf`, `todo`, and
  *      `only` on `test`/`it`/`describe` all fail, in any test file, whether or
  *      not it declares coverage — a skip that keeps a declaration is a lie
@@ -77,7 +79,8 @@ const SELF = ["check-suite-hygiene.mjs", "check-traceability.mjs", "compare.mjs"
 const RULES = [
   { id: "H1", re: /\b(?:mock|spyOn)\s*\(|jest\.fn/, why: "mock/spy in a behavior test" },
   { id: "H2", re: /console\.warn|\/\/\s*expect\s*\(/, why: "warn-instead-of-fail or commented-out expectation" },
-  { id: "H3", re: /from\s+['"][^'"]*\/src\//, why: "behavior test imports from src/** (spawn the CLI instead)" },
+  // The one carve-out: the public entry point, src/index.js, and nothing else under src/.
+  { id: "H3", re: /from\s+['"][^'"]*\/src\/(?!index\.js['"])/, why: "behavior test imports from src/** (spawn the CLI instead; only the public entry point, src/index.js, may be imported)" },
   { id: "H5", re: /normalizeHtml|replace\s*\(\s*\/\\s\+\/g/, why: "whitespace-normalized comparison (compare bytes)" },
 ];
 

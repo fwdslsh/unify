@@ -2,7 +2,8 @@
 /**
  * check-module-graph.mjs — release gate G8, "no dead modules".
  *
- * The claim: every file under `src/**` is reachable from `src/cli.js` by
+ * The claim: every file under `src/**` is reachable from `src/cli.js` (or the
+ * package's public entry, `src/index.js`) by
  * following static `import` specifiers. A module nothing imports is either a
  * feature that was cut and left behind or a feature that was written and never
  * wired — both are bugs, and both are invisible to a green test suite, because
@@ -24,15 +25,17 @@ import { reachableFrom, sourceFiles } from "../module-graph.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const SRC = join(ROOT, "src");
-const ENTRY = join(SRC, "cli.js");
+// Two entry points: the program, and the package's public entry (package.json
+// `main`/`exports`), which re-exports the CLI's `run` and adds the API.
+const ENTRIES = [join(SRC, "cli.js"), join(SRC, "index.js")];
 
 // The walk and the file sweep both come from tests/module-graph.mjs, which is
 // also what the test preflight uses. Two gates that answer "what does this file
 // import" from two copies of the same regexes can disagree about a specifier
 // form, and the disagreement is silent in both (testing-strategy §5).
-const reachable = reachableFrom([ENTRY], [SRC]);
+const reachable = reachableFrom(ENTRIES, [SRC]);
 const dead = sourceFiles(SRC).filter((f) => !reachable.has(f));
-console.log(`module graph: ${reachable.size} reachable from src/cli.js`);
+console.log(`module graph: ${reachable.size} reachable from src/cli.js and src/index.js`);
 if (dead.length) {
   console.error(`FAIL ${dead.length} unreachable module(s) under src/:`);
   for (const f of dead.sort()) console.error(`  ${relative(ROOT, f)}`);

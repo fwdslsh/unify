@@ -75,32 +75,34 @@ const FORMATS = ["human", "json", "sarif"];
  * ever reach the real stream, in the order this command chooses rather than
  * the order build.js's internal calls happen to make them.
  * @param {object} context
- * @returns {Promise<{reporter: Reporter, captured: string[]}>}
+ * @returns {Promise<{reporter: import("../../core/diagnostics.js").DiagnosticCollector, captured: string[]}>}
  */
 async function runBuildForAudit(context) {
   const { build } = await import("./build.js");
   const captured = [];
-  const reporter = new Reporter({
-    strict: context.settings.strict === true,
-    stderr: context.reporter.stderr,
-    stdout: { write: (s) => captured.push(s) },
-  });
+  // A quiet channel (the experimental API's) is its own collector: nothing is
+  // printed, so there is nothing to capture, and the caller's collector holds
+  // the diagnostics even if the run is cut short.
+  const reporter = context.reporter.quiet
+    ? context.reporter
+    : new Reporter({
+      strict: context.settings.strict === true,
+      stderr: context.reporter.stderr,
+      stdout: { write: (s) => captured.push(s) },
+    });
   await build({ ...context, settings: { ...context.settings, audit: true }, reporter });
   return { reporter, captured };
 }
 
 /**
- * @param {object} context - the run context cli.js assembles
- * @returns {Promise<number>} the §24.6 exit code
+ * The evaluation itself, with no rendering: the pipeline run for audit, the
+ * §31.3 network check when asked, and the results as data. `audit()` below
+ * renders them for the terminal; the experimental public API (`src/index.js`)
+ * turns them into its result object. One evaluation, two presentations.
+ * @param {object} context - the run context cli.js (or the API) assembles
+ * @returns {Promise<{buildReporter: import("../../core/diagnostics.js").DiagnosticCollector, captured: string[], findings: any[], documents: any[], base: any}>}
  */
-export async function audit(context) {
-  const format = context.settings.format ?? "human";
-  if (!FORMATS.includes(format)) {
-    throw new UsageError(`--format accepts human, json, or sarif — got ${JSON.stringify(format)}`, [
-      `write it as one of: ${FORMATS.join(", ")}`,
-    ]);
-  }
-
+export async function evaluate(context) {
   const { reporter: buildReporter, captured } = await runBuildForAudit(context);
 
   // Guaranteed non-null: `settings.audit = true` above makes `build.js` call
@@ -124,6 +126,23 @@ export async function audit(context) {
       findings = sortFindings([...findings, ...externalUnreachableFindings(results, owners)]);
     }
   }
+
+  return { buildReporter, captured, findings, documents, base };
+}
+
+/**
+ * @param {object} context - the run context cli.js assembles
+ * @returns {Promise<number>} the §24.6 exit code
+ */
+export async function audit(context) {
+  const format = context.settings.format ?? "human";
+  if (!FORMATS.includes(format)) {
+    throw new UsageError(`--format accepts human, json, or sarif — got ${JSON.stringify(format)}`, [
+      `write it as one of: ${FORMATS.join(", ")}`,
+    ]);
+  }
+
+  const { buildReporter, captured, findings, documents, base } = await evaluate(context);
 
   // ---- the report ---------------------------------------------------------
   if (format === "human") {

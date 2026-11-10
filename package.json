@@ -3,7 +3,10 @@
   "version": "0.11.17",
   "description": "A static site generator for HTML-native composition: includes, layouts, and slots in plain HTML \u2014 no expression language, no client runtime",
   "type": "module",
-  "main": "src/cli.js",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
   "bin": {
     "unify": "src/cli.js"
   },

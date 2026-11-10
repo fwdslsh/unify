@@ -421,9 +421,12 @@ export async function runGenerator({ generatorAbs, sourceRoot, overlayDir, conte
   // generator that skips a source it could not reach and says so on stderr
   // would otherwise be silent in the build log, which is the silent failure
   // the warning exists to prevent. A failure's stderr is P29's detail instead.
-  if (out) process.stdout.write(out);
+  // The pass-through is the CLI's: on a quiet channel (the experimental API's)
+  // nothing reaches the embedder's streams — a limitation, documented in
+  // docs/api.md. What P29 captures below still travels, inside the diagnostic.
+  if (out && !reporter.quiet) process.stdout.write(out);
   if (code === 0) {
-    if (err) process.stderr.write(err);
+    if (err && !reporter.quiet) process.stderr.write(err);
     return true;
   }
 
@@ -446,6 +449,6 @@ export async function runGenerator({ generatorAbs, sourceRoot, overlayDir, conte
       `run it directly to see its full output: ${reproduceWith()} ${rel}`,
     ],
   });
-  if (process.env.DEBUG && err) process.stderr.write(err);
+  if (process.env.DEBUG && err && !reporter.quiet) process.stderr.write(err);
   return false;
 }
