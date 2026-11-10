@@ -21,13 +21,10 @@
  * @module @fwdslsh/unify
  */
 import { DiagnosticCollector, UsageError } from "./core/diagnostics.js";
-import { auditExitCode, consumeLastAuditRun } from "./core/audit.js";
+import { auditExitCode } from "./core/audit.js";
 import { buildReport, serializeJson } from "./core/report.js";
 import { apiOptions } from "./cli/options.js";
 import { prepare } from "./cli/prepare.js";
-
-/** `run(argv)` is the command line itself. Exported only so that `import { run } from "@fwdslsh/unify"` keeps working; it is not API. */
-export { run } from "./cli.js";
 
 /**
  * Experimental: this API may change or be removed in any release before v1.
@@ -39,19 +36,20 @@ export { run } from "./cli.js";
  * `process.cwd()`, as the command line's do. An option that is `undefined` is
  * the same as absent; an unknown one is a usage error (`status: 2`).
  *
- * `format`, `save-config` and the options of `dev`, `watch`, `init` and
- * `update` do not exist here. `generate` is a path, never a function.
+ * `unify.yaml` is read exactly as the commands read it, and an option passed
+ * here wins over the file, as a flag does -- an explicit `false` included.
+ *
+ * `format`, `save-config` and the options of `dev`, `watch`,
+ * `init` and `update` do not exist here. `generate` is a path, never a function.
  *
  * @typedef {object} CommonOptions
  * @property {string} [source] - the directory to build from (default: `site/` if it exists, else `src/`, else `.`)
  * @property {string} [output] - the directory the site is published to (default `dist`)
- * @property {boolean} [clean] - empty the output directory before publishing
  * @property {string[]} [exclude] - globs never emitted, still usable by the build
  * @property {boolean} [prettyUrls] - `about.html` becomes `about/index.html`, links rewritten to match
  * @property {string} [baseUrl] - the site's whole address, e.g. `https://example.com/`
  * @property {string} [canonical] - `"auto"` or `"none"`
  * @property {boolean} [feedFull] - full-content feed entries (needs `baseUrl`)
- * @property {boolean} [dryRun] - run every check, write nothing
  * @property {boolean} [strict] - advisories count as problems for `status`
  * @property {boolean} [catalog] - generate `assets/unify/catalog.json`
  * @property {boolean} [searchCorpus] - generate `assets/unify/search-corpus.json`
@@ -59,14 +57,13 @@ export { run } from "./cli.js";
  * @property {string} [generate] - the PATH of one JavaScript file to run before the build
  * @property {boolean} [sourceInventory] - hand the generator `source-pages.json` (default on with `generate`)
  * @property {string} [extends] - a template to build on, as `init` takes one
- * @property {boolean|string} [config] - API-only. Absent or `false`: no `unify.yaml` is read. `true`: discovered as the CLI does. A string: that file.
  */
 
 /**
- * @typedef {CommonOptions & {audit?: boolean, write?: boolean}} BuildOptions
- *   `audit: true` is `build --audit` (publish only if `audit` would exit 0, and
- *   return the report). `write: false` publishes nothing and returns the
- *   composed site as `files`; the output directory is neither created nor touched.
+ * @typedef {CommonOptions & {clean?: boolean, dryRun?: boolean}} BuildOptions
+ *   `clean: true` empties the output directory before publishing. `dryRun: true`
+ *   runs every check, publishes nothing and returns the composed site as
+ *   `files`; the output directory is neither created nor touched.
  */
 
 /**
@@ -88,7 +85,8 @@ export { run } from "./cli.js";
  */
 
 /**
- * What a usage error or an unexpected failure looks like when returned.
+ * What a usage error looks like when returned: what the command line prints
+ * for exit 2.
  * @typedef {object} ApiError
  * @property {string} message
  * @property {string[]} fixes
@@ -103,17 +101,16 @@ export { run } from "./cli.js";
  * @typedef {object} BuildResult
  * @property {0|1|2} status - the CLI's exit code: 0 built, 1 problems (or, under `strict`, advisories), 2 usage error
  * @property {Diagnostic[]} diagnostics - ordered by path, then line; empty on status 2
- * @property {Map<string, Uint8Array>} [files] - only with `write: false`: output path -> bytes. Empty when a problem blocked the build
- * @property {AuditReport|null} [report] - only with `audit: true`; `null` if the build stopped before it could be evaluated
- * @property {ApiError} [error] - only with status 2, or status 1 from an unexpected failure rather than a finding
+ * @property {Map<string, Uint8Array>} [files] - only for a dry run: output path -> bytes. Empty when a problem blocked the build
+ * @property {ApiError} [error] - only with status 2 (a usage error)
  */
 
 /**
  * @typedef {object} AuditResult
  * @property {0|1|2} status - the CLI's `unify audit` exit code
  * @property {Diagnostic[]} diagnostics - the pipeline's problems and advisories, ordered by path, then line
- * @property {AuditReport|null} report - `null` when the run stopped before it could be evaluated (status 1 or 2)
- * @property {ApiError} [error] - only with status 2, or status 1 from an unexpected failure rather than a finding
+ * @property {AuditReport|null} report - `null` when the run stopped before the site could be evaluated (a failing generator, a usage error)
+ * @property {ApiError} [error] - only with status 2 (a usage error)
  */
 
 /**
@@ -121,6 +118,9 @@ export { run } from "./cli.js";
  * printing.
  *
  * Experimental: this API may change or be removed in any release before v1.
+ *
+ * Resolves with a result for everything the command line would exit 0, 1 or 2
+ * for. Anything else (an I/O error, a bug in unify) rejects with the original Error.
  *
  * @param {BuildOptions} [options]
  * @returns {Promise<BuildResult>}
@@ -146,7 +146,7 @@ export function audit(options = {}) {
 
 /**
  * Calls run one at a time. The pipeline reads the working directory and keeps
- * one piece of module state (`consumeLastAuditRun`'s stash), so two calls
+ * one piece of module state (`core/audit.js`'s last-run stash), so two calls
  * overlapping in one process could hand each other's results over; queuing
  * them costs nothing a caller could notice and makes "independent" true.
  */
@@ -165,7 +165,7 @@ function serialize(job) {
 
 /**
  * The CLI's long-flag form of the options, or a `UsageError` naming what is
- * wrong with them. `config` and `write` are returned apart: they are not flags.
+ * wrong with them. 
  * @param {"build"|"audit"} command
  * @param {unknown} options
  */
@@ -174,25 +174,12 @@ function toFlags(command, options) {
     throw new UsageError(`${command}() takes an options object, got ${options === null ? "null" : Array.isArray(options) ? "an array" : typeof options}`);
   }
   const known = apiOptions(command);
-  const own = command === "build" ? ["config", "write"] : ["config"];
   const flags = {};
-  let config = false;
-  let write = true;
   for (const [key, value] of Object.entries(options)) {
     if (value === undefined) continue;
-    if (key === "config" && own.includes(key)) {
-      if (typeof value !== "boolean" && typeof value !== "string") throw new UsageError(`config must be true, false or a path, got: ${JSON.stringify(value)}`);
-      config = value;
-      continue;
-    }
-    if (key === "write" && own.includes(key)) {
-      if (typeof value !== "boolean") throw new UsageError(`write must be true or false, got: ${JSON.stringify(value)}`);
-      write = value;
-      continue;
-    }
     const spec = Object.hasOwn(known, key) ? known[key] : undefined;
     if (!spec) {
-      throw new UsageError(`unknown option: ${key}`, [`the options of ${command}() are: ${[...Object.keys(known), ...own].filter((k) => command === "build" || !["clean", "dryRun"].includes(k)).sort().join(", ")}`]);
+      throw new UsageError(`unknown option: ${key}`, [`the options of ${command}() are: ${Object.keys(known).sort().join(", ")}`]);
     }
     const expected = { flag: "a boolean", string: "a string", value: "a string", list: "an array of strings" }[spec.kind];
     const ok = spec.kind === "flag" ? typeof value === "boolean"
@@ -201,7 +188,7 @@ function toFlags(command, options) {
     if (!ok) throw new UsageError(`${key} must be ${expected}, got: ${JSON.stringify(value)}`);
     flags[spec.flag] = value;
   }
-  return { flags, config, write };
+  return flags;
 }
 
 /**
@@ -231,30 +218,23 @@ function reportOf(input) {
 }
 
 /**
- * @param {unknown} error
- * @param {Diagnostic[]} diagnostics
- */
-function failure(error, diagnostics = []) {
-  const usage = error instanceof UsageError;
-  const message = error instanceof Error ? error.message : String(error);
-  return { status: usage ? 2 : 1, diagnostics, error: { message, fixes: usage ? [...error.fixes] : [] } };
-}
-
-/**
  * @param {"build"|"audit"} command
  * @param {unknown} options
  */
 async function execute(command, options) {
   const reporter = new DiagnosticCollector();
   try {
-    const { flags, config, write } = toFlags(command, options);
-    const { settings, sourceRoot, sourceDefaulted, output } = prepare({ command, options: flags, config });
+    const flags = toFlags(command, options);
+    const { settings, sourceRoot, sourceDefaulted, output } = prepare({ command, options: flags });
     reporter.strict = settings.strict;
 
     if (command === "audit") {
       const { evaluate } = await import("./cli/commands/audit.js");
       const context = { sourceRoot, output, settings, reporter, sourceDefaulted, command };
       const { buildReporter, findings, documents, base } = await evaluate(context);
+      const diagnostics = buildReporter.sorted().map(plain);
+      // The build stopped before the scan: no site, so no report (§24.2).
+      if (findings === null) return { status: buildReporter.exitCode, diagnostics, report: null };
       const report = reportOf({
         documents, findings, base,
         problemCount: buildReporter.problemCount, advisoryCount: buildReporter.advisoryCount,
@@ -262,28 +242,18 @@ async function execute(command, options) {
       // §24.6, as `cli/commands/audit.js` reads it: a pipeline problem exits 1
       // whatever the findings; past that, the findings decide.
       const status = buildReporter.exitCode !== 0 ? buildReporter.exitCode : auditExitCode(findings, settings.strict);
-      return { status, diagnostics: buildReporter.sorted().map(plain), report };
+      return { status, diagnostics, report };
     }
 
-    const result = {};
     let built = null;
     const context = {
       sourceRoot, output, reporter, sourceDefaulted, command,
-      settings: { ...settings, write, onBuilt: (b) => { built = b; } },
+      settings: { ...settings, onBuilt: (b) => { built = b; } },
     };
-    consumeLastAuditRun(); // nothing stale can be mistaken for this run's
     const { build: runBuild } = await import("./cli/commands/build.js");
     const status = await runBuild(context);
-    if (settings.auditGate) {
-      const run = consumeLastAuditRun();
-      result.report = run
-        ? reportOf({
-          documents: run.documents, findings: run.findings, base: run.base,
-          problemCount: reporter.problemCount, advisoryCount: reporter.advisoryCount,
-        })
-        : null;
-    }
-    if (write === false) {
+    const result = { status, diagnostics: reporter.sorted().map(plain) };
+    if (settings.dryRun) {
       result.files = new Map();
       if (built?.publishable) {
         for (const [path, content] of built.files) {
@@ -291,11 +261,13 @@ async function execute(command, options) {
         }
       }
     }
-    return { status, diagnostics: reporter.sorted().map(plain), ...result };
+    return result;
   } catch (error) {
-    // A usage error says nothing about the site; any other failure keeps what
-    // the pipeline had already found.
-    const result = failure(error, error instanceof UsageError ? [] : reporter.sorted().map(plain));
+    // Only what the command line would exit 2 for is a result. An I/O error or
+    // a bug in unify is not something to hand back as if it were a finding:
+    // it rejects, with the original Error and its stack.
+    if (!(error instanceof UsageError)) throw error;
+    const result = { status: 2, diagnostics: [], error: { message: error.message, fixes: [...error.fixes] } };
     return command === "audit" ? { ...result, report: null } : result;
   }
 }

@@ -849,10 +849,7 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
   // state whether this build reached the output directory without asking the
   // question a second way. `publish()` records no diagnostic (its own PUB-01
   // gate only declines), so the value cannot go stale between here and there.
-  // `settings.write === false` is the experimental API's `write: false`
-  // (src/index.js; never a flag): every step above ran, only this one — the
-  // transactional publish, still the only writer — is the branch not taken.
-  const published = shouldPublish(reporter) && !settings.dryRun && !gateBlocks && settings.write !== false;
+  const published = shouldPublish(reporter) && !settings.dryRun && !gateBlocks;
   if (published) {
     if (settings.clean) await publishModule.performClean({ output, source: sourceRoot });
     await publishModule.publish({ tempFiles, outputDir: output, reporter });
@@ -1008,7 +1005,7 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
     published,
   });
 
-  // The API's `write: false` reads the finished temp tree here, and only if
+  // The API's `build({ dryRun: true })` reads the finished temp tree here, and only if
   // this build could have published it. Like `onEvaluation`, set by a caller
   // that is not the command line; nothing here can alter what was built.
   settings.onBuilt?.({ files: tempFiles, publishable: shouldPublish(reporter) && !gateBlocks });

@@ -22,34 +22,34 @@ through the API, a person with a shell could already do.
 ```js
 import { build, audit } from "@fwdslsh/unify";
 
-const built = await build({ source: "site", output: "dist", strict: true });
-for (const d of built.diagnostics) {
-  console.log(`${d.file}${d.line ? `:${d.line}` : ""}: ${d.severity}: ${d.message}`);
-}
-console.log(`build status ${built.status}`);
-
-const { report } = await audit({ source: "site", baseUrl: "https://example.com/" });
-const broken = report.findings.filter((f) => f.severity === "broken");
+const audited = await audit({ source: "site", baseUrl: "https://example.com/" });
+const broken = audited.report?.findings.filter((f) => f.severity === "broken") ?? [];
 console.log(`${broken.length} broken findings`);
+
+if (audited.status === 0) {
+  const built = await build({ source: "site", output: "dist", baseUrl: "https://example.com/", strict: true });
+  for (const d of built.diagnostics) {
+    console.log(`${d.file}${d.line ? `:${d.line}` : ""}: ${d.severity}: ${d.message}`);
+  }
+  console.log(`build status ${built.status}`);
+}
 ```
 
-To get the site back as bytes instead of writing it:
+To get the site back as bytes instead of writing it, dry-run it:
 
 ```js
 import { build } from "@fwdslsh/unify";
 
-const { status, files } = await build({ source: "site", write: false });
+const { status, files } = await build({ source: "site", dryRun: true });
 for (const [path, bytes] of files) console.log(path, bytes.length);
 ```
 
 ## The package
 
-`@fwdslsh/unify` exports `build` and `audit`, and nothing else is importable:
-the package's `exports` map exposes the root only, so a deep import such as
-`@fwdslsh/unify/src/core/compose.js` is an error. (`run`, the command line's
-own entry, is still exported so `import { run }` keeps working; it is not part
-of the API.) Importing the package starts nothing, prints nothing and reads
-nothing.
+`@fwdslsh/unify` exports `build` and `audit`, and nothing else: the package's
+`exports` map exposes the root only, so a deep import such as
+`@fwdslsh/unify/src/core/compose.js` is an error. Importing the package starts
+nothing, prints nothing and reads nothing.
 
 The API works the same under Bun >= 1.2.0 and Node >= 22.12.0.
 
@@ -65,40 +65,38 @@ commands is an option here.
 - Relative paths resolve against `process.cwd()`, as the command line's do. There
   is no `cwd` option.
 - `generate` is a **path** to a JavaScript file, never a function.
-- An option that does not exist, or has the wrong type, is a usage error (below).
+- An option that does not exist for the function, or has the wrong type, is a usage
+  error (below).
 
 | | `build(options)` | `audit(options)` |
 |---|---|---|
-| In common | `source` `output` `exclude` `prettyUrls` `baseUrl` `canonical` `feedFull` `strict` `catalog` `searchCorpus` `includeNoindex` `generate` `sourceInventory` `extends` `config` | the same |
-| Only here | `clean` `dryRun` `audit` `write` | `external` |
+| In common | `source` `output` `exclude` `prettyUrls` `baseUrl` `canonical` `feedFull` `strict` `catalog` `searchCorpus` `includeNoindex` `generate` `sourceInventory` `extends` | the same |
+| Only here | `clean` `dryRun` | `external` |
 
-`audit` writes nothing, so `clean` and `dryRun` there are the same usage error
-the command line gives. `external: true` is the one option that touches the
-network: it fetches the off-origin URLs the site emits (`unify audit --external`).
+`audit` writes nothing, so it has neither `clean` nor `dryRun`. `external: true` is
+the one option that touches the network: it fetches the off-origin URLs the site
+emits (`unify audit --external`).
 
-Not available: `format` (serializing is the command line's job; the API returns
-an object), `saveConfig`, and everything specific to `dev`, `watch`, `init` and
-`update`, which stay CLI-only.
+Not available: `format` (serializing is the command line's job; the API returns an
+object), a gated-publish option (call `audit()`, then `build()`), and everything
+specific to `dev`, `watch`, `init` and `update`, which stay CLI-only. There are no
+API-only options.
 
-### `config`, `write`, `audit`
+### `unify.yaml`, and `dryRun`
 
-- **`config`** is the one option the command line has no flag for. Absent or
-  `false` (the default), no `unify.yaml` is read, so a call with explicit options
-  cannot be changed by a stray file in someone's repository. `true` discovers the
-  file as the command line does. A string names the file to read; relative paths
-  inside it resolve against that file.
-- **`write: false`** (`build` only) runs every step, the reference check
-  included, and publishes nothing: the result carries `files`, and the output
-  directory is neither created nor touched.
-- **`audit: true`** (`build` only) is `build --audit`: the build publishes only if
-  `unify audit` would exit 0, and the result carries the `report`.
+- **`unify.yaml`** is read exactly as the commands read it: the same discovery, the
+  same resolution of relative paths inside it. An option you pass **wins over the
+  file**, as a flag does on the command line, an explicit `false` included
+  (`prettyUrls: false` beats a saved `pretty-urls: true`).
+- **`dryRun: true`** (`build` only) runs every step, the reference check included,
+  and publishes nothing; the output directory is neither created nor touched. The
+  result carries `files` — the data form of what `unify build --dry-run` lists.
 
 ## Results
 
-Both functions resolve to an object and never throw for a bad site or bad options.
-
 ```
-{ status, diagnostics, files?, report?, error? }
+build(options)  -> Promise<{ status, diagnostics, files?, error? }>
+audit(options)  -> Promise<{ status, diagnostics, report, error? }>
 ```
 
 - **`status`** is the command line's exit code: `0` built, `1` a problem was found
@@ -109,15 +107,19 @@ Both functions resolve to an object and never throw for a bad site or bad option
   `{ severity, file, line?, message, context?, fixes? }`, ordered by path then line
   — the order and the content the command line prints, with `file` relative to the
   working directory. Empty on status 2.
-- **`files`** (`build` with `write: false`) is a `Map` from output path to bytes
+- **`files`** (`build`, only for a dry run) is a `Map` from output path to bytes
   (a `Uint8Array`) — exactly the tree a real build would have published. It is
-  empty when a problem stopped the build.
-- **`report`** (`audit`, and `build` with `audit: true`) is the object
-  `unify audit --format json` serializes, `schemaVersion` and all. `null` when the
-  run stopped before the site could be evaluated.
-- **`error`** is present on status 2, `{ message, fixes }`: what the command line
-  would have printed after `unify: `. It is also present when something failed that
-  is not a finding about the site (an unreadable file, say), with status 1.
+  empty when a problem stopped the build, and absent otherwise.
+- **`report`** (`audit`) is the object `unify audit --format json` serializes,
+  `schemaVersion` and all. It is `null` when the run stopped before the site could
+  be evaluated: a usage error, or a problem that stops the pipeline before the
+  scan, such as a failing generator (the problem is in `diagnostics`, `status` is
+  `1`).
+- **`error`**, `{ message, fixes }`, appears only with `status: 2`, a usage error:
+  what the command line prints for exit 2.
+
+Only what the command line would exit 0, 1 or 2 for is a result. Anything else — an
+I/O error, a bug in unify — **rejects** the promise with the original `Error`.
 
 Status 2 looks like this:
 
@@ -146,11 +148,5 @@ console.log(result.status, result.error.message);
   stderr reaches the command line's streams; it does not reach yours. A generator
   that fails still comes back as a located problem, with its error text in the
   message.
-- **`dryRun`'s report is not returned.** `dryRun: true` writes nothing and checks
-  everything, but the write/copy/delete list the command prints is not part of the
-  result; use `write: false` and `files` to see what would be written.
-- **`audit()` with a failing `generate`** returns status 1, the generator's problem
-  in `diagnostics`, `report: null` and an `error` (the command line's `audit` has
-  the same fault and ends with an internal error line).
 - No `.d.ts` files ship. The functions are documented with JSDoc.
 - No observers, hooks, callbacks or in-memory input. These are not planned.

@@ -1761,6 +1761,8 @@ Only the exit code depends on severity. The report, in every `--format` (§31.1)
 
 A pipeline problem exits 1 whether or not `--strict` is set, and whether or not there are findings. Evaluating output that cannot be built is meaningless, and the findings printed alongside it describe a site that would never ship.
 
+When the pipeline stops before the scan — a `--generate` generator that fails (P29), or a source-inventory frontmatter fault (§33.7) — there is no site to evaluate: `audit` prints the diagnostics the build reported, prints no report in any `--format` (nothing on stdout), and exits 1. It never ends in an internal error.
+
 ### 24.7 What `build` does with all of this
 
 Nothing, unless it is asked to with `--audit` (§24.8). `build` derives the manifest (§20.2 — it must, or the invariant that deriving it changes nothing would only be tested on the pages a discovery feature happens to touch), and never calls the evaluator. No finding in this section can affect a build's output, its diagnostics, or its exit code.

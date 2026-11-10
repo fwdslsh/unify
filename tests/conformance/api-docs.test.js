@@ -53,13 +53,13 @@ function run(runtime, dir, file) {
 const runtimes = { bun: process.execPath, node: Bun.which("node") };
 
 for (const [name, runtime] of Object.entries(runtimes)) {
-  test(`the first example builds, reports diagnostics and audits (${name})`, () => {
+  test(`the first example audits, then builds and reports diagnostics (${name})`, () => {
     expect(runtime, "node on PATH").toBeTruthy();
     const dir = project("example.mjs", jsBlock(0));
     const r = run(runtime, dir, "example.mjs");
     expect(r.stderr).toBe("");
     expect(r.exit).toBe(0);
-    expect(r.stdout).toBe("build status 0\n0 broken findings\n");
+    expect(r.stdout).toBe("0 broken findings\nbuild status 0\n");
     expect(existsSync(join(dir, "dist", "index.html"))).toBe(true);
   }, TEST_MS);
 

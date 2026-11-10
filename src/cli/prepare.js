@@ -22,12 +22,11 @@ import { resolveSettings } from "./settings.js";
  * @param {object} args
  * @param {string} args.command
  * @param {Record<string, any>} args.options - parsed flags, long names
- * @param {boolean|string} [args.config] - see `resolveSettings`'s `configSource`
  * @returns {{settings: Record<string, any>, sourceRoot: string, sourceDefaulted: boolean, output: string, saving: Map<string, string[]>|null}}
  * @throws {UsageError}
  */
-export function prepare({ command, options, config = true }) {
-  const { settings, sourceRoot, sourceDefaulted } = resolveSettings({ ...options, command }, process.cwd(), config);
+export function prepare({ command, options }) {
+  const { settings, sourceRoot, sourceDefaulted } = resolveSettings({ ...options, command });
 
   // `init` is exempt: its whole job is to create the source root, so requiring
   // one to already exist made `unify init --source new-site` exit 2 before the

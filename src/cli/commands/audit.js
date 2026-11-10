@@ -100,18 +100,19 @@ async function runBuildForAudit(context) {
  * renders them for the terminal; the experimental public API (`src/index.js`)
  * turns them into its result object. One evaluation, two presentations.
  * @param {object} context - the run context cli.js (or the API) assembles
- * @returns {Promise<{buildReporter: import("../../core/diagnostics.js").DiagnosticCollector, captured: string[], findings: any[], documents: any[], base: any}>}
+ * @returns {Promise<{buildReporter: import("../../core/diagnostics.js").DiagnosticCollector, captured: string[], findings: any[]|null, documents: any[]|null, base: any}>} `findings` is null when the build stopped before the scan
  */
 export async function evaluate(context) {
+  consumeLastAuditRun(); // clear anything an earlier run in this process left, so null below means THIS run
   const { reporter: buildReporter, captured } = await runBuildForAudit(context);
 
-  // Guaranteed non-null: `settings.audit = true` above makes `build.js` call
-  // `auditManifest` unconditionally before its only two returns (see
-  // `lastAuditRun`'s own comment in core/audit.js) — this project has no
-  // internal-error class that returns without throwing. Reading `run.findings`
-  // on a genuine `null` throws immediately rather than silently printing an
-  // empty report, which is the louder and more honest failure.
+  // Null when the build stopped before the scan — a generator that failed
+  // (P29), or a source-inventory frontmatter fault — because `build.js` then
+  // returns before it ever reaches `auditManifest`. There is no site to
+  // evaluate: the diagnostics the build already flushed are the whole answer,
+  // and the caller reports no findings (the API's `report: null`).
   const run = consumeLastAuditRun();
+  if (run === null) return { buildReporter, captured, findings: null, documents: null, base: null };
   let findings = run.findings;
   const { documents, base, htmlFiles } = run;
 
@@ -143,6 +144,13 @@ export async function audit(context) {
   }
 
   const { buildReporter, captured, findings, documents, base } = await evaluate(context);
+
+  // §24.2 — the pipeline stopped before the scan: nothing to evaluate, so no
+  // report in any format. The problem is already on stderr; exit as the build did.
+  if (findings === null) {
+    for (const line of captured) context.reporter.stdout.write(line);
+    return buildReporter.exitCode;
+  }
 
   // ---- the report ---------------------------------------------------------
   if (format === "human") {

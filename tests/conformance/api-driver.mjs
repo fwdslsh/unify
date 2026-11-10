@@ -33,7 +33,14 @@ async function runAll() {
   for (const c of spec.cases) {
     process.chdir(c.cwd);
     const fn = c.fn === "build" ? build : audit;
-    const r = await fn(c.options);
+    let r;
+    try {
+      r = await fn(c.options);
+    } catch (error) {
+      // a rejection is the API's answer to a failure that is not a finding
+      results[c.id] = { rejected: true, isError: error instanceof Error, message: error.message };
+      continue;
+    }
     const encoded = { ...r };
     if (r.files instanceof Map) {
       encoded.files = Object.fromEntries([...r.files].map(([p, b]) => [p, { isBytes: b instanceof Uint8Array, base64: Buffer.from(b).toString("base64") }]));

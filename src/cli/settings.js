@@ -10,11 +10,9 @@
  * it. cli.js importing a command module that imports cli.js back would have
  * been the alternative, and a cycle through the entrypoint is not one.
  */
-import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, isAbsolute, resolve } from "node:path";
-import { UsageError } from "../core/diagnostics.js";
 import { resolveSource } from "../core/paths.js";
-import { configPath, loadConfig, mergeConfig, parseConfig, templateRecord } from "./options.js";
+import { configPath, loadConfig, mergeConfig, templateRecord } from "./options.js";
 
 /**
  * Resolve the full run configuration from flags plus `unify.yaml`.
@@ -29,31 +27,18 @@ import { configPath, loadConfig, mergeConfig, parseConfig, templateRecord } from
  *   A parameter for the same reason `resolveSource(flag, cwd)` takes one — init's
  *   `--audit` gate resolves the project it just scaffolded, and a test names
  *   that directory without moving the process into it
- * @param {boolean|string} [configSource] - which `unify.yaml` to read: `true`
- *   (the CLI's way: the source root's, else the project root's), `false` (none —
- *   the public API's default), or the path of the file to read
  * @returns {{command: string, settings: Record<string, any>, sourceRoot: string, sourceDefaulted: boolean}}
  */
-export function resolveSettings(flags, cwd = process.cwd(), configSource = true) {
+export function resolveSettings(flags, cwd = process.cwd()) {
   const probe = resolveSource(flags.source, cwd);
-  let config;
-  let configFile;
-  if (typeof configSource === "string") {
-    configFile = resolve(cwd, configSource);
-    if (!existsSync(configFile) || !statSync(configFile).isFile()) {
-      throw new UsageError(`config file not found: ${configFile}`, ["pass config: true to discover unify.yaml as the CLI does, or the path of an existing file"]);
-    }
-    config = parseConfig(readFileSync(configFile, "utf8"), configFile);
-  } else {
-    config = configSource === false ? {} : loadConfig(probe.root, cwd);
-    configFile = configPath(probe.root, cwd).path;
-  }
+  const config = loadConfig(probe.root, cwd);
   // §18 — a path in unify.yaml is relative to the FILE, not to wherever the
   // command ran or to the source root: `source: site` and `generate:
   // scripts/gen.mjs` beside package.json name the directories beside it. For a
   // file inside the source root the two readings coincide, so nothing written
   // before 0.10 changes meaning. CLI flags keep their own rules (`--source`
   // from the working directory, `--generate` from the source root).
+  const configFile = configPath(probe.root, cwd).path;
   const configDir = dirname(configFile);
   for (const key of ["source", "generate"]) {
     if (typeof config[key] === "string" && !isAbsolute(config[key])) config[key] = resolve(configDir, config[key]);

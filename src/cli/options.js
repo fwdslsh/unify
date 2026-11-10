@@ -183,17 +183,19 @@ export function templateRecord(value) {
  *   - `save-config`: it writes `unify.yaml`;
  *   - `format`: it picks a serialization, and serializing is the CLI's job —
  *     the API returns the report as an object;
- *   - `external`: `audit`'s alone (`build` does not take it, as on the command line);
- *   - `audit` on `audit` itself: the command is the audit.
- * `clean` and `dry-run` stay valid names on `audit` so the one usage error that
- * explains them (`prepare.js`) is the CLI's own.
+ *   - `audit` on `build`: a gated publish is `audit()` and then `build()`; one
+ *     result shape per function;
+ *   - `external`: `audit`'s alone, as on the command line;
+ *   - `clean` and `dry-run` on `audit`, and `audit` itself: it never writes, and it is the audit.
+ * (`prepare.js` still refuses a `clean` or `dry-run` that arrives from a saved
+ * `unify.yaml` under `config: true`, exactly as the CLI does.)
  *
  * @param {"build"|"audit"} command
- * @returns {Record<string, {flag: string, kind: "flag"|"string"|"value"|"list"}>} camelCase name → registry entry
+ * @returns {Record<string, {flag: string, kind: "flag"|"string"|"value"|"list"}>} camelCase name -> registry entry
  */
 export function apiOptions(command) {
   const never = ["template", "keep", "yes", "port", "watch-path", "version", "help", "save-config", "format"];
-  const left = command === "build" ? ["external"] : ["audit"];
+  const left = command === "build" ? ["external", "audit"] : ["audit", "clean", "dry-run"];
   const camel = (flag) => flag.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
   return Object.fromEntries(
     Object.entries(OPTIONS)
