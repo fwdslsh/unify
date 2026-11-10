@@ -1,3 +1,7 @@
+---
+description: "Experimental: run(options), the build as a function for Node and Bun scripts, and the result it returns. It may change or be removed before v1."
+---
+
 # The JavaScript API
 
 > **Experimental: this API may change or be removed in any release before v1.**
