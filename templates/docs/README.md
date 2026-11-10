@@ -168,8 +168,8 @@ generator's directory is refused whether or not it publishes).
   the bare slot, and unfilled slots show their fallback. Main elements stay intact; their children
   are not fills. An include is still not a component: it takes no props and merges no attributes.
 - The layout's bare `<slot></slot>` — usually inside its `<main>` — receives everything the page
-  did not address elsewhere. Your first default-content main is unwrapped and its children used, so write
-  complete semantic documents.
+  did not address elsewhere. Your first default-content main is unwrapped, its children used and its attributes
+  merged onto the layout `<main>` that receives them (with no layout `<main>`, it ships whole).
 - A named slot `<slot name="footer">fallback</slot>` is filled by `slot="footer"` on a real
   element of the page, which replaces the slot tag and all. A `<slot>` tag written in a *page*
   fills nothing. Fills count on direct children of `<body>` (or of your `<main>`, unwrapped
@@ -178,8 +178,8 @@ generator's directory is refused whether or not it publishes).
 - Heads merge: the layout's is the base, your `<title>` is joined in front of the layout's
   (the separator lives in the layout — `<title>— My Site</title>`, and a page writes just
   `<title>About</title>`), your `<meta>` replaces the layout's with the same `name`/`property`,
-  and everything else appends. On `<html>`/`<body>` your classes are added and any other attribute
-  you set wins; attributes merge nowhere else.
+  and everything else appends. On `<html>`/`<body>` and the layout `<main>` receiving yours, your classes
+  are added and any other attribute you set wins; attributes merge nowhere else.
 
 ## Metadata, without inventing anything
 
