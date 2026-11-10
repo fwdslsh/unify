@@ -23,7 +23,7 @@ import { fileURLToPath } from "node:url";
 import pkg from "../package.json" with { type: "json" };
 import { Reporter, UsageError } from "./core/diagnostics.js";
 import { cleanRefusalReason, resolveSource } from "./core/paths.js";
-import { configPath, parseArgs } from "./cli/options.js";
+import { configPath, optionsFrom, parseArgs } from "./cli/options.js";
 import { resolveSettings } from "./cli/settings.js";
 import { saveEntries, writeConfig } from "./cli/save-config.js";
 import { classifyTemplateSource } from "./cli/template-source.js";
@@ -103,22 +103,34 @@ function version() {
  */
 
 /**
- * The command line, as a function: `run(["build", "--base-url", "https://example.com/"])`
- * is `unify build --base-url https://example.com/`, in this process. The same
- * arguments, the same `unify.yaml`, the same files written and the same lines
- * printed; what it adds is the return value.
+ * Build the site from a script: `run({ source: "site", baseUrl: "https://example.com/" })`
+ * is `unify build --source site --base-url https://example.com/`, in this
+ * process. The options are the command's flags by their long names in
+ * camelCase; `unify.yaml` is read, the site is written and the same lines are
+ * printed as on the command line. What it adds is the return value.
  *
  * This is the package's public API, and it is EXPERIMENTAL: it may change or be
  * removed in any release before v1. See docs/api.md.
  *
- * @param {string[]} argv - the arguments after `unify`
+ * @param {Record<string, boolean|string|string[]>} [options] - for example
+ *   `{ source: "site", prettyUrls: true, dryRun: true, audit: true }`
  * @returns {Promise<Result>} rejects with a `UsageError` (`.message`, `.fixes`)
  *   for what the command line exits 2 for, and with the original error for
  *   anything unexpected
  */
-export async function run(argv) {
+export async function run(options = {}) {
+  return main({ command: "build", template: undefined, options: optionsFrom(options) });
+}
+
+/**
+ * One run of the command line, already parsed: the program below calls it with
+ * `parseArgs(argv)`, `run()` with its options object.
+ * @param {ReturnType<typeof parseArgs>} parsed
+ * @returns {Promise<Result>}
+ */
+async function main(parsed) {
   const result = { status: 0, diagnostics: [], files: new Map(), report: null };
-  result.status = await execute(argv, result);
+  result.status = await execute(parsed, result);
   for (const [path, content] of result.files) {
     if (typeof content === "string") result.files.set(path, Buffer.from(content));
   }
@@ -126,13 +138,12 @@ export async function run(argv) {
 }
 
 /**
- * The command itself: parse, check, dispatch.
- * @param {string[]} argv
+ * The command itself: check, dispatch.
+ * @param {ReturnType<typeof parseArgs>} parsed
  * @param {Result} result - filled in by the commands that build a site
  * @returns {Promise<number>} the exit code
  */
-async function execute(argv, result) {
-  const { command, template, options } = parseArgs(argv);
+async function execute({ command, template, options }, result) {
 
   if (options.help) {
     process.stdout.write(HELP);
@@ -399,7 +410,7 @@ function isProgram() {
 /* c8 ignore start — process wiring, exercised by the conformance harness */
 if (isProgram()) {
   try {
-    process.exitCode = (await run(process.argv.slice(2))).status;
+    process.exitCode = (await main(parseArgs(process.argv.slice(2)))).status;
   } catch (error) {
     const usage = error instanceof UsageError;
     process.stderr.write(`${usage ? "" : "unify: "}${error.message}\n`);

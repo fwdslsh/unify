@@ -1,24 +1,24 @@
 /**
- * `run-result.test.js` — gate G15: what `run(argv)` returns is what the command
- * line did, as data.
+ * `run-result.test.js` — gate G15: what `run(options)` returns is what the
+ * build did, as data.
  *
- * `run` is the package's one export and the function the `unify` program itself
- * calls, so there is no second implementation to compare. What needs holding is
- * that the object it returns agrees with what the same command printed, wrote
- * and exited with — and that a script calling it gets the command line's own
- * behaviour in its own process.
+ * `run` is the package's one export. It runs the `build` command through the
+ * same code the `unify` program runs, so there is no second implementation to
+ * compare; what needs holding is that the object it returns agrees with what
+ * the same build printed, wrote and exited with.
  *
  * Each case runs twice in one directory, under bun and under node: the real
- * CLI, then a script that imports `run` from the package by name (through
- * `node_modules/@fwdslsh/unify`, as a user's script does) and writes the result
- * to a file. Then:
+ * CLI (`unify build <flags>`), then a script that imports `run` from the
+ * package by name (through `node_modules/@fwdslsh/unify`, as a user's script
+ * does), calls it with the same options as an object, and writes the result to
+ * a file. Then:
  *   - the script's stdout, stderr and the directory it leaves are byte-identical
  *     to the CLI's, and `status` is the CLI's exit code;
  *   - `diagnostics`, printed in §14.1's form, are the CLI's stderr;
  *   - `files` is the published tree, byte for byte, written or not, and empty
  *     when nothing could be published;
- *   - `report` is the document `unify audit --format json` prints, when the run
- *     was audited, and null otherwise;
+ *   - `report` is the document `unify audit --format json` prints, when the
+ *     build was audited, and null otherwise;
  *   - what the command line exits 2 for rejects with the `UsageError`.
  *
  * Real subprocesses only (H3: nothing here imports from the product); no
@@ -45,9 +45,9 @@ const DRIVER = `
 import { run } from "@fwdslsh/unify";
 import { writeFileSync } from "node:fs";
 const out = { runs: [] };
-for (const argv of JSON.parse(process.env.UNIFY_ARGVS)) {
+for (const options of JSON.parse(process.env.UNIFY_OPTIONS)) {
   try {
-    const r = await run(argv);
+    const r = await run(options);
     out.runs.push({
       keys: Object.keys(r), status: r.status, diagnostics: r.diagnostics, report: r.report,
       files: [...r.files].map(([path, bytes]) => [path, bytes instanceof Uint8Array, Buffer.from(bytes).toString("base64")]),
@@ -95,14 +95,15 @@ function published(dir) {
   return out;
 }
 
-/** The CLI, then `run()` in a script, for the same argv in the same directory. */
-function both(runtime, dir, argv, { again = [] } = {}) {
+/** `unify build <argv>`, then `run(options)` in a script, in the same directory. */
+function both(runtime, dir, argv, options, { again = [] } = {}) {
   rmSync(join(dir, "dist"), { recursive: true, force: true });
-  const cli = spawn([runtime, CLI, ...argv], dir);
+  const cli = spawn([runtime, CLI, "build", ...argv], dir);
   const cliTree = published(dir);
   rmSync(join(dir, "dist"), { recursive: true, force: true });
   const resultFile = join(dir, "result.json");
-  const script = spawn([runtime, "driver.mjs"], dir, { UNIFY_ARGVS: JSON.stringify([argv, ...again]), UNIFY_RESULT: resultFile });
+  const script = spawn([runtime, "driver.mjs"], dir, { UNIFY_OPTIONS: JSON.stringify([options, ...again]), UNIFY_RESULT: resultFile });
+  expect(script.exit, script.stderr).toBe(0);
   const out = JSON.parse(readFileSync(resultFile, "utf8"));
   rmSync(resultFile);
   return { cli, cliTree, script, tree: published(dir), out, result: out.runs[0] };
@@ -127,8 +128,8 @@ for (const [name, runtime] of Object.entries(runtimes)) {
     const example = spawn([runtime, "example.mjs"], dir);
     expect(example.stderr).toBe("");
     expect(example.exit).toBe(0);
-    expect(example.stdout).toContain("status 0, 4 files\n"); // two pages, the asset, sitemap.xml
-    expect(example.stdout.endsWith("0 broken findings\n")).toBe(true);
+    expect(example.stdout.endsWith("status 0, 4 files\n0 broken findings\n")).toBe(true); // two pages, the asset, sitemap.xml
+    expect(existsSync(join(dir, "dist")), "the example is a dry run").toBe(false);
     writeFileSync(join(dir, "usage.mjs"), docBlock(1));
     expect(spawn([runtime, "usage.mjs"], dir)).toEqual({
       exit: 0, stderr: "", stdout: "UsageError --base-url needs the site's whole address, got: example.com\n",
@@ -138,7 +139,7 @@ for (const [name, runtime] of Object.entries(runtimes)) {
   test(`a build: the CLI's output, and the site it wrote as \`files\` (${name})`, () => {
     expect(runtime, "node on PATH").toBeTruthy();
     const dir = project(SITE);
-    const { cli, cliTree, script, tree, out, result } = both(runtime, dir, ["build"], { again: [["build"]] });
+    const { cli, cliTree, script, tree, out, result } = both(runtime, dir, ["--source", "site"], { source: "site" }, { again: [{ source: "site" }] });
     expect(cli.exit).toBe(0);
     expect(script).toEqual({ exit: 0, stdout: cli.stdout + cli.stdout, stderr: "" }); // it ran twice
     expect(tree).toEqual(cliTree);
@@ -153,10 +154,22 @@ for (const [name, runtime] of Object.entries(runtimes)) {
     expect(out.runs[1], "a second run in the same process is independent of the first").toEqual(result);
   }, TEST_MS);
 
-  test(`a dry run returns the same \`files\` and writes nothing (${name})`, () => {
+  test(`options are the flags: camelCase names, booleans, strings and lists (${name})`, () => {
+    const dir = project({ ...SITE, "site/drafts/wip.html": page("WIP", ""), "unify.yaml": "exclude:\n  - _*\n" });
+    const argv = ["--pretty-urls", "--base-url", "https://example.com/docs/", "--exclude", "_*", "--exclude", "drafts/**"];
+    const options = { prettyUrls: true, baseUrl: "https://example.com/docs/", exclude: ["_*", "drafts/**"], clean: false, strict: undefined };
+    const { cli, cliTree, script, tree, result } = both(runtime, dir, argv, options);
+    expect(cli.exit).toBe(0);
+    expect(script).toEqual({ exit: 0, stdout: cli.stdout, stderr: cli.stderr });
+    expect(tree).toEqual(cliTree);
+    expect(filesOf(result)).toEqual(cliTree);
+    expect(Object.keys(cliTree)).toEqual(["about/index.html", "assets/mark.bin", "index.html", "sitemap.xml"]);
+  }, TEST_MS);
+
+  test(`dryRun returns the same \`files\` and writes nothing (${name})`, () => {
     const dir = project(SITE);
-    const real = both(runtime, dir, ["build"]);
-    const { cli, script, tree, result } = both(runtime, dir, ["build", "--dry-run"]);
+    const real = both(runtime, dir, [], {});
+    const { cli, script, tree, result } = both(runtime, dir, ["--dry-run"], { dryRun: true });
     expect(script).toEqual({ exit: 0, stdout: cli.stdout, stderr: cli.stderr });
     expect(cli.stdout).toContain("would publish 3 files");
     expect(tree, "nothing written").toBeNull();
@@ -166,7 +179,7 @@ for (const [name, runtime] of Object.entries(runtimes)) {
 
   test(`a problem: status 1, the diagnostics as data, no \`files\`, nothing published (${name})`, () => {
     const dir = project(BROKEN);
-    const { cli, script, tree, result } = both(runtime, dir, ["build"]);
+    const { cli, script, tree, result } = both(runtime, dir, [], {});
     expect(cli.exit).toBe(1);
     expect(script).toEqual({ exit: 0, stdout: cli.stdout, stderr: cli.stderr });
     expect(tree).toBeNull();
@@ -181,39 +194,30 @@ for (const [name, runtime] of Object.entries(runtimes)) {
     expect(result.report).toBeNull();
   }, TEST_MS);
 
-  test(`audit: \`report\` is the --format json document, whatever was printed (${name})`, () => {
+  test(`audit: \`report\` is the document unify audit --format json prints (${name})`, () => {
     const dir = project(SITE);
     const flags = ["--base-url", "https://example.com/docs/"];
-    const real = both(runtime, dir, ["build", ...flags]);
-    const json = both(runtime, dir, ["audit", ...flags, "--format", "json"]);
-    expect(json.script).toEqual({ exit: 0, stdout: json.cli.stdout, stderr: json.cli.stderr });
-    expect(json.tree, "audit writes nothing").toBeNull();
-    const document = JSON.parse(json.cli.stdout);
+    const document = JSON.parse(spawn([runtime, CLI, "audit", ...flags, "--format", "json"], dir).stdout);
     expect(document.schemaVersion).toBe(1);
-    expect(json.result.status).toBe(json.cli.exit);
-    expect(json.result.report).toEqual(document);
-    expect(filesOf(json.result), "the site the build would publish").toEqual(real.cliTree);
+    const { cli, cliTree, script, tree, result } = both(runtime, dir, [...flags, "--audit"], { baseUrl: "https://example.com/docs/", audit: true });
+    expect(script).toEqual({ exit: 0, stdout: cli.stdout, stderr: cli.stderr });
+    expect(tree).toEqual(cliTree);
+    expect(result.status).toBe(cli.exit);
+    expect(result.report).toEqual(document);
+    expect(filesOf(result)).toEqual(cliTree);
 
-    for (const format of ["human", "sarif"]) {
-      const other = both(runtime, dir, ["audit", ...flags, "--format", format]);
-      expect(other.script).toEqual({ exit: 0, stdout: other.cli.stdout, stderr: other.cli.stderr });
-      expect(other.result.report).toEqual(document);
-    }
-
-    const gated = both(runtime, dir, ["build", ...flags, "--audit"]);
-    expect(gated.script).toEqual({ exit: 0, stdout: gated.cli.stdout, stderr: gated.cli.stderr });
-    expect(gated.result.status).toBe(gated.cli.exit);
-    expect(gated.result.report, "build --audit carries the same report").toEqual(document);
-    expect(filesOf(gated.result)).toEqual(gated.cliTree);
+    const dry = both(runtime, dir, [...flags, "--audit", "--dry-run"], { baseUrl: "https://example.com/docs/", audit: true, dryRun: true });
+    expect(dry.tree, "audited and written nowhere").toBeNull();
+    expect(dry.result.report).toEqual(document);
+    expect(filesOf(dry.result)).toEqual(cliTree);
   }, TEST_MS);
 
-  test(`a generator that fails under audit: the problem, no report, no \`files\` (${name})`, () => {
+  test(`a generator that fails: the problem, no report, no \`files\` (${name})`, () => {
     const dir = project(FAILING_GENERATOR);
-    const argv = ["audit", "--generate", join(dir, "scripts", "gen.mjs")];
-    const { cli, script, result } = both(runtime, dir, argv);
+    const generate = join(dir, "scripts", "gen.mjs");
+    const { cli, script, result } = both(runtime, dir, ["--generate", generate, "--audit"], { generate, audit: true });
     expect(cli.exit).toBe(1);
-    expect(cli.stdout).toBe("");
-    expect(script).toEqual({ exit: 0, stdout: "", stderr: cli.stderr });
+    expect(script).toEqual({ exit: 0, stdout: cli.stdout, stderr: cli.stderr });
     expect(result.status).toBe(1);
     expect(result.diagnostics.map((d) => d.severity)).toEqual(["problem"]);
     expect(printed(result.diagnostics)).toBe(cli.stderr);
@@ -223,20 +227,24 @@ for (const [name, runtime] of Object.entries(runtimes)) {
 
   test(`what the command line exits 2 for rejects with the UsageError (${name})`, () => {
     const dir = project(SITE);
-    for (const argv of [["build", "--base-url", "example.com"], ["build", "--no-such-flag"], ["audit", "--clean"]]) {
-      const { cli, script, tree, result } = both(runtime, dir, argv);
-      expect(cli.exit).toBe(2);
-      expect(script, "a rejection prints nothing by itself").toEqual({ exit: 0, stdout: "", stderr: "" });
-      expect(tree).toBeNull();
-      expect(result.rejected.name).toBe("UsageError");
-      expect(`${result.rejected.message}\n${result.rejected.fixes.map((fix) => `  fix: ${fix}\n`).join("")}`).toBe(cli.stderr);
-    }
+    const { cli, script, tree, result } = both(runtime, dir, ["--base-url", "example.com"], { baseUrl: "example.com" });
+    expect(cli.exit).toBe(2);
+    expect(script, "a rejection prints nothing by itself").toEqual({ exit: 0, stdout: "", stderr: "" });
+    expect(tree).toBeNull();
+    expect(result.rejected.name).toBe("UsageError");
+    expect(`${result.rejected.message}\n${result.rejected.fixes.map((fix) => `  fix: ${fix}\n`).join("")}`).toBe(cli.stderr);
+
+    const unknown = both(runtime, dir, ["--no-such-flag"], { noSuchFlag: true });
+    expect(unknown.cli.exit).toBe(2);
+    expect(unknown.result.rejected).toEqual({ name: "UsageError", message: "unknown option: noSuchFlag", fixes: ["run `unify --help` for the full surface"] });
   }, TEST_MS);
 
-  test(`a command that builds no site returns the same four keys (${name})`, () => {
+  test(`a value that cannot be an option's value is a TypeError (${name})`, () => {
     const dir = project(SITE);
-    const { cli, script, result } = both(runtime, dir, ["--version"]);
-    expect(script).toEqual({ exit: 0, stdout: cli.stdout, stderr: "" });
-    expect(result).toEqual({ keys: ["status", "diagnostics", "files", "report"], status: 0, diagnostics: [], files: [], report: null });
+    for (const options of [{ source: 5 }, { prettyUrls: "yes" }, { exclude: [1] }, ["build"], null]) {
+      const { tree, result } = both(runtime, dir, ["--version"], options);
+      expect(result.rejected.name, JSON.stringify(options)).toBe("TypeError");
+      expect(tree, "nothing was built").toBeNull();
+    }
   }, TEST_MS);
 }
