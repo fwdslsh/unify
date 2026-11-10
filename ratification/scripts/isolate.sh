@@ -9,24 +9,19 @@
 # to hide can be named in RATIFY_MASK, colon-separated. Runs as root, or unprivileged
 # through a user namespace where the kernel allows one. Linux only.
 #
-# Why this exists: cwd is not isolation. A sample with a shell — or just a file tool given
-# an absolute path — can reach every other copy of the tool on the box. A probe run
-# confirmed it: the agent answered "NO" to the protocol's project-context question and, in
-# the same breath, listed three conformance specs and six harness copies it had just found.
-# Rounds 16-18 ran from /tmp/r16../tmp/r18 and were exposed the same way; round 29's first
-# probe found the published package source in the bun cache.
+# A working directory alone does not isolate documentation or credentials.
+# Mount masks hide repository context from each sample.
 #
 # So the sample gets: a fresh empty /tmp holding only itself, and an empty directory over
 # the repository, the package caches that hold unify's README and templates, the user's
 # OpenCode configuration (instructions, agents, commands, plugins, MCP servers, skills —
 # run-round.mjs passes the providers back in) and prompt history, and the Claude and agents
 # directories whose skills and CLAUDE.md OpenCode would otherwise load. Masking /tmp wholesale beats
-# enumerating leak paths — the enumeration was wrong twice.
+# enumerating individual paths.
 #
 # Order matters. The sample and its state directory both live inside the repository, so
 # each is bound to its new place BEFORE the repository is masked; bound afterwards, the
-# path would name a directory inside the mask. Round 27 lost every transcript to exactly
-# that ordering, silently, while each sample reported success.
+# path would name a directory inside the mask, losing the original transcript location.
 set -euo pipefail
 
 if [ "$#" -lt 4 ]; then

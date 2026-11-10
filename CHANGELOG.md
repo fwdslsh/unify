@@ -6,6 +6,85 @@ upgrading across them.
 The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] - 2026-11-10
+
+Two changes to read before upgrading, both under Changed: a page's `<main>` now composes with
+the layout's `<main>`, which changes built output, and `run`, the package's export, takes an
+options object. Also new: a generator can read each page's published address, and `run(options)`
+is documented as an experimental JavaScript API.
+
+### Changed
+
+- **`run`, the package's export, takes an options object and returns a result object (#50).** `import { run } from "@fwdslsh/unify"` already resolved: undocumented, it took the command line's argument list, printed, and returned the exit code. It is now the experimental JavaScript API (below): it takes `{ source: "site", ... }`, prints nothing, always runs the build, and resolves to `{ status, diagnostics, files, report }`. A script that called `run(["build", ...])` passes the options as an object and reads `.status`; one that ran another command through it (`audit`, `init`, ...) spawns the `unify` program for that. The `unify` program itself is unchanged.
+
+- **A page's `<main>` now composes with the layout's `<main>`: its attributes are kept, and a layout with no `<main>` keeps the element (#147, #148).** This changes built output. The page's default-content `<main>` is still unwrapped when a layout `<main>` receives its content, but its attributes are no longer discarded: they merge onto that layout `<main>` by the `<html>`/`<body>` rules (layout classes first, then new page classes; any other attribute the page sets wins; layout-only attributes stay). Layout `<main id="content" class="shell" tabindex="-1"><slot></slot></main>` with page `<main id="article" class="article"><h1>Example</h1></main>` built `<main id="content" class="shell" tabindex="-1"><h1>Example</h1></main>` and now builds `<main id="article" class="shell article" tabindex="-1"><h1>Example</h1></main>`. And when the layout's bare `<slot>` sits outside any `<main>` and the layout has no `<main>` at all (`<header>…</header><slot></slot><footer>…</footer>`), the page's `<main>` is now kept whole, in place among its siblings, where before the element and its attributes were removed and the page shipped with no main landmark. Everything else is as it was: a bare slot beside a layout `<main>` elsewhere still unwraps and carries nothing, as does a layout with only named slots; named `<main slot="…">` fills and sink-less layouts are untouched. Check on upgrade:
+  - `<main>` attributes that were silently dropped now apply: a class can restyle a page, and `data-*`/ARIA attributes can change behaviour.
+  - **A page `id` on `<main>` replaces the layout main's `id`**, which breaks a layout skip link (`<a href="#content">`) on that page. The build still succeeds; `unify audit` is what reports the broken fragment.
+  - A layout with a body-level bare slot and no `<main>` now emits the page's `<main>`, so selectors and scripts that relied on its absence need a look. A kept `<main>` is content, so even an empty one stops the slot's fallback from rendering.
+
+### Added
+
+- **An experimental JavaScript API: `run(options)` builds the site and returns what the build produced (#50).** `import { run } from "@fwdslsh/unify"`, then `const { status, diagnostics, files, report } = await run({ source: "site", baseUrl: "https://example.com/" })`. It is `unify build` with those options, run through the same code: the options are the command's flags by their long names in camelCase, `unify.yaml` is read and the site is written, and nothing is printed: what the command would print comes back as data. `status` is the exit code; `diagnostics` the problems and advisories as objects, in the order they are printed; `files` the built site as a `Map` of output path to bytes, returned whether or not it was written (so `dryRun` returns it too; empty when a problem blocked the build); `report` the object `unify audit --format json` prints when `audit` is set, else `null`. A usage error rejects with the `UsageError` (its `message` and `fixes`), and so does an option that belongs to another command, such as `external` or `port`, which the build would otherwise ignore; anything unexpected rejects with the original error. `unify audit --external` is not reachable through `run` yet (#163). See `docs/api.md`. **It is experimental and may change or be removed in any release before v1**; the command line is the stable surface. It is not a plugin API: nothing hooks into composition.
+- **`source-pages.json` records carry the page's address: `outputPath`, `path` and `url` (#149).** A generator writing something that is not HTML (an RSS file, a JSON index) had to re-derive each page's published address, because nothing rewrites a link outside HTML. Every record now ends with the page's projected output file, its public root-relative address and its absolute URL under the build's `--pretty-urls` and `--base-url` (`url` is `null` without `--base-url`), computed by the same functions as `catalog.json` and `audit --format json`. They are a projection from the source path and the flags, not a promise the page is emitted: a page that collides still fails the build. Additive, so `schemaVersion` stays `1` and `href` is unchanged. The RSS generator recipe reads `url` instead of working the address out. This is the filesystem form of the helper #149 asked for: it reaches a generator run by the standalone binary, which has no package to import.
+
+### Fixed
+
+- **`unify audit` no longer ends in an internal error when the pipeline stops before the scan.** With a `--generate` generator that fails (or a source-inventory frontmatter fault), it printed the problem and then `unify: null is not an object (evaluating 'run.findings')` under Bun or `unify: Cannot read properties of null (reading 'findings')` under Node, and exited 1. There is no site to evaluate then, so it now prints only the problem the build reported, no report in any `--format` (stdout stays empty), and exits 1 as before.
+- **Merged root attributes containing quotes are emitted well-formed.** A page `<body data-x='{"b":2}'>` over a layout that set the same attribute built `<body data-x="{"b":2}">`. A merged value is now written in `"` quotes, in `'` quotes when it holds a `"`, and with `&quot;` only when it holds both, on `<html>`, `<body>` and `<main>`.
+
+## [0.11.19] - 2026-11-09
+
+### Changed
+
+- **Include previews can show the complete page or layout.** Choosing a page or layout now defaults to **In context**, preserving surrounding markup, page styles and classes, and nested or repeated include content. **Isolated** keeps the existing focused preview. **Locate include** cycles through visible include elements without adding layout wrappers. Layout-only previews offer explicit, labeled placement in main content when the include is not already rendered there. Preview choices survive reloads and never change source files or published output.
+
+### Fixed
+
+- **Unavailable source previews no longer offer dead links (#153).** Generated or otherwise unavailable layouts and includes remain visible as labeled dependencies, while authored sources retain working previews. Failed rebuilds preserve the dependency map of the last published pages. An include preview whose selected page has an unavailable layout explains the limitation and links to the built page.
+- **Development links and assets work under `--base-url` subpaths.** The dev server serves the deployment mount as well as its existing root addresses, and the toolbar recognizes explicit `index.html` addresses and other aliases of the same page. The preview index also lists pages inherited from templates.
+- **Toolbar choices survive navigation.** Turning the toolbar off persists across pages, previews and redirects; page and layout selectors preserve unrelated query parameters, repeated values and URL fragments. Site pseudo-element styles no longer leak into toolbar controls.
+- **Generator and post-processing guidance matches the existing behavior (#152).** The integration guide correctly describes the source inventory as enabled by default for configured generators. It also explains where Unify's transaction ends, what source-based audit checks, and which watch, validation and artifact-update responsibilities belong to external tools.
+- **Scaffold and example guidance reflects current behavior.** Starter READMEs describe the new include preview controls, the blog template identifies the built-in Atom feed correctly, and the CLI reference and examples correct stale generator and resolved-finding descriptions.
+
+## [0.11.18] - 2026-11-08
+
+### Changed
+
+- **A plain `data-slot` or `data-layout` that addresses nothing is the author's (#154).** P08 read
+  `data-slot` on every element of every source file and failed the build, and P07 did the same for
+  `data-layout` on any element below the root. Both are ordinary `data-*` names that third-party markup
+  uses for its own purposes — shadcn/ui puts a `data-slot` on every primitive — and a port that carried
+  such markup could not build until the attributes were renamed. unify consumes `data-layout` on
+  `<html>`/`<body>` alone and never consumed `data-slot`, so nothing was ever lost; the two checks now
+  reach only as far as the intent is unambiguous. `data-slot="X"` is still P08 where it would have been
+  a fill — on an element in fill position whose layout, or whose fragment in a slotted include, declares
+  `<slot name="X">` — and names `slot="X"` as the fix. `data-layout` off the root is still P07 when its
+  value is a layout reference, a path ending `.html` or `none`. `data-unify` and `unify-*`, the
+  unify-branded tokens, are swept everywhere as before. A `<title data-slot="title">` in a layout, the
+  0.8.3 case, is no longer reported: a page's title merges regardless (conformance spec §6.3, §7.3, §32.3).
+
+### Fixed
+
+- **Strict audit recognizes navigation supplied by fetched fragments.** Pages linked from a shipped
+  `.fragment.html` referenced by a composed page no longer receive false `page-orphan` findings.
+  Fragment URLs resolve against their consuming page, including pretty URLs under a deployment
+  subpath; unrelated orphans and broken findings still block strict publishing.
+
+- **P15 points at the include recipe (#155).** The fix line for a layout that declares `data-layout`
+  said only to make it a complete standalone layout or delete it, which read as "copy the shell"; it
+  now also says to keep shared chrome in `_includes/`, so a section layout repeats one `<include>` per
+  region. The product spec's "accepted cost is repeating shared chrome" is corrected to match Getting
+  Started, and the first external request for chaining is logged beside the deferral (product spec
+  §3.2, §6.6).
+
+### Added
+
+- **A porting guide (#156).** `docs/guides/porting-an-existing-site.md` maps each live address to the
+  source path that keeps it, in a plain build and under `--pretty-urls`; states the rule for a site that
+  mixes `/x/` and `/x.html` addresses (no flag, every route in its path); and gives a ten-line check
+  that compares `unify audit --format json` against the list of addresses a port must keep. Every
+  literal is tested.
+
 ## [0.11.17] - 2026-10-29
 
 ### Added
@@ -1119,7 +1198,11 @@ with generated compare-link notes only. Their diffs are on the
 [releases page](https://github.com/fwdslsh/unify/releases). Nothing here
 retroactively reconstructs detail those notes never carried.
 
-[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.11.16...HEAD
+[Unreleased]: https://github.com/fwdslsh/unify/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/fwdslsh/unify/compare/v0.11.19...v0.12.0
+[0.11.19]: https://github.com/fwdslsh/unify/compare/v0.11.18...v0.11.19
+[0.11.18]: https://github.com/fwdslsh/unify/compare/v0.11.17...v0.11.18
+[0.11.17]: https://github.com/fwdslsh/unify/compare/v0.11.16...v0.11.17
 [0.11.16]: https://github.com/fwdslsh/unify/compare/v0.11.15...v0.11.16
 [0.11.15]: https://github.com/fwdslsh/unify/compare/v0.11.14...v0.11.15
 [0.11.14]: https://github.com/fwdslsh/unify/compare/v0.11.13...v0.11.14

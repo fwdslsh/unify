@@ -71,6 +71,7 @@ import { checkSchemaDeclarations, generateStructuredData } from "../../core/stru
 import * as robots from "../../core/robots.js";
 import * as generate from "../../core/generate.js";
 import { buildSourceInventory } from "../../core/source-inventory.js";
+import { buildReport } from "../../core/report.js";
 
 /**
  * @param {object} context
@@ -86,6 +87,13 @@ import { buildSourceInventory } from "../../core/source-inventory.js";
  *   function directly with no command at all — every real caller supplies one.
  *   Read solely to fill §33.2's generator-context `command` field (below); it
  *   changes nothing else about the pipeline.
+ * @param {{diagnostics: object[], files: Map<string, string|Uint8Array>, report: object|null}} [context.result]
+ *   - what `run()` (cli.js) returns to its caller, filled in here: the
+ *   diagnostics as data, the tree this build produced when it could be
+ *   published, and the audit report when the build was audited. `dev`, `watch`
+ *   and `init` pass none. Nothing reads it back; it changes nothing about the pipeline.
+ * @param {{stdout: {write(s: string): unknown}, stderr: {write(s: string): unknown}}} [context.io] - where a
+ *   generator's own output is passed through (§33.2): the process's streams unless `run()` says otherwise.
  * @returns {Promise<number>}
  *
  * Two keys on `settings` are set by a command rather than by a flag, and both
@@ -100,7 +108,7 @@ import { buildSourceInventory } from "../../core/source-inventory.js";
  * and `unify dev` IS `unify watch` plus a server — there is no other seam
  * between the two that reaches a rebuild.
  */
-export async function build({ sourceRoot, output, settings, reporter, sourceDefaulted = false, command = "build" }) {
+export async function build({ sourceRoot, output, settings, reporter, sourceDefaulted = false, command = "build", result, io = process }) {
   // ---- §34 — the template this site extends, BEFORE anything else ----------
   // Fetched (or found in the cache, or read in place) before the generator
   // runs and before anything is scanned, so a source that cannot be reached
@@ -132,14 +140,14 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
       // is pure and deterministic, so a second call here and `runBuild`'s own
       // below produce the identical `{origin, pathPrefix}` for the same flag.
       const baseConfig = settings.baseUrl ? urls.parseBaseUrl(settings.baseUrl) : null;
-      // §33.7 — the opt-in source inventory: the build's own scan of the SOURCE
+      // §33.7 — the source inventory (on by default with a generator): the build's own scan of the SOURCE
       // tree (no overlay, the generator hasn't run), read for authored metadata.
       // A frontmatter problem it reports stops the build here, before the
       // generator, the same located way and with the same exit as P29 below.
       let sourcePagesPath = null;
       if (settings.sourceInventory) {
         const sourceFiles = scanSourceTree(sourceRoot, output, settings.exclude, reporter);
-        const inventory = buildSourceInventory({ files: sourceFiles, sourceRoot, reporter });
+        const inventory = buildSourceInventory({ files: sourceFiles, sourceRoot, reporter, prettyUrls: settings.prettyUrls, base: baseConfig });
         if (!reporter.canPublish) {
           relocateDiagnosticsToCwd(reporter, sourceRoot);
           reporter.flush();
@@ -162,7 +170,7 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
         searchCorpusPath: settings.searchCorpus ? searchCorpus.SEARCH_CORPUS_PATH : null,
         sourcePagesPath,
       });
-      const ok = await generate.runGenerator({ generatorAbs, sourceRoot, overlayDir, contextPath, reporter });
+      const ok = await generate.runGenerator({ generatorAbs, sourceRoot, overlayDir, contextPath, reporter, io });
       if (!ok) {
         // P29 stops the build BEFORE the scan: a partial overlay is a site
         // nobody described, and §15's transaction leaves the previous dist/
@@ -179,14 +187,16 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
       }
     }
 
-    return await runBuild({ sourceRoot, output, settings, reporter, sourceDefaulted, overlayDir, layer });
+    return await runBuild({ sourceRoot, output, settings, reporter, sourceDefaulted, overlayDir, layer, result });
   } finally {
     if (overlayDir !== null) generate.removeOverlayDir(overlayDir);
+    // Every exit above has relocated and flushed by now: what was printed, as data.
+    if (result) result.diagnostics = reporter.sorted().map(({ discriminator, ...d }) => d);
   }
 }
 
 /** The build proper, with §33's overlay already produced (or absent). */
-async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulted, overlayDir, layer }) {
+async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulted, overlayDir, layer, result }) {
   // §33.3 — THE RESOLUTION NAMESPACE, computed once and threaded everywhere a
   // path is resolved or named. The overlay joins the scan (below) and this: a
   // generated page walks for `_layout.html` and an `<include src>` finds a
@@ -554,7 +564,13 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
   // fixture corpus rather than to the pages a discovery feature happens to
   // touch. An extractor that threw on some real emitted document would fail
   // the suite here, not at the first site that enabled a sitemap.
-  const manifest = buildManifest({ pages: manifestPages, base: baseConfig });
+  const shippedFragments = new Map(assetFiles
+    .filter((asset) => asset.relPath.endsWith(".fragment.html"))
+    .map((asset) => {
+      const path = outputPathOf.get(asset.relPath);
+      return [path, tempFiles.get(path).toString("utf8")];
+    }));
+  const manifest = buildManifest({ pages: manifestPages, base: baseConfig, fragments: shippedFragments });
 
   // ---- §21 — sitemap generation, the manifest's first projection. ----------
   // §21.5 must know which paths the site already emits from its own source
@@ -824,6 +840,7 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
 
   if (settings.audit) {
     reporter.summary(formatFindings(findings, reporter.problemCount));
+    if (result && shouldPublish(reporter)) result.files = tempFiles;
     // §24.6 — a pipeline problem exits 1 regardless: evaluating output that
     // cannot be built is meaningless, and the findings printed beside it
     // describe a site that would never ship. Otherwise a `broken` finding
@@ -843,6 +860,13 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
   const gated = settings.auditGate === true;
   const gateBlocks = gated && (reporter.exitCode !== 0 || auditExitCode(findings, settings.strict) !== 0);
   if (gated) reporter.summary(formatFindings(findings, reporter.problemCount));
+  if (gated && result) {
+    result.report = buildReport({
+      documents: manifest.documents, findings, base: baseConfig,
+      problemCount: reporter.problemCount, advisoryCount: reporter.advisoryCount,
+    });
+  }
+  if (result && shouldPublish(reporter) && !gateBlocks) result.files = tempFiles;
 
   // ---- §15 — transactional publish. ----------------------------------------
   // Named rather than inlined so the §27 sink at the end of this function can

@@ -119,11 +119,13 @@ Everything below is published at **[unify.fwdslsh.dev](https://unify.fwdslsh.dev
 - **[Getting Started](docs/getting-started.md)** — the tutorial.
 - **[Authoring Rules](docs/authoring-rules.md)** — the complete authoring surface, in under sixty lines.
 - **[CLI Reference](docs/cli-reference.md)** — every command, option, and exit code.
+- **[JavaScript API](docs/api.md)** — *experimental, may be removed before v1.* `run(options)`: the build as a function, returning the status, the diagnostics, the built files and the audit report as data.
 - **[Templates](docs/templates.md)** — scaffold from a built-in, a directory, a git repository or an npm package; keep the site current with `unify update`, which lists what it would overwrite and asks; publish a template of your own.
 - **[Integrations](docs/integrations.md)** — the compile-to-asset pattern: Svelte, TypeScript, or anything with a compiler, without adopting a framework.
 - **[Eleventy + htmx](docs/guides/eleventy-htmx.md)** — the advanced stack: another generator produces data-driven pages, unify composes them, htmx enhances them. Optional layers, and when not to reach for them.
 - **[Catalog and Search](docs/guides/catalog-and-search.md)** — a blog list, facets, and a search box built client-side from the two files `--catalog`/`--search-corpus` write.
 - **[Generator Recipes](docs/guides/generator-recipes.md)** — a content hash in an asset's URL, and an RSS feed with day-only dates handled your way, each in a screenful of `--generate`.
+- **[Porting an Existing Site](docs/guides/porting-an-existing-site.md)** — keep every live URL: which source path answers to each address, with and without `--pretty-urls`, and a ten-line check of the whole list against a build.
 - **[Template Versions](docs/guides/template-versions.md)** — pin a template to a version, move the pin with `unify update`, pin what `extends:` builds on, and try a template or unify before it ships.
 - **[Docker Usage](docs/docker-usage.md)** — running the CLI in a container.
 - **[Examples](examples/README.md)** — eight complete sites and the patterns they demonstrate.
@@ -137,8 +139,8 @@ Everything below is published at **[unify.fwdslsh.dev](https://unify.fwdslsh.dev
 
 **How the documentation was validated**
 
-- **[Ratification](ratification/ratification.md)** — the evidence: agents authoring from the sixty lines in isolation, what each round found, and what it changed.
-- **[Ratification Protocol](ratification/ratification-protocol.md)** — the procedure, for running another round.
+- **[Ratification](ratification/README.md)** — setup, running the tool, outputs and current status.
+- **[Ratification Protocol](ratification/ratification-protocol.md)** — execution policy, scoring, isolation and evidence rules.
 - **[Migration Plan](docs/migration-plan.md)** — how the current tree came to be. History, not current work.
 
 ## For Agents

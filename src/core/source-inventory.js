@@ -4,8 +4,8 @@
  *
  * SOURCE FACTS, NOTHING ELSE. The generator runs before the scan (§33.5), so
  * there is no manifest, no composed page and no layout to ask. What exists is
- * the author's own files, and this reads exactly three things out of each:
- * the `title`, `description` and `date` the AUTHOR wrote. It is not the
+ * the author's own files, and this reads the `title`, `description`, `date`,
+ * `meta` and `links` the AUTHOR wrote. It is not the
  * catalog (§30), has no layout title suffix, lists no generated page, and
  * renders no Markdown.
  *
@@ -22,17 +22,21 @@
 import { readFileSync } from "node:fs";
 import { extractDocument } from "./document.js";
 import { descriptionOf, firstNonEmpty, metaValues, titleOf } from "./document-selectors.js";
+import { computeOutputPath } from "./collisions.js";
 import { checkHtmlFrontmatter, inventoryFields } from "./markdown.js";
 import { resolutionRoots } from "./paths.js";
+import { urlForOutputPath } from "./publish.js";
 
 /**
  * @param {object} args
  * @param {{absPath: string, relPath: string, isPage: boolean, excluded: boolean}[]} args.files - the SOURCE scan, sorted by relPath
  * @param {string} args.sourceRoot
  * @param {import('./diagnostics.js').Reporter} args.reporter
- * @returns {{schemaVersion: 1, pages: {source: string, href: string, title: string|null, description: string|null, date: string|null, meta: Record<string,string>[], links: Record<string,string>[]}[]}}
+ * @param {boolean} [args.prettyUrls]
+ * @param {import('./urls.js').BaseUrlConfig|null} [args.base] - the parsed `--base-url`, or null
+ * @returns {{schemaVersion: 1, pages: {source: string, href: string, title: string|null, description: string|null, date: string|null, meta: Record<string,string>[], links: Record<string,string>[], outputPath: string, path: string, url: string|null}[]}}
  */
-export function buildSourceInventory({ files, sourceRoot, reporter }) {
+export function buildSourceInventory({ files, sourceRoot, reporter, prettyUrls = false, base = null }) {
   const roots = resolutionRoots(sourceRoot);
   const pages = [];
   for (const f of files) {
@@ -60,6 +64,10 @@ export function buildSourceInventory({ files, sourceRoot, reporter }) {
         links: doc.document.head.link,
       };
     }
+    // The page's projected address, from the engine's own functions and the
+    // source path and flags alone: a projection, not a promise of emission.
+    const outputPath = computeOutputPath({ path: f.relPath, kind: "page" }, { prettyUrls });
+    const path = urlForOutputPath(outputPath, base ? base.pathPrefix : "/");
     pages.push({
       source: f.relPath,
       href: `/${f.relPath.replace(/\.md$/, ".html")}`,
@@ -68,6 +76,9 @@ export function buildSourceInventory({ files, sourceRoot, reporter }) {
       date: fields.date,
       meta: fields.meta,
       links: fields.links,
+      outputPath,
+      path,
+      url: base ? base.origin + path : null,
     });
   }
   return { schemaVersion: 1, pages };

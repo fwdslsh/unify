@@ -57,7 +57,7 @@ import { dirname, join } from "node:path";
 
 const [, , , overlay, contextPath] = process.argv;
 const context = JSON.parse(readFileSync(contextPath, "utf8"));
-const { baseUrl, prettyUrls } = context.site;
+const { baseUrl } = context.site;
 if (!baseUrl) throw new Error("rss.mjs: an RSS link must be absolute, so build with --base-url");
 const { pages } = JSON.parse(readFileSync(context.inputs.sourcePages, "utf8"));
 
@@ -67,19 +67,13 @@ const OUT = "rss.xml"; // or an endpoint you already have, "news/rss.xml"; "feed
 const esc = (s) =>
   String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-// Nothing rewrites a link inside this file, so apply --pretty-urls and --base-url here.
-const address = (href) => {
-  const dir = href.replace(/(^|\/)index\.html$/, "$1"); // an index page answers at its directory
-  return new URL((prettyUrls ? dir.replace(/\.html$/, "/") : dir).slice(1), baseUrl).href;
-};
-
 // Dates are your decision. A full timestamp becomes the same instant in RFC 822;
 // a bare day names no instant, so that item gets no <pubDate>. Never the clock.
 const rfc822 = (d) =>
   /T.*(Z|[+-]\d\d:\d\d)$/.test(d) && !Number.isNaN(Date.parse(d)) ? new Date(d).toUTCString() : null;
 
 const item = (p) => {
-  const url = esc(address(p.href)), when = rfc822(p.date);
+  const url = esc(p.url), when = rfc822(p.date);
   return [
     "    <item>",
     `      <title>${esc(p.title)}</title>`,
@@ -141,8 +135,8 @@ With `posts/one.md` titled `Fish & Chips <tasty>` and dated `2026-03-04`, `posts
 </rss>
 ```
 
-- **Links are built here.** The inventory's `href` is `/` plus the source path with `.md` turned into `.html`. In HTML, unify rewrites such a link for `--pretty-urls` and `--base-url`; `rss.xml` is not HTML and ships byte-for-byte, so `address()` applies both, from `context.site.prettyUrls` and `context.site.baseUrl`. The latter is absolute with its trailing slash, or `null` without `--base-url`, which is why the generator stops the build in that case rather than write links nobody can follow.
+- **Links come from the inventory.** `rss.xml` is not HTML and ships byte-for-byte, so unify rewrites nothing inside it. Each record's `url` (conformance spec §33.7) is the page's absolute address under this build's `--pretty-urls` and `--base-url`, computed by the engine's own routing and equal to the `url` in `catalog.json` and `sitemap.xml`, so the generator carries no index, pretty-URL, encoding or 404 logic. It is a projection from the source path and the flags: a page that later collides fails the build as always. `url` is `null` without `--base-url`, which is why the generator stops the build in that case rather than write links nobody can follow.
 - **Dates are decided in the code, never by the build.** Nothing here reads the clock or a file's time, which is also why there is no `<lastBuildDate>`. A day-only post is listed without a `<pubDate>`, which RSS allows and Atom does not; if you would rather leave it out, filter it out. A post with no `date` is not a post to this filter. Items run newest first by the date as written.
 - **Text is escaped.** A title with `&` or `<` in it stays well-formed, as the second item above shows.
 - **Which file name.** Written as `rss.xml`, the feed sits beside whatever unify generates: a site whose posts declare `schema: BlogPosting` still gets its Atom `feed.xml` under `--base-url`, and A17 still names the day-dated posts left out of that one. Set `OUT` to `feed.xml` and yours is the feed: a `feed.xml` your generator writes, like one in the source tree, suppresses generation, and with it A17, because unify cannot say what is in a file it did not write.
-- **What unify checks.** The layout's `<link rel="alternate">` is an ordinary link: `--base-url` prefixes it, and a build where `rss.xml` is missing fails on it. The feed is not read. Under `--base-url`, unify checks the internal URLs of a file named `feed.xml`, and only the `href` of a `<link>` inside an Atom `<entry>`: so a broken URL in an Atom `feed.xml` blocks the publish, and one in an RSS `feed.xml`, whose `<link>` is text, does not. Nothing in `rss.xml` is checked. The one line to get right is `address()`; `sitemap.xml` spells the same addresses, so compare a few.
+- **What unify checks.** The layout's `<link rel="alternate">` is an ordinary link: `--base-url` prefixes it, and a build where `rss.xml` is missing fails on it. The feed is not read. Under `--base-url`, unify checks the internal URLs of a file named `feed.xml`, and only the `href` of a `<link>` inside an Atom `<entry>`: so a broken URL in an Atom `feed.xml` blocks the publish, and one in an RSS `feed.xml`, whose `<link>` is text, does not. Nothing in `rss.xml` is checked. `sitemap.xml` spells the same addresses, so compare a few.

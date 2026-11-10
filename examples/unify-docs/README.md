@@ -71,10 +71,9 @@ the documents and the template are both read from the repository.
 ## What it found
 
 Building this site was the point; the site is the instrument. `FINDINGS.md` records what it
-turned up: one bug that contradicts the documented `--generate` contract (generated pages
-silently get no layout), a related gap in include resolution, an undocumented trap for
-HTML-authored docs sites, one genuine defect in the documentation (fixed), and five things
-that worked better than expected.
+turned up: a generated-page layout bug, a related include-resolution gap, a problem with
+includes inside code samples, and a documentation defect. These findings have since been
+fixed; the original report also records five things that worked better than expected.
 
 The first two were one flaw (the overlay joined the scan but not the resolution namespace)
 and are fixed ([#54](https://github.com/fwdslsh/unify/issues/54),

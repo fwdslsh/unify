@@ -12,7 +12,9 @@ inner loop is `unify dev` (build, watch, serve on localhost, reload), which also
 `http://localhost:3000/_unify/` — every `unify audit` finding grouped by page, with that page's
 title, description, language, canonical, headings and links beside it, and the build's own
 diagnostics underneath — and `/_unify/preview/`, which lists every layout, include and page and
-opens any layout or include on its own, composed with a page you pick. Every page `dev` serves
+opens layouts and includes. Select a page to see an include in its full context, or use the
+**Isolated / In context** controls to switch views; **Locate include** finds its visible elements.
+Every page `dev` serves
 carries a small corner overlay naming its source file and linking its layout and includes
 (`?chrome=off` hides it). Nothing about any of this is written to `dist/`. `unify --help` lists
 every command and flag there is.
@@ -82,8 +84,8 @@ published** and the previous `dist/` is untouched — never report success on a 
   the bare slot, and unfilled slots show their fallback. Main elements stay intact; their children
   are not fills. An include is still not a component: it takes no props and merges no attributes.
 - The layout's bare `<slot></slot>` — usually inside its `<main>` — receives everything the page
-  did not address elsewhere. Your first default-content main is unwrapped and its children used, so write
-  complete semantic documents.
+  did not address elsewhere. Your first default-content main is unwrapped, its children used and its attributes
+  merged onto the layout `<main>` that receives them (with no layout `<main>`, it ships whole).
 - A named slot `<slot name="footer">fallback</slot>` is filled by `slot="footer"` on a real
   element of the page, which replaces the slot tag and all. A `<slot>` tag written in a *page*
   fills nothing. Fills count on direct children of `<body>` (or of your `<main>`, unwrapped
@@ -92,8 +94,8 @@ published** and the previous `dist/` is untouched — never report success on a 
 - Heads merge: the layout's is the base, your `<title>` is joined in front of the layout's
   (the separator lives in the layout — `<title>— My Site</title>`, and a page writes just
   `<title>About</title>`), your `<meta>` replaces the layout's with the same `name`/`property`,
-  and everything else appends. On `<html>`/`<body>` your classes are added and any other attribute
-  you set wins; attributes merge nowhere else.
+  and everything else appends. On `<html>`/`<body>` and the layout `<main>` receiving yours, your classes
+  are added and any other attribute you set wins; attributes merge nowhere else.
 
 ## Metadata, without inventing anything
 

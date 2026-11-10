@@ -52,8 +52,8 @@ const OPTIONS = {
   // absolute; anywhere on disk), never a command. Saved in unify.yaml like any
   // other long option.
   generate: { kind: "value", about: "a JavaScript file unify runs before every build, relative to this file", default: "none", save: "generate: scripts/gen.mjs" },
-  // §33.7 — opt in to `source-pages.json` for the generator. A boolean, saveable;
-  // naming it with no generator is a usage error (cli.js), like --include-noindex.
+  // §33.7 — source-pages.json is on by default with a generator and can be
+  // disabled in config; without a generator the setting is inert.
   "source-inventory": { kind: "flag", about: "hand that file source-pages.json: every source page's title, description, date, metas and links", default: "true whenever generate is set", save: "source-inventory: false" },
   // §19.10 — the template this project came from, as typed to `init`, which
   // records it (the one line it writes live); `update` fetches it again. The
@@ -280,6 +280,35 @@ export function parseArgs(argv) {
  * @param {string} arg
  * @returns {UsageError}
  */
+/**
+ * The options `parseArgs` produces, from an object instead of an argument
+ * list: what `run(options)` (cli.js) takes. Keys are the long option names in
+ * camelCase (`prettyUrls` is `--pretty-urls`), checked against the one table
+ * above and refused with the command line's own usage errors. `false` and
+ * `undefined` mean the option was not given, as leaving a flag off does.
+ * @param {Record<string, unknown>} object
+ * @returns {Record<string, string|boolean|string[]>}
+ */
+export function optionsFrom(object) {
+  if (object === null || typeof object !== "object" || Array.isArray(object)) {
+    throw new TypeError("run() takes an options object, for example run({ source: \"site\" })");
+  }
+  /** @type {Record<string, string|boolean|string[]>} */
+  const options = {};
+  for (const [key, value] of Object.entries(object)) {
+    if (value === undefined || value === false) continue;
+    const name = key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
+    const spec = OPTIONS[name];
+    if (!spec) throw unknownOption(key);
+    const strings = spec.kind === "list" && Array.isArray(value) ? value : [value];
+    if (spec.kind === "flag" ? value !== true : !strings.every((v) => typeof v === "string")) {
+      throw new TypeError(`run(): ${key} must be ${spec.kind === "flag" ? "true or false" : spec.kind === "list" ? "a string or an array of strings" : "a string"}`);
+    }
+    options[name] = spec.kind === "flag" ? true : spec.kind === "list" ? strings : value;
+  }
+  return options;
+}
+
 function unknownOption(arg) {
   return new UsageError(`unknown option: ${arg}`, ["run `unify --help` for the full surface"]);
 }

@@ -52,12 +52,12 @@ unify composes by editing spans of source text — it never reformats, re-indent
 - **S3 — Slot fill.** The slot element is replaced by the fill elements, in page order. The consumed `slot` attribute is removed from each fill; nothing else about a fill's markup changes.
 - **S4 — Slot fallback.** An unfilled slot's start and end tags are removed; its children remain, as written.
 - **S5 — Children replacement** (a `<main>` receiving default content, or a sink-less layout `<body>`, §7.4–7.5). The element's children are replaced by the default content; the element itself — tag and attributes — stays.
-- **S6 — Unwrap.** The page's first default-content `<main>`'s start and end tags are removed; its children stay in place. Successfully addressed named fills and their subtrees are excluded (§7.2).
+- **S6 — Unwrap.** The page's first default-content `<main>`'s start and end tags are removed; its children stay in place, and its attributes merge onto the layout main that receives the content (S11, §9). Successfully addressed named fills and their subtrees are excluded (§7.2). When the default slot has no layout main to land in (§7.2), the page's `<main>` is **kept** instead, whole and in place.
 - **S7 — Removal.** A removed element (head dedup, replaced layout elements) is removed entirely; a removed attribute (`data-layout`, a consumed `slot`) is removed cleanly from its tag. Removal changes nothing else.
 - **S8 — Head replacement in place.** A layout head element replaced under §8 has the page's element(s) take its position, in page order; the layout's other same-key elements are removed per S7.
 - **S9 — Head append.** Appended head elements land at the end of the layout's head content, in page-source order.
 - **S10 — Title join.** The layout `<title>`'s text becomes `pageText + " " + layoutText`, both trimmed of leading/trailing whitespace. The layout's title element (tag and attributes) is kept. Title text is text content and is compared exactly.
-- **S11 — Root attributes.** The layout's `<html>`/`<body>` tags are edited in place: the `class` value becomes the layout's tokens in order followed by page tokens not already present, space-separated; an overridden attribute keeps its position with the page's value; a new attribute is appended to the tag, in page-source order.
+- **S11 — Root attributes.** The layout's `<html>`/`<body>` tags — and the layout `<main>` that receives a page's unwrapped `<main>` (§9) — are edited in place: the `class` value becomes the layout's tokens in order followed by page tokens not already present, space-separated; an overridden attribute keeps its position with the page's value; a new attribute is appended to the tag, in page-source order. A merged attribute is always well-formed: its value is written in `"` quotes, `'` quotes when the value contains `"`, and with `"` written `&quot;` when it contains both.
 - **S12 — Default content.** Default content (§7.2) keeps its nodes — elements, text, comments — in source order, interior text preserved as written; whitespace-only text nodes at its boundaries are not significant.
 
 The output document's shell — doctype, `<html>`, `<head>`, `<body>` tags — is the layout's. The page's doctype and shell tags are not emitted (their attributes participate via S11). A page with no layout is emitted from its own text; for a layout-less Markdown page that text is its converted body inside the synthesized shell of §10.7.
@@ -256,16 +256,17 @@ Layout chaining is not part of the composition model. **A layout that itself dec
 ```
 src/blog/_layout.html:6: problem: this layout declares data-layout — layout chaining is not supported
   fix: make blog/_layout.html a complete standalone layout, or delete it so pages use /_layout.html
+  fix: keep shared chrome in _includes/ so a section layout repeats one <include> per region, not the chrome
 ```
 
-A section that wants its own chrome writes a complete `_layout.html` in its directory — the discovery walk (§6.1 step 4) already scopes it to that section. Chaining is a recorded future candidate (product spec §6) and returns only on demonstrated demand.
+A section that wants its own chrome writes a complete `_layout.html` in its directory — the discovery walk (§6.1 step 4) already scopes it to that section. The chrome itself lives in includes, so what a section layout repeats is the document skeleton and one `<include>` per region, not the chrome; the second fix line says so, because the first alone read as "copy the shell" (issue #155). Chaining is a recorded future candidate (product spec §6.6, where demand for it is logged) and returns only on demonstrated demand.
 
 ### 6.3 Misplacement and migration (problems)
 
-- `data-layout` on any element other than `<html>`/`<body>`: problem naming `<include src="…">` as the replacement — `data-layout` is never a component import.
-- Any `data-unify` attribute, any `data-slot` attribute, and any class token beginning `unify-`, anywhere in any source file — **excluded files included**: excluded files are build material (§1) and are scanned like everything else; only the never-shipped list (§4.3) escapes scanning. A retired spelling in an excluded fragment or draft would otherwise sit silently meaning something else until the day the file is included or published. `data-unify` is a retired spelling, `data-slot` is the retired fill spelling, and `unify-*` is the retired area-class vocabulary; each is a problem naming the supported replacement — `data-layout`, `slot=`, and `<slot name>`/`slot=` —
+- `data-layout` on any element other than `<html>`/`<body>` **whose value is a layout reference** — a path ending `.html`, or `none`, the two shapes §6.1 accepts on the root: problem (**P07**) naming `<include src="…">` as the replacement — `data-layout` is never a component import. Any other value off the root (`<div data-layout="grid">`) is an ordinary data attribute: unify consumes `data-layout` on the root alone (§6.1, §6.4), so the element means nothing to it and ships as written. unify reserves a plain `data-*` name only where its value is unmistakably its own; a whole-tree ban on the name failed builds over third-party markup that had never addressed a byte to unify (issue #154).
+- Any `data-unify` attribute and any class token beginning `unify-`, anywhere in any source file — **excluded files included**: excluded files are build material (§1) and are scanned like everything else; only the never-shipped list (§4.3) escapes scanning. A retired spelling in an excluded fragment or draft would otherwise sit silently meaning something else until the day the file is included or published. `data-unify` is a retired spelling and `unify-*` is the retired area-class vocabulary; each is a problem (**P08**) naming the supported replacement — `data-layout`, and `<slot name>`/`slot=` —
 - **P08 is inert inside code**, so a page can document the vocabulary it is telling you not to use. A retired spelling is a problem where it is *markup* and never where it is a *sample*. In HTML that means inside `<pre>` or `<code>` — the same textual region §5.1 item 8 already makes inert for `<include>`, so both checks agree about what a code sample is. In Markdown, where this check reads raw source before conversion, it means the three forms the language has: a fenced block (backticks or tildes, closed by a run of the same character at least as long as the opener), an indented block, and an inline span (closed by a backtick run of equal length). HTML's rule applies inside Markdown too, since a Markdown file may carry raw HTML. The CommonMark reading is deliberate rather than loose, because every byte marked inert is a byte this check stops protecting: an indented run counts only after a blank line — CommonMark forbids an indented code block from interrupting a paragraph — so an indented *continuation* line is still markup, and a retired spelling in it is still reported.
-`data-slot` earns its place here for the same reason the other two do, and more sharply: it is inert in the current model, so a page carrying it composed at exit 0 with the fill silently dropped. The worst observed case was a shared layout whose `<title>` carried the retired attribute, which left every page on a production site emitting the layout's default title with no diagnostic of any kind. That case looked like this in the layout it was found in — `<title data-slot="title">— Ashgrove</title>` — and this sentence can now spell it out, which it could not before: P08 is inert inside code (below).
+- `data-slot` is the retired *fill* spelling — the pre-migration `<template data-slot>`, never implemented in any release — and it is **not** in the sweep above. It is a plain `data-*` name that third-party markup uses for its own purposes (shadcn/ui puts one on every primitive), so it is diagnosed only where it would have been a fill: §7.3 and §32.3 make `data-slot="X"` on an element in fill position whose layout or fragment declares `<slot name="X">` a problem (**P08**), located at the element, naming `slot="X"`. A `data-slot` that names no slot the host declares is the author's and ships as written. From 0.8.3 until 2026-11 the sweep read `data-slot` everywhere, added after a shared layout's `<title data-slot="title">` left every page of a production site emitting the layout's default title at exit 0; that case is no longer diagnosed — a page's title merges by §8 regardless, and an attribute unify never had cannot be guarded in general — and the whole-tree reading had failed a port over markup that never addressed unify (issue #154).
 
 ```
 src/index.html:2: problem: data-unify is a retired spelling
@@ -315,15 +316,21 @@ src/_layout.html:8: problem: <slot name="inner"> is nested inside the fallback o
 
 Reserve C's direct body children whose non-empty `slot` names a slot in L. Each such named fill and its whole subtree are preserved, including any `<main>`; only the fill's own `slot` attribute is consumed (§7.3). Do not interpret nested `slot` attributes inside that fill.
 
-If L has at least one sink: the first `<main>` outside those reserved subtrees in C's body, in document order and **at any depth**, is **unwrapped once** (S6). A main inside a wrapper `<div>` unwraps and the wrapper stays. A main inside that selected main survives; no other element is unwrapped. This avoids adding another main around an ordinary page main, but does not repair already-nested mains. A bare slot outside any layout main still unwraps the selected page main; wrapper preservation is not part of this rule.
+If L has at least one sink: the first `<main>` outside those reserved subtrees in C's body, in document order and **at any depth**, is the page's **default-content main**, M. (Markdown conversion adds no `<main>` (§10): a `.md` page has an M only when its author wrote one as raw HTML, and is otherwise untouched by the unwrap, the merge and the keep below.) The layout main that receives the default content, R, is: the nearest `<main>` ancestor of L's default slot, if L has a default slot and it sits inside a `<main>`; else, if L has no default slot, L's first `<main>` (§7.1); else there is no R.
 
-**Fills** are then collected: every direct element child of C's body, **and every direct element child of the default-content `<main>` that was just unwrapped, wherever it sat**, carrying a `slot` attribute with a non-empty value. (`slot=""` counts as absent.) The unwrap and the collection are one step, not two: a fill inside a `<main>` inside a wrapper `<div>` counts, because the `<main>` is the page's content region and the wrapper is styling. A `slot` attribute anywhere else — deeper than that, or inside a `<template>` — is the author's own markup and is never touched or reported: the parent of a fill is always `<body>` or that `<main>`, and neither can be a component the author is assigning light DOM to. Fill elements are removed from the default-content sequence wherever they sat; a wrapper they leave behind stays, possibly empty.
+- **R exists → M is unwrapped once** (S6). A main inside a wrapper `<div>` unwraps and the wrapper stays. A main inside M survives; no other element is unwrapped. This avoids adding another main around an ordinary page main, but does not repair already-nested mains. **M's attributes merge onto R's start tag** under §9, whenever M and R both exist, even if the default content turns out to be empty.
+- **L has a default slot, that slot has no `<main>` ancestor, and L has no `<main>` at all → M is kept whole.** It is not unwrapped and stays in place in the default-content sequence with its attributes (§7.3 still consumes an unmatched `slot` on it). A kept `<main>` is default content like any other element, so the default slot's fallback does not render when the page supplies a `<main>`, even an empty one.
+- **Every other case unwraps M and transfers no attributes.** A default slot that sits outside L's own `<main>` while L has a `<main>` elsewhere unwraps M — keeping it would emit two `<main>` elements. A layout with only named slots unwraps M, so a page whose `<main>` holds only fills still composes with no "nowhere to land" problem (§7.4).
+
+**Fills** are then collected: every direct element child of C's body, **and every direct element child of M, whether or not it was unwrapped and wherever it sat**, carrying a `slot` attribute with a non-empty value. (`slot=""` counts as absent.) The unwrap and the collection are one step, not two: a fill inside a `<main>` inside a wrapper `<div>` counts, because the `<main>` is the page's content region and the wrapper is styling. A `slot` attribute anywhere else — deeper than that, or inside a `<template>` — is the author's own markup and is never touched or reported: the parent of a fill is always `<body>` or that `<main>`, and neither can be a component the author is assigning light DOM to. Fill elements are removed from the default-content sequence wherever they sat — from inside a kept M too; a wrapper (or kept M) they leave behind stays, possibly empty.
 
 **Default content** is everything else in C's body — elements, text, comments — in source order (S12).
 
 ### 7.3 Filling
 
-For each name X with fills: `<slot name="X">` is replaced by the fills in page order (S3). A fill whose name matches no slot in L: advisory A02, its `slot` attribute is consumed, and the element stays in place in the default-content sequence — nothing is lost. Report a direct-body main's unmatched name before §7.2 unwraps it; its children still enter default content.
+For each name X with fills: `<slot name="X">` is replaced by the fills in page order (S3). A fill whose name matches no slot in L: advisory A02, its `slot` attribute is consumed, and the element stays in place in the default-content sequence — nothing is lost. Report a direct-body main's unmatched name before §7.2 unwraps it; its children still enter default content. A kept main (§7.2) is reported like any other element.
+
+`data-slot="X"` on an element in fill position — a direct child of `<body>`, the default-content `<main>` §7.2 unwraps, or one of that main's own children — carrying no `slot=`, where L declares `<slot name="X">`: problem **P08**, located at the element, naming `slot="X"` as the fix. It is §6.3's retired fill spelling, diagnosed only where it would have filled: the author named a slot L has, and without the diagnostic the element lands in default content with the attribute shipped at exit 0 — nothing lost, intent silently not done, which is what made this vocabulary's sibling misplacements (P07, P15, P19, P20) problems. The element is left in default content, since the build is already blocked. A `data-slot` naming no slot L declares is an ordinary attribute and ships as written. Like A02 for a direct-body main, it is reported before §7.2 unwraps, which would otherwise take the attribute with it.
 
 Each unfilled named slot is replaced by its own children (S4). Fallback content is plain markup — a `<slot>` inside it is P16 (§7.1), so no recursive processing exists. Slots inside `<template>` are never touched and ship as written.
 
@@ -592,6 +599,33 @@ A layout containing
 ```
 ships those bytes unchanged, and a page fill `slot="x"` matching only that slot gets advisory A02 (no slot named "x" *of the layout's*).
 
+#### C10 — the layout main receives the page main's attributes (§7.2, §9)
+
+Layout body: `<a href="#content">Skip</a><main id="content" class="shell" tabindex="-1"><slot></slot></main>`. Page body: `<main id="article" class="article shell" aria-label="Article"><h1>Example</h1></main>`. Output body:
+```html
+<a href="#content">Skip</a><main id="article" class="shell article" tabindex="-1" aria-label="Article"><h1>Example</h1></main>
+```
+
+(The page's `<main>` was unwrapped (S6) and its attributes merged onto the layout `<main>` that holds the bare slot (S11): layout class tokens first, a page `id` replaces the layout's — the skip link's `#content` now points nowhere, which only `unify audit` reports — `tabindex` stays, `aria-label` is appended.) The same output results when the layout has no slot and the `<main>` is the implicit sink, and when the slot sits deeper (`<main><div><slot></slot></div></main>`).
+
+#### C11 — a body-level default slot keeps the page's `<main>` (§7.2)
+
+Layout body: `<header>Shared header</header><slot></slot><footer>Shared footer</footer>`. Page body: `<nav aria-label="Section">Section navigation</nav><main id="content" class="article"><h1>Example</h1></main><script src="/assets/page.js" defer></script>`. Output body:
+```html
+<header>Shared header</header><nav aria-label="Section">Section navigation</nav><main id="content" class="article"><h1>Example</h1></main><script src="/assets/page.js" defer></script><footer>Shared footer</footer>
+```
+
+(The layout has no `<main>` for the content to land in, so the page's `<main>` stays default content in source order. Because it is default content, an empty page `<main></main>` also suppresses the default slot's fallback.)
+
+#### C12 — a default slot beside an unrelated layout main still unwraps (§7.2)
+
+Layout body: `<main id="layout"><p>Layout content</p></main><slot></slot>`. Page body: `<main id="page" class="article"><h1>Example</h1></main>`. Output body:
+```html
+<main id="layout"><p>Layout content</p></main><h1>Example</h1>
+```
+
+(Keeping the page's `<main>` would emit two; the unrelated layout main receives nothing and acquires no attributes.)
+
 ---
 
 ## 8. Head merge
@@ -653,9 +687,11 @@ Row by row: identical charset silent; title joined; description replaced in plac
 
 ## 9. Root attributes
 
-On `<html>` and `<body>` only (S11): the page's class tokens are appended to the layout's (duplicates not repeated); any other attribute the page sets wins (edited in place if the layout had it, inserted before `>` otherwise). `data-layout` and consumed `slot` attributes are removed before this merge. A page cannot remove a layout attribute — there is no mechanism, by design. Attributes merge nowhere else.
+On `<html>` and `<body>`, and on the one layout `<main>` that receives the page's unwrapped default-content `<main>` (R, §7.2) (S11): the page's class tokens are appended to the layout's (duplicates not repeated); any other attribute the page sets wins (edited in place if the layout had it, inserted before `>` otherwise); layout-only attributes stay. `data-layout` and consumed `slot` attributes never transfer. A page `id` therefore replaces the layout main's `id`. A page cannot remove a layout attribute — there is no mechanism, by design. Attributes merge nowhere else: not onto a layout `<main>` that is not R, not onto any other element, and a named fill keeps its own markup whole.
 
-Fixture: layout `<body class="site">` + page `<body class="home" data-theme="dark">` → `<body class="site home" data-theme="dark">`.
+A merged value is carried as written: `data-x='{"b":2}'` stays well-formed whichever quotes the value holds (S11).
+
+Fixture: layout `<body class="site">` + page `<body class="home" data-theme="dark">` → `<body class="site home" data-theme="dark">`. Layout `<main id="layout" class="shell">` receiving page `<main id="guide" class="article" hidden>` → `<main id="guide" class="shell article" hidden>`.
 
 ---
 
@@ -908,7 +944,7 @@ A URL is internal when, after stripping the `--base-url` prefix — the path pre
 
 A `url(...)` in any CSS unify emits is a reference, and so is an `@import` naming its target as a bare string — `@import "/base.css"`. The two spellings of one at-rule were not treated alike: `@import url("…")` was already a `url()` and checked, while the bare form, which is the commoner one in hand-written CSS, was not, so a stylesheet importing a stylesheet that does not exist published green while the identical mistake in a `url()` one line down blocked the build.
 
-One unresolved target earns a second fix line: a reference to exactly `feed.xml`, `sitemap.xml`, `assets/unify/catalog.json`, or `assets/unify/search-corpus.json`, in a build that did not emit it. For that author the standing fix line is wrong on both counts — the spelling is right, and no source file is missing — because the name belongs to a file *this build generates under other conditions*, and the second line states the condition: `--base-url` for the sitemap; `--catalog`/`--search-corpus` for the catalog and the search corpus, each stating its own flag independently of the other (§30.1); and for the feed, whichever actually failed — no `--base-url`, no page declaring `schema: Article`/`BlogPosting`, or no declared date carrying a time of day (each day-only date already reported as A17). Ratification round 27 is the evidence: two of five authors hit this exact P13 mid-iteration and, told to check a spelling that was correct, one shipped `../feed.xml` and the other invented a build-twice model. The line names only the four generated paths §21/§29/§30 own, appears only when the file was not emitted, and changes nothing about what resolves — an authored or generated file at that path has always satisfied the check. `#fragment` targets are not validated against ids — that is a reader's judgment, not a build gate.
+One unresolved target earns a second fix line: a reference to exactly `feed.xml`, `sitemap.xml`, `assets/unify/catalog.json`, or `assets/unify/search-corpus.json`, in a build that did not emit it. For that author the standing fix line is wrong on both counts — the spelling is right, and no source file is missing — because the name belongs to a file *this build generates under other conditions*, and the second line states the condition: `--base-url` for the sitemap; `--catalog`/`--search-corpus` for the catalog and the search corpus, each stating its own flag independently of the other (§30.1); and for the feed, whichever actually failed — no `--base-url`, no page declaring `schema: Article`/`BlogPosting`, or no declared date carrying a time of day (each day-only date already reported as A17). The line names only the four generated paths §21/§29/§30 own, appears only when the file was not emitted, and changes nothing about what resolves — an authored or generated file at that path has always satisfied the check. `#fragment` targets are not validated against ids — that is a reader's judgment, not a build gate.
 
 One absence is **not** reported: a URL that resolves to the output path of a **source page that exists but failed to compose**. That page emitted no file because of a problem of its own — already reported, and already blocking the publish — so a second diagnostic located at the *link* sends the author to a correctly-spelled path in the wrong file, and, diagnostics being path-ordered, usually prints above the one problem that matters. Measured on a twenty-page site with one page failing to compose: twenty-one problems printed, one of them real, the real one last. A reference to a target with no source file at all, and a reference to a source file that exists but is *excluded* (the stranded underscore asset above), are not this case and still fail here, loudly.
 
@@ -986,8 +1022,8 @@ The bold IDs are the stable identifiers used by `tests/conformance/rules.tsv` an
 4. **P04** — Layout reference not a `.html` path (bare name) (§6.1)
 5. **P05** — Layout target missing or escaping the source root (§6.1)
 6. **P15** — A layout declares `data-layout` — layout chaining is not supported (§6.2)
-7. **P07** — `data-layout` on a non-root element (§6.3)
-8. **P08** — `data-unify` attribute; `data-slot` attribute; `unify-` class token (§6.3)
+7. **P07** — `data-layout` on a non-root element, where its value is a layout reference: a path ending `.html`, or `none` (§6.3)
+8. **P08** — `data-unify` attribute; `unify-` class token (§6.3); `data-slot` in fill position naming a slot the layout or fragment declares (§7.3, §32.3)
 9. **P09** — Unaddressed page content with no sink in a slotted layout (§7.4)
 10. **P16** — A `<slot>` nested inside another slot's fallback content — slots do not nest (§7.1). Located at the **inner** slot, which is the one that cannot exist
 11. **P10** — Frontmatter in an `.html` page (§10.5)
@@ -1049,6 +1085,8 @@ Discipline (asserted by the E2E suite): an advisory that fires on a correct site
 
 `unify dev` = watch + a static server on `localhost:<port>` (default 3000) serving the output directory with directory indexes and a 404 page, plus a reload event stream; the reload script is injected only into HTML responses **it serves** and never exists in the output directory. It answers one path that is not a file: `/_unify/`, the local audit view (§27), assembled in memory from the same manifest and findings the command line reads and written to the output directory never. No proxying, HTTPS, middleware, or config — permanently.
 
+With a subpath `--base-url` such as `https://example.test/docs/`, the static server also serves the output directory at `/docs/`, so the links and assets the build emits work locally. Existing output-root addresses remain usable; the base-path mount takes precedence inside its prefix. The development-only audit, preview and reload routes remain at the origin root.
+
 ---
 
 ## 17. `--dry-run` report
@@ -1068,7 +1106,7 @@ With `--base-url https://example.com/repo/` the first line reads `serving from h
 
 Every `write` names its inputs — the source page and the layout it resolved to (the one fact not readable from any single file). Every `write` and `copy` also names, in parentheses, **the URL that file answers to** once published; `delete` names neither, being a disk operation on a file the site no longer has. Diagnostics print to stderr exactly as a real build would. `unify build --dry-run --strict` is the one-line CI lint.
 
-The address line and the URLs exist because the reference check (§12) validates against the output *tree*, which is correct and says nothing about where that tree will live: a site built for a subpath with no `--base-url` passes every check and 404s on every link once deployed. Ratification round 11 produced exactly that, with exit 0. The URL is also the one inference `--pretty-urls` forces on a reader of output paths — `dist/about/index.html` is served as `/about/` — so the report states it instead of leaving it to be derived.
+The address line and the URLs exist because the reference check (§12) validates against the output *tree*, which is correct and says nothing about where that tree will live: a site built for a subpath with no `--base-url` passes every check and 404s on every link once deployed. The URL is also the one inference `--pretty-urls` forces on a reader of output paths — `dist/about/index.html` is served as `/about/` — so the report states it instead of leaving it to be derived.
 
 The list is what the **pipeline produced** — every page that composed, whether or not the build would go on to publish it. `--dry-run` is the pipeline through step 9; publishing is step 10 and it never runs. Because a single problem anywhere blocks the whole site (§15), a list of `write` lines could otherwise imply writes that a real build would refuse, so the report **ends with one line stating the outcome**:
 
@@ -1310,9 +1348,10 @@ Collapsing covers **ASCII** whitespace only. A decoded `&nbsp;` is U+00A0, a cha
 | `linksOut` | string[] | §20.9 — deduplicated, sorted output paths of internal pages this page links to |
 | `linksIn` | string[] | §20.9 — the exact reverse relation, deduplicated and sorted |
 | `fragmentLinks` | `{target, id}[]` | §20.9 |
+| `linksInFromFragments` | `string[]` | §20.9 — possible consumers supplying links through shipped fragments |
 | `refresh` | `{raw, seconds, url, target}`\|null | §20.11 |
 
-`extractDocument` itself returns the *per-document* half of this table — `visibleText`, `ids`, `titleTexts`, `langTexts`, `jsonLd`, `strayMetadata`, plus an unresolved `rawHrefs` (every `<a href>` value, document order) and an unresolved `refresh` reading. `linksOut`, `linksIn`, and `fragmentLinks` do not exist yet at that point — they are relations over the *whole manifest*, resolvable only once every document does — so `manifest.js`'s own second pass consumes `rawHrefs` into them and resolves `refresh.target`, exactly as `_hrefs`/`_refresh` were consumed and deleted in the 0.8 model. `rawHrefs` never survives onto the final envelope.
+`extractDocument` itself returns the *per-document* half of this table — `visibleText`, `ids`, `titleTexts`, `langTexts`, `jsonLd`, `strayMetadata`, plus an unresolved `rawHrefs` (every `<a href>` value, document order) and an unresolved `refresh` reading. `linksOut`, `linksIn`, `linksInFromFragments`, and `fragmentLinks` do not exist yet at that point — they are relations over the *whole manifest*, resolvable only once every document does — so `manifest.js`'s own second pass consumes `rawHrefs` into them and resolves `refresh.target`, exactly as `_hrefs`/`_refresh` were consumed and deleted in the 0.8 model. `rawHrefs` never survives onto the final envelope.
 
 ### 20.4 The `BuildDocument` envelope and the selector layer
 
@@ -1378,6 +1417,8 @@ A crawler-specific meta (`<meta name="googlebot">`) is **not** read: unify does 
 ### 20.9 The internal link graph
 
 `analysis.linksOut` holds the output paths of the pages this page links to. A link participates when it is an `<a href>` in the emitted document whose value, after `--base-url` stripping (§12's own rule, reused), resolves to an output path that has a document. Fragment-only, external, `mailto:`, `tel:`, and `data:` URLs never participate, and a link to a non-page asset never participates; the query and fragment of a participating URL are discarded before matching. A page linking to itself records itself. Values are deduplicated and sorted.
+
+`analysis.linksInFromFragments` records potential incoming navigation separately from the static graph. For each composed page, follow its emitted `<a href>` references to shipped `.fragment.html` files, and their anchor references to further shipped fragments, with a visited set per consumer. Resolve links inside each fragment against the **consuming page's output address**, not the fragment's own file path, using the same base stripping, entity/percent decoding, and directory-index resolution as the static graph. Record that consumer's output path on each existing destination page, excluding self-links; deduplicate and sort. Ignore inert markup, external URLs, and unreferenced or unpublished fragments. This is evidence that a page may receive navigation after fragment insertion, not proof that JavaScript executed. It does not add static graph edges or fragment-ID checks, rewrite fragment bytes, or validate their internal references. Arbitrary JavaScript-generated URLs remain outside the analysis.
 
 `analysis.fragmentLinks` records the same links again, keeping the fragment §12 discards: `{target, id}` per internal link that carries one. §12 deliberately does not validate fragments (REF-06) because a missing one is a reader's judgement rather than a build gate — but it is a *checkable* judgement, so the model carries the pairs and the evaluation command decides. `analysis.ids` is the other half: every `id` in the emitted document, in document order and with repeats kept, so that both "this fragment names nothing" and "this page declares one id twice" are answerable without re-parsing.
 
@@ -1614,7 +1655,7 @@ Every finding but the last is a predicate over the §20 model — the snapshot, 
 | `h1-missing` | incomplete | the page's `document.body.headings` (§20.3's heading scope) contains no level-1 entry |
 | `h1-multiple` | incomplete | `document.body.headings` contains more than one level-1 entry |
 | `lang-missing` | incomplete | `langOf(doc)` is null |
-| `page-orphan` | incomplete | `analysis.linksIn` is empty and the output path is neither `index.html` nor `404.html` |
+| `page-orphan` | incomplete | neither `analysis.linksIn` nor `analysis.linksInFromFragments` contains another page, and the output path is neither `index.html` nor `404.html` |
 | `id-duplicate` | broken | an id appears more than once in `analysis.ids`; one finding per repeated id, in sorted order |
 | `fragment-missing` | broken | an `analysis.fragmentLinks` entry names a page in this manifest whose `analysis.ids` does not contain the id |
 | `jsonld-invalid` | broken | an `analysis.jsonLd` entry has a non-null `error` |
@@ -1727,6 +1768,8 @@ A `broken` finding fails the run **without** `--strict`: it is objective (§24.3
 Only the exit code depends on severity. The report, in every `--format` (§31.1), lists the complete finding set with the same fingerprints (§31.2) whatever the exit code is.
 
 A pipeline problem exits 1 whether or not `--strict` is set, and whether or not there are findings. Evaluating output that cannot be built is meaningless, and the findings printed alongside it describe a site that would never ship.
+
+When the pipeline stops before the scan — a `--generate` generator that fails (P29), or a source-inventory frontmatter fault (§33.7) — there is no site to evaluate: `audit` prints the diagnostics the build reported, prints no report in any `--format` (nothing on stdout), and exits 1. It never ends in an internal error.
 
 ### 24.7 What `build` does with all of this
 
@@ -1993,25 +2036,29 @@ A request that arrives before any build has completed is answered — with the r
 
 ### 27.6 The page map (`/_unify/pages.json`)
 
-`unify dev` answers one more path, for editors rather than people: `/_unify/pages.json`, a JSON document that maps every emitted page to the source file it came from, the layout it composed with, and the address the server answers for it. An editor showing a live preview of the file being edited needs exactly those three facts, and each is something only the build knows — §13's output path, §11's address for it, §6's layout resolution — so the map is projected from the §20 manifest of the build that just ran, the same payload §27.3's report is rendered from, and from nothing else. It re-derives nothing: a page listed here and the same page in the report or in `--dry-run`'s listing cannot disagree.
+`unify dev` answers one more path, for editors rather than people: `/_unify/pages.json`, a JSON document that maps every emitted page to the source file it came from, the layout it composed with, and the address the server answers for it. An editor showing a live preview of the file being edited needs exactly those three facts, and each is something only the build knows — §13's output path, §11's address for it, §6's layout resolution — so the map is projected from the §20 manifest of the last build that published. It re-derives nothing: for that build, a page listed here and the same page in the report or in `--dry-run`'s listing cannot disagree. After a failed rebuild the report describes the new attempt, while the map retains the published build.
 
 The document is `{ "schemaVersion": 1, "built": <boolean>, "sourceRoot": <absolute path>, "pages": [ … ] }`, two-space-indented with a trailing newline, and each record carries exactly: `source` (the page's path relative to the source root, or relative to the generator's overlay when `generated` is true), `generated`, `layout` (relative to the source root, or `null` for a page that composed with none, §20.3), `includes` (every other file that authored a byte of the page — fragments included by the page, by its layout, and transitively — relative to the source root and sorted, §20.4), `outputPath` (under the output directory), `path` (the path the server and the site answer: `/about/` under `--pretty-urls`), and `url` (absolute under `--base-url`, else `null`). Only pages have records: a mirror-copied asset, the sitemap, the feed and the catalog are not in it. `schemaVersion` moves only when a field's meaning changes in a way an existing reader would misread; a new field is not a bump.
 
-It follows the rebuild the way the report does (§27.4): a completed build swaps in a whole new map, and a request before any build has completed is answered at once with `"built": false` and no pages. A rebuild that fails leaves the previous map in place, because §15 left the previous output directory in place and the map describes the site the server is serving. It is never written to the output directory (§27.1), it is one of the two paths beneath `/_unify/` that answer (§27.2; every other stays a 404), and only `unify dev` serves it.
+It follows publication: a build that publishes swaps in a whole new map, and a request before any build has published is answered at once with `"built": false` and no pages. A rebuild that fails leaves the previous map in place, because §15 left the previous output directory in place and the map describes the site the server is serving. It is never written to the output directory (§27.1), it is one of the reserved paths beneath `/_unify/` that answer (§27.2, alongside the preview routes), and only `unify dev` serves it.
 
 ### 27.7 The source preview (`/_unify/preview/<source path>`)
 
-A page has an address once it is built. A layout and an include never do — neither ships (§4.2, §4.4) — yet both are where a design is made, and both carry their own default content: a layout's slot fallbacks and a fragment's slot fallbacks are what a browser shows of them when nothing fills them. `unify dev` therefore answers `/_unify/preview/<path>`, where `<path>` is a source path relative to the source root (the §33.3 namespace, so a layout beside `package.json` previews too), with a rendering **composed on request from the source tree**, by the build's own inliner (§5), composer (§7) and URL rewriting (§11), scoped to that one file. It is a view of the source as the build would read it, not of the output directory, and it is the one thing the development server serves that `dist/` does not hold. Nothing here is a second composition model: every step is the build's own function called on one file.
+A page has an address once it is built. A layout and an include never do — neither ships (§4.2, §4.4) — yet both are where a design is made, and both carry their own default content: a layout's slot fallbacks and a fragment's slot fallbacks are what a browser shows of them when nothing fills them. `unify dev` therefore answers `/_unify/preview/<path>`, where `<path>` is a source path relative to the source root (the §33.3 namespace, so a layout beside `package.json` previews too), with a rendering **composed on request from the source tree**, by the build's own inliner (§5), composer (§7) and URL rewriting (§11), for the selected file and its requested context. It is a view of the source as the build would read it, not of the output directory, and, like the audit view and page map, it is served only by the development server and is not held in `dist/`. Nothing here is a second composition model: previews reuse the build's inliner, composer and provenance rewriting.
 
 Three kinds of file, told apart by the rules that already exist (a file named `_layout.html`, or one the last build composed with as a layout, is a **layout**; a `.fragment.html` or any path with a `_`-prefixed segment is an **include**; everything else that is `.html` or `.md` is a **page**):
 
 - A **layout** is shown as itself: its includes inlined, its `<slot>` elements left in place so their fallbacks render (the preview adds `slot { display: contents }` to the head, the one line the scaffold's stylesheet carries for the same purpose). With `?page=<source path>` it is shown composed with that page — §7 exactly, with this layout in place of the one the page would resolve — so a designer sees the layout under real content without the page having to name it.
-- An **include** is shown on its own, inside a shell that carries a layout's `<html>` start tag, its whole `<head>` (stylesheets, scripts, metas, with that layout's own includes inlined) and its `<body>` start tag (for the class the site's CSS keys on), and **none of the layout's body**: the fragment is the only content. The layout is `?layout=<source path>` when given, else the layout of `?page=` when given, else the one §6's walk finds from the fragment's own directory. With `?page=`, the fragment's slots are filled the way that page fills them (§32) when the page includes it with content; otherwise its own fallbacks show. A Markdown fragment is converted first (§5.1 step 4). A fragment with no layout anywhere above it gets a minimal shell.
+- An **include** has two views, selected by `?view=isolated|context`. With no recognized explicit view, choosing `?page=<source path>` or `?layout=<source path>` defaults to **In context**; with neither, it defaults to **Isolated**. The explicit choice wins and is preserved by the pickers. An unrecognized value uses the same default. The layout is the explicit selection, else the selected page's layout, else the nearest layout from the fragment's directory. A selected page with no layout remains standalone.
+
+  **In context**, a selected page is composed in full using §5–§9, including its head, root attributes, all surrounding content, repeated includes and nested includes. An explicit layout overrides that page's normal layout. The toolbar remains an include toolbar. With only a layout, its complete body and default content render, including any existing uses of the include and their fills. If no content from the include survives in that layout's provenance and the layout has a bare slot or a `<main>` outside templates, **Place in main content** submits `?placement=main`: the include's defaults are composed as page content into that layout, using the normal composer. This is explicitly labeled **Staged in main content**, never presented as an authored placement. Without a usable sink, the toolbar explains that a page or isolated view is needed. Staging does not apply to a selected page and is cleared when the page or layout picker changes. If there is no page or layout available, the fragment's defaults render with an explanation that context must be selected. If a page's recorded layout is unavailable, context reports that limitation and links to the built page instead of silently composing without the layout; selecting an available override remains possible.
+
+  **Isolated** retains the focused fragment view: the layout's `<html>` start tag, complete inlined `<head>` and `<body>` start tag surround only the fragment. A selected page supplies fills from its **first direct** include call when one exists; otherwise the fragment's own fallbacks render. It does not include page-specific head/body attributes or ancestor containers, and is not an assertion of the fragment's final appearance. Use In context for nested, layout-supplied or repeated uses. A Markdown fragment is converted first (§5.1 step 4); without a layout the shell is minimal.
 - A **page** redirects (302) to the address the page map gives it (§27.6), since the output directory already holds it composed; a page the last build did not emit is a 404 that says so.
 
-Every URL in the result is rewritten against the file that authored it (§11.1), as if the document had moved, so `assets/style.css` written in `site/_layout.html` is served from `/assets/style.css` whatever path the preview is fetched from — the same provenance rule that lets a layout link its stylesheet relative to itself (§19.1). Under `--pretty-urls` links to emitted pages take their pretty form (§11.2). `--base-url` is not applied: the preview is served from the development server's own root. Diagnostics the build would report for the file are shown inside the document rather than dropped, and none is ever a new finding. The result carries the reload script (§16), so an edit to the layout, the fragment, anything they include, or the chosen page re-renders it.
+Every URL in the result is rewritten against the file that authored it (§11.1), as if the document had moved, so `assets/style.css` written in `site/_layout.html` is served from `/assets/style.css` whatever path the preview is fetched from — the same provenance rule that lets a layout link its stylesheet relative to itself (§19.1). Under `--pretty-urls` links to emitted pages take their pretty form (§11.2). `--base-url` is not applied: the preview is served from the development server's own root. Diagnostics from composing the file and its selected context are shown inside the document rather than dropped, and none is ever a new finding. The result carries the reload script (§16), so an edit to the layout, the fragment, anything they include, or the chosen page re-renders it.
 
-**The index.** `/_unify/preview/` itself, with no file named, lists every layout, include and page the namespace holds — the source root whole, plus the `_layout.html`, `_includes/` and `includes/` the project root may hold for §4.5 — grouped by the same three kinds, each a link: a layout or include to its preview, a built page to its own address, a page the last build did not emit to its preview. Beside each layout and include is the number of built pages that reach it (§20.4), so an unused fragment reads as such. `unify dev` prints the index's address at startup beside the site's, the audit view (§27.3) links to it, and every preview's selector links back to it. This is the one address a designer needs: start `unify dev`, open it, choose the file. `/_unify/preview` without the slash redirects to it, as `/_unify` does (§27.2).
+**The index.** `/_unify/preview/` itself, with no file named, lists every layout, include and page the namespace holds — the source root whole, plus the `_layout.html`, `_includes/` and `includes/` the project root may hold for §4.5 — grouped by the same three kinds, with available files linked: a layout or include to its preview, a built page to its own address, a page the last build did not emit to its preview. Beside each layout and include is the number of built pages that reach it (§20.4), so an unused fragment reads as such. `unify dev` prints the index's address at startup beside the site's, the audit view (§27.3) links to it, and every preview's selector links back to it. This is the one address a designer needs: start `unify dev`, open it, choose the file. `/_unify/preview` without the slash redirects to it, as `/_unify` does (§27.2).
 
 The preview writes nothing (§27.1), is served by `unify dev` alone (§27.5), is not configurable beyond §27.8's chrome, and answers only `.html` and `.md` files under the namespace: any other path, and any path that escapes it, is the same 404 as the rest of `/_unify/`.
 
@@ -2021,10 +2068,20 @@ Every HTML document `unify dev` serves — a built page the page map knows, and 
 
 What it shows depends on the file:
 
-- On a **page**: the kind, the source path, the layout the page composed with (linked to that layout's preview) or that it has none, the includes it reaches (§20.4, each linked to its preview), and links to the index and the audit view.
+- On a **page**: the kind, the source path, the layout the page composed with or that it has none, the includes it reaches (§20.4), and links to the index and the audit view. Layout/include paths link to their source preview only when its source is available.
 - On a **layout** preview: the kind, the path, a page picker offering the built pages whose `layout` it is (or saying that none does), submitting `?page=` as a plain GET to the preview's own path, and the two links.
-- On an **include** preview: the same, with the pages whose `includes` name it, plus a layout picker offering every layout the namespace holds, submitting `?layout=`.
+- On an **include** preview: the same, with the pages whose `includes` name it, plus a layout picker offering every layout the namespace holds, submitting `?layout=`, and **Isolated / In context** buttons submitting `?view=`. Context also offers **Locate include** and, when applicable, the explicit placement action described in §27.7.
 - When the build would report diagnostics for the file (§14), a count in the chrome opens a panel listing them, formatted as `unify build` prints them. Nothing in it is a new finding.
+
+**Locate include** cycles in document order through visible outermost elements whose opening tags were authored by the selected include, scrolling to and briefly outlining each. It uses composition provenance and dev-response-only `data-unify-preview-target` attributes on existing elements, never wrappers that change layout. It preserves element geometry and respects reduced-motion preferences. If no elements can be identified, the control is disabled and the toolbar explains the limitation; if marked elements are all hidden, clicking reports that none is visible. Head-only, text-only, fully replaced or omitted content may have no locatable element even though the context itself still renders. These explanations are preview UI, not new build findings.
+
+Source preview availability is checked against the source and project roots on each
+request. The temporary generator overlay is not retained or regenerated for previews.
+The chrome and index preserve unavailable dependency paths from the last published build
+as plain text marked “source preview unavailable”; selectors disable unavailable choices.
+A generated page still links to its built address. Failed rebuilds leave the dependency
+map describing the last published build; the audit report continues to describe the latest
+attempt.
 
 **Modes and state.** Two query parameters govern it, and both persist in the browser (`localStorage`, keys `unify.chrome` and `unify.collapsed`) whenever they appear in a URL, so a link from one page to the next keeps the choice without every address carrying it:
 
@@ -2035,7 +2092,9 @@ What it shows depends on the file:
 
 Collapsed, the chrome is a small show control in the bottom corner; expanded, it carries a collapse control, and Escape collapses it. Pressing either control stores the new state, so the user's choice follows them; the automatic collapse of `partials` mode on a page stores nothing, so a choice made on a layout survives a detour through a page. Precedence, in one line: `chrome=off` beats everything; then the URL's `collapsed`; then, under `partials` on a page, collapsed; then the stored state; then expanded.
 
-The chrome is the only markup the server adds to a document beyond the reload script and, on a layout preview, the one `slot { display: contents }` rule, and like them it exists in no published file.
+The always-served reload script also records explicit chrome preferences, including on requests that omit the overlay and on the preview index. Preview redirects preserve the query string. Changing a page or layout picker preserves unrelated query parameters, including repeated values, and the URL fragment. All addresses resolving to the same emitted page carry the same chrome, including explicit `index.html` addresses and the `--base-url` mount.
+
+The chrome, reload script, source previews' `slot { display: contents }` rule and context previews' locator attributes exist only in dev responses, never in published files. `chrome=off` also omits the locator attributes. The include view and placement live in the URL, independently of the browser-stored chrome visibility preferences.
 
 ---
 
@@ -2426,6 +2485,7 @@ Both are located at the **include element**, in the file that wrote it, which is
 Slotted includes share §7's named-slot replacement and fallback rules, applied only to direct element children of the include:
 
 - A child carrying `slot="name"` **replaces** `<slot name="name">`, tag and all; the consumed `slot` attribute is removed; an unfilled slot is replaced by its own children (fallback).
+- A direct element child carrying `data-slot="name"` and no `slot=`, where the fragment declares `<slot name="name">`, is **P08**, located at the include element (§32.2): §6.3's retired fill spelling where it would have filled, exactly as §7.3 reads it on a page, and the include collapses to the fragment's fallbacks as every error path here does. A `data-slot` naming no slot the fragment declares is ordinary content and goes to the bare slot.
 - Everything else replaces the bare `<slot>`.
 - Slots do not nest (**P16**), slots inside `<template>` are never touched, and a repeated slot name draws **A13** — the same rules, from the same code, reported the same way.
 
@@ -2465,7 +2525,7 @@ For a Markdown page, §10.1's ordering is unchanged: conversion first, then incl
 
 No props. No attributes passed to a fragment. No expressions, loops, conditionals, or implicit data. No attribute merging on the include element or anywhere else. No style scoping. A fragment cannot read the page that included it, and a page cannot read the fragment. The complete authoring rule is: **an include may carry content when its target is a fragment with slots, and that content fills them the way a page fills a layout's.**
 
-Product-spec §6.4.1 makes shipping conditional on that rule still fitting comfortably on the authoring-rules page. The mechanical half of the condition is enforced rather than asserted: `docs/authoring-rules.md` stays within its line budget and `tests/unit/docs-sync.test.js` fails if it does not. The empirical half is **met**: ratification round 26 briefed six isolated samples (five Haiku, one Sonnet control) to build a site carrying the same panel in ten places with different words in every one, and the border changeable in one file. All six reached for a slotted include unprompted, all six built clean under `--dry-run --strict`, no fallback and no `<slot>` reached any output, and the mechanism worked from Markdown pages as well as HTML. `ratification/ratification.md` records the round, including the two documentation defects it found — neither of them in this rule.
+Product-spec §6.4.1 makes shipping conditional on that rule still fitting comfortably on the authoring-rules page. The mechanical half of the condition is enforced rather than asserted: `docs/authoring-rules.md` stays within its line budget and `tests/unit/docs-sync.test.js` fails if it does not. The empirical half is **not currently evidenced**: retained ratification results have been removed. A new authorized run under `ratification/ratification-protocol.md` is required before claiming empirical ratification. The [ratification status](../ratification/README.md#status) records that status.
 
 ---
 
@@ -2525,7 +2585,7 @@ The subprocess is therefore part of the contract and not an implementation detai
     "searchCorpus": null
   },
   "inputs": {
-    "sourcePages": null
+    "sourcePages": "/tmp/unify-generated-abc123/source-pages.json"
   }
 }
 ```
@@ -2543,7 +2603,7 @@ The subprocess is therefore part of the contract and not an implementation detai
 | `site.canonical` | `"auto"` \| null | `--canonical auto`'s value, or `null` |
 | `outputs.catalog` | string \| null | `assets/unify/catalog.json`, output-root-relative, when `--catalog` is set; `null` otherwise |
 | `outputs.searchCorpus` | string \| null | `assets/unify/search-corpus.json`, output-root-relative, when `--search-corpus` is set; `null` otherwise |
-| `inputs.sourcePages` | string \| null | the absolute path of `source-pages.json` (§33.7) when `--source-inventory` is set; `null` otherwise. Added in 0.9.3 as a new optional field, so `schemaVersion` stays `1` |
+| `inputs.sourcePages` | string \| null | the absolute path of `source-pages.json` (§33.7), enabled by default when a generator is named; `null` when `source-inventory: false` disables it. Added in 0.9.3 as a new optional field, so `schemaVersion` stays `1` |
 
 **Versioning.** The context carries its own `schemaVersion`, independent of `unifyVersion`, starting at `1`, and the rule is the same one §30.7 states for `catalog.json`/`search-corpus.json`: within version 1, only additive optional fields may be added; a change to an existing field's meaning or shape — including widening `command`'s closed set with a new value, or changing `site.baseUrl` from a string to an object — requires `schemaVersion` to increment. A generator reading `schemaVersion 1` today keeps reading a valid `schemaVersion 1` document as this contract grows only by new fields, the same guarantee `argv[2]`/`argv[3]` already make for a generator that predates `argv[4]` entirely.
 
@@ -2629,13 +2689,16 @@ Two things unify does guarantee, and they are what make the seam safe to use rat
       "description": null,
       "date": "2026-04-02T09:00:00Z",
       "meta": [{ "name": "tags", "content": "finance" }],
-      "links": []
+      "links": [],
+      "outputPath": "reports/q1/index.html",
+      "path": "/sub/reports/q1/",
+      "url": "https://example.com/sub/reports/q1/"
     }
   ]
 }
 ```
 
-Each record has exactly these seven keys, in this order, and nothing else — no timestamps, no absolute paths. `meta` and `links` were added in 0.9.4 as new fields, so `schemaVersion` stays `1`:
+Each record has exactly these ten keys, in this order, and nothing else — no timestamps, no absolute paths. `meta` and `links` were added in 0.9.4, and `outputPath`, `path` and `url` in 0.12.0, each as new fields, so `schemaVersion` stays `1` (the example above is built with `--pretty-urls --base-url https://example.com/sub/`):
 
 | Field | Type | Content |
 |---|---|---|
@@ -2644,8 +2707,13 @@ Each record has exactly these seven keys, in this order, and nothing else — no
 | `title`, `description`, `date` | string \| null | what the author wrote, trimmed; `null` when not authored or empty |
 | `meta` | object[] | the page's own `<meta>` elements as attribute records, in source order, with the projection `catalog.json` uses (§30.2): `{"name": "tags", "content": "homelab"}`, `{"property": "og:image", "content": "…"}`, `{"charset": "utf-8"}`. For a `.md` page, the metas its frontmatter synthesizes (§10.2): one record per list item, a `og:…` key as `property`, and `title`, `layout`, `class`, `lang`, `dir` never present. Repeats, order and empty values are kept; nothing is split, coerced, sorted or deduplicated |
 | `links` | object[] | the page's own `<link>` elements as attribute records, in source order, values as written: not resolved, completed or prefixed, and given no canonical or redirect meaning. Always `[]` for a `.md` page, which has no `<link>` syntax |
+| `outputPath` | string | the output-root-relative POSIX path this page is emitted at under this build's `--pretty-urls`, computed by §13's own function: `.md` becomes `.html`, then `X.html` becomes `X/index.html` under `--pretty-urls`, except a page already named `index.html` at any depth and the root `404.html` (§11.2). Not percent-encoded |
+| `path` | string | the page's public root-relative address, with exactly the meaning and encoding of `catalog.json`'s `path` (§30.2, §20.5): the `--base-url` path prefix (or `/`), then `outputPath` with a trailing `index.html` reduced to its directory, each segment percent-encoded |
+| `url` | string \| null | the page's absolute public URL, with exactly the meaning of `catalog.json`'s `url` (§30.2): the `--base-url` origin plus `path`; `null` without `--base-url` |
 
 `pages` is sorted by `source`, the order the build's own scan already uses.
+
+**The address is a projection, not a guarantee of emission.** `outputPath`, `path` and `url` are computed from the page's source path and the build's settings (`--pretty-urls`, `--base-url`) alone, before the generator runs, by the same functions §13 and §20.5 use: there is no second implementation of routing. A page that goes on to collide with another file (§13) or is otherwise not emitted fails or changes the build exactly as it does without a generator; the projection does not resolve collisions, discover files, rewrite links or compute an authored canonical override (`--canonical auto` does not affect a page's own address). Each value equals what the same build then emits: the page's `outputPath` and public URL in `audit --format json` (§31.1) and its `path` and `url` in `catalog.json` (§30.2). The unchanged `href` remains the source-route link to write into generated HTML, which §11 rewrites.
 
 **Eligibility is the build's own scan, not a second one.** A record exists for exactly the files the build treats as pages (§4) of the **source tree**: `.html` and `.md` files after the underscore rule (§4.2), `--exclude` (§4.1), the never-shipped list (§4.3) and the `.fragment.html` opt-out (§4.4). So `_layout.html`, `_includes/`, `_`-prefixed pages and files, excluded paths and fragments are absent. A page marked `noindex` is **present**: this is discovery, not publication. Generated files are absent, since the generator has not run.
 
@@ -2655,7 +2723,7 @@ Each record has exactly these seven keys, in this order, and nothing else — no
 - **`.html`**: from the page file's own `<head>`, as written in the file: the `<title>` text and the `content` of `<meta name="description">` and `<meta name="date">`, character references decoded (§20.3), the first non-empty value winning (§20). **Includes are not resolved**, so a title an `<include>` supplies is not seen, and a page with no `<head>` element reads those elements wherever they stand, exactly as §20 does.
 - A frontmatter fault the build would report (invalid YAML, P17, §28.1's counter-prior keys, §10.5's frontmatter in an HTML page) is reported here the same located way and **stops the build before the generator runs**. No page is silently left out.
 
-**What it is not.** It is source facts, not the final manifest (§20) or the catalog (§30). A `title` here has no layout title suffix and no heading fallback, no generated page appears, nothing is rendered, a layout's own `<meta>` is not merged in, and a page's emitted URL is not computed. unify offers no query language, no field list, no sorting or grouping, and no second pass: composed facts (a final title, rendered heading ids, a page's public URL) do not exist until after the generator has run, so the only catalog (§30) a generator can read is a prior build's, which describes that build rather than this one.
+**What it is not.** It is source facts, not the final manifest (§20) or the catalog (§30). A `title` here has no layout title suffix and no heading fallback, no generated page appears, nothing is rendered, and a layout's own `<meta>` is not merged in. unify offers no query language, no field list, no sorting or grouping, and no second pass: a page's address is projected from its source path (above), but composed facts (a final title, rendered heading ids, a layout's contribution to the head) do not exist until after the generator has run, so the only catalog (§30) a generator can read is a prior build's, which describes that build rather than this one.
 
 ---
 

@@ -1,7 +1,8 @@
 <!doctype html>
 <html lang="en">
-  <head><title data-slot="title">Site</title></head>
+  <head><title>Site</title></head>
   <body>
-    <main></main>
+    <main><slot></slot></main>
+    <aside><slot name="sidebar">default sidebar</slot></aside>
   </body>
 </html>

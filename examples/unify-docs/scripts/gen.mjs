@@ -39,10 +39,12 @@ const GROUPS = [
     ["guides/eleventy-htmx.md", "Eleventy and htmx"],
     ["guides/generator-recipes.md", "Generator recipes"],
     ["guides/template-versions.md", "Template versions"],
+    ["guides/porting-an-existing-site.md", "Porting an existing site"],
     ["docker-usage.md", "Docker"],
   ] },
   { label: "Reference", docs: [
     ["cli-reference.md", "CLI reference"],
+    ["api.md", "JavaScript API (experimental)"],
     ["product-spec.md", "Product spec"],
     ["conformance-spec.md", "Conformance spec"],
   ] },

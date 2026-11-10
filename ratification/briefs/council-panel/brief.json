@@ -1,6 +1,6 @@
 {
-  "title": "A bare opening-hours panel another site fetches, kept in one place, and month lists fetched on demand",
-  "origin": "round 23, the first exposure of *.fragment.html",
+  "title": "A bare opening-hours panel another site fetches, kept in one place, month lists fetched on demand, and a JSON list of the notes' public addresses",
+  "origin": "round 23, the first exposure of *.fragment.html; the JSON list was added for 0.12.0 (#149), so its results do not compare with earlier rounds",
   "baseUrl": "https://holtfen.pages.dev/mill/",
   "checks": [
     {
@@ -19,6 +19,12 @@
     {
       "id": "bare-fragment",
       "check": "bareFragment"
+    },
+    {
+      "id": "notes-json",
+      "check": "jsonListing",
+      "path": "milling-days.json",
+      "min": 3
     },
     {
       "id": "fetch-targets",
