@@ -1,3 +1,7 @@
+---
+description: "Experimental: run(options), the build as a function for Node and Bun scripts, and the result it returns. It may change or be removed before v1."
+---
+
 # The JavaScript API
 
 > **Experimental: this API may change or be removed in any release before v1.**
@@ -22,14 +26,16 @@ console.log(`${report.findings.filter((f) => f.severity === "broken").length} br
 
 `run(options)` is `unify build` with those options, in your process and your
 working directory. It runs the same code the command runs: `unify.yaml` is read
-the same way, the same files are written and the same lines are printed.
+the same way and the same files are written. It prints nothing; what the
+command would have printed comes back as data.
 
 **Options** are the command's flags by their long names in camelCase, and mean
 what they mean in the [CLI reference](cli-reference.md): `--pretty-urls` is
 `prettyUrls`, `--base-url` is `baseUrl`, `--dry-run` is `dryRun`. A flag takes
 `true`; an option with a value takes a string; `exclude` takes an array of
 strings. `false` and `undefined` mean the option was not given. There are no
-options of its own.
+options of its own, and an option that belongs to another command (`port`,
+`template`, `external`, `format`, ...) is a usage error, never silently ignored.
 
 **It resolves to** one object, always with these four keys:
 
@@ -64,8 +70,12 @@ try {
 - **To evaluate without publishing**, pass `dryRun: true` and `audit: true`:
   the site is built, checked and audited, nothing is written, and you get
   `files` and `report`.
-- **It prints.** `run` writes what the command writes, to the same streams.
-  The return value is in addition to that, not instead of it.
+- **It prints nothing.** Not the diagnostics, not the summary, not a
+  generator's own output. Print what you want from the result.
+- **No external link check yet.** `--external` is a flag of the `audit` command,
+  not of the build, so `run` cannot reach it; use `unify audit --external` for
+  now. Folding `audit` into the build is tracked in
+  [#163](https://github.com/fwdslsh/unify/issues/163).
 - **It does not exit.** `run` never calls `process.exit` and never sets
   `process.exitCode`; `status` is yours to act on.
 - **One at a time.** unify reads the working directory, so await one call

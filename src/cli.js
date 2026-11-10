@@ -105,9 +105,10 @@ function version() {
 /**
  * Build the site from a script: `run({ source: "site", baseUrl: "https://example.com/" })`
  * is `unify build --source site --base-url https://example.com/`, in this
- * process. The options are the command's flags by their long names in
- * camelCase; `unify.yaml` is read, the site is written and the same lines are
- * printed as on the command line. What it adds is the return value.
+ * process and through the same code. The options are the command's flags by
+ * their long names in camelCase; `unify.yaml` is read and the site is written
+ * as on the command line. Nothing is printed: what the command would have
+ * printed comes back as data.
  *
  * This is the package's public API, and it is EXPERIMENTAL: it may change or be
  * removed in any release before v1. See docs/api.md.
@@ -119,18 +120,37 @@ function version() {
  *   anything unexpected
  */
 export async function run(options = {}) {
-  return main({ command: "build", template: undefined, options: optionsFrom(options) });
+  const parsed = { command: "build", template: undefined, options: optionsFrom(options) };
+  // `run` is the build. An option the build would ignore is refused rather
+  // than accepted inertly — a flag that silently does nothing is the failure
+  // §14 exists to forbid.
+  for (const name of NOT_BUILD) {
+    if (name in parsed.options) {
+      const key = name.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+      throw new UsageError(`${key} is not an option of the build`, [
+        "run() is `unify build`: it takes that command's options (docs/api.md)",
+      ]);
+    }
+  }
+  return main(parsed, SILENT);
 }
+
+/** Flags of the other commands, and the two that only print. */
+const NOT_BUILD = ["external", "format", "port", "watch-path", "template", "keep", "yes", "help", "version"];
+
+/** Where `run()` sends what the command line prints: nowhere. */
+const SILENT = { stdout: { write() {} }, stderr: { write() {} } };
 
 /**
  * One run of the command line, already parsed: the program below calls it with
- * `parseArgs(argv)`, `run()` with its options object.
+ * `parseArgs(argv)` and the process's streams, `run()` with its options and none.
  * @param {ReturnType<typeof parseArgs>} parsed
+ * @param {{stdout: {write(s: string): unknown}, stderr: {write(s: string): unknown}}} io
  * @returns {Promise<Result>}
  */
-async function main(parsed) {
+async function main(parsed, io) {
   const result = { status: 0, diagnostics: [], files: new Map(), report: null };
-  result.status = await execute(parsed, result);
+  result.status = await execute(parsed, result, io);
   for (const [path, content] of result.files) {
     if (typeof content === "string") result.files.set(path, Buffer.from(content));
   }
@@ -141,16 +161,17 @@ async function main(parsed) {
  * The command itself: check, dispatch.
  * @param {ReturnType<typeof parseArgs>} parsed
  * @param {Result} result - filled in by the commands that build a site
+ * @param {{stdout: {write(s: string): unknown}, stderr: {write(s: string): unknown}}} io - where it prints
  * @returns {Promise<number>} the exit code
  */
-async function execute({ command, template, options }, result) {
+async function execute({ command, template, options }, result, io) {
 
   if (options.help) {
-    process.stdout.write(HELP);
+    io.stdout.write(HELP);
     return 0;
   }
   if (options.version) {
-    process.stdout.write(`${version()}\n`);
+    io.stdout.write(`${version()}\n`);
     return 0;
   }
 
@@ -330,13 +351,13 @@ async function execute({ command, template, options }, result) {
     }
   }
 
-  const reporter = new Reporter({ strict: settings.strict });
+  const reporter = new Reporter({ strict: settings.strict, stdout: io.stdout, stderr: io.stderr });
   // §33.2 — the actual subcommand, carried alongside `settings` rather than
   // folded into it: it is not a saved-flag concept (unify.yaml has nothing
   // named `command`), only the generator context's `command` field reads it,
   // and every command handler below (build/audit/dev/watch) already receives
   // and forwards this whole context object.
-  const context = { sourceRoot, output, settings, reporter, template, sourceDefaulted, command, result };
+  const context = { sourceRoot, output, settings, reporter, template, sourceDefaulted, command, result, io };
 
   switch (command) {
     case "build": {
@@ -348,10 +369,10 @@ async function execute({ command, template, options }, result) {
         const { path } = configPath(sourceRoot);
         relocateSavedPaths(saving, path);
         if (saving.size === 0) {
-          process.stdout.write("--save-config: no saveable options were given, so unify.yaml was not written\n");
+          io.stdout.write("--save-config: no saveable options were given, so unify.yaml was not written\n");
         } else {
           writeConfig(path, saving);
-          process.stdout.write(`saved ${[...saving.keys()].join(", ")} to ${path}\n`);
+          io.stdout.write(`saved ${[...saving.keys()].join(", ")} to ${path}\n`);
         }
       }
       return code;
@@ -410,7 +431,7 @@ function isProgram() {
 /* c8 ignore start — process wiring, exercised by the conformance harness */
 if (isProgram()) {
   try {
-    process.exitCode = (await main(parseArgs(process.argv.slice(2)))).status;
+    process.exitCode = (await main(parseArgs(process.argv.slice(2)), process)).status;
   } catch (error) {
     const usage = error instanceof UsageError;
     process.stderr.write(`${usage ? "" : "unify: "}${error.message}\n`);

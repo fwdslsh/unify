@@ -92,6 +92,8 @@ import { buildReport } from "../../core/report.js";
  *   diagnostics as data, the tree this build produced when it could be
  *   published, and the audit report when the build was audited. `dev`, `watch`
  *   and `init` pass none. Nothing reads it back; it changes nothing about the pipeline.
+ * @param {{stdout: {write(s: string): unknown}, stderr: {write(s: string): unknown}}} [context.io] - where a
+ *   generator's own output is passed through (§33.2): the process's streams unless `run()` says otherwise.
  * @returns {Promise<number>}
  *
  * Two keys on `settings` are set by a command rather than by a flag, and both
@@ -106,7 +108,7 @@ import { buildReport } from "../../core/report.js";
  * and `unify dev` IS `unify watch` plus a server — there is no other seam
  * between the two that reaches a rebuild.
  */
-export async function build({ sourceRoot, output, settings, reporter, sourceDefaulted = false, command = "build", result }) {
+export async function build({ sourceRoot, output, settings, reporter, sourceDefaulted = false, command = "build", result, io = process }) {
   // ---- §34 — the template this site extends, BEFORE anything else ----------
   // Fetched (or found in the cache, or read in place) before the generator
   // runs and before anything is scanned, so a source that cannot be reached
@@ -168,7 +170,7 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
         searchCorpusPath: settings.searchCorpus ? searchCorpus.SEARCH_CORPUS_PATH : null,
         sourcePagesPath,
       });
-      const ok = await generate.runGenerator({ generatorAbs, sourceRoot, overlayDir, contextPath, reporter });
+      const ok = await generate.runGenerator({ generatorAbs, sourceRoot, overlayDir, contextPath, reporter, io });
       if (!ok) {
         // P29 stops the build BEFORE the scan: a partial overlay is a site
         // nobody described, and §15's transaction leaves the previous dist/
