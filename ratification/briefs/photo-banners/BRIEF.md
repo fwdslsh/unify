@@ -25,6 +25,17 @@ image files.
 5. Every page shares the arboretum's header (with the logo) and footer — including the
    guides, one folder further down.
 
+## Getting around without seeing the page
+
+Some visitors use a screen reader and move through a page by its landmarks.
+
+- Every page — the guides included — has exactly one main landmark. A banner is
+  decoration: on the three pages that open on one, it sits above the main landmark, not
+  inside it.
+- On the home page and on each section's landing page, the main landmark announces that
+  page's own name — "Visit, main", "Collections, main" — not a bare "main", and not the
+  same name on all three.
+
 ## How it will be published
 
 - It is served from **`https://alderfen.pages.dev/arboretum/`** — a subdirectory, not

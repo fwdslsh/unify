@@ -3,8 +3,9 @@
 Can an agent, given only `docs/authoring-rules.md` and the `unify` binary, build the site a
 brief asks for? A round answers that for one unify (your working tree, a release, or any
 commit) and one model: each sample agent works alone, in a directory that cannot see the
-rest of this repository, and its site is then rebuilt and checked. You get a score, a
-summary, and everything each agent wrote and ran.
+rest of this repository, and its site is then rebuilt and checked. Each agent that
+finishes is then asked for a retrospective of using unify. You get a score, a summary,
+and everything each agent wrote, ran and said.
 
 [`ratification-protocol.md`](ratification-protocol.md) is the method — why rounds are run
 this way and how to triage what they find — and [`ratification.md`](ratification.md) is the
@@ -91,13 +92,37 @@ round.json                   what ran: unify commit and version, rules and promp
 rules.md, bin/unify          exactly what every sample was given
 <brief>/PROMPT.md            the prompt every sample of that brief received
 <brief>/<sample>/            the agent's directory, exactly as it left it, REPORT.md included
-<brief>/.harness/<sample>/   OpenCode's event stream (events.jsonl), stderr, exit, and its session data
+<brief>/.harness/<sample>/   OpenCode's event stream (events.jsonl), stderr, exit, and its session data;
+                             RETROSPECTIVE.md and retrospective-*: the follow-up turn (below)
+RETROSPECTIVE.md             the follow-up prompt every finished sample received
 <brief>/.build/<sample>/     the fresh build every check reads
 <brief>/.judge/<sample>/     scratch copy for npm-script preparation before strict judging
 <brief>/judge-results.json   the judge's full record: chosen command, diagnostics, markers
 ```
 
 A round exists only in this checkout. Copy the directory somewhere durable to keep it.
+
+## The retrospective
+
+When a sample's run ends on its own without an error — exit 0 and no error in its event
+stream — the runner sends the same agent one more message in the same session:
+[`briefs/RETROSPECTIVE.md`](briefs/RETROSPECTIVE.md), which asks it to look back on using
+unify. It is asked **whether or not the site would pass**: the checks have not run yet, and
+a sample that failed its brief is the one whose account is most worth reading. A run that
+timed out, was killed, exited non-zero or reported an error is not asked.
+
+The answer is evidence for review and is never scored. It is written to
+`<brief>/.harness/<sample>/RETROSPECTIVE.md`, with the turn's own event stream, stderr and
+exit record beside it as `retrospective-events.jsonl`, `retrospective-stderr.txt` and
+`retrospective-exit.json`; `SUMMARY.md` lists each one under its brief and `results.json`
+records it per sample. The turn runs in the sample's isolation, with OpenCode told to
+refuse the tools that write files or run commands, so the sample's directory stays exactly
+as its run left it, and it has ten minutes. Its cost is included in the summary's total.
+(An `--agent` command gets the follow-up on stdin too, with `RATIFY_STEP=retrospective` in
+its environment to tell the two turns apart; whatever it prints is the answer.)
+
+Read a retrospective the way the protocol reads `REPORT.md`: as evidence of where the
+agent hesitated and what it expected, not of what it did. The transcript says what it did.
 
 ## How a sample is scored
 
@@ -135,6 +160,8 @@ command:
 | `auditStrict` | `unify audit --strict`, with the command's own options, exits 0 |
 | `ranCommand` | the agent ran a shell command matching `pattern` (from its event stream) |
 | `noSlots` | no `<slot>` reached a published page |
+| `mainLandmarks` | every page has exactly one `<main>` (meta-refresh redirects aside); with `skipLink`, a same-page link before it lands on it or inside it; with `labelled: n`, at least `n` pages give theirs a name of its own (`aria-label`, or `aria-labelledby` naming an element of the page); with `outside`, no element naming one of those files (`src`, `srcset`, `poster`, `style`) is inside it |
+| `jsonListing` | `path` is a published JSON array of at least `min` entries, each with a `title`, a `date` and a `url` that is the full address of a published page, in exactly the form a static host serves without redirecting |
 | `bareFragment` | bare HTML is published, including extensionless endpoints, without a document wrapper; empty list fragments may coexist with a nonempty panel |
 | `cssUrls` | every root-relative `url()` in published CSS is under the address |
 | `clientFetches` | every fetch target the judge found in the pages resolves |
@@ -219,14 +246,28 @@ briefs/<name>/
 ```
 
 [`briefs/PROMPT.md`](briefs/PROMPT.md) is prepended to every brief: it points at `./unify`
-and `./rules.md` and asks for `REPORT.md`. Once a round has used a brief, keep its
+and `./rules.md` and asks for `REPORT.md`. [`briefs/RETROSPECTIVE.md`](briefs/RETROSPECTIVE.md)
+is the follow-up every finished sample gets, whatever its brief. Once a round has used a brief, keep its
 `BRIEF.md` unchanged while you measure a fix — the summary flags a brief that changed since
 its round ran — and write a new brief to ask a new question. The protocol's [Designing the
 brief](ratification-protocol.md#designing-the-brief) says how to compel a construct without
 naming it.
 
-The seven briefs here are the briefs of rounds 20 to 28, unchanged. Their seed files come
-from `examples/` (the catalogue export, the Svelte component) or were made for this harness
-(the photographs, the volunteers' drafts).
+The seven briefs here are the briefs of rounds 20 to 28. Four are unchanged. Three gained
+a requirement for 0.12.0, each with a check, so their results do not compare with the
+rounds before it:
+
+- `photo-banners` asks for exactly one main landmark on every page, a name of its own for
+  it on the home page and each section's landing page, and the banner above it and not
+  inside it: the page's own `<main>` reaching the output, whole or as attributes on the
+  layout's (#147, #148).
+- `audit-handover` asks for a skip link to each page's main content, which a page `id`
+  that replaces the layout's breaks, and which only the audit the brief already demands
+  reports (#147).
+- `council-panel` asks for a JSON list of the notes' public addresses, which need the
+  build's own address rules outside HTML (#149).
+
+Their seed files come from `examples/` (the catalogue export, the Svelte component) or
+were made for this harness (the photographs, the volunteers' drafts).
 [`briefs/BRIEF-maintenance.md`](briefs/BRIEF-maintenance.md) is a different experiment, its
 tasks delivered one at a time by hand, and the runner does not run it.

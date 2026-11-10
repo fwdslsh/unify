@@ -27,6 +27,12 @@ available to you, and nothing may be loaded from another website.
 - The same opening-hours panel appears on the mill's own **Visit** page. It is one panel,
   maintained in one place: when the hours change, one edit updates both the Visit page
   and what the council receives.
+- The **county tourism board** lists the mill's milling-day notes on its own site. Its
+  importer reads a fixed address on the mill's site, `milling-days.json`: a JSON array with
+  one entry per note, each giving the note's `title`, its `date`, and its `url` — the
+  note's full public address, exactly as a visitor's browser shows it. The importer
+  follows each address as given and drops any entry whose address redirects or is not
+  found, and nobody will remember to add a note to that file by hand.
 - On the home page, a visitor flips between **this month's** and **next month's** milling
   days without the page reloading. Each month's list is only fetched when the visitor
   asks for it.
@@ -44,5 +50,5 @@ available to you, and nothing may be loaded from another website.
 
 `./unify build` succeeds and the published output is correct **for that address** — not
 merely correct locally. State the exact publish command line, and say how you verified
-it: the pages, the council's address, and what the home page fetches when a visitor flips
-the month.
+it: the pages, the council's address, the tourism board's list, and what the home page
+fetches when a visitor flips the month.

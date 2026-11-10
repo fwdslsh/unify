@@ -89,6 +89,10 @@ Two more that cost hours rather than rounds:
    reached for the mechanism the brief was built to compel.
 5. Read every agent's self-report (`SUMMARY.md` quotes the start of each) and, for anything
    surprising, its transcript: the event stream in `<brief>/.harness/<sample>/events.jsonl`.
+   Read its retrospective too, `RETROSPECTIVE.md` beside that stream: after every run that
+   exits 0 without an error, pass or fail, the runner asks the same agent in the same
+   session to look back on using unify. It is not scored, and like the self-report it is
+   evidence of what the agent expected, not of what it did.
 6. Triage each finding (next section).
 7. Amend at most a handful of things. Re-run.
 
