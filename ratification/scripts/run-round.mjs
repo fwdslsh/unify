@@ -2,7 +2,8 @@
 /**
  * run-round.mjs — one ratification round, end to end: build the unify under test, give
  * each sample agent a brief, the authoring rules and that binary in an isolated
- * directory, then judge, rebuild, check and score what it published.
+ * directory, ask each one that finished for a retrospective of using unify, then judge,
+ * rebuild, check and score what it published.
  *
  *   bun run ratify [-- options]
  *
@@ -25,7 +26,9 @@
  *   SUMMARY.md, results.json   the score, per sample and check, and the agents' own notes
  *   round.json                 what ran: unify commit and version, rules and prompt hashes
  *   <brief>/<sample>/          the agent's working directory, exactly as it left it
- *   <brief>/.harness/<sample>/ the agent's event stream, stderr and OpenCode session data
+ *   <brief>/.harness/<sample>/ the agent's event stream, stderr and OpenCode session data,
+ *                              and RETROSPECTIVE.md: its answer to the follow-up every run
+ *                              that exited 0 without an error is asked, pass or fail
  *   <brief>/.build/<sample>/   the fresh build every check reads
  *
  * Exit: 0 when every sample passed every scored check, 1 when one did not, 2 when the
@@ -41,6 +44,7 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { CHECKS } from "./checks.mjs";
 import { isolationEnvironment } from "./isolation.mjs";
+import { finishedCleanly, replyOf, sessionOf } from "./retrospective.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const RAT = resolve(HERE, "..");
@@ -50,6 +54,7 @@ const ROUNDS = join(RAT, "rounds");
 const ISOLATE = join(HERE, "isolate.sh");
 const JUDGE = join(HERE, "judge-round.mjs");
 const BUILD_TIMEOUT_MS = 240_000;
+const RETROSPECTIVE_SECS = 600;
 
 const say = (s = "") => process.stdout.write(`${s}\n`);
 const sha = (text) => createHash("sha256").update(text).digest("hex");
@@ -210,27 +215,62 @@ function isolated(site, state, command, masks) {
 
 // ------------------------------------------------------------------ launch
 
-function launch(job) {
+const RUN = { events: "events.jsonl", stderr: "agent-stderr.txt", exit: "exit.json" };
+const RETROSPECTIVE = { events: "retrospective-events.jsonl", stderr: "retrospective-stderr.txt", exit: "retrospective-exit.json", reply: "RETROSPECTIVE.md" };
+
+/** One turn of a sample's agent, isolated: `turn` is its prompt, command and environment; `files` names what it leaves in the harness directory. */
+function launch(job, turn = job, files = RUN) {
   return new Promise((done) => {
     mkdirSync(job.harness, { recursive: true });
-    const fds = [openSync(job.prompt, "r"), openSync(join(job.harness, "events.jsonl"), "w"), openSync(join(job.harness, "agent-stderr.txt"), "w")];
+    const fds = [openSync(turn.prompt, "r"), openSync(join(job.harness, files.events), "w"), openSync(join(job.harness, files.stderr), "w")];
     const started = Date.now();
     const finish = (exit, signal, error) => {
       fds.forEach((fd) => closeSync(fd));
       const record = { exit, signal, error, timedOut: exit === 124, durationMs: Date.now() - started };
-      writeFileSync(join(job.harness, "exit.json"), `${JSON.stringify(record, null, 2)}\n`);
+      writeFileSync(join(job.harness, files.exit), `${JSON.stringify(record, null, 2)}\n`);
       done(record);
     };
-    const child = spawn(ISOLATE, [job.sample, REPO, join(job.harness, "opencode"), ...job.command], { env: job.env, stdio: fds });
+    const child = spawn(ISOLATE, [job.sample, REPO, join(job.harness, "opencode"), ...turn.command], { env: turn.env, stdio: fds });
     child.on("error", (e) => finish(null, null, e.message));
     child.on("close", (code, signal) => finish(code, signal, null));
   });
+}
+
+/**
+ * Ask a sample's agent to look back on using unify: one more turn in the session it just
+ * finished, in the same isolation. Asked of every run that exited 0 without an error,
+ * whether or not what it built would pass, and never scored. The turn cannot write: the
+ * tools that change files are refused, so the sample's directory stays the evidence of
+ * its run. Its reply is kept beside the run's own event stream. Returns the turn's exit
+ * record, or null when the run was not asked.
+ */
+async function retrospect(job, run) {
+  if (!finishedCleanly(run, agentEvents(job.harness).error)) return null;
+  const session = sessionOf(readFileSync(join(job.harness, RUN.events), "utf8"));
+  const record = await launch(job, { prompt: job.retrospective.prompt, command: job.retrospective.command(session), env: job.retrospective.env }, RETROSPECTIVE);
+  const reply = replyOf(readFileSync(join(job.harness, RETROSPECTIVE.events), "utf8"));
+  if (reply) writeFileSync(join(job.harness, RETROSPECTIVE.reply), `${reply}\n`);
+  return { ...record, answered: Boolean(reply) };
 }
 
 function agentCommand(opts, model, brief) {
   const secs = String(Number(opts.timeout ?? brief.timeoutSecs ?? 1800));
   if (opts.agent) return ["timeout", "-k", "30", secs, "bash", "-c", opts.agent];
   return ["timeout", "-k", "30", secs, "opencode", "run", "--pure", "--format", "json", "--model", model];
+}
+
+/** The follow-up turn's command: the same agent, continuing the session its run left (OpenCode's last one, when the stream named none). */
+function retrospectiveCommand(opts, model, session) {
+  const limit = ["timeout", "-k", "30", String(RETROSPECTIVE_SECS)];
+  if (opts.agent) return [...limit, "bash", "-c", opts.agent];
+  return [...limit, "opencode", "run", "--pure", "--format", "json", "--model", model, ...(session ? ["--session", session] : ["--continue"])];
+}
+
+/** A sample's environment for the follow-up turn: the same, with the tools that write refused. `RATIFY_STEP` tells an `--agent` command which turn it is. */
+function retrospectiveEnv(env) {
+  const config = JSON.parse(env.OPENCODE_CONFIG_CONTENT);
+  Object.assign(config.permission, { edit: "deny", bash: "deny" });
+  return { ...env, OPENCODE_CONFIG_CONTENT: JSON.stringify(config), RATIFY_STEP: "retrospective" };
 }
 
 async function newRound(opts) {
@@ -265,6 +305,8 @@ async function prepareAndRun(opts, { id, dir, ref, briefs, models, per }) {
   const rules = `\`\`\`markdown\n${unify.rules}\`\`\`\n`;
   writeFileSync(join(dir, "rules.md"), rules);
   const contract = readFileSync(join(BRIEFS, "PROMPT.md"), "utf8");
+  const followUp = readFileSync(join(BRIEFS, "RETROSPECTIVE.md"), "utf8");
+  writeFileSync(join(dir, "RETROSPECTIVE.md"), followUp);
 
   const envs = Object.fromEntries(models.map((m) => [m, sampleEnv(m, opts.mask)]));
   say(`  models: ${models.join(", ")}`);
@@ -291,7 +333,10 @@ async function prepareAndRun(opts, { id, dir, ref, briefs, models, per }) {
         writeFileSync(join(sample, "rules.md"), rules);
         linkOrCopy(join(dir, "bin", "unify"), join(sample, "unify"));
         samples.push({ name, model });
-        jobs.push({ label: `${brief.name}/${name}`, sample, prompt, harness: join(bdir, ".harness", name), env: envs[model], command: agentCommand(opts, model, brief) });
+        jobs.push({
+          label: `${brief.name}/${name}`, sample, prompt, harness: join(bdir, ".harness", name), env: envs[model], command: agentCommand(opts, model, brief),
+          retrospective: { prompt: join(dir, "RETROSPECTIVE.md"), env: retrospectiveEnv(envs[model]), command: (session) => retrospectiveCommand(opts, model, session) },
+        });
       }
     }
     return { name: brief.name, title: brief.title, origin: brief.origin, sha256: sha(brief.text), samples };
@@ -303,6 +348,7 @@ async function prepareAndRun(opts, { id, dir, ref, briefs, models, per }) {
     unify: { ref, commit: unify.commit, dirty: unify.dirty, version: unify.version },
     rules: { sha256: sha(unify.rules) },
     prompt: { sha256: sha(contract) },
+    retrospective: { sha256: sha(followUp) },
     agent: opts.agent ? `custom: ${opts.agent}` : `opencode ${run("opencode", ["--version"]).stdout.trim()}`,
     models,
     samplesPerModel: per,
@@ -318,6 +364,8 @@ async function prepareAndRun(opts, { id, dir, ref, briefs, models, per }) {
     say(`  started  ${job.label}`);
     const r = await launch(job);
     say(`  finished ${job.label}: exit ${r.exit}${r.timedOut ? " (timed out)" : ""} after ${duration(r.durationMs)}`);
+    const back = await retrospect(job, r);
+    if (back) say(`  retrospective ${job.label}: ${back.answered ? "answered" : `no answer (exit ${back.exit}${back.timedOut ? ", timed out" : ""})`} after ${duration(back.durationMs)}`);
   }));
   round.finished = new Date().toISOString();
   writeFileSync(join(dir, "round.json"), `${JSON.stringify(round, null, 2)}\n`);
@@ -350,8 +398,8 @@ function rulesGaps(sample) {
  * A model error OpenCode keeps retrying — a provider's usage limit — never reaches the
  * stream, and the run idles to its timeout; the session log is where it says why.
  */
-function agentEvents(harness) {
-  const file = join(harness, "events.jsonl");
+function agentEvents(harness, stream = RUN.events) {
+  const file = join(harness, stream);
   const events = (existsSync(file) ? readFileSync(file, "utf8") : "").split("\n").flatMap((l) => {
     try { return [JSON.parse(l)]; } catch { return []; }
   });
@@ -375,6 +423,7 @@ function scoreSample(dir, bdir, brief, { name, model }, judge, masks) {
   const agent = agentEvents(harness);
   const reported = existsSync(join(sample, "REPORT.md"));
   const command = judge?.chosenCommand ?? null;
+  const asked = readJson(join(harness, RETROSPECTIVE.exit));
 
   // A fresh build of the sample's own command, in a copy, so its directory stays the evidence.
   const site = join(bdir, ".build", name);
@@ -427,6 +476,12 @@ function scoreSample(dir, bdir, brief, { name, model }, judge, masks) {
     agent: { exit: exit.exit ?? null, timedOut: Boolean(exit.timedOut), durationMs: exit.durationMs ?? null, turns: agent.turns, costUsd: agent.costUsd },
     freshBuild: build && { command, exit: build.exit },
     rulesGaps: rulesGaps(sample),
+    // Evidence for review, never a check: what the agent said when asked to look back.
+    retrospective: asked && {
+      exit: asked.exit ?? null, timedOut: Boolean(asked.timedOut), durationMs: asked.durationMs ?? null,
+      costUsd: agentEvents(harness, RETROSPECTIVE.events).costUsd,
+      file: existsSync(join(harness, RETROSPECTIVE.reply)) ? relative(dir, join(harness, RETROSPECTIVE.reply)) : null,
+    },
   };
 }
 
@@ -459,7 +514,7 @@ function score(dir) {
 function renderSummary(round, results) {
   const all = results.briefs.flatMap((b) => b.samples);
   const passed = all.filter((s) => s.pass).length;
-  const cost = all.reduce((a, s) => a + (s.agent.costUsd ?? 0), 0);
+  const cost = all.reduce((a, s) => a + (s.agent.costUsd ?? 0) + (s.retrospective?.costUsd ?? 0), 0);
   const cell = (c) => (c.pass ? "✓" : "✗") + (c.scored ? "" : " (i)");
   const md = [];
   const groups = results.briefs.flatMap((b) => round.models.map((m) => ({ brief: b.name, model: m, samples: b.samples.filter((s) => s.model === m) })));
@@ -497,9 +552,14 @@ function renderSummary(round, results) {
       md.push("", "What the agents said the rules did not answer:", "");
       for (const s of gaps) md.push(`**${s.name}**`, "", ...s.rulesGaps.split("\n").map((l) => `> ${l}`), "");
     }
+    const asked = b.samples.filter((s) => s.retrospective);
+    if (asked.length) {
+      md.push("", "Retrospectives — each agent's own account of using unify, asked after its run and not scored:", "");
+      for (const s of asked) md.push(`- ${s.name}: ${s.retrospective.file ? `\`${s.retrospective.file}\`` : `asked, no answer (exit ${s.retrospective.exit}${s.retrospective.timedOut ? ", timed out" : ""})`}`);
+    }
   }
   md.push("", "---", "", "`✓` passed, `✗` failed, `(i)` reported but not scored. Each sample's directory is " +
-    "`<brief>/<sample>/`, its OpenCode event stream and session data are in `<brief>/.harness/<sample>/`, and the build the checks read is " +
+    "`<brief>/<sample>/`, its OpenCode event stream, session data and retrospective are in `<brief>/.harness/<sample>/`, and the build the checks read is " +
     "`<brief>/.build/<sample>/`. Triage every failure with ratification/ratification-protocol.md before changing anything.", "");
   return md.join("\n");
 }

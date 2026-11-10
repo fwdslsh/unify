@@ -15,6 +15,9 @@ write a small placeholder SVG wherever one is needed.
    volunteers who do not write HTML, with an index listing every post, newest
    first.
 4. Every page shares the library's header (a small seed mark) and footer.
+5. Visitors on a keyboard or a screen reader skip the header: the first link on every
+   page is "Skip to content", and it lands on that page's main content. Every page has
+   exactly one main landmark.
 
 ## What the notes must do out in the world
 
