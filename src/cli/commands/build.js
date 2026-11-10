@@ -71,6 +71,7 @@ import { checkSchemaDeclarations, generateStructuredData } from "../../core/stru
 import * as robots from "../../core/robots.js";
 import * as generate from "../../core/generate.js";
 import { buildSourceInventory } from "../../core/source-inventory.js";
+import { buildReport } from "../../core/report.js";
 
 /**
  * @param {object} context
@@ -86,6 +87,11 @@ import { buildSourceInventory } from "../../core/source-inventory.js";
  *   function directly with no command at all — every real caller supplies one.
  *   Read solely to fill §33.2's generator-context `command` field (below); it
  *   changes nothing else about the pipeline.
+ * @param {{diagnostics: object[], files: Map<string, string|Uint8Array>, report: object|null}} [context.result]
+ *   - what `run()` (cli.js) returns to its caller, filled in here: the
+ *   diagnostics as data, the tree this build produced when it could be
+ *   published, and the audit report when the build was audited. `dev`, `watch`
+ *   and `init` pass none. Nothing reads it back; it changes nothing about the pipeline.
  * @returns {Promise<number>}
  *
  * Two keys on `settings` are set by a command rather than by a flag, and both
@@ -100,7 +106,7 @@ import { buildSourceInventory } from "../../core/source-inventory.js";
  * and `unify dev` IS `unify watch` plus a server — there is no other seam
  * between the two that reaches a rebuild.
  */
-export async function build({ sourceRoot, output, settings, reporter, sourceDefaulted = false, command = "build" }) {
+export async function build({ sourceRoot, output, settings, reporter, sourceDefaulted = false, command = "build", result }) {
   // ---- §34 — the template this site extends, BEFORE anything else ----------
   // Fetched (or found in the cache, or read in place) before the generator
   // runs and before anything is scanned, so a source that cannot be reached
@@ -179,14 +185,16 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
       }
     }
 
-    return await runBuild({ sourceRoot, output, settings, reporter, sourceDefaulted, overlayDir, layer });
+    return await runBuild({ sourceRoot, output, settings, reporter, sourceDefaulted, overlayDir, layer, result });
   } finally {
     if (overlayDir !== null) generate.removeOverlayDir(overlayDir);
+    // Every exit above has relocated and flushed by now: what was printed, as data.
+    if (result) result.diagnostics = reporter.sorted().map(({ discriminator, ...d }) => d);
   }
 }
 
 /** The build proper, with §33's overlay already produced (or absent). */
-async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulted, overlayDir, layer }) {
+async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulted, overlayDir, layer, result }) {
   // §33.3 — THE RESOLUTION NAMESPACE, computed once and threaded everywhere a
   // path is resolved or named. The overlay joins the scan (below) and this: a
   // generated page walks for `_layout.html` and an `<include src>` finds a
@@ -824,6 +832,7 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
 
   if (settings.audit) {
     reporter.summary(formatFindings(findings, reporter.problemCount));
+    if (result && shouldPublish(reporter)) result.files = tempFiles;
     // §24.6 — a pipeline problem exits 1 regardless: evaluating output that
     // cannot be built is meaningless, and the findings printed beside it
     // describe a site that would never ship. Otherwise a `broken` finding
@@ -843,6 +852,13 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
   const gated = settings.auditGate === true;
   const gateBlocks = gated && (reporter.exitCode !== 0 || auditExitCode(findings, settings.strict) !== 0);
   if (gated) reporter.summary(formatFindings(findings, reporter.problemCount));
+  if (gated && result) {
+    result.report = buildReport({
+      documents: manifest.documents, findings, base: baseConfig,
+      problemCount: reporter.problemCount, advisoryCount: reporter.advisoryCount,
+    });
+  }
+  if (result && shouldPublish(reporter) && !gateBlocks) result.files = tempFiles;
 
   // ---- §15 — transactional publish. ----------------------------------------
   // Named rather than inlined so the §27 sink at the end of this function can
