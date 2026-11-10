@@ -189,11 +189,14 @@ test("MRG-22: no page main, a sink-less layout and a Markdown page are unchanged
     "plain/index.html": html('<main id="m"><p>Kept</p></main>'),
     "mdlayout/_layout.html": html('<main id="shell" class="s"><slot></slot></main>'),
     "mdlayout/post.md": "# Post\n\nBody\n",
+    "mdlayout/raw.md": "# Raw\n\n<main id=\"mine\" class=\"raw\">\n\nBody\n\n</main>\n",
   });
   await build(tmp);
   expect(bodyOf(read(tmp, "nomain.html"))).toBe('<p>No main here</p>');
   expect(bodyOf(read(tmp, "plain/index.html"))).toBe('<main id="m"><p>Kept</p></main>');
   expect(bodyOf(read(tmp, "mdlayout/post.html"))).toMatch(/^<main id="shell" class="s">\s*<h1[^>]*>Post<\/h1>/);
+  // Conversion adds no <main>; one the author wrote as raw HTML is an M like any other.
+  expect(bodyOf(read(tmp, "mdlayout/raw.html"))).toMatch(/^<main id="mine" class="s raw">\s*<h1[^>]*>Raw<\/h1>\s*<p>Body<\/p>\s*<\/main>$/);
   covers("MRG-22");
 });
 
