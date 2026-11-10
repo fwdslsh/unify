@@ -101,15 +101,16 @@ export async function audit(context) {
     ]);
   }
 
+  consumeLastAuditRun(); // drop anything an earlier run in this process left, so a null below is THIS run's
   const { reporter: buildReporter, captured } = await runBuildForAudit(context);
 
-  // Guaranteed non-null: `settings.audit = true` above makes `build.js` call
-  // `auditManifest` unconditionally before its only two returns (see
-  // `lastAuditRun`'s own comment in core/audit.js) — this project has no
-  // internal-error class that returns without throwing. Reading `run.findings`
-  // on a genuine `null` throws immediately rather than silently printing an
-  // empty report, which is the louder and more honest failure.
+  // Null when the build stopped before the scan: a `--generate` generator that
+  // failed (P29), or a source-inventory frontmatter fault (§33.7). `build.js`
+  // returns before it reaches `auditManifest` then, so there is no site to
+  // evaluate (§24.6). The diagnostics were already flushed by the build; print
+  // no report in any format and exit as the build did.
   const run = consumeLastAuditRun();
+  if (run === null) return buildReporter.exitCode;
   let findings = run.findings;
   const { documents, base, htmlFiles } = run;
 
@@ -126,6 +127,14 @@ export async function audit(context) {
   }
 
   // ---- the report ---------------------------------------------------------
+  // The document, built once: `--format json`/`sarif` print it below, and
+  // `run()` returns it (`result.report`) whatever was printed.
+  const report = buildReport({
+    documents, findings, base,
+    problemCount: buildReporter.problemCount,
+    advisoryCount: buildReporter.advisoryCount,
+  });
+  if (context.result) context.result.report = report;
   if (format === "human") {
     // Replay everything build.js printed before its own (now-superseded)
     // findings report — the sourceDefaulted notice, when there is one — so
@@ -142,11 +151,6 @@ export async function audit(context) {
     // lines around it.
     context.reporter.summary(formatFindings(findings, buildReporter.problemCount));
   } else {
-    const report = buildReport({
-      documents, findings, base,
-      problemCount: buildReporter.problemCount,
-      advisoryCount: buildReporter.advisoryCount,
-    });
     // Machine-readable output must BE the document, start to finish: no prose
     // line before it (nothing from `captured` is replayed here) or after.
     context.reporter.summary(

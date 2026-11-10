@@ -23,7 +23,7 @@ import { fileURLToPath } from "node:url";
 import pkg from "../package.json" with { type: "json" };
 import { Reporter, UsageError } from "./core/diagnostics.js";
 import { cleanRefusalReason, resolveSource } from "./core/paths.js";
-import { configPath, parseArgs } from "./cli/options.js";
+import { configPath, optionsFrom, parseArgs } from "./cli/options.js";
 import { resolveSettings } from "./cli/settings.js";
 import { saveEntries, writeConfig } from "./cli/save-config.js";
 import { classifyTemplateSource } from "./cli/template-source.js";
@@ -85,11 +85,65 @@ function version() {
 }
 
 /**
- * @param {string[]} argv
- * @returns {Promise<number>}
+ * One problem or advisory, as data: what the command prints on stderr.
+ * @typedef {object} Diagnostic
+ * @property {"problem"|"advisory"} severity
+ * @property {string} file - relative to the working directory
+ * @property {number} [line] - 1-based; absent when unknown
+ * @property {string} message - prose, not contract
+ * @property {string} [context] - the offending source text
+ * @property {string[]} [fixes] - one edit per entry
+ *
+ * What a run produced, as data. The same four keys for every command.
+ * @typedef {object} Result
+ * @property {number} status - the exit code: 0, or 1 when a problem (or, under `--strict`, an advisory or finding) was found
+ * @property {Diagnostic[]} diagnostics - ordered by path, then line, as printed
+ * @property {Map<string, Uint8Array>} files - output path -> bytes: the site the pipeline built, written or not. Empty when a problem (or the `--audit` gate) kept it from being published, and for commands that build no site
+ * @property {object|null} report - the document `unify audit --format json` prints, when the run was audited (`audit`, or `build --audit`); otherwise `null`
  */
-export async function run(argv) {
-  const { command, template, options } = parseArgs(argv);
+
+/**
+ * Build the site from a script: `run({ source: "site", baseUrl: "https://example.com/" })`
+ * is `unify build --source site --base-url https://example.com/`, in this
+ * process. The options are the command's flags by their long names in
+ * camelCase; `unify.yaml` is read, the site is written and the same lines are
+ * printed as on the command line. What it adds is the return value.
+ *
+ * This is the package's public API, and it is EXPERIMENTAL: it may change or be
+ * removed in any release before v1. See docs/api.md.
+ *
+ * @param {Record<string, boolean|string|string[]>} [options] - for example
+ *   `{ source: "site", prettyUrls: true, dryRun: true, audit: true }`
+ * @returns {Promise<Result>} rejects with a `UsageError` (`.message`, `.fixes`)
+ *   for what the command line exits 2 for, and with the original error for
+ *   anything unexpected
+ */
+export async function run(options = {}) {
+  return main({ command: "build", template: undefined, options: optionsFrom(options) });
+}
+
+/**
+ * One run of the command line, already parsed: the program below calls it with
+ * `parseArgs(argv)`, `run()` with its options object.
+ * @param {ReturnType<typeof parseArgs>} parsed
+ * @returns {Promise<Result>}
+ */
+async function main(parsed) {
+  const result = { status: 0, diagnostics: [], files: new Map(), report: null };
+  result.status = await execute(parsed, result);
+  for (const [path, content] of result.files) {
+    if (typeof content === "string") result.files.set(path, Buffer.from(content));
+  }
+  return result;
+}
+
+/**
+ * The command itself: check, dispatch.
+ * @param {ReturnType<typeof parseArgs>} parsed
+ * @param {Result} result - filled in by the commands that build a site
+ * @returns {Promise<number>} the exit code
+ */
+async function execute({ command, template, options }, result) {
 
   if (options.help) {
     process.stdout.write(HELP);
@@ -282,7 +336,7 @@ export async function run(argv) {
   // named `command`), only the generator context's `command` field reads it,
   // and every command handler below (build/audit/dev/watch) already receives
   // and forwards this whole context object.
-  const context = { sourceRoot, output, settings, reporter, template, sourceDefaulted, command };
+  const context = { sourceRoot, output, settings, reporter, template, sourceDefaulted, command, result };
 
   switch (command) {
     case "build": {
@@ -356,7 +410,7 @@ function isProgram() {
 /* c8 ignore start — process wiring, exercised by the conformance harness */
 if (isProgram()) {
   try {
-    process.exitCode = await run(process.argv.slice(2));
+    process.exitCode = (await main(parseArgs(process.argv.slice(2)))).status;
   } catch (error) {
     const usage = error instanceof UsageError;
     process.stderr.write(`${usage ? "" : "unify: "}${error.message}\n`);
