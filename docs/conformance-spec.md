@@ -1052,6 +1052,8 @@ Discipline (asserted by the E2E suite): an advisory that fires on a correct site
 
 `unify dev` = watch + a static server on `localhost:<port>` (default 3000) serving the output directory with directory indexes and a 404 page, plus a reload event stream; the reload script is injected only into HTML responses **it serves** and never exists in the output directory. It answers one path that is not a file: `/_unify/`, the local audit view (§27), assembled in memory from the same manifest and findings the command line reads and written to the output directory never. No proxying, HTTPS, middleware, or config — permanently.
 
+With a subpath `--base-url` such as `https://example.test/docs/`, the static server also serves the output directory at `/docs/`, so the links and assets the build emits work locally. Existing output-root addresses remain usable; the base-path mount takes precedence inside its prefix. The development-only audit, preview and reload routes remain at the origin root.
+
 ---
 
 ## 17. `--dry-run` report
@@ -2048,6 +2050,8 @@ attempt.
 - `collapsed=true|false`: the state for this load, taking precedence over the mode's default; stored.
 
 Collapsed, the chrome is a small show control in the bottom corner; expanded, it carries a collapse control, and Escape collapses it. Pressing either control stores the new state, so the user's choice follows them; the automatic collapse of `partials` mode on a page stores nothing, so a choice made on a layout survives a detour through a page. Precedence, in one line: `chrome=off` beats everything; then the URL's `collapsed`; then, under `partials` on a page, collapsed; then the stored state; then expanded.
+
+The always-served reload script also records explicit chrome preferences, including on requests that omit the overlay and on the preview index. Preview redirects preserve the query string. Changing a page or layout picker preserves unrelated query parameters, including repeated values, and the URL fragment. All addresses resolving to the same emitted page carry the same chrome, including explicit `index.html` addresses and the `--base-url` mount.
 
 The chrome is the only markup the server adds to a document beyond the reload script and, on a layout preview, the one `slot { display: contents }` rule, and like them it exists in no published file.
 

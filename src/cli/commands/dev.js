@@ -42,6 +42,7 @@ import { renderPageMap } from "../../core/page-map.js";
 import { resolutionRoots } from "../../core/paths.js";
 import { AUDIT_PATH, PREVIEW_PATH, hasPreviewSource, renderPreview } from "../../core/preview.js";
 import { renderChrome } from "../../core/chrome.js";
+import { parseBaseUrl } from "../../core/urls.js";
 import { watch } from "./watch.js";
 
 /**
@@ -59,6 +60,7 @@ export async function dev(context, opts = {}) {
   const devServer = await createDevServer({
     outputDir: output,
     port: settings.port,
+    basePath: settings.baseUrl ? parseBaseUrl(settings.baseUrl).pathPrefix : "/",
     pages: renderPageMap({ sourceRoot: absSourceRoot, documents: [], built: false }),
     preview: (relPath, params) => renderPreview({
       sourceRoot: absSourceRoot,
@@ -73,8 +75,10 @@ export async function dev(context, opts = {}) {
     }),
     // §27.8 — on a served page the chrome names the source file and links the
     // layout and includes it reaches, from the page map (no second reading).
-    chrome: (servedPath) => {
-      const record = lastDocuments.find((d) => d.document.path === servedPath || d.document.path === `${servedPath}/`);
+    chrome: (_servedPath, outputPath) => {
+      // The resolved output file is the identity across directory, explicit
+      // index, percent-encoded and --base-url-prefixed spellings of a page.
+      const record = lastDocuments.find((d) => d.outputPath === outputPath);
       if (!record) return "";
       return renderChrome({
         kind: "page",

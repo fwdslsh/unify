@@ -131,7 +131,10 @@ function renderIndex({ roots, pages, outputDir }) {
     if (p.layout && !groups.layout.includes(p.layout)) groups.layout.push(p.layout);
     for (const rel of p.includes ?? []) if (!groups.fragment.includes(rel)) groups.fragment.push(rel);
   }
-  for (const p of pages) if (p.generated && !groups.page.includes(p.source)) groups.page.push(p.source);
+  // The published map also knows pages supplied by an extends template (or
+  // a now-removed source). They still have usable built addresses even when
+  // the preview's source-only scan cannot see them.
+  for (const p of pages) if (!groups.page.includes(p.source)) groups.page.push(p.source);
   const built = new Map(pages.map((p) => [p.source, p]));
   const previewHref = (rel) => `${PREVIEW_PATH}${rel.split("/").map(encodeURIComponent).join("/")}`;
   const dependency = (rel) => hasPreviewSource(roots, rel)

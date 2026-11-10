@@ -24,6 +24,15 @@
 
 const ID = "unify-chrome";
 
+// Shared with the always-served reload script: ?chrome=off omits this
+// overlay, but must still persist on pages, previews and the preview index.
+// Both callers place this prefix inside their own function scope.
+export const CHROME_PREFERENCES_SCRIPT = `var q=new URLSearchParams(location.search),S={g:function(k){try{return localStorage.getItem(k)}catch(e){return null}},s:function(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+var c=q.get("chrome"),o=q.get("collapsed");
+if(c!==null){c=c==="false"||c==="off"?"off":c==="partials"?"partials":"on";S.s("unify.chrome",c)}
+if(o!==null){o=o==="false"||o==="0"||o==="no"?"false":"true";S.s("unify.collapsed",o)}
+`;
+
 /**
  * @param {object} args
  * @param {"page"|"layout"|"fragment"} args.kind
@@ -109,6 +118,7 @@ function esc(value) {
 // specificity whatever they say.
 const STYLE = `<style>#${ID}{--mono:ui-monospace,SFMono-Regular,Menlo,monospace;--bg:rgba(22,22,27,.8);--fg:#f2f2f5;--mute:#a9a9b3;--line:rgba(255,255,255,.14);--hover:rgba(255,255,255,.1);--link:#9fcbff;--amber:#f6c349;--shadow:0 6px 24px rgba(0,0,0,.28);
 &,*:not(style,script,noscript){all:initial;box-sizing:border-box;font:12px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--fg)}
+&::before,&::after,*::before,*::after{all:initial;content:none}
 position:fixed;right:12px;bottom:12px;z-index:2147483647;display:block;max-width:calc(100vw - 24px);direction:ltr;text-align:left;
 @media (prefers-color-scheme:dark){--bg:rgba(248,248,251,.86);--fg:#15151a;--mute:#5d5d69;--line:rgba(0,0,0,.12);--hover:rgba(0,0,0,.07);--link:#0f5cc0;--amber:#f2b63a;--shadow:0 6px 24px rgba(0,0,0,.22)}
 [hidden],&[data-state=closed] .uc-card,&[data-state=open] .uc-show{display:none!important}
@@ -139,10 +149,7 @@ option{font:12px var(--mono);color:#111;background:#fff}
 
 // Plain inline script: no libraries, tolerant of a blocked localStorage.
 const SCRIPT = `(function(){var r=document.getElementById("${ID}");if(!r)return;
-var q=new URLSearchParams(location.search),S={g:function(k){try{return localStorage.getItem(k)}catch(e){return null}},s:function(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
-var c=q.get("chrome"),o=q.get("collapsed");
-if(c!==null){c=c==="false"||c==="off"?"off":c==="partials"?"partials":"on";S.s("unify.chrome",c)}
-if(o!==null){o=o==="false"||o==="0"||o==="no"?"false":"true";S.s("unify.collapsed",o)}
+${CHROME_PREFERENCES_SCRIPT}
 var mode=c||S.g("unify.chrome")||"on";if(mode==="off"){r.remove();return}
 var col=o!==null?o==="true":mode==="partials"&&r.dataset.kind==="page"?true:S.g("unify.collapsed")==="true";
 var card=r.querySelector(".uc-card"),show=r.querySelector(".uc-show");
@@ -152,5 +159,5 @@ show.onclick=function(){set(false,true);var h=r.querySelector(".uc-hide");if(h)h
 r.querySelector(".uc-hide").onclick=function(){set(true,true);show.focus()};
 document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!col&&r.isConnected){set(true,true);show.focus()}});
 r.querySelectorAll("[aria-controls]").forEach(function(b){var p=document.getElementById(b.getAttribute("aria-controls"));if(!p)return;b.onclick=function(){var open=b.getAttribute("aria-expanded")==="true";b.setAttribute("aria-expanded",String(!open));p.hidden=open}});
-var f=r.querySelector("form");if(f){f.onsubmit=function(){f.querySelectorAll("select").forEach(function(s){if(!s.value)s.disabled=true})};f.querySelectorAll("select").forEach(function(s){s.onchange=function(){f.requestSubmit?f.requestSubmit():f.submit()}})}
+var f=r.querySelector("form");if(f){var selects=f.querySelectorAll("select"),submit=HTMLFormElement.prototype.requestSubmit||HTMLFormElement.prototype.submit,fields=document.createDocumentFragment();f.addEventListener("submit",function(){selects.forEach(function(s){if(!s.value)s.disabled=true})});selects.forEach(function(s){s.onchange=function(){submit.call(f)}});q.forEach(function(v,k){if(k==="page"||k==="layout")return;var i=document.createElement("input");i.type="hidden";i.name=k;i.value=v;fields.appendChild(i)});f.appendChild(fields)}
 })();`;

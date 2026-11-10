@@ -1062,6 +1062,9 @@ if (mode === "failed") writeFileSync(join(overlay, "broken.html"), '<include src
     expect(about).toContain('href="/_unify/preview/"');
     expect(about).toContain('href="/_unify/"');
     expect((await text("/about")).includes('id="unify-chrome"')).toBe(true); // the slashless spelling too
+    for (const alias of ["/index.html", "/about/index.html", "/%61bout/"]) {
+      expect(await text(alias)).toContain('id="unify-chrome"');
+    }
     // A page with no layout and no includes says so rather than linking nowhere.
     const plain = await text("/plain/");
     expect(plain).toContain('id="unify-chrome"');
@@ -1070,7 +1073,8 @@ if (mode === "failed") writeFileSync(join(overlay, "broken.html"), '<include src
     // §27.1 holds: dist/ carries none of it, and neither does the reload script.
     expect(readFileSync(join(tmp, "dist", "about", "index.html"), "utf8")).not.toContain("unify-chrome");
 
-    // Off for the request that says so; what the browser stores is its own business.
+    // Off requests omit the overlay; the reload script still stores the
+    // preference (the browser regression exercises navigation afterward).
     expect(await text("/about/?chrome=off")).not.toContain('id="unify-chrome"');
     expect(await text("/about/?chrome=false")).not.toContain('id="unify-chrome"');
     expect(await text("/about/?chrome=partials")).toContain('id="unify-chrome"');
@@ -1085,6 +1089,59 @@ if (mode === "failed") writeFileSync(join(overlay, "broken.html"), '<include src
     expect(served).toBe(readFileSync(join(tmp, "dist", "about", "index.html"), "utf8"));
     d.proc.kill("SIGTERM");
     await sleep(200);
+    covers("DEV-08");
+  }, 60_000);
+  test("DEV-08 — base-url paths, output-root aliases, inherited pages, preview redirects and assets remain usable in dev", async () => {
+    const tmp = mkTmp();
+    writeTree(tmp, {
+      "src/_layout.html": '<html><head><title> — Site</title><link rel="stylesheet" href="/style.css"></head><body><slot>Default</slot></body></html>',
+      "src/index.html": page("Home", "The landing page here", '<a href="/about.html">About</a>'),
+      "src/about.html": page("About", "About this site here", "<p>About.</p>"),
+      "src/style.css": "body{color:navy}",
+      "theme/template.html": page("Template", "A page inherited from a template", '<include src="/_includes/template.fragment.html"></include>'),
+      "theme/_includes/template.fragment.html": "<p>Template fragment.</p>",
+    });
+    const port = await freePort();
+    const d = start(["dev", "-p", String(port), "--pretty-urls", "--base-url", "https://example.test/docs/", "--extends", "./theme"], tmp);
+    await d.ready;
+    const base = `http://localhost:${port}`;
+    await waitForStatus(base + "/", 200);
+    for (const path of ["/", "/index.html", "/docs", "/docs/", "/docs/index.html", "/about/", "/about/index.html", "/docs/about/", "/docs/about/index.html", "/%64ocs/", "/%64ocs/about/"]) {
+      const res = await fetch(base + path);
+      expect(res.status).toBe(200);
+      expect(await res.text()).toContain('id="unify-chrome"');
+    }
+    for (const path of ["/style.css", "/docs/style.css"]) {
+      const res = await fetch(base + path);
+      expect(res.status).toBe(200);
+      expect(await res.text()).toBe("body{color:navy}");
+    }
+    for (const path of ["/docs/missing.html", "/docstyle.css", "/_unify/unknown", "/docs/_unify/unknown", "/docs/_unify/", "/docs/__unify_reload__"]) {
+      expect((await fetch(base + path)).status).toBe(404);
+    }
+    const map = await (await fetch(base + "/_unify/pages.json")).json();
+    expect(map.pages.map((p) => p.path).sort()).toEqual(["/docs/", "/docs/about/", "/docs/template/"]);
+    const index = await (await fetch(base + "/_unify/preview/")).text();
+    expect(index).toContain('<a href="/docs/template/">template.html</a>');
+    expect(index).toContain('_includes/template.fragment.html</span> <small>source preview unavailable</small>');
+    expect((await fetch(base + "/docs/template/")).status).toBe(200);
+    const preview = await (await fetch(base + "/_unify/preview/_layout.html")).text();
+    expect(preview).toContain('href="/style.css"');
+    expect(preview).toContain('id="unify-chrome"');
+    for (const [path, destination] of [
+      ["/_unify/preview/about.html", "/docs/about/"],
+      ["/_unify/preview", "/_unify/preview/"],
+      ["/_unify", "/_unify/"],
+    ]) {
+      const query = "?chrome=off&collapsed=true&tag=a&tag=b";
+      const res = await fetch(base + path + query, { redirect: "manual" });
+      expect(res.status).toBe(302);
+      expect(res.headers.get("location")).toBe(destination + query);
+    }
+    const reload = await fetch(base + "/__unify_reload__");
+    expect(reload.headers.get("content-type")).toContain("text/event-stream");
+    await reload.body.cancel();
+    d.proc.kill("SIGTERM");
     covers("DEV-08");
   }, 60_000);
 });
