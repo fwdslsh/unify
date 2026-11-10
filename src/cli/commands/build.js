@@ -139,7 +139,7 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
       let sourcePagesPath = null;
       if (settings.sourceInventory) {
         const sourceFiles = scanSourceTree(sourceRoot, output, settings.exclude, reporter);
-        const inventory = buildSourceInventory({ files: sourceFiles, sourceRoot, reporter });
+        const inventory = buildSourceInventory({ files: sourceFiles, sourceRoot, reporter, prettyUrls: settings.prettyUrls, base: baseConfig });
         if (!reporter.canPublish) {
           relocateDiagnosticsToCwd(reporter, sourceRoot);
           reporter.flush();

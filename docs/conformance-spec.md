@@ -2662,13 +2662,16 @@ Two things unify does guarantee, and they are what make the seam safe to use rat
       "description": null,
       "date": "2026-04-02T09:00:00Z",
       "meta": [{ "name": "tags", "content": "finance" }],
-      "links": []
+      "links": [],
+      "outputPath": "reports/q1/index.html",
+      "path": "/sub/reports/q1/",
+      "url": "https://example.com/sub/reports/q1/"
     }
   ]
 }
 ```
 
-Each record has exactly these seven keys, in this order, and nothing else — no timestamps, no absolute paths. `meta` and `links` were added in 0.9.4 as new fields, so `schemaVersion` stays `1`:
+Each record has exactly these ten keys, in this order, and nothing else — no timestamps, no absolute paths. `meta` and `links` were added in 0.9.4, and `outputPath`, `path` and `url` in 0.12.0, each as new fields, so `schemaVersion` stays `1` (the example above is built with `--pretty-urls --base-url https://example.com/sub/`):
 
 | Field | Type | Content |
 |---|---|---|
@@ -2677,8 +2680,13 @@ Each record has exactly these seven keys, in this order, and nothing else — no
 | `title`, `description`, `date` | string \| null | what the author wrote, trimmed; `null` when not authored or empty |
 | `meta` | object[] | the page's own `<meta>` elements as attribute records, in source order, with the projection `catalog.json` uses (§30.2): `{"name": "tags", "content": "homelab"}`, `{"property": "og:image", "content": "…"}`, `{"charset": "utf-8"}`. For a `.md` page, the metas its frontmatter synthesizes (§10.2): one record per list item, a `og:…` key as `property`, and `title`, `layout`, `class`, `lang`, `dir` never present. Repeats, order and empty values are kept; nothing is split, coerced, sorted or deduplicated |
 | `links` | object[] | the page's own `<link>` elements as attribute records, in source order, values as written: not resolved, completed or prefixed, and given no canonical or redirect meaning. Always `[]` for a `.md` page, which has no `<link>` syntax |
+| `outputPath` | string | the output-root-relative POSIX path this page is emitted at under this build's `--pretty-urls`, computed by §13's own function: `.md` becomes `.html`, then `X.html` becomes `X/index.html` under `--pretty-urls`, except a page already named `index.html` at any depth and the root `404.html` (§11.2). Not percent-encoded |
+| `path` | string | the page's public root-relative address, with exactly the meaning and encoding of `catalog.json`'s `path` (§30.2, §20.5): the `--base-url` path prefix (or `/`), then `outputPath` with a trailing `index.html` reduced to its directory, each segment percent-encoded |
+| `url` | string \| null | the page's absolute public URL, with exactly the meaning of `catalog.json`'s `url` (§30.2): the `--base-url` origin plus `path`; `null` without `--base-url` |
 
 `pages` is sorted by `source`, the order the build's own scan already uses.
+
+**The address is a projection, not a guarantee of emission.** `outputPath`, `path` and `url` are computed from the page's source path and the build's settings (`--pretty-urls`, `--base-url`) alone, before the generator runs, by the same functions §13 and §20.5 use: there is no second implementation of routing. A page that goes on to collide with another file (§13) or is otherwise not emitted fails or changes the build exactly as it does without a generator; the projection does not resolve collisions, discover files, rewrite links or compute an authored canonical override (`--canonical auto` does not affect a page's own address). Each value equals what the same build then emits: the page's `outputPath` and public URL in `audit --format json` (§31.1) and its `path` and `url` in `catalog.json` (§30.2). The unchanged `href` remains the source-route link to write into generated HTML, which §11 rewrites.
 
 **Eligibility is the build's own scan, not a second one.** A record exists for exactly the files the build treats as pages (§4) of the **source tree**: `.html` and `.md` files after the underscore rule (§4.2), `--exclude` (§4.1), the never-shipped list (§4.3) and the `.fragment.html` opt-out (§4.4). So `_layout.html`, `_includes/`, `_`-prefixed pages and files, excluded paths and fragments are absent. A page marked `noindex` is **present**: this is discovery, not publication. Generated files are absent, since the generator has not run.
 
@@ -2688,7 +2696,7 @@ Each record has exactly these seven keys, in this order, and nothing else — no
 - **`.html`**: from the page file's own `<head>`, as written in the file: the `<title>` text and the `content` of `<meta name="description">` and `<meta name="date">`, character references decoded (§20.3), the first non-empty value winning (§20). **Includes are not resolved**, so a title an `<include>` supplies is not seen, and a page with no `<head>` element reads those elements wherever they stand, exactly as §20 does.
 - A frontmatter fault the build would report (invalid YAML, P17, §28.1's counter-prior keys, §10.5's frontmatter in an HTML page) is reported here the same located way and **stops the build before the generator runs**. No page is silently left out.
 
-**What it is not.** It is source facts, not the final manifest (§20) or the catalog (§30). A `title` here has no layout title suffix and no heading fallback, no generated page appears, nothing is rendered, a layout's own `<meta>` is not merged in, and a page's emitted URL is not computed. unify offers no query language, no field list, no sorting or grouping, and no second pass: composed facts (a final title, rendered heading ids, a page's public URL) do not exist until after the generator has run, so the only catalog (§30) a generator can read is a prior build's, which describes that build rather than this one.
+**What it is not.** It is source facts, not the final manifest (§20) or the catalog (§30). A `title` here has no layout title suffix and no heading fallback, no generated page appears, nothing is rendered, and a layout's own `<meta>` is not merged in. unify offers no query language, no field list, no sorting or grouping, and no second pass: a page's address is projected from its source path (above), but composed facts (a final title, rendered heading ids, a layout's contribution to the head) do not exist until after the generator has run, so the only catalog (§30) a generator can read is a prior build's, which describes that build rather than this one.
 
 ---
 

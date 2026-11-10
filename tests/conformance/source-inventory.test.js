@@ -119,10 +119,10 @@ test("GEN-14 — the inventory lists every source page with its authored fields,
   expectEqual(Object.keys(inventory), ["schemaVersion", "pages"], "top-level keys");
   expectEqual(inventory.schemaVersion, 1, "schemaVersion");
   for (const p of inventory.pages) {
-    expectEqual(Object.keys(p), ["source", "href", "title", "description", "date", "meta", "links"], `keys of ${p.source}`);
+    expectEqual(Object.keys(p), ["source", "href", "title", "description", "date", "meta", "links", "outputPath", "path", "url"], `keys of ${p.source}`);
   }
   // meta/links are GEN-17's subject; here, the five 0.9.3 fields are unchanged.
-  const fields = inventory.pages.map(({ meta, links, ...rest }) => rest);
+  const fields = inventory.pages.map(({ meta, links, outputPath, path, url, ...rest }) => rest);
   expectEqual(fields, EXPECTED, "the records (_-prefixed, excluded and fragment files absent; noindex present)");
   covers("GEN-14");
 }, TEST_MS);
@@ -252,4 +252,106 @@ test("GEN-17 — meta and links: the page's own head records, in order, equivale
     { rel: "alternate", hreflang: "fr", href: "/fr/b.html" },
   ], "b.html links: kept as written, not resolved");
   covers("GEN-17");
+}, TEST_MS);
+
+// GEN-18 — the projected address equals what the same build emits.
+const ADDRESS_SITE = {
+  "index.html": head("Home"),
+  "404.html": head("Not found"),
+  "about.md": "---\ntitle: About\n---\n# About\n",
+  "guides/index.md": "---\ntitle: Guides\n---\n# Guides\n",
+  "guides/start.html": head("Start"),
+  "guides/404.html": head("Nested 404"),
+  "guides/deep/index.html": head("Deep"),
+  "notes/été/a b.html": head("Spaces"),
+  "notes/q&a #1 ?.md": "---\ntitle: Reserved\n---\n# Reserved\n",
+  "notes/100%.md": "---\ntitle: Percent\n---\n# Percent\n",
+  "hidden.html": head("Hidden", '<meta name="robots" content="noindex">'),
+};
+
+async function addressCase(extraArgs) {
+  const tmp = mkTmp();
+  const probe = join(tmp, "probe.json");
+  writeTree(join(tmp, "src"), { ...ADDRESS_SITE, "_scripts/gen.mjs": probeGenerator(probe) });
+  const args = ["-s", "src", "-o", "dist", "--generate", "_scripts/gen.mjs", "--catalog", ...extraArgs];
+  const b = await runCli(["build", ...args], tmp);
+  expectExit(b, 0, `build ${extraArgs.join(" ")}`);
+  const inventory = JSON.parse(JSON.parse(readFileSync(probe, "utf8")).raw);
+  const a = await runCli(["audit", ...args, "--format", "json"], tmp);
+  if (a.exit !== 0 && a.exit !== 1) throw new Error(`audit: ${a.stderr}`);
+  const audit = JSON.parse(a.stdout);
+  const catalog = JSON.parse(readFileSync(join(tmp, "dist", "assets", "unify", "catalog.json"), "utf8"));
+  return { inventory, audit, catalog, tmp };
+}
+
+const ADDRESS_CASES = [
+  [],
+  ["--pretty-urls"],
+  ["--base-url", "https://example.com/"],
+  ["--base-url", "https://example.com/", "--pretty-urls"],
+  ["--base-url", "https://example.com/manual/"],
+  ["--base-url", "https://example.com/manual/", "--pretty-urls"],
+];
+
+for (const flags of ADDRESS_CASES) {
+  test(`GEN-18 — outputPath, path and url equal the emitted ones (${flags.join(" ") || "no flags"})`, async () => {
+    const { inventory, audit, catalog, tmp } = await addressCase(flags);
+    expectEqual(inventory.schemaVersion, 1, "schemaVersion stays 1");
+    const sources = inventory.pages.map((p) => p.source);
+    for (const want of Object.keys(ADDRESS_SITE)) {
+      if (!sources.includes(want)) throw new Error(`${want} missing from the inventory: ${sources}`);
+    }
+    const hasBase = flags.includes("--base-url");
+    const auditBySource = new Map(audit.pages.map((p) => [p.source, p]));
+    const catalogByPath = new Map(catalog.pages.map((p) => [p.path, p]));
+    let inCatalog = 0;
+    for (const p of inventory.pages) {
+      const what = p.source;
+      expectEqual(Object.keys(p).slice(-3), ["outputPath", "path", "url"], `${what}: the three keys are appended last, in order`);
+      const emitted = auditBySource.get(p.source);
+      if (!emitted) throw new Error(`${what} not in the audit's pages`);
+      expectEqual(p.outputPath, emitted.outputPath, `${what}: outputPath`);
+      if (!existsSync(join(tmp, "dist", ...p.outputPath.split("/")))) throw new Error(`${what}: ${p.outputPath} is not in dist/`);
+      expectEqual(p.path, emitted.document.path, `${what}: path vs audit`);
+      expectEqual(p.url, hasBase ? emitted.document.url : null, `${what}: url vs audit`);
+      const c = catalogByPath.get(p.path);
+      if (c) {
+        inCatalog++;
+        if (hasBase) expectEqual(p.url, c.url, `${what}: url vs catalog`);
+      } else if (p.source !== "hidden.html" && p.source !== "404.html") {
+        throw new Error(`${what} (${p.path}) is not in the catalog`);
+      }
+    }
+    const hidden = inventory.pages.find((p) => p.source === "hidden.html");
+    if (catalogByPath.has(hidden.path)) throw new Error("the noindex page must not be in the catalog (the root 404 is not listed either)");
+    if (inCatalog !== inventory.pages.length - 2) throw new Error(`catalog pages ${inCatalog} of ${inventory.pages.length}`);
+    // Spot checks on the rules themselves.
+    const by = Object.fromEntries(inventory.pages.map((p) => [p.source, p]));
+    const pretty = flags.includes("--pretty-urls");
+    expectEqual(by["about.md"].outputPath, pretty ? "about/index.html" : "about.html", "about.md");
+    expectEqual(by["index.html"].outputPath, "index.html", "root index");
+    expectEqual(by["guides/index.md"].outputPath, "guides/index.html", "nested index");
+    expectEqual(by["404.html"].outputPath, "404.html", "root 404");
+    expectEqual(by["guides/404.html"].outputPath, pretty ? "guides/404/index.html" : "guides/404.html", "nested 404");
+    const reserved = by["notes/q&a #1 ?.md"];
+    if (!reserved.path.includes("%23") || !reserved.path.includes("%3F")) throw new Error(`reserved characters are percent-encoded: ${reserved.path}`);
+    if (reserved.outputPath.includes("%23")) throw new Error("outputPath is not percent-encoded");
+    if (!hasBase) expectEqual(by["about.md"].url, null, "url without --base-url");
+    if (flags.includes("https://example.com/manual/")) {
+      expectEqual(by["about.md"].path, pretty ? "/manual/about/" : "/manual/about.html", "prefix in path");
+      expectEqual(by["about.md"].url, `https://example.com${by["about.md"].path}`, "url");
+    }
+    covers("GEN-18");
+  }, TEST_MS);
+}
+
+test("GEN-18 — the projection is not a promise: a page that collides still fails the build", async () => {
+  const tmp = mkTmp();
+  const probe = join(tmp, "probe.json");
+  writeTree(join(tmp, "src"), { "a.md": "# A\n", "a.html": head("A"), "_scripts/gen.mjs": probeGenerator(probe) });
+  const r = await runCli(["build", "-s", "src", "-o", "dist", "--generate", "_scripts/gen.mjs"], tmp);
+  expectExit(r, 1, "a.md and a.html both produce a.html");
+  const pages = JSON.parse(JSON.parse(readFileSync(probe, "utf8")).raw).pages;
+  expectEqual(pages.map((p) => p.outputPath), ["a.html", "a.html"], "both are projected, the build refuses");
+  covers("GEN-18");
 }, TEST_MS);
