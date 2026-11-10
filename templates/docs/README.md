@@ -12,7 +12,9 @@ inner loop is `unify dev` (build, watch, serve on localhost, reload), which also
 `http://localhost:3000/_unify/` — every `unify audit` finding grouped by page, with that page's
 title, description, language, canonical, headings and links beside it, and the build's own
 diagnostics underneath — and `/_unify/preview/`, which lists every layout, include and page and
-opens any layout or include on its own, composed with a page you pick. Every page `dev` serves
+opens layouts and includes. Select a page to see an include in its full context, or use the
+**Isolated / In context** controls to switch views; **Locate include** finds its visible elements.
+Every page `dev` serves
 carries a small corner overlay naming its source file and linking its layout and includes
 (`?chrome=off` hides it). Nothing about any of this is written to `dist/`. `unify --help` lists
 every command and flag there is.

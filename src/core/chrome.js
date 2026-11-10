@@ -24,6 +24,15 @@
 
 const ID = "unify-chrome";
 
+// Shared with the always-served reload script: ?chrome=off omits this
+// overlay, but must still persist on pages, previews and the preview index.
+// Both callers place this prefix inside their own function scope.
+export const CHROME_PREFERENCES_SCRIPT = `var q=new URLSearchParams(location.search),S={g:function(k){try{return localStorage.getItem(k)}catch(e){return null}},s:function(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+var c=q.get("chrome"),o=q.get("collapsed");
+if(c!==null){c=c==="false"||c==="off"?"off":c==="partials"?"partials":"on";S.s("unify.chrome",c)}
+if(o!==null){o=o==="false"||o==="0"||o==="no"?"false":"true";S.s("unify.collapsed",o)}
+`;
+
 /**
  * @param {object} args
  * @param {"page"|"layout"|"fragment"} args.kind
@@ -31,17 +40,26 @@ const ID = "unify-chrome";
  * @param {{path: string, layout: string|null, includes: string[]}|null} args.record - a page's record; null for previews
  * @param {{source: string, path: string}[]} args.reaching - built pages that use a layout/fragment
  * @param {string[]} args.layouts - layout rels a fragment may be shown in
- * @param {{page: string|null, layout: string|null}} args.selection - the current `?page=` / `?layout=`
+ * @param {{page?: string|null, layout?: string|null, view?: string}} args.selection - page, layout and include view
+ * @param {string} [args.contextNote] - explanation of missing or staged context
+ * @param {boolean} [args.canPlace] - offer explicit placement in a layout
+ * @param {number} [args.locateCount] - outermost include elements available to locate
  * @param {string[]} args.problems - formatted diagnostics for this file
+ * @param {string[]} [args.unavailableSources] - dependencies without an available preview source
  * @param {string} args.previewPath - "/_unify/preview/"
  * @param {string} args.auditPath - "/_unify/"
  * @returns {string} HTML for insertion immediately before `</body>`
  */
-export function renderChrome({ kind, rel, record = null, reaching = [], layouts = [], selection = {}, problems = [], previewPath = "/_unify/preview/", auditPath = "/_unify/" }) {
-  const sel = { page: selection?.page ?? null, layout: selection?.layout ?? null };
+export function renderChrome({ kind, rel, record = null, reaching = [], layouts = [], selection = {}, problems = [], unavailableSources = [], contextNote = "", canPlace = false, locateCount = 0, previewPath = "/_unify/preview/", auditPath = "/_unify/" }) {
+  const sel = { page: selection?.page ?? null, layout: selection?.layout ?? null, view: selection?.view ?? "isolated" };
   const href = (path) => previewPath + String(path ?? "").split("/").map(encodeURIComponent).join("/");
   const label = kind === "fragment" ? "include" : kind;
   const n = problems.length;
+  const unavailable = new Set(unavailableSources);
+  const dependency = (path) => unavailable.has(path)
+    ? `<span class="uc-muted">${esc(path)} (source preview unavailable)</span>`
+    : `<a class="uc-link" href="${esc(href(path))}">${esc(path)}</a>`;
+  const sourceOption = (path, selected) => opt(path, unavailable.has(path) ? `${path} (source preview unavailable)` : path, selected, unavailable.has(path));
 
   const head = [
     `<span class="uc-mark" aria-hidden="true">/</span>`,
@@ -57,41 +75,49 @@ export function renderChrome({ kind, rel, record = null, reaching = [], layouts 
   if (kind === "page") {
     const includes = record?.includes ?? [];
     const layout = record?.layout
-      ? `layout: <a class="uc-link" href="${esc(href(record.layout))}">${esc(record.layout)}</a>`
+      ? `layout: ${dependency(record.layout)}`
       : `<span class="uc-muted">no layout</span>`;
     const inc = includes.length
       ? `<button type="button" class="uc-btn uc-text" aria-expanded="false" aria-controls="${ID}-includes">includes: ${includes.length}</button>`
       : `<span class="uc-muted">no includes</span>`;
     const list = includes.length
-      ? `<ul class="uc-list" id="${ID}-includes" hidden>${includes.map((i) => `<li><a class="uc-link" href="${esc(href(i))}">${esc(i)}</a></li>`).join("")}</ul>`
+      ? `<ul class="uc-list" id="${ID}-includes" hidden>${includes.map((i) => `<li>${dependency(i)}</li>`).join("")}</ul>`
       : "";
     body = `<div class="uc-row uc-meta">${layout}<span class="uc-dot" aria-hidden="true">·</span>${inc}</div>${list}`;
   } else {
-    const empty = kind === "layout" ? "No page — the layout's own defaults" : "No page — the include's own defaults";
+    const empty = kind === "layout" ? "No page — the layout's own defaults"
+      : sel.view === "context" ? "No page — layout only" : "No page — the include's own defaults";
     const extra = sel.page && !reaching.some((p) => p.source === sel.page) ? [{ source: sel.page }] : [];
     const pageOpts = [opt("", reaching.length ? empty : `${empty} (no built page uses this ${label})`, !sel.page)]
-      .concat(reaching.concat(extra).map((p) => opt(p.source, p.source, p.source === sel.page))).join("");
+      .concat(reaching.concat(extra).map((p) => sourceOption(p.source, p.source === sel.page))).join("");
     let fields = `<label class="uc-field"><span>page</span><select name="page" class="uc-select">${pageOpts}</select></label>`;
     if (kind === "fragment") {
       const all = sel.layout && !layouts.includes(sel.layout) ? layouts.concat(sel.layout) : layouts;
-      const layoutOpts = [opt("", "Default layout", !sel.layout)].concat(all.map((l) => opt(l, l, l === sel.layout))).join("");
+      const layoutOpts = [opt("", "Default layout", !sel.layout)].concat(all.map((l) => sourceOption(l, l === sel.layout))).join("");
       fields += `<label class="uc-field"><span>layout</span><select name="layout" class="uc-select">${layoutOpts}</select></label>`;
+      fields += `<div class="uc-view" role="group" aria-label="Include view"><span class="uc-muted">view</span>`
+        + [ ["isolated", "Isolated"], ["context", "In context"] ].map(([value, text]) =>
+          `<button type="submit" name="view" value="${value}" class="uc-btn" aria-pressed="${sel.view === value}">${text}</button>`).join("")
+        + (sel.view === "context" ? `<button type="button" class="uc-btn uc-locate"${locateCount ? "" : " disabled"}>Locate include</button>` : "")
+        + `<span class="uc-muted uc-locate-status" role="status"></span></div>`;
+      if (canPlace) fields += `<button type="submit" name="placement" value="main" class="uc-btn">Place in main content</button>`;
     }
-    body = `<form class="uc-row uc-form" method="get">${fields}<noscript><button class="uc-btn">apply</button></noscript></form>`;
+    body = `<form class="uc-row uc-form" method="get">${fields}<noscript><button class="uc-btn">apply</button></noscript></form>`
+      + (contextNote ? `<p class="uc-note">${esc(contextNote)}</p>` : "");
   }
 
   const panel = n
     ? `<div class="uc-problems" id="${ID}-problems" hidden>${problems.map((p) => `<div class="uc-pre">${esc(p)}</div>`).join("")}</div>`
     : "";
 
-  return `<div id="${ID}" data-kind="${esc(kind)}" data-state="open">${STYLE}` +
+  return `<div id="${ID}" data-kind="${esc(kind)}" data-state="open"${kind === "fragment" ? ` data-view="${esc(sel.view)}"` : ""}>${STYLE}` +
     `<button type="button" class="uc-show" aria-label="Show the unify chrome" title="unify">/</button>` +
     `<div class="uc-card" role="region" aria-label="unify"><div class="uc-row uc-head">${head}</div>${body}${panel}</div>` +
     `<script>${SCRIPT}</script></div>`;
 }
 
-function opt(value, text, selected) {
-  return `<option value="${esc(value)}"${selected ? " selected" : ""}>${esc(text)}</option>`;
+function opt(value, text, selected, disabled = false) {
+  return `<option value="${esc(value)}"${selected ? " selected" : ""}${disabled ? " disabled" : ""}>${esc(text)}</option>`;
 }
 
 function esc(value) {
@@ -103,6 +129,7 @@ function esc(value) {
 // specificity whatever they say.
 const STYLE = `<style>#${ID}{--mono:ui-monospace,SFMono-Regular,Menlo,monospace;--bg:rgba(22,22,27,.8);--fg:#f2f2f5;--mute:#a9a9b3;--line:rgba(255,255,255,.14);--hover:rgba(255,255,255,.1);--link:#9fcbff;--amber:#f6c349;--shadow:0 6px 24px rgba(0,0,0,.28);
 &,*:not(style,script,noscript){all:initial;box-sizing:border-box;font:12px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--fg)}
+&::before,&::after,*::before,*::after{all:initial;content:none}
 position:fixed;right:12px;bottom:12px;z-index:2147483647;display:block;max-width:calc(100vw - 24px);direction:ltr;text-align:left;
 @media (prefers-color-scheme:dark){--bg:rgba(248,248,251,.86);--fg:#15151a;--mute:#5d5d69;--line:rgba(0,0,0,.12);--hover:rgba(0,0,0,.07);--link:#0f5cc0;--amber:#f2b63a;--shadow:0 6px 24px rgba(0,0,0,.22)}
 [hidden],&[data-state=closed] .uc-card,&[data-state=open] .uc-show{display:none!important}
@@ -112,6 +139,11 @@ position:fixed;right:12px;bottom:12px;z-index:2147483647;display:block;max-width
 .uc-row{display:flex;align-items:center;gap:4px 8px;min-height:32px}
 .uc-end{display:inline-flex;gap:8px;margin-left:auto;padding-left:8px}
 @media (max-width:560px){.uc-row{flex-wrap:wrap}}
+.uc-form{flex-wrap:wrap}
+.uc-view{display:flex;align-items:center;flex-wrap:wrap;gap:6px;width:100%}
+.uc-view [aria-pressed=true]{background:var(--hover);box-shadow:inset 0 0 0 1px var(--link)}
+.uc-btn:disabled{opacity:.5;cursor:default;text-decoration:none}
+.uc-note{display:block;max-width:640px;white-space:normal;margin:6px 0 0;padding:6px 8px;border-top:1px solid var(--line);color:var(--mute)}
 .uc-meta,.uc-form,.uc-list,.uc-problems{border-top:1px solid var(--line);margin-top:4px;padding-top:4px}
 .uc-mark{font:700 15px/1 var(--mono);padding:0 2px}
 .uc-kind{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);border:1px solid var(--line);border-radius:999px;padding:3px 7px}
@@ -133,10 +165,7 @@ option{font:12px var(--mono);color:#111;background:#fff}
 
 // Plain inline script: no libraries, tolerant of a blocked localStorage.
 const SCRIPT = `(function(){var r=document.getElementById("${ID}");if(!r)return;
-var q=new URLSearchParams(location.search),S={g:function(k){try{return localStorage.getItem(k)}catch(e){return null}},s:function(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
-var c=q.get("chrome"),o=q.get("collapsed");
-if(c!==null){c=c==="false"||c==="off"?"off":c==="partials"?"partials":"on";S.s("unify.chrome",c)}
-if(o!==null){o=o==="false"||o==="0"||o==="no"?"false":"true";S.s("unify.collapsed",o)}
+${CHROME_PREFERENCES_SCRIPT}
 var mode=c||S.g("unify.chrome")||"on";if(mode==="off"){r.remove();return}
 var col=o!==null?o==="true":mode==="partials"&&r.dataset.kind==="page"?true:S.g("unify.collapsed")==="true";
 var card=r.querySelector(".uc-card"),show=r.querySelector(".uc-show");
@@ -146,5 +175,20 @@ show.onclick=function(){set(false,true);var h=r.querySelector(".uc-hide");if(h)h
 r.querySelector(".uc-hide").onclick=function(){set(true,true);show.focus()};
 document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!col&&r.isConnected){set(true,true);show.focus()}});
 r.querySelectorAll("[aria-controls]").forEach(function(b){var p=document.getElementById(b.getAttribute("aria-controls"));if(!p)return;b.onclick=function(){var open=b.getAttribute("aria-expanded")==="true";b.setAttribute("aria-expanded",String(!open));p.hidden=open}});
-var f=r.querySelector("form");if(f){f.onsubmit=function(){f.querySelectorAll("select").forEach(function(s){if(!s.value)s.disabled=true})};f.querySelectorAll("select").forEach(function(s){s.onchange=function(){f.requestSubmit?f.requestSubmit():f.submit()}})}
+var f=r.querySelector("form");if(f){
+var selects=f.querySelectorAll("select"),submit=HTMLFormElement.prototype.requestSubmit||HTMLFormElement.prototype.submit,fields=document.createDocumentFragment(),hidden=[];
+f.addEventListener("submit",function(e){selects.forEach(function(s){if(!s.value)s.disabled=true});if(e.submitter)hidden.forEach(function(i){if(i.name===e.submitter.name)i.disabled=true})});
+selects.forEach(function(s){s.onchange=function(){hidden.forEach(function(i){if(i.name==="placement")i.disabled=true});submit.call(f)}});
+q.forEach(function(v,k){if(k==="page"||k==="layout")return;var i=document.createElement("input");i.type="hidden";i.name=k;i.value=v;fields.appendChild(i);hidden.push(i)});f.appendChild(fields)
+}
+var locate=r.querySelector(".uc-locate"),next=0;
+if(locate)locate.onclick=function(){
+var targets=Array.from(document.querySelectorAll("[data-unify-preview-target]")).filter(function(e){var b=e.getBoundingClientRect();return b.width>0&&b.height>0&&getComputedStyle(e).visibility!=="hidden"});
+var status=r.querySelector(".uc-locate-status");
+if(!targets.length){status.textContent="No visible include element";return}
+var i=next++%targets.length,e=targets[i],reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
+e.scrollIntoView({block:"center",behavior:reduce?"auto":"smooth"});
+if(e.animate)e.animate([{outline:"3px solid #e8ad32",outlineOffset:"3px"},{outline:"3px solid transparent",outlineOffset:"3px"}],{duration:reduce?1:1800});
+status.textContent="Include element "+(i+1)+" of "+targets.length;
+};
 })();`;

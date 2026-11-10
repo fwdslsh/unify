@@ -19,13 +19,12 @@
  *     their fallbacks render. With `?page=` it is shown composed with that
  *     page instead — §7 exactly, with this layout in place of the one the page
  *     would resolve.
- *   - an INCLUDE (a fragment) is shown on its own, inside a shell that carries
- *     the `<html>`, `<head>` and `<body>` start tag of a layout — so the
- *     fragment gets the site's stylesheets, scripts and body class — but none
- *     of the layout's body. The layout is `?layout=`, else the layout of
- *     `?page=`, else the one §6's walk finds from the fragment's own directory.
- *     With `?page=` the fragment's slots are filled the way that page fills
- *     them (§32), when that page includes it with content.
+ *   - an INCLUDE offers Isolated and In context. With a chosen page or
+ *     layout, context is the default: compose the whole page or show the
+ *     whole layout. Layout-only staging into main content is explicit.
+ *     Isolated retains the fragment-only shell and first direct page fills.
+ *     Context uses provenance to mark existing elements for Locate include;
+ *     no extra layout wrappers or published markup are introduced.
  *   - a PAGE is redirected to its served address, the page map's `path`.
  *
  * Every URL in the result is rewritten against the file that authored it
@@ -37,14 +36,15 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { extname, posix, join } from "node:path";
 import { Reporter } from "./diagnostics.js";
-import { contentSpan, findFirst, getAttr, isElement, parse, rawSpan } from "./html.js";
+import { contentSpan, findAll, findFirst, getAttr, isElement, isInside, parse, rawSpan } from "./html.js";
 import { inlineIncludes } from "./includes.js";
 import { resolveHtmlLayout, resolveMarkdownLayout, walkForLayout } from "./layout.js";
 import { convert, convertFragment } from "./markdown.js";
-import { assembleMarkdownDocument, compose } from "./compose.js";
+import { assembleMarkdownDocument, compose, spliceTrackingSpans } from "./compose.js";
 import { locateExisting, nameOf, virtualOf } from "./paths.js";
 import { applyPrettyLinks, rewriteProvenanceUrls, spansToLocator } from "./urls.js";
 import { renderChrome } from "./chrome.js";
+import { mergeSlottedInclude } from "./slotted-include.js";
 
 export const PREVIEW_PATH = "/_unify/preview/";
 export const AUDIT_PATH = "/_unify/";
@@ -112,6 +112,11 @@ function scanLayouts(roots) {
   return scanSourceFiles(roots).filter((rel) => posix.basename(rel) === LAYOUT_FILENAME);
 }
 
+/** The same available-source boundary used by the preview request handler. */
+export function hasPreviewSource(roots, rel) {
+  return /\.(html|md)$/i.test(rel) && Boolean(locateExisting(roots, rel));
+}
+
 /**
  * §27.7 — the index at `/_unify/preview/`: every layout, include and page the
  * namespace holds, each a link to its preview (a built page to its own
@@ -122,12 +127,22 @@ function renderIndex({ roots, pages, outputDir }) {
   const knownLayouts = new Set(pages.map((p) => p.layout).filter(Boolean));
   const groups = { layout: [], fragment: [], page: [] };
   for (const rel of scanSourceFiles(roots, outputDir)) groups[kindOf(rel, knownLayouts)].push(rel);
-  for (const p of pages) if (p.generated && !groups.page.includes(p.source)) groups.page.push(p.source);
+  for (const p of pages) {
+    if (p.layout && !groups.layout.includes(p.layout)) groups.layout.push(p.layout);
+    for (const rel of p.includes ?? []) if (!groups.fragment.includes(rel)) groups.fragment.push(rel);
+  }
+  // The published map also knows pages supplied by an extends template (or
+  // a now-removed source). They still have usable built addresses even when
+  // the preview's source-only scan cannot see them.
+  for (const p of pages) if (!groups.page.includes(p.source)) groups.page.push(p.source);
   const built = new Map(pages.map((p) => [p.source, p]));
   const previewHref = (rel) => `${PREVIEW_PATH}${rel.split("/").map(encodeURIComponent).join("/")}`;
+  const dependency = (rel) => hasPreviewSource(roots, rel)
+    ? `<a href="${esc(previewHref(rel))}">${esc(rel)}</a>`
+    : `<span>${esc(rel)}</span> <small>source preview unavailable</small>`;
   const list = (items, link) => (items.length ? `<ul>\n${items.map(link).join("\n")}\n</ul>` : "<p>none</p>");
-  const layouts = list(groups.layout, (rel) => `<li><a href="${esc(previewHref(rel))}">${esc(rel)}</a> <small>${pages.filter((p) => p.layout === rel).length} page(s)</small></li>`);
-  const fragments = list(groups.fragment, (rel) => `<li><a href="${esc(previewHref(rel))}">${esc(rel)}</a> <small>${pages.filter((p) => (p.includes || []).includes(rel)).length} page(s)</small></li>`);
+  const layouts = list(groups.layout, (rel) => `<li>${dependency(rel)} <small>${pages.filter((p) => p.layout === rel).length} page(s)</small></li>`);
+  const fragments = list(groups.fragment, (rel) => `<li>${dependency(rel)} <small>${pages.filter((p) => (p.includes || []).includes(rel)).length} page(s)</small></li>`);
   const pageList = list(groups.page.sort(), (rel) => {
     const record = built.get(rel);
     return record
@@ -153,7 +168,7 @@ function renderIndex({ roots, pages, outputDir }) {
 </head>
 <body>
 <h1>unify — preview</h1>
-<p class="intro">Every layout and include rendered on its own, with the site's styles and its own default content; every page at its built address. A preview reloads when you save. <a href="/_unify/">Audit view</a></p>
+<p class="intro">Open layouts and includes with their defaults, then choose a page or layout to see an include in context. Use Isolated for the fragment alone. Pages open at their built addresses. Previews reload when you save. <a href="/_unify/">Audit view</a></p>
 <h2>Layouts</h2>
 ${layouts}
 <h2>Includes</h2>
@@ -172,26 +187,28 @@ ${pageList}
  * @param {string} args.relPath - the source path after `/_unify/preview/`
  * @param {string|null} args.page - `?page=`: a page's source path, or null
  * @param {string|null} args.layout - `?layout=`: a layout's source path, or null
+ * @param {string|null} [args.view] - isolated or context; defaults to context when a page/layout is selected
+ * @param {string|null} [args.placement] - main explicitly stages an unused include in a layout
  * @param {boolean} [args.chrome] - false when the URL said `chrome=off`: the chrome is left out server-side (§27.8)
  * @param {{source: string, generated?: boolean, layout: string|null, includes?: string[], path: string, outputPath: string}[]} args.pages - the page map's records (empty before the first build)
  * @param {boolean} args.prettyUrls
  * @param {string} [args.outputDir] - absolute; never listed by the index
  * @returns {Promise<{status: number, html?: string, location?: string}>}
  */
-export async function renderPreview({ sourceRoot, roots, relPath, page = null, layout = null, chrome = true, pages = [], prettyUrls = false, outputDir = null }) {
+export async function renderPreview({ sourceRoot, roots, relPath, page = null, layout = null, view = null, placement = null, chrome = true, pages = [], prettyUrls = false, outputDir = null }) {
   const rel = posix.normalize(relPath).replace(/^\/+/, "");
   // The index: no file named.
   if (rel === "" || rel === ".") return { status: 200, html: renderIndex({ roots, pages, outputDir }) };
   const abs = locateExisting(roots, rel);
-  const ext = extname(rel).toLowerCase();
-  if (!abs || (ext !== ".html" && ext !== ".md")) {
+  if (!hasPreviewSource(roots, rel)) {
     return { status: 404, html: message("Not a source file", `<code>${esc(rel)}</code> is not an <code>.html</code> or <code>.md</code> file under the source root.`) };
   }
   const knownLayouts = new Set(pages.map((p) => p.layout).filter(Boolean));
   const kind = kindOf(rel, knownLayouts);
+  const mode = view === "isolated" || view === "context" ? view : page || layout ? "context" : "isolated";
+  let contextNote = "", canPlace = false, locateCount = 0;
   const reporter = quietReporter();
   const ctx = { sourceRoot, roots, reporter, convertMarkdown: (p) => convertFragment(p, { sourceRoot, roots, reporter }) };
-  const emittedHtmlPaths = new Set(pages.map((p) => p.outputPath.replace(/\/index\.html$/, (m, o, s) => (s === "index.html" ? m : m))));
   const finish = (text, spans, file) => {
     let out = rewriteProvenanceUrls(text, { provenanceOf: spansToLocator(spans, file), pageFile: file, pageMoved: true });
     if (prettyUrls && pages.length) out = applyPrettyLinks(out, { pageOutputPath: "index.html", emittedHtmlPaths: new Set(pages.map((p) => p.outputPath)) });
@@ -206,7 +223,9 @@ export async function renderPreview({ sourceRoot, roots, relPath, page = null, l
     kind, rel, record: null,
     reaching: pages.filter((p) => !p.generated && uses(p)).map((p) => ({ source: p.source, path: p.path })),
     layouts: kind === "fragment" ? [...new Set([...scanLayouts(roots), ...knownLayouts])].sort() : [],
-    selection: { page, layout },
+    selection: { page, layout, view: mode },
+    contextNote, canPlace, locateCount,
+    unavailableSources: [...knownLayouts, ...pages.map((p) => p.source)].filter((path) => !hasPreviewSource(roots, path)),
     problems: reporter.sorted().map((d) => Reporter.format(d)),
     previewPath: PREVIEW_PATH, auditPath: AUDIT_PATH,
   }) : "");
@@ -236,16 +255,66 @@ export async function renderPreview({ sourceRoot, roots, relPath, page = null, l
     return { status: 200, html: insertBeforeBodyEnd(insertBeforeHeadEnd(html, SLOT_STYLE), chromeHtml()) };
   }
 
-  // fragment
-  const shellAbs = layoutAbs ?? (pageAbs ? layoutOfPage(pageAbs, pages, roots) : null) ?? walkForLayout(abs, roots);
+  // An explicit page with no layout stays standalone; it must not inherit
+  // the fragment's nearest layout as a side effect of previewing it.
+  const shellAbs = layoutAbs ?? (pageAbs ? layoutOfPage(pageAbs, pages, roots) : walkForLayout(abs, roots));
+  if (mode === "context") {
+    let composed;
+    const file = pageAbs ? nameOf(roots, pageAbs) : shellAbs ? nameOf(roots, shellAbs) : rel;
+    if (pageAbs) {
+      const record = pages.find((p) => p.source === nameOf(roots, pageAbs));
+      if (!layoutAbs && record?.layout && !shellAbs) {
+        const body = `The page's layout <code>${esc(record.layout)}</code> is unavailable for source preview. Choose an available layout, or <a href="${esc(record.path)}">open the built page</a>.`;
+        return { status: 200, html: message("Context unavailable", body).replace("</body>", `${chromeHtml()}</body>`) };
+      }
+      composed = await composePage({ pageAbs, layoutAbs: shellAbs, ctx });
+    } else if (shellAbs) {
+      composed = await loadInlined(shellAbs, ctx);
+      const present = composed.spans.some((s) => s.file === rel);
+      const { root } = parse(composed.text);
+      const sink = findFirst(root, (n) => isElement(n, "slot") && !(getAttr(n, "name") ?? "").trim()
+        && isInside(n, "body") && !isInside(n, "template"))
+        ?? findFirst(root, (n) => isElement(n, "main") && isInside(n, "body") && !isInside(n, "template"));
+      canPlace = !present && Boolean(sink);
+      if (canPlace && placement === "main") {
+        // Stage defaults through the real composer, not a second placement
+        // algorithm. A page with no fills leaves the layout's named fallbacks.
+        const loaded = await loadFragment(abs, rel, ctx);
+        const fragment = mergeSlottedInclude({ fragmentText: loaded.text, fragmentSpans: loaded.spans,
+          fragmentFile: rel, contentText: "", contentSpans: [], contentFile: rel, at: { file: rel }, reporter });
+        const pageText = shellDocument(null, fragment.text, rel);
+        const start = pageText.indexOf(fragment.text, pageText.indexOf("<body>"));
+        composed = compose({ pageText, pageFile: rel,
+          pageSpans: fragment.spans.map((s) => ({ ...s, start: s.start + start, end: s.end + start })),
+          layoutText: composed.text, layoutFile: file, layoutSpans: composed.spans, reporter });
+        contextNote = "Staged in main content — this layout does not include the file here.";
+        canPlace = false;
+      } else if (!present) {
+        contextNote = canPlace
+          ? "This layout has no rendered content from the include. Place its defaults in main content to try it here."
+          : "This layout has no rendered content from the include and no main content slot. Choose a page or use Isolated.";
+      }
+    } else {
+      contextNote = "Choose a page or layout to see the include in context.";
+      const fragment = await loadFragment(abs, rel, ctx);
+      const html = shellDocument(null, finish(fragment.text, fragment.spans, rel), rel);
+      return { status: 200, html: insertBeforeBodyEnd(html, chromeHtml()) };
+    }
+    if (!composed) return { status: 200, html: message("Could not compose", "The selected context could not be composed. Read the problems in the toolbar.").replace("</body>", `${chromeHtml()}</body>`) };
+    const marked = markIncludeElements(composed, rel, file, chrome);
+    locateCount = marked.count;
+    if (!locateCount && !contextNote) contextNote = "No element from this include can be located in this context. Text-only, hidden or replaced content may have no visible target.";
+    const html = insertBeforeHeadEnd(finish(marked.text, marked.spans, file), SLOT_STYLE);
+    return { status: 200, html: insertBeforeBodyEnd(html, chromeHtml()) };
+  }
+
+  // Isolated mode retains the focused fragment view and its direct page fills.
   let body;
   if (pageAbs) {
     body = await fragmentAsIncludedBy({ fragmentAbs: abs, fragmentRel: rel, pageAbs, ctx });
   }
   if (!body) {
-    body = ext === ".md"
-      ? { text: await convertFragment(abs, { sourceRoot, roots, reporter }), spans: null, file: rel }
-      : await loadInlined(abs, ctx);
+    body = await loadFragment(abs, rel, ctx);
   }
   const fragmentHtml = finish(body.text, body.spans ?? [{ start: 0, end: body.text.length, file: body.file, fileOffset: 0 }], body.file);
   const shell = shellAbs ? await loadInlined(shellAbs, ctx) : null;
@@ -254,6 +323,35 @@ export async function renderPreview({ sourceRoot, roots, relPath, page = null, l
 }
 
 // ------------------------------------------------------------- composition
+
+/** Convert Markdown snippets before inlining, as the build does for includes. */
+async function loadFragment(abs, rel, ctx) {
+  if (extname(abs).toLowerCase() !== ".md") return loadInlined(abs, ctx);
+  const text = await convertFragment(abs, ctx);
+  return { text, spans: [{ start: 0, end: text.length, file: rel, fileOffset: 0 }], file: rel };
+}
+
+/**
+ * Mark existing outermost elements authored by the include. No wrapper is
+ * inserted: grid/flex children, tables and ancestor selectors retain their
+ * composition. Text-only/head-only fragments may have no locatable element.
+ * The provenance-preserving splice keeps subsequent URL rewriting exact.
+ */
+function markIncludeElements(composed, rel, file, enabled) {
+  const { text, spans } = composed;
+  const { root } = parse(text);
+  const sourceOf = spansToLocator(spans, file);
+  const candidates = new Set(findAll(root, (n) => n.type === "element"
+    && isInside(n, "body") && !isInside(n, "template")
+    && !["script", "style", "slot", "template"].includes(n.tag.toLowerCase())
+    && sourceOf(n.start) === rel));
+  const targets = [...candidates].filter((n) => {
+    for (let p = n.parent; p; p = p.parent) if (candidates.has(p)) return false;
+    return true;
+  });
+  const edits = enabled ? targets.map((n) => ({ start: n.attrsEnd, end: n.attrsEnd, replacement: ' data-unify-preview-target=""' })) : [];
+  return { ...spliceTrackingSpans(text, spans, edits, file), count: targets.length };
+}
 
 /** Read a file and inline its includes, as §2 step 2 does for a layout or an HTML page. */
 async function loadInlined(absPath, ctx) {
@@ -271,13 +369,13 @@ async function loadInlined(absPath, ctx) {
 async function composePage({ pageAbs, layoutAbs, ctx }) {
   const { sourceRoot, roots, reporter } = ctx;
   const pageFile = nameOf(roots, pageAbs);
-  const layoutLoaded = await loadInlined(layoutAbs, ctx);
+  const layoutLoaded = layoutAbs ? await loadInlined(layoutAbs, ctx) : { text: null, spans: null, file: null };
   if (extname(pageAbs).toLowerCase() === ".md") {
     const source = readFileSync(pageAbs, "utf8");
     const md = convert(source, { path: pageAbs, sourceRoot, roots, reporter });
     const inlinedBody = await inlineIncludes({ text: md.html, file: pageAbs, ...ctx, linesAreSource: false });
     const assembled = { ...md, html: inlinedBody.text, htmlSpans: inlinedBody.spans };
-    const { text: pageText, spans: pageSpans } = assembleMarkdownDocument(assembled, { standalone: false, pageFile });
+    const { text: pageText, spans: pageSpans } = assembleMarkdownDocument(assembled, { standalone: !layoutAbs, pageFile });
     return compose({ pageText, pageFile, pageSpans, layoutText: layoutLoaded.text, layoutFile: layoutLoaded.file, layoutSpans: layoutLoaded.spans, reporter });
   }
   const inlined = await loadInlined(pageAbs, ctx);

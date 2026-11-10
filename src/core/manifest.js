@@ -74,7 +74,7 @@ import { stripBaseUrl, resolveReference } from "./references.js";
  * @property {object} analysis - `extractDocument`'s own `DocumentAnalysis`,
  *   minus `rawHrefs` (consumed below, never surviving on the final envelope
  *   — the same rule that deleted `_hrefs` in the 0.8 model), plus this
- *   module's own second pass: `linksOut`/`linksIn`/`fragmentLinks` (§20.9,
+ *   module's own second pass: `linksOut`/`linksIn`/`linksInFromFragments`/`fragmentLinks` (§20.9,
  *   resolved against the whole manifest) and `refresh` resolved to
  *   `{raw, seconds, url, target}` (§20.11).
  */
@@ -146,6 +146,7 @@ function extract(page, base) {
       // `fragmentLinks` are.
       linksOut: [],
       linksIn: [],
+      linksInFromFragments: [],
       fragmentLinks: [],
       refresh: null,
     },
@@ -188,9 +189,10 @@ function resolveRefresh(raw, outputPath, base, byOutputPath) {
  *   §15 publishes as HTML (§20.1). Assets, fragments, excluded sources, and
  *   pages that failed to compose are not passed and get no document.
  * @param {import('./urls.js').BaseUrlConfig|null} [args.base]
+ * @param {Map<string, string>} [args.fragments] - emitted .fragment.html paths and bytes
  * @returns {{documents: BuildDocument[], byOutputPath: Map<string, BuildDocument>, byPublicPath: Map<string, BuildDocument>}}
  */
-export function buildManifest({ pages, base = null }) {
+export function buildManifest({ pages, base = null, fragments = new Map() }) {
   const ordered = [...pages].sort((a, b) =>
     a.outputPath < b.outputPath ? -1 : a.outputPath > b.outputPath ? 1 : 0);
   const drafts = ordered.map((p) => extract(p, base));
@@ -256,6 +258,38 @@ export function buildManifest({ pages, base = null }) {
     for (const target of doc.analysis.linksOut) byOutputPath.get(target).analysis.linksIn.push(doc.outputPath);
   }
   for (const doc of documents) doc.analysis.linksIn = [...new Set(doc.analysis.linksIn)].sort();
+
+  // A referenced shipped fragment can supply navigation after insertion into
+  // its consumer. Its URLs resolve against that PAGE, not the fragment file.
+  // Keep this evidence separate from the static link graph: it prevents a
+  // false orphan finding, but does not claim that JS ran or validate fragment
+  // destinations/IDs. Unreferenced fragments confer no reachability.
+  const fragmentHrefs = new Map();
+  for (const { doc, rawHrefs } of drafts) {
+    const pending = [...rawHrefs];
+    const visited = new Set();
+    for (let i = 0; i < pending.length; i++) {
+      const href = decodeEntities(pending[i]);
+      const stripped = base ? stripBaseUrl(href, base) : href;
+      const target = resolveReference(stripped, doc.outputPath);
+      if (target === null || !fragments.has(target) || visited.has(target)) continue;
+      visited.add(target);
+      if (!fragmentHrefs.has(target)) {
+        fragmentHrefs.set(target, extractDocument(fragments.get(target)).analysis.rawHrefs);
+      }
+      for (const raw of fragmentHrefs.get(target)) {
+        const value = decodeEntities(raw);
+        const local = base ? stripBaseUrl(value, base) : value;
+        const resolved = resolveReference(local, doc.outputPath);
+        const destination = byOutputPath.get(resolved);
+        if (destination && destination !== doc) destination.analysis.linksInFromFragments.push(doc.outputPath);
+        if (resolved !== null && fragments.has(resolved)) pending.push(raw);
+      }
+    }
+  }
+  for (const doc of documents) {
+    doc.analysis.linksInFromFragments = [...new Set(doc.analysis.linksInFromFragments)].sort();
+  }
 
   // `byPublicPath` keys on `document.path` — the final public root-relative
   // path (§20.5), unlike `byOutputPath`'s filesystem-shaped key. First

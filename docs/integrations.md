@@ -160,14 +160,17 @@ failure:
     "searchCorpus": null
   },
   "inputs": {
-    "sourcePages": null
+    "sourcePages": "/tmp/unify-generated-abc123/source-pages.json"
   }
 }
 ```
 
 `site` and `outputs` are the flags that change what a generator would otherwise have to
 duplicate: the effective `--base-url`/`--pretty-urls`/`--canonical`, and the output-relative
-paths `--catalog`/`--search-corpus` will write, each `null` when its flag is off. `inputs.sourcePages` is `null` too unless you ask for the source inventory (below). There is
+paths `--catalog`/`--search-corpus` will write, each `null` when its flag is off.
+`inputs.sourcePages` names the source inventory (below), enabled by default when a generator
+is configured; `source-inventory: false` in `unify.yaml` disables it and makes this field
+`null`. There is
 nothing else in it — no settings dump, no environment, no internal option names, and no
 manifest, because the generator runs before unify has composed a single page. Reading it is
 optional: `sourceRoot` and `generatedDir` are the same two arguments the flag has always
@@ -214,9 +217,9 @@ Five properties are worth knowing before you write a longer one:
 
 ### An index of your pages, in one build
 
-A generator runs before unify has read a single page, so by default it can only read your
-files itself. `--source-inventory` hands it that reading, done: `inputs.sourcePages` in the
-context names `source-pages.json`, one record per source page with the `title`,
+Before running a configured generator, unify reads the source pages' authored metadata
+and writes a source inventory by default. `inputs.sourcePages` in the context names
+`source-pages.json`, one record per source page with the `title`,
 `description` and `date` its author wrote (`null` where there is none), the page's
 `source` path, an `href` you can link to, and its projected `outputPath`, `path` and `url`. It is the same list of pages the build
 treats as pages: `_`-prefixed files, `--exclude` matches, fragments and layouts are not in
@@ -256,15 +259,16 @@ ${items.join("\n")}
 ```
 
 ```sh
-unify build --generate ../scripts/reports.mjs --source-inventory --audit --strict
+unify build --generate ../scripts/reports.mjs --audit --strict
 ```
 
 On the command line `--generate` counts from the **source root**, hence the `../` to reach
 `scripts/` beside `site/`; in `unify.yaml` the same file is `generate: scripts/reports.mjs`,
 relative to the file. The `href`s are ordinary links to your source pages, so `--pretty-urls`
 and a `--base-url` path prefix rewrite them like links you typed, and the audit checks every
-one. Put `generate: scripts/reports.mjs` and `source-inventory: true` in `unify.yaml` and the
-command is just `unify build --audit --strict`.
+one. Put `generate: scripts/reports.mjs` in `unify.yaml` and the command is just
+`unify build --audit --strict`. Set `source-inventory: false` only if your generator does
+not need the inventory; it then receives `inputs.sourcePages: null`.
 
 Every record also carries `meta` and `links`: the `<meta>` and `<link>` elements the page
 itself declares, in order, as attribute records (`{"name": "tags", "content": "homelab"}`,
@@ -533,14 +537,20 @@ checker, `rsync`, a deploy CLI:
 unify build --base-url https://example.com/ && npx some-minifier dist/
 ```
 
-Two things make this safer than it looks:
+Two guarantees apply to Unify's part of this sequence:
 
 - **The build is transactional.** A failed build leaves the previous `dist/` untouched, so
-  `unify build && deploy` never deploys a half-built site — the `&&` is load-bearing and
-  sufficient.
+  `unify build && deploy` starts the deploy command only after a successful build.
 - **`unify audit` never writes.** It runs the whole pipeline, reports on the site the
   build *would* publish, and publishes nothing, so it is safe to run against a working
   tree in CI.
+
+Unify's transaction ends when it publishes. A later tool can partially change `dist/`
+before failing; `&&` does not roll those edits back. `unify audit` rebuilds from source,
+so it does not inspect externally modified `dist/`. A chained tool does not run
+automatically on each `dev` or `watch` rebuild, and external edits do not regenerate
+Unify's catalog, search corpus or feed. The external tool owns its failure handling,
+watch integration and final-output validation.
 
 For CI, `--format json` and `--format sarif` are mechanical views of the same findings the
 human report shows:

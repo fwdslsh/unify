@@ -32,6 +32,59 @@ is documented as an experimental JavaScript API.
 - **`unify audit` no longer ends in an internal error when the pipeline stops before the scan.** With a `--generate` generator that fails (or a source-inventory frontmatter fault), it printed the problem and then `unify: null is not an object (evaluating 'run.findings')` under Bun or `unify: Cannot read properties of null (reading 'findings')` under Node, and exited 1. There is no site to evaluate then, so it now prints only the problem the build reported, no report in any `--format` (stdout stays empty), and exits 1 as before.
 - **Merged root attributes containing quotes are emitted well-formed.** A page `<body data-x='{"b":2}'>` over a layout that set the same attribute built `<body data-x="{"b":2}">`. A merged value is now written in `"` quotes, in `'` quotes when it holds a `"`, and with `&quot;` only when it holds both, on `<html>`, `<body>` and `<main>`.
 
+## [0.11.19] - 2026-11-09
+
+### Changed
+
+- **Include previews can show the complete page or layout.** Choosing a page or layout now defaults to **In context**, preserving surrounding markup, page styles and classes, and nested or repeated include content. **Isolated** keeps the existing focused preview. **Locate include** cycles through visible include elements without adding layout wrappers. Layout-only previews offer explicit, labeled placement in main content when the include is not already rendered there. Preview choices survive reloads and never change source files or published output.
+
+### Fixed
+
+- **Unavailable source previews no longer offer dead links (#153).** Generated or otherwise unavailable layouts and includes remain visible as labeled dependencies, while authored sources retain working previews. Failed rebuilds preserve the dependency map of the last published pages. An include preview whose selected page has an unavailable layout explains the limitation and links to the built page.
+- **Development links and assets work under `--base-url` subpaths.** The dev server serves the deployment mount as well as its existing root addresses, and the toolbar recognizes explicit `index.html` addresses and other aliases of the same page. The preview index also lists pages inherited from templates.
+- **Toolbar choices survive navigation.** Turning the toolbar off persists across pages, previews and redirects; page and layout selectors preserve unrelated query parameters, repeated values and URL fragments. Site pseudo-element styles no longer leak into toolbar controls.
+- **Generator and post-processing guidance matches the existing behavior (#152).** The integration guide correctly describes the source inventory as enabled by default for configured generators. It also explains where Unify's transaction ends, what source-based audit checks, and which watch, validation and artifact-update responsibilities belong to external tools.
+- **Scaffold and example guidance reflects current behavior.** Starter READMEs describe the new include preview controls, the blog template identifies the built-in Atom feed correctly, and the CLI reference and examples correct stale generator and resolved-finding descriptions.
+
+## [0.11.18] - 2026-11-08
+
+### Changed
+
+- **A plain `data-slot` or `data-layout` that addresses nothing is the author's (#154).** P08 read
+  `data-slot` on every element of every source file and failed the build, and P07 did the same for
+  `data-layout` on any element below the root. Both are ordinary `data-*` names that third-party markup
+  uses for its own purposes — shadcn/ui puts a `data-slot` on every primitive — and a port that carried
+  such markup could not build until the attributes were renamed. unify consumes `data-layout` on
+  `<html>`/`<body>` alone and never consumed `data-slot`, so nothing was ever lost; the two checks now
+  reach only as far as the intent is unambiguous. `data-slot="X"` is still P08 where it would have been
+  a fill — on an element in fill position whose layout, or whose fragment in a slotted include, declares
+  `<slot name="X">` — and names `slot="X"` as the fix. `data-layout` off the root is still P07 when its
+  value is a layout reference, a path ending `.html` or `none`. `data-unify` and `unify-*`, the
+  unify-branded tokens, are swept everywhere as before. A `<title data-slot="title">` in a layout, the
+  0.8.3 case, is no longer reported: a page's title merges regardless (conformance spec §6.3, §7.3, §32.3).
+
+### Fixed
+
+- **Strict audit recognizes navigation supplied by fetched fragments.** Pages linked from a shipped
+  `.fragment.html` referenced by a composed page no longer receive false `page-orphan` findings.
+  Fragment URLs resolve against their consuming page, including pretty URLs under a deployment
+  subpath; unrelated orphans and broken findings still block strict publishing.
+
+- **P15 points at the include recipe (#155).** The fix line for a layout that declares `data-layout`
+  said only to make it a complete standalone layout or delete it, which read as "copy the shell"; it
+  now also says to keep shared chrome in `_includes/`, so a section layout repeats one `<include>` per
+  region. The product spec's "accepted cost is repeating shared chrome" is corrected to match Getting
+  Started, and the first external request for chaining is logged beside the deferral (product spec
+  §3.2, §6.6).
+
+### Added
+
+- **A porting guide (#156).** `docs/guides/porting-an-existing-site.md` maps each live address to the
+  source path that keeps it, in a plain build and under `--pretty-urls`; states the rule for a site that
+  mixes `/x/` and `/x.html` addresses (no flag, every route in its path); and gives a ten-line check
+  that compares `unify audit --format json` against the list of addresses a port must keep. Every
+  literal is tested.
+
 ## [0.11.17] - 2026-10-29
 
 ### Added
@@ -1146,7 +1199,9 @@ with generated compare-link notes only. Their diffs are on the
 retroactively reconstructs detail those notes never carried.
 
 [Unreleased]: https://github.com/fwdslsh/unify/compare/v0.12.0...HEAD
-[0.12.0]: https://github.com/fwdslsh/unify/compare/v0.11.17...v0.12.0
+[0.12.0]: https://github.com/fwdslsh/unify/compare/v0.11.19...v0.12.0
+[0.11.19]: https://github.com/fwdslsh/unify/compare/v0.11.18...v0.11.19
+[0.11.18]: https://github.com/fwdslsh/unify/compare/v0.11.17...v0.11.18
 [0.11.17]: https://github.com/fwdslsh/unify/compare/v0.11.16...v0.11.17
 [0.11.16]: https://github.com/fwdslsh/unify/compare/v0.11.15...v0.11.16
 [0.11.15]: https://github.com/fwdslsh/unify/compare/v0.11.14...v0.11.15

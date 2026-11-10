@@ -74,7 +74,8 @@
  */
 import { createReadStream, readFileSync, statSync } from "node:fs";
 import { createServer } from "node:http";
-import { extname, resolve } from "node:path";
+import { extname, relative, resolve, sep } from "node:path";
+import { CHROME_PREFERENCES_SCRIPT } from "./chrome.js";
 import { UsageError } from "./diagnostics.js";
 import { renderPending } from "./dev-report.js";
 import { renderPageMap } from "./page-map.js";
@@ -90,7 +91,10 @@ export const REPORT_PATH = "/_unify/";
 export const PAGES_PATH = "/_unify/pages.json";
 
 const RELOAD_SCRIPT =
-  `<script>new EventSource(${JSON.stringify(RELOAD_PATH)}).onmessage=function(){location.reload();};</script>`;
+  `<script>new EventSource(${JSON.stringify(RELOAD_PATH)}).onmessage=function(){location.reload();};` +
+  // Off requests omit the chrome entirely, so preference persistence must
+  // also run in the script every dev document receives (including the index).
+  `(function(){${CHROME_PREFERENCES_SCRIPT}})();</script>`;
 
 /**
  * Insert the reload script into an HTML document: right before `</body>`
@@ -341,7 +345,7 @@ function openReloadStream(res, clients) {
  * @param {() => string} report - the current §27 report, read at request time
  *   so a request always gets the latest FINISHED one (§27.4)
  */
-async function handleRequest(req, res, outputDir, clients, report, pages, preview, chrome) {
+async function handleRequest(req, res, outputDir, clients, report, pages, preview, chrome, basePath) {
   // `req.url` is a path under `node:http` and was an absolute URL under
   // `Bun.serve`; a base makes both parse, and an absolute-form request line
   // (what a proxy sends) still wins over the base, as it did before.
@@ -365,13 +369,15 @@ async function handleRequest(req, res, outputDir, clients, report, pages, previe
   // §27.7 — the source preview: composed on request from the source tree,
   // served with the reload script so an edit re-renders it, written nowhere.
   if (preview && url.pathname === PREVIEW_PATH.slice(0, -1)) {
-    res.writeHead(302, { location: PREVIEW_PATH, "content-length": 0 });
+    res.writeHead(302, { location: PREVIEW_PATH + url.search, "content-length": 0 });
     return res.end();
   }
   if (preview && url.pathname.startsWith(PREVIEW_PATH)) {
     const result = await preview(decodeURIComponent(url.pathname.slice(PREVIEW_PATH.length)), url.searchParams);
     if (result.status === 302) {
-      res.writeHead(302, { location: result.location, "content-length": 0 });
+      // A source-page redirect must retain chrome choices and the site's own
+      // query values; otherwise the browser never gets to store those choices.
+      res.writeHead(302, { location: result.location + url.search, "content-length": 0 });
       return res.end();
     }
     return respond(res, result.status, "text/html; charset=utf-8", injectReloadScript(result.html));
@@ -384,21 +390,34 @@ async function handleRequest(req, res, outputDir, clients, report, pages, previe
   // permanent redirect for a development-only path would outlive the process
   // in the browser's cache.
   if (url.pathname === REPORT_PATH.slice(0, -1)) {
-    res.writeHead(302, { location: REPORT_PATH, "content-length": 0 });
+    res.writeHead(302, { location: REPORT_PATH + url.search, "content-length": 0 });
     return res.end();
   }
   // The same 404 every other missing path gets — this server has one 404
   // behaviour, and a reserved path is not a reason to invent a second one.
   if (url.pathname.startsWith(REPORT_PATH)) return sendNotFound(res, outputDir);
 
-  const filePath = resolveStaticFile(outputDir, decodeURIComponent(url.pathname));
+  // Published links already carry --base-url's pathname. Serve that mount
+  // locally too, while retaining the existing output-root aliases and keeping
+  // the dev-only routes above at their reserved origin-root addresses.
+  const decodedPath = decodeURIComponent(url.pathname);
+  const decodedBase = decodeURIComponent(basePath);
+  const mounted = decodedBase !== "/" && (decodedPath === decodedBase.slice(0, -1) || decodedPath.startsWith(decodedBase));
+  const pathname = mounted ? decodedPath.slice(decodedBase.length - 1) || "/" : decodedPath;
+  // Reserved dev endpoints are origin-root routes, never static aliases
+  // beneath a site mount (even if an otherwise allowed asset has that name).
+  if (mounted && (pathname === REPORT_PATH.slice(0, -1) || pathname.startsWith(REPORT_PATH) || pathname === RELOAD_PATH)) {
+    return sendNotFound(res, outputDir);
+  }
+  const filePath = resolveStaticFile(outputDir, pathname);
   if (!filePath) return sendNotFound(res, outputDir);
 
   if (filePath.endsWith(".html")) {
     const text = readFileSync(filePath, "utf8");
     // §27.8 — the chrome rides on every served page the page map knows, like
     // the reload script: inserted into the response, never into dist/.
-    const overlay = chrome && url.searchParams.get("chrome") !== "off" && url.searchParams.get("chrome") !== "false" ? chrome(url.pathname) : "";
+    const outputPath = relative(resolve(outputDir), filePath).split(sep).join("/");
+    const overlay = chrome && url.searchParams.get("chrome") !== "off" && url.searchParams.get("chrome") !== "false" ? chrome(url.pathname, outputPath) : "";
     return respond(res, 200, "text/html; charset=utf-8", injectReloadScript(overlay ? injectBeforeBodyEnd(text, overlay) : text));
   }
   // Streamed, not buffered — `Bun.file` streamed too, and a site's largest
@@ -430,12 +449,13 @@ async function handleRequest(req, res, outputDir, clients, report, pages, previe
  *   before the first build with an empty map that says so (`built: false`).
  * @param {(relPath: string, params: URLSearchParams) => Promise<{status: number, html?: string, location?: string}>} [args.preview] -
  *   the §27.7 renderer for `/_unify/preview/<path>`; without one the path is a 404 like the rest of /_unify/.
- * @param {(servedPath: string) => string} [args.chrome] - the §27.8 chrome for a served page, "" when the
+ * @param {(servedPath: string, outputPath: string) => string} [args.chrome] - the §27.8 chrome for a served page, "" when the
  *   page map has no record for that path; without one no served page carries it.
+ * @param {string} [args.basePath] - normalized --base-url pathname, with leading and trailing slashes
  * @returns {Promise<{url: string, port: number, notifyReload(): void, setReport(html: string): void, setPages(json: string): void, stop(): void}>}
  * @throws {UsageError} when the port is already in use (§14.1, exit 2)
  */
-export async function createDevServer({ outputDir, port, report = renderPending(), pages = renderPageMap({ sourceRoot: "", documents: [], built: false }), preview = null, chrome = null }) {
+export async function createDevServer({ outputDir, port, report = renderPending(), pages = renderPageMap({ sourceRoot: "", documents: [], built: false }), preview = null, chrome = null, basePath = "/" }) {
   /** @type {Set<() => void>} */
   const clients = new Set();
   let currentReport = report;
@@ -443,7 +463,7 @@ export async function createDevServer({ outputDir, port, report = renderPending(
 
   const server = createServer(async (req, res) => {
     try {
-      await handleRequest(req, res, outputDir, clients, () => currentReport, () => currentPages, preview, chrome);
+      await handleRequest(req, res, outputDir, clients, () => currentReport, () => currentPages, preview, chrome, basePath);
     } catch {
       // A throw on the request path (a malformed percent-escape reaching
       // `decodeURIComponent` is the realistic one) used to become Bun's own

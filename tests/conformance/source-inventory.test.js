@@ -1,5 +1,5 @@
 /**
- * §33.7 — `--source-inventory`, the opt-in `source-pages.json`. GEN-13..GEN-16.
+ * §33.7 — `--source-inventory`, the default-on `source-pages.json` for generators. GEN-13..GEN-16.
  *
  * Real CLI spawns only (hygiene H3); no mocks (H1); no skips (H4).
  *

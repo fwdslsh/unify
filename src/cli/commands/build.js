@@ -140,7 +140,7 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
       // is pure and deterministic, so a second call here and `runBuild`'s own
       // below produce the identical `{origin, pathPrefix}` for the same flag.
       const baseConfig = settings.baseUrl ? urls.parseBaseUrl(settings.baseUrl) : null;
-      // §33.7 — the opt-in source inventory: the build's own scan of the SOURCE
+      // §33.7 — the source inventory (on by default with a generator): the build's own scan of the SOURCE
       // tree (no overlay, the generator hasn't run), read for authored metadata.
       // A frontmatter problem it reports stops the build here, before the
       // generator, the same located way and with the same exit as P29 below.
@@ -564,7 +564,13 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
   // fixture corpus rather than to the pages a discovery feature happens to
   // touch. An extractor that threw on some real emitted document would fail
   // the suite here, not at the first site that enabled a sitemap.
-  const manifest = buildManifest({ pages: manifestPages, base: baseConfig });
+  const shippedFragments = new Map(assetFiles
+    .filter((asset) => asset.relPath.endsWith(".fragment.html"))
+    .map((asset) => {
+      const path = outputPathOf.get(asset.relPath);
+      return [path, tempFiles.get(path).toString("utf8")];
+    }));
+  const manifest = buildManifest({ pages: manifestPages, base: baseConfig, fragments: shippedFragments });
 
   // ---- §21 — sitemap generation, the manifest's first projection. ----------
   // §21.5 must know which paths the site already emits from its own source

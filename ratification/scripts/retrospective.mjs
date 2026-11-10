@@ -18,8 +18,8 @@ export function sessionOf(stream) {
 }
 
 /**
- * What the agent answered. From an event stream, its text parts in order; from an agent
- * that is not OpenCode (`--agent`), whose output is not an event stream, the output itself.
+ * What the agent answered. From an event stream, its text parts in order; output that is
+ * not an event stream is the answer as written.
  */
 export function replyOf(output) {
   const stream = events(output);

@@ -341,7 +341,7 @@ describe("§20.11 the resolved refresh target (MAN-12)", () => {
       `<a href="/about.html">About</a><meta http-equiv="refresh" content="5">`,
     ));
     expect(Object.keys(d.analysis).sort()).toEqual([
-      "fragmentLinks", "ids", "jsonLd", "langTexts", "linksIn", "linksOut",
+      "fragmentLinks", "ids", "jsonLd", "langTexts", "linksIn", "linksInFromFragments", "linksOut",
       "refresh", "strayMetadata", "titleTexts", "visibleText",
     ]);
     expect("rawHrefs" in d.analysis).toBe(false);

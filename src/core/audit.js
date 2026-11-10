@@ -370,13 +370,15 @@ export function auditManifest({
 
     // ---- orphans -----------------------------------------------------------
     // The site root is reachable by definition and 404.html is never linked, so
-    // neither is an orphan; every other page nothing links to is unreachable by
-    // a reader who did not already have its URL.
+    // neither is an orphan. Referenced shipped fragments can also supply
+    // incoming navigation after insertion, so their evidence counts here
+    // without promoting it into the static page graph.
     // A self-link is not an incoming link. §20.9 records one (a permalink, a
     // "back to top" href to the page's own URL), and counting it made a page
     // nothing else links to unreportable — contradicting this finding's own
     // evidence line, which has always said "no OTHER page links to this one".
     const linksInFromElsewhere = doc.analysis.linksIn.filter((p) => p !== doc.outputPath);
+    linksInFromElsewhere.push(...doc.analysis.linksInFromFragments.filter((p) => p !== doc.outputPath));
     if (linksInFromElsewhere.length === 0 && doc.outputPath !== "index.html" && doc.outputPath !== "404.html" && !redirects.has(doc)) {
       add(doc, "page-orphan", "incomplete",
         "no other page links to this one",
