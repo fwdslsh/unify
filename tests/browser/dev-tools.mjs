@@ -25,6 +25,12 @@ const source = {
   "style.css": 'body{font:16px system-ui;margin:24px}main{min-height:110vh}button,select{font-size:24px;padding:20px}button::before{content:"SITE"}',
   "index.html": '<html><head><title>Home</title><meta name="description" content="The home page for QA"></head><body><h1>Home</h1><include src="/_includes/card.fragment.html"><span slot="title">Home card</span><p>Home body</p></include></body></html>',
   "about.html": '<html><head><title>About</title><meta name="description" content="The about page for QA"></head><body><h1>About</h1><include src="/_includes/card.fragment.html"><span slot="title">About card</span><p>About body</p></include></body></html>',
+  "context/_layout.html": '<html lang="en"><head><title> — Context</title><style>body{font:16px system-ui;margin:24px}.grid > .context-card{color:rgb(0,128,0)}.context-card{margin:20px 0;min-height:80px}.spacer{height:950px}</style></head><body class="context-layout"><header>Context header</header><main class="grid"><slot>Context fallback</slot></main><aside><include src="/_includes/context-notice.fragment.html"><span slot="title">Layout notice</span></include></aside><footer>Context footer</footer></body></html>',
+  "context/repeated.html": '<html><head><title>Repeated</title><meta name="description" content="Repeated includes"><style>.context-card{background:rgb(255,221,0)}</style></head><body class="page-theme"><h1>Repeated page</h1><include src="/_includes/context-card.fragment.html"><span slot="title">First instance</span></include><div class="spacer"></div><include src="/_includes/context-card.fragment.html"><span slot="title">Second instance</span></include></body></html>',
+  "context/nested.html": '<html><head><title>Nested</title><meta name="description" content="Nested includes"></head><body><h1>Nested page</h1><include src="/_includes/context-wrapper.fragment.html"></include></body></html>',
+  "_includes/context-card.fragment.html": '<article class="context-card"><h2><slot name="title">Default instance</slot></h2><p>Live original</p></article>',
+  "_includes/context-notice.fragment.html": '<p class="context-notice"><slot name="title">Default notice</slot></p>',
+  "_includes/context-wrapper.fragment.html": '<section class="grid"><include src="/_includes/context-card.fragment.html"><span slot="title">Nested instance</span></include></section>',
 };
 for (const [name, text] of Object.entries(source)) {
   await mkdir(dirname(join(fixture, "src", name)), { recursive: true });
@@ -128,6 +134,8 @@ try {
   assert.equal(url.hash, "#section");
   await page.locator("select[name=layout]").selectOption("_layout.html");
   await page.waitForURL(/layout=_layout.html/);
+  await page.getByRole("button", { name: "Isolated", exact: true }).click();
+  await page.waitForURL((u) => u.searchParams.get("view") === "isolated");
   await page.locator("select[name=page]").selectOption("");
   await page.waitForURL((u) => !u.searchParams.has("page"));
   assert.equal(await page.locator("article h2").innerText(), "Default card");
@@ -144,6 +152,88 @@ try {
     if (output) await page.screenshot({ path: join(output, `preview-${width}.png`) });
   }
   check("toolbar stays on-screen at mobile/tablet/desktop widths and during scroll");
+  await goto("/_unify/preview/_includes/context-card.fragment.html?tag=a&tag=b#context");
+  assert.equal(await chrome.getAttribute("data-view"), "isolated");
+  await page.locator("select[name=page]").selectOption("context/repeated.html");
+  await page.waitForURL((u) => u.searchParams.get("page") === "context/repeated.html");
+  assert.equal(await chrome.getAttribute("data-view"), "context");
+  assert.equal(await page.getByRole("button", { name: "In context", exact: true }).getAttribute("aria-pressed"), "true");
+  assert.equal(await page.locator(".context-card").count(), 2);
+  assert.equal(await page.locator("header").innerText(), "Context header");
+  assert.equal(await page.locator("footer").innerText(), "Context footer");
+  assert.equal(await page.locator("h1").innerText(), "Repeated page");
+  assert.equal(await page.locator("body").getAttribute("class"), "context-layout page-theme");
+  const cardStyle = await page.locator(".context-card").first().evaluate((e) => ({ color: getComputedStyle(e).color, background: getComputedStyle(e).backgroundColor, parent: e.parentElement.tagName }));
+  assert.deepEqual(cardStyle, { color: "rgb(0, 128, 0)", background: "rgb(255, 221, 0)", parent: "MAIN" });
+  assert.deepEqual(new URL(page.url()).searchParams.getAll("tag"), ["a", "b"]);
+  assert.equal(new URL(page.url()).hash, "#context");
+  check("selecting a page defaults to its complete context, preserving ancestor CSS, page head/body and repeated includes");
+  const beforeLocate = await page.locator(".context-card").first().evaluate((e) => ({ width: e.offsetWidth, height: e.offsetHeight, parent: e.parentElement.tagName }));
+  await page.getByRole("button", { name: "Locate include", exact: true }).click();
+  assert.equal(await page.locator(".uc-locate-status").innerText(), "Include element 1 of 2");
+  await page.getByRole("button", { name: "Locate include", exact: true }).click();
+  assert.equal(await page.locator(".uc-locate-status").innerText(), "Include element 2 of 2");
+  await page.waitForFunction(() => window.scrollY > 400);
+  assert.deepEqual(await page.locator(".context-card").first().evaluate((e) => ({ width: e.offsetWidth, height: e.offsetHeight, parent: e.parentElement.tagName })), beforeLocate);
+  check("Locate include scrolls through repeated elements without wrappers or geometry changes");
+  if (output) await page.screenshot({ path: join(output, "context-repeated.png") });
+  await page.getByRole("button", { name: "Isolated", exact: true }).click();
+  await page.waitForURL((u) => u.searchParams.get("view") === "isolated");
+  assert.equal(await page.locator(".context-card").count(), 1);
+  assert.equal(await page.locator(".context-card h2").innerText(), "First instance");
+  assert.equal(await page.locator("header").count(), 0);
+  assert.equal(new URL(page.url()).searchParams.getAll("view").length, 1);
+  await page.locator("select[name=page]").selectOption("context/nested.html");
+  await page.waitForURL((u) => u.searchParams.get("page") === "context/nested.html");
+  assert.equal(await chrome.getAttribute("data-view"), "isolated"); // an explicit choice stays chosen
+  await page.getByRole("button", { name: "In context", exact: true }).click();
+  await page.waitForURL((u) => u.searchParams.get("view") === "context");
+  assert.equal(await page.locator(".context-card h2").innerText(), "Nested instance");
+  assert.equal(await page.locator("h1").innerText(), "Nested page");
+  await page.reload();
+  assert.equal(await chrome.getAttribute("data-view"), "context");
+  await writeFile(join(fixture, "src/_includes/context-card.fragment.html"), source["_includes/context-card.fragment.html"].replace("Live original", "Live context update"));
+  await page.getByText("Live context update", { exact: true }).waitFor({ timeout: 20000 });
+  assert.equal(await page.locator(".context-card h2").innerText(), "Nested instance");
+  assert.equal(await page.locator("header").innerText(), "Context header");
+  assert.equal(new URL(page.url()).searchParams.get("view"), "context");
+  check("explicit view choice survives page changes and reloads; nested fills and live edits stay in full context");
+  await page.locator("select[name=layout]").selectOption("_layout.html");
+  await page.waitForURL((u) => u.searchParams.get("layout") === "_layout.html");
+  assert.equal(await page.locator("nav").innerText(), "Home About");
+  assert.equal(await page.locator(".context-card h2").innerText(), "Nested instance");
+  await page.locator("select[name=page]").selectOption("");
+  await page.waitForURL((u) => !u.searchParams.has("page"));
+  assert.equal(await page.locator(".context-card").count(), 0);
+  assert(await page.getByRole("button", { name: "Locate include", exact: true }).isDisabled());
+  await page.getByRole("button", { name: "Place in main content", exact: true }).click();
+  await page.waitForURL((u) => u.searchParams.get("placement") === "main");
+  assert.equal(await page.locator(".context-card h2").innerText(), "Default instance");
+  assert.match(await page.locator(".uc-note").innerText(), /Staged in main content/);
+  assert.equal(await page.locator("nav").innerText(), "Home About");
+  assert.equal(await page.locator(".uc-warn").count(), 0);
+  if (output) await page.screenshot({ path: join(output, "context-staged.png") });
+  await page.locator("select[name=layout]").selectOption("context/_layout.html");
+  await page.waitForURL((u) => u.searchParams.get("layout") === "context/_layout.html");
+  assert.equal(new URL(page.url()).searchParams.has("placement"), false);
+  assert.equal(await page.locator(".context-card").count(), 0);
+  check("layout overrides retain page content; layout-only placement is explicit, labeled and reset when context changes");
+  await goto("/_unify/preview/_includes/context-notice.fragment.html?page=context/repeated.html");
+  assert.equal(await page.locator(".context-notice").innerText(), "Layout notice");
+  assert.equal(await page.locator("h1").innerText(), "Repeated page");
+  await page.locator("select[name=layout]").selectOption("_layout.html");
+  await page.waitForURL((u) => u.searchParams.get("layout") === "_layout.html");
+  assert.equal(await page.locator(".context-notice").count(), 0);
+  assert(await page.getByRole("button", { name: "Locate include", exact: true }).isDisabled());
+  assert.match(await page.locator(".uc-note").innerText(), /No element from this include/);
+  check("includes supplied by layouts use actual fills; removing their layout reports no locatable content");
+  for (const width of [375, 768, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    const bounds = await page.locator(".uc-card").boundingBox();
+    assert(bounds.x >= 0 && bounds.x + bounds.width <= width);
+    assert.equal(await page.locator(".uc-card").evaluate((e) => e.scrollWidth <= e.clientWidth), true);
+    if (output) await page.screenshot({ path: join(output, `context-${width}.png`) });
+  }
   await goto("/_unify/preview/_includes/broken.fragment.html?chrome=on");
   await page.getByRole("button", { name: /problem/ }).click();
   assert(await page.locator("#unify-chrome-problems").isVisible());
@@ -189,6 +279,7 @@ try {
   check("index retains last-published page links after source deletion during a failed rebuild");
   assert.equal(errors.length, 0, errors.join("\n"));
   assert(!(await readFile(join(fixture, "dist/index.html"), "utf8")).includes("unify-chrome"));
+  assert(!(await readFile(join(fixture, "dist/context/repeated/index.html"), "utf8")).includes("data-unify-preview-target"));
   check("no browser script errors and chrome never written into published output");
   if (output) await writeFile(join(output, "result.json"), JSON.stringify({ passed, errors }, null, 2));
 } finally {

@@ -6,6 +6,12 @@ upgrading across them.
 The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **Include previews can show the complete page or layout.** Choosing a page or layout now defaults to **In context**, preserving surrounding markup, page styles and classes, and nested or repeated include content. **Isolated** keeps the existing focused preview. **Locate include** cycles through visible include elements without adding layout wrappers. Layout-only previews offer explicit, labeled placement in main content when the include is not already rendered there. Preview choices survive reloads and never change source files or published output.
+
 ## [0.11.18] - 2026-11-08
 
 ### Changed

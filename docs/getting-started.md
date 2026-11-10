@@ -18,7 +18,7 @@ Coming back to do one thing? Each task below is one section of this guide:
 | reuse one block with different words in each place | [A snippet that ships as written](#a-snippet-that-ships-as-written) |
 | link a page or an asset | [Links and assets](#links-and-assets) |
 | list pages on an index page | [Anything else derived from other files](#anything-else-derived-from-other-files) |
-| see a layout or an include on its own, or what the build made of a page | [Seeing what the build did](#seeing-what-the-build-did) |
+| see layouts and includes alone or in page context | [Seeing what the build did](#seeing-what-the-build-did) |
 | check the site before publishing | [Checking and publishing](#checking-and-publishing) |
 
 ## Install
@@ -385,7 +385,7 @@ Each of these answers a different question, and none of them writes anything to 
 
 - **`unify build --dry-run`** — what would be written, copied and deleted, each page with the layout it composed from and the address it answers to. No server needed.
 - **`http://localhost:3000/_unify/`**, while `unify dev` runs — the findings `unify audit` prints, as a page, grouped by page, with each page's record beside them (title, description, language, canonical, headings, links in and out) and the build's own diagnostics underneath: the place to check that a page's metadata landed.
-- **`/_unify/preview/`** (the second address `unify dev` prints) — every layout, include and page. Open a layout or an include on its own, rendered with the site's styles and its own default content, with a corner selector to compose it with a page of your choice.
+- **`/_unify/preview/`** (the second address `unify dev` prints) — every layout, include and page. Open an include with its defaults, then select a page to see the complete page around it. Switch between **Isolated** and **In context**, try a different layout, or use **Locate include** to find it on the page. A layout-only preview can explicitly **Place in main content** when the include is not already rendered there; the toolbar labels that placement as staged. The choices survive reloads. [The CLI reference explains the preview controls](cli-reference.md#unify-dev).
 - **`/_unify/pages.json`** — the same build as data, for an editor or a script: every page's source file, layout, includes and address.
 
 ## Feeds, a catalog, and a search corpus
