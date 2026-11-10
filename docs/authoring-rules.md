@@ -34,15 +34,15 @@ an error — on a layout too, because layouts don't chain (a section layout is a
   — and that element replaces the slot, tag and all, keeping its own markup; only the `slot=` attribute is dropped. Omit the fill and the
   fallback ships; `slot=` counts on direct body children or direct children of your default-content main. A named `<main slot="content">` fill and its subtree stay intact; nested fills there are inert.
 - **Everything else** replaces the layout's bare `<slot></slot>` if it has one — `<main><slot></slot></main>`
-  is the usual shape — otherwise the children of its `<main>`. The first default-content page main unwraps, even for a bare slot outside a layout main; write complete semantic
-  documents. A bare `<header>`/`<footer>` does **not** replace the layout's — only `slot=` fills, and it fills the *contents*: where the layout wraps its slot in its own `<footer>`, write `<p slot="footer">`, or you ship a footer inside a footer.
+  is the usual shape — otherwise the children of its `<main>`. Your page's first `<main id="guide" class="wide">` unwraps and its attributes go onto the layout `<main>` receiving it;
+  with no layout `<main>` at all, a bare slot ships your `<main>` whole, beside your `<nav>` and `<script>`. A bare `<header>`/`<footer>` does **not** replace the layout's — only `slot=` fills, and it fills the *contents*: where the layout wraps its slot in its own `<footer>`, write `<p slot="footer">`, or you ship a footer inside a footer.
 - **Head.** A page has its own complete `<head>`; the layout's is the base, and where both declare
   `<meta charset>` the layout's wins. **Write the separator into the layout's title** —
   `<title>— My Site</title>`, no leading space — and a page writes only its own name
   (`<title>About</title>`); the join adds the space, giving `About — My Site`. Your `<meta>` replaces the layout's same-`name`/`property`, your `canonical`/`icon`
   links replace the layout's, everything else appends after — page CSS wins. `og:title`/`og:description`/`og:url` default to final title/description/canonical; page-head declarations win over derived values, which win over layout fallbacks. No missing value or Twitter tag is invented.
-- **Root attributes.** On `<html>`/`<body>` only, your classes are added and any other attribute you
-  set wins; attributes merge nowhere else. Active nav is `<body class="home">` plus CSS
+- **Root attributes.** On `<html>`, `<body>` and the layout `<main>` receiving your `<main>`, your classes are added and
+  any other attribute you set wins (your `id="guide"` replaces the layout's id); nowhere else. Active nav is `<body class="home">` plus CSS
   (`body.home .nav-home {…}`), not a feature.
 
 ## Markdown

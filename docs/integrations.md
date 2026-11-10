@@ -218,7 +218,7 @@ A generator runs before unify has read a single page, so by default it can only 
 files itself. `--source-inventory` hands it that reading, done: `inputs.sourcePages` in the
 context names `source-pages.json`, one record per source page with the `title`,
 `description` and `date` its author wrote (`null` where there is none), the page's
-`source` path, and an `href` you can link to. It is the same list of pages the build
+`source` path, an `href` you can link to, and its projected `outputPath`, `path` and `url`. It is the same list of pages the build
 treats as pages: `_`-prefixed files, `--exclude` matches, fragments and layouts are not in
 it, a `noindex` page is. Markdown pages read their frontmatter; HTML pages read their own
 `<head>`, as written, with `<include>`s not resolved. It is source facts only: no layout
@@ -301,7 +301,7 @@ different moments of the build:
 
 | What | When it exists | What it holds | Read it for |
 |---|---|---|---|
-| The source inventory, `source-pages.json` | before your generator runs, in every build that names one (unless `source-inventory: false`) | each source page's `source` and `href`, and the `title`, `description`, `date`, `<meta>` and `<link>` its author wrote | an index, an archive or a nav your generator writes in the same build |
+| The source inventory, `source-pages.json` | before your generator runs, in every build that names one (unless `source-inventory: false`) | each source page's `source`, `href` and projected `outputPath`/`path`/`url`, and the `title`, `description`, `date`, `<meta>` and `<link>` its author wrote | an index, an archive or a nav your generator writes in the same build |
 | `assets/unify/catalog.json` (`--catalog`) | after composition, published with the site | each public page's final address, its merged head (the title with the layout's suffix, every meta and link) and its headings with their ids | browse, filter and table-of-contents UI in the browser |
 | `assets/unify/search-corpus.json` (`--search-corpus`) | after composition, published with the site | each public page's `path` and visible text | client-side search, joined to the catalog on `path` |
 | `unify audit --format json` | a separate run that publishes nothing | each page's `source`, `outputPath` and final document (the catalog's record shape), plus the findings | a tool outside unify that needs source → output → address ([recipe 4](#4-interoperating-with-post-build-tools)) |
@@ -338,7 +338,10 @@ is this record in the source inventory:
     { "name": "tags", "content": "setup" },
     { "name": "tags", "content": "intro" }
   ],
-  "links": []
+  "links": [],
+  "outputPath": "notes/first/index.html",
+  "path": "/sub/notes/first/",
+  "url": "https://example.com/sub/notes/first/"
 }
 ```
 
@@ -371,8 +374,9 @@ fields in `catalog.json`:
   source path with `.md` turned into `.html`. Written into a generated HTML page, unify
   rewrites it for `--pretty-urls` and `--base-url` like a link you typed. Written into JSON,
   XML, or anything else that is not HTML, it ships exactly as written, so a generator
-  writing a feed or a data file computes the address itself ([the RSS recipe's
-  `address()`](guides/generator-recipes.md#an-rss-feed) does).
+  writing a feed or a data file uses `path` or `url` instead ([the RSS
+  recipe](guides/generator-recipes.md#an-rss-feed) does): the address this build will give
+  the page, projected from its source path and flags, not a promise that it is emitted.
 - **The lists are not the same pages.** The inventory is every source page, a `noindex` one
   included, and no generated page, since none exists yet. The catalog and the search corpus
   are the published pages a crawler may index — no `noindex` page (unless

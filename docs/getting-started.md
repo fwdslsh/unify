@@ -119,7 +119,7 @@ Built result: the layout's `<main>` content is replaced by the page's, and the p
 
 Two details worth knowing:
 
-- Your first default-content `<main>` wrapper is unwrapped during composition, including inside a styling wrapper. This avoids adding another main around an ordinary page main; it does not repair already-nested mains.
+- Your first default-content `<main>` is unwrapped during composition, including inside a styling wrapper, and its attributes (`class`, `id`, `aria-label`, …) merge onto the layout's `<main>` that receives the content: classes are added, any other attribute you set wins — so a page `id` replaces the layout main's. This avoids adding another main around an ordinary page main; it does not repair already-nested mains. If the layout's bare `<slot>` sits outside any `<main>` and the layout has no `<main>` at all, there is nothing to unwrap into: your `<main>` ships whole, in place.
 - A page's `<body class="home">` is merged onto the built page's `<body>` — which is how you do active-nav highlighting: `body.home .nav-home { font-weight: bold; }` in your stylesheet. No feature needed. It is styling only: the shared nav's markup is the same on every page, so nothing marks the current link with `aria-current`.
 
 ## Overriding a region
