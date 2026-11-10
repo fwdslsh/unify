@@ -6,8 +6,6 @@ description: "Every unify command, option and exit code, and the unify.yaml keys
 
 This page lists every command, every option, and every exit code — there are no others. The behavior behind each is specified in [`product-spec.md`](product-spec.md) §4 and, rule by rule, in [`conformance-spec.md`](conformance-spec.md).
 
-To run the build from a Node or Bun script and get its results as data, there is an **experimental** [JavaScript API](api.md): one function, `run(options)`, taking `build`'s options below by their long names in camelCase. It may change or be removed before v1; the command line on this page is the stable surface.
-
 Everything below is the same under all three ways of running unify — the standalone binary, `node` (>= 22.12.0), and `bun` (>= 1.2.0). Same flags, same diagnostics, same exit codes, byte-identical output; nothing on this page is conditional on the runtime. Deno is not supported.
 
 ```

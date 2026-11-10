@@ -395,7 +395,7 @@ The manifest remains an **implementation boundary**, not a new file format autho
 
 ### 6.6 Explicitly deferred or rejected
 
-Do not restore DOM Cascade area matching, component props, expressions, loops, conditionals, a collections/query DSL, keyword rewriting, built-in generative prose, numeric SEO scores, guessed structured data, network access during `build`, or a plugin API — §5's experimental minimal public API is not one: it exposes the CLI's own work to callers and grants no hooks into composition. Layout chaining remains deferred: it adds recursive merge semantics to every page for a reuse problem slotted includes may solve more locally. The browser preview polyfill, HTML minification, and Markdown include shorthand remain possible later conveniences, but they do not close the production, self-containment, or authoring gaps that define this layer and are not roadmap priorities.
+Do not include DOM Cascade area matching, component props, expressions, loops, conditionals, a collections/query DSL, keyword rewriting, built-in generative prose, numeric SEO scores, guessed structured data, or a plugin API — §5's experimental minimal public API is not one: it exposes the CLI's own work to callers and grants no hooks into composition. Layout chaining remains deferred: it adds recursive merge semantics to every page for a reuse problem slotted includes may solve more locally. The browser preview polyfill, HTML minification, and Markdown include shorthand remain possible later conveniences, but they do not close the production, self-containment, or authoring gaps that define this layer and are not roadmap priorities.
 
 ### 6.7 AI-agent authoring and implementation guidance
 
