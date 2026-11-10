@@ -100,3 +100,4 @@ package-lock.json
 
 # Ratification round output: archives and judge results (ratification/ratification-protocol.md)
 ratification/rounds/
+.agents/
