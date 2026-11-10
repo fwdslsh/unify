@@ -6,6 +6,23 @@ upgrading across them.
 The format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **A page's `<main>` now composes with the layout's `<main>`: its attributes are kept, and a layout with no `<main>` keeps the element (#147, #148).** This changes built output. The page's default-content `<main>` is still unwrapped when a layout `<main>` receives its content, but its attributes are no longer discarded: they merge onto that layout `<main>` by the `<html>`/`<body>` rules (layout classes first, then new page classes; any other attribute the page sets wins; layout-only attributes stay). Layout `<main id="content" class="shell" tabindex="-1"><slot></slot></main>` with page `<main id="article" class="article"><h1>Example</h1></main>` built `<main id="content" class="shell" tabindex="-1"><h1>Example</h1></main>` and now builds `<main id="article" class="shell article" tabindex="-1"><h1>Example</h1></main>`. And when the layout's bare `<slot>` sits outside any `<main>` and the layout has no `<main>` at all (`<header>…</header><slot></slot><footer>…</footer>`), the page's `<main>` is now kept whole, in place among its siblings, where before the element and its attributes were removed and the page shipped with no main landmark. Everything else is as it was: a bare slot beside a layout `<main>` elsewhere still unwraps and carries nothing, as does a layout with only named slots; named `<main slot="…">` fills and sink-less layouts are untouched. Check on upgrade:
+  - `<main>` attributes that were silently dropped now apply: a class can restyle a page, and `data-*`/ARIA attributes can change behaviour.
+  - **A page `id` on `<main>` replaces the layout main's `id`**, which breaks a layout skip link (`<a href="#content">`) on that page. The build still succeeds; `unify audit` is what reports the broken fragment.
+  - A layout with a body-level bare slot and no `<main>` now emits the page's `<main>`, so selectors and scripts that relied on its absence need a look. A kept `<main>` is content, so even an empty one stops the slot's fallback from rendering.
+
+### Added
+
+- **`source-pages.json` records carry the page's address: `outputPath`, `path` and `url` (#149).** A generator writing something that is not HTML (an RSS file, a JSON index) had to re-derive each page's published address, because nothing rewrites a link outside HTML. Every record now ends with the page's projected output file, its public root-relative address and its absolute URL under the build's `--pretty-urls` and `--base-url` (`url` is `null` without `--base-url`), computed by the same functions as `catalog.json` and `audit --format json`. They are a projection from the source path and the flags, not a promise the page is emitted: a page that collides still fails the build. Additive, so `schemaVersion` stays `1` and `href` is unchanged. The RSS generator recipe reads `url` instead of working the address out. This is the filesystem form of the helper #149 asked for: it reaches a generator run by the standalone binary, which has no package to import.
+
+### Fixed
+
+- **Merged root attributes containing quotes are emitted well-formed.** A page `<body data-x='{"b":2}'>` over a layout that set the same attribute built `<body data-x="{"b":2}">`. A merged value is now written in `"` quotes, in `'` quotes when it holds a `"`, and with `&quot;` only when it holds both, on `<html>`, `<body>` and `<main>`.
+
 ## [0.11.17] - 2026-10-29
 
 ### Added

@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CHECKS } from "../../ratification/scripts/checks.mjs";
+import { finishedCleanly, replyOf, sessionOf } from "../../ratification/scripts/retrospective.mjs";
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const root = mkdtempSync(join(tmpdir(), "unify-ratification-"));
@@ -271,4 +272,100 @@ test("npm wrapper resolution rejects cycles, missing scripts, multiple builds an
     expect(judged.chosenCommand).toBeNull();
     expect(judged.run.refused).toContain(reason);
   }
+});
+
+test("main landmarks: exactly one per page, redirects aside, templates ignored", () => {
+  const one = '<header>H</header><main><h1>Title</h1></main>';
+  expect(CHECKS.mainLandmarks(siteFixture({ "index.html": document(one), "notes/index.html": document(`${one}<template><main>inert</main></template>`) }), {}).pass).toBe(true);
+  expect(CHECKS.mainLandmarks(siteFixture({ "index.html": document(one), "old/index.html": document("", '<meta http-equiv="refresh" content="0; url=../">') }), {}).pass).toBe(true);
+  const none = CHECKS.mainLandmarks(siteFixture({ "index.html": document(one), "visit/index.html": document("<h1>Visit</h1>") }), {});
+  expect(none.pass).toBe(false);
+  expect(none.failures).toEqual(["visit/index.html: 0 <main> elements"]);
+  expect(CHECKS.mainLandmarks(siteFixture({ "index.html": document(`${one}<main>second</main>`) }), {}).failures).toEqual(["index.html: 2 <main> elements"]);
+  expect(CHECKS.mainLandmarks(siteFixture({ "robots.txt": "" }), {}).pass).toBe(false);
+});
+
+test("main landmarks: a skip link must come before the main and land on it or inside it", () => {
+  const check = (body) => CHECKS.mainLandmarks(siteFixture({ "index.html": document(body) }), { skipLink: true });
+  expect(check('<a href="#content">Skip to content</a><main id="content">Text</main>').pass).toBe(true);
+  expect(check('<a href="#top">Skip</a><main><h1 id="top">Title</h1></main>').pass).toBe(true);
+  for (const body of [
+    '<main id="content">Text</main>',
+    '<a href="#content">Skip</a><main id="article">Text</main>',
+    '<a href="#">Skip</a><main>Text</main>',
+    '<a href="#nav">Skip</a><nav id="nav"></nav><main>Text</main>',
+    '<main id="content">Text</main><a href="#content">Back to top</a>',
+  ]) expect(check(body).failures).toEqual(["index.html: no link before its <main> jumps to it"]);
+});
+
+test("main landmarks: the names pages give their main must be their own", () => {
+  const page = (main) => document(`<header>H</header>${main}`);
+  const named = { "index.html": page('<main aria-label="Home">a</main>'), "visit/index.html": page('<main aria-labelledby="t"><h1 id="t">Visit <em>us</em></h1></main>'), "guides/oak/index.html": page("<main>c</main>") };
+  expect(CHECKS.mainLandmarks(siteFixture(named), { labelled: 2 }).pass).toBe(true);
+  expect(CHECKS.mainLandmarks(siteFixture(named), { labelled: 3 }).failures).toEqual(["2 distinct <main> names (needs 3)"]);
+  const same = { "index.html": page('<main aria-label="Alderfen">a</main>'), "visit/index.html": page('<main aria-label="alderfen">b</main>'), "x/index.html": page('<main aria-labelledby="gone">c</main>') };
+  expect(CHECKS.mainLandmarks(siteFixture(same), { labelled: 2 }).failures).toEqual(["1 distinct <main> names (needs 2)"]);
+});
+
+test("main landmarks: listed files sit outside the main, and markup that names none is noted", () => {
+  const outside = ["home-wide.png"];
+  const above = CHECKS.mainLandmarks(siteFixture({ "index.html": document('<div style="background-image:url(images/home-wide.png)"></div><main>Text</main>') }), { outside });
+  expect(above.pass).toBe(true);
+  expect(above.coverage).toEqual([]);
+  expect(CHECKS.mainLandmarks(siteFixture({ "index.html": document('<main><img src="/a/images/home-wide.png" alt="">Text</main>') }), { outside }).failures).toEqual(["index.html: home-wide.png is inside <main>"]);
+  const unseen = CHECKS.mainLandmarks(siteFixture({ "index.html": document('<div class="banner"></div><main>Text</main>') }), { outside });
+  expect(unseen.pass).toBe(true);
+  expect(unseen.coverage.length).toBe(1);
+});
+
+test("JSON listing: entries are the exact public addresses of published pages", () => {
+  const pages = { "notes/first/index.html": document("First"), "notes/second/index.html": document("Second"), "notes/data": "not a page" };
+  const check = (entries, params = { path: "notes.json", min: 2 }) => CHECKS.jsonListing(siteFixture({ ...pages, "notes.json": typeof entries === "string" ? entries : JSON.stringify(entries) }), params);
+  const entry = (slug, more = {}) => ({ title: slug, date: "2026-03-01", url: `https://example.test/mill/notes/${slug}/`, ...more });
+  expect(check([entry("first"), entry("second")]).pass).toBe(true);
+  expect(check([entry("first")]).pass).toBe(false);
+  for (const [bad, why] of [
+    [entry("first", { url: "https://example.test/mill/notes/first" }), "no published page at exactly that address"],
+    [entry("first", { url: "https://example.test/mill/notes/first.html" }), "(.html)"],
+    [entry("first", { url: "https://example.test/notes/first/" }), "outside https://example.test/mill/"],
+    [entry("first", { url: "/mill/notes/first/" }), "is not a full address"],
+    [entry("first", { url: "https://example.test/mill/notes/third/" }), "no published page"],
+    [entry("first", { url: "https://example.test/mill/notes/data" }), "no published page"],
+    [entry("first", { title: " " }), "no title"],
+    [entry("second"), "listed twice"],
+  ]) {
+    const result = check([bad, entry("second")]);
+    expect(result.pass).toBe(false);
+    expect(result.failures.join("\n")).toContain(why);
+  }
+  expect(check("{").detail).toContain("is not JSON");
+  expect(check({ notes: [] }).detail).toContain("not a JSON array");
+  expect(CHECKS.jsonListing(siteFixture(pages), { path: "notes.json" }).detail).toBe("no notes.json");
+});
+
+test("retrospective: asked only of runs that exit 0 without an error, pass or fail", () => {
+  expect(finishedCleanly({ exit: 0 }, null)).toBe(true);
+  expect(finishedCleanly({ exit: 0 }, "provider error")).toBe(false);
+  expect(finishedCleanly({ exit: 1 }, null)).toBe(false);
+  expect(finishedCleanly({ exit: 124, timedOut: true }, null)).toBe(false);
+  expect(finishedCleanly({ exit: null, signal: "SIGKILL" }, null)).toBe(false);
+});
+
+test("retrospective: the reply is the stream's text parts, and the session is the run's own", () => {
+  const event = (type, data) => JSON.stringify({ type, timestamp: 1, sessionID: "ses_1", ...data });
+  const stream = [
+    event("step_start", { part: {} }),
+    event("text", { part: { type: "text", text: "It went smoothly.\n" } }),
+    event("tool_use", { part: { tool: "read", state: { input: {} } } }),
+    "not json",
+    event("text", { part: { type: "text", text: "I lost time on the feed." } }),
+    event("text", { part: { type: "text", text: "  " } }),
+    event("step_finish", { part: { cost: 0 } }),
+  ].join("\n");
+  expect(replyOf(stream)).toBe("It went smoothly.\n\nI lost time on the feed.");
+  expect(sessionOf(stream)).toBe("ses_1");
+  expect(replyOf(event("step_finish", { part: {} }))).toBe("");
+  expect(sessionOf("plain text\n")).toBeNull();
+  // An `--agent` command's output is not an event stream: it is the reply.
+  expect(replyOf("A plain answer.\nOn two lines.\n")).toBe("A plain answer.\nOn two lines.");
 });

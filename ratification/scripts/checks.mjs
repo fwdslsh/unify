@@ -20,7 +20,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { checkAtomFeed } from "./atom.mjs";
-import { checkAddresses, checkBareFragments } from "./site-links.mjs";
+import { checkAddresses, checkBareFragments, checkJsonListing, checkMainLandmarks } from "./site-links.mjs";
 
 const TEXT = /\.(html|css|js|mjs|json|xml|txt|md|svg|webmanifest)$/i;
 
@@ -149,6 +149,16 @@ export const CHECKS = {
     if (missing(ctx.out)) return missing(ctx.out);
     const bad = walk(ctx.out).filter((r) => r.endsWith(".html") && /<slot[\s>]/i.test(readFileSync(join(ctx.out, r), "utf8")));
     return bad.length ? { pass: false, detail: `<slot> in ${list(bad)}` } : { pass: true, detail: "none" };
+  },
+
+  /** Every page has exactly one `<main>`; optionally a skip link to it, names of its own, files kept outside it. */
+  mainLandmarks(ctx, params) {
+    return checkMainLandmarks(ctx.out, params);
+  },
+
+  /** A published JSON array whose entries each carry a title, a date and the public address of a published page. */
+  jsonListing(ctx, params) {
+    return checkJsonListing(ctx.out, ctx.baseUrl, params);
   },
 
   /** At least one published bare HTML fragment, including extensionless endpoints. */
