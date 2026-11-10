@@ -347,6 +347,7 @@ function collect(proc) {
  * @param {string} args.overlayDir - absolute path of the generated directory
  * @param {string} args.contextPath - absolute path of `generator-context.json` (`writeGeneratorContext`'s return); becomes `process.argv[4]`
  * @param {import('./diagnostics.js').Reporter} args.reporter
+ * @param {{stdout: {write(s: string): unknown}, stderr: {write(s: string): unknown}}} [args.io] - the OUTER streams the generator's own output is passed through to, not the reporter's: under `audit` the reporter's stdout is captured
  * @returns {Promise<boolean>} false when the generator failed (P29 reported)
  */
 /**
@@ -361,7 +362,7 @@ function reproduceWith() {
   return name === "node" || name === "bun" ? name : `BUN_BE_BUN=1 ${process.execPath}`;
 }
 
-export async function runGenerator({ generatorAbs, sourceRoot, overlayDir, contextPath, reporter }) {
+export async function runGenerator({ generatorAbs, sourceRoot, overlayDir, contextPath, reporter, io = process }) {
   const root = resolve(sourceRoot);
   const rel = toRelative(root, generatorAbs);
 
@@ -421,12 +422,9 @@ export async function runGenerator({ generatorAbs, sourceRoot, overlayDir, conte
   // generator that skips a source it could not reach and says so on stderr
   // would otherwise be silent in the build log, which is the silent failure
   // the warning exists to prevent. A failure's stderr is P29's detail instead.
-  // The pass-through is the CLI's: on a quiet channel (the experimental API's)
-  // nothing reaches the embedder's streams — a limitation, documented in
-  // docs/api.md. What P29 captures below still travels, inside the diagnostic.
-  if (out && !reporter.quiet) process.stdout.write(out);
+  if (out) io.stdout.write(out);
   if (code === 0) {
-    if (err && !reporter.quiet) process.stderr.write(err);
+    if (err) io.stderr.write(err);
     return true;
   }
 
@@ -449,6 +447,6 @@ export async function runGenerator({ generatorAbs, sourceRoot, overlayDir, conte
       `run it directly to see its full output: ${reproduceWith()} ${rel}`,
     ],
   });
-  if (process.env.DEBUG && err && !reporter.quiet) process.stderr.write(err);
+  if (process.env.DEBUG && err) io.stderr.write(err);
   return false;
 }

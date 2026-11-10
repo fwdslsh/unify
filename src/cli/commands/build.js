@@ -100,7 +100,7 @@ import { buildSourceInventory } from "../../core/source-inventory.js";
  * and `unify dev` IS `unify watch` plus a server — there is no other seam
  * between the two that reaches a rebuild.
  */
-export async function build({ sourceRoot, output, settings, reporter, sourceDefaulted = false, command = "build" }) {
+export async function build({ sourceRoot, output, settings, reporter, sourceDefaulted = false, command = "build", io = process }) {
   // ---- §34 — the template this site extends, BEFORE anything else ----------
   // Fetched (or found in the cache, or read in place) before the generator
   // runs and before anything is scanned, so a source that cannot be reached
@@ -162,7 +162,7 @@ export async function build({ sourceRoot, output, settings, reporter, sourceDefa
         searchCorpusPath: settings.searchCorpus ? searchCorpus.SEARCH_CORPUS_PATH : null,
         sourcePagesPath,
       });
-      const ok = await generate.runGenerator({ generatorAbs, sourceRoot, overlayDir, contextPath, reporter });
+      const ok = await generate.runGenerator({ generatorAbs, sourceRoot, overlayDir, contextPath, reporter, io });
       if (!ok) {
         // P29 stops the build BEFORE the scan: a partial overlay is a site
         // nobody described, and §15's transaction leaves the previous dist/
@@ -1004,11 +1004,6 @@ async function runBuild({ sourceRoot, output, settings, reporter, sourceDefaulte
     diagnostics: reporter.sorted(),
     published,
   });
-
-  // The API's `build({ dryRun: true })` reads the finished temp tree here, and only if
-  // this build could have published it. Like `onEvaluation`, set by a caller
-  // that is not the command line; nothing here can alter what was built.
-  settings.onBuilt?.({ files: tempFiles, publishable: shouldPublish(reporter) && !gateBlocks });
 
   return gateBlocks ? 1 : reporter.exitCode;
 }

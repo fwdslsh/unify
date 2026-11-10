@@ -43,29 +43,17 @@
 /** Messages about a path always end with this; a case mismatch builds on macOS and 404s on Linux. */
 export const CHECK_SPELLING = "check the path spelling and casing";
 
-/**
- * The COLLECTOR half of the reporting channel: it accumulates structured,
- * deduplicated diagnostics and answers the questions the build asks of them
- * (`canPublish`, `exitCode`, `sorted()`), and it writes nothing, anywhere.
- * `flush()` and `summary()` exist here as no-ops so the pipeline can call
- * them unconditionally; the RENDERER half, `Reporter` below, overrides them
- * to print today's prose. The experimental public API (`src/index.js`) runs
- * the pipeline on a bare collector, which is how it never prints.
- */
-export class DiagnosticCollector {
+export class Reporter {
   /**
    * @param {object} [options]
    * @param {boolean} [options.strict] - advisories affect the exit code
+   * @param {NodeJS.WritableStream} [options.stderr]
+   * @param {NodeJS.WritableStream} [options.stdout]
    */
-  constructor({ strict = false } = {}) {
+  constructor({ strict = false, stderr = process.stderr, stdout = process.stdout } = {}) {
     this.strict = strict;
-    /**
-     * True when nothing may reach the process's own streams on this
-     * channel's behalf. `runGenerator` reads it: passing a generator's output
-     * through is the one write the pipeline makes outside the channel.
-     * `Reporter`, the renderer, overrides it.
-     */
-    this.quiet = true;
+    this.stderr = stderr;
+    this.stdout = stdout;
     /**
      * The DEDUPLICATED set, in the order the first of each was reported. This
      * is the diagnostic set in every sense §14.1 means: what prints, what is
@@ -209,34 +197,6 @@ export class DiagnosticCollector {
         return a.index - b.index;
       })
       .map(({ d }) => d);
-  }
-
-  /** The renderer's job; a collector has nothing to print. */
-  flush() {}
-
-  /**
-   * @param {string} _text
-   */
-  summary(_text) {}
-}
-
-/**
- * The RENDERER half: a collector that also prints — §14.1's prose on stderr,
- * the summary on stdout. Every byte the CLI has always written goes through
- * here, unchanged.
- */
-export class Reporter extends DiagnosticCollector {
-  /**
-   * @param {object} [options]
-   * @param {boolean} [options.strict] - advisories affect the exit code
-   * @param {NodeJS.WritableStream} [options.stderr]
-   * @param {NodeJS.WritableStream} [options.stdout]
-   */
-  constructor({ strict = false, stderr = process.stderr, stdout = process.stdout } = {}) {
-    super({ strict });
-    this.quiet = false;
-    this.stderr = stderr;
-    this.stdout = stdout;
   }
 
   /**

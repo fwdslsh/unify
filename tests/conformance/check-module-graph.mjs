@@ -26,7 +26,7 @@ import { reachableFrom, sourceFiles } from "../module-graph.mjs";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const SRC = join(ROOT, "src");
 // Two entry points: the program, and the package's public entry (package.json
-// `main`/`exports`), which exposes the API and does not import src/cli.js.
+// `main`/`exports`), which wraps the CLI's `main` as `build()` and `audit()`.
 const ENTRIES = [join(SRC, "cli.js"), join(SRC, "index.js")];
 
 // The walk and the file sweep both come from tests/module-graph.mjs, which is

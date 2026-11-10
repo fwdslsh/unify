@@ -75,60 +75,18 @@ const FORMATS = ["human", "json", "sarif"];
  * ever reach the real stream, in the order this command chooses rather than
  * the order build.js's internal calls happen to make them.
  * @param {object} context
- * @returns {Promise<{reporter: import("../../core/diagnostics.js").DiagnosticCollector, captured: string[]}>}
+ * @returns {Promise<{reporter: Reporter, captured: string[]}>}
  */
 async function runBuildForAudit(context) {
   const { build } = await import("./build.js");
   const captured = [];
-  // A quiet channel (the experimental API's) is its own collector: nothing is
-  // printed, so there is nothing to capture, and the caller's collector holds
-  // the diagnostics even if the run is cut short.
-  const reporter = context.reporter.quiet
-    ? context.reporter
-    : new Reporter({
-      strict: context.settings.strict === true,
-      stderr: context.reporter.stderr,
-      stdout: { write: (s) => captured.push(s) },
-    });
+  const reporter = new Reporter({
+    strict: context.settings.strict === true,
+    stderr: context.reporter.stderr,
+    stdout: { write: (s) => captured.push(s) },
+  });
   await build({ ...context, settings: { ...context.settings, audit: true }, reporter });
   return { reporter, captured };
-}
-
-/**
- * The evaluation itself, with no rendering: the pipeline run for audit, the
- * §31.3 network check when asked, and the results as data. `audit()` below
- * renders them for the terminal; the experimental public API (`src/index.js`)
- * turns them into its result object. One evaluation, two presentations.
- * @param {object} context - the run context cli.js (or the API) assembles
- * @returns {Promise<{buildReporter: import("../../core/diagnostics.js").DiagnosticCollector, captured: string[], findings: any[]|null, documents: any[]|null, base: any}>} `findings` is null when the build stopped before the scan
- */
-export async function evaluate(context) {
-  consumeLastAuditRun(); // clear anything an earlier run in this process left, so null below means THIS run
-  const { reporter: buildReporter, captured } = await runBuildForAudit(context);
-
-  // Null when the build stopped before the scan — a generator that failed
-  // (P29), or a source-inventory frontmatter fault — because `build.js` then
-  // returns before it ever reaches `auditManifest`. There is no site to
-  // evaluate: the diagnostics the build already flushed are the whole answer,
-  // and the caller reports no findings (the API's `report: null`).
-  const run = consumeLastAuditRun();
-  if (run === null) return { buildReporter, captured, findings: null, documents: null, base: null };
-  let findings = run.findings;
-  const { documents, base, htmlFiles } = run;
-
-  // ---- §31.3 — the network check ---------------------------------------
-  if (context.settings.external) {
-    const owners = collectExternalReferences(documents, htmlFiles, base);
-    if (owners.size > 0) {
-      // Every failure is a finding, including all of them (§31.3). There is
-      // no "the network is down" branch here on purpose: see probeUrls for
-      // why the heuristic that used to live here could not be made honest.
-      const results = await probeUrls([...owners.keys()]);
-      findings = sortFindings([...findings, ...externalUnreachableFindings(results, owners)]);
-    }
-  }
-
-  return { buildReporter, captured, findings, documents, base };
 }
 
 /**
@@ -143,13 +101,29 @@ export async function audit(context) {
     ]);
   }
 
-  const { buildReporter, captured, findings, documents, base } = await evaluate(context);
+  consumeLastAuditRun(); // drop anything an earlier run in this process left, so a null below is THIS run's
+  const { reporter: buildReporter, captured } = await runBuildForAudit(context);
 
-  // §24.2 — the pipeline stopped before the scan: nothing to evaluate, so no
-  // report in any format. The problem is already on stderr; exit as the build did.
-  if (findings === null) {
-    for (const line of captured) context.reporter.stdout.write(line);
-    return buildReporter.exitCode;
+  // Null when the build stopped before the scan: a `--generate` generator that
+  // failed (P29), or a source-inventory frontmatter fault (§33.7). `build.js`
+  // returns before it reaches `auditManifest` then, so there is no site to
+  // evaluate (§24.6). The diagnostics were already flushed by the build; print
+  // no report in any format and exit as the build did.
+  const run = consumeLastAuditRun();
+  if (run === null) return buildReporter.exitCode;
+  let findings = run.findings;
+  const { documents, base, htmlFiles } = run;
+
+  // ---- §31.3 — the network check ---------------------------------------
+  if (context.settings.external) {
+    const owners = collectExternalReferences(documents, htmlFiles, base);
+    if (owners.size > 0) {
+      // Every failure is a finding, including all of them (§31.3). There is
+      // no "the network is down" branch here on purpose: see probeUrls for
+      // why the heuristic that used to live here could not be made honest.
+      const results = await probeUrls([...owners.keys()]);
+      findings = sortFindings([...findings, ...externalUnreachableFindings(results, owners)]);
+    }
   }
 
   // ---- the report ---------------------------------------------------------

@@ -172,38 +172,6 @@ export function templateRecord(value) {
   return value && typeof value === "object" ? { ...value } : {};
 }
 
-/**
- * The options of the experimental public API (src/index.js), DERIVED from the
- * registry above: the camelCase of every long flag that means something to the
- * command, so the API, the CLI and `unify.yaml` name the same things and there
- * is no second list to keep in step. What is left out, and why:
- *   - `template`, `keep`, `yes`, `port`, `watch-path`: flags of `init`,
- *     `update`, `dev` and `watch`, which are CLI-only;
- *   - `version`, `help`: they print;
- *   - `save-config`: it writes `unify.yaml`;
- *   - `format`: it picks a serialization, and serializing is the CLI's job —
- *     the API returns the report as an object;
- *   - `audit` on `build`: a gated publish is `audit()` and then `build()`; one
- *     result shape per function;
- *   - `external`: `audit`'s alone, as on the command line;
- *   - `clean` and `dry-run` on `audit`, and `audit` itself: it never writes, and it is the audit.
- * (`prepare.js` still refuses a `clean` that arrives from a saved `unify.yaml`,
- * exactly as the CLI does.)
- *
- * @param {"build"|"audit"} command
- * @returns {Record<string, {flag: string, kind: "flag"|"string"|"value"|"list"}>} camelCase name -> registry entry
- */
-export function apiOptions(command) {
-  const never = ["template", "keep", "yes", "port", "watch-path", "version", "help", "save-config", "format"];
-  const left = command === "build" ? ["external", "audit"] : ["audit", "clean", "dry-run"];
-  const camel = (flag) => flag.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-  return Object.fromEntries(
-    Object.entries(OPTIONS)
-      .filter(([flag]) => !never.includes(flag) && !left.includes(flag))
-      .map(([flag, spec]) => [camel(flag), { flag, kind: spec.kind }]),
-  );
-}
-
 const SHORT = Object.fromEntries(
   Object.entries(OPTIONS)
     .filter(([, spec]) => spec.short)
