@@ -187,8 +187,8 @@ export function templateRecord(value) {
  *     result shape per function;
  *   - `external`: `audit`'s alone, as on the command line;
  *   - `clean` and `dry-run` on `audit`, and `audit` itself: it never writes, and it is the audit.
- * (`prepare.js` still refuses a `clean` or `dry-run` that arrives from a saved
- * `unify.yaml` under `config: true`, exactly as the CLI does.)
+ * (`prepare.js` still refuses a `clean` that arrives from a saved `unify.yaml`,
+ * exactly as the CLI does.)
  *
  * @param {"build"|"audit"} command
  * @returns {Record<string, {flag: string, kind: "flag"|"string"|"value"|"list"}>} camelCase name -> registry entry
